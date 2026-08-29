@@ -18,7 +18,9 @@
 @property (nonatomic, strong) RDLView *previewView;
 @end
 
-@implementation PicaDesignerWindow
+@implementation PicaDesignerWindow {
+  BOOL _reloading;
+}
 
 - (instancetype)init {
   NSWindow *win = [[NSWindow alloc]
@@ -39,6 +41,7 @@
                                              selector:@selector(reloadUI:)
                                                  name:PicaSelectionDidChangeNotification
                                                object:nil];
+    [self reloadUI:nil];
   }
   return self;
 }
@@ -124,6 +127,9 @@
 
 - (void)reloadUI:(NSNotification *)n {
   (void)n;
+  if (_reloading)
+    return;
+  _reloading = YES;
   [_outline reloadData];
   [_inspector reload];
   [_dataView reload];
@@ -134,6 +140,7 @@
   if (c.dirty)
     title = [title stringByAppendingString:@" — edited"];
   [[self window] setTitle:title];
+  _reloading = NO;
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -153,6 +160,8 @@
 
 - (void)tableViewSelectionDidChange:(NSNotification *)notification {
   (void)notification;
+  if (_reloading)
+    return;
   NSInteger row = [_outline selectedRow];
   NSArray *items = [[PicaController sharedController].report allItems];
   if (row < 0 || row >= (NSInteger)[items count])
@@ -201,7 +210,7 @@
   PicaController *c = [PicaController sharedController];
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"pdf" ]];
-  [p setNameFieldStringValue:[(c.report.name ?: @"report") stringByAppendingPathExtension:@"pdf"]];
+  [p setNameFieldStringValue:[[c.report.name ?: @"report"] stringByAppendingPathExtension:@"pdf"]];
   if ([p runModal] == NSOKButton) {
     NSData *pdf = [RDLGenerator PDFForReport:c.report parameters:c.paramValues];
     [pdf writeToURL:[p URL] atomically:YES];

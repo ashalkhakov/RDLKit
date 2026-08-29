@@ -8,7 +8,9 @@
 @property (nonatomic, copy) NSString *editingDataset;
 @end
 
-@implementation PicaDataView
+@implementation PicaDataView {
+  BOOL _reloading;
+}
 
 - (instancetype)initWithFrame:(NSRect)frameRect {
   self = [super initWithFrame:frameRect];
@@ -44,6 +46,9 @@
 }
 
 - (void)reload {
+  if (_reloading)
+    return;
+  _reloading = YES;
   NSArray *subs = [_stack.subviews copy];
   for (NSView *v in subs)
     [v removeFromSuperview];
@@ -119,9 +124,12 @@
   }
   [_stack setFrame:NSMakeRect(0, 0, NSWidth(self.bounds), MAX(y + 12, NSHeight(self.bounds)))];
   [self setFrameSize:_stack.frame.size];
+  _reloading = NO;
 }
 
 - (void)toggleDataset:(NSButton *)sender {
+  if (_reloading)
+    return;
   PicaController *c = [PicaController sharedController];
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[c.report.dataSets count])
@@ -135,6 +143,8 @@
 }
 
 - (void)paramChanged:(NSTextField *)sender {
+  if (_reloading)
+    return;
   PicaController *c = [PicaController sharedController];
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[c.report.parameters count])
@@ -151,7 +161,7 @@
 
 - (void)textDidEndEditing:(NSNotification *)notification {
   (void)notification;
-  if (_jsonView == nil || _editingDataset == nil)
+  if (_reloading || _jsonView == nil || _editingDataset == nil)
     return;
   [[PicaController sharedController] setDatasetJSON:[_jsonView string] name:_editingDataset];
 }

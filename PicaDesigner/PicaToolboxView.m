@@ -3,6 +3,7 @@
 
 @implementation PicaToolboxView {
   NSMutableArray *_buttons;
+  BOOL _reloading;
 }
 
 - (instancetype)initWithFrame:(NSRect)frameRect {
@@ -45,14 +46,20 @@
 }
 
 - (void)pick:(NSButton *)sender {
+  if (_reloading)
+    return;
   [PicaController sharedController].tool = (PicaTool)[sender tag];
   [self reload];
 }
 
 - (void)reload {
+  if (_reloading)
+    return;
+  _reloading = YES;
   PicaTool t = [PicaController sharedController].tool;
   for (NSButton *b in _buttons)
     [b setState:([b tag] == t) ? NSOnState : NSOffState];
+  _reloading = NO;
 }
 
 @end

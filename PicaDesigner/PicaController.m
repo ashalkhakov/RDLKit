@@ -9,13 +9,21 @@ static CGFloat PicaSnap(CGFloat n) {
   return round(n / g) * g;
 }
 
-@implementation PicaController
+@implementation PicaController {
+  BOOL _loading;
+  BOOL _postingReport;
+  BOOL _postingSelection;
+}
 
 + (instancetype)sharedController {
-  static PicaController *c = nil;
-  if (c == nil)
-    c = [[PicaController alloc] init];
-  return c;
+  static PicaController *shared = nil;
+  if (shared == nil) {
+    /* Publish the allocation before -init so an observer that re-enters
+       +sharedController during setup does not construct a second instance. */
+    shared = [PicaController alloc];
+    shared = [shared init];
+  }
+  return shared;
 }
 
 - (instancetype)init {
@@ -24,22 +32,36 @@ static CGFloat PicaSnap(CGFloat n) {
     _zoom = 1.0;
     _showsGrid = YES;
     _selectedBandKey = @"body";
-    [self newReport];
+    /* Do not go through -loadReport: / -postReport here. Views already
+       observe those notifications; posting before +sharedController
+       returns re-enters -init. */
+    _report = [PicaSamples blankLetter];
+    [self syncParamsFromReport];
   }
   return self;
 }
 
 - (void)postReport {
+  if (_postingReport)
+    return;
+  _postingReport = YES;
   [[NSNotificationCenter defaultCenter] postNotificationName:PicaReportDidChangeNotification
                                                       object:self];
+  _postingReport = NO;
 }
 
 - (void)postSelection {
+  if (_postingSelection)
+    return;
+  _postingSelection = YES;
   [[NSNotificationCenter defaultCenter] postNotificationName:PicaSelectionDidChangeNotification
                                                       object:self];
+  _postingSelection = NO;
 }
 
 - (void)noteChange {
+  if (_loading)
+    return;
   self.dirty = YES;
   [self postReport];
 }
@@ -52,6 +74,9 @@ static CGFloat PicaSnap(CGFloat n) {
 }
 
 - (void)loadReport:(RDLReport *)report {
+  if (report == nil || _loading)
+    return;
+  _loading = YES;
   self.report = report;
   self.selectedName = nil;
   self.selectedBandKey = @"body";
@@ -60,6 +85,7 @@ static CGFloat PicaSnap(CGFloat n) {
   [self syncParamsFromReport];
   [self postReport];
   [self postSelection];
+  _loading = NO;
 }
 
 - (void)loadSample:(NSString *)sampleId {
@@ -79,13 +105,9 @@ static CGFloat PicaSnap(CGFloat n) {
     return NO;
   if ([r.name length] == 0)
     r.name = [[url lastPathComponent] stringByDeletingPathExtension];
-  self.report = r;
+  [self loadReport:r];
   self.fileURL = url;
   self.dirty = NO;
-  self.selectedName = nil;
-  [self syncParamsFromReport];
-  [self postReport];
-  [self postSelection];
   return YES;
 }
 

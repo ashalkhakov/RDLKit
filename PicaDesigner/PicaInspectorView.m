@@ -16,7 +16,9 @@
 @property (nonatomic, strong) NSView *docBox;
 @end
 
-@implementation PicaInspectorView
+@implementation PicaInspectorView {
+  BOOL _reloading;
+}
 
 - (NSTextField *)label:(NSString *)t frame:(NSRect)f inView:(NSView *)v {
   NSTextField *l = [[NSTextField alloc] initWithFrame:f];
@@ -182,6 +184,9 @@
 }
 
 - (void)reload {
+  if (_reloading)
+    return;
+  _reloading = YES;
   PicaController *c = [PicaController sharedController];
   RDLItem *it = [c.report itemNamed:c.selectedName inBand:NULL];
   [_itemBox setHidden:(it == nil)];
@@ -227,6 +232,7 @@
     [_footerHField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.pageFooter.height]];
     [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.page.leftMargin]];
   }
+  _reloading = NO;
 }
 
 - (void)controlTextDidEndEditing:(NSNotification *)obj {
@@ -234,6 +240,8 @@
 }
 
 - (void)changed:(id)sender {
+  if (_reloading)
+    return;
   PicaController *c = [PicaController sharedController];
   RDLItem *it = [c.report itemNamed:c.selectedName inBand:NULL];
   if (it) {
