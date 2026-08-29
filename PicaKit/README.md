@@ -80,4 +80,4 @@ See `../PicaKitTests/README.md`. GNUstep harness later: call `PicaRunAllChecks()
 
 GNUstep: `make` in this directory, then `make` in `../PicaDemo` or `../PicaDesigner`.
 
-Xcode: add these sources to a macOS AppKit target (app and/or command-line tool).
+Xcode: open `../RDLKit.xcodeproj` (scheme **PicaKit**).

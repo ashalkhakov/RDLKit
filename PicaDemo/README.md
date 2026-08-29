@@ -22,3 +22,7 @@ Build after PicaKit:
 cd ../PicaKit && make
 cd ../PicaDemo && make
 ```
+
+## Cocoa (Xcode)
+
+Open `../RDLKit.xcodeproj`, scheme **PicaDemo**. The tool links `PicaKit.framework` (copied next to the executable).

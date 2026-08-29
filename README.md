@@ -49,6 +49,8 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 swift test
 ```
 
+Or in Xcode: open `RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
+
 ## GNUstep
 
 ```
@@ -64,8 +66,20 @@ Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
 
 ## Cocoa (Xcode)
 
-1. macOS App target, Objective-C, ARC, AppKit.
-2. Add every `.h`/`.m` in `PicaDesigner/` and `PicaKit/`.
-3. Set `PicaDesigner/main.m` as the entry. Leave the main nib empty.
-4. Optional tool target: `PicaDemo/main.m` linked against PicaKit.
-5. Optional: open `Package.swift` and run the PicaKitTests target.
+Open `RDLKit.xcodeproj` (this folder). Four targets, all Objective-C ARC, macOS 12+:
+
+| Scheme | Product | Role |
+| --- | --- | --- |
+| **Pica** | `Pica.app` | Designer (welcome screen also opens the generator window) |
+| **PicaDemo** | `PicaDemo` | Command-line generator |
+| **PicaKit** | `PicaKit.framework` | Generator library |
+| **PicaKitTests** | `PicaKitTests.xctest` | XCTest (parser, expressions, layout, backends) |
+
+Pica and PicaDemo link and embed `PicaKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
+
+```
+xcodebuild -project RDLKit.xcodeproj -scheme Pica -configuration Debug build
+xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test
+```
+
+SwiftPM still works for the kit + tests only: `swift test`.

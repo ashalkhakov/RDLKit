@@ -35,9 +35,7 @@ Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
 
 ## Cocoa (Xcode)
 
-1. macOS App target, Objective-C, ARC, AppKit.
-2. Add every `.h`/`.m` in `PicaDesigner/` and `PicaKit/`.
-3. Set `main.m` as the entry. Leave the main nib empty.
+Open `../RDLKit.xcodeproj`, scheme **Pica**. The designer app links `PicaKit.framework`. Leave the main nib empty (`NSMainNibFile` is blank).
 
 ## Headless generator
 

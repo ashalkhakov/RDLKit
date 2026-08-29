@@ -21,15 +21,13 @@ Foundation-only. PDF uses AppKit `dataWithPDFInsideRect:` (macOS; GNUstep PDF la
 
 ## Run on Mac
 
-From `objc/`:
+From this folder’s parent:
 
 ```
 swift test
 ```
 
-Or in Xcode: open `objc/Package.swift`, or add a **macOS Unit Testing Bundle**
-to the app target, compile every `.m` in this folder plus `../PicaKit`, and
-link AppKit + XCTest.
+Or open `../RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
 
 ## GNUstep (later)
 

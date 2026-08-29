@@ -1,0 +1,853 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DD27E7C9DFCA6B68D3BD3521 /* PicaKit.h in Sources */ = {isa = PBXBuildFile; fileRef = 03EB33FD7A64B360E76AF94E /* PicaKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		09B7F4F94CF7B7CAD50CC62C /* PicaCompatibility.h in Sources */ = {isa = PBXBuildFile; fileRef = 0870B1CA8FCBFEE09BFC85EF /* PicaCompatibility.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		EA1ECD1351FA319CC3B4E37C /* RDLReport.h in Sources */ = {isa = PBXBuildFile; fileRef = 5B462C812D943AA1A0D5BFDC /* RDLReport.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C3EB649CC42680C456B883E3 /* RDLParser.h in Sources */ = {isa = PBXBuildFile; fileRef = BB224C8B29C878CC6C92E994 /* RDLParser.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		9FBD142AFC677F41736F21C6 /* RDLExpression.h in Sources */ = {isa = PBXBuildFile; fileRef = 1B73D39AEAC5AB3BBF0BBAEF /* RDLExpression.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Sources */ = {isa = PBXBuildFile; fileRef = 388AD53F1764907577168AE8 /* RDLLayoutEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		A2F0FA38F5F0CE312118BC0F /* RDLView.h in Sources */ = {isa = PBXBuildFile; fileRef = 5287B31A4A81269C168B694D /* RDLView.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		32E8E73DCB0DEF3A0DE88EF1 /* RDLBackend.h in Sources */ = {isa = PBXBuildFile; fileRef = CAB789E21E4046599AD9FA60 /* RDLBackend.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		15172DE8214E9EDE7FF97C4C /* RDLGenerator.h in Sources */ = {isa = PBXBuildFile; fileRef = 27ECA835280D45B396FB5C44 /* RDLGenerator.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */ = {isa = PBXBuildFile; fileRef = CB30BBD185439ABC015B8C91 /* RDLReport.m */; };
+		F0908E034271ACFC6E8487F5 /* RDLParser.m in Sources */ = {isa = PBXBuildFile; fileRef = E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */; };
+		F56E72CC18EFFE5521469BD5 /* RDLExpression.m in Sources */ = {isa = PBXBuildFile; fileRef = 7CECB821FFED22DFD87FEE06 /* RDLExpression.m */; };
+		247A1B99F9F61E2ED8DBF10A /* RDLLayoutEngine.m in Sources */ = {isa = PBXBuildFile; fileRef = BB06AE65D2508BE359426E27 /* RDLLayoutEngine.m */; };
+		7DEB25C2F77B206818A7D8EA /* RDLView.m in Sources */ = {isa = PBXBuildFile; fileRef = F1EE0475B7EBC42015D59375 /* RDLView.m */; };
+		2F259D5D4809D39F5BB5823F /* RDLHTMLBackend.m in Sources */ = {isa = PBXBuildFile; fileRef = 2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */; };
+		2F55F4B8430F65CA1B7BAA0C /* RDLPDFBackend.m in Sources */ = {isa = PBXBuildFile; fileRef = DAB2A7A5AE6E5BE964549133 /* RDLPDFBackend.m */; };
+		4AF1F77A5A32574E3B420A9A /* RDLGenerator.m in Sources */ = {isa = PBXBuildFile; fileRef = E989DF8464B34666FDA8CDAA /* RDLGenerator.m */; };
+		1AB417A75C1794728E68D04E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = DC31C18582DB97C5DF6573CD /* main.m */; };
+		CD16E8E89FDBE601591035CC /* PicaAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */; };
+		5E857B5DEB5C69384F67F2C2 /* PicaCanvasView.m in Sources */ = {isa = PBXBuildFile; fileRef = AF7A0C2EA618F5BE947043F1 /* PicaCanvasView.m */; };
+		BC70D011C9198B007BFB52C1 /* PicaController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF28DDAD906EBA44CFC1AE51 /* PicaController.m */; };
+		207F62C4B325286E32DA36CC /* PicaDataView.m in Sources */ = {isa = PBXBuildFile; fileRef = 56FF59445895326DCEBE3E51 /* PicaDataView.m */; };
+		44DAA7FC14DCD3C38A4D90BC /* PicaDesignerWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 88F0BDB43861D06A9D120937 /* PicaDesignerWindow.m */; };
+		948181811E10DEB424788F78 /* PicaGeneratorWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 9AB735B023E47621763374DB /* PicaGeneratorWindow.m */; };
+		4232151F3F5B6D37A8C2E327 /* PicaInspectorView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7EFA16D79BB10E2489A21CC2 /* PicaInspectorView.m */; };
+		9424909E6EE670EF371FC07D /* PicaSamples.m in Sources */ = {isa = PBXBuildFile; fileRef = E46BA8ED30D063FB448EB1DE /* PicaSamples.m */; };
+		69534CDDE7045ACC3660D3A8 /* PicaToolboxView.m in Sources */ = {isa = PBXBuildFile; fileRef = 6FB4B4ECCAB613E6971F594A /* PicaToolboxView.m */; };
+		C64526DBC3B8898C885ECA7F /* PicaWelcomeWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */; };
+		9EE8663597592E060D9B85E5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 52D939EF9898701ED8C0484C /* main.m */; };
+		F3C696E6D8C4268736CDE752 /* PicaChecks.m in Sources */ = {isa = PBXBuildFile; fileRef = B1200B16459F67D6DF909C0E /* PicaChecks.m */; };
+		E49064EFAA718365E67147C5 /* PicaKitTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2EF02D16E9FF2F88CA6B2C23 /* PicaKitTests.m */; };
+		8D92EA1642AFC3256F660C88 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		0FEF055A10144BEB0846DD94 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5FAFB6AF50417D519888C179 /* Foundation.framework */; };
+		9103EFB536BAD208E47EBC10 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		9344C238D4AB0EB8FD9A6A05 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BC4A9A4E48001E3E80DBB5A /* Cocoa.framework */; };
+		04CF4D9048301BEEE8ED0513 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		9C525284C4FE682D677B4E12 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BC4A9A4E48001E3E80DBB5A /* Cocoa.framework */; };
+		E97A29A2AD303803BF10C5E8 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		5CA2B37A0E355D5F2898D6C0 /* PicaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; };
+		CE65B5EED5EC5A3A470E38EE /* PicaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; };
+		2542A9DFAC29096649324061 /* PicaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; };
+		1724A67DAAA0BDBCB829D7FF /* PicaKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		34CF8670DFFB8A8963C41008 /* PicaKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+
+		62ED8AF6CF85286BDA7F1DB9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteInfo = PicaKit;
+			remoteGlobalIDString = F14379BD3391DC97D94E4AC2;
+		};
+		9AE740AE55254BE9D01795A9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteInfo = PicaKit;
+			remoteGlobalIDString = F14379BD3391DC97D94E4AC2;
+		};
+		B760B800B89BAE98CD9E710D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteInfo = PicaKit;
+			remoteGlobalIDString = F14379BD3391DC97D94E4AC2;
+		};
+		BDB8DF0A5AE8AFF9CE59BB30 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F14379BD3391DC97D94E4AC2 /* PicaKit */;
+			targetProxy = 62ED8AF6CF85286BDA7F1DB9 /* PBXContainerItemProxy */;
+		};
+		B2F3F811EAE5F5276803D36F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F14379BD3391DC97D94E4AC2 /* PicaKit */;
+			targetProxy = 9AE740AE55254BE9D01795A9 /* PBXContainerItemProxy */;
+		};
+		64DBFE94FE71CE6DE9455536 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F14379BD3391DC97D94E4AC2 /* PicaKit */;
+			targetProxy = B760B800B89BAE98CD9E710D /* PBXContainerItemProxy */;
+		};
+
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		03EB33FD7A64B360E76AF94E /* PicaKit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaKit.h; sourceTree = "<group>"; };
+		0870B1CA8FCBFEE09BFC85EF /* PicaCompatibility.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaCompatibility.h; sourceTree = "<group>"; };
+		5B462C812D943AA1A0D5BFDC /* RDLReport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLReport.h; sourceTree = "<group>"; };
+		BB224C8B29C878CC6C92E994 /* RDLParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLParser.h; sourceTree = "<group>"; };
+		1B73D39AEAC5AB3BBF0BBAEF /* RDLExpression.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpression.h; sourceTree = "<group>"; };
+		388AD53F1764907577168AE8 /* RDLLayoutEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLLayoutEngine.h; sourceTree = "<group>"; };
+		5287B31A4A81269C168B694D /* RDLView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLView.h; sourceTree = "<group>"; };
+		CAB789E21E4046599AD9FA60 /* RDLBackend.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLBackend.h; sourceTree = "<group>"; };
+		27ECA835280D45B396FB5C44 /* RDLGenerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLGenerator.h; sourceTree = "<group>"; };
+		CB30BBD185439ABC015B8C91 /* RDLReport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLReport.m; sourceTree = "<group>"; };
+		E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLParser.m; sourceTree = "<group>"; };
+		7CECB821FFED22DFD87FEE06 /* RDLExpression.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpression.m; sourceTree = "<group>"; };
+		BB06AE65D2508BE359426E27 /* RDLLayoutEngine.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLLayoutEngine.m; sourceTree = "<group>"; };
+		F1EE0475B7EBC42015D59375 /* RDLView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLView.m; sourceTree = "<group>"; };
+		2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLHTMLBackend.m; sourceTree = "<group>"; };
+		DAB2A7A5AE6E5BE964549133 /* RDLPDFBackend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPDFBackend.m; sourceTree = "<group>"; };
+		E989DF8464B34666FDA8CDAA /* RDLGenerator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLGenerator.m; sourceTree = "<group>"; };
+		901AB0AC0C53219CCE9B02C9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		3988A14CD9E1B0BA1FAC689B /* GNUmakefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = GNUmakefile; sourceTree = "<group>"; };
+		4BBD021D6129910A18C54E70 /* PicaAppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaAppDelegate.h; sourceTree = "<group>"; };
+		9C93A8A6979B659C019D9C82 /* PicaCanvasView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaCanvasView.h; sourceTree = "<group>"; };
+		4FF506E0765CCD79D8C4346E /* PicaController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaController.h; sourceTree = "<group>"; };
+		E36F1417AB3C67B3E26DEFF8 /* PicaDataView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaDataView.h; sourceTree = "<group>"; };
+		B621BC81F65752457F397A3D /* PicaDesignerWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaDesignerWindow.h; sourceTree = "<group>"; };
+		716F81F62762E1B81C134DB0 /* PicaGeneratorWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaGeneratorWindow.h; sourceTree = "<group>"; };
+		C6645C70B8F9A09B3D8DCEA5 /* PicaInspectorView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaInspectorView.h; sourceTree = "<group>"; };
+		6953FC0FFD8435619E816F9E /* PicaSamples.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaSamples.h; sourceTree = "<group>"; };
+		02D26151022DE1CAA5E57814 /* PicaToolboxView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaToolboxView.h; sourceTree = "<group>"; };
+		592B68BD2F966622839891E7 /* PicaWelcomeWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaWelcomeWindow.h; sourceTree = "<group>"; };
+		DC31C18582DB97C5DF6573CD /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaAppDelegate.m; sourceTree = "<group>"; };
+		AF7A0C2EA618F5BE947043F1 /* PicaCanvasView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaCanvasView.m; sourceTree = "<group>"; };
+		BF28DDAD906EBA44CFC1AE51 /* PicaController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaController.m; sourceTree = "<group>"; };
+		56FF59445895326DCEBE3E51 /* PicaDataView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaDataView.m; sourceTree = "<group>"; };
+		88F0BDB43861D06A9D120937 /* PicaDesignerWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaDesignerWindow.m; sourceTree = "<group>"; };
+		9AB735B023E47621763374DB /* PicaGeneratorWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaGeneratorWindow.m; sourceTree = "<group>"; };
+		7EFA16D79BB10E2489A21CC2 /* PicaInspectorView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaInspectorView.m; sourceTree = "<group>"; };
+		E46BA8ED30D063FB448EB1DE /* PicaSamples.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaSamples.m; sourceTree = "<group>"; };
+		6FB4B4ECCAB613E6971F594A /* PicaToolboxView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaToolboxView.m; sourceTree = "<group>"; };
+		C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaWelcomeWindow.m; sourceTree = "<group>"; };
+		C4EBE709B7C0EB54DA16CA66 /* Pica-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Pica-Info.plist; sourceTree = "<group>"; };
+		E7F4AAE5DA543577DD26E124 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		52D939EF9898701ED8C0484C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		30C70FC212DFDBB423681D78 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		4A7EC759B31E5CE35348B9B5 /* PicaChecks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaChecks.h; sourceTree = "<group>"; };
+		4670AACF804D5A7D49B095FE /* PicaTestMacros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaTestMacros.h; sourceTree = "<group>"; };
+		B1200B16459F67D6DF909C0E /* PicaChecks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaChecks.m; sourceTree = "<group>"; };
+		2EF02D16E9FF2F88CA6B2C23 /* PicaKitTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaKitTests.m; sourceTree = "<group>"; };
+		3FF932DD49FE9CA2225FCE16 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8CBC030D3A8D2EF4DCBED36A /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		14A697408350C1E512848621 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
+		5B525B480D23A981A0DB1611 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		36F476BBE541DC85EE2D7647 /* PicaKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PicaKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		595C479D7AC91F29089D5228 /* Pica.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pica.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9FDB08F274A9264C500CEE4F /* PicaDemo */ = {isa = PBXFileReference; explicitFileType = compiled.mach-o.executable; includeInIndex = 0; path = PicaDemo; sourceTree = BUILT_PRODUCTS_DIR; };
+		3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PicaKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5B7068E3A597C2544433CB15 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		5FAFB6AF50417D519888C179 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		5BC4A9A4E48001E3E80DBB5A /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+
+		BDE88D77EBDC01774960BE71 = {
+			isa = PBXGroup;
+			children = (
+				45316B45CB436116EC434408 /* PicaKit */,
+				367BDD79C0EB7824B717F2C6 /* PicaDesigner */,
+				2E717BE81530C7484312DD81 /* PicaDemo */,
+				E1F97BA8A1EBCC74BB0E0AFC /* PicaKitTests */,
+				14A697408350C1E512848621 /* Package.swift */,
+				5B525B480D23A981A0DB1611 /* README.md */,
+				79B75F223E5D7AEAEC1468B4 /* Frameworks */,
+				4FDE57E4B72FFCEE306CEB0F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4FDE57E4B72FFCEE306CEB0F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				36F476BBE541DC85EE2D7647 /* PicaKit.framework */,
+				595C479D7AC91F29089D5228 /* Pica.app */,
+				9FDB08F274A9264C500CEE4F /* PicaDemo */,
+				3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		45316B45CB436116EC434408 /* PicaKit */ = {
+			isa = PBXGroup;
+			children = (
+				03EB33FD7A64B360E76AF94E /* PicaKit.h */,
+				0870B1CA8FCBFEE09BFC85EF /* PicaCompatibility.h */,
+				5B462C812D943AA1A0D5BFDC /* RDLReport.h */,
+				BB224C8B29C878CC6C92E994 /* RDLParser.h */,
+				1B73D39AEAC5AB3BBF0BBAEF /* RDLExpression.h */,
+				388AD53F1764907577168AE8 /* RDLLayoutEngine.h */,
+				5287B31A4A81269C168B694D /* RDLView.h */,
+				CAB789E21E4046599AD9FA60 /* RDLBackend.h */,
+				27ECA835280D45B396FB5C44 /* RDLGenerator.h */,
+				CB30BBD185439ABC015B8C91 /* RDLReport.m */,
+				E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */,
+				7CECB821FFED22DFD87FEE06 /* RDLExpression.m */,
+				BB06AE65D2508BE359426E27 /* RDLLayoutEngine.m */,
+				F1EE0475B7EBC42015D59375 /* RDLView.m */,
+				2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */,
+				DAB2A7A5AE6E5BE964549133 /* RDLPDFBackend.m */,
+				E989DF8464B34666FDA8CDAA /* RDLGenerator.m */,
+				901AB0AC0C53219CCE9B02C9 /* README.md */,
+				3988A14CD9E1B0BA1FAC689B /* GNUmakefile */,
+			);
+			path = PicaKit;
+			sourceTree = "<group>";
+		};
+		367BDD79C0EB7824B717F2C6 /* PicaDesigner */ = {
+			isa = PBXGroup;
+			children = (
+				4BBD021D6129910A18C54E70 /* PicaAppDelegate.h */,
+				9C93A8A6979B659C019D9C82 /* PicaCanvasView.h */,
+				4FF506E0765CCD79D8C4346E /* PicaController.h */,
+				E36F1417AB3C67B3E26DEFF8 /* PicaDataView.h */,
+				B621BC81F65752457F397A3D /* PicaDesignerWindow.h */,
+				716F81F62762E1B81C134DB0 /* PicaGeneratorWindow.h */,
+				C6645C70B8F9A09B3D8DCEA5 /* PicaInspectorView.h */,
+				6953FC0FFD8435619E816F9E /* PicaSamples.h */,
+				02D26151022DE1CAA5E57814 /* PicaToolboxView.h */,
+				592B68BD2F966622839891E7 /* PicaWelcomeWindow.h */,
+				DC31C18582DB97C5DF6573CD /* main.m */,
+				B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */,
+				AF7A0C2EA618F5BE947043F1 /* PicaCanvasView.m */,
+				BF28DDAD906EBA44CFC1AE51 /* PicaController.m */,
+				56FF59445895326DCEBE3E51 /* PicaDataView.m */,
+				88F0BDB43861D06A9D120937 /* PicaDesignerWindow.m */,
+				9AB735B023E47621763374DB /* PicaGeneratorWindow.m */,
+				7EFA16D79BB10E2489A21CC2 /* PicaInspectorView.m */,
+				E46BA8ED30D063FB448EB1DE /* PicaSamples.m */,
+				6FB4B4ECCAB613E6971F594A /* PicaToolboxView.m */,
+				C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */,
+				C4EBE709B7C0EB54DA16CA66 /* Pica-Info.plist */,
+				E7F4AAE5DA543577DD26E124 /* README.md */,
+			);
+			path = PicaDesigner;
+			sourceTree = "<group>";
+		};
+		2E717BE81530C7484312DD81 /* PicaDemo */ = {
+			isa = PBXGroup;
+			children = (
+				52D939EF9898701ED8C0484C /* main.m */,
+				30C70FC212DFDBB423681D78 /* README.md */,
+			);
+			path = PicaDemo;
+			sourceTree = "<group>";
+		};
+		E1F97BA8A1EBCC74BB0E0AFC /* PicaKitTests */ = {
+			isa = PBXGroup;
+			children = (
+				4A7EC759B31E5CE35348B9B5 /* PicaChecks.h */,
+				4670AACF804D5A7D49B095FE /* PicaTestMacros.h */,
+				B1200B16459F67D6DF909C0E /* PicaChecks.m */,
+				2EF02D16E9FF2F88CA6B2C23 /* PicaKitTests.m */,
+				3FF932DD49FE9CA2225FCE16 /* Info.plist */,
+				8CBC030D3A8D2EF4DCBED36A /* README.md */,
+			);
+			path = PicaKitTests;
+			sourceTree = "<group>";
+		};
+		79B75F223E5D7AEAEC1468B4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5B7068E3A597C2544433CB15 /* AppKit.framework */,
+				5FAFB6AF50417D519888C179 /* Foundation.framework */,
+				5BC4A9A4E48001E3E80DBB5A /* Cocoa.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+
+		F14379BD3391DC97D94E4AC2 /* PicaKit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C6DC951750BAB4FF5516E1E3 /* Build configuration list for PBXNativeTarget "PicaKit" */;
+			buildPhases = (
+				7904DBFDD0ABC4FECE1D6E19 /* Headers */,
+				BBD96B25C463E4F2194995B6 /* Sources */,
+				CDBFB62783883E55A0C29C70 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PicaKit;
+			productName = PicaKit;
+			productReference = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		2FE3FBD7A51C361D063370C7 /* Pica */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B32609AB0116718037E776D2 /* Build configuration list for PBXNativeTarget "Pica" */;
+			buildPhases = (
+				9A62AC01A2B00BE761FA3E90 /* Sources */,
+				4116E98744ABB22AED50FBDD /* Frameworks */,
+				F0BE7C60351F60A2424990B8 /* Resources */,
+				832B849E62CD55F4E60B2DA6 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BDB8DF0A5AE8AFF9CE59BB30 /* PBXTargetDependency */,
+			);
+			name = Pica;
+			productName = Pica;
+			productReference = 595C479D7AC91F29089D5228 /* Pica.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D125E61DED1C7934C31DB9B9 /* PicaDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaDemo" */;
+			buildPhases = (
+				6D7BCA08514DA73CAB700FD2 /* Sources */,
+				2B396DA3F7C5571D3F7FCD3D /* Frameworks */,
+				DC920F24DD0598BDE395A9DE /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B2F3F811EAE5F5276803D36F /* PBXTargetDependency */,
+			);
+			name = PicaDemo;
+			productName = PicaDemo;
+			productReference = 9FDB08F274A9264C500CEE4F /* PicaDemo */;
+			productType = "com.apple.product-type.tool";
+		};
+		45C98D5FCE3016A4889B25F4 /* PicaKitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 45142A599B36A5D993641B46 /* Build configuration list for PBXNativeTarget "PicaKitTests" */;
+			buildPhases = (
+				8967BADA0134978ADD4D33C6 /* Sources */,
+				79D49D6BD76D7A0DC436FE64 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				64DBFE94FE71CE6DE9455536 /* PBXTargetDependency */,
+			);
+			name = PicaKitTests;
+			productName = PicaKitTests;
+			productReference = 3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1500;
+				ORGANIZATIONNAME = Pica;
+				TargetAttributes = {
+					F14379BD3391DC97D94E4AC2 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					2FE3FBD7A51C361D063370C7 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					D125E61DED1C7934C31DB9B9 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					45C98D5FCE3016A4889B25F4 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = F14379BD3391DC97D94E4AC2;
+					};
+				};
+			};
+			buildConfigurationList = 61E44E14228E7449E75C66FE /* Build configuration list for PBXProject "RDLKit" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = BDE88D77EBDC01774960BE71;
+			productRefGroup = 4FDE57E4B72FFCEE306CEB0F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F14379BD3391DC97D94E4AC2 /* PicaKit */,
+				2FE3FBD7A51C361D063370C7 /* Pica */,
+				D125E61DED1C7934C31DB9B9 /* PicaDemo */,
+				45C98D5FCE3016A4889B25F4 /* PicaKitTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+/* End PBXSourcesBuildPhase section */
+
+
+		7904DBFDD0ABC4FECE1D6E19 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD27E7C9DFCA6B68D3BD3521 /* PicaKit.h in Headers */,
+				09B7F4F94CF7B7CAD50CC62C /* PicaCompatibility.h in Headers */,
+				EA1ECD1351FA319CC3B4E37C /* RDLReport.h in Headers */,
+				C3EB649CC42680C456B883E3 /* RDLParser.h in Headers */,
+				9FBD142AFC677F41736F21C6 /* RDLExpression.h in Headers */,
+				A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Headers */,
+				A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */,
+				32E8E73DCB0DEF3A0DE88EF1 /* RDLBackend.h in Headers */,
+				15172DE8214E9EDE7FF97C4C /* RDLGenerator.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BBD96B25C463E4F2194995B6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */,
+				F0908E034271ACFC6E8487F5 /* RDLParser.m in Sources */,
+				F56E72CC18EFFE5521469BD5 /* RDLExpression.m in Sources */,
+				247A1B99F9F61E2ED8DBF10A /* RDLLayoutEngine.m in Sources */,
+				7DEB25C2F77B206818A7D8EA /* RDLView.m in Sources */,
+				2F259D5D4809D39F5BB5823F /* RDLHTMLBackend.m in Sources */,
+				2F55F4B8430F65CA1B7BAA0C /* RDLPDFBackend.m in Sources */,
+				4AF1F77A5A32574E3B420A9A /* RDLGenerator.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDBFB62783883E55A0C29C70 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D92EA1642AFC3256F660C88 /* AppKit.framework in Frameworks */,
+				0FEF055A10144BEB0846DD94 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9A62AC01A2B00BE761FA3E90 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1AB417A75C1794728E68D04E /* main.m in Sources */,
+				CD16E8E89FDBE601591035CC /* PicaAppDelegate.m in Sources */,
+				5E857B5DEB5C69384F67F2C2 /* PicaCanvasView.m in Sources */,
+				BC70D011C9198B007BFB52C1 /* PicaController.m in Sources */,
+				207F62C4B325286E32DA36CC /* PicaDataView.m in Sources */,
+				44DAA7FC14DCD3C38A4D90BC /* PicaDesignerWindow.m in Sources */,
+				948181811E10DEB424788F78 /* PicaGeneratorWindow.m in Sources */,
+				4232151F3F5B6D37A8C2E327 /* PicaInspectorView.m in Sources */,
+				9424909E6EE670EF371FC07D /* PicaSamples.m in Sources */,
+				69534CDDE7045ACC3660D3A8 /* PicaToolboxView.m in Sources */,
+				C64526DBC3B8898C885ECA7F /* PicaWelcomeWindow.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4116E98744ABB22AED50FBDD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5CA2B37A0E355D5F2898D6C0 /* PicaKit.framework in Frameworks */,
+				9344C238D4AB0EB8FD9A6A05 /* Cocoa.framework in Frameworks */,
+				9103EFB536BAD208E47EBC10 /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BE7C60351F60A2424990B8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		832B849E62CD55F4E60B2DA6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				1724A67DAAA0BDBCB829D7FF /* PicaKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6D7BCA08514DA73CAB700FD2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9EE8663597592E060D9B85E5 /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2B396DA3F7C5571D3F7FCD3D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CE65B5EED5EC5A3A470E38EE /* PicaKit.framework in Frameworks */,
+				9C525284C4FE682D677B4E12 /* Cocoa.framework in Frameworks */,
+				04CF4D9048301BEEE8ED0513 /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DC920F24DD0598BDE395A9DE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 16;
+			files = (
+				34CF8670DFFB8A8963C41008 /* PicaKit.framework in Embed Frameworks */,
+			);
+			name = "Copy Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8967BADA0134978ADD4D33C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F3C696E6D8C4268736CDE752 /* PicaChecks.m in Sources */,
+				E49064EFAA718365E67147C5 /* PicaKitTests.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		79D49D6BD76D7A0DC436FE64 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2542A9DFAC29096649324061 /* PicaKit.framework in Frameworks */,
+				E97A29A2AD303803BF10C5E8 /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+
+/* Begin XCBuildConfiguration section */
+
+		C6181AE73EB95E424D80A5C0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+
+			};
+			name = Debug;
+		};
+		998A37D93C19C736263CA477 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+
+			};
+			name = Release;
+		};
+		9EE8ACF497BA7F8FC55E62AD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.kit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+
+			};
+			name = Debug;
+		};
+		38A4A176E5495D32BCE7DA30 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.kit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+
+			};
+			name = Release;
+		};
+		45B7B0EE735BFAB070FEB643 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PicaDesigner/Pica-Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.designer;
+				PRODUCT_NAME = Pica;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+
+			};
+			name = Debug;
+		};
+		182A51FDC2717B5F88301B81 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PicaDesigner/Pica-Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.designer;
+				PRODUCT_NAME = Pica;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+
+			};
+			name = Release;
+		};
+		6C24AE4171CCECDC2D082869 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.demo;
+				PRODUCT_NAME = PicaDemo;
+				SKIP_INSTALL = YES;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+
+			};
+			name = Debug;
+		};
+		1E82542BCCC099F129EC2C05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.demo;
+				PRODUCT_NAME = PicaDemo;
+				SKIP_INSTALL = YES;
+				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
+
+			};
+			name = Release;
+		};
+		42AD2FE4CEE18DE5596236A3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PicaKitTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.kit.tests;
+				PRODUCT_NAME = PicaKitTests;
+				USER_HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/PicaKit",
+					"$(SRCROOT)/PicaKitTests",
+				);
+
+			};
+			name = Debug;
+		};
+		5CEF03E672B96387AF8D2893 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PicaKitTests/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.pica.kit.tests;
+				PRODUCT_NAME = PicaKitTests;
+				USER_HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/PicaKit",
+					"$(SRCROOT)/PicaKitTests",
+				);
+
+			};
+			name = Release;
+		};
+		61E44E14228E7449E75C66FE /* Build configuration list for PBXProject "RDLKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C6181AE73EB95E424D80A5C0 /* Debug */,
+				998A37D93C19C736263CA477 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C6DC951750BAB4FF5516E1E3 /* Build configuration list for PBXNativeTarget "PicaKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9EE8ACF497BA7F8FC55E62AD /* Debug */,
+				38A4A176E5495D32BCE7DA30 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B32609AB0116718037E776D2 /* Build configuration list for PBXNativeTarget "Pica" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				45B7B0EE735BFAB070FEB643 /* Debug */,
+				182A51FDC2717B5F88301B81 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C24AE4171CCECDC2D082869 /* Debug */,
+				1E82542BCCC099F129EC2C05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		45142A599B36A5D993641B46 /* Build configuration list for PBXNativeTarget "PicaKitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				42AD2FE4CEE18DE5596236A3 /* Debug */,
+				5CEF03E672B96387AF8D2893 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+/* End XCBuildConfiguration section */
+
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}
