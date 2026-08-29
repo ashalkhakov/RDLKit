@@ -345,7 +345,7 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
 
 - (void)keyDown:(NSEvent *)event {
   NSString *ch = [event charactersIgnoringModifiers];
-  if ([ch isEqualToString:@"\u007f"] || [ch isEqualToString:@"\b"]) {
+  if ([ch isEqualToString:[NSString stringWithFormat:@"%C", 0x007f]] || [ch isEqualToString:@"\b"]) {
     [[PicaController sharedController] removeSelected];
     return;
   }

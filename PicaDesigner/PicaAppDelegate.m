@@ -184,7 +184,7 @@
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"rdl" ]];
   [p setNameFieldStringValue:
-      [[[PicaController sharedController].report.name ?: @"report"] stringByAppendingPathExtension:@"rdl"]];
+      [([PicaController sharedController].report.name ?: @"report") stringByAppendingPathExtension:@"rdl"]];
   if ([p runModal] == NSOKButton) {
     NSError *err = nil;
     [[PicaController sharedController] saveToURL:[p URL] error:&err];
