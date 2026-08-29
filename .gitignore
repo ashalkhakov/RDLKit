@@ -42,3 +42,12 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# GNUstep
+obj/
+*.so
+*.dylib
+*.a
+
+# OS
+.DS_Store

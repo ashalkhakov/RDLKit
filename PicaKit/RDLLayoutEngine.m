@@ -1,0 +1,834 @@
+#import "RDLLayoutEngine.h"
+#import "RDLReport.h"
+#import "RDLExpression.h"
+#import <math.h>
+
+@interface PicaTablixCellInst : NSObject
+@property (nonatomic, assign) CGFloat xRel;
+@property (nonatomic, assign) CGFloat width;
+@property (nonatomic, assign) CGFloat height;
+@property (nonatomic, strong) RDLItem *item;
+@property (nonatomic, assign) NSInteger rowSpan;
+@property (nonatomic, assign) BOOL skip;
+@property (nonatomic, assign) BOOL rowHeader;
+@end
+@implementation PicaTablixCellInst
+@end
+
+@interface PicaTablixInst : NSObject
+@property (nonatomic, assign) CGFloat yRel;
+@property (nonatomic, assign) CGFloat height;
+@property (nonatomic, assign) BOOL repeatOnNewPage;
+@property (nonatomic, assign) BOOL pageBreakBefore;
+@property (nonatomic, assign) CGFloat keepTogetherHeight;
+@property (nonatomic, strong) NSMutableArray<PicaTablixCellInst *> *cells;
+@property (nonatomic, copy) NSDictionary *row;
+@property (nonatomic, copy) NSArray *groupRows;
+@end
+@implementation PicaTablixInst
+@end
+
+@implementation RDLLayoutEngine
+
+static RDLDataSet *PicaFindSet(RDLReport *report, NSString *name) {
+  for (RDLDataSet *d in report.dataSets)
+    if ([d.name isEqualToString:name])
+      return d;
+  return nil;
+}
+
+static NSInteger PicaLeafCount(NSArray<RDLTablixMember *> *members) {
+  NSInteger n = 0;
+  for (RDLTablixMember *m in members) {
+    if ([m.members count])
+      n += PicaLeafCount(m.members);
+    else
+      n += 1;
+  }
+  return n;
+}
+
+static CGFloat PicaHeaderWidth(NSArray<RDLTablixMember *> *members) {
+  CGFloat max = 0;
+  for (RDLTablixMember *m in members) {
+    CGFloat own = m.header.size;
+    CGFloat child = [m.members count] ? PicaHeaderWidth(m.members) : 0;
+    if (own + child > max)
+      max = own + child;
+  }
+  return max;
+}
+
+static NSString *PicaFieldOf(NSString *expr) {
+  if (expr == nil)
+    return nil;
+  NSRange r = [expr rangeOfString:@"Fields!"];
+  if (r.location == NSNotFound)
+    return nil;
+  NSString *rest = [expr substringFromIndex:r.location + 7];
+  NSRange dot = [rest rangeOfString:@"."];
+  return dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+}
+
+static id PicaEvalRow(NSString *expr, NSDictionary *row, RDLEvalScope *scope) {
+  if (expr == nil)
+    return @"";
+  if (![expr hasPrefix:@"="]) {
+    NSString *f = PicaFieldOf(expr);
+    if (f && row) {
+      for (NSString *k in row)
+        if ([k caseInsensitiveCompare:f] == NSOrderedSame)
+          return row[k];
+    }
+    return expr;
+  }
+  if (scope) {
+    NSDictionary *saved = scope.row;
+    scope.row = row;
+    id v = [RDLExpression evaluate:expr scope:scope];
+    scope.row = saved;
+    return v;
+  }
+  NSString *f = PicaFieldOf(expr);
+  if (f && row) {
+    for (NSString *k in row)
+      if ([k caseInsensitiveCompare:f] == NSOrderedSame)
+        return row[k];
+  }
+  return [expr substringFromIndex:1];
+}
+
+static NSString *PicaAsStr(id v) {
+  if (v == nil || v == [NSNull null])
+    return @"";
+  return [v description];
+}
+
+static double PicaAsN(id v) {
+  if ([v isKindOfClass:[NSNumber class]])
+    return [v doubleValue];
+  if ([v isKindOfClass:[NSString class]])
+    return [(NSString *)v doubleValue];
+  return 0;
+}
+
+static NSComparisonResult PicaCmp(id a, id b) {
+  BOOL numeric = [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
+  if (numeric) {
+    double d = PicaAsN(a) - PicaAsN(b);
+    if (d < 0)
+      return NSOrderedAscending;
+    if (d > 0)
+      return NSOrderedDescending;
+    return NSOrderedSame;
+  }
+  return [PicaAsStr(a) caseInsensitiveCompare:PicaAsStr(b)];
+}
+
+static BOOL PicaLike(NSString *value, NSString *pattern) {
+  NSMutableString *p = [pattern mutableCopy];
+  [p replaceOccurrencesOfString:@"." withString:@"\\." options:0 range:NSMakeRange(0, p.length)];
+  [p replaceOccurrencesOfString:@"*" withString:@".*" options:0 range:NSMakeRange(0, p.length)];
+  [p replaceOccurrencesOfString:@"?" withString:@"." options:0 range:NSMakeRange(0, p.length)];
+  NSRegularExpression *re =
+      [NSRegularExpression regularExpressionWithPattern:[NSString stringWithFormat:@"^%@$", p]
+                                                options:NSRegularExpressionCaseInsensitive
+                                                  error:nil];
+  NSString *val = value ?: @"";
+  return [re numberOfMatchesInString:val options:0 range:NSMakeRange(0, val.length)] > 0;
+}
+
+static BOOL PicaPassesFilter(NSDictionary *row, RDLFilter *f, RDLEvalScope *scope) {
+  id left = PicaEvalRow(f.expression, row, scope);
+  NSString *op = f.oper.length ? f.oper : @"Equal";
+  id right = [f.values count] ? PicaEvalRow(f.values[0], row, scope) : @"";
+  if ([op isEqualToString:@"Equal"])
+    return PicaCmp(left, right) == NSOrderedSame;
+  if ([op isEqualToString:@"NotEqual"])
+    return PicaCmp(left, right) != NSOrderedSame;
+  if ([op isEqualToString:@"GreaterThan"])
+    return PicaCmp(left, right) == NSOrderedDescending;
+  if ([op isEqualToString:@"GreaterThanOrEqual"])
+    return PicaCmp(left, right) != NSOrderedAscending;
+  if ([op isEqualToString:@"LessThan"])
+    return PicaCmp(left, right) == NSOrderedAscending;
+  if ([op isEqualToString:@"LessThanOrEqual"])
+    return PicaCmp(left, right) != NSOrderedDescending;
+  if ([op isEqualToString:@"Contains"])
+    return [PicaAsStr(left).lowercaseString rangeOfString:PicaAsStr(right).lowercaseString].location !=
+           NSNotFound;
+  if ([op isEqualToString:@"Like"])
+    return PicaLike(PicaAsStr(left), PicaAsStr(right));
+  if ([op isEqualToString:@"Between"]) {
+    id hi = [f.values count] > 1 ? PicaEvalRow(f.values[1], row, scope) : right;
+    return PicaCmp(left, right) != NSOrderedAscending && PicaCmp(left, hi) != NSOrderedDescending;
+  }
+  if ([op isEqualToString:@"In"]) {
+    for (NSString *v in f.values) {
+      if (PicaCmp(left, PicaEvalRow(v, row, scope)) == NSOrderedSame)
+        return YES;
+    }
+    return NO;
+  }
+  return YES;
+}
+
+static NSArray *PicaApplyFilters(NSArray *rows, NSArray<RDLFilter *> *filters, RDLEvalScope *scope) {
+  if ([filters count] == 0)
+    return rows;
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSDictionary *row in rows) {
+    BOOL ok = YES;
+    for (RDLFilter *f in filters) {
+      if (!PicaPassesFilter(row, f, scope)) {
+        ok = NO;
+        break;
+      }
+    }
+    if (ok)
+      [out addObject:row];
+  }
+  return out;
+}
+
+static NSArray *PicaApplySort(NSArray *rows, NSArray<RDLSortExpression *> *sorts, RDLEvalScope *scope) {
+  if ([sorts count] == 0)
+    return rows;
+  return [rows sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+    for (RDLSortExpression *s in sorts) {
+      NSComparisonResult c = PicaCmp(PicaEvalRow(s.expression, a, scope), PicaEvalRow(s.expression, b, scope));
+      if ([s.direction isEqualToString:@"Descending"]) {
+        if (c == NSOrderedAscending)
+          c = NSOrderedDescending;
+        else if (c == NSOrderedDescending)
+          c = NSOrderedAscending;
+      }
+      if (c != NSOrderedSame)
+        return c;
+    }
+    return NSOrderedSame;
+  }];
+}
+
+static NSArray *PicaPartition(NSArray *rows, NSArray<NSString *> *exprs, RDLEvalScope *scope) {
+  NSMutableArray *order = [NSMutableArray array];
+  NSMutableDictionary *map = [NSMutableDictionary dictionary];
+  for (NSDictionary *row in rows) {
+    NSMutableString *key = [NSMutableString string];
+    for (NSString *e in exprs) {
+      [key appendString:PicaAsStr(PicaEvalRow(e, row, scope))];
+      [key appendString:@"\x1f"];
+    }
+    NSMutableArray *bucket = map[key];
+    if (bucket == nil) {
+      bucket = [NSMutableArray array];
+      map[key] = bucket;
+      [order addObject:key];
+    }
+    [bucket addObject:row];
+  }
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSString *k in order)
+    [out addObject:map[k]];
+  return out;
+}
+
+static NSMutableArray *PicaBodyCells(RDLTablixRow *bodyRow, NSArray<RDLTablixColumn *> *columns,
+                                     CGFloat bodyX, CGFloat height) {
+  NSMutableArray *cells = [NSMutableArray array];
+  if (bodyRow == nil)
+    return cells;
+  NSUInteger n = [columns count];
+  NSUInteger ci = 0;
+  CGFloat x = bodyX;
+  while (ci < n) {
+    RDLTablixCell *cell = ci < [bodyRow.cells count] ? bodyRow.cells[ci] : nil;
+    NSInteger span = cell.colSpan > 1 ? cell.colSpan : 1;
+    CGFloat w = 0;
+    for (NSInteger s = 0; s < span && ci + (NSUInteger)s < n; s++)
+      w += columns[ci + (NSUInteger)s].width;
+    PicaTablixCellInst *cix = [[PicaTablixCellInst alloc] init];
+    cix.xRel = x;
+    cix.width = w;
+    cix.height = height;
+    cix.item = cell.item;
+    cix.rowSpan = cell.rowSpan > 1 ? cell.rowSpan : 1;
+    [cells addObject:cix];
+    x += w;
+    ci += (NSUInteger)MAX(span, 1);
+  }
+  return cells;
+}
+
+static void PicaApplyRowSpan(NSArray<PicaTablixInst *> *insts) {
+  for (NSUInteger i = 0; i < [insts count]; i++) {
+    for (PicaTablixCellInst *cell in insts[i].cells) {
+      if (cell.rowSpan <= 1)
+        continue;
+      CGFloat h = 0;
+      for (NSInteger k = 0; k < cell.rowSpan && i + (NSUInteger)k < [insts count]; k++)
+        h += insts[i + (NSUInteger)k].height;
+      cell.height = h;
+      for (NSInteger k = 1; k < cell.rowSpan && i + (NSUInteger)k < [insts count]; k++) {
+        for (PicaTablixCellInst *c in insts[i + (NSUInteger)k].cells) {
+          if (fabs(c.xRel - cell.xRel) < 1e-6)
+            c.skip = YES;
+        }
+      }
+    }
+  }
+}
+
+static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray *currentRows,
+                             BOOL dynamic, NSDictionary *row, NSArray *groupRows, RDLItem *tab,
+                             CGFloat headerW) {
+  CGFloat h = bodyRow.height > 0 ? bodyRow.height : 0.28;
+  BOOL repeat = m.repeatOnNewPage || (tab.repeatColumnHeaders && [m.keepWithGroup isEqualToString:@"After"] &&
+                                      [m.groupName length] == 0);
+  NSArray *runs = dynamic ? ([currentRows count] ? currentRows : @[ @{} ])
+                          : @[ row ?: [NSNull null] ];
+  NSMutableArray *local = [NSMutableArray array];
+  for (id r in runs) {
+    PicaTablixInst *inst = [[PicaTablixInst alloc] init];
+    inst.height = h;
+    inst.repeatOnNewPage = repeat && !dynamic;
+    inst.cells = PicaBodyCells(bodyRow, tab.tablixBody.columns, headerW, h);
+    inst.row = (r == [NSNull null]) ? nil : r;
+    inst.groupRows = groupRows;
+    [local addObject:inst];
+  }
+  return local;
+}
+
+static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
+                                NSInteger leafStart, RDLItem *tab, RDLEvalScope *scope, CGFloat headerW);
+
+static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
+                                NSInteger leafStart, RDLItem *tab, RDLEvalScope *scope, CGFloat headerW) {
+  NSMutableArray *out = [NSMutableArray array];
+  NSInteger leaf = leafStart;
+  RDLTablixBody *body = tab.tablixBody;
+  for (RDLTablixMember *m in list) {
+    BOOL nested = [m.members count] > 0;
+    NSInteger count = nested ? PicaLeafCount(m.members) : 1;
+    BOOL hasGroup = [m.groupName length] > 0;
+    NSArray *exprs = m.groupExpressions;
+    CGFloat childX = headerX + m.header.size;
+
+    if (hasGroup && [exprs count]) {
+      NSArray *parts = PicaPartition(currentRows, exprs, scope);
+      NSMutableArray *kept = [NSMutableArray array];
+      for (NSArray *part in parts) {
+        NSArray *fp = PicaApplyFilters(part, m.filters, scope);
+        if ([fp count])
+          [kept addObject:fp];
+      }
+      parts = kept;
+      if ([m.sortExpressions count]) {
+        parts = [parts sortedArrayUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
+          NSDictionary *ra = [a count] ? a[0] : @{};
+          NSDictionary *rb = [b count] ? b[0] : @{};
+          for (RDLSortExpression *s in m.sortExpressions) {
+            NSComparisonResult c =
+                PicaCmp(PicaEvalRow(s.expression, ra, scope), PicaEvalRow(s.expression, rb, scope));
+            if ([s.direction isEqualToString:@"Descending"]) {
+              if (c == NSOrderedAscending)
+                c = NSOrderedDescending;
+              else if (c == NSOrderedDescending)
+                c = NSOrderedAscending;
+            }
+            if (c != NSOrderedSame)
+              return c;
+          }
+          return NSOrderedSame;
+        }];
+      }
+      NSInteger partIndex = 0;
+      for (NSArray *part in parts) {
+        NSArray *childInsts = nested ? PicaWalkMembers(m.members, part, childX, leaf, tab, scope, headerW)
+                                     : PicaEmitRuns(m, leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : nil,
+                                                    part, NO, [part firstObject], part, tab, headerW);
+        if ([childInsts count] == 0) {
+          partIndex += 1;
+          continue;
+        }
+        CGFloat groupH = 0;
+        for (PicaTablixInst *ci in childInsts)
+          groupH += ci.height;
+        PicaTablixInst *first = childInsts[0];
+        if (m.header) {
+          PicaTablixCellInst *hc = [[PicaTablixCellInst alloc] init];
+          hc.xRel = headerX;
+          hc.width = m.header.size > 0 ? m.header.size : headerW;
+          hc.height = groupH;
+          hc.item = m.header.item;
+          hc.rowHeader = YES;
+          NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
+          [cells addObjectsFromArray:first.cells];
+          first.cells = cells;
+        }
+        if (m.keepTogether)
+          first.keepTogetherHeight = groupH;
+        NSString *brk = m.pageBreak;
+        if (partIndex > 0 && ([brk isEqualToString:@"Between"] || [brk isEqualToString:@"StartAndEnd"]))
+          first.pageBreakBefore = YES;
+        if (partIndex == 0 && ([brk isEqualToString:@"Start"] || [brk isEqualToString:@"StartAndEnd"]))
+          first.pageBreakBefore = YES;
+        for (PicaTablixInst *ci in childInsts) {
+          if (ci.groupRows == nil)
+            ci.groupRows = part;
+          if (ci.row == nil)
+            ci.row = [part firstObject];
+        }
+        [out addObjectsFromArray:childInsts];
+        partIndex += 1;
+      }
+      leaf += count;
+      continue;
+    }
+
+    if (hasGroup && !nested) {
+      RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
+      [out addObjectsFromArray:PicaEmitRuns(m, br, currentRows, YES, nil, currentRows, tab, headerW)];
+      leaf += 1;
+      continue;
+    }
+
+    if (nested) {
+      NSArray *childInsts = PicaWalkMembers(m.members, currentRows, childX, leaf, tab, scope, headerW);
+      [out addObjectsFromArray:childInsts];
+      leaf += count;
+      continue;
+    }
+
+    RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
+    [out addObjectsFromArray:PicaEmitRuns(m, br, currentRows, NO, [currentRows firstObject], currentRows, tab,
+                                          headerW)];
+    leaf += 1;
+  }
+  return out;
+}
+
+static NSArray *PicaApplyPageRules(NSArray<PicaTablixInst *> *insts, CGFloat bodyAvail, CGFloat tablixTop) {
+  if ([insts count] == 0 || bodyAvail <= 0)
+    return insts;
+  CGFloat y = 0;
+  for (PicaTablixInst *inst in insts) {
+    if (inst.pageBreakBefore) {
+      CGFloat abs = tablixTop + y;
+      CGFloat into = fmod(abs, bodyAvail);
+      if (into < 0)
+        into += bodyAvail;
+      if (into > 0.0001)
+        y += bodyAvail - into;
+    }
+    if (inst.keepTogetherHeight > 0) {
+      CGFloat abs = tablixTop + y;
+      CGFloat into = fmod(abs, bodyAvail);
+      if (into < 0)
+        into += bodyAvail;
+      CGFloat remain = bodyAvail - into;
+      if (inst.keepTogetherHeight > remain + 0.001 && inst.keepTogetherHeight <= bodyAvail + 0.001) {
+        if (into > 0.0001)
+          y += bodyAvail - into;
+      }
+    }
+    inst.yRel = y;
+    y += inst.height;
+  }
+  return insts;
+}
+
+static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *report, RDLEvalScope *scope,
+                                                   CGFloat bodyAvail, CGFloat tablixTop) {
+  if (tab.tablixBody == nil || [tab.tablixBody.rows count] == 0)
+    [tab rebuildTableFromColumns];
+  RDLTablixBody *body = tab.tablixBody;
+  if ([body.rows count] == 0)
+    return @[];
+  RDLDataSet *ds = PicaFindSet(report, tab.dataSetName);
+  NSArray *dataRows = ds.rows ?: @[];
+  dataRows = PicaApplyFilters(dataRows, tab.filters, scope);
+  dataRows = PicaApplySort(dataRows, tab.sortExpressions, scope);
+
+  if ([dataRows count] == 0 && [tab.noRowsMessage length]) {
+    PicaTablixInst *inst = [[PicaTablixInst alloc] init];
+    inst.height = tab.rowHeight > 0 ? tab.rowHeight : 0.35;
+    PicaTablixCellInst *cell = [[PicaTablixCellInst alloc] init];
+    cell.xRel = 0;
+    cell.width = tab.width > 0 ? tab.width : 7.5;
+    cell.height = inst.height;
+    RDLItem *tb = [[RDLItem alloc] init];
+    tb.type = @"Textbox";
+    tb.name = [NSString stringWithFormat:@"%@NoRows", tab.name ?: @"T"];
+    tb.value = tab.noRowsMessage;
+    tb.style.fontStyle = @"Italic";
+    cell.item = tb;
+    inst.cells = [NSMutableArray arrayWithObject:cell];
+    inst.groupRows = @[];
+    return @[ inst ];
+  }
+
+  NSArray *rows = [dataRows count] ? dataRows : @[ @{} ];
+  NSArray *members = tab.rowHierarchy.members;
+  CGFloat headerW = PicaHeaderWidth(members);
+  NSArray *walked;
+  if ([members count]) {
+    walked = PicaWalkMembers(members, rows, 0, 0, tab, scope, headerW);
+  } else {
+    NSMutableArray *synth = [NSMutableArray array];
+    for (NSUInteger i = 0; i < [body.rows count]; i++) {
+      RDLTablixMember *m = [[RDLTablixMember alloc] init];
+      if (i == 0) {
+        m.repeatOnNewPage = YES;
+        m.keepWithGroup = @"After";
+      } else {
+        m.groupName = @"Details";
+      }
+      [synth addObject:m];
+    }
+    walked = PicaWalkMembers(synth, rows, 0, 0, tab, scope, headerW);
+  }
+
+  if (headerW > 0 && [tab.cornerRows count]) {
+    NSArray *cornerRow = tab.cornerRows[0];
+    if ([cornerRow count]) {
+      RDLTablixCell *cc = cornerRow[0];
+      PicaTablixInst *headerInst = nil;
+      for (PicaTablixInst *r in walked) {
+        if (r.repeatOnNewPage) {
+          headerInst = r;
+          break;
+        }
+      }
+      if (headerInst == nil)
+        headerInst = [walked firstObject];
+      BOOL already = NO;
+      for (PicaTablixCellInst *c in headerInst.cells)
+        if (c.rowHeader && fabs(c.xRel) < 1e-6)
+          already = YES;
+      if (!already && headerInst) {
+        PicaTablixCellInst *hc = [[PicaTablixCellInst alloc] init];
+        hc.xRel = 0;
+        hc.width = headerW;
+        hc.height = headerInst.height;
+        hc.item = cc.item;
+        hc.rowHeader = YES;
+        NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
+        [cells addObjectsFromArray:headerInst.cells];
+        headerInst.cells = cells;
+      }
+    }
+  }
+
+  PicaApplyRowSpan(walked);
+  if (tab.keepTogether && [walked count]) {
+    CGFloat total = 0;
+    for (PicaTablixInst *r in walked)
+      total += r.height;
+    PicaTablixInst *first = walked[0];
+    if (total > first.keepTogetherHeight)
+      first.keepTogetherHeight = total;
+  }
+  if ([tab.pageBreak isEqualToString:@"Start"] && [walked count])
+    ((PicaTablixInst *)walked[0]).pageBreakBefore = YES;
+
+  CGFloat y = 0;
+  for (PicaTablixInst *inst in walked) {
+    inst.yRel = y;
+    y += inst.height;
+  }
+  return PicaApplyPageRules(walked, bodyAvail, tablixTop);
+}
+
+static CGFloat PicaTablixHeight(RDLItem *item, RDLReport *report, CGFloat bodyAvail, CGFloat tablixTop) {
+  NSArray *insts = PicaExpandTablix(item, report, nil, bodyAvail, tablixTop);
+  if ([insts count] == 0)
+    return item.height;
+  PicaTablixInst *last = [insts lastObject];
+  return last.yRel + last.height;
+}
+
+static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport *report, CGFloat bodyAvail) {
+  CGFloat extra = 0;
+  for (RDLItem *t in tablixes) {
+    if (t.top < y) {
+      CGFloat design = t.height > 0 ? t.height : (t.headerHeight + t.rowHeight);
+      CGFloat grown = PicaTablixHeight(t, report, bodyAvail, t.top) - design;
+      if (grown > 0)
+        extra += grown;
+    }
+  }
+  return extra;
+}
+
++ (void)placeItem:(RDLItem *)item
+          originX:(CGFloat)ox
+          originY:(CGFloat)oy
+            scope:(RDLEvalScope *)scope
+           onPage:(RDLLaidOutPage *)page
+            clipTop:(CGFloat)clipTop
+         clipBottom:(CGFloat)clipBottom {
+  if ([item.type isEqualToString:@"Tablix"])
+    return;
+  CGFloat x = ox + item.left;
+  CGFloat y = oy + item.top;
+  CGFloat w = item.width;
+  CGFloat h = item.height;
+  if (y + h < clipTop || y > clipBottom)
+    return;
+  RDLLaidOutItem *li = [[RDLLaidOutItem alloc] init];
+  li.kind = item.type;
+  li.name = item.name;
+  li.x = x;
+  li.y = y;
+  li.w = w;
+  li.h = h;
+  li.style = item.style;
+  if ([item.type isEqualToString:@"Textbox"]) {
+    li.text = [RDLExpression formatValue:[RDLExpression evaluate:item.value scope:scope]
+                                  format:item.style.format];
+  } else if ([item.type isEqualToString:@"Image"]) {
+    li.imageSrc = item.value;
+  } else if ([item.type isEqualToString:@"Chart"]) {
+    li.chartType = item.chartType;
+    li.title = item.title;
+    RDLDataSet *ds = PicaFindSet(scope.report, item.dataSetName);
+    NSMutableArray *cats = [NSMutableArray array];
+    NSMutableArray *vals = [NSMutableArray array];
+    for (NSDictionary *row in ds.rows) {
+      id ck = nil;
+      id vk = nil;
+      for (NSString *k in row) {
+        if ([k caseInsensitiveCompare:item.categoryField] == NSOrderedSame)
+          ck = row[k];
+        if ([k caseInsensitiveCompare:item.valueField] == NSOrderedSame)
+          vk = row[k];
+      }
+      [cats addObject:ck ? [ck description] : @""];
+      [vals addObject:@([vk respondsToSelector:@selector(doubleValue)] ? [vk doubleValue] : 0)];
+    }
+    li.categories = cats;
+    li.values = vals;
+  } else if ([item.type isEqualToString:@"Rectangle"]) {
+    [page.items addObject:li];
+    for (RDLItem *child in item.items)
+      [self placeItem:child originX:x originY:y scope:scope onPage:page clipTop:clipTop clipBottom:clipBottom];
+    return;
+  }
+  [page.items addObject:li];
+}
+
++ (void)placeTablixInst:(PicaTablixInst *)inst
+                    tab:(RDLItem *)tab
+                     x0:(CGFloat)x0
+                      y:(CGFloat)y
+                  scope:(RDLEvalScope *)scope
+                 onPage:(RDLLaidOutPage *)page
+                clipTop:(CGFloat)clipTop
+             clipBottom:(CGFloat)clipBottom {
+  if (y + inst.height < clipTop || y > clipBottom)
+    return;
+  NSDictionary *savedRow = scope.row;
+  RDLDataSet *savedSet = scope.dataSet;
+  NSArray *savedGroup = scope.groupRows;
+  if (inst.row)
+    scope.row = inst.row;
+  scope.dataSet = PicaFindSet(scope.report, tab.dataSetName) ?: savedSet;
+  if (inst.groupRows)
+    scope.groupRows = inst.groupRows;
+  for (PicaTablixCellInst *cell in inst.cells) {
+    if (cell.skip)
+      continue;
+    RDLItem *contents = cell.item;
+    if (contents == nil)
+      continue;
+    CGFloat savedL = contents.left, savedT = contents.top, savedW = contents.width, savedH = contents.height;
+    contents.left = 0;
+    contents.top = 0;
+    contents.width = cell.width;
+    contents.height = cell.height > 0 ? cell.height : inst.height;
+    [self placeItem:contents
+            originX:(x0 + cell.xRel)
+            originY:y
+              scope:scope
+             onPage:page
+            clipTop:clipTop
+         clipBottom:clipBottom];
+    contents.left = savedL;
+    contents.top = savedT;
+    contents.width = savedW;
+    contents.height = savedH;
+  }
+  scope.row = savedRow;
+  scope.dataSet = savedSet;
+  scope.groupRows = savedGroup;
+}
+
++ (void)placeTablix:(RDLItem *)item
+            originX:(CGFloat)ox
+          tablixTop:(CGFloat)tablixTop
+            sliceTop:(CGFloat)sliceTop
+           bodyTop:(CGFloat)bodyTop
+        bodyBottom:(CGFloat)bodyBottom
+             scope:(RDLEvalScope *)scope
+            onPage:(RDLLaidOutPage *)page
+         firstPage:(BOOL)firstPage {
+  CGFloat bodyAvail = bodyBottom - bodyTop;
+  NSArray *insts = PicaExpandTablix(item, scope.report, scope, bodyAvail, tablixTop);
+  CGFloat x0 = ox + item.left;
+  CGFloat sliceBot = sliceTop + bodyAvail;
+  CGFloat repeatH = 0;
+  if (!firstPage) {
+    for (PicaTablixInst *r in insts) {
+      if (r.repeatOnNewPage)
+        repeatH += r.height;
+    }
+  }
+  BOOL any = NO;
+  for (PicaTablixInst *r in insts) {
+    CGFloat absY = tablixTop + r.yRel;
+    if (absY + r.height <= sliceTop || absY >= sliceBot)
+      continue;
+    any = YES;
+    break;
+  }
+  if (!any)
+    return;
+
+  NSDictionary *savedPrev = scope.previousRow;
+  if (!firstPage && repeatH > 0) {
+    CGFloat hy = bodyTop;
+    for (PicaTablixInst *r in insts) {
+      if (!r.repeatOnNewPage)
+        continue;
+      [self placeTablixInst:r tab:item x0:x0 y:hy scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom];
+      hy += r.height;
+    }
+  }
+  NSDictionary *prev = savedPrev;
+  for (PicaTablixInst *r in insts) {
+    if (!firstPage && r.repeatOnNewPage) {
+      if (r.row)
+        prev = r.row;
+      continue;
+    }
+    CGFloat absY = tablixTop + r.yRel;
+    if (absY + r.height <= sliceTop || absY >= sliceBot) {
+      if (r.row)
+        prev = r.row;
+      continue;
+    }
+    CGFloat pageY = bodyTop + (absY - sliceTop) + (firstPage ? 0 : repeatH);
+    scope.previousRow = prev;
+    [self placeTablixInst:r tab:item x0:x0 y:pageY scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom];
+    if (r.row)
+      prev = r.row;
+  }
+  scope.previousRow = savedPrev;
+}
+
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                  paramValues:(NSDictionary<NSString *, NSString *> *)params {
+  CGFloat mx = report.page.leftMargin;
+  CGFloat my = report.page.topMargin;
+  CGFloat headerH = report.pageHeader.height;
+  CGFloat footerH = report.pageFooter.height;
+  CGFloat bodyTop = my + headerH;
+  CGFloat bodyBottom = report.page.pageHeight - report.page.bottomMargin - footerH;
+  CGFloat bodyAvail = bodyBottom - bodyTop;
+  if (bodyAvail < 0.5)
+    bodyAvail = 0.5;
+
+  NSMutableArray *tablixes = [NSMutableArray array];
+  for (RDLItem *it in report.body.items)
+    if ([it.type isEqualToString:@"Tablix"])
+      [tablixes addObject:it];
+
+  CGFloat expanded = 0;
+  for (RDLItem *it in report.body.items) {
+    if ([it.type isEqualToString:@"Tablix"])
+      expanded = MAX(expanded, it.top + PicaTablixHeight(it, report, bodyAvail, it.top));
+    else
+      expanded = MAX(expanded, it.top + PicaExtraBelow(it.top, tablixes, report, bodyAvail) + it.height);
+  }
+  CGFloat bodyNeeded = MAX(report.body.height, expanded);
+  NSInteger total = (NSInteger)MAX(1, (NSInteger)ceil(bodyNeeded / bodyAvail));
+
+  NSMutableArray *pages = [NSMutableArray array];
+  for (NSInteger p = 1; p <= total; p++) {
+    RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+    scope.report = report;
+    scope.pageNumber = p;
+    scope.totalPages = total;
+    scope.executionTime = [NSDate date];
+    scope.paramValues = params ?: @{};
+    if ([report.dataSets count])
+      scope.dataSet = report.dataSets[0];
+
+    RDLLaidOutPage *page = [[RDLLaidOutPage alloc] init];
+    page.index = p;
+    page.width = report.page.pageWidth;
+    page.height = report.page.pageHeight;
+
+    BOOL showHeader = (p == 1 && report.pageHeader.printOnFirstPage) ||
+                      (p == total && report.pageHeader.printOnLastPage) || (p != 1 && p != total);
+    BOOL showFooter = (p == 1 && report.pageFooter.printOnFirstPage) ||
+                      (p == total && report.pageFooter.printOnLastPage) || (p != 1 && p != total);
+    if (p == 1 && p == total) {
+      showHeader = report.pageHeader.printOnFirstPage;
+      showFooter = report.pageFooter.printOnFirstPage;
+    }
+    if (showHeader) {
+      for (RDLItem *it in report.pageHeader.items)
+        [self placeItem:it originX:mx originY:my scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
+    }
+    if (showFooter) {
+      CGFloat fy = report.page.pageHeight - report.page.bottomMargin - footerH;
+      for (RDLItem *it in report.pageFooter.items)
+        [self placeItem:it originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
+    }
+
+    CGFloat sliceTop = (CGFloat)(p - 1) * bodyAvail;
+    for (RDLItem *item in report.body.items) {
+      if ([item.type isEqualToString:@"Tablix"])
+        continue;
+      CGFloat dy = PicaExtraBelow(item.top, tablixes, report, bodyAvail);
+      CGFloat y0 = item.top + dy;
+      CGFloat y1 = y0 + item.height;
+      if (y1 <= sliceTop || y0 >= sliceTop + bodyAvail)
+        continue;
+      CGFloat saved = item.top;
+      item.top = item.top + dy;
+      [self placeItem:item
+              originX:mx
+              originY:(bodyTop - sliceTop)
+                scope:scope
+               onPage:page
+              clipTop:bodyTop
+           clipBottom:bodyBottom];
+      item.top = saved;
+    }
+    for (RDLItem *t in tablixes) {
+      CGFloat tTop = t.top + PicaExtraBelow(t.top, tablixes, report, bodyAvail);
+      CGFloat tBot = tTop + PicaTablixHeight(t, report, bodyAvail, tTop);
+      if (tBot <= sliceTop || tTop >= sliceTop + bodyAvail)
+        continue;
+      BOOL first = (tTop >= sliceTop);
+      [self placeTablix:t
+                originX:mx
+              tablixTop:tTop
+               sliceTop:sliceTop
+                bodyTop:bodyTop
+             bodyBottom:bodyBottom
+                  scope:scope
+                 onPage:page
+              firstPage:first];
+    }
+
+    [pages addObject:page];
+  }
+  return pages;
+}
+
+@end
