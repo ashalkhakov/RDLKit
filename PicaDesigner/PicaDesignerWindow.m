@@ -210,7 +210,7 @@
   PicaController *c = [PicaController sharedController];
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"pdf" ]];
-  [p setNameFieldStringValue:[[c.report.name ?: @"report"] stringByAppendingPathExtension:@"pdf"]];
+  [p setNameFieldStringValue:[(c.report.name ?: @"report") stringByAppendingPathExtension:@"pdf"]];
   if ([p runModal] == NSOKButton) {
     NSData *pdf = [RDLGenerator PDFForReport:c.report parameters:c.paramValues];
     [pdf writeToURL:[p URL] atomically:YES];
