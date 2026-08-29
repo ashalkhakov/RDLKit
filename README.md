@@ -77,6 +77,8 @@ Open `RDLKit.xcodeproj` (this folder). Four targets, all Objective-C ARC, macOS 
 
 Pica and PicaDemo link and embed `PicaKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
 
+Xcode 26: every scheme’s Run action expands macros from a real product (`Pica.app`, `PicaDemo`, or `PicaKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
+
 ```
 xcodebuild -project RDLKit.xcodeproj -scheme Pica -configuration Debug build
 xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test

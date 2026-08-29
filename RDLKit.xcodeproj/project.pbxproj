@@ -377,7 +377,6 @@
 					};
 					45C98D5FCE3016A4889B25F4 = {
 						CreatedOnToolsVersion = 15.0;
-						TestTargetID = F14379BD3391DC97D94E4AC2;
 					};
 				};
 			};
