@@ -205,7 +205,9 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         else if ([b.style isEqualToString:@"Dotted"])
           dash = @" stroke-dasharray=\"2,3\"";
         NSString *lc = (b && b.color.length) ? b.color : color;
-        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Line\" style=\"%@\">", st];
+        lc = PicaHTMLEsc(lc);
+        lw = PicaHTMLEsc(lw);
+        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Line\" style=\"%@\">", PicaHTMLEsc(st)];
         if (it.h < 0.001) {
           [html appendFormat:@"<svg width=\"100%%\" height=\"2\" style=\"overflow:visible;\">"
                              @"<line x1=\"0\" y1=\"1\" x2=\"100%%\" y2=\"1\" stroke=\"%@\" "
@@ -228,7 +230,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
       }
       PicaAppendCSSBox(st, it.style);
       if ([it.kind isEqualToString:@"Rectangle"]) {
-        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Rectangle\" style=\"%@\"></div>\n", st];
+        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Rectangle\" style=\"%@\"></div>\n", PicaHTMLEsc(st)];
         continue;
       }
       if ([it.kind isEqualToString:@"Image"]) {
@@ -240,7 +242,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         } else if ([it.imageSrc length]) {
           src = it.imageSrc;
         }
-        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Image\" style=\"%@\">", st];
+        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Image\" style=\"%@\">", PicaHTMLEsc(st)];
         if (src) {
           NSString *fit = @"contain";
           NSString *sizing = it.sizing ?: @"Fit";
@@ -263,7 +265,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         continue;
       }
       if ([it.kind isEqualToString:@"Chart"]) {
-        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Chart\" style=\"%@\">", st];
+        [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Chart\" style=\"%@\">", PicaHTMLEsc(st)];
         [html appendString:PicaChartSVG(it)];
         [html appendString:@"</div>\n"];
         continue;
@@ -280,7 +282,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         body = [NSString stringWithFormat:@"<a href=\"%@\" style=\"color:inherit;\">%@</a>",
                                           PicaHTMLEsc(it.hyperlink), body];
       [html appendFormat:@"<div class=\"pica-item\" data-kind=\"%@\" style=\"%@\">%@</div>\n",
-                         PicaHTMLEsc(it.kind ?: @"Textbox"), st, body];
+                         PicaHTMLEsc(it.kind ?: @"Textbox"), PicaHTMLEsc(st), body];
     }
     [html appendString:@"</section>\n"];
   }
