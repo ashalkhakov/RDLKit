@@ -22,6 +22,7 @@
 @property (nonatomic, copy) NSString *backgroundColor;
 @property (nonatomic, copy) NSString *textAlign;
 @property (nonatomic, copy) NSString *verticalAlign;
+@property (nonatomic, copy) NSString *textDecoration; // None, Underline, Overline, LineThrough
 @property (nonatomic, copy) NSString *format;
 @property (nonatomic, copy) NSString *paddingLeft, *paddingRight, *paddingTop, *paddingBottom;
 @property (nonatomic, strong) RDLBorder *border;
@@ -41,6 +42,10 @@
 @property (nonatomic, assign) CGFloat top, left, width, height;
 @property (nonatomic, assign) NSInteger zIndex;
 @property (nonatomic, strong) RDLStyle *style;
+// Visibility/Hidden: "true", "false", or an `=` expression evaluated at layout time.
+@property (nonatomic, copy) NSString *hidden;
+// Action/Hyperlink: constant URL or an `=` expression.
+@property (nonatomic, copy) NSString *hyperlink;
 // Textbox / Image
 @property (nonatomic, copy) NSString *value;
 @property (nonatomic, assign) BOOL canGrow;
@@ -113,6 +118,7 @@
 
 @interface RDLTablixMember : NSObject
 @property (nonatomic, copy) NSString *groupName; // nil / empty = static member
+@property (nonatomic, copy) NSString *hidden;    // Visibility/Hidden expression
 @property (nonatomic, strong) NSMutableArray<NSString *> *groupExpressions;
 @property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
@@ -139,6 +145,13 @@
 @interface RDLField : NSObject
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *dataField;
+@property (nonatomic, copy) NSString *value; // calculated field `=` expression
+@end
+
+@interface RDLEmbeddedImage : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *mimeType;
+@property (nonatomic, strong) NSData *imageData;
 @end
 
 @interface RDLDataSet : NSObject
@@ -146,6 +159,7 @@
 @property (nonatomic, copy) NSString *dataSourceName;
 @property (nonatomic, copy) NSString *commandText;
 @property (nonatomic, strong) NSArray *fields; // NSString or RDLField
+@property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
 @property (nonatomic, strong) NSArray<NSDictionary *> *rows;
 @end
 
@@ -179,6 +193,8 @@
 @property (nonatomic, strong) NSMutableArray<RDLDataSource *> *dataSources;
 @property (nonatomic, strong) NSMutableArray<RDLDataSet *> *dataSets;
 @property (nonatomic, strong) NSMutableArray<RDLParameter *> *parameters;
+@property (nonatomic, strong) NSMutableArray<RDLEmbeddedImage *> *embeddedImages;
+- (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
 - (RDLBand *)bandWithKey:(NSString *)key;
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand;
@@ -193,7 +209,12 @@
 @property (nonatomic, assign) CGFloat x, y, w, h;
 @property (nonatomic, copy) NSString *text;
 @property (nonatomic, strong) RDLStyle *style;
-@property (nonatomic, copy) NSString *imageSrc;
+@property (nonatomic, assign) NSInteger zIndex;
+@property (nonatomic, copy) NSString *hyperlink; // resolved URL, or nil
+@property (nonatomic, copy) NSString *imageSrc;  // external URL / name
+@property (nonatomic, strong) NSData *imageData; // resolved embedded bytes
+@property (nonatomic, copy) NSString *imageMIME;
+@property (nonatomic, copy) NSString *sizing; // Fit, FitProportional, Clip, AutoSize
 @property (nonatomic, copy) NSArray<NSString *> *categories;
 @property (nonatomic, copy) NSArray<NSNumber *> *values;
 @property (nonatomic, copy) NSString *chartType;

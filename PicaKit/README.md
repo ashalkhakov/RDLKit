@@ -30,7 +30,9 @@ NSData *html = [backend renderPages:pages title:report.name];
 
 ## RDL model (MS-RDL 2010/01 subset)
 
-`RDLItem` is a ReportItem. `type` is the element name (Textbox, Line, Rectangle, Image, Tablix, Chart).
+`RDLItem` is a ReportItem. `type` is the element name (Textbox, Line, Rectangle, Image, Tablix, Chart). `List` is parsed as a single-cell grouped Tablix.
+
+ReportItem features: `Visibility/Hidden` (static or expression), `ActionInfo/Hyperlink`, `ZIndex`, `CanGrow` (textboxes grow, pages reflow), multi-`Paragraph`/`TextRun` textboxes, `EmbeddedImages` + Image `Source`/`Sizing`, style properties as `=` expressions (evaluated per instance), per-side borders and padding rendered by both backends.
 
 Tablix follows the spec:
 
@@ -62,7 +64,7 @@ Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebui
 | Class | Role |
 | --- | --- |
 | `RDLParser` / `RDLWriter` | RDL 2010 XML ↔ `RDLReport` |
-| `RDLExpression` | VB-style expressions: tokenize → AST → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates (group or named dataset), Format, string/math/date |
+| `RDLExpression` | VB-style expressions: tokenize → AST → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
 | `RDLLayoutEngine` | Banded pages + tablix expansion → laid-out elements |
 | `RDLView` | Flipped `NSView`; stacked pages; PDF from pages |
 | `RDLPDFBackend` | PDF backend (`renderPages:`) |

@@ -569,6 +569,9 @@ static NSArray *PicaRows(RDLEvalScope *scope, NSString *dsName) {
     for (RDLDataSet *d in scope.report.dataSets)
       if ([d.name isEqualToString:dsName])
         ds = d;
+    // Not a dataset name: treat as a group scope name → current group rows.
+    if (ds == nil && [scope.groupRows count])
+      return scope.groupRows;
   } else if (ds == nil && [scope.report.dataSets count])
     ds = scope.report.dataSets[0];
   return ds.rows ?: @[];
@@ -647,6 +650,21 @@ static id PicaField(RDLEvalScope *scope, NSString *name, NSString *prop) {
   if (scope.row == nil)
     return missing ? PicaYes(YES) : @"";
   id v = PicaLookup(scope.row, name);
+  if (v == nil) {
+    // Calculated field on the current dataset.
+    for (id f in scope.dataSet.fields) {
+      if (![f isKindOfClass:[RDLField class]])
+        continue;
+      RDLField *fld = (RDLField *)f;
+      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || [fld.value length] == 0)
+        continue;
+      PicaAst *ast = PicaParse(fld.value);
+      if (ast) {
+        v = PicaExec(ast, scope);
+        break;
+      }
+    }
+  }
   if (missing)
     return PicaYes(v == nil);
   return v ?: @"";
@@ -741,6 +759,7 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
     return v ?: @"";
   }
   double acc = 0;
+  double accSq = 0;
   BOOL any = NO;
   double mn = 0, mx = 0;
   NSDictionary *saved = scope.row;
@@ -752,13 +771,14 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
       any = YES;
     }
     acc += x;
+    accSq += x * x;
     if (x < mn)
       mn = x;
     if (x > mx)
       mx = x;
   }
   scope.row = saved;
-  if ([n isEqualToString:@"sum"])
+  if ([n isEqualToString:@"sum"] || [n isEqualToString:@"aggregate"])
     return @(acc);
   if ([n isEqualToString:@"avg"])
     return @([rows count] ? acc / [rows count] : 0);
@@ -766,7 +786,67 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
     return @(any ? mn : 0);
   if ([n isEqualToString:@"max"])
     return @(any ? mx : 0);
+  NSUInteger cnt = [rows count];
+  if ([n isEqualToString:@"var"] || [n isEqualToString:@"stdev"]) {
+    if (cnt < 2)
+      return @0;
+    double v = (accSq - acc * acc / cnt) / (cnt - 1);
+    if (v < 0)
+      v = 0;
+    return [n isEqualToString:@"var"] ? @(v) : @(sqrt(v));
+  }
+  if ([n isEqualToString:@"varp"] || [n isEqualToString:@"stdevp"]) {
+    if (cnt == 0)
+      return @0;
+    double v = (accSq - acc * acc / cnt) / cnt;
+    if (v < 0)
+      v = 0;
+    return [n isEqualToString:@"varp"] ? @(v) : @(sqrt(v));
+  }
   return @0;
+}
+
+// RunningValue(expr, "Function", ["Scope"]) — aggregate over rows up to and
+// including the current row.
+static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
+  PicaAst *expr = [args count] ? args[0] : nil;
+  NSString *fn = [args count] > 1 ? [PicaStr(PicaExec(args[1], scope)) lowercaseString] : @"sum";
+  NSString *ds = [args count] > 2 ? PicaDsName(args[2], scope) : nil;
+  NSArray *rows = PicaRows(scope, ds);
+  NSDictionary *current = scope.row;
+  NSDictionary *saved = scope.row;
+  double acc = 0;
+  NSInteger cnt = 0;
+  BOOL any = NO;
+  double mn = 0, mx = 0;
+  for (NSDictionary *row in rows) {
+    scope.row = row;
+    id v = expr ? PicaExec(expr, scope) : nil;
+    double x = PicaNum(v);
+    if (!PicaIsNothing(v))
+      cnt += 1;
+    if (!any) {
+      mn = mx = x;
+      any = YES;
+    }
+    acc += x;
+    if (x < mn)
+      mn = x;
+    if (x > mx)
+      mx = x;
+    if (current != nil && row == current)
+      break;
+  }
+  scope.row = saved;
+  if ([fn isEqualToString:@"count"])
+    return @((double)cnt);
+  if ([fn isEqualToString:@"avg"])
+    return @(cnt ? acc / cnt : 0);
+  if ([fn isEqualToString:@"min"])
+    return @(any ? mn : 0);
+  if ([fn isEqualToString:@"max"])
+    return @(any ? mx : 0);
+  return @(acc);
 }
 
 static id PicaExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
@@ -1273,8 +1353,12 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
     }
     if ([n isEqualToString:@"sum"] || [n isEqualToString:@"count"] || [n isEqualToString:@"countdistinct"] ||
         [n isEqualToString:@"avg"] || [n isEqualToString:@"first"] || [n isEqualToString:@"last"] ||
-        [n isEqualToString:@"min"] || [n isEqualToString:@"max"] || [n isEqualToString:@"countrows"])
+        [n isEqualToString:@"min"] || [n isEqualToString:@"max"] || [n isEqualToString:@"countrows"] ||
+        [n isEqualToString:@"stdev"] || [n isEqualToString:@"stdevp"] || [n isEqualToString:@"var"] ||
+        [n isEqualToString:@"varp"] || [n isEqualToString:@"aggregate"])
       return PicaExecAgg(n, ast.args, scope);
+    if ([n isEqualToString:@"runningvalue"])
+      return PicaExecRunningValue(ast.args, scope);
     if ([n isEqualToString:@"lookup"] || [n isEqualToString:@"lookupset"] || [n isEqualToString:@"multilookup"])
       return PicaExecLookup(n, ast.args, scope);
     if ([n isEqualToString:@"previous"]) {

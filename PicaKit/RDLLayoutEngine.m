@@ -104,6 +104,115 @@ static NSString *PicaAsStr(id v) {
   return [v description];
 }
 
+// Visibility/Hidden: constant true/false or an `=` expression.
+static BOOL PicaIsHiddenExpr(NSString *hidden, RDLEvalScope *scope) {
+  if ([hidden length] == 0)
+    return NO;
+  if ([hidden caseInsensitiveCompare:@"true"] == NSOrderedSame)
+    return YES;
+  if ([hidden caseInsensitiveCompare:@"false"] == NSOrderedSame)
+    return NO;
+  if ([hidden hasPrefix:@"="] && scope) {
+    id v = [RDLExpression evaluate:hidden scope:scope];
+    if ([v isKindOfClass:[NSNumber class]])
+      return [v boolValue];
+    NSString *s = PicaAsStr(v);
+    return [s caseInsensitiveCompare:@"true"] == NSOrderedSame || [s isEqualToString:@"1"];
+  }
+  return NO;
+}
+
+static NSString *PicaResolveStyleProp(NSString *raw, RDLEvalScope *scope) {
+  if ([raw hasPrefix:@"="] && scope)
+    return [RDLExpression evaluateText:raw scope:scope];
+  return raw;
+}
+
+// Styles may carry `=` expressions (conditional formatting). Resolve them per
+// instance at layout time; returns the original object when fully static.
+static RDLStyle *PicaResolveStyle(RDLStyle *s, RDLEvalScope *scope) {
+  if (s == nil || scope == nil)
+    return s;
+  NSArray *props = @[
+    s.color ?: @"", s.backgroundColor ?: @"", s.fontWeight ?: @"", s.fontStyle ?: @"",
+    s.fontFamily ?: @"", s.fontSize ?: @"", s.textAlign ?: @"", s.verticalAlign ?: @"",
+    s.textDecoration ?: @"", s.format ?: @""
+  ];
+  BOOL dynamic = NO;
+  for (NSString *p in props) {
+    if ([p hasPrefix:@"="]) {
+      dynamic = YES;
+      break;
+    }
+  }
+  if (!dynamic)
+    return s;
+  RDLStyle *r = [[RDLStyle alloc] init];
+  r.color = PicaResolveStyleProp(s.color, scope);
+  r.backgroundColor = PicaResolveStyleProp(s.backgroundColor, scope);
+  r.fontWeight = PicaResolveStyleProp(s.fontWeight, scope);
+  r.fontStyle = PicaResolveStyleProp(s.fontStyle, scope);
+  r.fontFamily = PicaResolveStyleProp(s.fontFamily, scope);
+  r.fontSize = PicaResolveStyleProp(s.fontSize, scope);
+  r.textAlign = PicaResolveStyleProp(s.textAlign, scope);
+  r.verticalAlign = PicaResolveStyleProp(s.verticalAlign, scope);
+  r.textDecoration = PicaResolveStyleProp(s.textDecoration, scope);
+  r.format = PicaResolveStyleProp(s.format, scope);
+  r.paddingLeft = s.paddingLeft;
+  r.paddingRight = s.paddingRight;
+  r.paddingTop = s.paddingTop;
+  r.paddingBottom = s.paddingBottom;
+  r.border = s.border;
+  r.borderLeft = s.borderLeft;
+  r.borderRight = s.borderRight;
+  r.borderTop = s.borderTop;
+  r.borderBottom = s.borderBottom;
+  return r;
+}
+
+static CGFloat PicaPtToIn(NSString *raw, CGFloat fallbackPt) {
+  double pt = [raw doubleValue];
+  if (pt <= 0)
+    pt = fallbackPt;
+  return (CGFloat)(pt / 72.0);
+}
+
+// Deterministic, backend-independent text height estimate for CanGrow.
+static CGFloat PicaEstimateTextHeight(NSString *text, RDLStyle *style, CGFloat widthIn) {
+  if ([text length] == 0)
+    return 0;
+  CGFloat fontIn = PicaPtToIn(style.fontSize, 10);
+  CGFloat lineH = fontIn * 1.35;
+  CGFloat charW = fontIn * 0.52;
+  CGFloat padL = PicaPtToIn(style.paddingLeft, 0);
+  CGFloat padR = PicaPtToIn(style.paddingRight, 0);
+  CGFloat padT = PicaPtToIn(style.paddingTop, 0);
+  CGFloat padB = PicaPtToIn(style.paddingBottom, 0);
+  CGFloat usable = widthIn - padL - padR;
+  if (usable < charW)
+    usable = charW;
+  NSInteger lines = 0;
+  for (NSString *para in [text componentsSeparatedByString:@"\n"]) {
+    NSInteger perLine = (NSInteger)floor(usable / charW);
+    if (perLine < 1)
+      perLine = 1;
+    NSInteger need = (NSInteger)ceil((double)[para length] / (double)perLine);
+    lines += MAX(need, 1);
+  }
+  return lines * lineH + padT + padB;
+}
+
+// Height a textbox wants when CanGrow is on (>= design height).
+static CGFloat PicaTextboxGrownHeight(RDLItem *item, CGFloat width, RDLEvalScope *scope) {
+  if (![item.type isEqualToString:@"Textbox"] || !item.canGrow || scope == nil)
+    return item.height;
+  RDLStyle *st = PicaResolveStyle(item.style, scope);
+  NSString *text = [RDLExpression formatValue:[RDLExpression evaluate:item.value scope:scope]
+                                       format:st.format];
+  CGFloat needed = PicaEstimateTextHeight(text, st ?: item.style, width > 0 ? width : item.width);
+  return MAX(item.height, needed);
+}
+
 static double PicaAsN(id v) {
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
@@ -314,6 +423,10 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
     BOOL hasGroup = [m.groupName length] > 0;
     NSArray *exprs = m.groupExpressions;
     CGFloat childX = headerX + m.header.size;
+    if (PicaIsHiddenExpr(m.hidden, scope)) {
+      leaf += count;
+      continue;
+    }
 
     if (hasGroup && [exprs count]) {
       NSArray *parts = PicaPartition(currentRows, exprs, scope);
@@ -522,6 +635,38 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *repo
   }
 
   PicaApplyRowSpan(walked);
+
+  // CanGrow: grow row instances so long cell text is not clipped.
+  if (scope) {
+    NSDictionary *savedRow = scope.row;
+    NSArray *savedGroup = scope.groupRows;
+    RDLDataSet *savedSet = scope.dataSet;
+    scope.dataSet = ds ?: savedSet;
+    for (PicaTablixInst *inst in walked) {
+      if (inst.row)
+        scope.row = inst.row;
+      if (inst.groupRows)
+        scope.groupRows = inst.groupRows;
+      CGFloat grown = inst.height;
+      for (PicaTablixCellInst *cell in inst.cells) {
+        if (cell.skip || cell.rowSpan > 1 || cell.item == nil)
+          continue;
+        CGFloat need = PicaTextboxGrownHeight(cell.item, cell.width, scope);
+        if (need > grown)
+          grown = need;
+      }
+      if (grown > inst.height) {
+        for (PicaTablixCellInst *cell in inst.cells) {
+          if (!cell.skip && cell.rowSpan <= 1 && fabs(cell.height - inst.height) < 1e-6)
+            cell.height = grown;
+        }
+        inst.height = grown;
+      }
+      scope.row = savedRow;
+      scope.groupRows = savedGroup;
+    }
+    scope.dataSet = savedSet;
+  }
   if (tab.keepTogether && [walked count]) {
     CGFloat total = 0;
     for (PicaTablixInst *r in walked)
@@ -541,20 +686,32 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *repo
   return PicaApplyPageRules(walked, bodyAvail, tablixTop);
 }
 
-static CGFloat PicaTablixHeight(RDLItem *item, RDLReport *report, CGFloat bodyAvail, CGFloat tablixTop) {
-  NSArray *insts = PicaExpandTablix(item, report, nil, bodyAvail, tablixTop);
+static CGFloat PicaTablixHeight(RDLItem *item, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail,
+                                CGFloat tablixTop) {
+  NSArray *insts = PicaExpandTablix(item, report, scope, bodyAvail, tablixTop);
   if ([insts count] == 0)
     return item.height;
   PicaTablixInst *last = [insts lastObject];
   return last.yRel + last.height;
 }
 
-static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport *report, CGFloat bodyAvail) {
+// Design-height delta for an item once expanded/grown (tablix rows, CanGrow text).
+static CGFloat PicaGrownDelta(RDLItem *t, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail) {
+  if ([t.type isEqualToString:@"Tablix"]) {
+    CGFloat design = t.height > 0 ? t.height : (t.headerHeight + t.rowHeight);
+    return PicaTablixHeight(t, report, scope, bodyAvail, t.top) - design;
+  }
+  if ([t.type isEqualToString:@"Textbox"] && t.canGrow)
+    return PicaTextboxGrownHeight(t, t.width, scope) - t.height;
+  return 0;
+}
+
+static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport *report,
+                              RDLEvalScope *scope, CGFloat bodyAvail) {
   CGFloat extra = 0;
-  for (RDLItem *t in tablixes) {
+  for (RDLItem *t in growers) {
     if (t.top < y) {
-      CGFloat design = t.height > 0 ? t.height : (t.headerHeight + t.rowHeight);
-      CGFloat grown = PicaTablixHeight(t, report, bodyAvail, t.top) - design;
+      CGFloat grown = PicaGrownDelta(t, report, scope, bodyAvail);
       if (grown > 0)
         extra += grown;
     }
@@ -571,10 +728,14 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
          clipBottom:(CGFloat)clipBottom {
   if ([item.type isEqualToString:@"Tablix"])
     return;
+  if (PicaIsHiddenExpr(item.hidden, scope))
+    return;
   CGFloat x = ox + item.left;
   CGFloat y = oy + item.top;
   CGFloat w = item.width;
   CGFloat h = item.height;
+  if ([item.type isEqualToString:@"Textbox"] && item.canGrow)
+    h = MAX(h, PicaTextboxGrownHeight(item, w, scope));
   if (y + h < clipTop || y > clipBottom)
     return;
   RDLLaidOutItem *li = [[RDLLaidOutItem alloc] init];
@@ -584,25 +745,46 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
   li.y = y;
   li.w = w;
   li.h = h;
-  li.style = item.style;
+  li.zIndex = item.zIndex;
+  li.style = PicaResolveStyle(item.style, scope);
+  if ([item.hyperlink length]) {
+    NSString *url = [item.hyperlink hasPrefix:@"="]
+                        ? [RDLExpression evaluateText:item.hyperlink scope:scope]
+                        : item.hyperlink;
+    if ([url length])
+      li.hyperlink = url;
+  }
   if ([item.type isEqualToString:@"Textbox"]) {
     li.text = [RDLExpression formatValue:[RDLExpression evaluate:item.value scope:scope]
-                                  format:item.style.format];
+                                  format:(li.style ?: item.style).format];
   } else if ([item.type isEqualToString:@"Image"]) {
-    li.imageSrc = item.value;
+    NSString *val = [item.value hasPrefix:@"="]
+                        ? [RDLExpression evaluateText:item.value scope:scope]
+                        : item.value;
+    li.sizing = item.sizing.length ? item.sizing : @"Fit";
+    if ([item.source isEqualToString:@"Embedded"]) {
+      RDLEmbeddedImage *img = [scope.report embeddedImageNamed:val];
+      li.imageData = img.imageData;
+      li.imageMIME = img.mimeType.length ? img.mimeType : @"image/png";
+      li.imageSrc = val;
+    } else {
+      li.imageSrc = val;
+    }
   } else if ([item.type isEqualToString:@"Chart"]) {
     li.chartType = item.chartType;
     li.title = item.title;
     RDLDataSet *ds = PicaFindSet(scope.report, item.dataSetName);
+    NSString *catField = PicaFieldOf(item.categoryField) ?: item.categoryField;
+    NSString *valField = PicaFieldOf(item.valueField) ?: item.valueField;
     NSMutableArray *cats = [NSMutableArray array];
     NSMutableArray *vals = [NSMutableArray array];
     for (NSDictionary *row in ds.rows) {
       id ck = nil;
       id vk = nil;
       for (NSString *k in row) {
-        if ([k caseInsensitiveCompare:item.categoryField] == NSOrderedSame)
+        if (catField && [k caseInsensitiveCompare:catField] == NSOrderedSame)
           ck = row[k];
-        if ([k caseInsensitiveCompare:item.valueField] == NSOrderedSame)
+        if (valField && [k caseInsensitiveCompare:valField] == NSOrderedSame)
           vk = row[k];
       }
       [cats addObject:ck ? [ck description] : @""];
@@ -740,17 +922,42 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
   if (bodyAvail < 0.5)
     bodyAvail = 0.5;
 
+  // Measuring scope: used for dataset filters, expansion and growth estimates.
+  RDLEvalScope *measure = [[RDLEvalScope alloc] init];
+  measure.report = report;
+  measure.executionTime = [NSDate date];
+  measure.paramValues = params ?: @{};
+  if ([report.dataSets count])
+    measure.dataSet = report.dataSets[0];
+
+  // Dataset-level filters apply to every consumer (details and aggregates).
+  for (RDLDataSet *ds in report.dataSets) {
+    if ([ds.filters count] && [ds.rows count]) {
+      RDLDataSet *saved = measure.dataSet;
+      measure.dataSet = ds;
+      ds.rows = PicaApplyFilters(ds.rows, ds.filters, measure);
+      measure.dataSet = saved;
+    }
+  }
+
   NSMutableArray *tablixes = [NSMutableArray array];
-  for (RDLItem *it in report.body.items)
-    if ([it.type isEqualToString:@"Tablix"])
+  NSMutableArray *growers = [NSMutableArray array];
+  for (RDLItem *it in report.body.items) {
+    if ([it.type isEqualToString:@"Tablix"]) {
       [tablixes addObject:it];
+      [growers addObject:it];
+    } else if ([it.type isEqualToString:@"Textbox"] && it.canGrow) {
+      [growers addObject:it];
+    }
+  }
 
   CGFloat expanded = 0;
   for (RDLItem *it in report.body.items) {
     if ([it.type isEqualToString:@"Tablix"])
-      expanded = MAX(expanded, it.top + PicaTablixHeight(it, report, bodyAvail, it.top));
+      expanded = MAX(expanded, it.top + PicaTablixHeight(it, report, measure, bodyAvail, it.top));
     else
-      expanded = MAX(expanded, it.top + PicaExtraBelow(it.top, tablixes, report, bodyAvail) + it.height);
+      expanded = MAX(expanded, it.top + PicaExtraBelow(it.top, growers, report, measure, bodyAvail) +
+                                   it.height + MAX(PicaGrownDelta(it, report, measure, bodyAvail), 0));
   }
   CGFloat bodyNeeded = MAX(report.body.height, expanded);
   NSInteger total = (NSInteger)MAX(1, (NSInteger)ceil(bodyNeeded / bodyAvail));
@@ -793,9 +1000,10 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
     for (RDLItem *item in report.body.items) {
       if ([item.type isEqualToString:@"Tablix"])
         continue;
-      CGFloat dy = PicaExtraBelow(item.top, tablixes, report, bodyAvail);
+      CGFloat dy = PicaExtraBelow(item.top, growers, report, measure, bodyAvail);
       CGFloat y0 = item.top + dy;
-      CGFloat y1 = y0 + item.height;
+      CGFloat grownH = item.height + MAX(PicaGrownDelta(item, report, measure, bodyAvail), 0);
+      CGFloat y1 = y0 + grownH;
       if (y1 <= sliceTop || y0 >= sliceTop + bodyAvail)
         continue;
       CGFloat saved = item.top;
@@ -810,8 +1018,8 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
       item.top = saved;
     }
     for (RDLItem *t in tablixes) {
-      CGFloat tTop = t.top + PicaExtraBelow(t.top, tablixes, report, bodyAvail);
-      CGFloat tBot = tTop + PicaTablixHeight(t, report, bodyAvail, tTop);
+      CGFloat tTop = t.top + PicaExtraBelow(t.top, growers, report, measure, bodyAvail);
+      CGFloat tBot = tTop + PicaTablixHeight(t, report, measure, bodyAvail, tTop);
       if (tBot <= sliceTop || tTop >= sliceTop + bodyAvail)
         continue;
       BOOL first = (tTop >= sliceTop);
@@ -826,6 +1034,23 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *tablixes, RDLReport
               firstPage:first];
     }
 
+    BOOL anyZ = NO;
+    for (RDLLaidOutItem *li in page.items) {
+      if (li.zIndex != 0) {
+        anyZ = YES;
+        break;
+      }
+    }
+    if (anyZ) {
+      [page.items sortWithOptions:NSSortStable
+                  usingComparator:^NSComparisonResult(RDLLaidOutItem *a, RDLLaidOutItem *b) {
+                    if (a.zIndex < b.zIndex)
+                      return NSOrderedAscending;
+                    if (a.zIndex > b.zIndex)
+                      return NSOrderedDescending;
+                    return NSOrderedSame;
+                  }];
+    }
     [pages addObject:page];
   }
   return pages;

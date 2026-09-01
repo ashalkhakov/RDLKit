@@ -28,6 +28,7 @@
   s.backgroundColor = @"Transparent";
   s.textAlign = @"Left";
   s.verticalAlign = @"Top";
+  s.textDecoration = @"None";
   s.paddingLeft = @"4pt";
   s.paddingRight = @"4pt";
   s.paddingTop = @"2pt";
@@ -369,7 +370,17 @@
 @implementation RDLField
 @end
 
+@implementation RDLEmbeddedImage
+@end
+
 @implementation RDLDataSet
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _filters = [NSMutableArray array];
+  }
+  return self;
+}
 @end
 
 @implementation RDLDataSource
@@ -412,7 +423,17 @@
   [r.dataSources addObject:dsrc];
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
+  r.embeddedImages = [NSMutableArray array];
   return r;
+}
+
+- (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLEmbeddedImage *img in self.embeddedImages)
+    if ([img.name caseInsensitiveCompare:name] == NSOrderedSame)
+      return img;
+  return nil;
 }
 
 - (RDLBand *)bandWithKey:(NSString *)key {

@@ -757,6 +757,263 @@ NSArray<NSString *> *PicaRunPDFBackendChecks(void) {
   return fails;
 }
 
+NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // Multi-paragraph / multi-TextRun concatenation, real Chart, List, calculated
+  // fields, dataset filters and embedded images via true RDL 2010 XML.
+  NSString *xml = @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+                   "<Width>8in</Width>"
+                   "<EmbeddedImages><EmbeddedImage Name=\"Logo\"><MIMEType>image/png</MIMEType>"
+                   "<ImageData>iVBORw0KGgo=</ImageData></EmbeddedImage></EmbeddedImages>"
+                   "<DataSets><DataSet Name=\"Items\"><Query><DataSourceName>Demo</DataSourceName>"
+                   "<CommandText>[{\"Sku\":\"W1\",\"Amount\":10},{\"Sku\":\"W2\",\"Amount\":5}]</CommandText></Query>"
+                   "<Fields><Field Name=\"Sku\"><DataField>Sku</DataField></Field>"
+                   "<Field Name=\"Amount\"><DataField>Amount</DataField></Field>"
+                   "<Field Name=\"Double\"><Value>=Fields!Amount.Value * 2</Value></Field></Fields>"
+                   "<Filters><Filter><FilterExpression>=Fields!Amount.Value</FilterExpression>"
+                   "<Operator>GreaterThan</Operator><FilterValues><FilterValue>1</FilterValue></FilterValues>"
+                   "</Filter></Filters></DataSet></DataSets>"
+                   "<Body><Height>6in</Height><ReportItems>"
+                   "<Textbox Name=\"Multi\"><Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>0.3in</Height>"
+                   "<Paragraphs><Paragraph><TextRuns><TextRun><Value>Hello</Value></TextRun>"
+                   "<TextRun><Value> World</Value></TextRun></TextRuns></Paragraph>"
+                   "<Paragraph><TextRuns><TextRun><Value>Line2</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+                   "<ActionInfo><Actions><Action><Hyperlink>https://example.com</Hyperlink></Action></Actions></ActionInfo>"
+                   "</Textbox>"
+                   "<Textbox Name=\"Ghost\"><Top>0.4in</Top><Left>0in</Left><Width>1in</Width><Height>0.2in</Height>"
+                   "<Visibility><Hidden>true</Hidden></Visibility>"
+                   "<Paragraphs><Paragraph><TextRuns><TextRun><Value>SECRET</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+                   "</Textbox>"
+                   "<Image Name=\"Logo1\"><Top>0.7in</Top><Left>0in</Left><Width>1in</Width><Height>1in</Height>"
+                   "<Source>Embedded</Source><Value>Logo</Value><Sizing>FitProportional</Sizing></Image>"
+                   "<Chart Name=\"C1\"><Top>2in</Top><Left>0in</Left><Width>3in</Width><Height>2in</Height>"
+                   "<DataSetName>Items</DataSetName>"
+                   "<ChartData><ChartSeriesCollection><ChartSeries Name=\"S1\"><Type>Pie</Type>"
+                   "<ChartDataPoints><ChartDataPoint><ChartDataPointValues><Y>=Fields!Amount.Value</Y>"
+                   "</ChartDataPointValues></ChartDataPoint></ChartDataPoints></ChartSeries></ChartSeriesCollection></ChartData>"
+                   "<ChartCategoryHierarchy><ChartMembers><ChartMember><Group Name=\"g\"><GroupExpressions>"
+                   "<GroupExpression>=Fields!Sku.Value</GroupExpression></GroupExpressions></Group></ChartMember>"
+                   "</ChartMembers></ChartCategoryHierarchy>"
+                   "<ChartTitles><ChartTitle Name=\"T\"><Caption>Amounts</Caption></ChartTitle></ChartTitles></Chart>"
+                   "<List Name=\"L1\"><Top>4.2in</Top><Left>0in</Left><Width>4in</Width><Height>0.4in</Height>"
+                   "<DataSetName>Items</DataSetName>"
+                   "<ReportItems><Textbox Name=\"LT\"><Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+                   "<Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Sku.Value</Value></TextRun></TextRuns>"
+                   "</Paragraph></Paragraphs></Textbox></ReportItems></List>"
+                   "</ReportItems></Body>"
+                   "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
+                   "</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"subset parse failed: %@", err.localizedDescription]);
+    return fails;
+  }
+  if ([r.embeddedImages count] != 1 || [r embeddedImageNamed:@"Logo"] == nil)
+    PicaFail(fails, @"EmbeddedImages not parsed");
+  else if ([[r embeddedImageNamed:@"Logo"] imageData] == nil)
+    PicaFail(fails, @"EmbeddedImage base64 not decoded");
+  if ([r.dataSets.firstObject.filters count] != 1)
+    PicaFail(fails, @"dataset Filters not parsed");
+  BOOL sawCalc = NO;
+  for (id f in r.dataSets.firstObject.fields)
+    if ([f isKindOfClass:[RDLField class]] && [[(RDLField *)f value] length])
+      sawCalc = YES;
+  if (!sawCalc)
+    PicaFail(fails, @"calculated field not parsed");
+  RDLItem *multi = nil, *ghost = nil, *chart = nil, *list = nil;
+  for (RDLItem *it in r.body.items) {
+    if ([it.name isEqualToString:@"Multi"])
+      multi = it;
+    if ([it.name isEqualToString:@"Ghost"])
+      ghost = it;
+    if ([it.name isEqualToString:@"C1"])
+      chart = it;
+    if ([it.name isEqualToString:@"L1"])
+      list = it;
+  }
+  if (![multi.value isEqualToString:@"Hello World\nLine2"])
+    PicaFail(fails, [NSString stringWithFormat:@"multi TextRun concat → %@", multi.value]);
+  if (![multi.hyperlink isEqualToString:@"https://example.com"])
+    PicaFail(fails, @"Hyperlink not parsed");
+  if (![ghost.hidden isEqualToString:@"true"])
+    PicaFail(fails, @"Visibility/Hidden not parsed");
+  if (chart == nil || ![chart.type isEqualToString:@"Chart"])
+    PicaFail(fails, @"real RDL Chart not parsed");
+  else {
+    if (![[chart.chartType lowercaseString] isEqualToString:@"pie"])
+      PicaFail(fails, [NSString stringWithFormat:@"chart type → %@", chart.chartType]);
+    if ([chart.valueField rangeOfString:@"Amount"].location == NSNotFound)
+      PicaFail(fails, @"chart valueField");
+    if ([chart.categoryField rangeOfString:@"Sku"].location == NSNotFound)
+      PicaFail(fails, @"chart categoryField");
+    if (![chart.title isEqualToString:@"Amounts"])
+      PicaFail(fails, @"chart title");
+  }
+  if (list == nil || ![list.type isEqualToString:@"Tablix"])
+    PicaFail(fails, @"List should map onto Tablix");
+
+  // Layout: hidden item suppressed, hyperlink and image resolved, list expanded.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  BOOL sawSecret = NO, sawLink = NO, sawImg = NO, sawW1 = NO, sawChart = NO;
+  for (RDLLaidOutPage *p in pages) {
+    for (RDLLaidOutItem *it in p.items) {
+      if ([it.text isEqualToString:@"SECRET"])
+        sawSecret = YES;
+      if ([it.hyperlink isEqualToString:@"https://example.com"])
+        sawLink = YES;
+      if ([it.kind isEqualToString:@"Image"] && [it.imageData length] > 0)
+        sawImg = YES;
+      if ([it.text isEqualToString:@"W1"])
+        sawW1 = YES;
+      if ([it.kind isEqualToString:@"Chart"] && [it.values count] == 2)
+        sawChart = YES;
+    }
+  }
+  if (sawSecret)
+    PicaFail(fails, @"hidden textbox leaked into layout");
+  if (!sawLink)
+    PicaFail(fails, @"hyperlink missing from layout IR");
+  if (!sawImg)
+    PicaFail(fails, @"embedded image bytes missing from layout IR");
+  if (!sawW1)
+    PicaFail(fails, @"List did not repeat per row");
+  if (!sawChart)
+    PicaFail(fails, @"real Chart did not produce data points");
+
+  // HTML backend: data URI, hyperlink anchor, borders and padding CSS, SVG chart.
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  if ([out rangeOfString:@"data:image/png;base64,"].location == NSNotFound)
+    PicaFail(fails, @"HTML missing embedded image data URI");
+  if ([out rangeOfString:@"href=\"https://example.com\""].location == NSNotFound)
+    PicaFail(fails, @"HTML missing hyperlink anchor");
+  if ([out rangeOfString:@"<svg"].location == NSNotFound)
+    PicaFail(fails, @"HTML missing SVG chart");
+
+  // Writer round-trip for new properties.
+  NSString *back = [RDLWriter XMLStringFromReport:r];
+  for (NSString *needle in @[
+         @"EmbeddedImages", @"Hyperlink", @"<Visibility>", @"<Filters>", @"<Value>=Fields!Amount.Value * 2</Value>"
+       ]) {
+    if ([back rangeOfString:needle].location == NSNotFound)
+      PicaFail(fails, [NSString stringWithFormat:@"writer omitted %@", needle]);
+  }
+  RDLReport *r2 = [RDLParser reportFromXMLString:back error:&err];
+  if (r2 == nil)
+    PicaFail(fails, @"subset re-parse failed");
+
+  // Styled report built via model: borders, padding, text styles, style
+  // expressions, CanGrow and z-index.
+  RDLReport *sr = [RDLReport emptyReportNamed:@"Styles"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Items";
+  ds.dataSourceName = @"Demo";
+  ds.fields = @[ @"Sku", @"Amount" ];
+  ds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
+  [sr.dataSets addObject:ds];
+  RDLItem *tb = [[RDLItem alloc] init];
+  tb.type = @"Textbox";
+  tb.name = @"Styled";
+  tb.value = @"styled";
+  tb.left = 0.5;
+  tb.top = 0.2;
+  tb.width = 3;
+  tb.height = 0.3;
+  tb.style.fontStyle = @"Italic";
+  tb.style.textDecoration = @"Underline";
+  tb.style.verticalAlign = @"Middle";
+  tb.style.paddingLeft = @"6pt";
+  tb.style.border = [[RDLBorder alloc] init];
+  tb.style.border.style = @"Solid";
+  tb.style.border.width = @"2pt";
+  tb.style.border.color = @"#ff0000";
+  tb.style.backgroundColor = @"=IIf(1 > 0, \"#00ff00\", \"#0000ff\")";
+  [sr.body.items addObject:tb];
+  RDLItem *vline = [[RDLItem alloc] init];
+  vline.type = @"Line";
+  vline.name = @"VLine";
+  vline.left = 4;
+  vline.top = 0.2;
+  vline.width = 0;
+  vline.height = 1;
+  [sr.body.items addObject:vline];
+  RDLItem *below = [[RDLItem alloc] init];
+  below.type = @"Textbox";
+  below.name = @"Below";
+  below.value = @"below";
+  below.left = 0.5;
+  below.top = 0.6;
+  below.width = 3;
+  below.height = 0.2;
+  below.zIndex = 3;
+  [sr.body.items addObject:below];
+  RDLItem *grow = [[RDLItem alloc] init];
+  grow.type = @"Textbox";
+  grow.name = @"Grow";
+  grow.value = @"word word word word word word word word word word word word word word word word "
+               @"word word word word word word word word word word word word word word word word";
+  grow.left = 0.5;
+  grow.top = 1.0;
+  grow.width = 1.5;
+  grow.height = 0.2;
+  grow.canGrow = YES;
+  [sr.body.items addObject:grow];
+  NSArray *spages = [RDLGenerator pagesForReport:sr parameters:@{}];
+  RDLLaidOutItem *lstyled = nil, *lgrow = nil, *lvline = nil;
+  for (RDLLaidOutItem *it in [spages.firstObject items]) {
+    if ([it.name isEqualToString:@"Styled"])
+      lstyled = it;
+    if ([it.name isEqualToString:@"Grow"])
+      lgrow = it;
+    if ([it.name isEqualToString:@"VLine"])
+      lvline = it;
+  }
+  if (![lstyled.style.backgroundColor isEqualToString:@"#00ff00"])
+    PicaFail(fails, [NSString stringWithFormat:@"style expression not resolved → %@",
+                                               lstyled.style.backgroundColor]);
+  if (lgrow == nil || lgrow.h <= 0.2)
+    PicaFail(fails, @"CanGrow textbox did not grow");
+  if (lvline == nil)
+    PicaFail(fails, @"vertical line missing from layout");
+  NSString *shtml = [[NSString alloc] initWithData:[html renderPages:spages title:sr.name]
+                                          encoding:NSUTF8StringEncoding];
+  for (NSString *needle in @[
+         @"border-top:", @"padding:", @"font-style:italic", @"text-decoration:underline",
+         @"background:#00ff00"
+       ]) {
+    if ([shtml rangeOfString:needle].location == NSNotFound)
+      PicaFail(fails, [NSString stringWithFormat:@"HTML missing %@", needle]);
+  }
+
+  // New aggregate / running-value functions.
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  s.report = sr;
+  s.dataSet = ds;
+  s.row = ds.rows[1];
+  s.paramValues = @{};
+  id rv = [RDLExpression evaluate:@"=RunningValue(Fields!Amount.Value, \"Sum\")" scope:s];
+  if (PicaAsNum(rv) != 15)
+    PicaFail(fails, [NSString stringWithFormat:@"RunningValue Sum → %@", rv]);
+  id sd = [RDLExpression evaluate:@"=StDevP(Fields!Amount.Value)" scope:s];
+  if (fabs(PicaAsNum(sd) - 2.5) > 0.001)
+    PicaFail(fails, [NSString stringWithFormat:@"StDevP → %@", sd]);
+  id vr = [RDLExpression evaluate:@"=VarP(Fields!Amount.Value)" scope:s];
+  if (fabs(PicaAsNum(vr) - 6.25) > 0.001)
+    PicaFail(fails, [NSString stringWithFormat:@"VarP → %@", vr]);
+
+  // Calculated field + dataset filter behavior end to end.
+  s.row = r.dataSets.firstObject.rows.firstObject;
+  s.dataSet = r.dataSets.firstObject;
+  s.report = r;
+  id calc = [RDLExpression evaluate:@"=Fields!Double.Value" scope:s];
+  if (PicaAsNum(calc) != 20)
+    PicaFail(fails, [NSString stringWithFormat:@"calculated field → %@", calc]);
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -766,6 +1023,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];
+  [fails addObjectsFromArray:PicaRunRDLSubsetChecks()];
 #if !defined(GNUSTEP)
   [fails addObjectsFromArray:PicaRunPDFBackendChecks()];
 #endif

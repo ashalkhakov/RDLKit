@@ -43,6 +43,9 @@
 - (void)testHTMLBackend {
   PICA_ASSERT_NO_FAILURES(PicaRunHTMLBackendChecks());
 }
+- (void)testRDLSubsetFeatures {
+  PICA_ASSERT_NO_FAILURES(PicaRunRDLSubsetChecks());
+}
 - (void)testPDFBackend {
   PICA_ASSERT_NO_FAILURES(PicaRunPDFBackendChecks());
 }

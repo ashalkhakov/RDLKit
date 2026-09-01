@@ -17,6 +17,16 @@ parse / bind  →  layout (tablix → elements)  →  backends
 
 Backends receive `RDLLaidOutPage` of primitives (Textbox, Line, Rectangle, Image, Chart). They never see Tablix.
 
+## Supported RDL subset
+
+* **Report items** — Textbox (multi-Paragraph/TextRun, CanGrow, styles), Line (horizontal / vertical / sloped, dash styles), Rectangle, Image (`Source` Embedded/External, `Sizing` Fit/FitProportional/Clip/AutoSize, report-level `EmbeddedImages`), Chart (Column/Bar/Line/Pie: first series, category group, data point), Tablix, List (mapped onto Tablix).
+* **Styles** — fonts (weight/style/size/family), color, background, per-side borders, padding, TextAlign, VerticalAlign, TextDecoration; any style property may be an `=` expression (conditional formatting), resolved per instance.
+* **Behavior** — `Visibility/Hidden` (static or expression) on items and tablix members, `ActionInfo/Hyperlink` (HTML `<a>`), `ZIndex`, `PageBreak`, `RepeatOnNewPage`, `NoRowsMessage`.
+* **Data** — datasets from `CommandText` JSON or `bindJSONString:`, calculated fields (`Field/Value`), dataset-level `Filters`, group/sort/filter on tablix members.
+* **Expressions** — VB-style operators, ~90 functions, aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes, `Lookup`/`LookupSet`/`MultiLookup`, `Globals!`, `User!`, `Parameters!`.
+
+Not (yet) supported: dynamic column groups (crosstab pivot), Subreport, Gauge/Map, Toggle/InteractiveSort/DocumentMap, Drillthrough/BookmarkLink actions.
+
 ```
 [RDLGenerator bindJSONString:json toDataSet:@"Items" inReport:report error:&err];
 NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{ @"InvoiceNo": @"A-1042" }];
