@@ -10,4 +10,5 @@ NSArray<NSString *> *PicaRunHTMLBackendChecks(void);
 NSArray<NSString *> *PicaRunPDFBackendChecks(void);
 NSArray<NSString *> *PicaRunBackendRegistryChecks(void);
 NSArray<NSString *> *PicaRunRDLSubsetChecks(void);
+NSArray<NSString *> *PicaRunRDLSubset2Checks(void);
 NSArray<NSString *> *PicaRunAllChecks(void);

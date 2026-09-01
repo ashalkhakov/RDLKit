@@ -1048,6 +1048,264 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   return fails;
 }
 
+// Increment 2: crosstab column groups, parameter completeness, warnings
+// channel, Body style, ResetPageNumber/PageName and body-item KeepTogether.
+NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // Parameters, warnings and Body style via true RDL 2010 XML.
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<Width>8in</Width>"
+       "<ReportParameters>"
+       "<ReportParameter Name=\"Tags\"><DataType>String</DataType><MultiValue>true</MultiValue>"
+       "<DefaultValue><Values><Value>A</Value><Value>B</Value></Values></DefaultValue>"
+       "<ValidValues><ParameterValues>"
+       "<ParameterValue><Value>A</Value></ParameterValue>"
+       "<ParameterValue><Value>B</Value></ParameterValue>"
+       "<ParameterValue><Value>C</Value></ParameterValue>"
+       "</ParameterValues></ValidValues></ReportParameter>"
+       "<ReportParameter Name=\"Start\"><DataType>DateTime</DataType>"
+       "<DefaultValue><Values><Value>2024-03-01</Value></Values></DefaultValue></ReportParameter>"
+       "<ReportParameter Name=\"Note\"><DataType>String</DataType><Nullable>true</Nullable></ReportParameter>"
+       "<ReportParameter Name=\"Calc\"><DataType>Integer</DataType>"
+       "<DefaultValue><Values><Value>=1+1</Value></Values></DefaultValue></ReportParameter>"
+       "</ReportParameters>"
+       "<Body><Height>3in</Height>"
+       "<Style><BackgroundColor>#eeeeff</BackgroundColor></Style>"
+       "<ReportItems>"
+       "<Textbox Name=\"T1\"><Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>0.3in</Height>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>=Parameters!Tags.Count</Value></TextRun>"
+       "</TextRuns></Paragraph></Paragraphs></Textbox>"
+       "<Subreport Name=\"Sub1\"><Top>1in</Top><Left>0in</Left><Width>2in</Width><Height>1in</Height>"
+       "<ReportName>Other</ReportName></Subreport>"
+       "</ReportItems></Body>"
+       "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
+       "</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"subset2 parse failed: %@", err.localizedDescription]);
+    return fails;
+  }
+  RDLParameter *tags = nil, *start = nil, *note = nil;
+  for (RDLParameter *p in r.parameters) {
+    if ([p.name isEqualToString:@"Tags"])
+      tags = p;
+    if ([p.name isEqualToString:@"Start"])
+      start = p;
+    if ([p.name isEqualToString:@"Note"])
+      note = p;
+  }
+  if (!tags.multiValue || [tags.defaultValues count] != 2)
+    PicaFail(fails, @"MultiValue parameter defaults not parsed");
+  if ([tags.validValues count] != 3)
+    PicaFail(fails, @"ValidValues not parsed");
+  if (![start.dataType isEqualToString:@"DateTime"])
+    PicaFail(fails, @"DateTime parameter not parsed");
+  if (!note.nullable)
+    PicaFail(fails, @"Nullable not parsed");
+  BOOL warned = NO;
+  for (NSString *w in r.warnings)
+    if ([w rangeOfString:@"Subreport"].location != NSNotFound)
+      warned = YES;
+  if (!warned)
+    PicaFail(fails, [NSString stringWithFormat:@"no warning for Subreport (warnings: %@)", r.warnings]);
+  if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
+    PicaFail(fails, @"Body Style not parsed");
+
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  s.report = r;
+  s.paramValues = @{};
+  id cnt = [RDLExpression evaluate:@"=Parameters!Tags.Count" scope:s];
+  if (PicaAsNum(cnt) != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"Parameters!Tags.Count → %@", cnt]);
+  id joined = [RDLExpression evaluate:@"=Join(Parameters!Tags.Value, \",\")" scope:s];
+  if (![[joined description] isEqualToString:@"A,B"])
+    PicaFail(fails, [NSString stringWithFormat:@"Join(Parameters!Tags.Value) → %@", joined]);
+  id yr = [RDLExpression evaluate:@"=Year(Parameters!Start.Value)" scope:s];
+  if (PicaAsNum(yr) != 2024)
+    PicaFail(fails, [NSString stringWithFormat:@"Year(DateTime param) → %@", yr]);
+  id calc = [RDLExpression evaluate:@"=Parameters!Calc.Value" scope:s];
+  if (PicaAsNum(calc) != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"expression default → %@", calc]);
+  s.paramValues = @{ @"Tags" : @[ @"A", @"B", @"C" ] };
+  id cnt3 = [RDLExpression evaluate:@"=Parameters!Tags.Count" scope:s];
+  if (PicaAsNum(cnt3) != 3)
+    PicaFail(fails, [NSString stringWithFormat:@"array param Count → %@", cnt3]);
+
+  // Writer round-trip and body background in HTML output.
+  NSString *back = [RDLWriter XMLStringFromReport:r];
+  for (NSString *needle in @[
+         @"<MultiValue>true</MultiValue>", @"<Nullable>true</Nullable>", @"<ParameterValues>",
+         @"<Value>A</Value><Value>B</Value>", @"<BackgroundColor>#eeeeff</BackgroundColor>"
+       ]) {
+    if ([back rangeOfString:needle].location == NSNotFound)
+      PicaFail(fails, [NSString stringWithFormat:@"writer omitted %@", needle]);
+  }
+  RDLReport *r2 = [RDLParser reportFromXMLString:back error:&err];
+  if (r2 == nil || [r2.parameters count] != 4)
+    PicaFail(fails, @"subset2 re-parse failed");
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  if ([out rangeOfString:@"#eeeeff"].location == NSNotFound)
+    PicaFail(fails, @"HTML missing body background");
+
+  // Crosstab: dynamic column group pivots quarters into columns.
+  NSString *cxml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<Width>8in</Width>"
+       "<DataSets><DataSet Name=\"Sales\"><Query><DataSourceName>Demo</DataSourceName>"
+       "<CommandText>[{\"Region\":\"North\",\"Quarter\":\"Q1\",\"Amount\":10},"
+       "{\"Region\":\"North\",\"Quarter\":\"Q2\",\"Amount\":20},"
+       "{\"Region\":\"South\",\"Quarter\":\"Q1\",\"Amount\":30},"
+       "{\"Region\":\"South\",\"Quarter\":\"Q2\",\"Amount\":40}]</CommandText></Query>"
+       "<Fields><Field Name=\"Region\"><DataField>Region</DataField></Field>"
+       "<Field Name=\"Quarter\"><DataField>Quarter</DataField></Field>"
+       "<Field Name=\"Amount\"><DataField>Amount</DataField></Field></Fields></DataSet></DataSets>"
+       "<Body><Height>4in</Height><ReportItems>"
+       "<Tablix Name=\"X\"><Top>0in</Top><Left>0in</Left><Width>4in</Width><Height>0.5in</Height>"
+       "<DataSetName>Sales</DataSetName>"
+       "<TablixBody><TablixColumns><TablixColumn><Width>1.5in</Width></TablixColumn></TablixColumns>"
+       "<TablixRows><TablixRow><Height>0.25in</Height><TablixCells><TablixCell><CellContents>"
+       "<Textbox Name=\"XCell\"><Paragraphs><Paragraph><TextRuns><TextRun>"
+       "<Value>=Sum(Fields!Amount.Value)</Value></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>"
+       "</CellContents></TablixCell></TablixCells></TablixRow></TablixRows></TablixBody>"
+       "<TablixColumnHierarchy><TablixMembers><TablixMember>"
+       "<Group Name=\"QG\"><GroupExpressions><GroupExpression>=Fields!Quarter.Value</GroupExpression>"
+       "</GroupExpressions></Group>"
+       "<TablixHeader><Size>0.25in</Size><CellContents>"
+       "<Textbox Name=\"QHdr\"><Paragraphs><Paragraph><TextRuns><TextRun>"
+       "<Value>=Fields!Quarter.Value</Value></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>"
+       "</CellContents></TablixHeader></TablixMember></TablixMembers></TablixColumnHierarchy>"
+       "<TablixRowHierarchy><TablixMembers><TablixMember>"
+       "<Group Name=\"RG\"><GroupExpressions><GroupExpression>=Fields!Region.Value</GroupExpression>"
+       "</GroupExpressions></Group>"
+       "<TablixHeader><Size>1in</Size><CellContents>"
+       "<Textbox Name=\"RHdr\"><Paragraphs><Paragraph><TextRuns><TextRun>"
+       "<Value>=Fields!Region.Value</Value></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>"
+       "</CellContents></TablixHeader></TablixMember></TablixMembers></TablixRowHierarchy>"
+       "</Tablix></ReportItems></Body>"
+       "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
+       "</Report>";
+  RDLReport *cr = [RDLParser reportFromXMLString:cxml error:&err];
+  if (cr == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"crosstab parse failed: %@", err.localizedDescription]);
+    return fails;
+  }
+  NSArray *cpages = [RDLGenerator pagesForReport:cr parameters:@{}];
+  BOOL sawQ1 = NO, sawQ2 = NO, sawNorth = NO, sawSouth = NO;
+  BOOL saw10 = NO, saw20 = NO, saw30 = NO, saw40 = NO;
+  CGFloat q1x = -1, q2x = -1;
+  for (RDLLaidOutItem *it in [cpages.firstObject items]) {
+    if ([it.text isEqualToString:@"Q1"]) {
+      sawQ1 = YES;
+      q1x = it.x;
+    }
+    if ([it.text isEqualToString:@"Q2"]) {
+      sawQ2 = YES;
+      q2x = it.x;
+    }
+    if ([it.text isEqualToString:@"North"])
+      sawNorth = YES;
+    if ([it.text isEqualToString:@"South"])
+      sawSouth = YES;
+    if (PicaAsNum(it.text) == 10)
+      saw10 = YES;
+    if (PicaAsNum(it.text) == 20)
+      saw20 = YES;
+    if (PicaAsNum(it.text) == 30)
+      saw30 = YES;
+    if (PicaAsNum(it.text) == 40)
+      saw40 = YES;
+  }
+  if (!sawQ1 || !sawQ2)
+    PicaFail(fails, @"crosstab missing pivoted column headers Q1/Q2");
+  if (q1x >= 0 && q2x >= 0 && q2x <= q1x)
+    PicaFail(fails, @"crosstab Q2 column should be right of Q1");
+  if (!sawNorth || !sawSouth)
+    PicaFail(fails, @"crosstab missing row headers North/South");
+  if (!saw10 || !saw20 || !saw30 || !saw40)
+    PicaFail(fails, @"crosstab cell sums wrong (want 10/20/30/40)");
+
+  // ResetPageNumber + PageName on a group page break.
+  RDLReport *brk = PicaGroupedJobs();
+  RDLTablixMember *gm = brk.body.items.firstObject.rowHierarchy.members[1];
+  gm.pageBreak = @"Between";
+  gm.resetPageNumber = YES;
+  gm.pageName = @"=Fields!Finish.Value";
+  RDLItem *hdrNum = [[RDLItem alloc] init];
+  hdrNum.type = @"Textbox";
+  hdrNum.name = @"HdrNum";
+  hdrNum.value = @"=Globals!PageNumber";
+  hdrNum.width = 1;
+  hdrNum.height = 0.25;
+  [brk.pageHeader.items addObject:hdrNum];
+  RDLItem *hdrName = [[RDLItem alloc] init];
+  hdrName.type = @"Textbox";
+  hdrName.name = @"HdrName";
+  hdrName.value = @"=Globals!PageName";
+  hdrName.left = 2;
+  hdrName.width = 2;
+  hdrName.height = 0.25;
+  [brk.pageHeader.items addObject:hdrName];
+  NSArray *bpages = [RDLGenerator pagesForReport:brk parameters:@{}];
+  if ([bpages count] < 3) {
+    PicaFail(fails, @"reset check expected >= 3 pages");
+  } else {
+    NSString *p2num = nil, *p2name = nil;
+    for (RDLLaidOutItem *it in [bpages[1] items]) {
+      if ([it.name isEqualToString:@"HdrNum"])
+        p2num = it.text;
+      if ([it.name isEqualToString:@"HdrName"])
+        p2name = it.text;
+    }
+    if (PicaAsNum(p2num) != 1)
+      PicaFail(fails, [NSString stringWithFormat:@"ResetPageNumber: page 2 number → %@", p2num]);
+    if (![p2name isEqualToString:@"Lacquer"])
+      PicaFail(fails, [NSString stringWithFormat:@"Globals!PageName on page 2 → %@", p2name]);
+  }
+  NSString *bxml = [RDLWriter XMLStringFromReport:brk];
+  if ([bxml rangeOfString:@"<ResetPageNumber>true</ResetPageNumber>"].location == NSNotFound ||
+      [bxml rangeOfString:@"<PageName>"].location == NSNotFound)
+    PicaFail(fails, @"writer omitted ResetPageNumber/PageName");
+
+  // Body-item KeepTogether: item straddling a slice boundary moves to the next page.
+  RDLReport *kt = [RDLReport emptyReportNamed:@"Keep"];
+  kt.page.pageHeight = 5;
+  kt.page.pageWidth = 8.5;
+  kt.page.topMargin = 0.5;
+  kt.page.bottomMargin = 0.5;
+  // bodyTop = 0.5 + header 0.5 = 1.0; bodyBottom = 5 - 0.5 - footer 0.4 = 4.1; avail = 3.1
+  RDLItem *keep = [[RDLItem alloc] init];
+  keep.type = @"Textbox";
+  keep.name = @"KeepMe";
+  keep.value = @"kept";
+  keep.top = 2.5;
+  keep.height = 1.0;
+  keep.width = 2;
+  keep.keepTogether = YES;
+  [kt.body.items addObject:keep];
+  kt.body.height = 3.6;
+  NSArray *kpages = [RDLGenerator pagesForReport:kt parameters:@{}];
+  if ([kpages count] < 2) {
+    PicaFail(fails, @"KeepTogether should push item to page 2");
+  } else {
+    BOOL onP1 = NO, onP2 = NO;
+    for (RDLLaidOutItem *it in [kpages[0] items])
+      if ([it.text isEqualToString:@"kept"])
+        onP1 = YES;
+    for (RDLLaidOutItem *it in [kpages[1] items])
+      if ([it.text isEqualToString:@"kept"])
+        onP2 = YES;
+    if (onP1 || !onP2)
+      PicaFail(fails, @"KeepTogether item should render only on page 2");
+  }
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -1058,6 +1316,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubsetChecks()];
+  [fails addObjectsFromArray:PicaRunRDLSubset2Checks()];
 #if !defined(GNUSTEP)
   [fails addObjectsFromArray:PicaRunPDFBackendChecks()];
 #endif

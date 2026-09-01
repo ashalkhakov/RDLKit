@@ -46,6 +46,9 @@
 - (void)testRDLSubsetFeatures {
   PICA_ASSERT_NO_FAILURES(PicaRunRDLSubsetChecks());
 }
+- (void)testRDLSubset2Features {
+  PICA_ASSERT_NO_FAILURES(PicaRunRDLSubset2Checks());
+}
 - (void)testPDFBackend {
   PICA_ASSERT_NO_FAILURES(PicaRunPDFBackendChecks());
 }
