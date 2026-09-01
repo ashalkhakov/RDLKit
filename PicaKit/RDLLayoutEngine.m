@@ -931,10 +931,13 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     measure.dataSet = report.dataSets[0];
 
   // Dataset-level filters apply to every consumer (details and aggregates).
+  // Filter into locals; the report model's rows are restored before returning.
+  NSMapTable *savedRows = [NSMapTable strongToStrongObjectsMapTable];
   for (RDLDataSet *ds in report.dataSets) {
     if ([ds.filters count] && [ds.rows count]) {
       RDLDataSet *saved = measure.dataSet;
       measure.dataSet = ds;
+      [savedRows setObject:ds.rows forKey:ds];
       ds.rows = PicaApplyFilters(ds.rows, ds.filters, measure);
       measure.dataSet = saved;
     }
@@ -1053,6 +1056,8 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     }
     [pages addObject:page];
   }
+  for (RDLDataSet *ds in savedRows)
+    ds.rows = [savedRows objectForKey:ds];
   return pages;
 }
 

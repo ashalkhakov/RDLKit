@@ -1004,6 +1004,40 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   if (fabs(PicaAsNum(vr) - 6.25) > 0.001)
     PicaFail(fails, [NSString stringWithFormat:@"VarP → %@", vr]);
 
+  // Dataset filters must not permanently mutate the report model.
+  RDLReport *fr = [RDLReport emptyReportNamed:@"FilterRestore"];
+  RDLDataSet *fds = [[RDLDataSet alloc] init];
+  fds.name = @"Items";
+  fds.dataSourceName = @"Demo";
+  fds.fields = @[ @"Sku", @"Amount" ];
+  fds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
+  RDLFilter *ff = [[RDLFilter alloc] init];
+  ff.expression = @"=Fields!Amount.Value";
+  ff.oper = @"GreaterThan";
+  [ff.values addObject:@"6"];
+  [fds.filters addObject:ff];
+  [fr.dataSets addObject:fds];
+  RDLItem *ftb = [[RDLItem alloc] init];
+  ftb.type = @"Textbox";
+  ftb.name = @"FSum";
+  ftb.value = @"=Sum(Fields!Amount.Value, \"Items\")";
+  ftb.left = 0.5;
+  ftb.top = 0.2;
+  ftb.width = 2;
+  ftb.height = 0.3;
+  [fr.body.items addObject:ftb];
+  for (int pass = 0; pass < 2; pass++) {
+    NSArray *fp = [RDLGenerator pagesForReport:fr parameters:@{}];
+    BOOL saw10 = NO;
+    for (RDLLaidOutItem *it in [fp.firstObject items])
+      if (PicaAsNum(it.text) == 10)
+        saw10 = YES;
+    if (!saw10)
+      PicaFail(fails, [NSString stringWithFormat:@"dataset filter pass %d Sum != 10", pass]);
+  }
+  if ([fds.rows count] != 2)
+    PicaFail(fails, @"dataset rows not restored after layout");
+
   // Calculated field + dataset filter behavior end to end.
   s.row = r.dataSets.firstObject.rows.firstObject;
   s.dataSet = r.dataSets.firstObject;

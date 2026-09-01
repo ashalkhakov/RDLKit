@@ -61,13 +61,4 @@ static inline CGFloat PicaInchesFromString(NSString *raw) {
 #define NSWeekCalendarUnit NSCalendarUnitWeekOfYear
 #endif
 
-#ifdef GNUSTEP
-// GNUstep Foundation has no CoreFoundation kCFBoolean constants; NSNumber
-// booleans are singletons there too, so identity comparison still works.
-#ifndef kCFBooleanTrue
-#define kCFBooleanTrue ([NSNumber numberWithBool:YES])
-#define kCFBooleanFalse ([NSNumber numberWithBool:NO])
-#endif
-#endif
-
 #endif

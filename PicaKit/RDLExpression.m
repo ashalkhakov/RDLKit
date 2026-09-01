@@ -24,6 +24,28 @@ static BOOL PicaIsNothing(id v) {
   return NO;
 }
 
+// Boolean NSNumber detection that does not rely on CFBoolean singletons
+// (portable across Apple Foundation and GNUstep).
+static BOOL PicaAsBoolObj(id v, BOOL *out) {
+  if (![v isKindOfClass:[NSNumber class]])
+    return NO;
+  if (v == (id)@YES) {
+    *out = YES;
+    return YES;
+  }
+  if (v == (id)@NO) {
+    *out = NO;
+    return YES;
+  }
+  const char *t = [(NSNumber *)v objCType];
+  if (t != NULL && (t[0] == 'c' || t[0] == 'B') &&
+      ([v isEqual:@YES] || [v isEqual:@NO])) {
+    *out = [(NSNumber *)v boolValue];
+    return YES;
+  }
+  return NO;
+}
+
 static NSString *PicaStr(id v) {
   if (PicaIsNothing(v))
     return @"";
@@ -33,10 +55,9 @@ static NSString *PicaStr(id v) {
       [parts addObject:PicaStr(x)];
     return [parts componentsJoinedByString:@", "];
   }
-  if (v == (id)kCFBooleanTrue)
-    return @"True";
-  if (v == (id)kCFBooleanFalse)
-    return @"False";
+  BOOL bv = NO;
+  if (PicaAsBoolObj(v, &bv))
+    return bv ? @"True" : @"False";
   if ([v isKindOfClass:[NSDate class]]) {
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
     f.dateStyle = NSDateFormatterMediumStyle;
@@ -59,9 +80,10 @@ static double PicaNum(id v) {
 }
 
 static BOOL PicaBool(id v) {
-  if (v == (id)kCFBooleanTrue)
-    return YES;
-  if (v == (id)kCFBooleanFalse || PicaIsNothing(v))
+  BOOL bv = NO;
+  if (PicaAsBoolObj(v, &bv))
+    return bv;
+  if (PicaIsNothing(v))
     return NO;
   if ([v isKindOfClass:[NSArray class]])
     return [(NSArray *)v count] > 0;
@@ -101,7 +123,7 @@ static BOOL PicaKeyEq(id a, id b) {
 }
 
 static id PicaYes(BOOL b) {
-  return b ? (id)kCFBooleanTrue : (id)kCFBooleanFalse;
+  return b ? @YES : @NO;
 }
 
 static NSDate *PicaAsDate(id v, NSDate *fallback) {
@@ -525,10 +547,9 @@ static NSString *PicaPrint(PicaAst *a) {
   if ([a.kind isEqualToString:@"lit"]) {
     if (PicaIsNothing(a.value))
       return @"Nothing";
-    if (a.value == (id)kCFBooleanTrue)
-      return @"True";
-    if (a.value == (id)kCFBooleanFalse)
-      return @"False";
+    BOOL pv = NO;
+    if (PicaAsBoolObj(a.value, &pv))
+      return pv ? @"True" : @"False";
     if ([a.value isKindOfClass:[NSString class]])
       return [NSString stringWithFormat:@"\"%@\"", a.value];
     return PicaStr(a.value);
@@ -815,10 +836,19 @@ static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
   NSArray *rows = PicaRows(scope, ds);
   NSDictionary *current = scope.row;
   NSDictionary *saved = scope.row;
+  // Locate the current row by identity first, then by equality, so the
+  // running aggregate stops correctly even if row dictionaries were copied.
+  NSUInteger stop = NSNotFound;
+  if (current != nil) {
+    stop = [rows indexOfObjectIdenticalTo:current];
+    if (stop == NSNotFound)
+      stop = [rows indexOfObject:current];
+  }
   double acc = 0;
   NSInteger cnt = 0;
   BOOL any = NO;
   double mn = 0, mx = 0;
+  NSUInteger idx = 0;
   for (NSDictionary *row in rows) {
     scope.row = row;
     id v = expr ? PicaExec(expr, scope) : nil;
@@ -834,8 +864,9 @@ static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
       mn = x;
     if (x > mx)
       mx = x;
-    if (current != nil && row == current)
+    if (stop != NSNotFound && idx >= stop)
       break;
+    idx += 1;
   }
   scope.row = saved;
   if ([fn isEqualToString:@"count"])
