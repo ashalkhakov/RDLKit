@@ -981,6 +981,185 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   return fails;
 }
 
+// Nested (stacked) column groups with tiered spanning headers, plus
+// horizontal pagination of wide tablixes with RepeatRowHeaders.
+NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  // ---- Nested column groups: Finish > Job two-tier column headers. ----
+  RDLReport *r = PicaGroupedJobs();
+  [r.body.items removeAllObjects];
+  RDLItem *tab = [[RDLItem alloc] init];
+  tab.type = @"Tablix";
+  tab.name = @"NestedCols";
+  tab.dataSetName = @"Jobs";
+  tab.left = 0;
+  tab.top = 0.1;
+  tab.width = 7.5;
+  tab.height = 1;
+  RDLTablixBody *nb = [[RDLTablixBody alloc] init];
+  RDLTablixColumn *nc = [[RDLTablixColumn alloc] init];
+  nc.width = 1.0;
+  [nb.columns addObject:nc];
+  RDLTablixRow *nr = [[RDLTablixRow alloc] init];
+  nr.height = 0.28;
+  RDLItem *ncell = [[RDLItem alloc] init];
+  ncell.type = @"Textbox";
+  ncell.name = @"NestedCell";
+  ncell.value = @"=Sum(Fields!Amount.Value)";
+  RDLTablixCell *ncc = [[RDLTablixCell alloc] init];
+  ncc.item = ncell;
+  [nr.cells addObject:ncc];
+  [nb.rows addObject:nr];
+  tab.tablixBody = nb;
+
+  RDLTablixMember * (^colGroup)(NSString *) = ^RDLTablixMember *(NSString *field) {
+    RDLTablixMember *m = [[RDLTablixMember alloc] init];
+    m.groupName = [NSString stringWithFormat:@"g%@", field];
+    [m.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+    RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
+    h.size = 0.3;
+    RDLItem *ht = [[RDLItem alloc] init];
+    ht.type = @"Textbox";
+    ht.name = [NSString stringWithFormat:@"Hdr%@", field];
+    ht.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+    h.item = ht;
+    m.header = h;
+    return m;
+  };
+  RDLTablixMember *outer = colGroup(@"Finish");
+  RDLTablixMember *inner = colGroup(@"Job");
+  [outer.members addObject:inner];
+  RDLTablixHierarchy *colH = [[RDLTablixHierarchy alloc] init];
+  [colH.members addObject:outer];
+  tab.columnHierarchy = colH;
+  [r.body.items addObject:tab];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  RDLLaidOutItem *oil = nil, *lacq = nil, *wax = nil, *desk = nil, *chair = nil, *shelf = nil;
+  NSMutableArray *sums = [NSMutableArray array];
+  for (RDLLaidOutPage *p in pages) {
+    for (RDLLaidOutItem *it in p.items) {
+      if ([it.text isEqualToString:@"Oil"])
+        oil = it;
+      else if ([it.text isEqualToString:@"Lacquer"])
+        lacq = it;
+      else if ([it.text isEqualToString:@"Wax"])
+        wax = it;
+      else if ([it.text isEqualToString:@"Desk"])
+        desk = it;
+      else if ([it.text isEqualToString:@"Chair"])
+        chair = it;
+      else if ([it.text isEqualToString:@"Shelf"])
+        shelf = it;
+      else if (PicaAsNum(it.text) > 0)
+        [sums addObject:it];
+    }
+  }
+  if (oil == nil || lacq == nil || wax == nil)
+    PicaFail(fails, @"nested columns missing outer Finish tier headers");
+  if (desk == nil || chair == nil || shelf == nil)
+    PicaFail(fails, @"nested columns missing inner Job tier headers");
+  if (oil && lacq && wax) {
+    if (fabs(oil.y - lacq.y) > 0.01 || fabs(oil.y - wax.y) > 0.01)
+      PicaFail(fails, @"outer tier headers should share one row");
+    if (fabs(oil.w - 3.0) > 0.01)
+      PicaFail(fails, [NSString stringWithFormat:@"Oil should span 3 columns, got %.2f", oil.w]);
+    if (fabs(lacq.w - 2.0) > 0.01 || fabs(wax.w - 2.0) > 0.01)
+      PicaFail(fails, @"Lacquer/Wax should span 2 columns each");
+  }
+  if (oil && desk) {
+    if (desk.y <= oil.y + 0.01)
+      PicaFail(fails, @"inner tier should sit below the outer tier");
+    if (fabs(desk.x - oil.x) > 0.01)
+      PicaFail(fails, @"Desk should start under Oil");
+    if (chair && fabs(chair.x - (oil.x + 1.0)) > 0.01)
+      PicaFail(fails, @"Chair should be the second column under Oil");
+  }
+  BOOL n1840 = NO, n610 = NO;
+  for (RDLLaidOutItem *it in sums) {
+    if (PicaAsNum(it.text) == 1840 && desk && fabs(it.x - desk.x) < 0.01)
+      n1840 = YES;
+    if (PicaAsNum(it.text) == 610 && shelf && fabs(it.x - shelf.x) < 0.01)
+      n610 = YES;
+  }
+  if (!n1840 || !n610)
+    PicaFail(fails, @"nested column cells should hold per-(Finish,Job) sums");
+
+  // Round-trip: writer keeps the nested column member tree.
+  NSString *nxml = [RDLWriter XMLStringFromReport:r];
+  NSError *nerr = nil;
+  RDLReport *nparsed = [RDLParser reportFromXMLString:nxml error:&nerr];
+  if (nparsed == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"nested column round-trip parse failed: %@",
+                                               nerr.localizedDescription]);
+  else {
+    RDLItem *pt = nil;
+    for (RDLItem *it in nparsed.body.items)
+      if ([it.type isEqualToString:@"Tablix"])
+        pt = it;
+    RDLTablixMember *po = pt.columnHierarchy.members.firstObject;
+    if ([po.members count] != 1 || [po.members.firstObject.groupExpressions count] == 0)
+      PicaFail(fails, @"round-trip lost the nested column group");
+  }
+
+  // ---- Horizontal pagination with RepeatRowHeaders. ----
+  RDLReport * (^wideReport)(BOOL) = ^RDLReport *(BOOL repeat) {
+    RDLReport *w = PicaGroupedJobs();
+    w.page.pageWidth = 4.5;
+    w.page.leftMargin = 0.5;
+    w.page.rightMargin = 0.5;
+    RDLItem *t = w.body.items.firstObject;
+    t.columns = @[
+      @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+      @{@"width" : @2.0, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
+    ];
+    t.repeatRowHeaders = repeat;
+    return w;
+  };
+  NSArray *wpages = [RDLGenerator pagesForReport:wideReport(YES) parameters:@{}];
+  if ([wpages count] != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"wide tablix should split into 2 pages, got %lu",
+                                               (unsigned long)[wpages count]]);
+  if ([wpages count] == 2) {
+    RDLLaidOutPage *p1 = wpages[0], *p2 = wpages[1];
+    BOOL p1Desk = NO, p1Amt = NO, p2Oil = NO, p2Amt = NO, p2Desk = NO;
+    for (RDLLaidOutItem *it in p1.items) {
+      if ([it.text isEqualToString:@"Desk"])
+        p1Desk = YES;
+      if (PicaAsNum(it.text) == 1840)
+        p1Amt = YES;
+    }
+    for (RDLLaidOutItem *it in p2.items) {
+      if ([it.text isEqualToString:@"Oil"])
+        p2Oil = YES;
+      if ([it.text isEqualToString:@"Desk"])
+        p2Desk = YES;
+      if (PicaAsNum(it.text) == 1840)
+        p2Amt = YES;
+    }
+    if (!p1Desk || p1Amt)
+      PicaFail(fails, @"page 1 should show the Job column but not the overflow Amount column");
+    if (!p2Amt || p2Desk)
+      PicaFail(fails, @"page 2 should show the overflow Amount column only");
+    if (!p2Oil)
+      PicaFail(fails, @"RepeatRowHeaders should repeat the Finish group header on page 2");
+    for (RDLLaidOutItem *it in p2.items)
+      if (it.x + it.w > 4.5 - 0.5 + 0.05 && it.zIndex >= 0)
+        PicaFail(fails, [NSString stringWithFormat:@"page 2 item '%@' overflows the page", it.text]);
+  }
+  NSArray *npages = [RDLGenerator pagesForReport:wideReport(NO) parameters:@{}];
+  if ([npages count] == 2) {
+    for (RDLLaidOutItem *it in ((RDLLaidOutPage *)npages[1]).items)
+      if ([it.text isEqualToString:@"Oil"])
+        PicaFail(fails, @"row headers should not repeat when RepeatRowHeaders is off");
+  } else {
+    PicaFail(fails, @"wide tablix without RepeatRowHeaders should still split into 2 pages");
+  }
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunBackendRegistryChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   NSArray *named = [[RDLGenerator backends] valueForKey:@"name"];
@@ -1632,6 +1811,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
+  [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubsetChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubset2Checks()];

@@ -36,6 +36,9 @@
 - (void)testTablixEditing {
   PICA_ASSERT_NO_FAILURES(PicaRunTablixEditingChecks());
 }
+- (void)testTablixAdvanced {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixAdvancedChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

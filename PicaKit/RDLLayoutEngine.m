@@ -36,12 +36,21 @@
 
 // One rendered column of the tablix body. For dynamic (crosstab) column
 // groups the same body column repeats once per distinct group instance.
+// One tier of a column-group header above a plan leaf. Consecutive leaves
+// sharing the same node (pointer identity) are merged into one spanning cell.
+@interface PicaColHeaderNode : NSObject
+@property (nonatomic, strong) RDLItem *item;
+@property (nonatomic, assign) CGFloat size;
+@property (nonatomic, copy) NSArray *rows; // group-instance rows; nil = all rows
+@end
+@implementation PicaColHeaderNode
+@end
+
 @interface PicaColPlanEntry : NSObject
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, assign) NSUInteger bodyCol;
 @property (nonatomic, copy) NSArray *colRows; // nil for static columns
-@property (nonatomic, strong) RDLItem *headerItem;
-@property (nonatomic, assign) CGFloat headerSize;
+@property (nonatomic, copy) NSArray<PicaColHeaderNode *> *headerChain; // outermost tier first
 @end
 @implementation PicaColPlanEntry
 @end
@@ -383,21 +392,27 @@ static NSArray *PicaSortParts(NSArray *parts, NSArray<RDLSortExpression *> *sort
 
 // Build the rendered column list from TablixColumnHierarchy. Returns nil when
 // there is no dynamic column group (static layout keeps the fast path).
-static NSArray<PicaColPlanEntry *> *PicaColumnPlan(RDLItem *tab, NSArray *dataRows, RDLEvalScope *scope) {
-  NSArray<RDLTablixMember *> *members = tab.columnHierarchy.members;
-  if ([members count] == 0)
-    return nil;
-  BOOL anyDynamic = NO;
-  for (RDLTablixMember *m in members)
-    if ([m.groupName length] && [m.groupExpressions count])
-      anyDynamic = YES;
-  if (!anyDynamic)
-    return nil;
-  NSArray<RDLTablixColumn *> *cols = tab.tablixBody.columns;
-  NSMutableArray *plan = [NSMutableArray array];
-  NSInteger leaf = 0;
+static BOOL PicaAnyDynamicMember(NSArray<RDLTablixMember *> *members) {
   for (RDLTablixMember *m in members) {
-    NSInteger count = [m.members count] ? PicaLeafCount(m.members) : 1;
+    if ([m.groupName length] && [m.groupExpressions count])
+      return YES;
+    if ([m.members count] && PicaAnyDynamicMember(m.members))
+      return YES;
+  }
+  return NO;
+}
+
+// Recursively expand column members into leaf plan entries. `leafStart` is the
+// body-column index of the first leaf under `members`; each dynamic group
+// instance re-expands the same underlying body columns.
+static void PicaColPlanWalk(NSArray<RDLTablixMember *> *members, NSArray *dataRows, RDLItem *tab,
+                            RDLEvalScope *scope, NSArray<PicaColHeaderNode *> *chain,
+                            NSInteger leafStart, NSMutableArray *plan) {
+  NSArray<RDLTablixColumn *> *cols = tab.tablixBody.columns;
+  NSInteger leaf = leafStart;
+  for (RDLTablixMember *m in members) {
+    BOOL nested = [m.members count] > 0;
+    NSInteger count = nested ? PicaLeafCount(m.members) : 1;
     if (PicaIsHiddenExpr(m.hidden, scope)) {
       leaf += count;
       continue;
@@ -412,24 +427,50 @@ static NSArray<PicaColPlanEntry *> *PicaColumnPlan(RDLItem *tab, NSArray *dataRo
           [kept addObject:fp];
       }
       for (NSArray *part in PicaSortParts(kept, m.sortExpressions, scope)) {
+        PicaColHeaderNode *node = [[PicaColHeaderNode alloc] init];
+        node.item = m.header.item;
+        node.size = m.header.size;
+        node.rows = part;
+        NSArray *newChain = [chain arrayByAddingObject:node];
+        if (nested) {
+          PicaColPlanWalk(m.members, part, tab, scope, newChain, leaf, plan);
+        } else {
+          PicaColPlanEntry *e = [[PicaColPlanEntry alloc] init];
+          e.width = w;
+          e.bodyCol = (NSUInteger)leaf;
+          e.colRows = part;
+          e.headerChain = newChain;
+          [plan addObject:e];
+        }
+      }
+    } else {
+      PicaColHeaderNode *node = [[PicaColHeaderNode alloc] init];
+      node.item = m.header.item;
+      node.size = m.header.size;
+      node.rows = nil;
+      NSArray *newChain = [chain arrayByAddingObject:node];
+      if (nested) {
+        PicaColPlanWalk(m.members, dataRows, tab, scope, newChain, leaf, plan);
+      } else {
         PicaColPlanEntry *e = [[PicaColPlanEntry alloc] init];
         e.width = w;
         e.bodyCol = (NSUInteger)leaf;
-        e.colRows = part;
-        e.headerItem = m.header.item;
-        e.headerSize = m.header.size;
+        e.headerChain = newChain;
         [plan addObject:e];
       }
-    } else {
-      PicaColPlanEntry *e = [[PicaColPlanEntry alloc] init];
-      e.width = w;
-      e.bodyCol = (NSUInteger)leaf;
-      e.headerItem = m.header.item;
-      e.headerSize = m.header.size;
-      [plan addObject:e];
     }
     leaf += count;
   }
+}
+
+static NSArray<PicaColPlanEntry *> *PicaColumnPlan(RDLItem *tab, NSArray *dataRows, RDLEvalScope *scope) {
+  NSArray<RDLTablixMember *> *members = tab.columnHierarchy.members;
+  if ([members count] == 0)
+    return nil;
+  if (!PicaAnyDynamicMember(members))
+    return nil;
+  NSMutableArray *plan = [NSMutableArray array];
+  PicaColPlanWalk(members, dataRows, tab, scope, @[], 0, plan);
   return plan;
 }
 
@@ -731,17 +772,26 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *repo
     walked = PicaWalkMembers(synth, rows, 0, 0, tab, scope, headerW, plan);
   }
 
-  // Crosstab: emit a column-header row from the column members' TablixHeader.
+  // Crosstab: emit one column-header row per column-group tier. Consecutive
+  // leaves sharing a header node are merged into a single spanning cell.
+  CGFloat planHdrTotalH = 0;
   if (plan) {
-    CGFloat hdrH = 0;
-    BOOL anyHdr = NO;
-    for (PicaColPlanEntry *e in plan) {
-      if (e.headerItem) {
-        anyHdr = YES;
-        hdrH = MAX(hdrH, e.headerSize);
+    NSUInteger tiers = 0;
+    for (PicaColPlanEntry *e in plan)
+      tiers = MAX(tiers, [e.headerChain count]);
+    NSMutableArray *headerRows = [NSMutableArray array];
+    for (NSUInteger t = 0; t < tiers; t++) {
+      CGFloat hdrH = 0;
+      BOOL anyHdr = NO;
+      for (PicaColPlanEntry *e in plan) {
+        PicaColHeaderNode *n = t < [e.headerChain count] ? e.headerChain[t] : nil;
+        if (n.item) {
+          anyHdr = YES;
+          hdrH = MAX(hdrH, n.size);
+        }
       }
-    }
-    if (anyHdr) {
+      if (!anyHdr)
+        continue;
       if (hdrH <= 0)
         hdrH = 0.28;
       PicaTablixInst *hi = [[PicaTablixInst alloc] init];
@@ -749,20 +799,39 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *repo
       hi.repeatOnNewPage = tab.repeatColumnHeaders;
       hi.cells = [NSMutableArray array];
       CGFloat hx = headerW;
-      for (PicaColPlanEntry *e in plan) {
-        if (e.headerItem) {
+      NSUInteger i = 0;
+      while (i < [plan count]) {
+        PicaColPlanEntry *e = plan[i];
+        PicaColHeaderNode *n = t < [e.headerChain count] ? e.headerChain[t] : nil;
+        CGFloat span = e.width;
+        NSUInteger j = i + 1;
+        while (j < [plan count]) {
+          PicaColPlanEntry *e2 = plan[j];
+          PicaColHeaderNode *n2 = t < [e2.headerChain count] ? e2.headerChain[t] : nil;
+          if (n == nil || n2 != n)
+            break;
+          span += e2.width;
+          j++;
+        }
+        if (n.item) {
           PicaTablixCellInst *c = [[PicaTablixCellInst alloc] init];
           c.xRel = hx;
-          c.width = e.width;
+          c.width = span;
           c.height = hdrH;
-          c.item = e.headerItem;
-          c.colRows = e.colRows ?: dataRows;
+          c.item = n.item;
+          c.colRows = n.rows ?: dataRows;
           [hi.cells addObject:c];
         }
-        hx += e.width;
+        hx += span;
+        i = j;
       }
       hi.groupRows = rows;
-      NSMutableArray *withHeader = [NSMutableArray arrayWithObject:hi];
+      [headerRows addObject:hi];
+    }
+    if ([headerRows count]) {
+      for (PicaTablixInst *hr in headerRows)
+        planHdrTotalH += hr.height;
+      NSMutableArray *withHeader = [NSMutableArray arrayWithArray:headerRows];
       [withHeader addObjectsFromArray:walked];
       walked = withHeader;
     }
@@ -789,7 +858,7 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *repo
         PicaTablixCellInst *hc = [[PicaTablixCellInst alloc] init];
         hc.xRel = 0;
         hc.width = headerW;
-        hc.height = headerInst.height;
+        hc.height = MAX(headerInst.height, planHdrTotalH);
         hc.item = cc.item;
         hc.rowHeader = YES;
         NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
@@ -988,7 +1057,10 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
                   scope:(RDLEvalScope *)scope
                  onPage:(RDLLaidOutPage *)page
                 clipTop:(CGFloat)clipTop
-             clipBottom:(CGFloat)clipBottom {
+             clipBottom:(CGFloat)clipBottom
+                chunkX0:(CGFloat)chunkX0
+                chunkX1:(CGFloat)chunkX1
+                  hLead:(CGFloat)hLead {
   if (y + inst.height < clipTop || y > clipBottom)
     return;
   NSDictionary *savedRow = scope.row;
@@ -1005,6 +1077,23 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     RDLItem *contents = cell.item;
     if (contents == nil)
       continue;
+    CGFloat cellX = cell.xRel;
+    CGFloat cellW = cell.width;
+    if (chunkX1 > 0) {
+      if (cell.rowHeader) {
+        // Row headers/corner: shown on the first chunk, and repeated on later
+        // chunks only when RepeatRowHeaders reserved room for them.
+        if (chunkX0 > 1e-6 && hLead <= 0)
+          continue;
+      } else {
+        CGFloat s = MAX(cellX, chunkX0);
+        CGFloat e = MIN(cellX + cellW, chunkX1);
+        if (e - s <= 1e-6)
+          continue;
+        cellX = hLead + (s - chunkX0);
+        cellW = e - s;
+      }
+    }
     NSDictionary *cellSavedRow = scope.row;
     NSArray *cellSavedGroup = scope.groupRows;
     if (cell.colRows) {
@@ -1016,10 +1105,10 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     CGFloat savedL = contents.left, savedT = contents.top, savedW = contents.width, savedH = contents.height;
     contents.left = 0;
     contents.top = 0;
-    contents.width = cell.width;
+    contents.width = cellW;
     contents.height = cell.height > 0 ? cell.height : inst.height;
     [self placeItem:contents
-            originX:(x0 + cell.xRel)
+            originX:(x0 + cellX)
             originY:y
               scope:scope
              onPage:page
@@ -1037,6 +1126,63 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
   scope.groupRows = savedGroup;
 }
 
+// Horizontal pagination: compute column chunks for a tablix wider than the
+// available page width. Returns nil when the tablix fits. Each chunk is
+// {x0, x1} in tablix-relative units; chunks after the first reserve room for
+// repeated row headers (width headerW) when RepeatRowHeaders is set.
+static NSArray<NSDictionary *> *PicaHChunks(NSArray<PicaTablixInst *> *insts, CGFloat headerW,
+                                            BOOL repeatRowHeaders, CGFloat availW) {
+  if (availW <= 0.01)
+    return nil;
+  CGFloat totalW = 0;
+  NSMutableSet *edgeSet = [NSMutableSet set];
+  for (PicaTablixInst *r in insts) {
+    for (PicaTablixCellInst *c in r.cells) {
+      if (c.skip)
+        continue;
+      CGFloat end = c.xRel + c.width;
+      if (end > totalW)
+        totalW = end;
+      if (c.xRel > headerW + 1e-6)
+        [edgeSet addObject:@(round(c.xRel * 1000) / 1000)];
+    }
+  }
+  if (totalW <= availW + 0.01)
+    return nil;
+  NSMutableArray *edges = [[edgeSet allObjects] mutableCopy];
+  [edges sortUsingSelector:@selector(compare:)];
+  [edges addObject:@(totalW)];
+  NSMutableArray *chunks = [NSMutableArray array];
+  CGFloat x0 = 0;
+  CGFloat lead = 0;
+  NSUInteger i = 0;
+  while (x0 < totalW - 1e-6 && [chunks count] < 200) {
+    CGFloat cap = availW - lead;
+    CGFloat x1 = x0;
+    while (i < [edges count]) {
+      CGFloat e = [edges[i] doubleValue];
+      if (e <= x0 + 1e-6) {
+        i++;
+        continue;
+      }
+      if (e - x0 > cap + 0.01)
+        break;
+      x1 = e;
+      i++;
+    }
+    if (x1 <= x0 + 1e-6) {
+      // A single column wider than the page: advance to the next edge anyway.
+      x1 = i < [edges count] ? [edges[i] doubleValue] : totalW;
+      if (i < [edges count])
+        i++;
+    }
+    [chunks addObject:@{ @"x0" : @(x0), @"x1" : @(x1) }];
+    x0 = x1;
+    lead = repeatRowHeaders ? headerW : 0;
+  }
+  return [chunks count] > 1 ? chunks : nil;
+}
+
 + (void)placeTablix:(RDLItem *)item
             originX:(CGFloat)ox
           tablixTop:(CGFloat)tablixTop
@@ -1045,7 +1191,10 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
         bodyBottom:(CGFloat)bodyBottom
              scope:(RDLEvalScope *)scope
             onPage:(RDLLaidOutPage *)page
-         firstPage:(BOOL)firstPage {
+         firstPage:(BOOL)firstPage
+           chunkX0:(CGFloat)chunkX0
+           chunkX1:(CGFloat)chunkX1
+             hLead:(CGFloat)hLead {
   CGFloat bodyAvail = bodyBottom - bodyTop;
   NSArray *insts = PicaExpandTablix(item, scope.report, scope, bodyAvail, tablixTop);
   CGFloat x0 = ox + item.left;
@@ -1074,7 +1223,8 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     for (PicaTablixInst *r in insts) {
       if (!r.repeatOnNewPage)
         continue;
-      [self placeTablixInst:r tab:item x0:x0 y:hy scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom];
+      [self placeTablixInst:r tab:item x0:x0 y:hy scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
+                     chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
       hy += r.height;
     }
   }
@@ -1093,7 +1243,8 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
     }
     CGFloat pageY = bodyTop + (absY - sliceTop) + (firstPage ? 0 : repeatH);
     scope.previousRow = prev;
-    [self placeTablixInst:r tab:item x0:x0 y:pageY scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom];
+    [self placeTablixInst:r tab:item x0:x0 y:pageY scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
+                   chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
     if (r.row)
       prev = r.row;
   }
@@ -1176,7 +1327,24 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
     }
   }
   CGFloat bodyNeeded = MAX(report.body.height, expanded);
-  NSInteger total = (NSInteger)MAX(1, (NSInteger)ceil(bodyNeeded / bodyAvail));
+  NSInteger vTotal = (NSInteger)MAX(1, (NSInteger)ceil(bodyNeeded / bodyAvail));
+
+  // Horizontal pagination: tablixes wider than the page split into column
+  // chunks; extra pages are emitted to the right of each vertical slice.
+  NSMapTable *chunkMap = [NSMapTable strongToStrongObjectsMapTable];
+  NSInteger maxChunks = 1;
+  for (RDLItem *t in tablixes) {
+    CGFloat tTop = t.top + PicaExtraBelow(t.top, growers, report, measure, bodyAvail);
+    NSArray *tInsts = PicaExpandTablix(t, report, measure, bodyAvail, tTop);
+    CGFloat availW = report.page.pageWidth - report.page.rightMargin - (mx + t.left);
+    CGFloat hw = PicaHeaderWidth(t.rowHierarchy.members);
+    NSArray *chunks = PicaHChunks(tInsts, hw, t.repeatRowHeaders, availW);
+    if (chunks) {
+      [chunkMap setObject:@{ @"chunks" : chunks, @"headerW" : @(hw) } forKey:t];
+      maxChunks = MAX(maxChunks, (NSInteger)[chunks count]);
+    }
+  }
+  NSInteger total = vTotal * maxChunks;
 
   // ResetPageNumber/PageName: collect slice indices where a section starts or
   // a page name changes (from body items and tablix group breaks).
@@ -1230,9 +1398,10 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
 
   NSMutableArray *pages = [NSMutableArray array];
   for (NSInteger p = 1; p <= total; p++) {
-    NSInteger sliceIdx = p - 1;
+    NSInteger sliceIdx = (p - 1) / maxChunks;
+    NSInteger chunkIdx = (p - 1) % maxChunks;
     NSInteger sectStart = 0;
-    NSInteger nextSect = total;
+    NSInteger nextSect = vTotal;
     NSString *pname = nil;
     for (NSDictionary *mk in marks) {
       NSInteger s = [mk[@"slice"] integerValue];
@@ -1247,8 +1416,8 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
 
     RDLEvalScope *scope = [[RDLEvalScope alloc] init];
     scope.report = report;
-    scope.pageNumber = sliceIdx - sectStart + 1;
-    scope.totalPages = nextSect - sectStart;
+    scope.pageNumber = (sliceIdx - sectStart) * maxChunks + chunkIdx + 1;
+    scope.totalPages = (nextSect - sectStart) * maxChunks;
     scope.overallPageNumber = p;
     scope.overallTotalPages = total;
     scope.pageName = pname;
@@ -1280,11 +1449,13 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
         [self placeItem:it originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
     }
 
-    CGFloat sliceTop = (CGFloat)(p - 1) * bodyAvail;
+    CGFloat sliceTop = (CGFloat)sliceIdx * bodyAvail;
     if (bodyBG)
       [self placeItem:bodyBG originX:mx originY:bodyTop scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom];
     for (RDLItem *item in report.body.items) {
       if ([item.type isEqualToString:@"Tablix"])
+        continue;
+      if (chunkIdx != 0)
         continue;
       CGFloat dy = PicaExtraBelow(item.top, growers, report, measure, bodyAvail);
       CGFloat grownH = item.height + MAX(PicaGrownDelta(item, report, measure, bodyAvail), 0);
@@ -1310,6 +1481,19 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
       CGFloat tBot = tTop + PicaTablixHeight(t, report, measure, bodyAvail, tTop);
       if (tBot <= sliceTop || tTop >= sliceTop + bodyAvail)
         continue;
+      CGFloat cx0 = 0, cx1 = 0, lead = 0;
+      NSDictionary *ci = [chunkMap objectForKey:t];
+      if (ci) {
+        NSArray *chunks = ci[@"chunks"];
+        if (chunkIdx >= (NSInteger)[chunks count])
+          continue;
+        cx0 = [chunks[(NSUInteger)chunkIdx][@"x0"] doubleValue];
+        cx1 = [chunks[(NSUInteger)chunkIdx][@"x1"] doubleValue];
+        if (chunkIdx > 0 && t.repeatRowHeaders)
+          lead = [ci[@"headerW"] doubleValue];
+      } else if (chunkIdx != 0) {
+        continue;
+      }
       BOOL first = (tTop >= sliceTop);
       [self placeTablix:t
                 originX:mx
@@ -1319,7 +1503,10 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
              bodyBottom:bodyBottom
                   scope:scope
                  onPage:page
-              firstPage:first];
+              firstPage:first
+                chunkX0:cx0
+                chunkX1:cx1
+                  hLead:lead];
     }
 
     BOOL anyZ = NO;
