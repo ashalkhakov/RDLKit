@@ -69,6 +69,8 @@
 @property (nonatomic, copy) NSString *noRowsMessage;
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, copy) NSString *pageBreak; // None, Start, End, StartAndEnd, Between
+@property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
+@property (nonatomic, copy) NSString *pageName;     // PageBreak/PageName → Globals!PageName
 @property (nonatomic, assign) BOOL repeatColumnHeaders;
 @property (nonatomic, assign) BOOL repeatRowHeaders;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
@@ -124,6 +126,8 @@
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
 @property (nonatomic, strong) RDLTablixHeader *header;
 @property (nonatomic, copy) NSString *pageBreak; // None, Start, End, StartAndEnd, Between
+@property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
+@property (nonatomic, copy) NSString *pageName;     // PageBreak/PageName → Globals!PageName
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) BOOL repeatOnNewPage;
 @property (nonatomic, copy) NSString *keepWithGroup; // None, Before, After
@@ -140,6 +144,7 @@
 @property (nonatomic, strong) NSMutableArray<RDLItem *> *items;
 @property (nonatomic, assign) BOOL printOnFirstPage;
 @property (nonatomic, assign) BOOL printOnLastPage;
+@property (nonatomic, strong) RDLStyle *style; // Body/section Style (background, border)
 @end
 
 @interface RDLField : NSObject
@@ -174,6 +179,10 @@
 @property (nonatomic, copy) NSString *dataType;
 @property (nonatomic, copy) NSString *prompt;
 @property (nonatomic, copy) NSString *defaultValue;
+@property (nonatomic, assign) BOOL nullable;
+@property (nonatomic, assign) BOOL multiValue;
+@property (nonatomic, strong) NSMutableArray<NSString *> *defaultValues; // MultiValue defaults
+@property (nonatomic, strong) NSMutableArray<NSString *> *validValues;   // ValidValues/ParameterValues Value list
 @end
 
 @interface RDLPage : NSObject
@@ -194,6 +203,8 @@
 @property (nonatomic, strong) NSMutableArray<RDLDataSet *> *dataSets;
 @property (nonatomic, strong) NSMutableArray<RDLParameter *> *parameters;
 @property (nonatomic, strong) NSMutableArray<RDLEmbeddedImage *> *embeddedImages;
+// Parser diagnostics: names of unsupported/skipped elements ("Subreport 'X'", …).
+@property (nonatomic, strong) NSMutableArray<NSString *> *warnings;
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
 - (RDLBand *)bandWithKey:(NSString *)key;

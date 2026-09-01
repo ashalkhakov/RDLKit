@@ -691,6 +691,22 @@ static id PicaField(RDLEvalScope *scope, NSString *name, NSString *prop) {
   return v ?: @"";
 }
 
+static id PicaCoerceParamValue(RDLParameter *hit, id raw, RDLEvalScope *scope) {
+  if ([raw isKindOfClass:[NSString class]] && [(NSString *)raw hasPrefix:@"="])
+    raw = [RDLExpression evaluate:raw scope:scope];
+  if (raw == nil || ([raw isKindOfClass:[NSString class]] && [(NSString *)raw length] == 0))
+    return hit.nullable ? nil : @"";
+  if ([hit.dataType isEqualToString:@"Integer"] || [hit.dataType isEqualToString:@"Float"])
+    return @([[raw description] doubleValue]);
+  if ([hit.dataType isEqualToString:@"Boolean"]) {
+    NSString *s = [raw description];
+    return PicaYes([s caseInsensitiveCompare:@"true"] == NSOrderedSame || [s isEqualToString:@"1"]);
+  }
+  if ([hit.dataType isEqualToString:@"DateTime"])
+    return PicaAsDate(raw, nil) ?: raw;
+  return raw;
+}
+
 static id PicaParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
   RDLParameter *hit = nil;
   for (RDLParameter *p in scope.report.parameters)
@@ -698,26 +714,46 @@ static id PicaParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
       hit = p;
   if ([prop caseInsensitiveCompare:@"Label"] == NSOrderedSame)
     return hit.prompt.length ? hit.prompt : (hit.name ?: name);
-  NSString *raw = scope.paramValues[hit.name ?: name] ?: @"";
-  if ([raw length] == 0 && hit)
-    raw = hit.defaultValue ?: @"";
-  if (hit && ([hit.dataType isEqualToString:@"Integer"] || [hit.dataType isEqualToString:@"Float"]))
-    return @([raw doubleValue]);
-  if (hit && [hit.dataType isEqualToString:@"Boolean"])
-    return PicaYes([raw isEqualToString:@"true"] || [raw isEqualToString:@"True"] || [raw isEqualToString:@"1"]);
-  return raw ?: @"";
+  id raw = scope.paramValues[hit.name ?: name];
+  if (raw == nil || ([raw isKindOfClass:[NSString class]] && [(NSString *)raw length] == 0)) {
+    if (hit.multiValue && [hit.defaultValues count])
+      raw = hit.defaultValues;
+    else if ([hit.defaultValues count])
+      raw = hit.defaultValues[0];
+    else
+      raw = hit.defaultValue;
+  }
+  if (hit.multiValue && [raw isKindOfClass:[NSString class]])
+    raw = @[ raw ];
+  if ([prop caseInsensitiveCompare:@"Count"] == NSOrderedSame)
+    return @([raw isKindOfClass:[NSArray class]] ? [(NSArray *)raw count] : (raw != nil ? 1 : 0));
+  if ([raw isKindOfClass:[NSArray class]]) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (id v in (NSArray *)raw) {
+      id c = PicaCoerceParamValue(hit, v, scope);
+      [out addObject:c ?: [NSNull null]];
+    }
+    return out;
+  }
+  return PicaCoerceParamValue(hit, raw, scope);
 }
 
 static id PicaGlobal(RDLEvalScope *scope, NSString *name) {
   NSString *n = [name lowercaseString];
-  if ([n isEqualToString:@"pagenumber"] || [n isEqualToString:@"overallpagenumber"])
+  if ([n isEqualToString:@"pagenumber"])
     return @(scope.pageNumber);
-  if ([n isEqualToString:@"totalpages"] || [n isEqualToString:@"overalltotalpages"])
+  if ([n isEqualToString:@"overallpagenumber"])
+    return @(scope.overallPageNumber > 0 ? scope.overallPageNumber : scope.pageNumber);
+  if ([n isEqualToString:@"totalpages"])
     return @(scope.totalPages);
+  if ([n isEqualToString:@"overalltotalpages"])
+    return @(scope.overallTotalPages > 0 ? scope.overallTotalPages : scope.totalPages);
   if ([n isEqualToString:@"reportname"])
     return scope.report.name ?: @"";
   if ([n isEqualToString:@"executiontime"])
     return scope.executionTime ?: [NSDate date];
+  if ([n isEqualToString:@"pagename"])
+    return scope.pageName ?: @"";
   return @"";
 }
 

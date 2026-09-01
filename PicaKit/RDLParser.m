@@ -149,6 +149,16 @@ static NSString *PicaParsePageBreak(NSXMLElement *el) {
   return [loc length] ? loc : nil;
 }
 
+static BOOL PicaParsePageBreakReset(NSXMLElement *el) {
+  NSString *r = PicaText(PicaChild(el, @"ResetPageNumber"));
+  return [r caseInsensitiveCompare:@"true"] == NSOrderedSame;
+}
+
+static NSString *PicaParsePageBreakName(NSXMLElement *el) {
+  NSString *n = PicaText(PicaChild(el, @"PageName"));
+  return [n length] ? n : nil;
+}
+
 static NSString *PicaFindGroupBy(NSArray<RDLTablixMember *> *members) {
   for (RDLTablixMember *mm in members) {
     if ([mm.groupExpressions count]) {
@@ -168,6 +178,25 @@ static NSString *PicaFindGroupBy(NSArray<RDLTablixMember *> *members) {
 }
 
 static RDLItem *PicaParseItem(NSXMLElement *el);
+
+// Collected during a single parse; reportFromXMLString: copies them into
+// report.warnings. Elements we knowingly skip should warn, not vanish.
+static NSMutableArray *gPicaParseWarnings = nil;
+
+static BOOL PicaIsSupportedItemElement(NSString *localName) {
+  static NSArray *known = nil;
+  if (known == nil)
+    known = @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart", @"List" ];
+  return [known containsObject:localName];
+}
+
+static void PicaWarnUnsupported(NSXMLElement *el) {
+  NSString *name = [el attributeForName:@"Name"].stringValue;
+  NSString *msg = name.length
+                      ? [NSString stringWithFormat:@"unsupported element %@ '%@' skipped", el.localName, name]
+                      : [NSString stringWithFormat:@"unsupported element %@ skipped", el.localName];
+  [gPicaParseWarnings addObject:msg];
+}
 
 static RDLTablixCell *PicaParseCellContents(NSXMLElement *contents) {
   RDLTablixCell *cell = [[RDLTablixCell alloc] init];
@@ -201,6 +230,10 @@ static RDLTablixMember *PicaParseMember(NSXMLElement *el) {
     NSString *pb = PicaParsePageBreak(PicaChild(group, @"PageBreak"));
     if (pb)
       m.pageBreak = pb;
+    m.resetPageNumber = PicaParsePageBreakReset(PicaChild(group, @"PageBreak"));
+    NSString *pn = PicaParsePageBreakName(PicaChild(group, @"PageBreak"));
+    if (pn)
+      m.pageName = pn;
     NSArray *gf = PicaParseFilters(PicaChild(group, @"Filters"));
     if ([gf count])
       [m.filters addObjectsFromArray:gf];
@@ -229,6 +262,11 @@ static RDLTablixMember *PicaParseMember(NSXMLElement *el) {
   NSString *mb = PicaParsePageBreak(PicaChild(el, @"PageBreak"));
   if (mb)
     m.pageBreak = mb;
+  if (PicaParsePageBreakReset(PicaChild(el, @"PageBreak")))
+    m.resetPageNumber = YES;
+  NSString *mpn = PicaParsePageBreakName(PicaChild(el, @"PageBreak"));
+  if (mpn)
+    m.pageName = mpn;
   NSXMLElement *kids = PicaChild(el, @"TablixMembers");
   for (NSXMLNode *n in [kids children]) {
     if (n.kind == NSXMLElementKind && [[(NSXMLElement *)n localName] isEqualToString:@"TablixMember"])
@@ -302,6 +340,19 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
   NSString *zi = PicaText(PicaChild(el, @"ZIndex"));
   if ([zi length])
     item.zIndex = [zi integerValue];
+  NSXMLElement *pbEl = PicaChild(el, @"PageBreak");
+  if (pbEl) {
+    NSString *pb = PicaParsePageBreak(pbEl);
+    if (pb)
+      item.pageBreak = pb;
+    item.resetPageNumber = PicaParsePageBreakReset(pbEl);
+    NSString *pn = PicaParsePageBreakName(pbEl);
+    if (pn)
+      item.pageName = pn;
+  }
+  NSString *ktc = PicaText(PicaChild(el, @"KeepTogether"));
+  if ([ktc length])
+    item.keepTogether = [ktc caseInsensitiveCompare:@"true"] == NSOrderedSame;
   if ([el.localName isEqualToString:@"Textbox"]) {
     item.value = PicaTextboxValue(el);
     item.hyperlink = PicaParseHyperlink(el);
@@ -364,8 +415,13 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     cellRect.height = item.height;
     NSXMLElement *ri = PicaChild(el, @"ReportItems");
     for (NSXMLNode *n in [ri children]) {
-      if (n.kind == NSXMLElementKind)
-        [cellRect.items addObject:PicaParseItem((NSXMLElement *)n)];
+      if (n.kind != NSXMLElementKind)
+        continue;
+      if (!PicaIsSupportedItemElement([(NSXMLElement *)n localName])) {
+        PicaWarnUnsupported((NSXMLElement *)n);
+        continue;
+      }
+      [cellRect.items addObject:PicaParseItem((NSXMLElement *)n)];
     }
     RDLTablixBody *body = [[RDLTablixBody alloc] init];
     RDLTablixColumn *col = [[RDLTablixColumn alloc] init];
@@ -490,8 +546,13 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     if (!chart) {
       NSXMLElement *ri = PicaChild(el, @"ReportItems");
       for (NSXMLNode *n in [ri children]) {
-        if (n.kind == NSXMLElementKind)
-          [item.items addObject:PicaParseItem((NSXMLElement *)n)];
+        if (n.kind != NSXMLElementKind)
+          continue;
+        if (!PicaIsSupportedItemElement([(NSXMLElement *)n localName])) {
+          PicaWarnUnsupported((NSXMLElement *)n);
+          continue;
+        }
+        [item.items addObject:PicaParseItem((NSXMLElement *)n)];
       }
     }
   }
@@ -515,9 +576,15 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
     b.printOnLastPage = ![p2 isEqualToString:@"false"];
   NSXMLElement *ri = PicaChild(el, @"ReportItems");
   for (NSXMLNode *n in [ri children]) {
-    if (n.kind == NSXMLElementKind)
-      [b.items addObject:PicaParseItem((NSXMLElement *)n)];
+    if (n.kind != NSXMLElementKind)
+      continue;
+    if (!PicaIsSupportedItemElement([(NSXMLElement *)n localName])) {
+      PicaWarnUnsupported((NSXMLElement *)n);
+      continue;
+    }
+    [b.items addObject:PicaParseItem((NSXMLElement *)n)];
   }
+  b.style = PicaChild(el, @"Style") ? PicaParseStyle(PicaChild(el, @"Style")) : nil;
   return b;
 }
 
@@ -535,6 +602,7 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
     return nil;
   }
   RDLReport *r = [RDLReport emptyReportNamed:@"Report"];
+  gPicaParseWarnings = [NSMutableArray array];
   NSString *nm = PicaText(PicaChild(root, @"Name"));
   if ([nm length] == 0)
     nm = PicaText(PicaChild(root, @"ReportName"));
@@ -639,11 +707,25 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
     rp.prompt = PicaText(PicaChild(p, @"Prompt"));
     if ([rp.prompt length] == 0)
       rp.prompt = rp.name;
-    rp.defaultValue = PicaText(PicaChild(PicaChild(PicaChild(p, @"DefaultValue"), @"Values"), @"Value"));
+    NSString *nullable = PicaText(PicaChild(p, @"Nullable"));
+    rp.nullable = [nullable caseInsensitiveCompare:@"true"] == NSOrderedSame;
+    NSString *multi = PicaText(PicaChild(p, @"MultiValue"));
+    rp.multiValue = [multi caseInsensitiveCompare:@"true"] == NSOrderedSame;
+    for (NSXMLNode *vn in [PicaChild(PicaChild(p, @"DefaultValue"), @"Values") children]) {
+      if (vn.kind == NSXMLElementKind)
+        [rp.defaultValues addObject:PicaText((NSXMLElement *)vn)];
+    }
+    rp.defaultValue = [rp.defaultValues firstObject];
+    for (NSXMLNode *vn in [PicaChild(PicaChild(p, @"ValidValues"), @"ParameterValues") children]) {
+      if (vn.kind == NSXMLElementKind)
+        [rp.validValues addObject:PicaText(PicaChild((NSXMLElement *)vn, @"Value"))];
+    }
     [r.parameters addObject:rp];
   }
   if ([r.name length] == 0)
     r.name = @"Report";
+  [r.warnings setArray:gPicaParseWarnings];
+  gPicaParseWarnings = nil;
   return r;
 }
 @end
@@ -751,10 +833,17 @@ static void PicaAppendSorts(NSMutableString *xml, NSArray<RDLSortExpression *> *
   [xml appendString:@"</SortExpressions>"];
 }
 
-static void PicaAppendPageBreak(NSMutableString *xml, NSString *loc) {
-  if ([loc length] == 0 || [loc isEqualToString:@"None"])
+static void PicaAppendPageBreak(NSMutableString *xml, NSString *loc, BOOL reset, NSString *pageName) {
+  if (([loc length] == 0 || [loc isEqualToString:@"None"]) && !reset && [pageName length] == 0)
     return;
-  [xml appendFormat:@"<PageBreak><BreakLocation>%@</BreakLocation></PageBreak>", PicaEsc(loc)];
+  [xml appendString:@"<PageBreak>"];
+  if ([loc length] && ![loc isEqualToString:@"None"])
+    [xml appendFormat:@"<BreakLocation>%@</BreakLocation>", PicaEsc(loc)];
+  if (reset)
+    [xml appendString:@"<ResetPageNumber>true</ResetPageNumber>"];
+  if ([pageName length])
+    [xml appendFormat:@"<PageName>%@</PageName>", PicaEsc(pageName)];
+  [xml appendString:@"</PageBreak>"];
 }
 
 static void PicaAppendMember(NSMutableString *xml, RDLTablixMember *m) {
@@ -767,7 +856,7 @@ static void PicaAppendMember(NSMutableString *xml, RDLTablixMember *m) {
         [xml appendFormat:@"<GroupExpression>%@</GroupExpression>", PicaEsc(e)];
       [xml appendString:@"</GroupExpressions>"];
     }
-    PicaAppendPageBreak(xml, m.pageBreak);
+    PicaAppendPageBreak(xml, m.pageBreak, m.resetPageNumber, m.pageName);
     PicaAppendFilters(xml, m.filters);
     [xml appendString:@"</Group>"];
   }
@@ -809,7 +898,7 @@ static void PicaAppendTablix(NSMutableString *xml, RDLItem *it) {
     [xml appendString:@"<RepeatRowHeaders>true</RepeatRowHeaders>"];
   if (it.keepTogether)
     [xml appendString:@"<KeepTogether>true</KeepTogether>"];
-  PicaAppendPageBreak(xml, it.pageBreak);
+  PicaAppendPageBreak(xml, it.pageBreak, it.resetPageNumber, it.pageName);
   PicaAppendFilters(xml, it.filters);
   PicaAppendSorts(xml, it.sortExpressions);
   PicaAppendStyle(xml, it.style);
@@ -880,6 +969,12 @@ static void PicaAppendHyperlink(NSMutableString *xml, RDLItem *it) {
                       PicaEsc(it.hyperlink)];
 }
 
+static void PicaAppendItemPagination(NSMutableString *xml, RDLItem *it) {
+  if (it.keepTogether)
+    [xml appendString:@"<KeepTogether>true</KeepTogether>"];
+  PicaAppendPageBreak(xml, it.pageBreak, it.resetPageNumber, it.pageName);
+}
+
 static void PicaAppendItem(NSMutableString *xml, RDLItem *it) {
   if ([it.type isEqualToString:@"Line"]) {
     [xml appendFormat:@"<Line Name=\"%@\">", PicaEsc(it.name)];
@@ -905,6 +1000,7 @@ static void PicaAppendItem(NSMutableString *xml, RDLItem *it) {
     [xml appendFormat:@"<Rectangle Name=\"%@\">", PicaEsc(it.name)];
     PicaAppendBox(xml, it);
     PicaAppendVisibility(xml, it);
+    PicaAppendItemPagination(xml, it);
     PicaAppendStyle(xml, it.style);
     if ([it.items count]) {
       [xml appendString:@"<ReportItems>"];
@@ -941,6 +1037,7 @@ static void PicaAppendItem(NSMutableString *xml, RDLItem *it) {
   PicaAppendBox(xml, it);
   PicaAppendVisibility(xml, it);
   PicaAppendHyperlink(xml, it);
+  PicaAppendItemPagination(xml, it);
   [xml appendFormat:@"<CanGrow>%@</CanGrow>", it.canGrow ? @"true" : @"false"];
   PicaAppendStyle(xml, it.style);
   [xml appendFormat:@"<Paragraphs><Paragraph><TextRuns><TextRun><Value>%@</Value>",
@@ -953,6 +1050,8 @@ static void PicaAppendBand(NSMutableString *xml, RDLBand *b) {
   [xml appendFormat:@"<Height>%@</Height>", PicaIn(b.height)];
   [xml appendFormat:@"<PrintOnFirstPage>%@</PrintOnFirstPage>", b.printOnFirstPage ? @"true" : @"false"];
   [xml appendFormat:@"<PrintOnLastPage>%@</PrintOnLastPage>", b.printOnLastPage ? @"true" : @"false"];
+  if (b.style)
+    PicaAppendStyle(xml, b.style);
   [xml appendString:@"<ReportItems>"];
   for (RDLItem *it in b.items)
     PicaAppendItem(xml, it);
@@ -1007,10 +1106,26 @@ static void PicaAppendBand(NSMutableString *xml, RDLBand *b) {
   }
   [xml appendString:@"</DataSets>\n  <ReportParameters>"];
   for (RDLParameter *p in report.parameters) {
-    [xml appendFormat:@"<ReportParameter Name=\"%@\"><DataType>%@</DataType><Prompt>%@</Prompt>"
-                      @"<DefaultValue><Values><Value>%@</Value></Values></DefaultValue></ReportParameter>",
+    [xml appendFormat:@"<ReportParameter Name=\"%@\"><DataType>%@</DataType><Prompt>%@</Prompt>",
                       PicaEsc(p.name), PicaEsc(p.dataType ?: @"String"),
-                      PicaEsc(p.prompt.length ? p.prompt : p.name), PicaEsc(p.defaultValue)];
+                      PicaEsc(p.prompt.length ? p.prompt : p.name)];
+    if (p.nullable)
+      [xml appendString:@"<Nullable>true</Nullable>"];
+    if (p.multiValue)
+      [xml appendString:@"<MultiValue>true</MultiValue>"];
+    NSArray *defaults = [p.defaultValues count] ? p.defaultValues
+                        : (p.defaultValue ? @[ p.defaultValue ] : @[]);
+    [xml appendString:@"<DefaultValue><Values>"];
+    for (NSString *v in defaults)
+      [xml appendFormat:@"<Value>%@</Value>", PicaEsc(v)];
+    [xml appendString:@"</Values></DefaultValue>"];
+    if ([p.validValues count]) {
+      [xml appendString:@"<ValidValues><ParameterValues>"];
+      for (NSString *v in p.validValues)
+        [xml appendFormat:@"<ParameterValue><Value>%@</Value></ParameterValue>", PicaEsc(v)];
+      [xml appendString:@"</ParameterValues></ValidValues>"];
+    }
+    [xml appendString:@"</ReportParameter>"];
   }
   [xml appendString:@"</ReportParameters>\n"];
   if ([report.embeddedImages count]) {

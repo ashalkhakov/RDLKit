@@ -387,6 +387,14 @@
 @end
 
 @implementation RDLParameter
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _defaultValues = [NSMutableArray array];
+    _validValues = [NSMutableArray array];
+  }
+  return self;
+}
 @end
 
 @implementation RDLPage
@@ -424,6 +432,7 @@
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
   r.embeddedImages = [NSMutableArray array];
+  r.warnings = [NSMutableArray array];
   return r;
 }
 

@@ -10,8 +10,11 @@
 @property (nonatomic, copy) NSDictionary *previousRow;
 @property (nonatomic, assign) NSInteger pageNumber;
 @property (nonatomic, assign) NSInteger totalPages;
+@property (nonatomic, assign) NSInteger overallPageNumber; // 0 = same as pageNumber
+@property (nonatomic, assign) NSInteger overallTotalPages; // 0 = same as totalPages
+@property (nonatomic, copy) NSString *pageName; // Globals!PageName
 @property (nonatomic, strong) NSDate *executionTime;
-@property (nonatomic, copy) NSDictionary<NSString *, NSString *> *paramValues;
+@property (nonatomic, copy) NSDictionary<NSString *, id> *paramValues; // NSString or NSArray (MultiValue)
 @property (nonatomic, copy) NSString *userID;
 @property (nonatomic, copy) NSString *language;
 @end
