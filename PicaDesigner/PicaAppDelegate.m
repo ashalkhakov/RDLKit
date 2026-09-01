@@ -31,6 +31,12 @@
   return it;
 }
 
+// Nil-target item: the action goes to the first responder (field editor,
+// canvas, window undo manager…) instead of the app delegate.
+- (NSMenuItem *)responderItem:(NSString *)title action:(SEL)sel key:(NSString *)key {
+  return [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:key ?: @""];
+}
+
 - (void)buildMenu {
   NSMenu *menubar = [[NSMenu alloc] initWithTitle:@""];
   NSMenuItem *appItem = [[NSMenuItem alloc] init];
@@ -80,7 +86,17 @@
   NSMenuItem *editItem = [[NSMenuItem alloc] init];
   [menubar addItem:editItem];
   NSMenu *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
-  [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"a"]];
+  // Standard editing items dispatch through the responder chain (nil target);
+  // without them Cmd+Z/X/C/V/A never reach text fields or the undo manager.
+  [edit addItem:[self responderItem:@"Undo" action:@selector(undo:) key:@"z"]];
+  [edit addItem:[self responderItem:@"Redo" action:@selector(redo:) key:@"Z"]];
+  [edit addItem:[NSMenuItem separatorItem]];
+  [edit addItem:[self responderItem:@"Cut" action:@selector(cut:) key:@"x"]];
+  [edit addItem:[self responderItem:@"Copy" action:@selector(copy:) key:@"c"]];
+  [edit addItem:[self responderItem:@"Paste" action:@selector(paste:) key:@"v"]];
+  [edit addItem:[self responderItem:@"Select All" action:@selector(selectAll:) key:@"a"]];
+  [edit addItem:[NSMenuItem separatorItem]];
+  [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"A"]];
   [edit addItem:[self item:@"Delete" action:@selector(delete:) key:@"\b"]];
   [edit addItem:[self item:@"Toggle Grid" action:@selector(toggleGrid:) key:@"g"]];
   [edit addItem:[self item:@"Zoom In" action:@selector(zoomIn:) key:@"="]];

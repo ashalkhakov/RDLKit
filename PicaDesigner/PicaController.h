@@ -20,6 +20,9 @@ typedef NS_ENUM(NSInteger, PicaSelectionScope) {
 @property (nonatomic, copy) NSURL *fileURL;
 @property (nonatomic, assign) BOOL dirty;
 @property (nonatomic, copy) NSDictionary<NSString *, NSString *> *paramValues;
+// Report-level undo: every noteChange registers an XML snapshot of the
+// report, so any model edit (move, resize, cell text, inspector…) undoes.
+@property (nonatomic, strong, readonly) NSUndoManager *undoManager;
 + (instancetype)sharedController;
 - (void)newReport;
 - (void)loadReport:(RDLReport *)report;
@@ -46,4 +49,7 @@ typedef NS_ENUM(NSInteger, PicaSelectionScope) {
 - (void)setDatasetJSON:(NSString *)json name:(NSString *)datasetName;
 - (void)syncParamsFromReport;
 - (void)noteChange;
+// Coalesce a continuous interaction (e.g. a mouse drag) into one undo step.
+- (void)beginUndoCoalescing;
+- (void)endUndoCoalescing;
 @end

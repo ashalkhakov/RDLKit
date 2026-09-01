@@ -63,6 +63,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 @implementation PicaCanvasView {
   NSString *_dragKind; // move, se, e, s
   NSPoint _dragStart;
+  BOOL _dragActive; // passed the slop threshold; coalescing one undo step
   CGFloat _origLeft, _origTop, _origW, _origH;
   // In-place editing session
   NSTextField *_editorField;
@@ -70,8 +71,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSDictionary *_editContext; // nil = item value; tablix: {col, part:header|value}
   BOOL _editorCancelled;
   BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
-  // Double-click edit deferred past the mouse event (Cocoa's field-editor
-  // setup misbehaves when started inside mouseDown: of a double-click).
+  // Double-click edit begins on mouseUp: (starting a field editor inside
+  // mouseDown: is unreliable on Cocoa — pending mouseUp and focus changes
+  // tear the fresh editor down again).
   RDLItem *_pendingEditItem;
   NSPoint _pendingEditPoint;
 }
@@ -531,18 +533,16 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     if (hit) {
       [c selectItemNamed:hit.name bandKey:key];
       if ([event clickCount] >= 2) {
+        // The edit starts from mouseUp: (the reliable Cocoa pattern);
+        // remember what was hit so the second click's release begins it.
         _dragKind = nil;
-        // Defer past the double-click event: starting a field editor inside
-        // mouseDown: is unreliable on Cocoa (the pending mouseUp and focus
-        // changes tear the fresh editor down again).
         _pendingEditItem = hit;
         _pendingEditPoint = p;
-        [self performSelector:@selector(startPendingEdit)
-                   withObject:nil
-                   afterDelay:0];
         return;
       }
+      _pendingEditItem = nil;
       _dragKind = kind;
+      _dragActive = NO;
       _dragStart = p;
       _origLeft = hit.left;
       _origTop = hit.top;
@@ -553,12 +553,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     if (NSPointInRect(p, br)) {
       [c selectBandWithKey:key];
       _dragKind = nil;
+      _pendingEditItem = nil;
       return;
     }
     y += bh;
   }
   [c selectReport];
   _dragKind = nil;
+  _pendingEditItem = nil;
 }
 
 - (void)mouseDragged:(NSEvent *)event {
@@ -566,6 +568,16 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return;
   PicaController *c = [PicaController sharedController];
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+  if (!_dragActive) {
+    // Slop threshold: the jiggle between the clicks of a double-click (or a
+    // sloppy single click) must not move the item — that both disturbed
+    // double-click editing on Mac and polluted the model with tiny moves.
+    if (fabs(p.x - _dragStart.x) < 3 && fabs(p.y - _dragStart.y) < 3)
+      return;
+    _dragActive = YES;
+    _pendingEditItem = nil;
+    [c beginUndoCoalescing]; // the whole drag is one undo step
+  }
   CGFloat z = c.zoom;
   CGFloat dx = (p.x - _dragStart.x) / (kDPI * z);
   CGFloat dy = (p.y - _dragStart.y) / (kDPI * z);
@@ -580,8 +592,15 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)mouseUp:(NSEvent *)event {
-  (void)event;
+  if (_dragActive)
+    [[PicaController sharedController] endUndoCoalescing];
   _dragKind = nil;
+  _dragActive = NO;
+  if (_pendingEditItem && [event clickCount] >= 2) {
+    // Begin the in-place edit now that the event sequence is over; starting
+    // a field editor inside mouseDown: is unreliable on Cocoa.
+    [self startPendingEdit];
+  }
 }
 
 - (void)keyDown:(NSEvent *)event {

@@ -40,6 +40,9 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   BOOL _loading;
   BOOL _postingReport;
   BOOL _postingSelection;
+  NSString *_lastSnapshot; // XML of the report before the pending change
+  BOOL _coalescing;
+  BOOL _coalescedRegistered;
 }
 
 + (instancetype)sharedController {
@@ -65,6 +68,8 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
        returns re-enters -init. */
     _report = [PicaSamples blankLetter];
     [self syncParamsFromReport];
+    _undoManager = [[NSUndoManager alloc] init];
+    _lastSnapshot = [RDLWriter XMLStringFromReport:_report];
   }
   return self;
 }
@@ -91,7 +96,59 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   if (_loading)
     return;
   self.dirty = YES;
+  [self registerUndoSnapshot];
   [self postReport];
+}
+
+// Snapshot-based undo: the report round-trips through RDL XML, so one
+// registration covers every kind of model edit.
+- (void)registerUndoSnapshot {
+  NSString *xml = [RDLWriter XMLStringFromReport:self.report];
+  if (_lastSnapshot != nil && [xml isEqualToString:_lastSnapshot])
+    return;
+  if (!_coalescing || !_coalescedRegistered) {
+    [[_undoManager prepareWithInvocationTarget:self] restoreSnapshotXML:_lastSnapshot];
+    [_undoManager setActionName:@"Edit Report"];
+    if (_coalescing)
+      _coalescedRegistered = YES;
+  }
+  _lastSnapshot = xml;
+}
+
+- (void)restoreSnapshotXML:(NSString *)xml {
+  if (xml == nil)
+    return;
+  RDLReport *restored = [RDLParser reportFromXMLString:xml error:NULL];
+  if (restored == nil)
+    return;
+  [[_undoManager prepareWithInvocationTarget:self]
+      restoreSnapshotXML:[RDLWriter XMLStringFromReport:self.report]];
+  [_undoManager setActionName:@"Edit Report"];
+  _loading = YES; // suppress noteChange re-registration during the swap
+  self.report = restored;
+  _lastSnapshot = xml;
+  self.dirty = YES;
+  [self syncParamsFromReport];
+  // Selection is name-based; drop it if the restored report lost the item.
+  if (self.selectionScope == PicaSelectionItem &&
+      (self.selectedName == nil ||
+       [self findItemNamed:self.selectedName bandKey:NULL parent:NULL] == nil)) {
+    self.selectedName = nil;
+    self.selectionScope = PicaSelectionReport;
+  }
+  _loading = NO;
+  [self postReport];
+  [self postSelection];
+}
+
+- (void)beginUndoCoalescing {
+  _coalescing = YES;
+  _coalescedRegistered = NO;
+}
+
+- (void)endUndoCoalescing {
+  _coalescing = NO;
+  _coalescedRegistered = NO;
 }
 
 - (void)syncParamsFromReport {
@@ -112,6 +169,8 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   self.fileURL = nil;
   self.dirty = NO;
   [self syncParamsFromReport];
+  [_undoManager removeAllActions];
+  _lastSnapshot = [RDLWriter XMLStringFromReport:report];
   [self postReport];
   [self postSelection];
   _loading = NO;

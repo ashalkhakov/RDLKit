@@ -57,8 +57,19 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   if (_fieldEditor == nil) {
     _fieldEditor = [[PicaExpressionFieldEditor alloc] initWithFrame:NSZeroRect];
     [_fieldEditor setFieldEditor:YES];
+    [_fieldEditor setRichText:NO];
+    // The stock field editor allows undo; a replacement must opt in or
+    // Cmd+Z stops working in every text field of the window.
+    [_fieldEditor setAllowsUndo:YES];
   }
   return _fieldEditor;
+}
+
+// Route Cmd+Z to the report-level undo manager when no text field is being
+// edited (field editors keep their own typing undo via allowsUndo).
+- (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window {
+  (void)window;
+  return [[PicaController sharedController] undoManager];
 }
 
 - (instancetype)init {

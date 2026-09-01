@@ -13,12 +13,12 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaWelcomeWindow` | Chooser: Generator or Designer |
 | `PicaGeneratorWindow` | Open RDL, bind parameters/JSON, paper, export PDF/HTML |
 | `PicaDesignerWindow` | Split: report outline (+/− bar, modal Add Element palette) · canvas · inspector · data |
-| `PicaCanvasView` | Flipped paper, bands, drag/resize, snap 0.05 in, nested Rectangle children; WYSIWYG attributed-string preview (fonts, bold/italic, underline, colors, background, borders, padding); in-place editing — double-click (or Return) edits a textbox value, double-click a tablix header/value cell edits it in place with Tab/Backtab moving across cells |
+| `PicaCanvasView` | Flipped paper, bands, drag/resize (3 px slop; one undo step per drag), snap 0.05 in, nested Rectangle children; WYSIWYG attributed-string preview (fonts, bold/italic, underline, colors, background, borders, padding); in-place editing — double-click (edit starts on mouse-up, or press Return) edits a textbox value, double-click a tablix header/value cell edits it in place with Tab/Backtab moving across cells |
 | `PicaExpressionHelper` | XPath-editor-style expression completion: typing `!` after `Fields`/`Parameters`/`Globals`/`User` pops the member list (dataset fields, report parameters, built-ins); Escape completes function names; used by canvas in-place editors and inspector fields |
 | `PicaInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `PicaTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total), row group with subtotal, nested child row group, column group (crosstab pivot), grand-total row |
 | `PicaDataView` | Parameters and dataset JSON |
-| `PicaController` | Current `RDLReport`, selection (report / band / item), element insertion rules |
+| `PicaController` | Current `RDLReport`, selection (report / band / item), element insertion rules; report-level undo/redo — every model change registers an RDL-XML snapshot on `undoManager` (drags coalesce into one step); the Edit menu carries the standard Undo/Redo/Cut/Copy/Paste/Select All items dispatched through the responder chain |
 | `PicaSamples` | Native sample factories |
 | `RDLView` (kit) | Paginated preview from laid-out pages + `PDFData` |
 
