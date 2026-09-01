@@ -32,6 +32,10 @@
 - (void)testTablixGroupsFiltersNoRows {
   PICA_ASSERT_NO_FAILURES(PicaRunTablixGroupChecks());
 }
+
+- (void)testTablixEditing {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixEditingChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE
