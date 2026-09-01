@@ -881,6 +881,103 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   if ([mtab.tablixBody.columns count] != 2 || [mtab.tablixBody.rows count] != 3)
     PicaFail(fails, @"clearing pivotBy should rebuild the grouped table");
 
+  // Nested row groups: outer Finish, inner Job — two header levels, two
+  // subtotal scopes, plus a grand total.
+  RDLReport *nx = PicaGroupedJobs();
+  RDLItem *ntab = nx.body.items.firstObject;
+  ntab.groupBy = @"Finish";
+  ntab.groupBy2 = @"Job";
+  ntab.showGrandTotal = YES;
+  ntab.columns = @[
+    @{@"width" : @2.8, @"header" : @"Item", @"value" : @"=Fields!Job.Value"},
+    @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum"},
+  ];
+  // Rows: header, detail, inner subtotal, outer subtotal, grand total.
+  if ([ntab.tablixBody.rows count] != 5)
+    PicaFail(fails, [NSString stringWithFormat:@"nested body rows %lu",
+                                               (unsigned long)[ntab.tablixBody.rows count]]);
+  if ([ntab.rowHierarchy.members count] != 3)
+    PicaFail(fails, @"nested expected header + outer group + total members");
+  else {
+    RDLTablixMember *og = ntab.rowHierarchy.members[1];
+    if ([og.groupExpressions count] == 0 ||
+        [og.groupExpressions[0] rangeOfString:@"Finish"].location == NSNotFound)
+      PicaFail(fails, @"outer group should group by Finish");
+    if ([og.members count] != 2)
+      PicaFail(fails, @"outer group should nest inner group + footer");
+    else {
+      RDLTablixMember *ig = og.members[0];
+      if ([ig.groupExpressions count] == 0 ||
+          [ig.groupExpressions[0] rangeOfString:@"Job"].location == NSNotFound)
+        PicaFail(fails, @"inner group should group by Job");
+      if (ig.header == nil || og.header == nil)
+        PicaFail(fails, @"both group levels should carry TablixHeader");
+      if ([ig.members count] != 2)
+        PicaFail(fails, @"inner group should nest details + footer");
+    }
+  }
+
+  // Layout: both header levels appear and subtotals evaluate per scope.
+  // Oil group = Desk 1840 + Chair 420 + Frame 95 = 2355; grand total 3468.
+  NSArray *npages = [RDLGenerator pagesForReport:nx parameters:@{}];
+  BOOL nOil = NO, nDesk = NO, nTotal = NO, nOilSum = NO, nGrand = NO, nDeskSum = NO;
+  NSInteger subCount = 0;
+  for (RDLLaidOutPage *p in npages) {
+    for (RDLLaidOutItem *it in p.items) {
+      if ([it.text isEqualToString:@"Oil"])
+        nOil = YES;
+      if ([it.text isEqualToString:@"Desk"])
+        nDesk = YES;
+      if ([it.text isEqualToString:@"Subtotal"])
+        subCount += 1;
+      if ([it.text isEqualToString:@"Total"])
+        nTotal = YES;
+      if (PicaAsNum(it.text) == 2355)
+        nOilSum = YES;
+      if (PicaAsNum(it.text) == 3468)
+        nGrand = YES;
+      if (PicaAsNum(it.text) == 1840)
+        nDeskSum = YES;
+    }
+  }
+  if (!nOil || !nDesk)
+    PicaFail(fails, @"nested layout missing outer (Oil) or inner (Desk) headers");
+  if (subCount < 2)
+    PicaFail(fails, @"nested layout should emit inner and outer subtotals");
+  if (!nOilSum)
+    PicaFail(fails, @"nested outer subtotal for Oil should be 2355");
+  if (!nDeskSum)
+    PicaFail(fails, @"nested inner subtotal for Desk should be 1840");
+  if (!nTotal || !nGrand)
+    PicaFail(fails, @"nested grand total row should show 3468");
+
+  // Round-trip: both group levels survive writer → parser.
+  NSString *nxml = [RDLWriter XMLStringFromReport:nx];
+  NSError *nerr = nil;
+  RDLReport *nparsed = [RDLParser reportFromXMLString:nxml error:&nerr];
+  if (nparsed == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"nested round-trip parse failed: %@",
+                                               nerr.localizedDescription]);
+  else {
+    RDLItem *pt = nil;
+    for (RDLItem *it in nparsed.body.items)
+      if ([it.type isEqualToString:@"Tablix"])
+        pt = it;
+    if (![pt.groupBy isEqualToString:@"Finish"])
+      PicaFail(fails, @"nested round-trip lost outer groupBy");
+    if (![pt.groupBy2 isEqualToString:@"Job"])
+      PicaFail(fails, [NSString stringWithFormat:@"nested round-trip groupBy2 %@", pt.groupBy2]);
+    if (!pt.showGrandTotal)
+      PicaFail(fails, @"nested round-trip lost showGrandTotal");
+  }
+
+  // Clearing the child group falls back to single-level grouping.
+  ntab.groupBy2 = @"";
+  ntab.showGrandTotal = NO;
+  [ntab rebuildTableFromColumns];
+  if ([ntab.tablixBody.rows count] != 3)
+    PicaFail(fails, @"clearing groupBy2 should rebuild the single-level table");
+
   return fails;
 }
 

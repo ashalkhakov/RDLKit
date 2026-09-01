@@ -444,6 +444,26 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   _stashRowH = rh;
 }
 
+// Dynamic group member with a 1.2in bold row header showing the field value.
+- (RDLTablixMember *)picaGroupMemberForField:(NSString *)field suffix:(NSString *)suffix {
+  RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
+  gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
+  [gMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+  gMem.keepTogether = YES;
+  RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
+  th.size = 1.2;
+  RDLItem *gh = [[RDLItem alloc] init];
+  gh.type = @"Textbox";
+  gh.name = [NSString stringWithFormat:@"%@G%@", self.name ?: @"T", suffix];
+  gh.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  gh.style.fontWeight = @"Bold";
+  gh.style.backgroundColor = @"#ece6d8";
+  gh.style.verticalAlign = @"Middle";
+  th.item = gh;
+  gMem.header = th;
+  return gMem;
+}
+
 - (void)picaBuildTable:(NSArray *)cols headerHeight:(CGFloat)hh rowHeight:(CGFloat)rh {
   if (hh <= 0)
     hh = 0.3;
@@ -522,7 +542,18 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   [rowH.members addObject:hMem];
 
   NSInteger extraRows = 0;
+  NSString *groupBy2 = (groupBy && [self.groupBy2 length]) ? self.groupBy2 : nil;
   if (groupBy) {
+    // Body row order must match the hierarchy's leaf order: details, inner
+    // subtotal (nested only), outer subtotal.
+    if (groupBy2) {
+      [body.rows addObject:[self picaAggregateRow:specs
+                                            label:@"Subtotal"
+                                           prefix:@"F2"
+                                           height:rh
+                                    fallbackField:sumField]];
+      extraRows += 1;
+    }
     [body.rows addObject:[self picaAggregateRow:specs
                                           label:@"Subtotal"
                                          prefix:@"F"
@@ -530,26 +561,21 @@ static NSString *PicaAggregateOfValue(NSString *value) {
                                   fallbackField:sumField]];
     extraRows += 1;
 
-    RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
-    gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", groupBy];
-    [gMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", groupBy]];
-    gMem.keepTogether = YES;
-    RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
-    th.size = 1.2;
-    RDLItem *gh = [[RDLItem alloc] init];
-    gh.type = @"Textbox";
-    gh.name = [NSString stringWithFormat:@"%@G", self.name ?: @"T"];
-    gh.value = [NSString stringWithFormat:@"=Fields!%@.Value", groupBy];
-    gh.style.fontWeight = @"Bold";
-    gh.style.backgroundColor = @"#ece6d8";
-    gh.style.verticalAlign = @"Middle";
-    th.item = gh;
-    gMem.header = th;
+    RDLTablixMember *gMem = [self picaGroupMemberForField:groupBy suffix:@""];
     RDLTablixMember *dMem = [[RDLTablixMember alloc] init];
     dMem.groupName = [NSString stringWithFormat:@"%@_Details", self.name ?: @"Tablix"];
     RDLTablixMember *fMem = [[RDLTablixMember alloc] init];
     fMem.keepWithGroup = @"Before";
-    [gMem.members addObject:dMem];
+    if (groupBy2) {
+      RDLTablixMember *g2 = [self picaGroupMemberForField:groupBy2 suffix:@"2"];
+      RDLTablixMember *f2 = [[RDLTablixMember alloc] init];
+      f2.keepWithGroup = @"Before";
+      [g2.members addObject:dMem];
+      [g2.members addObject:f2];
+      [gMem.members addObject:g2];
+    } else {
+      [gMem.members addObject:dMem];
+    }
     [gMem.members addObject:fMem];
     [rowH.members addObject:gMem];
 
@@ -560,7 +586,7 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     RDLItem *ct = [[RDLItem alloc] init];
     ct.type = @"Textbox";
     ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
-    ct.value = groupBy;
+    ct.value = groupBy2 ? [NSString stringWithFormat:@"%@ / %@", groupBy, groupBy2] : groupBy;
     ct.style.fontWeight = @"Bold";
     ct.style.fontSize = @"8pt";
     ct.style.color = @"#5c574e";
@@ -589,8 +615,9 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     CGFloat bodyW = 0;
     for (RDLTablixColumn *tc in body.columns)
       bodyW += tc.width;
-    if (self.width < bodyW + 1.2)
-      self.width = bodyW + 1.2;
+    CGFloat headerW = groupBy2 ? 2.4 : 1.2;
+    if (self.width < bodyW + headerW)
+      self.width = bodyW + headerW;
   }
   if (self.height < hh + rh + extraRows * rh)
     self.height = hh + rh + extraRows * rh;

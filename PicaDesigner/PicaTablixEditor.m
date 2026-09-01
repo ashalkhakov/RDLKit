@@ -11,7 +11,7 @@ static NSArray *PicaAlignNames(void) {
 @interface PicaTablixEditor () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) NSPanel *panel;
 @property (nonatomic, strong) NSTableView *table;
-@property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop, *pivotPop;
+@property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop, *group2Pop, *pivotPop;
 @property (nonatomic, strong) NSButton *grandTotalCheck;
 @property (nonatomic, strong) NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
@@ -54,11 +54,12 @@ static NSArray *PicaAlignNames(void) {
 - (void)datasetChanged:(id)sender {
   (void)sender;
   [self rebuildFieldPop:_groupPop selecting:[_groupPop titleOfSelectedItem]];
+  [self rebuildFieldPop:_group2Pop selecting:[_group2Pop titleOfSelectedItem]];
   [self rebuildFieldPop:_pivotPop selecting:[_pivotPop titleOfSelectedItem]];
 }
 
 - (void)buildPanelForTablix:(RDLItem *)tab {
-  _panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 640, 430)
+  _panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 640, 466)
                                       styleMask:NSTitledWindowMask
                                         backing:NSBackingStoreBuffered
                                           defer:NO];
@@ -94,11 +95,17 @@ static NSArray *PicaAlignNames(void) {
   [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
   [cv addSubview:_grandTotalCheck];
 
+  // Row 2: nested child row group.
+  [self label:@"Child row group" frame:NSMakeRect(198, top - 66, 150, 14) inView:cv];
+  _group2Pop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(198, top - 90, 150, 22) pullsDown:NO];
+  [cv addSubview:_group2Pop];
+  [self rebuildFieldPop:_group2Pop selecting:tab.groupBy2];
+
   // Columns grid.
   [self label:@"Columns — Total picks the aggregate; with a column group (pivot) the first column is the measure"
-        frame:NSMakeRect(14, top - 84, 500, 14)
+        frame:NSMakeRect(14, top - 116, 560, 14)
        inView:cv];
-  NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(14, 118, NSWidth(b) - 28, top - 84 - 128)];
+  NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(14, 118, NSWidth(b) - 28, top - 116 - 128)];
   [sv setHasVerticalScroller:YES];
   [sv setBorderType:NSBezelBorder];
   _table = [[NSTableView alloc] initWithFrame:[sv bounds]];
@@ -302,6 +309,8 @@ static NSArray *PicaAlignNames(void) {
   tablix.dataSetName = [ed.datasetPop titleOfSelectedItem] ?: tablix.dataSetName;
   NSString *group = [ed.groupPop indexOfSelectedItem] > 0 ? [ed.groupPop titleOfSelectedItem] : @"";
   tablix.groupBy = group;
+  NSString *group2 = [ed.group2Pop indexOfSelectedItem] > 0 ? [ed.group2Pop titleOfSelectedItem] : @"";
+  tablix.groupBy2 = [group length] ? group2 : @"";
   NSString *pivot = [ed.pivotPop indexOfSelectedItem] > 0 ? [ed.pivotPop titleOfSelectedItem] : @"";
   tablix.pivotBy = pivot;
   tablix.showGrandTotal = [ed.grandTotalCheck state] == NSOnState;

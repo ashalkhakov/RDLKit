@@ -159,6 +159,18 @@ static NSString *PicaParsePageBreakName(NSXMLElement *el) {
   return [n length] ? n : nil;
 }
 
+// First member (depth-first) carrying group expressions — the outer group.
+static RDLTablixMember *PicaFindGroupMember(NSArray<RDLTablixMember *> *members) {
+  for (RDLTablixMember *mm in members) {
+    if ([mm.groupExpressions count])
+      return mm;
+    RDLTablixMember *nested = PicaFindGroupMember(mm.members);
+    if (nested)
+      return nested;
+  }
+  return nil;
+}
+
 static NSString *PicaFindGroupBy(NSArray<RDLTablixMember *> *members) {
   for (RDLTablixMember *mm in members) {
     if ([mm.groupExpressions count]) {
@@ -524,8 +536,15 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
       item.rowHierarchy = synth;
     }
     NSString *found = PicaFindGroupBy(item.rowHierarchy.members);
-    if (found)
+    if (found) {
       item.groupBy = found;
+      // A second dynamic group nested inside the outer one is the child
+      // row group (designer convenience groupBy2).
+      RDLTablixMember *outer = PicaFindGroupMember(item.rowHierarchy.members);
+      NSString *inner = PicaFindGroupBy(outer.members);
+      if (inner && ![inner isEqualToString:found])
+        item.groupBy2 = inner;
+    }
     // Designer convenience: a trailing static top-level member is a grand
     // total row (see -[RDLItem picaBuildTable:...]).
     RDLTablixMember *lastMem = item.rowHierarchy.members.lastObject;
