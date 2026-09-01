@@ -5,7 +5,7 @@ Report Definition Language Kit for GNUstep and Cocoa.
 Pure Objective-C (ARC). No Swift, no UIKit, no nibs.
 
 1. **Generator** (`PicaKit` + `PicaDemo`) — takes an RDL file, data sources, and input parameters, lays out pages (tablix expansion included), then a **PDF** or **HTML** backend paints those elements.
-2. **Designer** (`PicaDesigner`) — creates and edits RDL files (toolbox, canvas, inspector, datasets).
+2. **Designer** (`PicaDesigner`) — creates and edits RDL files (report outline, canvas, inspector, datasets).
 
 The object model follows **MS-RDL 2010/01**: ReportItems, TablixBody / TablixRow / TablixCell, TablixMember (static vs Group with GroupExpressions and TablixHeader, RepeatOnNewPage), Filters, SortExpressions, TablixCorner, DataSources, PageHeader/Footer as PageSection.
 
@@ -40,7 +40,7 @@ NSData *out = [backend renderPages:pages title:report.name];
 | --- | --- | --- |
 | `PicaKit` | Generator library | Parse RDL 2010, bind JSON, evaluate VB-style `=` expressions (tokenize → AST → execute), paginate, PDF + HTML backends |
 | `PicaDemo` | Generator CLI | `PicaDemo report.rdl [-f pdf\|html] [-o out] [-p Name=Value] [-d DataSet=file.json]` |
-| `PicaDesigner` | Designer app | Toolbox · outline · paper · inspector · data. Generator window exports PDF/HTML. |
+| `PicaDesigner` | Designer app | Report outline · paper · inspector · data; modal Add Element palette. Generator window exports PDF/HTML. |
 | `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends. Portable `PicaChecks` for a later GNUstep runner. |
 
 ## Generator API

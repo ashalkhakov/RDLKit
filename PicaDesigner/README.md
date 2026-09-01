@@ -12,11 +12,11 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | --- | --- |
 | `PicaWelcomeWindow` | Chooser: Generator or Designer |
 | `PicaGeneratorWindow` | Open RDL, bind parameters/JSON, paper, export PDF/HTML |
-| `PicaDesignerWindow` | Split: toolbox · outline · canvas · inspector · data |
-| `PicaCanvasView` | Flipped paper, bands, drag/resize, snap 0.05 in |
-| `PicaInspectorView` | Value, geometry, typeface, ink, tablix/chart |
+| `PicaDesignerWindow` | Split: report outline (+/− bar, modal Add Element palette) · canvas · inspector · data |
+| `PicaCanvasView` | Flipped paper, bands, drag/resize, snap 0.05 in, nested Rectangle children |
+| `PicaInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `PicaDataView` | Parameters and dataset JSON |
-| `PicaController` | Current `RDLReport`, tool, selection |
+| `PicaController` | Current `RDLReport`, selection (report / band / item), element insertion rules |
 | `PicaSamples` | Native sample factories |
 | `RDLView` (kit) | Paginated preview from laid-out pages + `PDFData` |
 
