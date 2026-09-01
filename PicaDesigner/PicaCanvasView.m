@@ -70,6 +70,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   RDLItem *_editItem;
   NSDictionary *_editContext; // nil = item value; tablix: {col, part:header|value}
   BOOL _editorCancelled;
+  BOOL _editorStarting; // ignore end-editing fired while the session begins
   BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
   // Double-click edit begins on mouseUp: (starting a field editor inside
   // mouseDown: is unreliable on Cocoa — pending mouseUp and focus changes
@@ -648,6 +649,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSRect r = NSInsetRect(itemRect, -1, -1);
   r.size.height = MAX(NSHeight(r), 19);
   PicaController *c = [PicaController sharedController];
+  // The editor mirrors the attributed preview: same font (family, size,
+  // weight, italic — all zoom-scaled), alignment and text color.
   [self beginEditingItem:hit
                  context:nil
                     rect:r
@@ -657,7 +660,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                              ? NSCenterTextAlignment
                              : ([hit.style.textAlign isEqualToString:@"Right"]
                                     ? NSRightTextAlignment
-                                    : NSLeftTextAlignment)];
+                                    : NSLeftTextAlignment)
+                   color:PicaColorFromHex(hit.style.color)];
 }
 
 - (void)beginEditingTablix:(RDLItem *)tab col:(NSUInteger)col part:(NSString *)part {
@@ -678,7 +682,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                     rect:cell
                  initial:initial
                     font:font
-                   align:NSLeftTextAlignment];
+                   align:NSLeftTextAlignment
+                   color:nil];
 }
 
 - (void)beginEditingItem:(RDLItem *)it
@@ -686,21 +691,33 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                     rect:(NSRect)rect
                  initial:(NSString *)text
                     font:(NSFont *)font
-                   align:(NSTextAlignment)align {
+                   align:(NSTextAlignment)align
+                   color:(NSColor *)color {
   [self commitEditor];
   _editItem = it;
   _editContext = ctx;
   _editorCancelled = NO;
+  _editorStarting = YES;
   NSTextField *f = [[NSTextField alloc] initWithFrame:rect];
   [f setStringValue:text ?: @""];
   [f setFont:font];
   [f setAlignment:align];
+  if (color)
+    [f setTextColor:color];
   [f setDelegate:self];
   [f setBezeled:YES];
   [self addSubview:f];
   _editorField = f;
-  [[self window] makeFirstResponder:f];
-  [f selectText:nil];
+  // Do NOT use -selectText: here: on Cocoa it *ends* the editing session that
+  // makeFirstResponder: just began, which synchronously posts
+  // NSControlTextDidEndEditingNotification and tore the fresh editor down
+  // before it ever painted (the "double-click does nothing on Mac" bug).
+  // Select through the live field editor instead.
+  if ([[self window] makeFirstResponder:f]) {
+    NSText *fe = [f currentEditor];
+    [fe setSelectedRange:NSMakeRange(0, [[fe string] length])];
+  }
+  _editorStarting = NO;
   [self setNeedsDisplay:YES];
 }
 
@@ -786,6 +803,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)controlTextDidEndEditing:(NSNotification *)n {
   if ([n object] != _editorField)
+    return;
+  // Cocoa can end-and-restart the editing session while it is being set up
+  // (e.g. field-editor swaps); committing here would tear down the editor
+  // before it ever appeared.
+  if (_editorStarting)
     return;
   RDLItem *it = _editItem;
   NSDictionary *ctx = _editContext;
