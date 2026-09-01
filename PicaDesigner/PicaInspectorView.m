@@ -2,6 +2,7 @@
 #import "PicaController.h"
 #import "PicaKit.h"
 #import "PicaTablixEditor.h"
+#import "PicaExpressionHelper.h"
 
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
@@ -432,6 +433,27 @@ static const CGFloat kHalf2X = 136;
 
 - (void)controlTextDidEndEditing:(NSNotification *)obj {
   [self changed:[obj object]];
+}
+
+// Expression completion (XPath-editor style): `!` pops the member list, and
+// Escape completes function names, in any inspector text field.
+- (void)controlTextDidChange:(NSNotification *)n {
+  NSTextView *tv = [[n userInfo] objectForKey:@"NSFieldEditor"];
+  if (tv && PicaShouldAutoComplete([tv string], [tv selectedRange]))
+    [tv complete:nil];
+}
+
+- (NSArray *)control:(NSControl *)control
+               textView:(NSTextView *)textView
+            completions:(NSArray *)words
+    forPartialWordRange:(NSRange)charRange
+    indexOfSelectedItem:(PicaCompletionIndex *)index {
+  (void)control;
+  (void)words;
+  if (index)
+    *index = 0;
+  RDLItem *it = [[PicaController sharedController] selectedItem];
+  return PicaExpressionCompletions([textView string], charRange, it.dataSetName);
 }
 
 - (void)changed:(id)sender {
