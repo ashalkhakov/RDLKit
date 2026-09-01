@@ -69,6 +69,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   RDLItem *_editItem;
   NSDictionary *_editContext; // nil = item value; tablix: {col, part:header|value}
   BOOL _editorCancelled;
+  BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
+  // Double-click edit deferred past the mouse event (Cocoa's field-editor
+  // setup misbehaves when started inside mouseDown: of a double-click).
+  RDLItem *_pendingEditItem;
+  NSPoint _pendingEditPoint;
 }
 
 // --- Tablix preview & cell geometry ----------------------------------------
@@ -503,6 +508,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   PicaController *c = [PicaController sharedController];
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
   [self commitEditor];
+  // Take keyboard focus so Return-to-edit and Delete work after a click
+  // (Cocoa does not focus a view on click by itself).
+  [[self window] makeFirstResponder:self];
   RDLReport *r = c.report;
   CGFloat z = c.zoom;
   NSRect paper = [self paperRect];
@@ -524,7 +532,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       [c selectItemNamed:hit.name bandKey:key];
       if ([event clickCount] >= 2) {
         _dragKind = nil;
-        [self beginEditingHit:hit rect:itemRect point:p];
+        // Defer past the double-click event: starting a field editor inside
+        // mouseDown: is unreliable on Cocoa (the pending mouseUp and focus
+        // changes tear the fresh editor down again).
+        _pendingEditItem = hit;
+        _pendingEditPoint = p;
+        [self performSelector:@selector(startPendingEdit)
+                   withObject:nil
+                   afterDelay:0];
         return;
       }
       _dragKind = kind;
@@ -589,6 +604,17 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 // --- In-place editing -------------------------------------------------------
+
+- (void)startPendingEdit {
+  RDLItem *hit = _pendingEditItem;
+  _pendingEditItem = nil;
+  if (hit == nil)
+    return;
+  // The report may have changed since the click; re-resolve the rect.
+  NSRect r;
+  if ([self findRectOfItem:hit rect:&r])
+    [self beginEditingHit:hit rect:r point:_pendingEditPoint];
+}
 
 - (void)beginEditingHit:(RDLItem *)hit rect:(NSRect)itemRect point:(NSPoint)p {
   if ([hit.type isEqualToString:@"Tablix"]) {
@@ -702,9 +728,16 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 // --- Editor field delegate ---------------------------------------------------
 
 - (void)controlTextDidChange:(NSNotification *)n {
+  if (_completing)
+    return;
+  if (!PicaIsTypingEvent())
+    return;
   NSTextView *tv = [[n userInfo] objectForKey:@"NSFieldEditor"];
-  if (tv && PicaShouldAutoComplete([tv string], [tv selectedRange]))
+  if (tv && PicaShouldAutoComplete([tv string], [tv selectedRange])) {
+    _completing = YES;
     [tv complete:nil];
+    _completing = NO;
+  }
 }
 
 - (NSArray *)control:(NSControl *)control

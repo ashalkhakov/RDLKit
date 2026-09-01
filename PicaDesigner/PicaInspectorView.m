@@ -52,6 +52,7 @@ static const CGFloat kHalf2X = 136;
 
 @implementation PicaInspectorView {
   BOOL _reloading;
+  BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
 }
 
 - (NSTextField *)label:(NSString *)t frame:(NSRect)f inView:(NSView *)v {
@@ -438,9 +439,16 @@ static const CGFloat kHalf2X = 136;
 // Expression completion (XPath-editor style): `!` pops the member list, and
 // Escape completes function names, in any inspector text field.
 - (void)controlTextDidChange:(NSNotification *)n {
+  if (_completing)
+    return;
+  if (!PicaIsTypingEvent())
+    return;
   NSTextView *tv = [[n userInfo] objectForKey:@"NSFieldEditor"];
-  if (tv && PicaShouldAutoComplete([tv string], [tv selectedRange]))
+  if (tv && PicaShouldAutoComplete([tv string], [tv selectedRange])) {
+    _completing = YES;
     [tv complete:nil];
+    _completing = NO;
+  }
 }
 
 - (NSArray *)control:(NSControl *)control

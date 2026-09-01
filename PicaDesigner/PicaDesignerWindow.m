@@ -3,6 +3,7 @@
 #import "PicaController.h"
 #import "PicaInspectorView.h"
 #import "PicaDataView.h"
+#import "PicaExpressionHelper.h"
 #import "PicaKit.h"
 
 typedef NS_ENUM(NSInteger, PicaNodeKind) {
@@ -43,6 +44,21 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 
 @implementation PicaDesignerWindow {
   BOOL _reloading;
+  PicaExpressionFieldEditor *_fieldEditor;
+}
+
+// Text fields get an expression-aware field editor so `complete:` uses the
+// RDL completion range (Cocoa's stock editor beeps on the empty partial word
+// right after `Fields!`, which made completion a no-op on Mac).
+- (id)windowWillReturnFieldEditor:(NSWindow *)sender toObject:(id)client {
+  (void)sender;
+  if (![client isKindOfClass:[NSTextField class]])
+    return nil;
+  if (_fieldEditor == nil) {
+    _fieldEditor = [[PicaExpressionFieldEditor alloc] initWithFrame:NSZeroRect];
+    [_fieldEditor setFieldEditor:YES];
+  }
+  return _fieldEditor;
 }
 
 - (instancetype)init {
@@ -55,6 +71,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [win setTitle:@"Pica Designer"];
   self = [super initWithWindow:win];
   if (self) {
+    [win setDelegate:(id)self];
     [self buildUI];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(reloadUI:)
