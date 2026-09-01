@@ -1278,7 +1278,7 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   kt.page.pageWidth = 8.5;
   kt.page.topMargin = 0.5;
   kt.page.bottomMargin = 0.5;
-  // bodyTop = 0.5 + header 0.5 = 1.0; bodyBottom = 5 - 0.5 - footer 0.4 = 4.1; avail = 3.1
+  // bodyTop = 0.5 + default header 0.55; bodyBottom = 5 - 0.5 - default footer 0.4; avail ≈ 3.05
   RDLItem *keep = [[RDLItem alloc] init];
   keep.type = @"Textbox";
   keep.name = @"KeepMe";

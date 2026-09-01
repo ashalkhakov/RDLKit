@@ -590,6 +590,13 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
 
 @implementation RDLParser
 + (RDLReport *)reportFromXMLString:(NSString *)xml error:(NSError **)error {
+  // gPicaParseWarnings is shared parse state; serialize concurrent parses.
+  @synchronized (self) {
+    return [self picaParseReportFromXMLString:xml error:error];
+  }
+}
+
++ (RDLReport *)picaParseReportFromXMLString:(NSString *)xml error:(NSError **)error {
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml options:0 error:error];
   if (doc == nil)
     return nil;

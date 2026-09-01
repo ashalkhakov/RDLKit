@@ -1215,7 +1215,7 @@ static CGFloat PicaBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat b
   RDLItem *bodyBG = nil;
   if (report.body.style &&
       ([report.body.style.backgroundColor length] ||
-       ![report.body.style.border.style isEqualToString:@"None"])) {
+       (report.body.style.border && ![report.body.style.border.style isEqualToString:@"None"]))) {
     bodyBG = [[RDLItem alloc] init];
     bodyBG.type = @"Rectangle";
     bodyBG.name = @"__BodyBackground";
