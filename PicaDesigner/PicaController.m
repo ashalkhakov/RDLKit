@@ -244,8 +244,6 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
       if (outKey)
         *outKey = foundKey;
       if ([sel.type isEqualToString:@"Rectangle"]) {
-        if (sel.items == nil)
-          sel.items = [NSMutableArray array];
         if (outContainer)
           *outContainer = sel;
         return sel.items;
@@ -353,6 +351,10 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   RDLItem *container = nil;
   RDLItem *sibling = nil;
   NSMutableArray *items = [self insertionContainerBandKey:&key container:&container sibling:&sibling];
+  if (items == nil && container != nil) {
+    container.items = [NSMutableArray array];
+    items = container.items;
+  }
   RDLItem *it = [[RDLItem alloc] init];
   it.name = [self uniqueNameWithPrefix:kind];
   [self configureNewItem:it kind:kind];
