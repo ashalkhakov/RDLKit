@@ -40,7 +40,7 @@ NSData *out = [backend renderPages:pages title:report.name];
 | --- | --- | --- |
 | `PicaKit` | Generator library | Parse RDL 2010, bind JSON, evaluate VB-style `=` expressions (tokenize → AST → execute), paginate, PDF + HTML backends |
 | `PicaDemo` | Generator CLI | `PicaDemo report.rdl [-f pdf\|html] [-o out] [-p Name=Value] [-d DataSet=file.json]` |
-| `PicaDesigner` | Designer app | Report outline · paper · inspector · data; modal Add Element palette; modal tablix editor (columns, nested row groups, column group crosstab, subtotals, grand total). Generator window exports PDF/HTML. |
+| `PicaDesigner` | Designer app | Report outline · paper · inspector · data; modal Add Element palette; modal tablix editor (columns, nested row groups, column group crosstab, subtotals, grand total); WYSIWYG canvas with attributed-text preview, double-click in-place editing of textboxes and tablix cells (Tab moves across cells), and `Fields!`/`Parameters!` expression completion. Generator window exports PDF/HTML. |
 | `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends. Portable `PicaChecks` for a later GNUstep runner. |
 
 ## Generator API
