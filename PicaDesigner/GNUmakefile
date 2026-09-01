@@ -12,6 +12,7 @@ Pica_OBJC_FILES = \
   PicaAppDelegate.m \
   PicaSamples.m \
   PicaInspectorView.m \
+  PicaTablixEditor.m \
   PicaDataView.m \
   PicaWelcomeWindow.m
 Pica_OBJC_LIBS += -lPicaKit

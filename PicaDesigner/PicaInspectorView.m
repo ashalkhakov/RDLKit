@@ -1,6 +1,7 @@
 #import "PicaInspectorView.h"
 #import "PicaController.h"
 #import "PicaKit.h"
+#import "PicaTablixEditor.h"
 
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
@@ -39,7 +40,7 @@
 // Tablix section
 @property (nonatomic, strong) NSView *tablixBox;
 @property (nonatomic, strong) NSPopUpButton *tablixDatasetPop;
-@property (nonatomic, strong) NSTextField *tablixHeaderHField, *tablixRowHField, *groupByField;
+@property (nonatomic, strong) NSTextField *tablixHeaderHField, *tablixRowHField;
 @end
 
 static const CGFloat kInspectorWidth = 260;
@@ -290,8 +291,25 @@ static const CGFloat kHalf2X = 136;
   _tablixHeaderHField = [self fieldIn:_tablixBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
   _tablixRowHField = [self fieldIn:_tablixBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
   y += 28;
-  _groupByField = [self row:@"Group by field" y:&y inView:_tablixBox height:22];
+  NSButton *edit = [[NSButton alloc] initWithFrame:NSMakeRect(kFieldX, y, kFieldW, 24)];
+  [edit setTitle:@"Edit Tablix…"];
+  [edit setBezelStyle:NSShadowlessSquareBezelStyle];
+  [edit setTarget:self];
+  [edit setAction:@selector(editTablix:)];
+  [_tablixBox addSubview:edit];
+  y += 30;
   [_tablixBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
+}
+
+// Opens the Report-Builder-style tablix editor for the selected tablix.
+- (void)editTablix:(id)sender {
+  (void)sender;
+  PicaController *c = [PicaController sharedController];
+  RDLItem *it = [c selectedItem];
+  if (it == nil || ![it.type isEqualToString:@"Tablix"])
+    return;
+  if ([PicaTablixEditor runForTablix:it report:c.report])
+    [c noteChange];
 }
 
 #pragma mark - Fill (model → UI)
@@ -377,7 +395,6 @@ static const CGFloat kHalf2X = 136;
       [self rebuildDatasetPop:_tablixDatasetPop selecting:it.dataSetName];
       [_tablixHeaderHField setStringValue:[NSString stringWithFormat:@"%.3f", it.headerHeight]];
       [_tablixRowHField setStringValue:[NSString stringWithFormat:@"%.3f", it.rowHeight]];
-      [_groupByField setStringValue:it.groupBy ?: @""];
     }
     [self stackBoxes:boxes];
   } else if (c.selectionScope == PicaSelectionBand) {
@@ -471,10 +488,7 @@ static const CGFloat kHalf2X = 136;
       it.headerHeight = [[_tablixHeaderHField stringValue] doubleValue];
     else if (sender == _tablixRowHField)
       it.rowHeight = [[_tablixRowHField stringValue] doubleValue];
-    else if (sender == _groupByField) {
-      it.groupBy = [_groupByField stringValue];
-      [it rebuildTableFromColumns];
-    } else
+    else
       return;
     [c noteChange];
     return;

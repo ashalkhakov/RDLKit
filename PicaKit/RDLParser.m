@@ -522,6 +522,13 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     NSString *found = PicaFindGroupBy(item.rowHierarchy.members);
     if (found)
       item.groupBy = found;
+    // Designer convenience: a trailing static top-level member is a grand
+    // total row (see -[RDLItem picaBuildTable:...]).
+    RDLTablixMember *lastMem = item.rowHierarchy.members.lastObject;
+    if ([item.rowHierarchy.members count] >= 2 && lastMem != nil &&
+        [lastMem.groupName length] == 0 && [lastMem.groupExpressions count] == 0 &&
+        [lastMem.members count] == 0)
+      item.showGrandTotal = YES;
   } else if ([el.localName isEqualToString:@"Rectangle"]) {
     BOOL chart = NO;
     for (NSXMLNode *n in [PicaChild(el, @"CustomProperties") children]) {

@@ -664,6 +664,131 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
   return fails;
 }
 
+NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  // Explicit per-column aggregates drive subtotal cells (Report Builder style).
+  RDLReport *r = PicaGroupedJobs();
+  RDLItem *tab = r.body.items.firstObject;
+  tab.showGrandTotal = YES;
+  tab.columns = @[
+    @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{
+      @"width" : @2.1,
+      @"header" : @"Amount",
+      @"value" : @"=Fields!Amount.Value",
+      @"align" : @"Right",
+      @"aggregate" : @"Sum"
+    },
+  ];
+  if ([tab.tablixBody.rows count] != 4)
+    PicaFail(fails, [NSString stringWithFormat:@"grouped+total body rows %lu",
+                                               (unsigned long)[tab.tablixBody.rows count]]);
+  if ([tab.rowHierarchy.members count] != 3)
+    PicaFail(fails, @"expected header + group + grand-total members");
+  RDLTablixRow *totalRow = tab.tablixBody.rows.lastObject;
+  if (![totalRow.cells.lastObject.item.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    PicaFail(fails, @"grand total should use explicit Sum aggregate");
+  if (![totalRow.cells.firstObject.item.value isEqualToString:@"Total"])
+    PicaFail(fails, @"grand total first column should carry Total label");
+  if (![totalRow.cells.lastObject.item.style.textAlign isEqualToString:@"Right"])
+    PicaFail(fails, @"aggregate row should inherit column align");
+
+  // The columns getter should surface the derived designer metadata.
+  NSArray *derived = tab.columns;
+  if (![derived.lastObject[@"aggregate"] isEqualToString:@"Sum"])
+    PicaFail(fails, [NSString stringWithFormat:@"derived aggregate %@", derived.lastObject[@"aggregate"]]);
+  if (![derived.lastObject[@"align"] isEqualToString:@"Right"])
+    PicaFail(fails, @"derived align should be Right");
+
+  // Round-trip: writer XML → parser keeps groupBy, showGrandTotal, aggregates.
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  NSError *err = nil;
+  RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
+  if (parsed == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"editing round-trip parse failed: %@",
+                                               err.localizedDescription]);
+  else {
+    RDLItem *pt = nil;
+    for (RDLItem *it in parsed.body.items)
+      if ([it.type isEqualToString:@"Tablix"])
+        pt = it;
+    if (![pt.groupBy isEqualToString:@"Finish"])
+      PicaFail(fails, @"round-trip lost groupBy");
+    if (!pt.showGrandTotal)
+      PicaFail(fails, @"round-trip lost showGrandTotal");
+    NSArray *pcols = pt.columns;
+    if (![pcols.lastObject[@"aggregate"] isEqualToString:@"Sum"])
+      PicaFail(fails, @"round-trip lost column aggregate");
+  }
+
+  // Layout: grand total row shows dataset-wide Sum (all seven jobs = 3468).
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  BOOL sawTotal = NO, sawGrandSum = NO;
+  for (RDLLaidOutPage *p in pages) {
+    for (RDLLaidOutItem *it in p.items) {
+      if ([it.text isEqualToString:@"Total"])
+        sawTotal = YES;
+      if (PicaAsNum(it.text) == 3468)
+        sawGrandSum = YES;
+    }
+  }
+  if (!sawTotal)
+    PicaFail(fails, @"layout missing grand-total label");
+  if (!sawGrandSum)
+    PicaFail(fails, @"layout missing dataset-wide Sum 3468");
+
+  // Flat tablix with a grand total: no group needed.
+  RDLReport *flat = PicaGroupedJobs();
+  RDLItem *ftab = flat.body.items.firstObject;
+  ftab.groupBy = @"";
+  ftab.showGrandTotal = YES;
+  ftab.columns = @[
+    @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{
+      @"width" : @2.1,
+      @"header" : @"Amount",
+      @"value" : @"=Fields!Amount.Value",
+      @"aggregate" : @"Sum"
+    },
+  ];
+  if ([ftab.tablixBody.rows count] != 3)
+    PicaFail(fails, [NSString stringWithFormat:@"flat+total body rows %lu",
+                                               (unsigned long)[ftab.tablixBody.rows count]]);
+  if ([ftab.rowHierarchy.members count] != 3)
+    PicaFail(fails, @"flat+total expected header + details + total members");
+  if ([ftab.cornerRows count] != 0)
+    PicaFail(fails, @"ungrouped rebuild should clear TablixCorner");
+  NSArray *fpages = [RDLGenerator pagesForReport:flat parameters:@{}];
+  BOOL flatTotal = NO;
+  for (RDLLaidOutPage *p in fpages)
+    for (RDLLaidOutItem *it in p.items)
+      if (PicaAsNum(it.text) == 3468)
+        flatTotal = YES;
+  if (!flatTotal)
+    PicaFail(fails, @"flat grand total should sum whole dataset");
+
+  // Count aggregate on a non-numeric column.
+  RDLReport *cnt = PicaGroupedJobs();
+  RDLItem *ctab = cnt.body.items.firstObject;
+  ctab.columns = @[
+    @{
+      @"width" : @2.8,
+      @"header" : @"Job",
+      @"value" : @"=Fields!Job.Value",
+      @"aggregate" : @"Count"
+    },
+    @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
+  ];
+  RDLTablixRow *sub = ctab.tablixBody.rows.lastObject;
+  if (![sub.cells.firstObject.item.value isEqualToString:@"=Count(Fields!Job.Value)"])
+    PicaFail(fails, @"explicit Count should land in first column subtotal");
+  if ([sub.cells.lastObject.item.value length] != 0)
+    PicaFail(fails, @"explicit aggregates disable the last-column Sum fallback");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunBackendRegistryChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   NSArray *named = [[RDLGenerator backends] valueForKey:@"name"];
@@ -1314,6 +1439,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
+  [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubsetChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubset2Checks()];

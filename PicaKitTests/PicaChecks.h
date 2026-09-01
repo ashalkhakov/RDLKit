@@ -6,6 +6,7 @@ NSArray<NSString *> *PicaRunExpressionLangChecks(void);
 NSArray<NSString *> *PicaRunLayoutChecks(void);
 NSArray<NSString *> *PicaRunTablixChecks(void);
 NSArray<NSString *> *PicaRunTablixGroupChecks(void);
+NSArray<NSString *> *PicaRunTablixEditingChecks(void);
 NSArray<NSString *> *PicaRunHTMLBackendChecks(void);
 NSArray<NSString *> *PicaRunPDFBackendChecks(void);
 NSArray<NSString *> *PicaRunBackendRegistryChecks(void);

@@ -75,10 +75,11 @@
 @property (nonatomic, assign) BOOL repeatRowHeaders;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
 // Designer convenience for a header + details table. Reads/writes the Tablix structures.
-@property (nonatomic, copy) NSArray *columns; // @{width, header, value, align?}
+@property (nonatomic, copy) NSArray *columns; // @{width, header, value, align?, aggregate?}
 @property (nonatomic, assign) CGFloat headerHeight;
 @property (nonatomic, assign) CGFloat rowHeight;
 @property (nonatomic, copy) NSString *groupBy; // rebuilds grouped header + details + footer
+@property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
 - (void)rebuildTableFromColumns;
 @end
 
