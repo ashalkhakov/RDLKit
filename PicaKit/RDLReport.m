@@ -40,6 +40,41 @@
   s.borderBottom = [RDLBorder none];
   return s;
 }
+
++ (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base {
+  RDLStyle *s = [[RDLStyle alloc] init];
+  s.fontFamily = [run.fontFamily length] ? run.fontFamily : base.fontFamily;
+  s.fontSize = [run.fontSize length] ? run.fontSize : base.fontSize;
+  s.fontWeight = [run.fontWeight length] ? run.fontWeight : base.fontWeight;
+  s.fontStyle = [run.fontStyle length] ? run.fontStyle : base.fontStyle;
+  s.color = [run.color length] ? run.color : base.color;
+  s.backgroundColor = [run.backgroundColor length] ? run.backgroundColor : base.backgroundColor;
+  s.textAlign = [run.textAlign length] ? run.textAlign : base.textAlign;
+  s.verticalAlign = base.verticalAlign;
+  s.textDecoration = [run.textDecoration length] ? run.textDecoration : base.textDecoration;
+  s.format = [run.format length] ? run.format : base.format;
+  s.paddingLeft = base.paddingLeft;
+  s.paddingRight = base.paddingRight;
+  s.paddingTop = base.paddingTop;
+  s.paddingBottom = base.paddingBottom;
+  s.border = base.border;
+  s.borderLeft = base.borderLeft;
+  s.borderRight = base.borderRight;
+  s.borderTop = base.borderTop;
+  s.borderBottom = base.borderBottom;
+  return s;
+}
+@end
+
+@implementation RDLTextRun
+@end
+
+@implementation RDLParagraph
+- (instancetype)init {
+  if ((self = [super init]))
+    _runs = [NSMutableArray array];
+  return self;
+}
 @end
 
 @implementation RDLTablixColumn

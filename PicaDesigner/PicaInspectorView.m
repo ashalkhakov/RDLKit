@@ -478,8 +478,10 @@ static const CGFloat kHalf2X = 136;
       it.width = [[_widthField stringValue] doubleValue];
     else if (sender == _heightField)
       it.height = [[_heightField stringValue] doubleValue];
-    else if (sender == _valueField)
+    else if (sender == _valueField) {
       it.value = [_valueField stringValue];
+      it.paragraphs = nil; // plain edit replaces any rich-text runs
+    }
     else if (sender == _fontField)
       it.style.fontFamily = [_fontField stringValue];
     else if (sender == _sizeField)

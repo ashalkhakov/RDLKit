@@ -310,6 +310,71 @@ static NSString *PicaTextboxValue(NSXMLElement *el) {
   return [paraTexts componentsJoinedByString:@"\n"];
 }
 
+// Sparse run/paragraph style: only fields present in the XML are set, so
+// renderers can inherit everything else from the textbox style.
+static RDLStyle *PicaParseSparseStyle(NSXMLElement *el) {
+  if (el == nil)
+    return nil;
+  RDLStyle *s = [[RDLStyle alloc] init];
+  s.fontFamily = PicaText(PicaChild(el, @"FontFamily"));
+  s.fontSize = PicaText(PicaChild(el, @"FontSize"));
+  s.fontWeight = PicaText(PicaChild(el, @"FontWeight"));
+  s.fontStyle = PicaText(PicaChild(el, @"FontStyle"));
+  s.color = PicaText(PicaChild(el, @"Color"));
+  s.backgroundColor = PicaText(PicaChild(el, @"BackgroundColor"));
+  s.textAlign = PicaText(PicaChild(el, @"TextAlign"));
+  s.textDecoration = PicaText(PicaChild(el, @"TextDecoration"));
+  s.format = PicaText(PicaChild(el, @"Format"));
+  return s;
+}
+
+static BOOL PicaSparseStyleIsEmpty(RDLStyle *s) {
+  return ![s.fontFamily length] && ![s.fontSize length] && ![s.fontWeight length] &&
+         ![s.fontStyle length] && ![s.color length] && ![s.backgroundColor length] &&
+         ![s.textAlign length] && ![s.textDecoration length] && ![s.format length];
+}
+
+// Rich text: keep the Paragraph/TextRun structure when any run or paragraph
+// carries its own style, or a paragraph holds more than one run. Otherwise the
+// flattened `value` string is a lossless representation and we return nil.
+static NSMutableArray *PicaParseParagraphs(NSXMLElement *el) {
+  NSXMLElement *paragraphs = PicaChild(el, @"Paragraphs");
+  if (paragraphs == nil)
+    return nil;
+  NSMutableArray *paras = [NSMutableArray array];
+  BOOL rich = NO;
+  for (NSXMLNode *pn in [paragraphs children]) {
+    if (pn.kind != NSXMLElementKind || ![pn.localName isEqualToString:@"Paragraph"])
+      continue;
+    RDLParagraph *para = [[RDLParagraph alloc] init];
+    RDLStyle *ps = PicaParseSparseStyle(PicaChild((NSXMLElement *)pn, @"Style"));
+    if (ps && !PicaSparseStyleIsEmpty(ps)) {
+      para.style = ps;
+      rich = YES;
+    }
+    for (NSXMLNode *tn in [PicaChild((NSXMLElement *)pn, @"TextRuns") children]) {
+      if (tn.kind != NSXMLElementKind || ![tn.localName isEqualToString:@"TextRun"])
+        continue;
+      RDLTextRun *run = [[RDLTextRun alloc] init];
+      run.value = [PicaChild((NSXMLElement *)tn, @"Value") stringValue] ?: @"";
+      RDLStyle *rs = PicaParseSparseStyle(PicaChild((NSXMLElement *)tn, @"Style"));
+      if (rs && !PicaSparseStyleIsEmpty(rs)) {
+        run.style = rs;
+        rich = YES;
+      }
+      [para.runs addObject:run];
+    }
+    if ([para.runs count] > 1)
+      rich = YES;
+    [paras addObject:para];
+  }
+  // A single paragraph with a single run flattens losslessly into `value`
+  // (our own plain writer duplicates the textbox style on that run).
+  if ([paras count] == 1 && [[(RDLParagraph *)paras.firstObject runs] count] <= 1)
+    return nil;
+  return rich ? paras : nil;
+}
+
 static NSString *PicaParseVisibility(NSXMLElement *el) {
   NSXMLElement *vis = PicaChild(el, @"Visibility");
   if (vis == nil)
@@ -367,6 +432,7 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     item.keepTogether = [ktc caseInsensitiveCompare:@"true"] == NSOrderedSame;
   if ([el.localName isEqualToString:@"Textbox"]) {
     item.value = PicaTextboxValue(el);
+    item.paragraphs = PicaParseParagraphs(el);
     item.hyperlink = PicaParseHyperlink(el);
     NSString *cg = PicaText(PicaChild(el, @"CanGrow"));
     item.canGrow = ![cg isEqualToString:@"false"];
@@ -800,6 +866,34 @@ static void PicaAppendBorder(NSMutableString *xml, NSString *tag, RDLBorder *b) 
                     tag];
 }
 
+// Sparse Style for rich-text runs/paragraphs: only explicitly set fields are
+// written so unset ones keep inheriting from the textbox style on re-parse.
+static void PicaAppendSparseStyle(NSMutableString *xml, RDLStyle *s) {
+  if (s == nil)
+    return;
+  NSMutableString *body = [NSMutableString string];
+  if ([s.fontFamily length])
+    [body appendFormat:@"<FontFamily>%@</FontFamily>", PicaEsc(s.fontFamily)];
+  if ([s.fontSize length])
+    [body appendFormat:@"<FontSize>%@</FontSize>", PicaEsc(s.fontSize)];
+  if ([s.fontWeight length])
+    [body appendFormat:@"<FontWeight>%@</FontWeight>", PicaEsc(s.fontWeight)];
+  if ([s.fontStyle length])
+    [body appendFormat:@"<FontStyle>%@</FontStyle>", PicaEsc(s.fontStyle)];
+  if ([s.color length])
+    [body appendFormat:@"<Color>%@</Color>", PicaEsc(s.color)];
+  if ([s.backgroundColor length])
+    [body appendFormat:@"<BackgroundColor>%@</BackgroundColor>", PicaEsc(s.backgroundColor)];
+  if ([s.textAlign length])
+    [body appendFormat:@"<TextAlign>%@</TextAlign>", PicaEsc(s.textAlign)];
+  if ([s.textDecoration length])
+    [body appendFormat:@"<TextDecoration>%@</TextDecoration>", PicaEsc(s.textDecoration)];
+  if ([s.format length])
+    [body appendFormat:@"<Format>%@</Format>", PicaEsc(s.format)];
+  if ([body length])
+    [xml appendFormat:@"<Style>%@</Style>", body];
+}
+
 static void PicaAppendStyle(NSMutableString *xml, RDLStyle *s) {
   if (s == nil)
     s = [RDLStyle defaultStyle];
@@ -1077,6 +1171,22 @@ static void PicaAppendItem(NSMutableString *xml, RDLItem *it) {
   PicaAppendItemPagination(xml, it);
   [xml appendFormat:@"<CanGrow>%@</CanGrow>", it.canGrow ? @"true" : @"false"];
   PicaAppendStyle(xml, it.style);
+  if ([it.paragraphs count]) {
+    [xml appendString:@"<Paragraphs>"];
+    for (RDLParagraph *para in it.paragraphs) {
+      [xml appendString:@"<Paragraph>"];
+      PicaAppendSparseStyle(xml, para.style);
+      [xml appendString:@"<TextRuns>"];
+      for (RDLTextRun *run in para.runs) {
+        [xml appendFormat:@"<TextRun><Value>%@</Value>", PicaEsc(run.value ?: @"")];
+        PicaAppendSparseStyle(xml, run.style);
+        [xml appendString:@"</TextRun>"];
+      }
+      [xml appendString:@"</TextRuns></Paragraph>"];
+    }
+    [xml appendString:@"</Paragraphs></Textbox>"];
+    return;
+  }
   [xml appendFormat:@"<Paragraphs><Paragraph><TextRuns><TextRun><Value>%@</Value>",
                     PicaEsc(it.value)];
   PicaAppendStyle(xml, it.style);

@@ -3,6 +3,7 @@
 #import "PicaCompatibility.h"
 #import "PicaExpressionHelper.h"
 #import "PicaTablixEditor.h"
+#import "PicaRichTextEditor.h"
 
 static const CGFloat kDPI = 72.0;
 
@@ -49,6 +50,35 @@ static NSDictionary *PicaTextAttributes(RDLStyle *style, CGFloat zoom) {
   else if ([deco isEqualToString:@"LineThrough"])
     attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
   return attrs;
+}
+
+// Rich text preview: paragraphs of styled runs merged over the item style.
+static NSAttributedString *PicaParagraphsAttributed(RDLItem *it, CGFloat zoom) {
+  NSMutableAttributedString *out = [[NSMutableAttributedString alloc] init];
+  NSString *prevAlign = nil;
+  BOOL first = YES;
+  for (RDLParagraph *para in it.paragraphs) {
+    NSString *align = para.style.textAlign;
+    if (!first) {
+      RDLStyle *sepStyle = [RDLStyle styleByMerging:nil over:it.style];
+      if ([prevAlign length])
+        sepStyle.textAlign = prevAlign;
+      [out appendAttributedString:[[NSAttributedString alloc]
+                                      initWithString:@"\n"
+                                          attributes:PicaTextAttributes(sepStyle, zoom)]];
+    }
+    first = NO;
+    prevAlign = align;
+    for (RDLTextRun *run in para.runs) {
+      RDLStyle *merged = [RDLStyle styleByMerging:run.style over:it.style];
+      if ([align length])
+        merged.textAlign = align;
+      [out appendAttributedString:[[NSAttributedString alloc]
+                                      initWithString:run.value ?: @""
+                                          attributes:PicaTextAttributes(merged, zoom)]];
+    }
+  }
+  return out;
 }
 
 // Text spans render as attributed strings: paragraphs split on newlines keep
@@ -439,8 +469,12 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     CGFloat padR = PicaInchesFromString(it.style.paddingRight) * kDPI * c.zoom;
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
-    if (!(_editorField && _editItem == it && _editContext == nil))
-      [PicaAttributedText(it.value ?: it.type, it.style, c.zoom) drawInRect:textRect];
+    if (!(_editorField && _editItem == it && _editContext == nil)) {
+      if ([it.paragraphs count])
+        [PicaParagraphsAttributed(it, c.zoom) drawInRect:textRect];
+      else
+        [PicaAttributedText(it.value ?: it.type, it.style, c.zoom) drawInRect:textRect];
+    }
   }
   if (sel) {
     [[NSColor colorWithCalibratedRed:0.1 green:0.1 blue:0.09 alpha:1] set];
@@ -790,6 +824,13 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
         BOOL onCell = [self tablix:hit itemRect:itemRect point:p col:&col part:&part];
         return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:hit];
       }
+      if ([hit.type isEqualToString:@"Textbox"]) {
+        NSMenu *m = [[NSMenu alloc] initWithTitle:@"Textbox"];
+        [m addItem:[self tablixMenuItem:@"Edit Rich Text…"
+                                 action:@selector(ctxEditRichText:)
+                                    tag:0]];
+        return m;
+      }
       return nil;
     }
     y += band.height * kDPI * z;
@@ -853,6 +894,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   RDLItem *it = [c selectedItem];
   if (it && [it.type isEqualToString:@"Tablix"] &&
       [PicaTablixEditor runForTablix:it report:c.report])
+    [c noteChange];
+}
+
+- (void)ctxEditRichText:(NSMenuItem *)mi {
+  PICA_UNUSED(mi);
+  PicaController *c = [PicaController sharedController];
+  RDLItem *it = [c selectedItem];
+  if (it && [it.type isEqualToString:@"Textbox"] && [PicaRichTextEditor runForTextbox:it])
     [c noteChange];
 }
 
@@ -1059,6 +1108,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     if ([text isEqualToString:it.value ?: @""])
       return;
     it.value = text;
+    it.paragraphs = nil; // plain edit replaces any rich-text runs
   } else {
     NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
     NSString *key = [ctx[@"part"] isEqualToString:@"header"] ? @"header" : @"value";

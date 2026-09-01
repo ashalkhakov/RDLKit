@@ -277,7 +277,45 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         [st appendString:@"display:flex;flex-direction:column;justify-content:center;"];
       else if ([va isEqualToString:@"Bottom"])
         [st appendString:@"display:flex;flex-direction:column;justify-content:flex-end;"];
-      NSString *body = PicaHTMLEsc(it.text ?: @"");
+      NSString *body;
+      if ([it.spans count]) {
+        // Rich text: one div per paragraph, one span per styled run.
+        NSMutableString *rich = [NSMutableString string];
+        for (RDLParagraph *para in it.spans) {
+          if ([para.style.textAlign length])
+            [rich appendFormat:@"<div style=\"text-align:%@;\">",
+                               PicaCSSAlign(para.style.textAlign)];
+          else
+            [rich appendString:@"<div>"];
+          for (RDLTextRun *run in para.runs) {
+            NSMutableString *rs = [NSMutableString string];
+            RDLStyle *s = run.style;
+            if ([s.color length])
+              [rs appendFormat:@"color:%@;", s.color];
+            if ([s.fontFamily length])
+              [rs appendFormat:@"font-family:%@;", s.fontFamily];
+            if ([s.fontSize length])
+              [rs appendFormat:@"font-size:%@;", s.fontSize];
+            if ([s.fontWeight length])
+              [rs appendFormat:@"font-weight:%@;",
+                               [s.fontWeight isEqualToString:@"Bold"] ? @"700" : @"400"];
+            if ([s.fontStyle isEqualToString:@"Italic"])
+              [rs appendString:@"font-style:italic;"];
+            NSString *rdeco = PicaCSSTextDecoration(s.textDecoration);
+            if (rdeco)
+              [rs appendFormat:@"text-decoration:%@;", rdeco];
+            if ([rs length])
+              [rich appendFormat:@"<span style=\"%@\">%@</span>", PicaHTMLEsc(rs),
+                                 PicaHTMLEsc(run.value ?: @"")];
+            else
+              [rich appendString:PicaHTMLEsc(run.value ?: @"")];
+          }
+          [rich appendString:@"</div>"];
+        }
+        body = rich;
+      } else {
+        body = PicaHTMLEsc(it.text ?: @"");
+      }
       if ([it.hyperlink length])
         body = [NSString stringWithFormat:@"<a href=\"%@\" style=\"color:inherit;\">%@</a>",
                                           PicaHTMLEsc(it.hyperlink), body];

@@ -35,6 +35,73 @@ static void PicaStrokeBorderEdge(NSPoint a, NSPoint b, RDLBorder *border, RDLBor
   [p stroke];
 }
 
+// Font + text attributes for a resolved style (used both for the plain text
+// path and for each rich-text run merged over the textbox style).
+static NSFont *PicaViewFont(RDLStyle *style) {
+  CGFloat pt = [style.fontSize floatValue];
+  if (pt <= 0)
+    pt = 10;
+  NSFont *font = [NSFont fontWithName:style.fontFamily size:pt];
+  if (font == nil)
+    font = [NSFont userFontOfSize:pt];
+  NSFontManager *fm = [NSFontManager sharedFontManager];
+  if ([style.fontWeight isEqualToString:@"Bold"]) {
+    NSFont *b = [fm convertFont:font toHaveTrait:NSBoldFontMask];
+    if (b)
+      font = b;
+  }
+  if ([style.fontStyle isEqualToString:@"Italic"]) {
+    NSFont *i2 = [fm convertFont:font toHaveTrait:NSItalicFontMask];
+    if (i2)
+      font = i2;
+  }
+  return font;
+}
+
+static NSDictionary *PicaViewAttrs(RDLStyle *style, NSString *paraAlign) {
+  NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
+  attrs[NSFontAttributeName] = PicaViewFont(style);
+  attrs[NSForegroundColorAttributeName] = PicaColorFromHex(style.color);
+  if ([style.textDecoration isEqualToString:@"Underline"])
+    attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
+  else if ([style.textDecoration isEqualToString:@"LineThrough"])
+    attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
+  NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
+  NSString *align = [paraAlign length] ? paraAlign : style.textAlign;
+  if ([align isEqualToString:@"Center"])
+    ps.alignment = NSCenterTextAlignment;
+  else if ([align isEqualToString:@"Right"])
+    ps.alignment = NSRightTextAlignment;
+  else
+    ps.alignment = NSLeftTextAlignment;
+  ps.lineBreakMode = NSLineBreakByWordWrapping;
+  attrs[NSParagraphStyleAttributeName] = ps;
+  return attrs;
+}
+
+// Rich text: paragraphs joined by \n, each run merged over the textbox style.
+static NSAttributedString *PicaSpansAttributed(RDLLaidOutItem *it) {
+  NSMutableAttributedString *out = [[NSMutableAttributedString alloc] init];
+  NSString *prevAlign = nil;
+  BOOL first = YES;
+  for (RDLParagraph *para in it.spans) {
+    NSString *paraAlign = para.style.textAlign;
+    if (!first)
+      [out appendAttributedString:
+               [[NSAttributedString alloc] initWithString:@"\n"
+                                                attributes:PicaViewAttrs(it.style, prevAlign)]];
+    first = NO;
+    prevAlign = paraAlign;
+    for (RDLTextRun *run in para.runs) {
+      RDLStyle *merged = [RDLStyle styleByMerging:run.style over:it.style];
+      [out appendAttributedString:
+               [[NSAttributedString alloc] initWithString:run.value ?: @""
+                                                attributes:PicaViewAttrs(merged, paraAlign)]];
+    }
+  }
+  return out;
+}
+
 static void PicaDrawBorders(NSRect r, RDLStyle *s) {
   if (s == nil)
     return;
@@ -243,38 +310,7 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
     }
     // Textbox
     PicaFillBackground(r, it.style);
-    NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
-    CGFloat pt = [it.style.fontSize floatValue];
-    if (pt <= 0)
-      pt = 10;
-    NSFont *font = [NSFont fontWithName:it.style.fontFamily size:pt];
-    if (font == nil)
-      font = [NSFont userFontOfSize:pt];
-    NSFontManager *fm = [NSFontManager sharedFontManager];
-    if ([it.style.fontWeight isEqualToString:@"Bold"]) {
-      NSFont *b = [fm convertFont:font toHaveTrait:NSBoldFontMask];
-      if (b)
-        font = b;
-    }
-    if ([it.style.fontStyle isEqualToString:@"Italic"]) {
-      NSFont *i2 = [fm convertFont:font toHaveTrait:NSItalicFontMask];
-      if (i2)
-        font = i2;
-    }
-    attrs[NSFontAttributeName] = font;
-    attrs[NSForegroundColorAttributeName] = PicaColorFromHex(it.style.color);
-    if ([it.style.textDecoration isEqualToString:@"Underline"])
-      attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-    else if ([it.style.textDecoration isEqualToString:@"LineThrough"])
-      attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
-    NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
-    if ([it.style.textAlign isEqualToString:@"Center"])
-      ps.alignment = NSCenterTextAlignment;
-    else if ([it.style.textAlign isEqualToString:@"Right"])
-      ps.alignment = NSRightTextAlignment;
-    else
-      ps.alignment = NSLeftTextAlignment;
-    attrs[NSParagraphStyleAttributeName] = ps;
+    NSDictionary *attrs = PicaViewAttrs(it.style, nil);
     // Padding inset.
     NSRect textRect = r;
     CGFloat padL = PicaViewPt(it.style.paddingLeft, 0);
@@ -285,17 +321,24 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
     textRect.origin.y += padT;
     textRect.size.width -= padL + padR;
     textRect.size.height -= padT + padB;
+    NSAttributedString *rich = [it.spans count] ? PicaSpansAttributed(it) : nil;
     NSString *text = it.text ?: @"";
     NSString *va = it.style.verticalAlign;
     if ([va isEqualToString:@"Middle"] || [va isEqualToString:@"Bottom"]) {
-      NSRect used = [text boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
-                                       options:NSStringDrawingUsesLineFragmentOrigin
-                                    attributes:attrs];
+      NSRect used =
+          rich ? [rich boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
+                                    options:NSStringDrawingUsesLineFragmentOrigin]
+               : [text boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
+                                    options:NSStringDrawingUsesLineFragmentOrigin
+                                 attributes:attrs];
       CGFloat dy = NSHeight(textRect) - NSHeight(used);
       if (dy > 0)
         textRect.origin.y += [va isEqualToString:@"Middle"] ? dy / 2 : dy;
     }
-    [text drawInRect:textRect withAttributes:attrs];
+    if (rich)
+      [rich drawInRect:textRect];
+    else
+      [text drawInRect:textRect withAttributes:attrs];
     PicaDrawBorders(r, it.style);
   }
 }

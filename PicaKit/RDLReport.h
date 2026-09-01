@@ -28,6 +28,21 @@
 @property (nonatomic, strong) RDLBorder *border;
 @property (nonatomic, strong) RDLBorder *borderLeft, *borderRight, *borderTop, *borderBottom;
 + (instancetype)defaultStyle;
+// New style taking every non-empty field of `run` over `base` (rich-text run
+// styles are sparse: unset fields inherit from the textbox style).
++ (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base;
+@end
+
+// Rich text. A Textbox may carry Paragraphs of styled TextRuns; when
+// `paragraphs` on the item is nil the plain `value` string is used instead.
+@interface RDLTextRun : NSObject
+@property (nonatomic, copy) NSString *value;   // literal or `=` expression
+@property (nonatomic, strong) RDLStyle *style; // sparse; nil = inherit textbox style
+@end
+
+@interface RDLParagraph : NSObject
+@property (nonatomic, strong) RDLStyle *style; // sparse (TextAlign …); nil = inherit
+@property (nonatomic, strong) NSMutableArray<RDLTextRun *> *runs;
 @end
 
 @class RDLTablixBody;
@@ -48,6 +63,9 @@
 @property (nonatomic, copy) NSString *hyperlink;
 // Textbox / Image
 @property (nonatomic, copy) NSString *value;
+// Rich text paragraphs; nil = plain `value`. Kept in sync: `value` always
+// holds the flattened text (runs joined, paragraphs separated by \n).
+@property (nonatomic, strong) NSMutableArray<RDLParagraph *> *paragraphs;
 @property (nonatomic, assign) BOOL canGrow;
 @property (nonatomic, copy) NSString *source; // Image: Embedded | External
 @property (nonatomic, copy) NSString *sizing; // Fit, FitProportional, Clip, AutoSize
@@ -222,6 +240,9 @@
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, assign) CGFloat x, y, w, h;
 @property (nonatomic, copy) NSString *text;
+// Rich text: evaluated paragraphs (run values resolved, styles sparse). When
+// nil, `text` with the item style is the whole content.
+@property (nonatomic, copy) NSArray<RDLParagraph *> *spans;
 @property (nonatomic, strong) RDLStyle *style;
 @property (nonatomic, assign) NSInteger zIndex;
 @property (nonatomic, copy) NSString *hyperlink; // resolved URL, or nil

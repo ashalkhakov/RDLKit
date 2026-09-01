@@ -14,6 +14,7 @@ Pica_OBJC_FILES = \
   PicaInspectorView.m \
   PicaExpressionHelper.m \
   PicaTablixEditor.m \
+  PicaRichTextEditor.m \
   PicaDataView.m \
   PicaWelcomeWindow.m
 Pica_OBJC_LIBS += -lPicaKit

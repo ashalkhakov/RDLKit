@@ -1006,6 +1006,29 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
   if ([item.type isEqualToString:@"Textbox"]) {
     li.text = [RDLExpression formatValue:[RDLExpression evaluate:item.value scope:scope]
                                   format:(li.style ?: item.style).format];
+    if ([item.paragraphs count]) {
+      NSMutableArray *spans = [NSMutableArray array];
+      NSMutableArray *flat = [NSMutableArray array];
+      for (RDLParagraph *para in item.paragraphs) {
+        RDLParagraph *outPara = [[RDLParagraph alloc] init];
+        outPara.style = para.style;
+        NSMutableString *paraText = [NSMutableString string];
+        for (RDLTextRun *run in para.runs) {
+          RDLTextRun *outRun = [[RDLTextRun alloc] init];
+          outRun.style = run.style;
+          NSString *fmt = [run.style.format length] ? run.style.format
+                                                    : (li.style ?: item.style).format;
+          outRun.value = [RDLExpression formatValue:[RDLExpression evaluate:run.value scope:scope]
+                                             format:fmt];
+          [outPara.runs addObject:outRun];
+          [paraText appendString:outRun.value ?: @""];
+        }
+        [spans addObject:outPara];
+        [flat addObject:paraText];
+      }
+      li.spans = spans;
+      li.text = [flat componentsJoinedByString:@"\n"];
+    }
   } else if ([item.type isEqualToString:@"Image"]) {
     NSString *val = [item.value hasPrefix:@"="]
                         ? [RDLExpression evaluateText:item.value scope:scope]

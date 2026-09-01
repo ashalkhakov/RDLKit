@@ -1802,6 +1802,111 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   return fails;
 }
 
+NSArray<NSString *> *PicaRunRichTextChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  // Model → writer → parser round trip of styled runs.
+  RDLReport *r = [RDLReport emptyReportNamed:@"Rich"];
+  RDLParameter *who = [[RDLParameter alloc] init];
+  who.name = @"Who";
+  who.dataType = @"String";
+  who.defaultValue = @"Ada";
+  [r.parameters addObject:who];
+  RDLItem *tb = [[RDLItem alloc] init];
+  tb.type = @"Textbox";
+  tb.name = @"RichBox";
+  tb.width = 4;
+  tb.height = 0.6;
+  RDLParagraph *p1 = [[RDLParagraph alloc] init];
+  RDLTextRun *r1 = [[RDLTextRun alloc] init];
+  r1.value = @"Hello ";
+  RDLTextRun *r2 = [[RDLTextRun alloc] init];
+  r2.value = @"=Parameters!Who.Value";
+  RDLStyle *bold = [[RDLStyle alloc] init];
+  bold.fontWeight = @"Bold";
+  bold.color = @"#aa0000";
+  r2.style = bold;
+  [p1.runs addObject:r1];
+  [p1.runs addObject:r2];
+  RDLParagraph *p2 = [[RDLParagraph alloc] init];
+  RDLTextRun *r3 = [[RDLTextRun alloc] init];
+  r3.value = @"second line";
+  RDLStyle *centered = [[RDLStyle alloc] init];
+  centered.textAlign = @"Center";
+  p2.style = centered;
+  [p2.runs addObject:r3];
+  tb.paragraphs = [NSMutableArray arrayWithObjects:p1, p2, nil];
+  tb.value = @"Hello =Parameters!Who.Value\nsecond line";
+  [r.body.items addObject:tb];
+
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<TextRun><Value>Hello </Value></TextRun>"].location == NSNotFound)
+    PicaFail(fails, @"richtext: writer should emit unstyled run without Style");
+  if ([xml rangeOfString:@"<FontWeight>Bold</FontWeight>"].location == NSNotFound)
+    PicaFail(fails, @"richtext: writer should emit sparse run FontWeight");
+  if ([xml rangeOfString:@"<TextAlign>Center</TextAlign>"].location == NSNotFound)
+    PicaFail(fails, @"richtext: writer should emit paragraph TextAlign");
+
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  RDLItem *tb2 = back.body.items.firstObject;
+  if ([tb2.paragraphs count] != 2)
+    PicaFail(fails, @"richtext: re-parse should keep 2 paragraphs");
+  RDLParagraph *bp1 = tb2.paragraphs.firstObject;
+  if ([bp1.runs count] != 2)
+    PicaFail(fails, @"richtext: paragraph 1 should keep 2 runs");
+  RDLTextRun *br2 = [bp1.runs count] > 1 ? bp1.runs[1] : nil;
+  if (![br2.style.fontWeight isEqualToString:@"Bold"] ||
+      ![br2.style.color isEqualToString:@"#aa0000"])
+    PicaFail(fails, @"richtext: run style should round-trip Bold + color");
+  if (br2.style.fontFamily.length)
+    PicaFail(fails, @"richtext: run style should stay sparse (no FontFamily)");
+  if (![[tb2.paragraphs[1] style].textAlign isEqualToString:@"Center"])
+    PicaFail(fails, @"richtext: paragraph style should round-trip TextAlign");
+  if ([tb2.value rangeOfString:@"second line"].location == NSNotFound)
+    PicaFail(fails, @"richtext: flattened value should include both paragraphs");
+
+  // Layout: run expressions evaluate into spans, flattened text matches.
+  NSArray *pages = [RDLGenerator pagesForReport:back parameters:@{}];
+  RDLLaidOutItem *li = nil;
+  for (RDLLaidOutItem *it in [pages.firstObject items])
+    if ([it.name isEqualToString:@"RichBox"])
+      li = it;
+  if (li == nil) {
+    PicaFail(fails, @"richtext: laid-out textbox missing");
+  } else {
+    if ([li.spans count] != 2)
+      PicaFail(fails, @"richtext: laid-out spans should keep 2 paragraphs");
+    RDLTextRun *lr2 = [[li.spans.firstObject runs] count] > 1 ? [li.spans.firstObject runs][1] : nil;
+    if (![lr2.value isEqualToString:@"Ada"])
+      PicaFail(fails, @"richtext: run expression should evaluate to Ada");
+    if ([li.text rangeOfString:@"Hello Ada"].location == NSNotFound)
+      PicaFail(fails, @"richtext: flattened laid-out text should read Hello Ada");
+  }
+
+  // HTML: styled runs render as spans inside per-paragraph divs.
+  NSString *html = [RDLHTMLBackend HTMLStringForPages:pages title:@"t"];
+  if ([html rangeOfString:@"font-weight:700"].location == NSNotFound ||
+      [html rangeOfString:@"<span"].location == NSNotFound)
+    PicaFail(fails, @"richtext: HTML should carry bold span");
+  if ([html rangeOfString:@"text-align:center"].location == NSNotFound)
+    PicaFail(fails, @"richtext: HTML should carry centered paragraph");
+
+  // Plain textboxes stay plain: no paragraphs, no spans in HTML body text.
+  RDLReport *plain = [RDLReport emptyReportNamed:@"Plain"];
+  RDLItem *ptb = [[RDLItem alloc] init];
+  ptb.type = @"Textbox";
+  ptb.name = @"P";
+  ptb.value = @"just text";
+  ptb.width = 2;
+  ptb.height = 0.3;
+  [plain.body.items addObject:ptb];
+  NSString *pxml = [RDLWriter XMLStringFromReport:plain];
+  RDLReport *pback = [RDLParser reportFromXMLString:pxml error:&err];
+  if ([pback.body.items.firstObject paragraphs] != nil)
+    PicaFail(fails, @"richtext: single unstyled run should parse as plain value");
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -1815,6 +1920,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubsetChecks()];
   [fails addObjectsFromArray:PicaRunRDLSubset2Checks()];
+  [fails addObjectsFromArray:PicaRunRichTextChecks()];
 #if !defined(GNUSTEP)
   [fails addObjectsFromArray:PicaRunPDFBackendChecks()];
 #endif
