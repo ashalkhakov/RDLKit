@@ -39,11 +39,14 @@ Tablix follows the spec:
 - `TablixBody` → `TablixColumn` / `TablixRow` / `TablixCell` / CellContents (`ColSpan` / `RowSpan`)
 - `TablixColumnHierarchy` / `TablixRowHierarchy` → `TablixMember`
 - static member vs `Group` (`GroupExpressions`, nested members, `TablixHeader`)
-- `Filters`, `SortExpressions`, `PageBreak` (Between / Start), `KeepTogether`
+- one dynamic column-group member pivots columns (crosstab): each group instance repeats the body column, `TablixHeader` becomes the column caption, and cell aggregates evaluate over the row-rows ∩ column-rows intersection
+- `Filters`, `SortExpressions`, `PageBreak` (Between / Start, plus `ResetPageNumber` / `PageName`), `KeepTogether`
 - `NoRowsMessage`, `RepeatColumnHeaders` / `RepeatRowHeaders`, `TablixCorner`
 - group-scoped `Sum` / `Count` (current group rows, or a named dataset)
 
 Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebuild those structures (header + optional group header + details + subtotal footer).
+
+Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Subreport, Gauge, Map, …) are collected into `report.warnings` by the parser.
 
 ## Public entry
 
