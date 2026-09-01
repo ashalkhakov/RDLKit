@@ -2,7 +2,7 @@
 
 **Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. Same binary on **Cocoa** (macOS) and **GNUstep**. No Swift, no UIKit, no nibs — every window is built in code.
 
-`../PicaKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columns` / `groupBy` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. The "Edit Tablix…" inspector button opens the modal editor.
+`../PicaKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columns` / `groupBy` / `pivotBy` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. Setting `pivotBy` alongside `groupBy` builds a crosstab (matrix): a dynamic `TablixColumnHierarchy` group with the first column as the aggregated measure. The "Edit Tablix…" inspector button opens the modal editor.
 
 Pica.app’s welcome screen opens either this designer or the generator window.
 
@@ -15,7 +15,7 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaDesignerWindow` | Split: report outline (+/− bar, modal Add Element palette) · canvas · inspector · data |
 | `PicaCanvasView` | Flipped paper, bands, drag/resize, snap 0.05 in, nested Rectangle children |
 | `PicaInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
-| `PicaTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total), row group with subtotal, grand-total row |
+| `PicaTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total), row group with subtotal, column group (crosstab pivot), grand-total row |
 | `PicaDataView` | Parameters and dataset JSON |
 | `PicaController` | Current `RDLReport`, selection (report / band / item), element insertion rules |
 | `PicaSamples` | Native sample factories |

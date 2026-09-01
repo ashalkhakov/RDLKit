@@ -505,6 +505,10 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     NSXMLElement *ch = PicaChild(el, @"TablixColumnHierarchy");
     if (ch)
       item.columnHierarchy = PicaParseHierarchy(ch);
+    // Designer convenience: a dynamic column group means crosstab (matrix).
+    NSString *pivot = PicaFindGroupBy(item.columnHierarchy.members);
+    if (pivot)
+      item.pivotBy = pivot;
     NSXMLElement *rh = PicaChild(el, @"TablixRowHierarchy");
     if (rh)
       item.rowHierarchy = PicaParseHierarchy(rh);

@@ -11,7 +11,7 @@ static NSArray *PicaAlignNames(void) {
 @interface PicaTablixEditor () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) NSPanel *panel;
 @property (nonatomic, strong) NSTableView *table;
-@property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop;
+@property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop, *pivotPop;
 @property (nonatomic, strong) NSButton *grandTotalCheck;
 @property (nonatomic, strong) NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
@@ -40,21 +40,21 @@ static NSArray *PicaAlignNames(void) {
   return _report.dataSets.firstObject;
 }
 
-- (void)rebuildGroupPop:(NSString *)selecting {
-  [_groupPop removeAllItems];
-  [_groupPop addItemWithTitle:@"(none)"];
+- (void)rebuildFieldPop:(NSPopUpButton *)pop selecting:(NSString *)selecting {
+  [pop removeAllItems];
+  [pop addItemWithTitle:@"(none)"];
   for (NSString *f in [self selectedDataset].fields)
-    [_groupPop addItemWithTitle:f];
-  if ([selecting length] && [_groupPop itemWithTitle:selecting])
-    [_groupPop selectItemWithTitle:selecting];
+    [pop addItemWithTitle:f];
+  if ([selecting length] && [pop itemWithTitle:selecting])
+    [pop selectItemWithTitle:selecting];
   else
-    [_groupPop selectItemAtIndex:0];
+    [pop selectItemAtIndex:0];
 }
 
 - (void)datasetChanged:(id)sender {
   (void)sender;
-  NSString *cur = [_groupPop titleOfSelectedItem];
-  [self rebuildGroupPop:cur];
+  [self rebuildFieldPop:_groupPop selecting:[_groupPop titleOfSelectedItem]];
+  [self rebuildFieldPop:_pivotPop selecting:[_pivotPop titleOfSelectedItem]];
 }
 
 - (void)buildPanelForTablix:(RDLItem *)tab {
@@ -78,21 +78,24 @@ static NSArray *PicaAlignNames(void) {
   [_datasetPop setAction:@selector(datasetChanged:)];
   [cv addSubview:_datasetPop];
 
-  [self label:@"Row group (adds a group header and subtotal row)"
-        frame:NSMakeRect(198, top - 34, 280, 14)
-       inView:cv];
-  _groupPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(198, top - 58, 170, 22) pullsDown:NO];
+  [self label:@"Row group" frame:NSMakeRect(198, top - 34, 150, 14) inView:cv];
+  _groupPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(198, top - 58, 150, 22) pullsDown:NO];
   [cv addSubview:_groupPop];
-  [self rebuildGroupPop:tab.groupBy];
+  [self rebuildFieldPop:_groupPop selecting:tab.groupBy];
 
-  _grandTotalCheck = [[NSButton alloc] initWithFrame:NSMakeRect(382, top - 58, 150, 22)];
+  [self label:@"Column group (pivot)" frame:NSMakeRect(362, top - 34, 150, 14) inView:cv];
+  _pivotPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(362, top - 58, 150, 22) pullsDown:NO];
+  [cv addSubview:_pivotPop];
+  [self rebuildFieldPop:_pivotPop selecting:tab.pivotBy];
+
+  _grandTotalCheck = [[NSButton alloc] initWithFrame:NSMakeRect(524, top - 58, 110, 22)];
   [_grandTotalCheck setButtonType:NSSwitchButton];
   [_grandTotalCheck setTitle:@"Grand total row"];
   [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
   [cv addSubview:_grandTotalCheck];
 
   // Columns grid.
-  [self label:@"Columns — Total picks the aggregate shown in subtotal and total rows"
+  [self label:@"Columns — Total picks the aggregate; with a column group (pivot) the first column is the measure"
         frame:NSMakeRect(14, top - 84, 500, 14)
        inView:cv];
   NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(14, 118, NSWidth(b) - 28, top - 84 - 128)];
@@ -299,7 +302,10 @@ static NSArray *PicaAlignNames(void) {
   tablix.dataSetName = [ed.datasetPop titleOfSelectedItem] ?: tablix.dataSetName;
   NSString *group = [ed.groupPop indexOfSelectedItem] > 0 ? [ed.groupPop titleOfSelectedItem] : @"";
   tablix.groupBy = group;
+  NSString *pivot = [ed.pivotPop indexOfSelectedItem] > 0 ? [ed.pivotPop titleOfSelectedItem] : @"";
+  tablix.pivotBy = pivot;
   tablix.showGrandTotal = [ed.grandTotalCheck state] == NSOnState;
+  // Note: heights must be set before columns; setColumns rebuilds the Tablix.
   tablix.headerHeight = [[ed.headerHField stringValue] doubleValue];
   tablix.rowHeight = [[ed.rowHField stringValue] doubleValue];
   tablix.columns = ed.cols; // triggers the full Tablix rebuild

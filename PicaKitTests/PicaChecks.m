@@ -786,6 +786,101 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   if ([sub.cells.lastObject.item.value length] != 0)
     PicaFail(fails, @"explicit aggregates disable the last-column Sum fallback");
 
+  // Matrix (crosstab) via the designer convenience: pivotBy + groupBy.
+  RDLReport *mx = PicaGroupedJobs();
+  RDLItem *mtab = mx.body.items.firstObject;
+  mtab.groupBy = @"Finish";
+  mtab.pivotBy = @"Job";
+  mtab.showGrandTotal = YES;
+  mtab.columns = @[ @{
+    @"width" : @1.5,
+    @"value" : @"=Fields!Amount.Value",
+    @"aggregate" : @"Sum"
+  } ];
+  if ([mtab.tablixBody.columns count] != 1 || [mtab.tablixBody.rows count] != 2)
+    PicaFail(fails, @"matrix body should be 1 column x 2 rows (data + totals)");
+  RDLTablixMember *cm = mtab.columnHierarchy.members.firstObject;
+  if ([cm.groupExpressions count] == 0 ||
+      [cm.groupExpressions[0] rangeOfString:@"Job"].location == NSNotFound)
+    PicaFail(fails, @"matrix column hierarchy should group by Job");
+  if (cm.header == nil)
+    PicaFail(fails, @"matrix column group missing TablixHeader");
+  NSString *mcell = mtab.tablixBody.rows.firstObject.cells.firstObject.item.value;
+  if (![mcell isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    PicaFail(fails, [NSString stringWithFormat:@"matrix cell %@", mcell]);
+
+  // The columns getter should recover the measure spec.
+  NSArray *mcols = mtab.columns;
+  if ([mcols count] != 1 || ![mcols.firstObject[@"aggregate"] isEqualToString:@"Sum"] ||
+      ![mcols.firstObject[@"value"] isEqualToString:@"=Fields!Amount.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"matrix derived columns %@", mcols]);
+
+  // Layout: Job values pivot into columns, Finish values become row headers,
+  // and cells hold the scoped sums (Oil x Desk = 1840).
+  NSArray *mpages = [RDLGenerator pagesForReport:mx parameters:@{}];
+  BOOL mDesk = NO, mChair = NO, mOil = NO, mWax = NO;
+  NSInteger deskSums = 0;
+  CGFloat deskX = -1, chairX = -1;
+  for (RDLLaidOutPage *p in mpages) {
+    for (RDLLaidOutItem *it in p.items) {
+      if ([it.text isEqualToString:@"Desk"]) {
+        mDesk = YES;
+        deskX = it.x;
+      }
+      if ([it.text isEqualToString:@"Chair"]) {
+        mChair = YES;
+        chairX = it.x;
+      }
+      if ([it.text isEqualToString:@"Oil"])
+        mOil = YES;
+      if ([it.text isEqualToString:@"Wax"])
+        mWax = YES;
+      if (PicaAsNum(it.text) == 1840)
+        deskSums += 1;
+    }
+  }
+  if (!mDesk || !mChair)
+    PicaFail(fails, @"matrix missing pivoted Job column headers");
+  if (deskX >= 0 && chairX >= 0 && deskX == chairX)
+    PicaFail(fails, @"matrix pivoted columns should have distinct x positions");
+  if (!mOil || !mWax)
+    PicaFail(fails, @"matrix missing Finish row headers");
+  if (deskSums < 2)
+    PicaFail(fails, @"matrix should show Desk sum 1840 in the Oil row and the totals row");
+
+  // Round-trip: writer XML → parser keeps pivotBy, groupBy and the measure.
+  NSString *mxml = [RDLWriter XMLStringFromReport:mx];
+  NSError *merr = nil;
+  RDLReport *mparsed = [RDLParser reportFromXMLString:mxml error:&merr];
+  if (mparsed == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"matrix round-trip parse failed: %@",
+                                               merr.localizedDescription]);
+  else {
+    RDLItem *pt = nil;
+    for (RDLItem *it in mparsed.body.items)
+      if ([it.type isEqualToString:@"Tablix"])
+        pt = it;
+    if (![pt.pivotBy isEqualToString:@"Job"])
+      PicaFail(fails, [NSString stringWithFormat:@"round-trip pivotBy %@", pt.pivotBy]);
+    if (![pt.groupBy isEqualToString:@"Finish"])
+      PicaFail(fails, @"matrix round-trip lost groupBy");
+    if (!pt.showGrandTotal)
+      PicaFail(fails, @"matrix round-trip lost showGrandTotal");
+    NSArray *pcols = pt.columns;
+    if (![pcols.firstObject[@"aggregate"] isEqualToString:@"Sum"])
+      PicaFail(fails, @"matrix round-trip lost measure aggregate");
+  }
+
+  // Clearing pivotBy falls back to the plain table build.
+  mtab.pivotBy = @"";
+  mtab.showGrandTotal = NO;
+  mtab.columns = @[
+    @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
+  ];
+  if ([mtab.tablixBody.columns count] != 2 || [mtab.tablixBody.rows count] != 3)
+    PicaFail(fails, @"clearing pivotBy should rebuild the grouped table");
+
   return fails;
 }
 

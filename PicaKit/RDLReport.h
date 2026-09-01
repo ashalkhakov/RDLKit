@@ -80,6 +80,7 @@
 @property (nonatomic, assign) CGFloat rowHeight;
 @property (nonatomic, copy) NSString *groupBy; // rebuilds grouped header + details + footer
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
+@property (nonatomic, copy) NSString *pivotBy; // column group field → crosstab (matrix)
 - (void)rebuildTableFromColumns;
 @end
 
