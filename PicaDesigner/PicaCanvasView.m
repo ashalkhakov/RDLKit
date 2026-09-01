@@ -2,6 +2,7 @@
 #import "PicaController.h"
 #import "PicaCompatibility.h"
 #import "PicaExpressionHelper.h"
+#import "PicaTablixEditor.h"
 
 static const CGFloat kDPI = 72.0;
 
@@ -61,10 +62,20 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 @end
 
 @implementation PicaCanvasView {
-  NSString *_dragKind; // move, se, e, s
+  NSString *_dragKind; // move, se, e, s, tabcol
   NSPoint _dragStart;
   BOOL _dragActive; // passed the slop threshold; coalescing one undo step
   CGFloat _origLeft, _origTop, _origW, _origH;
+  // Tablix column-border drag
+  NSUInteger _dragColIndex;
+  CGFloat _origColW;
+  // Keyboard nudge (arrow keys), coalesced into one undo step per burst
+  BOOL _nudging;
+  // Hovered tablix cell (discoverability highlight)
+  RDLItem *_hoverTablix;
+  NSUInteger _hoverCol;
+  NSString *_hoverPart;
+  NSTrackingRectTag _hoverTrackingTag;
   // In-place editing session
   NSTextField *_editorField;
   RDLItem *_editItem;
@@ -143,6 +154,32 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   return NO;
 }
 
+// Column border under the point (for width-resize dragging). Only internal
+// borders count: the right edge of the last column is the item's own east
+// resize handle. Returns the index of the column whose right border is hit.
+- (BOOL)tablixColumnBorder:(RDLItem *)it
+                  itemRect:(NSRect)r
+                     point:(NSPoint)p
+                       col:(NSUInteger *)outCol {
+  PicaController *c = [PicaController sharedController];
+  NSArray *cols = it.columns ?: @[];
+  if ([cols count] < 2)
+    return NO;
+  CGFloat gridBottom = NSMinY(r) + [self tablixHeaderHeight:it] + [self tablixRowHeight:it];
+  if (p.y < NSMinY(r) || p.y > gridBottom)
+    return NO;
+  CGFloat x = NSMinX(r);
+  for (NSUInteger i = 0; i + 1 < [cols count]; i++) {
+    x += [cols[i][@"width"] doubleValue] * kDPI * c.zoom;
+    if (fabs(p.x - x) <= 3) {
+      if (outCol)
+        *outCol = i;
+      return YES;
+    }
+  }
+  return NO;
+}
+
 - (void)drawTablix:(RDLItem *)it inRect:(NSRect)r {
   PicaController *c = [PicaController sharedController];
   CGFloat z = c.zoom;
@@ -154,6 +191,13 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSRect hr = NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), MIN(hh, NSHeight(r)));
   [PicaColorFromHex(@"#ece6d8") set];
   NSRectFill(hr);
+
+  // Hovered cell highlight: shows which region a double-click would edit.
+  if (_hoverTablix == it && _hoverPart != nil && _editorField == nil) {
+    NSRect cell = [self tablixCellRect:it itemRect:r col:_hoverCol part:_hoverPart];
+    [[NSColor colorWithCalibratedRed:0.55 green:0.62 blue:0.85 alpha:0.18] set];
+    NSRectFillUsingOperation(cell, NSCompositeSourceOver);
+  }
 
   RDLStyle *headerStyle = [RDLStyle defaultStyle];
   headerStyle.fontWeight = @"Bold";
@@ -542,6 +586,17 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
         return;
       }
       _pendingEditItem = nil;
+      NSUInteger borderCol = 0;
+      if ([hit.type isEqualToString:@"Tablix"] &&
+          [self tablixColumnBorder:hit itemRect:itemRect point:p col:&borderCol]) {
+        // Drag an internal column border to resize that column's width.
+        _dragKind = @"tabcol";
+        _dragActive = NO;
+        _dragStart = p;
+        _dragColIndex = borderCol;
+        _origColW = [hit.columns[borderCol][@"width"] doubleValue];
+        return;
+      }
       _dragKind = kind;
       _dragActive = NO;
       _dragStart = p;
@@ -590,6 +645,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [c resizeSelectedToWidth:_origW + dx height:_origH];
   else if ([_dragKind isEqualToString:@"s"])
     [c resizeSelectedToWidth:_origW height:_origH + dy];
+  else if ([_dragKind isEqualToString:@"tabcol"])
+    [c tablixSetColumn:_dragColIndex width:_origColW + dx];
 }
 
 - (void)mouseUp:(NSEvent *)event {
@@ -606,6 +663,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)keyDown:(NSEvent *)event {
   NSString *ch = [event charactersIgnoringModifiers];
+  unichar c0 = [ch length] ? [ch characterAtIndex:0] : 0;
+  if (c0 >= NSUpArrowFunctionKey && c0 <= NSRightArrowFunctionKey) {
+    if ([self nudgeWithKey:c0 shift:([event modifierFlags] & NSShiftKeyMask) != 0])
+      return;
+  }
   if ([ch isEqualToString:@"\r"] || [ch isEqualToString:@"\n"]) {
     // Return starts in-place editing of the selected item, Word-style.
     PicaController *c = [PicaController sharedController];
@@ -621,6 +683,258 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return;
   }
   [super keyDown:event];
+}
+
+// Arrow keys move the selected item one grid step; Shift+arrow resizes.
+// A burst of presses coalesces into a single undo step.
+- (BOOL)nudgeWithKey:(unichar)key shift:(BOOL)shift {
+  PicaController *c = [PicaController sharedController];
+  RDLItem *it = [c selectedItem];
+  if (it == nil)
+    return NO;
+  CGFloat step = 0.05;
+  CGFloat dx = key == NSLeftArrowFunctionKey ? -step
+                                             : (key == NSRightArrowFunctionKey ? step : 0);
+  CGFloat dy = key == NSUpArrowFunctionKey ? -step
+                                           : (key == NSDownArrowFunctionKey ? step : 0);
+  if (!_nudging) {
+    _nudging = YES;
+    [c beginUndoCoalescing];
+  }
+  [NSObject cancelPreviousPerformRequestsWithTarget:self
+                                           selector:@selector(endNudge)
+                                             object:nil];
+  [self performSelector:@selector(endNudge) withObject:nil afterDelay:0.5];
+  if (shift)
+    [c resizeSelectedToWidth:it.width + dx height:it.height + dy];
+  else
+    [c moveSelectedToLeft:it.left + dx top:it.top + dy];
+  return YES;
+}
+
+- (void)endNudge {
+  if (_nudging) {
+    _nudging = NO;
+    [[PicaController sharedController] endUndoCoalescing];
+  }
+}
+
+// --- Clipboard & Edit-menu actions (responder chain) ------------------------
+
+- (void)copy:(id)sender {
+  PICA_UNUSED(sender);
+  [[PicaController sharedController] copySelected];
+}
+
+- (void)cut:(id)sender {
+  PICA_UNUSED(sender);
+  [[PicaController sharedController] cutSelected];
+}
+
+- (void)paste:(id)sender {
+  PICA_UNUSED(sender);
+  [[PicaController sharedController] pasteFromPasteboard];
+}
+
+- (void)duplicate:(id)sender {
+  PICA_UNUSED(sender);
+  [[PicaController sharedController] duplicateSelected];
+}
+
+- (void)delete:(id)sender {
+  PICA_UNUSED(sender);
+  [[PicaController sharedController] removeSelected];
+}
+
+// Select All on the canvas widens the selection to the current band instead
+// of beeping (item → its band, otherwise → body).
+- (void)selectAll:(id)sender {
+  PICA_UNUSED(sender);
+  PicaController *c = [PicaController sharedController];
+  [c selectBandWithKey:c.selectedBandKey ?: @"body"];
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  SEL a = [item action];
+  PicaController *c = [PicaController sharedController];
+  if (a == @selector(copy:) || a == @selector(cut:) || a == @selector(duplicate:) ||
+      a == @selector(delete:))
+    return [c selectedItem] != nil;
+  if (a == @selector(paste:))
+    return [c canPaste];
+  return YES;
+}
+
+// --- Tablix context menu -----------------------------------------------------
+
+- (NSMenu *)menuForEvent:(NSEvent *)event {
+  NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+  PicaController *c = [PicaController sharedController];
+  RDLReport *r = c.report;
+  CGFloat z = c.zoom;
+  NSRect paper = [self paperRect];
+  CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
+  CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
+  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
+  NSArray *bands = @[ r.pageHeader, r.body, r.pageFooter ];
+  for (NSInteger bi = 0; bi < 3; bi++) {
+    RDLBand *band = bands[bi];
+    NSString *kind = nil;
+    NSRect itemRect = NSZeroRect;
+    RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
+    if (hit) {
+      [c selectItemNamed:hit.name bandKey:keys[bi]];
+      if ([hit.type isEqualToString:@"Tablix"]) {
+        NSUInteger col = 0;
+        NSString *part = nil;
+        BOOL onCell = [self tablix:hit itemRect:itemRect point:p col:&col part:&part];
+        return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:hit];
+      }
+      return nil;
+    }
+    y += band.height * kDPI * z;
+  }
+  return nil;
+}
+
+- (NSMenuItem *)tablixMenuItem:(NSString *)title action:(SEL)sel tag:(NSInteger)tag {
+  NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:@""];
+  [mi setTarget:self];
+  [mi setTag:tag];
+  return mi;
+}
+
+- (NSMenu *)tablixMenuForColumn:(NSInteger)col item:(RDLItem *)tab {
+  NSMenu *m = [[NSMenu alloc] initWithTitle:@"Tablix"];
+  if (col >= 0) {
+    [m addItem:[self tablixMenuItem:@"Insert Column Before"
+                             action:@selector(ctxInsertColumnBefore:)
+                                tag:col]];
+    [m addItem:[self tablixMenuItem:@"Insert Column After"
+                             action:@selector(ctxInsertColumnAfter:)
+                                tag:col]];
+    if ([tab.columns count] > 1)
+      [m addItem:[self tablixMenuItem:@"Delete Column"
+                               action:@selector(ctxDeleteColumn:)
+                                  tag:col]];
+    [m addItem:[NSMenuItem separatorItem]];
+  }
+  [m addItem:[self tablixMenuItem:tab.showGrandTotal ? @"Hide Grand Total" : @"Show Grand Total"
+                           action:@selector(ctxToggleGrandTotal:)
+                              tag:0]];
+  [m addItem:[self tablixMenuItem:@"Edit Group…" action:@selector(ctxEditGroup:) tag:0]];
+  return m;
+}
+
+- (void)ctxInsertColumnBefore:(NSMenuItem *)mi {
+  PicaController *c = [PicaController sharedController];
+  [c tablixInsertColumnAt:(NSUInteger)[mi tag] inItem:[c selectedItem]];
+}
+
+- (void)ctxInsertColumnAfter:(NSMenuItem *)mi {
+  PicaController *c = [PicaController sharedController];
+  [c tablixInsertColumnAt:(NSUInteger)[mi tag] + 1 inItem:[c selectedItem]];
+}
+
+- (void)ctxDeleteColumn:(NSMenuItem *)mi {
+  PicaController *c = [PicaController sharedController];
+  [c tablixDeleteColumn:(NSUInteger)[mi tag] inItem:[c selectedItem]];
+}
+
+- (void)ctxToggleGrandTotal:(NSMenuItem *)mi {
+  PICA_UNUSED(mi);
+  PicaController *c = [PicaController sharedController];
+  [c tablixToggleGrandTotal:[c selectedItem]];
+}
+
+- (void)ctxEditGroup:(NSMenuItem *)mi {
+  PICA_UNUSED(mi);
+  PicaController *c = [PicaController sharedController];
+  RDLItem *it = [c selectedItem];
+  if (it && [it.type isEqualToString:@"Tablix"] &&
+      [PicaTablixEditor runForTablix:it report:c.report])
+    [c noteChange];
+}
+
+// --- Hover tracking (tablix cell highlight + column-resize cursor) ----------
+
+// GNUstep has no NSTrackingArea; use the classic tracking rect plus
+// window-level mouse-moved events (the canvas is usually first responder).
+- (void)viewDidMoveToWindow {
+  [[self window] setAcceptsMouseMovedEvents:YES];
+  [self resetHoverTracking];
+}
+
+- (void)setFrameSize:(NSSize)size {
+  [super setFrameSize:size];
+  [self resetHoverTracking];
+}
+
+- (void)resetHoverTracking {
+  if (_hoverTrackingTag) {
+    [self removeTrackingRect:_hoverTrackingTag];
+    _hoverTrackingTag = 0;
+  }
+  if ([self window])
+    _hoverTrackingTag = [self addTrackingRect:[self bounds]
+                                        owner:self
+                                     userData:NULL
+                                 assumeInside:NO];
+}
+
+- (void)mouseMoved:(NSEvent *)event {
+  NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+  PicaController *c = [PicaController sharedController];
+  RDLReport *r = c.report;
+  CGFloat z = c.zoom;
+  NSRect paper = [self paperRect];
+  CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
+  CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
+  RDLItem *hoverTab = nil;
+  NSUInteger hoverCol = 0;
+  NSString *hoverPart = nil;
+  BOOL onBorder = NO;
+  for (RDLBand *band in @[ r.pageHeader, r.body, r.pageFooter ]) {
+    for (RDLItem *it in band.items) {
+      if (![it.type isEqualToString:@"Tablix"])
+        continue;
+      NSRect ir = PicaItemRect(it, x, y, z);
+      NSUInteger bc = 0;
+      if ([self tablixColumnBorder:it itemRect:ir point:p col:&bc]) {
+        onBorder = YES;
+        break;
+      }
+      NSUInteger col = 0;
+      NSString *part = nil;
+      if ([self tablix:it itemRect:ir point:p col:&col part:&part]) {
+        hoverTab = it;
+        hoverCol = col;
+        hoverPart = part;
+        break;
+      }
+    }
+    if (onBorder || hoverTab)
+      break;
+    y += band.height * kDPI * z;
+  }
+  [onBorder ? [NSCursor resizeLeftRightCursor] : [NSCursor arrowCursor] set];
+  if (hoverTab != _hoverTablix || hoverCol != _hoverCol ||
+      (hoverPart != _hoverPart && ![hoverPart isEqualToString:_hoverPart])) {
+    _hoverTablix = hoverTab;
+    _hoverCol = hoverCol;
+    _hoverPart = hoverPart;
+    [self setNeedsDisplay:YES];
+  }
+}
+
+- (void)mouseExited:(NSEvent *)event {
+  PICA_UNUSED(event);
+  if (_hoverTablix) {
+    _hoverTablix = nil;
+    _hoverPart = nil;
+    [self setNeedsDisplay:YES];
+  }
+  [[NSCursor arrowCursor] set];
 }
 
 // --- In-place editing -------------------------------------------------------

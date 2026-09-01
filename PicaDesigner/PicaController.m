@@ -473,6 +473,160 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   [self noteChange];
 }
 
+#pragma mark - Item clipboard
+
+static NSString * const PicaItemPboardType = @"com.pica.rdl-item-xml";
+
+// Single-item XML round-trip via the report writer: the item is temporarily
+// hosted in an empty report's body, so the writer's tablix/columns handling
+// applies unchanged.
+- (NSString *)xmlForItem:(RDLItem *)it {
+  if (it == nil)
+    return nil;
+  RDLReport *carrier = [RDLReport emptyReportNamed:@"PicaClipboard"];
+  [carrier.body.items addObject:it];
+  NSString *xml = [RDLWriter XMLStringFromReport:carrier];
+  [carrier.body.items removeAllObjects];
+  return xml;
+}
+
+- (RDLItem *)itemFromXML:(NSString *)xml {
+  if ([xml length] == 0)
+    return nil;
+  RDLReport *carrier = [RDLParser reportFromXMLString:xml error:NULL];
+  return [carrier.body.items firstObject];
+}
+
+// Rename the pasted tree so every item name is unique in the report.
+- (void)renameItemTree:(RDLItem *)it usedNames:(NSMutableSet *)used {
+  NSString *prefix = it.type ?: @"Item";
+  NSInteger i = 1;
+  while ([used containsObject:[NSString stringWithFormat:@"%@%ld", prefix, (long)i]])
+    i += 1;
+  it.name = [NSString stringWithFormat:@"%@%ld", prefix, (long)i];
+  [used addObject:it.name];
+  for (RDLItem *child in it.items)
+    [self renameItemTree:child usedNames:used];
+}
+
+- (BOOL)copySelected {
+  RDLItem *it = [self selectedItem];
+  NSString *xml = [self xmlForItem:it];
+  if (xml == nil)
+    return NO;
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  [pb declareTypes:@[ PicaItemPboardType, NSStringPboardType ] owner:nil];
+  [pb setString:xml forType:PicaItemPboardType];
+  [pb setString:xml forType:NSStringPboardType];
+  return YES;
+}
+
+- (void)cutSelected {
+  if ([self copySelected])
+    [self removeSelected];
+}
+
+// Insert a parsed item into the current insertion context with a fresh
+// unique name and a slight offset, then select it.
+- (void)insertPastedItem:(RDLItem *)it {
+  if (it == nil)
+    return;
+  NSString *key = nil;
+  RDLItem *container = nil;
+  [self insertionContainerBandKey:&key container:&container sibling:NULL];
+  // Data regions are not allowed inside a Rectangle.
+  if (container != nil &&
+      ([it.type isEqualToString:@"Tablix"] || [it.type isEqualToString:@"Chart"])) {
+    container = nil;
+    key = self.selectedBandKey ?: @"body";
+  }
+  NSMutableArray *items = container ? container.items : [self.report bandWithKey:key].items;
+  if (items == nil && container != nil) {
+    container.items = [NSMutableArray array];
+    items = container.items;
+  }
+  NSMutableSet *used = [NSMutableSet set];
+  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ])
+    PicaCollectNames([self.report bandWithKey:k].items, used);
+  [self renameItemTree:it usedNames:used];
+  it.left = PicaSnap(it.left + 0.1);
+  it.top = PicaSnap(it.top + 0.1);
+  [items addObject:it];
+  self.selectionScope = PicaSelectionItem;
+  self.selectedName = it.name;
+  self.selectedBandKey = key ?: @"body";
+  [self noteChange];
+  [self postSelection];
+}
+
+- (void)pasteFromPasteboard {
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  NSString *xml = [pb stringForType:PicaItemPboardType];
+  if (xml == nil)
+    return;
+  [self insertPastedItem:[self itemFromXML:xml]];
+}
+
+- (BOOL)canPaste {
+  return [[NSPasteboard generalPasteboard] stringForType:PicaItemPboardType] != nil;
+}
+
+- (void)duplicateSelected {
+  // Copy + paste in one step, without touching the pasteboard.
+  [self insertPastedItem:[self itemFromXML:[self xmlForItem:[self selectedItem]]]];
+}
+
+#pragma mark - Tablix structure editing
+
+- (void)tablixSetColumn:(NSUInteger)ci width:(CGFloat)w {
+  RDLItem *it = [self selectedItem];
+  if (![it.type isEqualToString:@"Tablix"] || ci >= [it.columns count])
+    return;
+  NSMutableArray *cols = [it.columns mutableCopy];
+  NSMutableDictionary *col = [cols[ci] mutableCopy];
+  col[@"width"] = @(PicaSnap(MAX(0.2, w)));
+  cols[ci] = col;
+  it.columns = cols; // setter rebuilds the tablix body
+  CGFloat total = 0;
+  for (NSDictionary *c in cols)
+    total += [c[@"width"] doubleValue];
+  it.width = total;
+  [self noteChange];
+}
+
+- (void)tablixInsertColumnAt:(NSUInteger)ci inItem:(RDLItem *)it {
+  if (![it.type isEqualToString:@"Tablix"])
+    return;
+  NSMutableArray *cols = [it.columns mutableCopy] ?: [NSMutableArray array];
+  if (ci > [cols count])
+    ci = [cols count];
+  [cols insertObject:@{ @"width" : @1.2, @"header" : @"Column", @"value" : @"" }
+             atIndex:ci];
+  it.columns = cols;
+  it.width += 1.2;
+  [self noteChange];
+}
+
+- (void)tablixDeleteColumn:(NSUInteger)ci inItem:(RDLItem *)it {
+  if (![it.type isEqualToString:@"Tablix"] || ci >= [it.columns count] ||
+      [it.columns count] <= 1)
+    return;
+  NSMutableArray *cols = [it.columns mutableCopy];
+  CGFloat w = [cols[ci][@"width"] doubleValue];
+  [cols removeObjectAtIndex:ci];
+  it.columns = cols;
+  it.width = MAX(0.2, it.width - w);
+  [self noteChange];
+}
+
+- (void)tablixToggleGrandTotal:(RDLItem *)it {
+  if (![it.type isEqualToString:@"Tablix"])
+    return;
+  it.showGrandTotal = !it.showGrandTotal;
+  it.columns = it.columns; // trigger rebuild with the new total row
+  [self noteChange];
+}
+
 - (void)setParam:(NSString *)name value:(NSString *)value {
   NSMutableDictionary *m = [self.paramValues mutableCopy] ?: [NSMutableDictionary dictionary];
   m[name] = value ?: @"";

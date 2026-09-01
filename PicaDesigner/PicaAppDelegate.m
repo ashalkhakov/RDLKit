@@ -95,6 +95,7 @@
   [edit addItem:[self responderItem:@"Copy" action:@selector(copy:) key:@"c"]];
   [edit addItem:[self responderItem:@"Paste" action:@selector(paste:) key:@"v"]];
   [edit addItem:[self responderItem:@"Select All" action:@selector(selectAll:) key:@"a"]];
+  [edit addItem:[self responderItem:@"Duplicate" action:@selector(duplicate:) key:@"d"]];
   [edit addItem:[NSMenuItem separatorItem]];
   [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"A"]];
   [edit addItem:[self item:@"Delete" action:@selector(delete:) key:@"\b"]];

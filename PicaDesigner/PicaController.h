@@ -47,6 +47,19 @@ typedef NS_ENUM(NSInteger, PicaSelectionScope) {
 - (void)resizeSelectedToWidth:(CGFloat)w height:(CGFloat)h;
 - (void)setParam:(NSString *)name value:(NSString *)value;
 - (void)setDatasetJSON:(NSString *)json name:(NSString *)datasetName;
+// Item clipboard (RDL-XML on the general pasteboard)
+- (BOOL)copySelected;
+- (void)cutSelected;
+- (void)pasteFromPasteboard;
+- (BOOL)canPaste;
+- (void)duplicateSelected;
+- (NSString *)xmlForItem:(RDLItem *)it;
+- (RDLItem *)itemFromXML:(NSString *)xml;
+// WYSIWYG tablix structure editing
+- (void)tablixSetColumn:(NSUInteger)ci width:(CGFloat)w;
+- (void)tablixInsertColumnAt:(NSUInteger)ci inItem:(RDLItem *)it;
+- (void)tablixDeleteColumn:(NSUInteger)ci inItem:(RDLItem *)it;
+- (void)tablixToggleGrandTotal:(RDLItem *)it;
 - (void)syncParamsFromReport;
 - (void)noteChange;
 // Coalesce a continuous interaction (e.g. a mouse drag) into one undo step.
