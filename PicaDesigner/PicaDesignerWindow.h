@@ -4,4 +4,6 @@
 - (void)showPreview:(id)sender;
 - (void)toggleDesignPreview:(id)sender;
 - (void)exportPDF:(id)sender;
+- (void)addElement:(id)sender;
+- (void)removeElement:(id)sender;
 @end

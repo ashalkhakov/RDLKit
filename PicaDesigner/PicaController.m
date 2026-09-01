@@ -9,6 +9,33 @@ static CGFloat PicaSnap(CGFloat n) {
   return round(n / g) * g;
 }
 
+// Depth-first search through nested Rectangle children.
+static RDLItem *PicaFindInItems(NSArray *items, NSString *name, RDLItem *container,
+                                RDLItem **outParent) {
+  for (RDLItem *it in items) {
+    if ([it.name isEqualToString:name]) {
+      if (outParent)
+        *outParent = container;
+      return it;
+    }
+    if ([it.items count]) {
+      RDLItem *found = PicaFindInItems(it.items, name, it, outParent);
+      if (found)
+        return found;
+    }
+  }
+  return nil;
+}
+
+static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
+  for (RDLItem *it in items) {
+    if (it.name)
+      [names addObject:it.name];
+    if ([it.items count])
+      PicaCollectNames(it.items, names);
+  }
+}
+
 @implementation PicaController {
   BOOL _loading;
   BOOL _postingReport;
@@ -32,6 +59,7 @@ static CGFloat PicaSnap(CGFloat n) {
     _zoom = 1.0;
     _showsGrid = YES;
     _selectedBandKey = @"body";
+    _selectionScope = PicaSelectionReport;
     /* Do not go through -loadReport: / -postReport here. Views already
        observe those notifications; posting before +sharedController
        returns re-enters -init. */
@@ -80,6 +108,7 @@ static CGFloat PicaSnap(CGFloat n) {
   self.report = report;
   self.selectedName = nil;
   self.selectedBandKey = @"body";
+  self.selectionScope = PicaSelectionReport;
   self.fileURL = nil;
   self.dirty = NO;
   [self syncParamsFromReport];
@@ -124,21 +153,153 @@ static CGFloat PicaSnap(CGFloat n) {
   return ok;
 }
 
-- (void)selectItemNamed:(NSString *)name bandKey:(NSString *)key {
-  self.selectedName = name;
-  if (key)
-    self.selectedBandKey = key;
-  self.tool = PicaToolSelect;
+#pragma mark - Selection
+
+- (void)selectReport {
+  self.selectionScope = PicaSelectionReport;
+  self.selectedName = nil;
   [self postSelection];
 }
 
-- (void)addItemOfKind:(NSString *)kind inBand:(NSString *)bandKey atLeft:(CGFloat)left top:(CGFloat)top {
-  RDLBand *band = [self.report bandWithKey:bandKey];
-  RDLItem *it = [[RDLItem alloc] init];
-  it.name = [self.report nextNameWithPrefix:kind];
+- (void)selectBandWithKey:(NSString *)key {
+  self.selectionScope = PicaSelectionBand;
+  self.selectedName = nil;
+  if (key)
+    self.selectedBandKey = key;
+  [self postSelection];
+}
+
+- (void)selectItemNamed:(NSString *)name bandKey:(NSString *)key {
+  if (name == nil) {
+    if (key)
+      [self selectBandWithKey:key];
+    else
+      [self selectReport];
+    return;
+  }
+  self.selectionScope = PicaSelectionItem;
+  self.selectedName = name;
+  if (key)
+    self.selectedBandKey = key;
+  [self postSelection];
+}
+
+- (RDLItem *)findItemNamed:(NSString *)name
+                   bandKey:(NSString **)outKey
+                    parent:(RDLItem **)outParent {
+  if (outParent)
+    *outParent = nil;
+  if (outKey)
+    *outKey = nil;
+  if (name == nil)
+    return nil;
+  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ]) {
+    RDLBand *b = [self.report bandWithKey:k];
+    RDLItem *parent = nil;
+    RDLItem *found = PicaFindInItems(b.items, name, nil, &parent);
+    if (found) {
+      if (outKey)
+        *outKey = k;
+      if (outParent)
+        *outParent = parent;
+      return found;
+    }
+  }
+  return nil;
+}
+
+- (RDLItem *)selectedItem {
+  if (self.selectionScope != PicaSelectionItem)
+    return nil;
+  return [self findItemNamed:self.selectedName bandKey:NULL parent:NULL];
+}
+
+#pragma mark - Element insertion
+
+- (NSString *)uniqueNameWithPrefix:(NSString *)prefix {
+  NSMutableSet *used = [NSMutableSet set];
+  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ])
+    PicaCollectNames([self.report bandWithKey:k].items, used);
+  NSInteger i = 1;
+  while ([used containsObject:[NSString stringWithFormat:@"%@%ld", prefix, (long)i]])
+    i += 1;
+  return [NSString stringWithFormat:@"%@%ld", prefix, (long)i];
+}
+
+// Where would a new element go, given the current selection?
+// Returns the mutable items array and describes the location.
+- (NSMutableArray *)insertionContainerBandKey:(NSString **)outKey
+                                    container:(RDLItem **)outContainer
+                                      sibling:(RDLItem **)outSibling {
+  if (outContainer)
+    *outContainer = nil;
+  if (outSibling)
+    *outSibling = nil;
+  NSString *key = self.selectedBandKey ?: @"body";
+  if (self.selectionScope == PicaSelectionItem) {
+    NSString *foundKey = nil;
+    RDLItem *parent = nil;
+    RDLItem *sel = [self findItemNamed:self.selectedName bandKey:&foundKey parent:&parent];
+    if (sel) {
+      if (outKey)
+        *outKey = foundKey;
+      if ([sel.type isEqualToString:@"Rectangle"]) {
+        if (sel.items == nil)
+          sel.items = [NSMutableArray array];
+        if (outContainer)
+          *outContainer = sel;
+        return sel.items;
+      }
+      if (outSibling)
+        *outSibling = sel;
+      if (parent) {
+        if (outContainer)
+          *outContainer = parent;
+        return parent.items;
+      }
+      return [self.report bandWithKey:foundKey].items;
+    }
+  }
+  if (self.selectionScope == PicaSelectionReport)
+    key = @"body";
+  if (outKey)
+    *outKey = key;
+  return [self.report bandWithKey:key].items;
+}
+
+- (NSArray<NSString *> *)allowedElementKinds {
+  RDLItem *container = nil;
+  [self insertionContainerBandKey:NULL container:&container sibling:NULL];
+  // Inside a Rectangle only simple report items are allowed; at band level
+  // the data regions (Tablix, Chart) are available too.
+  if (container != nil)
+    return @[ @"Textbox", @"Line", @"Rectangle", @"Image" ];
+  return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart" ];
+}
+
+- (NSString *)bandTitleForKey:(NSString *)key {
+  if ([key isEqualToString:@"pageHeader"])
+    return @"Page Header";
+  if ([key isEqualToString:@"pageFooter"])
+    return @"Page Footer";
+  return @"Body";
+}
+
+- (NSString *)insertionDescription {
+  NSString *key = nil;
+  RDLItem *container = nil;
+  RDLItem *sibling = nil;
+  [self insertionContainerBandKey:&key container:&container sibling:&sibling];
+  if (container)
+    return [NSString stringWithFormat:@"inside %@", container.name];
+  if (sibling)
+    return [NSString stringWithFormat:@"after %@ in %@", sibling.name,
+                                      [self bandTitleForKey:key]];
+  return [NSString stringWithFormat:@"into %@", [self bandTitleForKey:key]];
+}
+
+- (void)configureNewItem:(RDLItem *)it kind:(NSString *)kind {
   it.type = kind;
-  it.left = PicaSnap(MAX(0, left));
-  it.top = PicaSnap(MAX(0, top));
   it.width = 2.0;
   it.height = 0.32;
   if ([kind isEqualToString:@"Textbox"]) {
@@ -185,29 +346,56 @@ static CGFloat PicaSnap(CGFloat n) {
     it.width = 1.6 * [cols count];
     it.height = 0.6;
   }
-  [band.items addObject:it];
+}
+
+- (void)addItemOfKind:(NSString *)kind {
+  NSString *key = nil;
+  RDLItem *container = nil;
+  RDLItem *sibling = nil;
+  NSMutableArray *items = [self insertionContainerBandKey:&key container:&container sibling:&sibling];
+  RDLItem *it = [[RDLItem alloc] init];
+  it.name = [self uniqueNameWithPrefix:kind];
+  [self configureNewItem:it kind:kind];
+  if (sibling) {
+    it.left = sibling.left;
+    it.top = PicaSnap(sibling.top + sibling.height + 0.1);
+  } else if (container) {
+    it.left = 0.1;
+    it.top = 0.1;
+  } else {
+    it.left = 0.25;
+    it.top = 0.25;
+  }
+  [items addObject:it];
+  self.selectionScope = PicaSelectionItem;
   self.selectedName = it.name;
-  self.selectedBandKey = bandKey;
-  self.tool = PicaToolSelect;
+  self.selectedBandKey = key ?: @"body";
   [self noteChange];
   [self postSelection];
 }
 
 - (void)removeSelected {
-  if (self.selectedName == nil)
+  if (self.selectionScope != PicaSelectionItem || self.selectedName == nil)
     return;
-  RDLBand *band = nil;
-  RDLItem *it = [self.report itemNamed:self.selectedName inBand:&band];
+  NSString *key = nil;
+  RDLItem *parent = nil;
+  RDLItem *it = [self findItemNamed:self.selectedName bandKey:&key parent:&parent];
   if (it == nil)
     return;
-  [band.items removeObject:it];
+  if (parent)
+    [parent.items removeObject:it];
+  else
+    [[self.report bandWithKey:key].items removeObject:it];
   self.selectedName = nil;
+  self.selectionScope = PicaSelectionBand;
+  if (key)
+    self.selectedBandKey = key;
   [self noteChange];
   [self postSelection];
 }
 
 - (void)moveSelectedToLeft:(CGFloat)left top:(CGFloat)top {
-  RDLItem *it = [self.report itemNamed:self.selectedName inBand:NULL];
+  RDLItem *it = [self selectedItem];
   if (it == nil)
     return;
   it.left = PicaSnap(MAX(0, left));
@@ -216,7 +404,7 @@ static CGFloat PicaSnap(CGFloat n) {
 }
 
 - (void)resizeSelectedToWidth:(CGFloat)w height:(CGFloat)h {
-  RDLItem *it = [self.report itemNamed:self.selectedName inBand:NULL];
+  RDLItem *it = [self selectedItem];
   if (it == nil)
     return;
   it.width = PicaSnap(MAX(0.1, w));

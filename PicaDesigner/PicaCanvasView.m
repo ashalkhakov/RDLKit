@@ -128,13 +128,14 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
     [lab drawAtPoint:NSZeroPoint withAttributes:labelAttr];
     [[NSGraphicsContext currentContext] restoreGraphicsState];
     for (RDLItem *it in band.items)
-      [self drawItem:it originX:x originY:y selected:[it.name isEqualToString:c.selectedName]];
+      [self drawItem:it originX:x originY:y];
     y += bh;
   }
 }
 
-- (void)drawItem:(RDLItem *)it originX:(CGFloat)ox originY:(CGFloat)oy selected:(BOOL)sel {
+- (void)drawItem:(RDLItem *)it originX:(CGFloat)ox originY:(CGFloat)oy {
   PicaController *c = [PicaController sharedController];
+  BOOL sel = c.selectionScope == PicaSelectionItem && [it.name isEqualToString:c.selectedName];
   NSRect r = PicaItemRect(it, ox, oy, c.zoom);
   if ([it.type isEqualToString:@"Line"]) {
     [PicaColorFromHex(it.style.color) set];
@@ -144,6 +145,8 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
       [PicaColorFromHex(it.style.backgroundColor) set];
       NSRectFill(r);
     }
+    for (RDLItem *child in it.items)
+      [self drawItem:child originX:NSMinX(r) originY:NSMinY(r)];
   } else if ([it.type isEqualToString:@"Tablix"]) {
     [[NSColor colorWithCalibratedWhite:0.92 alpha:1] set];
     NSFrameRect(r);
@@ -270,6 +273,25 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
   return NO;
 }
 
+- (RDLItem *)hitInItems:(NSArray *)items
+                originX:(CGFloat)ox
+                originY:(CGFloat)oy
+                  point:(NSPoint)p
+                   kind:(NSString **)kind {
+  PicaController *c = [PicaController sharedController];
+  for (RDLItem *it in [items reverseObjectEnumerator]) {
+    if ([it.items count]) {
+      NSRect r = PicaItemRect(it, ox, oy, c.zoom);
+      RDLItem *child = [self hitInItems:it.items originX:NSMinX(r) originY:NSMinY(r) point:p kind:kind];
+      if (child)
+        return child;
+    }
+    if ([self hitItem:it originX:ox originY:oy point:p kind:kind])
+      return it;
+  }
+  return nil;
+}
+
 - (void)mouseDown:(NSEvent *)event {
   PicaController *c = [PicaController sharedController];
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
@@ -287,36 +309,26 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
     NSString *key = keys[bi];
     CGFloat bh = band.height * kDPI * z;
     NSRect br = NSMakeRect(x, y, NSWidth(paper) - ml - r.page.rightMargin * kDPI * z, bh);
-    for (RDLItem *it in [band.items reverseObjectEnumerator]) {
-      NSString *kind = nil;
-      if ([self hitItem:it originX:x originY:y point:p kind:&kind]) {
-        [c selectItemNamed:it.name bandKey:key];
-        _dragKind = kind;
-        _dragStart = p;
-        _origLeft = it.left;
-        _origTop = it.top;
-        _origW = it.width;
-        _origH = it.height;
-        return;
-      }
+    NSString *kind = nil;
+    RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind];
+    if (hit) {
+      [c selectItemNamed:hit.name bandKey:key];
+      _dragKind = kind;
+      _dragStart = p;
+      _origLeft = hit.left;
+      _origTop = hit.top;
+      _origW = hit.width;
+      _origH = hit.height;
+      return;
     }
     if (NSPointInRect(p, br)) {
-      if (c.tool != PicaToolSelect) {
-        static NSString *kinds[] = {@"Textbox", @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix",
-                                    @"Chart"};
-        NSString *kind = kinds[c.tool];
-        CGFloat left = (p.x - x) / (kDPI * z);
-        CGFloat top = (p.y - y) / (kDPI * z);
-        [c addItemOfKind:kind inBand:key atLeft:left top:top];
-        return;
-      }
-      [c selectItemNamed:nil bandKey:key];
+      [c selectBandWithKey:key];
       _dragKind = nil;
       return;
     }
     y += bh;
   }
-  [c selectItemNamed:nil bandKey:c.selectedBandKey];
+  [c selectReport];
   _dragKind = nil;
 }
 

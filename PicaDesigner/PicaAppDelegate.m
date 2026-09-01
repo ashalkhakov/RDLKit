@@ -80,6 +80,7 @@
   NSMenuItem *editItem = [[NSMenuItem alloc] init];
   [menubar addItem:editItem];
   NSMenu *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
+  [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"a"]];
   [edit addItem:[self item:@"Delete" action:@selector(delete:) key:@"\b"]];
   [edit addItem:[self item:@"Toggle Grid" action:@selector(toggleGrid:) key:@"g"]];
   [edit addItem:[self item:@"Zoom In" action:@selector(zoomIn:) key:@"="]];
@@ -210,6 +211,14 @@
 - (void)delete:(id)sender {
   (void)sender;
   [[PicaController sharedController] removeSelected];
+}
+
+- (void)addElement:(id)sender {
+  if ([self generatorIsFront])
+    return;
+  [self ensureDesigner];
+  [[_designer window] makeKeyAndOrderFront:nil];
+  [_designer addElement:sender];
 }
 
 - (void)toggleGrid:(id)sender {

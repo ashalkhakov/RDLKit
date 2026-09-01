@@ -11,7 +11,6 @@ Pica_OBJC_FILES = \
   PicaGeneratorWindow.m \
   PicaAppDelegate.m \
   PicaSamples.m \
-  PicaToolboxView.m \
   PicaInspectorView.m \
   PicaDataView.m \
   PicaWelcomeWindow.m

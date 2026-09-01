@@ -4,21 +4,17 @@
 extern NSString * const PicaReportDidChangeNotification;
 extern NSString * const PicaSelectionDidChangeNotification;
 
-typedef NS_ENUM(NSInteger, PicaTool) {
-  PicaToolSelect = 0,
-  PicaToolTextbox,
-  PicaToolLine,
-  PicaToolRectangle,
-  PicaToolImage,
-  PicaToolTablix,
-  PicaToolChart
+typedef NS_ENUM(NSInteger, PicaSelectionScope) {
+  PicaSelectionReport = 0,
+  PicaSelectionBand,
+  PicaSelectionItem
 };
 
 @interface PicaController : NSObject
 @property (nonatomic, strong) RDLReport *report;
+@property (nonatomic, assign) PicaSelectionScope selectionScope;
 @property (nonatomic, copy) NSString *selectedName;
 @property (nonatomic, copy) NSString *selectedBandKey;
-@property (nonatomic, assign) PicaTool tool;
 @property (nonatomic, assign) CGFloat zoom;
 @property (nonatomic, assign) BOOL showsGrid;
 @property (nonatomic, copy) NSURL *fileURL;
@@ -30,8 +26,19 @@ typedef NS_ENUM(NSInteger, PicaTool) {
 - (void)loadSample:(NSString *)sampleId;
 - (BOOL)openURL:(NSURL *)url error:(NSError **)error;
 - (BOOL)saveToURL:(NSURL *)url error:(NSError **)error;
+// Selection
+- (void)selectReport;
+- (void)selectBandWithKey:(NSString *)key;
 - (void)selectItemNamed:(NSString *)name bandKey:(NSString *)key;
-- (void)addItemOfKind:(NSString *)kind inBand:(NSString *)bandKey atLeft:(CGFloat)left top:(CGFloat)top;
+- (RDLItem *)selectedItem;
+// Recursive lookup: searches all bands and nested Rectangle children.
+- (RDLItem *)findItemNamed:(NSString *)name
+                   bandKey:(NSString **)outKey
+                    parent:(RDLItem **)outParent;
+// Element insertion driven by the current selection.
+- (NSArray<NSString *> *)allowedElementKinds;
+- (NSString *)insertionDescription;
+- (void)addItemOfKind:(NSString *)kind;
 - (void)removeSelected;
 - (void)moveSelectedToLeft:(CGFloat)left top:(CGFloat)top;
 - (void)resizeSelectedToWidth:(CGFloat)w height:(CGFloat)h;

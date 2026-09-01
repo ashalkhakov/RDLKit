@@ -53,7 +53,7 @@ NSString * const PicaOpenGeneratorNotification = @"PicaOpenGeneratorNotification
   NSButton *des = [[NSButton alloc] initWithFrame:NSMakeRect(380, 28, 332, 250)];
   [des setBezelStyle:NSShadowlessSquareBezelStyle];
   [des setAttributedTitle:[self cardTitle:@"2  Designer"
-                                    body:@"Create and edit RDL files.\nToolbox, canvas, inspector, datasets.\n\nPica.app"]];
+                                    body:@"Create and edit RDL files.\nOutline, canvas, inspector, datasets.\n\nPica.app"]];
   [des setTarget:self];
   [des setAction:@selector(openDesigner:)];
   [des setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable | NSViewMinXMargin];
