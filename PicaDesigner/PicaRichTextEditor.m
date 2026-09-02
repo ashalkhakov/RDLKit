@@ -7,7 +7,7 @@
 // PicaKit's PicaRichTextCodec, where it is UI-free and covered by checks; this
 // file is now just the panel around it.
 @interface PicaRichTextEditor ()
-@property (nonatomic, strong) NSPanel *panel;
+@property (nonatomic, strong) NSWindow *window;
 @property (nonatomic, strong) NSTextView *textView;
 @end
 
@@ -25,12 +25,14 @@
 
 - (void)accept:(id)sender {
   (void)sender;
-  [NSApp stopModalWithCode:1];
+  [NSApp stopModalWithCode:NSModalResponseOK];
+  [self.window close];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
-  [NSApp stopModalWithCode:0];
+  [NSApp stopModalWithCode:NSModalResponseCancel];
+  [self.window close];
 }
 
 + (BOOL)runForTextbox:(RDLItem *)item context:(PicaEditingContext *)context {
@@ -38,12 +40,20 @@
     return NO;
   PicaRichTextEditor *ed = [[PicaRichTextEditor alloc] init];
   NSRect frame = NSMakeRect(0, 0, 480, 320);
-  ed.panel = [[NSPanel alloc] initWithContentRect:frame
+  ed.window = [[NSWindow alloc] initWithContentRect:frame
                                         styleMask:(NSTitledWindowMask | NSResizableWindowMask)
                                           backing:NSBackingStoreBuffered
                                             defer:NO];
-  [ed.panel setTitle:[NSString stringWithFormat:@"Rich Text — %@", item.name]];
-  NSView *content = [ed.panel contentView];
+
+  // ARC releases this window too, so leaving releasedWhenClosed at its
+
+  // default YES makes AppKit release it a second time: the window is
+
+  // deallocated early and AppKit then messages the freed pointer.
+
+  [ed.window setReleasedWhenClosed:NO];
+  [ed.window setTitle:[NSString stringWithFormat:@"Rich Text — %@", item.name]];
+  NSView *content = [ed.window contentView];
 
   NSTextField *hint = [[NSTextField alloc] initWithFrame:NSMakeRect(12, 288, 456, 20)];
   [hint setBezeled:NO];
@@ -92,11 +102,10 @@
   [cancel setAutoresizingMask:NSViewMinXMargin | NSViewMaxYMargin];
   [content addSubview:cancel];
 
-  [ed.panel setInitialFirstResponder:tv];
-  [ed.panel center];
-  NSInteger code = [NSApp runModalForWindow:ed.panel];
-  [ed.panel orderOut:nil];
-  if (code != 1)
+  [ed.window setInitialFirstResponder:tv];
+  [ed.window center];
+  NSInteger code = [NSApp runModalForWindow:ed.window];
+  if (code != NSModalResponseOK)
     return NO;
   [context.editor setAttributedString:[ed.textView textStorage] ofItem:item];
   return YES;

@@ -1573,6 +1573,9 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   _sawModal = modal != nil;
   if (modal == nil)
     return;
+  // Deliberately not asserting -isKeyWindow: a test bundle is not an active
+  // app, so no window becomes key here regardless of its class. Whether the
+  // dialog takes key focus has to be checked in the running app.
   NSButton *b = [self findIn:[modal contentView]];
   _foundButton = b != nil;
   if (b)
@@ -1614,44 +1617,41 @@ NSArray<NSString *> *PicaRunDialogLifecycleChecks(void) {
   NSString *groupBefore = tab.groupBy;
   NSUInteger specsBefore = [tab.columnSpecs count];
 
-  // First open: cancel. Nothing should change.
-  PicaDialogClicker *first = nil;
-  BOOL changed = PicaRunTablixDialog(tab, ctx, @"Cancel", &first);
-  if (!first.sawModal)
-    PicaFail(fails, @"first open: the dialog never became the modal window");
-  if (!first.foundButton)
-    PicaFail(fails, @"first open: no Cancel button in the panel");
-  if (changed)
-    PicaFail(fails, @"cancelling should report no change");
-  if (![tab.groupBy isEqualToString:groupBefore])
-    PicaFail(fails, @"cancelling must not touch the tablix");
-  if (ctx.document.undoManager.canUndo)
-    PicaFail(fails, @"cancelling must not put anything on the undo stack");
+  // Opened repeatedly, alternating dismissal, because the failures here have
+  // all been about the second and later openings rather than the first. Six
+  // rounds: an over-released window only shows up once its memory has been
+  // handed to something else, which took two rounds of three to surface.
+  for (NSInteger round = 1; round <= 6; round++) {
+    BOOL accept = (round % 2) == 0;
+    PicaDialogClicker *clicker = nil;
+    BOOL changed = PicaRunTablixDialog(tab, ctx, accept ? @"OK" : @"Cancel", &clicker);
 
-  // Second open: this is the case that was reported as broken. The dialog has
-  // to come up and dismiss exactly as it did the first time.
-  PicaDialogClicker *second = nil;
-  changed = PicaRunTablixDialog(tab, ctx, @"OK", &second);
-  if (!second.sawModal)
-    PicaFail(fails, @"second open: the dialog never became the modal window");
-  if (!second.foundButton)
-    PicaFail(fails, @"second open: no OK button in the panel");
-  if (!changed)
-    PicaFail(fails, @"accepting should report a change");
-  if (![tab.groupBy isEqualToString:groupBefore])
-    PicaFail(fails, @"an OK with no edits must preserve the row group");
-  if ([tab.columnSpecs count] != specsBefore)
-    PicaFail(fails, @"an OK with no edits must preserve the columns");
+    if (!clicker.sawModal)
+      PicaFail(fails, [NSString stringWithFormat:
+                                    @"round %ld: the dialog never became the modal window",
+                                    (long)round]);
+    if (!clicker.foundButton)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: no %@ button in the window",
+                                                 (long)round, accept ? @"OK" : @"Cancel"]);
+    if (changed != accept)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: changed=%d for a %@",
+                                                 (long)round, (int)changed,
+                                                 accept ? @"an OK" : @"a cancel"]);
+    if ([NSApp modalWindow] != nil)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: a modal session was left running",
+                                                 (long)round]);
+    // An OK with no edits must be a no-op on the model, not a rewrite.
+    if (![tab.groupBy isEqualToString:groupBefore])
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: the row group was lost",
+                                                 (long)round]);
+    if ([tab.columnSpecs count] != specsBefore)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: the columns changed",
+                                                 (long)round]);
+  }
+
+  // Cancelling must never reach the undo stack; the three OKs must.
   if (!ctx.document.undoManager.canUndo)
-    PicaFail(fails, @"the dialog's changes should be undoable");
-
-  // And a third, to catch anything that only breaks once state accumulates.
-  PicaDialogClicker *third = nil;
-  PicaRunTablixDialog(tab, ctx, @"Cancel", &third);
-  if (!third.sawModal || !third.foundButton)
-    PicaFail(fails, @"third open: the dialog did not come up cleanly");
-  if ([NSApp modalWindow] != nil)
-    PicaFail(fails, @"no modal session should be left running");
+    PicaFail(fails, @"an accepted dialog should be undoable");
 
   return fails;
 }

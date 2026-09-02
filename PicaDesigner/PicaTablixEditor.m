@@ -10,7 +10,7 @@ static NSArray *PicaAlignNames(void) {
 }
 
 @interface PicaTablixEditor () <NSTableViewDataSource, NSTableViewDelegate>
-@property (nonatomic, strong) NSPanel *panel;
+@property (nonatomic, strong) NSWindow *window;
 @property (nonatomic, strong) NSTableView *table;
 @property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop, *group2Pop, *pivotPop;
 @property (nonatomic, strong) NSButton *grandTotalCheck;
@@ -60,12 +60,20 @@ static NSArray *PicaAlignNames(void) {
 }
 
 - (void)buildPanelForTablix:(RDLItem *)tab {
-  _panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 640, 466)
+  _window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 466)
                                       styleMask:NSTitledWindowMask
                                         backing:NSBackingStoreBuffered
                                           defer:NO];
-  [_panel setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
-  NSView *cv = [_panel contentView];
+
+  // ARC releases this window too, so leaving releasedWhenClosed at its
+
+  // default YES makes AppKit release it a second time: the window is
+
+  // deallocated early and AppKit then messages the freed pointer.
+
+  [_window setReleasedWhenClosed:NO];
+  [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
+  NSView *cv = [_window contentView];
   NSRect b = [cv bounds];
   CGFloat top = NSHeight(b);
 
@@ -241,12 +249,14 @@ static NSArray *PicaAlignNames(void) {
 - (void)accept:(id)sender {
   (void)sender;
   [self commitTableEditing];
-  [NSApp stopModalWithCode:1];
+  [NSApp stopModalWithCode:NSModalResponseOK];
+  [self.window close];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
-  [NSApp stopModalWithCode:0];
+  [NSApp stopModalWithCode:NSModalResponseCancel];
+  [self.window close];
 }
 
 #pragma mark - Table data source
@@ -302,10 +312,9 @@ static NSArray *PicaAlignNames(void) {
     [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
   ed.cols = cols;
   [ed buildPanelForTablix:tablix];
-  [ed.panel center];
-  NSInteger code = [NSApp runModalForWindow:ed.panel];
-  [ed.panel orderOut:nil];
-  if (code != 1)
+  [ed.window center];
+  NSInteger code = [NSApp runModalForWindow:ed.window];
+  if (code != NSModalResponseOK)
     return NO;
 
   // One registration for the whole dialog. It has to be one: -rebuildTablix

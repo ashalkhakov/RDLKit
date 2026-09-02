@@ -223,13 +223,21 @@
 - (void)addElement:(id)sender {
   (void)sender;
   NSArray *kinds = [_context allowedElementKinds];
-  NSPanel *panel = [[NSPanel alloc]
+  NSWindow *window = [[NSWindow alloc]
       initWithContentRect:NSMakeRect(0, 0, 260, 92 + 30 * (CGFloat)[kinds count])
                 styleMask:NSTitledWindowMask
                   backing:NSBackingStoreBuffered
                     defer:NO];
-  [panel setTitle:@"Add Element"];
-  NSView *cv = [panel contentView];
+
+  // ARC releases this window too, so leaving releasedWhenClosed at its
+
+  // default YES makes AppKit release it a second time: the window is
+
+  // deallocated early and AppKit then messages the freed pointer.
+
+  [window setReleasedWhenClosed:NO];
+  [window setTitle:@"Add Element"];
+  NSView *cv = [window contentView];
   NSRect pb = [cv bounds];
 
   NSTextField *info = [[NSTextField alloc]
@@ -265,15 +273,15 @@
   [cancel setAction:@selector(paletteChoose:)];
   [cv addSubview:cancel];
 
-  [panel center];
-  NSInteger code = [NSApp runModalForWindow:panel];
-  [panel orderOut:nil];
+  [window center];
+  NSInteger code = [NSApp runModalForWindow:window];
   if (code >= 1 && code <= (NSInteger)[kinds count])
     [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
 }
 
 - (void)paletteChoose:(NSButton *)sender {
   [NSApp stopModalWithCode:[sender tag]];
+  [self.window close];
 }
 
 - (void)removeElement:(id)sender {
