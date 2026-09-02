@@ -52,6 +52,16 @@
 		F0908E034271ACFC6E8487F5 /* RDLParser.m in Sources */ = {isa = PBXBuildFile; fileRef = E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */; };
 		F3C696E6D8C4268736CDE752 /* PicaChecks.m in Sources */ = {isa = PBXBuildFile; fileRef = B1200B16459F67D6DF909C0E /* PicaChecks.m */; };
 		F56E72CC18EFFE5521469BD5 /* RDLExpression.m in Sources */ = {isa = PBXBuildFile; fileRef = 7CECB821FFED22DFD87FEE06 /* RDLExpression.m */; };
+		2100B94C672C78FA2A8D8DA6 /* RDLChange.h in Headers */ = {isa = PBXBuildFile; fileRef = 9EFE64F46ADC5FD68E4B553F /* RDLChange.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		1E774F9ABCD3F34B5B4F3F9A /* RDLChange.m in Sources */ = {isa = PBXBuildFile; fileRef = 14918EA4F1F8FB1BF57C44B2 /* RDLChange.m */; };
+		FDBEF2EE28E456DB561D0B17 /* RDLSelection.h in Headers */ = {isa = PBXBuildFile; fileRef = B4B4245AFC50DE83F25A1201 /* RDLSelection.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		E6AA99BB7EC5A4AB9678E170 /* RDLSelection.m in Sources */ = {isa = PBXBuildFile; fileRef = 2DEFEE2760E3219E585D2509 /* RDLSelection.m */; };
+		9EA144B556EC3C8824474A84 /* RDLDocument.h in Headers */ = {isa = PBXBuildFile; fileRef = 5665F58A9912919899DF8432 /* RDLDocument.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		A24E1FB7D1DD26468279BD57 /* RDLDocument.m in Sources */ = {isa = PBXBuildFile; fileRef = 9FDBBD8CDFC0399AE8BD9E15 /* RDLDocument.m */; };
+		5B798427BD838772C209ACA6 /* RDLEditor.h in Headers */ = {isa = PBXBuildFile; fileRef = 454C24ED8C6E81B4033341E4 /* RDLEditor.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		86FBF933120B32F29879240C /* RDLEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */; };
+		D4704492705E498BC4AC6B96 /* RDLItemFactory.h in Headers */ = {isa = PBXBuildFile; fileRef = 6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		1CAD8C23F22E73ECA81584BF /* RDLItemFactory.m in Sources */ = {isa = PBXBuildFile; fileRef = 635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -167,6 +177,16 @@
 		E7F4AAE5DA543577DD26E124 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E989DF8464B34666FDA8CDAA /* RDLGenerator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLGenerator.m; sourceTree = "<group>"; };
 		F1EE0475B7EBC42015D59375 /* RDLView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLView.m; sourceTree = "<group>"; };
+		9EFE64F46ADC5FD68E4B553F /* RDLChange.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChange.h; sourceTree = "<group>"; };
+		14918EA4F1F8FB1BF57C44B2 /* RDLChange.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChange.m; sourceTree = "<group>"; };
+		B4B4245AFC50DE83F25A1201 /* RDLSelection.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSelection.h; sourceTree = "<group>"; };
+		2DEFEE2760E3219E585D2509 /* RDLSelection.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLSelection.m; sourceTree = "<group>"; };
+		5665F58A9912919899DF8432 /* RDLDocument.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDocument.h; sourceTree = "<group>"; };
+		9FDBBD8CDFC0399AE8BD9E15 /* RDLDocument.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDocument.m; sourceTree = "<group>"; };
+		454C24ED8C6E81B4033341E4 /* RDLEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLEditor.h; sourceTree = "<group>"; };
+		4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLEditor.m; sourceTree = "<group>"; };
+		6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLItemFactory.h; sourceTree = "<group>"; };
+		635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLItemFactory.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -276,6 +296,16 @@
 				E989DF8464B34666FDA8CDAA /* RDLGenerator.m */,
 				901AB0AC0C53219CCE9B02C9 /* README.md */,
 				3988A14CD9E1B0BA1FAC689B /* GNUmakefile */,
+				9EFE64F46ADC5FD68E4B553F /* RDLChange.h */,
+				14918EA4F1F8FB1BF57C44B2 /* RDLChange.m */,
+				B4B4245AFC50DE83F25A1201 /* RDLSelection.h */,
+				2DEFEE2760E3219E585D2509 /* RDLSelection.m */,
+				5665F58A9912919899DF8432 /* RDLDocument.h */,
+				9FDBBD8CDFC0399AE8BD9E15 /* RDLDocument.m */,
+				454C24ED8C6E81B4033341E4 /* RDLEditor.h */,
+				4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */,
+				6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */,
+				635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */,
 			);
 			path = PicaKit;
 			sourceTree = "<group>";
@@ -344,6 +374,11 @@
 				A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */,
 				32E8E73DCB0DEF3A0DE88EF1 /* RDLBackend.h in Headers */,
 				15172DE8214E9EDE7FF97C4C /* RDLGenerator.h in Headers */,
+				2100B94C672C78FA2A8D8DA6 /* RDLChange.h in Headers */,
+				FDBEF2EE28E456DB561D0B17 /* RDLSelection.h in Headers */,
+				9EA144B556EC3C8824474A84 /* RDLDocument.h in Headers */,
+				5B798427BD838772C209ACA6 /* RDLEditor.h in Headers */,
+				D4704492705E498BC4AC6B96 /* RDLItemFactory.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -526,6 +561,11 @@
 				2F259D5D4809D39F5BB5823F /* RDLHTMLBackend.m in Sources */,
 				2F55F4B8430F65CA1B7BAA0C /* RDLPDFBackend.m in Sources */,
 				4AF1F77A5A32574E3B420A9A /* RDLGenerator.m in Sources */,
+				1E774F9ABCD3F34B5B4F3F9A /* RDLChange.m in Sources */,
+				E6AA99BB7EC5A4AB9678E170 /* RDLSelection.m in Sources */,
+				A24E1FB7D1DD26468279BD57 /* RDLDocument.m in Sources */,
+				86FBF933120B32F29879240C /* RDLEditor.m in Sources */,
+				1CAD8C23F22E73ECA81584BF /* RDLItemFactory.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

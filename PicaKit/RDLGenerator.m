@@ -5,22 +5,32 @@
 
 @implementation RDLGenerator
 
-+ (void)bindJSONString:(NSString *)json
++ (BOOL)bindJSONString:(NSString *)json
              toDataSet:(NSString *)name
               inReport:(RDLReport *)report
                  error:(NSError **)error {
-  if (json == nil || name == nil || report == nil)
-    return;
+  if (json == nil || name == nil || report == nil) {
+    if (error)
+      *error = [NSError errorWithDomain:@"PicaKit" code:3 userInfo:@{
+        NSLocalizedDescriptionKey : @"Need JSON, a dataset name and a report to bind"
+      }];
+    return NO;
+  }
   NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
-  if (data == nil)
-    return;
+  if (data == nil) {
+    if (error)
+      *error = [NSError errorWithDomain:@"PicaKit" code:4 userInfo:@{
+        NSLocalizedDescriptionKey : @"Dataset JSON is not valid UTF-8"
+      }];
+    return NO;
+  }
   id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
   if (![obj isKindOfClass:[NSArray class]]) {
     if (error)
       *error = [NSError errorWithDomain:@"PicaKit" code:2 userInfo:@{
         NSLocalizedDescriptionKey : @"Dataset JSON must be an array of objects"
       }];
-    return;
+    return NO;
   }
   RDLDataSet *ds = nil;
   for (RDLDataSet *d in report.dataSets) {
@@ -36,9 +46,12 @@
     [report.dataSets addObject:ds];
   }
   ds.rows = obj;
+  // Only infer when nothing is declared: allKeys is unordered, so inferring
+  // over an existing schema would silently reorder the report's columns.
   NSDictionary *first = [obj firstObject];
-  if ([first isKindOfClass:[NSDictionary class]])
+  if ([ds.fields count] == 0 && [first isKindOfClass:[NSDictionary class]])
     ds.fields = [first allKeys];
+  return YES;
 }
 
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report

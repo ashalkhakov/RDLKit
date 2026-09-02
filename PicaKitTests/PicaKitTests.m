@@ -50,6 +50,29 @@
 }
 @end
 
+@interface PicaEditorTests : PICA_TEST_CASE
+@end
+@implementation PicaEditorTests
+- (void)testDocument {
+  PICA_ASSERT_NO_FAILURES(PicaRunDocumentChecks());
+}
+- (void)testGranularUndo {
+  PICA_ASSERT_NO_FAILURES(PicaRunUndoChecks());
+}
+- (void)testEditorTablixOps {
+  PICA_ASSERT_NO_FAILURES(PicaRunEditorTablixChecks());
+}
+- (void)testSelection {
+  PICA_ASSERT_NO_FAILURES(PicaRunSelectionChecks());
+}
+- (void)testInsertionPolicy {
+  PICA_ASSERT_NO_FAILURES(PicaRunInsertionChecks());
+}
+- (void)testItemTransfer {
+  PICA_ASSERT_NO_FAILURES(PicaRunItemTransferChecks());
+}
+@end
+
 @interface PicaBackendTests : PICA_TEST_CASE
 @end
 @implementation PicaBackendTests

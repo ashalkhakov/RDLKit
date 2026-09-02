@@ -2043,6 +2043,534 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
   return fails;
 }
 
+// --- Stage 2: document, granular undo, selection, insertion policy ---------
+
+// A textbox in the body, plus a rectangle holding one child, so the checks can
+// exercise nesting, ordering and container policy.
+static RDLReport *PicaEditableReport(void) {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Editable"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Rows";
+  ds.dataSourceName = @"Demo";
+  ds.fields = @[ @"Sku", @"Amount" ];
+  ds.rows = @[ @{@"Sku" : @"A", @"Amount" : @10} ];
+  [r.dataSets addObject:ds];
+
+  RDLItem *text = [[RDLItem alloc] init];
+  text.name = @"Title";
+  text.type = @"Textbox";
+  text.value = @"Hello";
+  text.left = 1.0;
+  text.top = 1.0;
+  text.width = 2.0;
+  text.height = 0.3;
+  [r.body.items addObject:text];
+
+  RDLItem *rect = [[RDLItem alloc] init];
+  rect.name = @"Box";
+  rect.type = @"Rectangle";
+  rect.left = 0.5;
+  rect.top = 2.0;
+  rect.width = 3.0;
+  rect.height = 1.0;
+  RDLItem *child = [[RDLItem alloc] init];
+  child.name = @"Inner";
+  child.type = @"Textbox";
+  child.value = @"Nested";
+  [rect.items addObject:child];
+  [r.body.items addObject:rect];
+  return r;
+}
+
+NSArray<NSString *> *PicaRunDocumentChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:PicaEditableReport()];
+
+  if (doc.isDirty)
+    PicaFail(fails, @"a freshly opened document should not be dirty");
+  if (doc.undoManager == nil)
+    PicaFail(fails, @"document should own an undo manager");
+
+  // Parameter values are preview bindings, not document content: setting one
+  // must not dirty the file.
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Customer";
+  p.defaultValue = @"Acme";
+  [doc.report.parameters addObject:p];
+  [doc syncParamValuesFromReport];
+  if (![doc.paramValues[@"Customer"] isEqualToString:@"Acme"])
+    PicaFail(fails, @"paramValues should pick up the parameter default");
+  [doc setParamValue:@"Other" forName:@"Customer"];
+  if (![doc.paramValues[@"Customer"] isEqualToString:@"Other"])
+    PicaFail(fails, @"setParamValue should take effect");
+  if (doc.isDirty)
+    PicaFail(fails, @"changing a preview parameter must not dirty the document");
+
+  // An edit dirties it.
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLItem *title = doc.report.body.items.firstObject;
+  [ed setValue:@"Changed" forKeyPath:@"value" ofItem:title];
+  if (!doc.isDirty)
+    PicaFail(fails, @"an edit should dirty the document");
+
+  // Save round-trip: writes, clears dirty, and adopts the file name.
+  NSString *tmp = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:@"pica-doc-check.rdl"];
+  NSURL *url = [NSURL fileURLWithPath:tmp];
+  NSError *err = nil;
+  if (![doc saveToURL:url error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"saveToURL failed: %@",
+                                               err.localizedDescription]);
+  if (doc.isDirty)
+    PicaFail(fails, @"saving should clear dirty");
+  if (![doc.report.name isEqualToString:@"pica-doc-check"])
+    PicaFail(fails, [NSString stringWithFormat:@"report should adopt the file name, got %@",
+                                               doc.report.name]);
+
+  RDLDocument *reopened = [[RDLDocument alloc] initWithReport:nil];
+  if (![reopened openURL:url error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"openURL failed: %@",
+                                               err.localizedDescription]);
+  else {
+    RDLItem *t = reopened.report.body.items.firstObject;
+    if (![t.value isEqualToString:@"Changed"])
+      PicaFail(fails, @"reopened document lost the edit");
+    if (reopened.isDirty)
+      PicaFail(fails, @"a freshly opened document should not be dirty");
+  }
+  [[NSFileManager defaultManager] removeItemAtURL:url error:NULL];
+
+  // Loading resets undo — you cannot undo across a document boundary.
+  [ed setValue:@"Again" forKeyPath:@"value" ofItem:doc.report.body.items.firstObject];
+  if (!doc.undoManager.canUndo)
+    PicaFail(fails, @"expected an undoable edit before load");
+  [doc loadReport:PicaEditableReport()];
+  if (doc.undoManager.canUndo)
+    PicaFail(fails, @"loading a report should clear the undo stack");
+  if (doc.isDirty)
+    PicaFail(fails, @"loading a report should clear dirty");
+
+  // The JSON binder must not clobber a declared schema (allKeys is unordered).
+  RDLDocument *bindDoc = [[RDLDocument alloc] initWithReport:PicaEditableReport()];
+  NSArray *declared = [bindDoc.report.dataSets.firstObject fields];
+  if (![bindDoc bindJSON:@"[{\"Amount\":5,\"Sku\":\"Z\"}]" toDataSetNamed:@"Rows" error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"bindJSON failed: %@",
+                                               err.localizedDescription]);
+  if (![[bindDoc.report.dataSets.firstObject fields] isEqualToArray:declared])
+    PicaFail(fails, @"binding JSON must not reorder a declared field list");
+  if ([[bindDoc.report.dataSets.firstObject rows] count] != 1)
+    PicaFail(fails, @"binding JSON should replace the rows");
+  if (![bindDoc isDirty])
+    PicaFail(fails, @"binding data is a document edit and should dirty it");
+  if ([bindDoc bindJSON:@"{\"not\":\"an array\"}" toDataSetNamed:@"Rows" error:NULL])
+    PicaFail(fails, @"binding a JSON object rather than an array should fail");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunUndoChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:PicaEditableReport()];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLItem *title = doc.report.body.items.firstObject;
+
+  // A no-op assignment registers nothing. AppKit re-sends a field's value on
+  // every focus change, so without this the undo stack fills with nothing.
+  [ed setValue:@"Hello" forKeyPath:@"value" ofItem:title];
+  if (doc.undoManager.canUndo)
+    PicaFail(fails, @"a no-op edit should not register undo");
+  if (doc.isDirty)
+    PicaFail(fails, @"a no-op edit should not dirty the document");
+
+  // Property edit: undo restores, redo re-applies.
+  [ed setValue:@"Second" forKeyPath:@"value" ofItem:title];
+  if (![title.value isEqualToString:@"Second"])
+    PicaFail(fails, @"edit did not apply");
+  [doc.undoManager undo];
+  if (![title.value isEqualToString:@"Hello"])
+    PicaFail(fails, [NSString stringWithFormat:@"undo left value %@", title.value]);
+  [doc.undoManager redo];
+  if (![title.value isEqualToString:@"Second"])
+    PicaFail(fails, [NSString stringWithFormat:@"redo left value %@", title.value]);
+
+  // A nested key path reaches the style, and undoes just as well.
+  [ed setValue:@"Courier" forKeyPath:@"style.fontFamily" ofItem:title];
+  if (![title.style.fontFamily isEqualToString:@"Courier"])
+    PicaFail(fails, @"style key path edit did not apply");
+  [doc.undoManager undo];
+  if ([title.style.fontFamily isEqualToString:@"Courier"])
+    PicaFail(fails, @"undo did not restore the style key path");
+
+  // Geometry: both coordinates restore as one step, and values snap.
+  [ed moveItem:title toLeft:1.53 top:2.02];
+  if (fabs(title.left - 1.55) > 0.0001 || fabs(title.top - 2.0) > 0.0001)
+    PicaFail(fails, [NSString stringWithFormat:@"move should snap to the grid, got %g,%g",
+                                               (double)title.left, (double)title.top]);
+  [doc.undoManager undo];
+  if (fabs(title.left - 1.0) > 0.0001 || fabs(title.top - 1.0) > 0.0001)
+    PicaFail(fails, @"undoing a move should restore both coordinates at once");
+
+  [ed resizeItem:title toWidth:3.0 height:0.5];
+  [doc.undoManager undo];
+  if (fabs(title.width - 2.0) > 0.0001 || fabs(title.height - 0.3) > 0.0001)
+    PicaFail(fails, @"undoing a resize should restore both dimensions at once");
+
+  // A drag is many moves but one undo step: the group keeps only the first
+  // inverse, so undo returns to where the gesture started.
+  [ed beginGroup:@"Move"];
+  for (NSInteger i = 1; i <= 8; i++)
+    [ed moveItem:title toLeft:1.0 + 0.05 * i top:1.0];
+  [ed endGroup];
+  if (fabs(title.left - 1.4) > 0.0001)
+    PicaFail(fails, [NSString stringWithFormat:@"drag should end at 1.4, got %g",
+                                               (double)title.left]);
+  [doc.undoManager undo];
+  if (fabs(title.left - 1.0) > 0.0001)
+    PicaFail(fails, [NSString stringWithFormat:@"one undo should revert the whole drag, got %g",
+                                               (double)title.left]);
+  // Atomic in both directions: one redo replays the whole gesture, which is
+  // what proves the eight moves collapsed into a single group rather than
+  // merely that the first inverse happened to restore the start value.
+  [doc.undoManager redo];
+  if (fabs(title.left - 1.4) > 0.0001)
+    PicaFail(fails, [NSString stringWithFormat:@"one redo should replay the whole drag, got %g",
+                                               (double)title.left]);
+  [doc.undoManager undo];
+
+  // Structure: remove and undo restores position in the sibling order.
+  RDLItem *box = doc.report.body.items[1];
+  if (![ed removeItem:box])
+    PicaFail(fails, @"removeItem should find and remove the rectangle");
+  if ([doc.report.body.items count] != 1)
+    PicaFail(fails, @"remove did not take effect");
+  [doc.undoManager undo];
+  if ([doc.report.body.items count] != 2 || doc.report.body.items[1] != box)
+    PicaFail(fails, @"undoing a remove should restore the item at its old index");
+
+  // Removing a nested child finds it through the Rectangle.
+  RDLItem *inner = box.items.firstObject;
+  if (![ed removeItem:inner])
+    PicaFail(fails, @"removeItem should reach a nested child");
+  if ([box.items count] != 0)
+    PicaFail(fails, @"nested remove did not take effect");
+  [doc.undoManager undo];
+  if ([box.items count] != 1 || box.items.firstObject != inner)
+    PicaFail(fails, @"undo should put the nested child back");
+
+  // Insert and undo.
+  RDLItem *fresh = [[RDLItem alloc] init];
+  fresh.name = @"Added";
+  fresh.type = @"Textbox";
+  [ed addItem:fresh into:doc.report.body.items bandKey:@"body"];
+  if (doc.report.body.items.lastObject != fresh)
+    PicaFail(fails, @"addItem should append");
+  [doc.undoManager undo];
+  if ([doc.report.body.items containsObject:fresh])
+    PicaFail(fails, @"undoing an insert should remove the item");
+  [doc.undoManager redo];
+  if (doc.report.body.items.lastObject != fresh)
+    PicaFail(fails, @"redoing an insert should put it back");
+
+  // Report-level edits go through the same machinery.
+  [ed setReportValue:@(8.27) forKeyPath:@"page.pageWidth"];
+  if (fabs(doc.report.page.pageWidth - 8.27) > 0.0001)
+    PicaFail(fails, @"report key path edit did not apply");
+  [doc.undoManager undo];
+  if (fabs(doc.report.page.pageWidth - 8.5) > 0.0001)
+    PicaFail(fails, @"undo should restore the page width");
+
+  // Band edits too.
+  [ed setValue:@(2.5) forKeyPath:@"height" ofBandWithKey:@"pageHeader"];
+  if (fabs(doc.report.pageHeader.height - 2.5) > 0.0001)
+    PicaFail(fails, @"band edit did not apply");
+  [doc.undoManager undo];
+  if (fabs(doc.report.pageHeader.height - 0.55) > 0.0001)
+    PicaFail(fails, @"undo should restore the band height");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = PicaGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLItem *tab = r.body.items.firstObject;
+  NSUInteger baseCols = [tab.columnSpecs count];
+
+  // Insert a column: the spec grows, the body rebuilds, the item widens, and
+  // all of that is a single undo step.
+  CGFloat baseWidth = tab.width;
+  [ed insertTablixColumnAtIndex:1 ofTablix:tab];
+  if ([tab.columnSpecs count] != baseCols + 1)
+    PicaFail(fails, @"insert column should grow the spec");
+  if ([tab.tablixBody.columns count] != baseCols + 1)
+    PicaFail(fails, @"insert column should rebuild the body");
+  if (fabs(tab.width - (baseWidth + 1.2)) > 0.0001)
+    PicaFail(fails, @"insert column should widen the tablix");
+  [doc.undoManager undo];
+  if ([tab.columnSpecs count] != baseCols)
+    PicaFail(fails, @"one undo should revert the whole column insert");
+  if (fabs(tab.width - baseWidth) > 0.0001)
+    PicaFail(fails, @"undo should restore the tablix width too");
+  if ([tab.tablixBody.columns count] != baseCols)
+    PicaFail(fails, @"undo should rebuild the body back");
+
+  // Delete a column, and refuse to delete the last one.
+  [ed removeTablixColumnAtIndex:0 ofTablix:tab];
+  if ([tab.columnSpecs count] != baseCols - 1)
+    PicaFail(fails, @"delete column should shrink the spec");
+  [doc.undoManager undo];
+  if ([tab.columnSpecs count] != baseCols)
+    PicaFail(fails, @"undo should restore the deleted column");
+  [ed setColumnSpecs:@[ @{@"width" : @2.0, @"header" : @"Only", @"value" : @""} ] ofTablix:tab];
+  [ed removeTablixColumnAtIndex:0 ofTablix:tab];
+  if ([tab.columnSpecs count] != 1)
+    PicaFail(fails, @"the last column must not be deletable");
+
+  // Column width, snapped, one step with the item width.
+  RDLReport *r2 = PicaGroupedJobs();
+  RDLDocument *doc2 = [[RDLDocument alloc] initWithReport:r2];
+  RDLEditor *ed2 = [[RDLEditor alloc] initWithDocument:doc2];
+  RDLItem *tab2 = r2.body.items.firstObject;
+  [ed2 setTablixColumn:0 width:3.13 ofTablix:tab2];
+  if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 3.15) > 0.0001)
+    PicaFail(fails, [NSString stringWithFormat:@"column width should snap, got %@",
+                                               tab2.columnSpecs[0][@"width"]]);
+  [doc2.undoManager undo];
+  if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 2.8) > 0.0001)
+    PicaFail(fails, @"one undo should revert the column resize");
+
+  // Grand total toggles and untoggles.
+  BOOL before = tab2.showGrandTotal;
+  [ed2 toggleGrandTotalOfTablix:tab2];
+  if (tab2.showGrandTotal == before)
+    PicaFail(fails, @"grand total should toggle");
+  [doc2.undoManager undo];
+  if (tab2.showGrandTotal != before)
+    PicaFail(fails, @"undo should restore the grand total setting");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunSelectionChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = PicaEditableReport();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLSelection *sel = [[RDLSelection alloc] init];
+
+  if (sel.scope != RDLSelectionScopeReport)
+    PicaFail(fails, @"selection should start on the report");
+  if (![sel.bandKey isEqualToString:@"body"])
+    PicaFail(fails, @"selection should default to the body band");
+
+  RDLItem *title = r.body.items.firstObject;
+  [sel selectItem:title inBandWithKey:@"body"];
+  if (sel.scope != RDLSelectionScopeItem || sel.item != title)
+    PicaFail(fails, @"selecting an item should hold the resolved reference");
+
+  // The reference survives an edit — this is the point of dropping name-based
+  // selection: granular undo no longer replaces the report object.
+  [ed setValue:@"Renamed" forKeyPath:@"name" ofItem:title];
+  if (sel.item != title)
+    PicaFail(fails, @"selection should survive a rename");
+  [doc.undoManager undo];
+  if (sel.item != title)
+    PicaFail(fails, @"selection should survive an undo");
+
+  // Deleting the selected item falls back to its band rather than dangling.
+  [sel itemWasRemoved:title];
+  if (sel.scope != RDLSelectionScopeBand || sel.item != nil)
+    PicaFail(fails, @"removing the selected item should fall back to its band");
+
+  // Validation drops a selection that is not in the report any more.
+  RDLItem *orphan = [[RDLItem alloc] init];
+  orphan.name = @"Ghost";
+  [sel selectItem:orphan inBandWithKey:@"body"];
+  [sel validateAgainstReport:r];
+  if (sel.scope == RDLSelectionScopeItem)
+    PicaFail(fails, @"validation should drop an item that is not in the report");
+
+  // Validation corrects the band of an item that is in the report.
+  RDLItem *header = [[RDLItem alloc] init];
+  header.name = @"HeaderText";
+  header.type = @"Textbox";
+  [r.pageHeader.items addObject:header];
+  [sel selectItem:header inBandWithKey:@"body"];
+  [sel validateAgainstReport:r];
+  if (![sel.bandKey isEqualToString:@"pageHeader"])
+    PicaFail(fails, [NSString stringWithFormat:@"validation should fix the band key, got %@",
+                                               sel.bandKey]);
+
+  // A nested child is still found by validation.
+  RDLItem *box = r.body.items[1];
+  [sel selectItem:box.items.firstObject inBandWithKey:@"pageFooter"];
+  [sel validateAgainstReport:r];
+  if (![sel.bandKey isEqualToString:@"body"] || sel.scope != RDLSelectionScopeItem)
+    PicaFail(fails, @"validation should find a nested child in its band");
+
+  [sel reset];
+  if (sel.scope != RDLSelectionScopeReport || sel.item != nil)
+    PicaFail(fails, @"reset should clear the selection");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunInsertionChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = PicaEditableReport();
+  RDLSelection *sel = [[RDLSelection alloc] init];
+
+  // Nothing selected: new elements land in the body, and everything is allowed.
+  RDLInsertionPoint *p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  if (![p.bandKey isEqualToString:@"body"] || p.container != nil || p.sibling != nil)
+    PicaFail(fails, @"report selection should insert into the body at top level");
+  if (p.items != r.body.items)
+    PicaFail(fails, @"insertion point should target the body items array");
+  if ([[RDLItemFactory elementKindsAllowedAt:p] count] != 6)
+    PicaFail(fails, @"band level should allow all six element kinds");
+  if (![[p localizedDescription] isEqualToString:@"into Body"])
+    PicaFail(fails, [NSString stringWithFormat:@"description %@", [p localizedDescription]]);
+
+  // A plain item selected: insert after it, as a sibling.
+  RDLItem *title = r.body.items.firstObject;
+  [sel selectItem:title inBandWithKey:@"body"];
+  p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  if (p.sibling != title || p.container != nil)
+    PicaFail(fails, @"selecting a plain item should insert alongside it");
+  if (![[p localizedDescription] isEqualToString:@"after Title in Body"])
+    PicaFail(fails, [NSString stringWithFormat:@"sibling description %@",
+                                               [p localizedDescription]]);
+
+  // A Rectangle selected: insert inside, and data regions are refused there.
+  RDLItem *box = r.body.items[1];
+  [sel selectItem:box inBandWithKey:@"body"];
+  p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  if (p.container != box || p.items != box.items)
+    PicaFail(fails, @"selecting a Rectangle should insert into it");
+  NSArray *allowed = [RDLItemFactory elementKindsAllowedAt:p];
+  if ([allowed containsObject:@"Tablix"] || [allowed containsObject:@"Chart"])
+    PicaFail(fails, @"a Rectangle must not accept data regions");
+  if (![RDLItemFactory kind:@"Textbox" isAllowedAt:p])
+    PicaFail(fails, @"a Rectangle should accept a Textbox");
+  if ([RDLItemFactory kind:@"Tablix" isAllowedAt:p])
+    PicaFail(fails, @"kind:isAllowedAt: should agree with the allowed list");
+  if (![[p localizedDescription] isEqualToString:@"inside Box"])
+    PicaFail(fails, [NSString stringWithFormat:@"container description %@",
+                                               [p localizedDescription]]);
+
+  // A child of the Rectangle selected: insert as its sibling, inside the box.
+  [sel selectItem:box.items.firstObject inBandWithKey:@"body"];
+  p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  if (p.container != box || p.items != box.items)
+    PicaFail(fails, @"a nested child should insert into its parent Rectangle");
+
+  // Unique naming looks inside Rectangles, which the report's own
+  // -nextNameWithPrefix: does not.
+  RDLItem *clash = [[RDLItem alloc] init];
+  clash.name = @"Textbox1";
+  clash.type = @"Textbox";
+  [box.items addObject:clash];
+  NSString *name = [RDLItemFactory uniqueNameWithPrefix:@"Textbox" inReport:r];
+  if ([name isEqualToString:@"Textbox1"])
+    PicaFail(fails, @"unique naming must consider items nested in Rectangles");
+
+  // Defaults: a new Tablix binds the first dataset and builds a real body.
+  [sel selectReport];
+  p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  RDLItem *tab = [RDLItemFactory itemOfKind:@"Tablix" atPoint:p inReport:r];
+  if (![tab.dataSetName isEqualToString:@"Rows"])
+    PicaFail(fails, @"a new Tablix should bind the first dataset");
+  if ([tab.columnSpecs count] != 2)
+    PicaFail(fails, @"a new Tablix should get one column per dataset field");
+  if ([tab.tablixBody.columns count] != 2)
+    PicaFail(fails, @"a new Tablix should arrive with a built body");
+  if (![tab.columnSpecs.firstObject[@"value"] isEqualToString:@"=Fields!Sku.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"new tablix column value %@",
+                                               tab.columnSpecs.firstObject[@"value"]]);
+  RDLItem *chart = [RDLItemFactory itemOfKind:@"Chart" atPoint:p inReport:r];
+  if (![chart.categoryField isEqualToString:@"Sku"] ||
+      ![chart.valueField isEqualToString:@"Amount"])
+    PicaFail(fails, @"a new Chart should bind the first two fields");
+  RDLItem *line = [RDLItemFactory itemOfKind:@"Line" atPoint:p inReport:r];
+  if (line.height > 0.05)
+    PicaFail(fails, @"a new Line should be hairline height");
+
+  // Position follows the insertion point.
+  [sel selectItem:title inBandWithKey:@"body"];
+  p = [RDLItemFactory insertionPointInReport:r selection:sel];
+  RDLItem *below = [RDLItemFactory itemOfKind:@"Textbox" atPoint:p inReport:r];
+  if (fabs(below.left - title.left) > 0.0001)
+    PicaFail(fails, @"a sibling should share the selection's left edge");
+  if (below.top <= title.top)
+    PicaFail(fails, @"a sibling should sit below the selection");
+
+  if (![[RDLItemFactory titleForBandKey:@"pageFooter"] isEqualToString:@"Page Footer"])
+    PicaFail(fails, @"band titles should be human readable");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunItemTransferChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = PicaEditableReport();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+
+  // A Rectangle with a child round-trips through RDL XML as a deep copy.
+  RDLItem *box = r.body.items[1];
+  NSString *xml = [RDLEditor XMLStringForItem:box];
+  if ([xml length] == 0)
+    PicaFail(fails, @"XMLStringForItem should produce XML");
+  if ([r.body.items count] != 2)
+    PicaFail(fails, @"serialising an item must not leave it in the carrier report");
+
+  RDLItem *copy = [RDLEditor itemFromXMLString:xml];
+  if (copy == nil) {
+    PicaFail(fails, @"itemFromXMLString should parse the item back");
+    return fails;
+  }
+  if (copy == box)
+    PicaFail(fails, @"the copy should be a distinct object");
+  if (![copy.type isEqualToString:@"Rectangle"])
+    PicaFail(fails, [NSString stringWithFormat:@"copy type %@", copy.type]);
+  if ([copy.items count] != 1)
+    PicaFail(fails, @"the copy should keep its nested child");
+  if (copy.items.firstObject == box.items.firstObject)
+    PicaFail(fails, @"the nested child should be a copy, not a shared reference");
+
+  // Renaming the pasted tree makes every name unique, children included.
+  [RDLItemFactory renameTreeUniquely:copy inReport:r];
+  if ([copy.name isEqualToString:@"Box"])
+    PicaFail(fails, @"a pasted item should get a fresh name");
+  if ([[copy.items.firstObject name] isEqualToString:@"Inner"])
+    PicaFail(fails, @"a pasted child should get a fresh name too");
+
+  [ed addItem:copy into:r.body.items bandKey:@"body"];
+  if ([r.body.items count] != 3)
+    PicaFail(fails, @"pasting should insert the copy");
+  [doc.undoManager undo];
+  if ([r.body.items count] != 2)
+    PicaFail(fails, @"undo should remove the pasted copy");
+
+  // A tablix survives the round trip with its spec, since the carrier goes
+  // through the real writer and parser.
+  RDLReport *jobs = PicaGroupedJobs();
+  RDLItem *tab = jobs.body.items.firstObject;
+  RDLItem *tabCopy = [RDLEditor itemFromXMLString:[RDLEditor XMLStringForItem:tab]];
+  if (![tabCopy.type isEqualToString:@"Tablix"])
+    PicaFail(fails, @"a copied tablix should still be a Tablix");
+  if ([tabCopy.columnSpecs count] != [tab.columnSpecs count])
+    PicaFail(fails, [NSString stringWithFormat:@"copied tablix specs %lu vs %lu",
+                                               (unsigned long)[tabCopy.columnSpecs count],
+                                               (unsigned long)[tab.columnSpecs count]]);
+  if (![tabCopy.groupBy isEqualToString:@"Finish"])
+    PicaFail(fails, @"a copied tablix should keep its row group");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -2052,6 +2580,12 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
   [fails addObjectsFromArray:PicaRunBandEnumerationChecks()];
+  [fails addObjectsFromArray:PicaRunDocumentChecks()];
+  [fails addObjectsFromArray:PicaRunUndoChecks()];
+  [fails addObjectsFromArray:PicaRunEditorTablixChecks()];
+  [fails addObjectsFromArray:PicaRunSelectionChecks()];
+  [fails addObjectsFromArray:PicaRunInsertionChecks()];
+  [fails addObjectsFromArray:PicaRunItemTransferChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];

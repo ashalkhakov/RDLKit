@@ -5,7 +5,10 @@
 
 // Pipeline: bind data → layout (tablix expansion) → laid-out pages → backend.
 @interface RDLGenerator : NSObject
-+ (void)bindJSONString:(NSString *)json
+// Returns NO (and sets `error`) when the JSON is unusable. Fields are inferred
+// from the first row ONLY when the dataset declares none: [NSDictionary allKeys]
+// is unordered, so inferring over a declared schema would scramble column order.
++ (BOOL)bindJSONString:(NSString *)json
              toDataSet:(NSString *)name
               inReport:(RDLReport *)report
                  error:(NSError **)error;

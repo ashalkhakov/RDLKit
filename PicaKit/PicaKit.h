@@ -9,3 +9,10 @@
 #import "RDLView.h"
 #import "RDLBackend.h"
 #import "RDLGenerator.h"
+// Editor core: document, selection, insertion policy and the undoable
+// mutation layer. UI-free, so PicaKitTests can cover it.
+#import "RDLChange.h"
+#import "RDLSelection.h"
+#import "RDLDocument.h"
+#import "RDLEditor.h"
+#import "RDLItemFactory.h"

@@ -1,0 +1,75 @@
+// RDLEditor — the one place the model gets mutated.
+//
+// Every edit used to happen wherever it was convenient (the canvas wrote tablix
+// column dictionaries, the inspector assigned item properties, the modal
+// editors wrote eight properties in a required order) and each site then called
+// a global -noteChange. Nothing knew *what* had changed, which is why undo had
+// to serialize the entire report to XML on every keystroke.
+//
+// Here each mutation records its own inverse on the document's NSUndoManager
+// before applying itself. The inverse is invariably a call to the same method
+// with the previous value, so NSUndoManager derives redo for free.
+#import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
+
+@class RDLDocument;
+@class RDLItem;
+
+@interface RDLEditor : NSObject
+- (instancetype)initWithDocument:(RDLDocument *)document;
+@property (nonatomic, readonly, weak) RDLDocument *document;
+
+// The design grid. Positions and sizes snap to it.
++ (CGFloat)gridStep;
++ (CGFloat)snap:(CGFloat)value;
+
+// Coalesce a continuous interaction — a mouse drag, a burst of arrow keys —
+// into a single undo step. Only the first inverse recorded for a given
+// property is kept while a group is open, so undo returns to where the gesture
+// started rather than stepping back through every intermediate value.
+// Re-entrant: nested begin/end pairs collapse into the outermost one.
+- (void)beginGroup:(NSString *)actionName;
+- (void)endGroup;
+
+// --- Property edits -------------------------------------------------------
+// Key paths are relative to the object, so "left" and "style.fontFamily" both
+// work. A no-op assignment is dropped: it registers no undo and posts nothing,
+// which matters because AppKit re-sends a field's value on every focus change.
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofItem:(RDLItem *)item;
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofBandWithKey:(NSString *)bandKey;
+- (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath;
+
+// --- Geometry -------------------------------------------------------------
+// Snapped and clamped. Both coordinates move as one undo step.
+- (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top;
+- (void)resizeItem:(RDLItem *)item toWidth:(CGFloat)width height:(CGFloat)height;
+
+// --- Structure ------------------------------------------------------------
+- (void)insertItem:(RDLItem *)item
+              into:(NSMutableArray *)container
+           bandKey:(NSString *)bandKey
+           atIndex:(NSUInteger)index;
+- (void)addItem:(RDLItem *)item into:(NSMutableArray *)container bandKey:(NSString *)bandKey;
+- (BOOL)removeItem:(RDLItem *)item;
+// The array that holds `item` — a band's items or a Rectangle's children.
+- (NSMutableArray *)containerOfItem:(RDLItem *)item bandKey:(NSString **)outBandKey;
+
+// --- Tablix ---------------------------------------------------------------
+// All of these go through columnSpecs + -rebuildTablix, so the inverse is
+// simply the previous spec, and the ordering hazard of the old implicit
+// rebuild-on-set does not arise.
+- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLItem *)tablix;
+- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLItem *)tablix;
+- (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
+- (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
+- (void)toggleGrandTotalOfTablix:(RDLItem *)tablix;
+
+// --- Item transfer (clipboard, duplicate) ---------------------------------
+// An item round-trips as RDL XML by hosting it in an otherwise empty report, so
+// the writer's tablix handling applies unchanged and a pasted item is a genuine
+// deep copy rather than a shared reference.
++ (NSString *)XMLStringForItem:(RDLItem *)item;
++ (RDLItem *)itemFromXMLString:(NSString *)xml;
+// Renaming a pasted tree is RDLItemFactory's job (+renameTreeUniquely:inReport:);
+// it is preparation before insertion, not an undoable edit of its own.
+@end
