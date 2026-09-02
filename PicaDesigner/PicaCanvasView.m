@@ -577,7 +577,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSRect paper = [self paperRect];
   CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
   CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
-  for (RDLBand *band in @[ r.pageHeader, r.body, r.pageFooter ]) {
+  for (RDLBand *band in [r allBands]) {
     if ([self findRectOfItem:target inItems:band.items originX:x originY:y rect:outRect])
       return YES;
     y += band.height * kDPI * z;
@@ -599,11 +599,10 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   CGFloat mt = r.page.topMargin * kDPI * z;
   CGFloat x = NSMinX(paper) + ml;
   CGFloat y = NSMinY(paper) + mt;
-  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
-  NSArray *bands = @[ r.pageHeader, r.body, r.pageFooter ];
-  for (NSInteger bi = 0; bi < 3; bi++) {
-    RDLBand *band = bands[bi];
+  NSArray *keys = [RDLReport bandKeys];
+  for (NSInteger bi = 0; bi < (NSInteger)[keys count]; bi++) {
     NSString *key = keys[bi];
+    RDLBand *band = [r bandWithKey:key];
     CGFloat bh = band.height * kDPI * z;
     NSRect br = NSMakeRect(x, y, NSWidth(paper) - ml - r.page.rightMargin * kDPI * z, bh);
     NSString *kind = nil;
@@ -809,10 +808,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSRect paper = [self paperRect];
   CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
   CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
-  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
-  NSArray *bands = @[ r.pageHeader, r.body, r.pageFooter ];
-  for (NSInteger bi = 0; bi < 3; bi++) {
-    RDLBand *band = bands[bi];
+  NSArray *keys = [RDLReport bandKeys];
+  for (NSInteger bi = 0; bi < (NSInteger)[keys count]; bi++) {
+    RDLBand *band = [r bandWithKey:keys[bi]];
     NSString *kind = nil;
     NSRect itemRect = NSZeroRect;
     RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
@@ -943,7 +941,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSUInteger hoverCol = 0;
   NSString *hoverPart = nil;
   BOOL onBorder = NO;
-  for (RDLBand *band in @[ r.pageHeader, r.body, r.pageFooter ]) {
+  for (RDLBand *band in [r allBands]) {
     for (RDLItem *it in band.items) {
       if (![it.type isEqualToString:@"Tablix"])
         continue;

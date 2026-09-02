@@ -252,7 +252,7 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
     *outKey = nil;
   if (name == nil)
     return nil;
-  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ]) {
+  for (NSString *k in [RDLReport bandKeys]) {
     RDLBand *b = [self.report bandWithKey:k];
     RDLItem *parent = nil;
     RDLItem *found = PicaFindInItems(b.items, name, nil, &parent);
@@ -277,7 +277,7 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
 
 - (NSString *)uniqueNameWithPrefix:(NSString *)prefix {
   NSMutableSet *used = [NSMutableSet set];
-  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ])
+  for (NSString *k in [RDLReport bandKeys])
     PicaCollectNames([self.report bandWithKey:k].items, used);
   NSInteger i = 1;
   while ([used containsObject:[NSString stringWithFormat:@"%@%ld", prefix, (long)i]])
@@ -546,7 +546,7 @@ static NSString * const PicaItemPboardType = @"com.pica.rdl-item-xml";
     items = container.items;
   }
   NSMutableSet *used = [NSMutableSet set];
-  for (NSString *k in @[ @"pageHeader", @"body", @"pageFooter" ])
+  for (NSString *k in [RDLReport bandKeys])
     PicaCollectNames([self.report bandWithKey:k].items, used);
   [self renameItemTree:it usedNames:used];
   it.left = PicaSnap(it.left + 0.1);

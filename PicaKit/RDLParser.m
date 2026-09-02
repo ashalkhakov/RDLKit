@@ -618,6 +618,10 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
         [lastMem.groupName length] == 0 && [lastMem.groupExpressions count] == 0 &&
         [lastMem.members count] == 0)
       item.showGrandTotal = YES;
+    // Recover the designer column spec now that pivotBy/groupBy/showGrandTotal
+    // are known (the recovery reads them), so an item loaded from disk carries
+    // a spec and -rebuildTablix has something authoritative to build from.
+    [item inferColumnSpecsFromTablixBody];
   } else if ([el.localName isEqualToString:@"Rectangle"]) {
     BOOL chart = NO;
     for (NSXMLNode *n in [PicaChild(el, @"CustomProperties") children]) {

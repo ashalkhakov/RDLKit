@@ -1907,6 +1907,142 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   return fails;
 }
 
+// --- Stage 1: canonical band enumeration + explicit tablix rebuild ----------
+
+NSArray<NSString *> *PicaRunBandEnumerationChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = [RDLReport emptyReportNamed:@"Bands"];
+
+  NSArray *keys = [RDLReport bandKeys];
+  if (![keys isEqualToArray:@[ @"pageHeader", @"body", @"pageFooter" ]])
+    PicaFail(fails, [NSString stringWithFormat:@"bandKeys order %@", keys]);
+
+  // Render order matters: layout stacks the bands in exactly this sequence.
+  NSArray *bands = [r allBands];
+  if ([bands count] != 3)
+    PicaFail(fails, [NSString stringWithFormat:@"allBands count %lu",
+                                               (unsigned long)[bands count]]);
+  else {
+    if (bands[0] != r.pageHeader)
+      PicaFail(fails, @"allBands[0] should be the page header");
+    if (bands[1] != r.body)
+      PicaFail(fails, @"allBands[1] should be the body");
+    if (bands[2] != r.pageFooter)
+      PicaFail(fails, @"allBands[2] should be the page footer");
+  }
+
+  // bandKeys paired with bandWithKey: is the replacement for the band-key
+  // literal that used to be copied around the codebase.
+  for (NSString *k in keys) {
+    if ([r bandWithKey:k] == nil)
+      PicaFail(fails, [NSString stringWithFormat:@"bandWithKey: nil for %@", k]);
+  }
+
+  // A report with a missing band must not put a hole in the array.
+  RDLReport *bare = [[RDLReport alloc] init];
+  bare.body = [[RDLBand alloc] init];
+  NSArray *bareBands = [bare allBands];
+  if ([bareBands count] != 1 || bareBands[0] != bare.body)
+    PicaFail(fails, [NSString stringWithFormat:@"allBands should skip nil bands, got %lu",
+                                               (unsigned long)[bareBands count]]);
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  // The ordering hazard, stated as a test. The deprecated `columns` setter
+  // rebuilds immediately, so a group assigned *after* it was ignored until
+  // something reassigned the columns. columnSpecs + -rebuildTablix separates
+  // "what the columns are" from "when to project them", so assignment order
+  // no longer matters.
+  RDLReport *r = PicaGroupedJobs();
+  RDLItem *tab = r.body.items.firstObject;
+  tab.groupBy = @"";
+  tab.showGrandTotal = NO;
+  [tab rebuildTablix];
+  NSUInteger flatRows = [tab.tablixBody.rows count];
+
+  tab.columnSpecs = @[
+    @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value",
+      @"aggregate" : @"Sum"},
+  ];
+  // Assigning the spec alone must NOT touch the built structures.
+  if ([tab.tablixBody.rows count] != flatRows)
+    PicaFail(fails, @"assigning columnSpecs must not rebuild on its own");
+
+  // Now set the grouping *after* the spec — the case the old setter got wrong.
+  tab.groupBy = @"Finish";
+  tab.showGrandTotal = YES;
+  [tab rebuildTablix];
+  if ([tab.tablixBody.rows count] != 4)
+    PicaFail(fails, [NSString stringWithFormat:@"spec-then-group rebuild rows %lu, want 4",
+                                               (unsigned long)[tab.tablixBody.rows count]]);
+  if ([tab.rowHierarchy.members count] != 3)
+    PicaFail(fails, @"spec-then-group rebuild should give header + group + grand total");
+  RDLTablixRow *totalRow = tab.tablixBody.rows.lastObject;
+  if (![totalRow.cells.lastObject.item.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    PicaFail(fails, [NSString stringWithFormat:@"grand total cell %@",
+                                               totalRow.cells.lastObject.item.value]);
+
+  // The stored spec is what comes back out, verbatim.
+  NSArray *specs = tab.columnSpecs;
+  if ([specs count] != 2 || ![specs.lastObject[@"aggregate"] isEqualToString:@"Sum"])
+    PicaFail(fails, [NSString stringWithFormat:@"columnSpecs round-trip %@", specs]);
+
+  // Rebuilding twice is idempotent (it fully replaces, never appends).
+  [tab rebuildTablix];
+  if ([tab.tablixBody.rows count] != 4)
+    PicaFail(fails, @"-rebuildTablix should be idempotent");
+
+  // The deprecated setter still stores the spec, so both APIs agree.
+  RDLReport *r2 = PicaGroupedJobs();
+  RDLItem *t2 = r2.body.items.firstObject;
+  if (![t2.columnSpecs isEqualToArray:t2.columns])
+    PicaFail(fails, @"the columns setter should store columnSpecs too");
+
+  // A report parsed from disk must arrive with a spec, not just a built body,
+  // so the designer can rebuild it without first reverse-engineering one.
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  NSError *err = nil;
+  RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
+  if (parsed == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"rebuild round-trip parse failed: %@",
+                                               err.localizedDescription]);
+  else {
+    RDLItem *pt = nil;
+    for (RDLItem *it in parsed.body.items)
+      if ([it.type isEqualToString:@"Tablix"])
+        pt = it;
+    if ([pt.columnSpecs count] != 2)
+      PicaFail(fails, [NSString stringWithFormat:@"parser should infer columnSpecs, got %lu",
+                                                 (unsigned long)[pt.columnSpecs count]]);
+    if (![pt.columnSpecs.lastObject[@"aggregate"] isEqualToString:@"Sum"])
+      PicaFail(fails, @"inferred spec lost the column aggregate");
+    // And rebuilding a parsed item reproduces the same shape.
+    NSUInteger before = [pt.tablixBody.rows count];
+    [pt rebuildTablix];
+    if ([pt.tablixBody.rows count] != before)
+      PicaFail(fails, [NSString stringWithFormat:@"rebuild of a parsed item changed rows %lu -> %lu",
+                                                 (unsigned long)before,
+                                                 (unsigned long)[pt.tablixBody.rows count]]);
+  }
+
+  // An item with no stored spec (an RDL 2005 List becomes a Tablix) must still
+  // rebuild from whatever the body implies rather than wiping itself.
+  RDLItem *noSpec = [[RDLItem alloc] init];
+  noSpec.type = @"Tablix";
+  noSpec.name = @"Listish";
+  noSpec.columns = @[ @{@"width" : @2.0, @"header" : @"H", @"value" : @"=Fields!Job.Value"} ];
+  noSpec.columnSpecs = nil;
+  [noSpec rebuildTablix];
+  if ([noSpec.tablixBody.columns count] != 1)
+    PicaFail(fails, @"rebuild without a stored spec should fall back to the derived one");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -1915,6 +2051,8 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];
+  [fails addObjectsFromArray:PicaRunBandEnumerationChecks()];
+  [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];
   [fails addObjectsFromArray:PicaRunHTMLBackendChecks()];

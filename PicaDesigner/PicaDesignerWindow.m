@@ -216,7 +216,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   PicaOutlineNode *root = [[PicaOutlineNode alloc] init];
   root.kind = PicaNodeReport;
   root.title = c.report.name ?: @"Report";
-  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
+  NSArray *keys = [RDLReport bandKeys];
   NSArray *titles = @[ @"Page Header", @"Body", @"Page Footer" ];
   for (NSUInteger i = 0; i < 3; i++) {
     PicaOutlineNode *bn = [[PicaOutlineNode alloc] init];

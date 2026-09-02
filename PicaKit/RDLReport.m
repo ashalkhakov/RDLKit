@@ -251,7 +251,11 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   return [known containsObject:fn] ? fn : nil;
 }
 
-- (NSArray *)columns {
+// Recover the designer column spec from a built tablixBody. Lossy: the
+// aggregate and (for a matrix) the header are read back out of the cell
+// expression text. Used by -inferColumnSpecsFromTablixBody and as the
+// fallback for items that never had a spec stored (e.g. an RDL 2005 List).
+- (NSArray *)picaDerivedColumns {
   if ([_tablixBody.columns count] == 0)
     return @[];
   if ([self.pivotBy length] && [self.groupBy length]) {
@@ -309,13 +313,32 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   return cols;
 }
 
+// The stored spec when there is one, else recovered from the built body so
+// callers that never assigned a spec (parsed List items) behave as before.
+- (NSArray *)columns {
+  return _columnSpecs ?: [self picaDerivedColumns];
+}
+
+// Deprecated: stores the spec AND rebuilds at once, which is why every other
+// tablix property has to be set first. Prefer columnSpecs + -rebuildTablix.
 - (void)setColumns:(NSArray *)cols {
+  _columnSpecs = [cols copy];
   _type = @"Tablix";
   [self picaBuildTable:cols headerHeight:_stashHeaderH rowHeight:_stashRowH];
 }
 
+- (void)rebuildTablix {
+  NSArray *specs = _columnSpecs ?: [self picaDerivedColumns];
+  _type = @"Tablix";
+  [self picaBuildTable:specs headerHeight:self.headerHeight rowHeight:self.rowHeight];
+}
+
+- (void)inferColumnSpecsFromTablixBody {
+  _columnSpecs = [[self picaDerivedColumns] copy];
+}
+
 - (void)rebuildTableFromColumns {
-  [self picaBuildTable:self.columns headerHeight:self.headerHeight rowHeight:self.rowHeight];
+  [self rebuildTablix];
 }
 
 - (RDLTablixRow *)picaAggregateRow:(NSArray<PicaColSpec *> *)specs
@@ -758,6 +781,26 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   return nil;
 }
 
++ (NSArray<NSString *> *)bandKeys {
+  static NSArray *keys = nil;
+  if (keys == nil)
+    keys = @[ @"pageHeader", @"body", @"pageFooter" ];
+  return keys;
+}
+
+// The bands that exist, in -bandKeys order. A bare RDLReport may not have all
+// three yet, so this skips nils; pair -bandKeys with -bandWithKey: when you
+// need the key alongside the band.
+- (NSArray<RDLBand *> *)allBands {
+  NSMutableArray *bands = [NSMutableArray array];
+  for (NSString *k in [RDLReport bandKeys]) {
+    RDLBand *b = [self bandWithKey:k];
+    if (b)
+      [bands addObject:b];
+  }
+  return bands;
+}
+
 - (RDLBand *)bandWithKey:(NSString *)key {
   if ([key isEqualToString:@"pageHeader"])
     return self.pageHeader;
@@ -775,8 +818,7 @@ static NSString *PicaAggregateOfValue(NSString *value) {
 }
 
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand {
-  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
-  for (NSString *k in keys) {
+  for (NSString *k in [RDLReport bandKeys]) {
     RDLBand *b = [self bandWithKey:k];
     for (RDLItem *it in b.items) {
       if ([it.name isEqualToString:name]) {

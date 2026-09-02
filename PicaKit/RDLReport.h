@@ -92,7 +92,19 @@
 @property (nonatomic, assign) BOOL repeatColumnHeaders;
 @property (nonatomic, assign) BOOL repeatRowHeaders;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
-// Designer convenience for a header + details table. Reads/writes the Tablix structures.
+// Designer convenience for a header + details table.
+//
+// `columnSpecs` is the authoritative, plainly stored spec — one dictionary per
+// column, @{width, header, value, align?, aggregate?}. Assigning it has NO side
+// effect; call -rebuildTablix to project it onto the MS-RDL Tablix structures
+// (tablixBody, rowHierarchy, columnHierarchy, cornerRows). Splitting the two
+// removes the ordering hazard the old `columns` setter had: the rebuild reads
+// groupBy, groupBy2, pivotBy, showGrandTotal, name and the heights, so with an
+// implicit rebuild-on-set those all had to be assigned *before* the columns.
+@property (nonatomic, copy) NSArray<NSDictionary *> *columnSpecs;
+// Deprecated: assigns columnSpecs AND rebuilds immediately, so it still carries
+// the set-everything-else-first ordering requirement. Prefer columnSpecs +
+// -rebuildTablix. Kept so existing callers keep working; slated for removal.
 @property (nonatomic, copy) NSArray *columns; // @{width, header, value, align?, aggregate?}
 @property (nonatomic, assign) CGFloat headerHeight;
 @property (nonatomic, assign) CGFloat rowHeight;
@@ -100,7 +112,15 @@
 @property (nonatomic, copy) NSString *groupBy2; // nested child row group (requires groupBy)
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
 @property (nonatomic, copy) NSString *pivotBy; // column group field → crosstab (matrix)
-- (void)rebuildTableFromColumns;
+// Rebuild the Tablix structures from columnSpecs (falling back to the spec
+// derived from the current tablixBody when none is stored, e.g. an RDL 2005
+// List). Destroys any hand-made edits to tablixBody/hierarchies/cornerRows.
+- (void)rebuildTablix;
+// Recover a columnSpecs array from an already-built tablixBody. Used by the
+// parser so a report loaded from disk arrives with a spec; the recovery is
+// lossy (the aggregate is read back out of "=Sum(Fields!X.Value)" text).
+- (void)inferColumnSpecsFromTablixBody;
+- (void)rebuildTableFromColumns; // deprecated alias for -rebuildTablix
 @end
 
 @interface RDLTablixColumn : NSObject
@@ -228,6 +248,11 @@
 @property (nonatomic, strong) NSMutableArray<NSString *> *warnings;
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
+// Canonical band identity, in render order: page header, body, page footer.
+// Layout, hit-testing and the designer all depend on that order. Iterate
+// -bandKeys with -bandWithKey: when you need the key alongside the band.
++ (NSArray<NSString *> *)bandKeys;
+- (NSArray<RDLBand *> *)allBands;
 - (RDLBand *)bandWithKey:(NSString *)key;
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand;
 - (NSString *)nextNameWithPrefix:(NSString *)prefix;
