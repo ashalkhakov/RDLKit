@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="PicaAppDelegate">
+            <connections>
+                <outlet property="mainMenu" destination="mainMenu" id="mainMenuOutlet"/>
+                <outlet property="samplesMenu" destination="samplesMenu" id="samplesMenuOutlet"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <menu title="MainMenu" systemMenu="main" id="mainMenu">
+            <items>
+                <menuItem title="Pica" id="appMenuItem">
+                    <menu key="submenu" title="Pica" systemMenu="apple" id="appMenu">
+                        <items>
+                            <menuItem title="About Pica" id="aboutItem">
+                                <connections>
+                                    <action selector="orderFrontStandardAboutPanel:" target="-3" id="aboutAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="appSep1"/>
+                            <menuItem title="Quit Pica" keyEquivalent="q" id="quitItem">
+                                <connections>
+                                    <action selector="terminate:" target="-3" id="quitAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="File" id="fileMenuItem">
+                    <menu key="submenu" title="File" id="fileMenu">
+                        <items>
+                            <menuItem title="Library…" keyEquivalent="l" id="libraryItem">
+                                <connections>
+                                    <action selector="showLibrary:" target="-2" id="libraryAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Generator" id="generatorItem">
+                                <connections>
+                                    <action selector="showGenerator:" target="-2" id="generatorAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Designer" id="designerItem">
+                                <connections>
+                                    <action selector="showDesigner:" target="-2" id="designerAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="fileSep1"/>
+                            <menuItem title="New Letter" keyEquivalent="n" id="newItem">
+                                <connections>
+                                    <action selector="newDocument:" target="-2" id="newAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Open…" keyEquivalent="o" id="openItem">
+                                <connections>
+                                    <action selector="openDocument:" target="-1" id="openAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Save" keyEquivalent="s" id="saveItem">
+                                <connections>
+                                    <action selector="saveDocument:" target="-2" id="saveAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Save As…" keyEquivalent="S" id="saveAsItem">
+                                <connections>
+                                    <action selector="saveDocumentAs:" target="-2" id="saveAsAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="fileSep2"/>
+                            <menuItem title="Samples" id="samplesItem">
+                                <menu key="submenu" title="Samples" id="samplesMenu"/>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="fileSep3"/>
+                            <menuItem title="Preview" keyEquivalent="p" id="previewItem">
+                                <connections>
+                                    <action selector="preview:" target="-2" id="previewAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Export PDF…" keyEquivalent="e" id="exportItem">
+                                <connections>
+                                    <action selector="exportPDF:" target="-1" id="exportAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="Edit" id="editMenuItem">
+                    <menu key="submenu" title="Edit" id="editMenu">
+                        <items>
+                            <menuItem title="Undo" keyEquivalent="z" id="undoItem">
+                                <connections>
+                                    <action selector="undo:" target="-1" id="undoAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Redo" keyEquivalent="Z" id="redoItem">
+                                <connections>
+                                    <action selector="redo:" target="-1" id="redoAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="editSep1"/>
+                            <menuItem title="Cut" keyEquivalent="x" id="cutItem">
+                                <connections>
+                                    <action selector="cut:" target="-1" id="cutAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Copy" keyEquivalent="c" id="copyItem">
+                                <connections>
+                                    <action selector="copy:" target="-1" id="copyAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Paste" keyEquivalent="v" id="pasteItem">
+                                <connections>
+                                    <action selector="paste:" target="-1" id="pasteAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Select All" keyEquivalent="a" id="selectAllItem">
+                                <connections>
+                                    <action selector="selectAll:" target="-1" id="selectAllAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Duplicate" keyEquivalent="d" id="duplicateItem">
+                                <connections>
+                                    <action selector="duplicate:" target="-1" id="duplicateAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="editSep2"/>
+                            <menuItem title="Add Element…" keyEquivalent="A" id="addElementItem">
+                                <connections>
+                                    <action selector="addElement:" target="-2" id="addElementAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Delete" keyEquivalent="" id="deleteItem">
+                                <connections>
+                                    <action selector="delete:" target="-2" id="deleteAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Toggle Grid" keyEquivalent="g" id="toggleGridItem">
+                                <connections>
+                                    <action selector="toggleGrid:" target="-2" id="toggleGridAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Zoom In" keyEquivalent="=" id="zoomInItem">
+                                <connections>
+                                    <action selector="zoomIn:" target="-2" id="zoomInAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Zoom Out" keyEquivalent="-" id="zoomOutItem">
+                                <connections>
+                                    <action selector="zoomOut:" target="-2" id="zoomOutAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+            </items>
+            <point key="canvasLocation" x="140" y="154"/>
+        </menu>
+    </objects>
+</document>

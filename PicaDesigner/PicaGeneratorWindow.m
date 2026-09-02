@@ -8,29 +8,20 @@
 
 @interface PicaGeneratorWindow ()
 @property (nonatomic, strong, readwrite) PicaDocument *reportDocument;
-@property (nonatomic, strong) RDLView *preview;
-@property (nonatomic, strong) PicaDataView *dataView;
-@property (nonatomic, strong) NSPopUpButton *samplePopup;
+@property (nonatomic, strong) IBOutlet RDLView *preview;
+@property (nonatomic, strong) IBOutlet PicaDataView *dataView;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *samplePopup;
+@property (nonatomic, strong) IBOutlet NSSplitView *split;
 @end
 
 @implementation PicaGeneratorWindow
 
 - (instancetype)initWithDocument:(PicaDocument *)document {
-  NSWindow *win = [[NSWindow alloc]
-      initWithContentRect:NSMakeRect(80, 40, 1100, 740)
-                styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask |
-                           NSResizableWindowMask)
-                  backing:NSBackingStoreBuffered
-                    defer:NO];
-  [win setTitle:@"Pica Generator"];
-  self = [super initWithWindow:win];
+  self = [super initWithWindowNibName:@"PicaGeneratorWindow"];
   if (self) {
+    // Set before -window pulls the nib in, so -windowDidLoad can pass it on.
     _reportDocument = document;
-    // The window controller is the window's delegate, which puts it in the
-    // responder chain: menu actions with a nil target reach whichever window
-    // is in front, so the app delegate does not have to ask which that is.
-    [win setDelegate:(id)self];
-    [self buildUI];
+    [self window];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(documentDidChange:)
                                                  name:PicaDocumentDidChangeNotification
@@ -54,81 +45,33 @@
 
 #pragma mark - UI
 
-- (NSButton *)buttonTitled:(NSString *)title
-                    action:(SEL)action
-                     frame:(NSRect)frame
-                      mask:(NSUInteger)mask {
-  NSButton *b = [[NSButton alloc] initWithFrame:frame];
-  [b setTitle:title];
-  [b setBezelStyle:NSRoundedBezelStyle];
-  [b setTarget:self];
-  [b setAction:action];
-  [b setAutoresizingMask:mask];
-  return b;
-}
+// PicaGeneratorWindow.xib holds the window, the toolbar row, the split and
+// both panes. Two things are not fixed: the sample list, which comes from the
+// sample catalog, and one export button per backend the kit offers -- so
+// adding a backend still needs no change here.
+- (void)windowDidLoad {
+  [super windowDidLoad];
+  // The window controller is the window's delegate (wired in the XIB), which
+  // puts it in the responder chain: menu actions with a nil target reach
+  // whichever window is in front, so the app delegate need not ask which.
+  _dataView.document = _reportDocument;
 
-- (void)buildUI {
-  NSView *content = [[self window] contentView];
-  NSRect b = [content bounds];
-  CGFloat top = NSHeight(b) - 36;
-
-  [content addSubview:[self buttonTitled:@"Open RDL"
-                                  action:@selector(openRdl:)
-                                   frame:NSMakeRect(12, top, 90, 26)
-                                    mask:NSViewMinYMargin]];
-
-  _samplePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(108, top, 200, 26)
-                                            pullsDown:YES];
-  [_samplePopup addItemWithTitle:@"Sample"];
   for (NSDictionary *sample in [PicaSamples catalog])
     [_samplePopup addItemWithTitle:sample[@"title"]];
-  [_samplePopup setTarget:self];
-  [_samplePopup setAction:@selector(samplePicked:)];
-  [_samplePopup setAutoresizingMask:NSViewMinYMargin];
-  [content addSubview:_samplePopup];
 
-  [content addSubview:[self buttonTitled:@"Bind JSON"
-                                  action:@selector(bindJSONFile:)
-                                   frame:NSMakeRect(316, top, 100, 26)
-                                    mask:NSViewMinYMargin]];
-
-  // One button per backend the kit offers, so a new backend appears here
-  // without touching this method.
-  CGFloat x = NSWidth(b) - 90;
+  NSView *content = [[self window] contentView];
+  CGFloat top = NSHeight([content bounds]) - 36;
+  CGFloat x = NSWidth([content bounds]) - 90;
   for (id<RDLBackend> backend in [_reportDocument exportBackends]) {
-    NSButton *button = [self buttonTitled:[backend.pathExtension uppercaseString]
-                                   action:@selector(exportFrontmost:)
-                                    frame:NSMakeRect(x, top, 80, 26)
-                                     mask:NSViewMinXMargin | NSViewMinYMargin];
+    NSButton *button = [[NSButton alloc] initWithFrame:NSMakeRect(x, top, 80, 26)];
     [button setTitle:[backend.pathExtension uppercaseString]];
+    [button setBezelStyle:NSRoundedBezelStyle];
+    [button setTarget:self];
+    [button setAction:@selector(exportFrontmost:)];
+    [button setAutoresizingMask:NSViewMinXMargin | NSViewMinYMargin];
     [content addSubview:button];
     x -= 90;
   }
-
-  NSSplitView *split = [[NSSplitView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(b), NSHeight(b) - 44)];
-  [split setVertical:YES];
-  [split setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-  NSScrollView *inputScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400)];
-  [inputScroll setHasVerticalScroller:YES];
-  [inputScroll setBorderType:NSBezelBorder];
-  [inputScroll setAutoresizingMask:NSViewHeightSizable];
-  // The same pane the designer uses; this window used to carry its own copy.
-  _dataView = [[PicaDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
-                                         document:_reportDocument];
-  [inputScroll setDocumentView:_dataView];
-
-  NSScrollView *previewScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 800, 400)];
-  [previewScroll setHasVerticalScroller:YES];
-  [previewScroll setHasHorizontalScroller:YES];
-  [previewScroll setBorderType:NSBezelBorder];
-  [previewScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  _preview = [[RDLView alloc] initWithFrame:NSMakeRect(0, 0, 612, 792)];
-  [previewScroll setDocumentView:_preview];
-
-  [split addSubview:inputScroll];
-  [split addSubview:previewScroll];
-  [content addSubview:split];
 }
 
 - (void)reloadPreview {

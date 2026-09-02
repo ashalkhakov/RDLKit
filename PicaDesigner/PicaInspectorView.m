@@ -12,128 +12,98 @@
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
 @interface PicaInspectorView () <NSTextFieldDelegate>
-@property (nonatomic, strong) PicaEditingContext *context;
 // One declaration per field drives both directions; see PicaInspectorFields.
 @property (nonatomic, strong) PicaFieldBindings *bindings;
-@property (nonatomic, strong) NSTextField *kindLabel;
+@property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
 // Report section
-@property (nonatomic, strong) NSView *docBox;
-@property (nonatomic, strong) NSTextField *docNameField, *authorField, *descField;
-@property (nonatomic, strong) NSPopUpButton *pagePop;
-@property (nonatomic, strong) NSTextField *headerHField, *bodyHField, *footerHField, *marginField;
+@property (nonatomic, strong) IBOutlet NSView *docBox;
+@property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *pagePop;
+@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *bodyHField, *footerHField, *marginField;
 // Band section
-@property (nonatomic, strong) NSView *bandBox;
-@property (nonatomic, strong) NSTextField *bandHField, *bandBGField;
+@property (nonatomic, strong) IBOutlet NSView *bandBox;
+@property (nonatomic, strong) IBOutlet NSTextField *bandHField, *bandBGField;
 // Common item geometry section
-@property (nonatomic, strong) NSView *geoBox;
-@property (nonatomic, strong) NSTextField *nameField;
-@property (nonatomic, strong) NSTextField *leftField, *topField, *widthField, *heightField;
+@property (nonatomic, strong) IBOutlet NSView *geoBox;
+@property (nonatomic, strong) IBOutlet NSTextField *nameField;
+@property (nonatomic, strong) IBOutlet NSTextField *leftField, *topField, *widthField, *heightField;
 // Textbox section
-@property (nonatomic, strong) NSView *textBox;
-@property (nonatomic, strong) NSTextField *valueField, *fontField, *sizeField, *colorField, *formatField;
-@property (nonatomic, strong) NSPopUpButton *weightPop, *alignPop;
+@property (nonatomic, strong) IBOutlet NSView *textBox;
+@property (nonatomic, strong) IBOutlet NSTextField *valueField, *fontField, *sizeField, *colorField, *formatField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
-@property (nonatomic, strong) NSView *lineBox;
-@property (nonatomic, strong) NSTextField *lineColorField;
+@property (nonatomic, strong) IBOutlet NSView *lineBox;
+@property (nonatomic, strong) IBOutlet NSTextField *lineColorField;
 // Rectangle section
-@property (nonatomic, strong) NSView *rectBox;
-@property (nonatomic, strong) NSTextField *rectBGField;
+@property (nonatomic, strong) IBOutlet NSView *rectBox;
+@property (nonatomic, strong) IBOutlet NSTextField *rectBGField;
 // Image section
-@property (nonatomic, strong) NSView *imageBox;
-@property (nonatomic, strong) NSTextField *imageValueField;
-@property (nonatomic, strong) NSPopUpButton *imageSourcePop, *imageSizingPop;
+@property (nonatomic, strong) IBOutlet NSView *imageBox;
+@property (nonatomic, strong) IBOutlet NSTextField *imageValueField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
 // Chart section
-@property (nonatomic, strong) NSView *chartBox;
-@property (nonatomic, strong) NSPopUpButton *chartDatasetPop, *chartKindPop;
-@property (nonatomic, strong) NSTextField *titleField, *catField, *valField;
+@property (nonatomic, strong) IBOutlet NSView *chartBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
+@property (nonatomic, strong) IBOutlet NSTextField *titleField, *catField, *valField;
 // Tablix section
-@property (nonatomic, strong) NSView *tablixBox;
-@property (nonatomic, strong) NSPopUpButton *tablixDatasetPop;
-@property (nonatomic, strong) NSTextField *tablixHeaderHField, *tablixRowHField;
+@property (nonatomic, strong) IBOutlet NSView *tablixBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
+@property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
 @end
-
-static const CGFloat kInspectorWidth = 260;
-static const CGFloat kFieldX = 10;
-static const CGFloat kFieldW = 240;
-static const CGFloat kHalfW = 114;
-static const CGFloat kHalf2X = 136;
 
 @implementation PicaInspectorView {
   BOOL _reloading;
   BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
 }
 
-- (NSTextField *)label:(NSString *)t frame:(NSRect)f inView:(NSView *)v {
-  NSTextField *l = [[NSTextField alloc] initWithFrame:f];
-  [l setBezeled:NO];
-  [l setDrawsBackground:NO];
-  [l setEditable:NO];
-  [l setSelectable:NO];
-  [l setStringValue:t];
-  [l setFont:[NSFont userFontOfSize:10]];
-  [v addSubview:l];
-  return l;
-}
-
-- (NSTextField *)fieldIn:(NSView *)v frame:(NSRect)f {
-  NSTextField *t = [[NSTextField alloc] initWithFrame:f];
-  [t setDelegate:self];
-  [t setTarget:self];
-  [t setAction:@selector(changed:)];
-  [t setFont:[NSFont userFontOfSize:11]];
-  [v addSubview:t];
-  return t;
-}
-
-- (NSPopUpButton *)popIn:(NSView *)v frame:(NSRect)f titles:(NSArray *)titles {
-  NSPopUpButton *p = [[NSPopUpButton alloc] initWithFrame:f pullsDown:NO];
-  if (titles)
-    [p addItemsWithTitles:titles];
-  [p setTarget:self];
-  [p setAction:@selector(changed:)];
-  [v addSubview:p];
-  return p;
-}
-
-// Adds a labeled full-width field at *y, advancing it.
-- (NSTextField *)row:(NSString *)title y:(CGFloat *)y inView:(NSView *)v height:(CGFloat)h {
-  [self label:title frame:NSMakeRect(kFieldX, *y, kFieldW, 14) inView:v];
-  *y += 16;
-  NSTextField *f = [self fieldIn:v frame:NSMakeRect(kFieldX, *y, kFieldW, h)];
-  *y += h + 6;
-  return f;
-}
-
 - (instancetype)initWithFrame:(NSRect)frame context:(PicaEditingContext *)context {
   self = [super initWithFrame:frame];
-  if (self) {
-    _context = context;
-    _kindLabel = [self label:@"Report" frame:NSMakeRect(10, 8, kFieldW, 16) inView:self];
-    [_kindLabel setFont:[NSFont boldSystemFontOfSize:11]];
-
-    [self buildDocBox];
-    [self buildBandBox];
-    [self buildGeoBox];
-    [self buildTextBox];
-    [self buildLineBox];
-    [self buildRectBox];
-    [self buildImageBox];
-    [self buildChartBox];
-    [self buildTablixBox];
-
-    [self declareBindings];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(documentDidChange:)
-                                                 name:PicaDocumentDidChangeNotification
-                                               object:context.document];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(reload)
-                                                 name:PicaSelectionDidChangeNotification
-                                               object:context.selection];
-    [self reload];
-  }
+  if (self)
+    [self setContext:context];
   return self;
+}
+
+- (void)setContext:(PicaEditingContext *)context {
+  if (_context == context)
+    return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _context = context;
+  if (context == nil)
+    return;
+  if (_kindLabel == nil)
+    [self buildSections];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(documentDidChange:)
+                                               name:PicaDocumentDidChangeNotification
+                                             object:context.document];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(reload)
+                                               name:PicaSelectionDidChangeNotification
+                                             object:context.selection];
+  [self reload];
+}
+
+// The nine sections -- every label, field, popup and their fixed frames --
+// are PicaInspectorSections.xib, as nine top-level views plus the kind label.
+// Which of them is shown, and where each one sits, stays in -stackBoxes:
+// below, because that depends on what is selected.
+- (void)buildSections {
+  NSNib *nib = [[NSNib alloc] initWithNibNamed:@"PicaInspectorSections"
+                                        bundle:[NSBundle bundleForClass:[self class]]];
+  [nib instantiateWithOwner:self topLevelObjects:NULL];
+  // A nib's top-level view has no meaningful frame origin: Interface Builder
+  // normalises it to (0,0) and records where it sits on the canvas instead. So
+  // the label is placed here, the way -stackBoxes: places the sections.
+  [_kindLabel setFrame:NSMakeRect(10, 8, 240, 16)];
+  [self addSubview:_kindLabel];
+  // The page popup lists the kit's standard paper sizes, which the XIB has no
+  // way to know; the dataset popups are filled per report in -reload.
+  for (NSDictionary *size in [RDLPage standardSizes])
+    [_pagePop addItemWithTitle:size[@"name"]];
+  for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
+                         _imageBox, _chartBox, _tablixBox ])
+    [self addSubview:box];
+  [self declareBindings];
 }
 
 - (void)dealloc {
@@ -153,177 +123,6 @@ static const CGFloat kHalf2X = 136;
       [change.keys count] > 0)
     return;
   [self reload];
-}
-
-#pragma mark - Section construction
-
-- (NSView *)boxWithHeight:(CGFloat)h {
-  NSView *v = [[NSView alloc] initWithFrame:NSMakeRect(0, 28, kInspectorWidth, h)];
-  [self addSubview:v];
-  return v;
-}
-
-- (void)buildDocBox {
-  CGFloat y = 4;
-  _docBox = [self boxWithHeight:320];
-  _docNameField = [self row:@"Name" y:&y inView:_docBox height:22];
-  _authorField = [self row:@"Author" y:&y inView:_docBox height:22];
-  _descField = [self row:@"Description" y:&y inView:_docBox height:44];
-  [self label:@"Page" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_docBox];
-  y += 16;
-  NSMutableArray *pageNames = [NSMutableArray array];
-  for (NSDictionary *size in [RDLPage standardSizes])
-    [pageNames addObject:size[@"name"]];
-  _pagePop = [self popIn:_docBox frame:NSMakeRect(kFieldX, y, kFieldW, 22) titles:pageNames];
-  y += 28;
-  [self label:@"Header in" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_docBox];
-  [self label:@"Body in" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_docBox];
-  y += 16;
-  _headerHField = [self fieldIn:_docBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _bodyHField = [self fieldIn:_docBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
-  y += 28;
-  [self label:@"Footer in" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_docBox];
-  [self label:@"Margin in" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_docBox];
-  y += 16;
-  _footerHField = [self fieldIn:_docBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _marginField = [self fieldIn:_docBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
-  y += 28;
-  [_docBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildBandBox {
-  CGFloat y = 4;
-  _bandBox = [self boxWithHeight:100];
-  _bandHField = [self row:@"Height in" y:&y inView:_bandBox height:22];
-  _bandBGField = [self row:@"Background" y:&y inView:_bandBox height:22];
-  [_bandBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildGeoBox {
-  CGFloat y = 4;
-  _geoBox = [self boxWithHeight:140];
-  _nameField = [self row:@"Name" y:&y inView:_geoBox height:22];
-  [_nameField setEditable:NO];
-  NSArray *geo = @[ @"Left", @"Top", @"Width", @"Height" ];
-  NSMutableArray *gfs = [NSMutableArray array];
-  CGFloat gy0 = y;
-  for (NSInteger i = 0; i < 4; i++) {
-    CGFloat x = (i % 2) == 0 ? kFieldX : kHalf2X;
-    CGFloat gy = gy0 + (i / 2) * 44;
-    [self label:geo[i] frame:NSMakeRect(x, gy, kHalfW, 14) inView:_geoBox];
-    [gfs addObject:[self fieldIn:_geoBox frame:NSMakeRect(x, gy + 16, kHalfW, 22)]];
-  }
-  _leftField = gfs[0];
-  _topField = gfs[1];
-  _widthField = gfs[2];
-  _heightField = gfs[3];
-  y = gy0 + 2 * 44 + 4;
-  [_geoBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildTextBox {
-  CGFloat y = 4;
-  _textBox = [self boxWithHeight:260];
-  _valueField = [self row:@"Value" y:&y inView:_textBox height:44];
-  _fontField = [self row:@"Typeface" y:&y inView:_textBox height:22];
-  [self label:@"Size" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_textBox];
-  [self label:@"Weight" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_textBox];
-  y += 16;
-  _sizeField = [self fieldIn:_textBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _weightPop = [self popIn:_textBox
-                     frame:NSMakeRect(kHalf2X, y, kHalfW, 22)
-                    titles:@[ @"Roman", @"Bold" ]];
-  y += 28;
-  [self label:@"Align" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_textBox];
-  y += 16;
-  _alignPop = [self popIn:_textBox
-                    frame:NSMakeRect(kFieldX, y, kFieldW, 22)
-                   titles:@[ @"Left", @"Center", @"Right" ]];
-  y += 28;
-  [self label:@"Ink" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_textBox];
-  [self label:@"Format" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_textBox];
-  y += 16;
-  _colorField = [self fieldIn:_textBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _formatField = [self fieldIn:_textBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
-  y += 28;
-  [_textBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildLineBox {
-  CGFloat y = 4;
-  _lineBox = [self boxWithHeight:52];
-  _lineColorField = [self row:@"Ink" y:&y inView:_lineBox height:22];
-  [_lineBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildRectBox {
-  CGFloat y = 4;
-  _rectBox = [self boxWithHeight:52];
-  _rectBGField = [self row:@"Background" y:&y inView:_rectBox height:22];
-  [_rectBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildImageBox {
-  CGFloat y = 4;
-  _imageBox = [self boxWithHeight:150];
-  _imageValueField = [self row:@"Image (name or =expr)" y:&y inView:_imageBox height:22];
-  [self label:@"Source" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_imageBox];
-  [self label:@"Sizing" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_imageBox];
-  y += 16;
-  _imageSourcePop = [self popIn:_imageBox
-                          frame:NSMakeRect(kFieldX, y, kHalfW, 22)
-                         titles:@[ @"Embedded", @"External" ]];
-  _imageSizingPop = [self popIn:_imageBox
-                          frame:NSMakeRect(kHalf2X, y, kHalfW, 22)
-                         titles:@[ @"Fit", @"FitProportional", @"Clip", @"AutoSize" ]];
-  y += 28;
-  [_imageBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildChartBox {
-  CGFloat y = 4;
-  _chartBox = [self boxWithHeight:220];
-  [self label:@"Dataset" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_chartBox];
-  y += 16;
-  _chartDatasetPop = [self popIn:_chartBox frame:NSMakeRect(kFieldX, y, kFieldW, 22) titles:nil];
-  y += 28;
-  _titleField = [self row:@"Title" y:&y inView:_chartBox height:22];
-  [self label:@"Kind" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_chartBox];
-  y += 16;
-  _chartKindPop = [self popIn:_chartBox
-                        frame:NSMakeRect(kFieldX, y, kFieldW, 22)
-                       titles:@[ @"Column", @"Bar", @"Line", @"Pie" ]];
-  y += 28;
-  [self label:@"Category field" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_chartBox];
-  [self label:@"Value field" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_chartBox];
-  y += 16;
-  _catField = [self fieldIn:_chartBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _valField = [self fieldIn:_chartBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
-  y += 28;
-  [_chartBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
-}
-
-- (void)buildTablixBox {
-  CGFloat y = 4;
-  _tablixBox = [self boxWithHeight:170];
-  [self label:@"Dataset" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_tablixBox];
-  y += 16;
-  _tablixDatasetPop = [self popIn:_tablixBox frame:NSMakeRect(kFieldX, y, kFieldW, 22) titles:nil];
-  y += 28;
-  [self label:@"Header in" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_tablixBox];
-  [self label:@"Row in" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_tablixBox];
-  y += 16;
-  _tablixHeaderHField = [self fieldIn:_tablixBox frame:NSMakeRect(kFieldX, y, kHalfW, 22)];
-  _tablixRowHField = [self fieldIn:_tablixBox frame:NSMakeRect(kHalf2X, y, kHalfW, 22)];
-  y += 28;
-  NSButton *edit = [[NSButton alloc] initWithFrame:NSMakeRect(kFieldX, y, kFieldW, 24)];
-  [edit setTitle:@"Edit Tablix…"];
-  [edit setBezelStyle:NSShadowlessSquareBezelStyle];
-  [edit setTarget:self];
-  [edit setAction:@selector(editTablix:)];
-  [_tablixBox addSubview:edit];
-  y += 30;
-  [_tablixBox setFrameSize:NSMakeSize(kInspectorWidth, y)];
 }
 
 // Opens the Report-Builder-style tablix editor for the selected tablix.

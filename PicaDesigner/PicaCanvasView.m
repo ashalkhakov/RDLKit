@@ -12,7 +12,6 @@
 #import "PicaRichTextEditor.h"
 
 @interface PicaCanvasView () <PicaInPlaceEditorHost, PicaCanvasInteractionHost>
-@property (nonatomic, strong) PicaEditingContext *context;
 // Rebuilt on demand from the report, zoom and view origin. All five of the
 // canvas's former band traversals now go through this.
 @property (nonatomic, strong) PicaPageGeometry *geometry;
@@ -30,30 +29,40 @@
 
 - (instancetype)initWithFrame:(NSRect)frame context:(PicaEditingContext *)context {
   self = [super initWithFrame:frame];
-  if (self) {
-    _context = context;
-    _renderer = [[PicaCanvasRenderer alloc] initWithContext:context];
-    _overlay = [[PicaCanvasOverlay alloc] init];
-    _inPlaceEditor = [[PicaInPlaceEditor alloc] initWithContext:context hostView:self];
-    _inPlaceEditor.host = self;
-    _interaction = [[PicaCanvasInteraction alloc] initWithContext:context hostView:self];
-    _interaction.host = self;
-    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
-    [nc addObserver:self
-           selector:@selector(documentDidChange:)
-               name:PicaDocumentDidChangeNotification
-             object:context.document];
-    [nc addObserver:self
-           selector:@selector(selectionDidChange:)
-               name:PicaSelectionDidChangeNotification
-             object:context.selection];
-    // Zoom and grid have their own channel: they are not document edits.
-    [nc addObserver:self
-           selector:@selector(viewStateDidChange:)
-               name:PicaViewStateDidChangeNotification
-             object:context];
-  }
+  if (self)
+    [self setContext:context];
   return self;
+}
+
+- (void)setContext:(PicaEditingContext *)context {
+  if (_context == context)
+    return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _context = context;
+  if (context == nil)
+    return;
+  _renderer = [[PicaCanvasRenderer alloc] initWithContext:context];
+  _overlay = [[PicaCanvasOverlay alloc] init];
+  _inPlaceEditor = [[PicaInPlaceEditor alloc] initWithContext:context hostView:self];
+  _inPlaceEditor.host = self;
+  _interaction = [[PicaCanvasInteraction alloc] initWithContext:context hostView:self];
+  _interaction.host = self;
+  NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+  [nc addObserver:self
+         selector:@selector(documentDidChange:)
+             name:PicaDocumentDidChangeNotification
+           object:context.document];
+  [nc addObserver:self
+         selector:@selector(selectionDidChange:)
+             name:PicaSelectionDidChangeNotification
+           object:context.selection];
+  // Zoom and grid have their own channel: they are not document edits.
+  [nc addObserver:self
+         selector:@selector(viewStateDidChange:)
+             name:PicaViewStateDidChangeNotification
+           object:context];
+  [self sizeToPage];
+  [self setNeedsDisplay:YES];
 }
 
 - (void)dealloc {

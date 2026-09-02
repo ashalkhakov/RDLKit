@@ -11,6 +11,10 @@
 @property (nonatomic, strong) PicaDesignerWindow *designer;
 @property (nonatomic, strong) PicaWelcomeWindow *welcome;
 @property (nonatomic, strong) PicaGeneratorWindow *generator;
+// MainMenu.xib holds the whole menu bar; only the Samples submenu, whose items
+// come from the sample catalog, is filled in at launch.
+@property (nonatomic, strong) IBOutlet NSMenu *mainMenu;
+@property (nonatomic, strong) IBOutlet NSMenu *samplesMenu;
 - (void)showDesigner:(id)sender;
 - (void)showGenerator:(id)sender;
 - (void)showLibrary:(id)sender;

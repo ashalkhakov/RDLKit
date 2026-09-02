@@ -10,7 +10,7 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
   (void)n;
   _context = [[PicaEditingContext alloc] init];
-  [self buildMenu];
+  [self loadMenuBar];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(showDesigner:)
                                                name:PicaOpenDesignerNotification
@@ -26,86 +26,28 @@
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (NSMenuItem *)item:(NSString *)title action:(SEL)sel key:(NSString *)key {
-  NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:key ?: @""];
-  [it setTarget:self];
-  return it;
+// The menu bar is MainMenu.xib. Its items are wired there: the ones this class
+// implements to File's Owner, and the editing ones (Undo, Cut, Open…, Export
+// PDF…) to First Responder, so the front window or the field editor answers
+// them before this fallback does.
+- (void)loadMenuBar {
+  NSNib *nib = [[NSNib alloc] initWithNibNamed:@"MainMenu" bundle:[NSBundle mainBundle]];
+  [nib instantiateWithOwner:self topLevelObjects:NULL];
+  [self populateSamplesMenu];
+  [NSApp setMainMenu:_mainMenu];
 }
 
-// Nil-target item: the action goes to the first responder (field editor,
-// canvas, window undo manager…) instead of the app delegate.
-- (NSMenuItem *)responderItem:(NSString *)title action:(SEL)sel key:(NSString *)key {
-  return [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:key ?: @""];
-}
-
-- (void)buildMenu {
-  NSMenu *menubar = [[NSMenu alloc] initWithTitle:@""];
-  NSMenuItem *appItem = [[NSMenuItem alloc] init];
-  [menubar addItem:appItem];
-  NSMenu *app = [[NSMenu alloc] initWithTitle:@"Pica"];
-  NSMenuItem *about = [[NSMenuItem alloc] initWithTitle:@"About Pica"
-                                                 action:@selector(orderFrontStandardAboutPanel:)
-                                          keyEquivalent:@""];
-  [about setTarget:NSApp];
-  [app addItem:about];
-  [app addItem:[NSMenuItem separatorItem]];
-  NSMenuItem *quit = [self item:@"Quit Pica" action:@selector(terminate:) key:@"q"];
-  [quit setTarget:NSApp];
-  [app addItem:quit];
-  [appItem setSubmenu:app];
-
-  NSMenuItem *fileItem = [[NSMenuItem alloc] init];
-  [menubar addItem:fileItem];
-  NSMenu *file = [[NSMenu alloc] initWithTitle:@"File"];
-  [file addItem:[self item:@"Library…" action:@selector(showLibrary:) key:@"l"]];
-  [file addItem:[self item:@"Generator" action:@selector(showGenerator:) key:@""]];
-  [file addItem:[self item:@"Designer" action:@selector(showDesigner:) key:@""]];
-  [file addItem:[NSMenuItem separatorItem]];
-  [file addItem:[self item:@"New Letter" action:@selector(newDocument:) key:@"n"]];
-  [file addItem:[self responderItem:@"Open…" action:@selector(openDocument:) key:@"o"]];
-  [file addItem:[self item:@"Save" action:@selector(saveDocument:) key:@"s"]];
-  [file addItem:[self item:@"Save As…" action:@selector(saveDocumentAs:) key:@"S"]];
-  [file addItem:[NSMenuItem separatorItem]];
-  NSMenuItem *samplesItem = [[NSMenuItem alloc] initWithTitle:@"Samples" action:NULL keyEquivalent:@""];
-  NSMenu *samples = [[NSMenu alloc] initWithTitle:@"Samples"];
-  NSArray *cat = [PicaSamples catalog];
-  for (NSInteger i = 0; i < (NSInteger)[cat count]; i++) {
-    NSMenuItem *si = [[NSMenuItem alloc] initWithTitle:cat[i][@"title"]
-                                                action:@selector(openSample:)
-                                         keyEquivalent:@""];
-    [si setTag:i];
-    [si setTarget:self];
-    [samples addItem:si];
+- (void)populateSamplesMenu {
+  [_samplesMenu removeAllItems];
+  NSArray *catalog = [PicaSamples catalog];
+  for (NSInteger i = 0; i < (NSInteger)[catalog count]; i++) {
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:catalog[i][@"title"]
+                                                  action:@selector(openSample:)
+                                           keyEquivalent:@""];
+    [item setTag:i];
+    [item setTarget:self];
+    [_samplesMenu addItem:item];
   }
-  [samplesItem setSubmenu:samples];
-  [file addItem:samplesItem];
-  [file addItem:[NSMenuItem separatorItem]];
-  [file addItem:[self item:@"Preview" action:@selector(preview:) key:@"p"]];
-  [file addItem:[self responderItem:@"Export PDF…" action:@selector(exportPDF:) key:@"e"]];
-  [fileItem setSubmenu:file];
-
-  NSMenuItem *editItem = [[NSMenuItem alloc] init];
-  [menubar addItem:editItem];
-  NSMenu *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
-  // Standard editing items dispatch through the responder chain (nil target);
-  // without them Cmd+Z/X/C/V/A never reach text fields or the undo manager.
-  [edit addItem:[self responderItem:@"Undo" action:@selector(undo:) key:@"z"]];
-  [edit addItem:[self responderItem:@"Redo" action:@selector(redo:) key:@"Z"]];
-  [edit addItem:[NSMenuItem separatorItem]];
-  [edit addItem:[self responderItem:@"Cut" action:@selector(cut:) key:@"x"]];
-  [edit addItem:[self responderItem:@"Copy" action:@selector(copy:) key:@"c"]];
-  [edit addItem:[self responderItem:@"Paste" action:@selector(paste:) key:@"v"]];
-  [edit addItem:[self responderItem:@"Select All" action:@selector(selectAll:) key:@"a"]];
-  [edit addItem:[self responderItem:@"Duplicate" action:@selector(duplicate:) key:@"d"]];
-  [edit addItem:[NSMenuItem separatorItem]];
-  [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"A"]];
-  [edit addItem:[self item:@"Delete" action:@selector(delete:) key:@"\b"]];
-  [edit addItem:[self item:@"Toggle Grid" action:@selector(toggleGrid:) key:@"g"]];
-  [edit addItem:[self item:@"Zoom In" action:@selector(zoomIn:) key:@"="]];
-  [edit addItem:[self item:@"Zoom Out" action:@selector(zoomOut:) key:@"-"]];
-  [editItem setSubmenu:edit];
-
-  [NSApp setMainMenu:menubar];
 }
 
 - (void)ensureDesigner {
@@ -147,13 +89,13 @@
   // One document, so the sample lands wherever the user is looking.
   [_context loadSampleWithId:cat[i][@"id"]];
   if (![[_generator window] isKeyWindow])
-    [self showDesigner:nil];
+    [self showGenerator:nil];
 }
 
 - (void)newDocument:(id)sender {
   (void)sender;
   [_context loadBlankReport];
-  [self showDesigner:nil];
+  [self showGenerator:nil];
 }
 
 // Only reached when no window handled it -- each window controller implements

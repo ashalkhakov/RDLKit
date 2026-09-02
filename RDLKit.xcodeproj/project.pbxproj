@@ -81,6 +81,16 @@
 		F8EA04B9F8175CF7FCE6FEAD /* PicaInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* PicaInspectorFields.m */; };
 		34F5FB27860DCDFCF7241FCE /* PicaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; };
 		C76E850AF8CE40F9D17DF932 /* PicaTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* PicaTablixEditor.m */; };
+		ABBF3C3472A41DED23D94B9B /* PicaWelcomeWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 0A1BF161B8F9CBBC60FC1A1A /* PicaWelcomeWindow.xib */; };
+		E7F8944CAEB592B0657501A0 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 9C8A71C79B82884FF928EBE1 /* MainMenu.xib */; };
+		6BCBCF5E3943CCD3A1684F6E /* PicaRichTextEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 50F5F68C92EA73417F3EFF61 /* PicaRichTextEditor.xib */; };
+		0F974518B2EF46F9790D99D1 /* PicaTablixEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6CABBF53E00B2DB406D58975 /* PicaTablixEditor.xib */; };
+		B31B2D52BA44A3FCD9E15506 /* PicaTablixEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6CABBF53E00B2DB406D58975 /* PicaTablixEditor.xib */; };
+		4E27950D2900B2B9B96ED0C5 /* PicaDesignerWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = C377F19E69246533DA7EAF09 /* PicaDesignerWindow.xib */; };
+		B165DBE8251A8B763F003AC8 /* PicaPreviewWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = F3D38A29DDBE8ADCC484A10E /* PicaPreviewWindow.xib */; };
+		D94080269225683213760055 /* PicaAddElementPanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 27DB8C5CCBB595290E4B7BBE /* PicaAddElementPanel.xib */; };
+		EBF7165C1B6689C83EFFE827 /* PicaGeneratorWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 39D4A9ED7DAEFDD8C43CA55B /* PicaGeneratorWindow.xib */; };
+		E57B48BECBA27CF5473E355C /* PicaInspectorSections.xib in Resources */ = {isa = PBXBuildFile; fileRef = FD2BA757C61D0F567D92D2C8 /* PicaInspectorSections.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -229,6 +239,15 @@
 		A896A40DCA2AB0F57532ECFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		18F13C0ED4E70F80B9FCF4C0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		6790076B2E553AE0FAFF4A94 /* PicaDesignerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PicaDesignerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A1BF161B8F9CBBC60FC1A1A /* PicaWelcomeWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaWelcomeWindow.xib; sourceTree = "<group>"; };
+		9C8A71C79B82884FF928EBE1 /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = "<group>"; };
+		50F5F68C92EA73417F3EFF61 /* PicaRichTextEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaRichTextEditor.xib; sourceTree = "<group>"; };
+		6CABBF53E00B2DB406D58975 /* PicaTablixEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaTablixEditor.xib; sourceTree = "<group>"; };
+		C377F19E69246533DA7EAF09 /* PicaDesignerWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaDesignerWindow.xib; sourceTree = "<group>"; };
+		F3D38A29DDBE8ADCC484A10E /* PicaPreviewWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaPreviewWindow.xib; sourceTree = "<group>"; };
+		27DB8C5CCBB595290E4B7BBE /* PicaAddElementPanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaAddElementPanel.xib; sourceTree = "<group>"; };
+		39D4A9ED7DAEFDD8C43CA55B /* PicaGeneratorWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaGeneratorWindow.xib; sourceTree = "<group>"; };
+		FD2BA757C61D0F567D92D2C8 /* PicaInspectorSections.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaInspectorSections.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -344,6 +363,15 @@
 				9524D1B90D804A24421BD61B /* PicaPageGeometry.m */,
 				11C5F9A9E901CA1BF142761D /* PicaRichTextCodec.h */,
 				BC0759CCB84484DB344078DA /* PicaRichTextCodec.m */,
+				0A1BF161B8F9CBBC60FC1A1A /* PicaWelcomeWindow.xib */,
+				9C8A71C79B82884FF928EBE1 /* MainMenu.xib */,
+				50F5F68C92EA73417F3EFF61 /* PicaRichTextEditor.xib */,
+				6CABBF53E00B2DB406D58975 /* PicaTablixEditor.xib */,
+				C377F19E69246533DA7EAF09 /* PicaDesignerWindow.xib */,
+				F3D38A29DDBE8ADCC484A10E /* PicaPreviewWindow.xib */,
+				27DB8C5CCBB595290E4B7BBE /* PicaAddElementPanel.xib */,
+				39D4A9ED7DAEFDD8C43CA55B /* PicaGeneratorWindow.xib */,
+				FD2BA757C61D0F567D92D2C8 /* PicaInspectorSections.xib */,
 			);
 			path = PicaDesigner;
 			sourceTree = "<group>";
@@ -539,6 +567,7 @@
 			buildPhases = (
 				A38464B071A1A354E92781FB /* Sources */,
 				372EFEEE5F8D5A11D2D64CA6 /* Frameworks */,
+				0C7A1FD3B4E5A6C7D8E9F001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -596,10 +625,27 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0C7A1FD3B4E5A6C7D8E9F001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B31B2D52BA44A3FCD9E15506 /* PicaTablixEditor.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F0BE7C60351F60A2424990B8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ABBF3C3472A41DED23D94B9B /* PicaWelcomeWindow.xib in Resources */,
+				E7F8944CAEB592B0657501A0 /* MainMenu.xib in Resources */,
+				6BCBCF5E3943CCD3A1684F6E /* PicaRichTextEditor.xib in Resources */,
+				0F974518B2EF46F9790D99D1 /* PicaTablixEditor.xib in Resources */,
+				4E27950D2900B2B9B96ED0C5 /* PicaDesignerWindow.xib in Resources */,
+				B165DBE8251A8B763F003AC8 /* PicaPreviewWindow.xib in Resources */,
+				D94080269225683213760055 /* PicaAddElementPanel.xib in Resources */,
+				EBF7165C1B6689C83EFFE827 /* PicaGeneratorWindow.xib in Resources */,
+				E57B48BECBA27CF5473E355C /* PicaInspectorSections.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

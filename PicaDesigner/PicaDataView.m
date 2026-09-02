@@ -5,7 +5,6 @@
 #import "PicaKit.h"
 
 @interface PicaDataView () <NSTextFieldDelegate, NSTextViewDelegate>
-@property (nonatomic, strong) PicaDocument *document;
 @property (nonatomic, strong) NSView *stack;
 @property (nonatomic, strong) NSTextView *jsonView;
 @property (nonatomic, copy) NSString *editingDataset;
@@ -17,17 +16,27 @@
 
 - (instancetype)initWithFrame:(NSRect)frame document:(PicaDocument *)document {
   self = [super initWithFrame:frame];
-  if (self) {
-    _document = document;
+  if (self)
+    [self setDocument:document];
+  return self;
+}
+
+- (void)setDocument:(PicaDocument *)document {
+  if (_document == document)
+    return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _document = document;
+  if (_stack == nil) {
     _stack = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 240, 400)];
     [self addSubview:_stack];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(documentDidChange:)
-                                                 name:PicaDocumentDidChangeNotification
-                                               object:document];
-    [self reload];
   }
-  return self;
+  if (document == nil)
+    return;
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(documentDidChange:)
+                                               name:PicaDocumentDidChangeNotification
+                                             object:document];
+  [self reload];
 }
 
 // This pane shows parameters and datasets only, so an item or band edit is

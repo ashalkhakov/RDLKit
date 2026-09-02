@@ -10,6 +10,13 @@ this does it idempotently.
     python3 .tools/pbxadd.py PicaKit RDLDocument.h RDLDocument.m ...
     python3 .tools/pbxadd.py Pica PicaCanvasRenderer.h PicaCanvasRenderer.m
     python3 .tools/pbxadd.py Pica --resource PicaWelcomeWindow.xib
+    python3 .tools/pbxadd.py PicaDesignerTests --shared-ref PicaTablixEditor.xib
+
+--shared-ref reuses the PBXFileReference another target already has for that
+basename, instead of adding one to this target's group. Use it when a file that
+lives in one target's directory has to be built into a second target as well:
+a new reference would be resolved against the second group's own path and the
+build would fail on a file that is not there.
 """
 import hashlib, os, re, sys
 
@@ -21,6 +28,10 @@ TARGETS = {
                 '7904DBFDD0ABC4FECE1D6E19', None),
     'Pica':    ('367BDD79C0EB7824B717F2C6', '9A62AC01A2B00BE761FA3E90',
                 None, 'F0BE7C60351F60A2424990B8'),
+    # The checks drive the tablix panel, so its XIB has to be in the test
+    # bundle as well: -bundleForClass: resolves there, not to Pica.app.
+    'PicaDesignerTests': ('9D4444B8635515926096826D', 'A38464B071A1A354E92781FB',
+                          None, '0C7A1FD3B4E5A6C7D8E9F001'),
 }
 
 FILETYPE = {
@@ -35,15 +46,22 @@ def uid(seed):
 
 
 def insert_into_list(s, section_id, label, entry):
-    """Append `entry` to the files=/children=( ... ) list of a given object."""
-    m = re.search(r'(\t\t%s /\* [^*]*\*/ = \{.*?\n\t\t\t%s = \(\n)(.*?)(\n\t\t\t\);)'
-                  % (section_id, label), s, re.S)
+    """Append `entry` to the files=/children=( ... ) list of a given object.
+
+    The list may be empty -- a target that has never had a resource is written
+    by Xcode as `files = (\\n\\t\\t\\t);` -- so the body is matched as zero or
+    more whole entry lines rather than as arbitrary text, which would otherwise
+    run past the end of this object and into the next one.
+    """
+    m = re.search(r'(\t\t%s /\* [^*]*\*/ = \{\n(?:[^\n]*\n)*?\t\t\t%s = \(\n)'
+                  r'((?:\t\t\t\t[^\n]*\n)*)(\t\t\t\);)'
+                  % (section_id, label), s)
     if not m:
         raise SystemExit('could not find %s list of %s' % (label, section_id))
     body = m.group(2)
     if entry.strip() in body:
         return s, False
-    new = m.group(1) + (body + '\n' if body.strip() else '') + entry + m.group(3)
+    new = m.group(1) + body + entry + '\n' + m.group(3)
     return s[:m.start()] + new + s[m.end():], True
 
 
@@ -53,6 +71,7 @@ def main():
         raise SystemExit(__doc__)
     target, args = args[0], args[1:]
     as_resource = '--resource' in args
+    shared_ref = '--shared-ref' in args
     files = [a for a in args if not a.startswith('--')]
     if target not in TARGETS:
         raise SystemExit('unknown target %r; known: %s' % (target, ', '.join(TARGETS)))
@@ -70,8 +89,15 @@ def main():
         fref = uid('fileRef:%s:%s' % (target, base))
         bfile = uid('buildFile:%s:%s' % (target, base))
 
+        if shared_ref:
+            m = re.search(r'\t\t([0-9A-F]{24}) /\* %s \*/ = \{isa = PBXFileReference;'
+                          % re.escape(base), s)
+            if not m:
+                raise SystemExit('no existing file reference for %r to share' % base)
+            fref = m.group(1)
+
         # 1. PBXFileReference
-        if ('%s /* %s */' % (fref, base)) not in s:
+        if not shared_ref and ('%s /* %s */' % (fref, base)) not in s:
             anchor = '/* End PBXFileReference section */'
             line = ('\t\t%s /* %s */ = {isa = PBXFileReference; '
                     'lastKnownFileType = %s; path = %s; sourceTree = "<group>"; };\n'
@@ -96,9 +122,10 @@ def main():
             s, _ = insert_into_list(s, phase, 'files',
                                     '\t\t\t\t%s /* %s in %s */,' % (bfile, base, kind))
 
-        # 3. Group membership
-        s, _ = insert_into_list(s, group, 'children',
-                                '\t\t\t\t%s /* %s */,' % (fref, base))
+        # 3. Group membership -- a shared reference already belongs to a group
+        if not shared_ref:
+            s, _ = insert_into_list(s, group, 'children',
+                                    '\t\t\t\t%s /* %s */,' % (fref, base))
         added.append(base)
 
     open(PROJ, 'w').write(s)

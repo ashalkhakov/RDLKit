@@ -1,37 +1,18 @@
 #import "PicaTablixEditor.h"
 #import "PicaEditingContext.h"
 
-static NSArray *PicaAggregateNames(void) {
-  return @[ @"", @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ];
-}
-
-static NSArray *PicaAlignNames(void) {
-  return @[ @"", @"Left", @"Center", @"Right" ];
-}
-
 @interface PicaTablixEditor () <NSTableViewDataSource, NSTableViewDelegate>
-@property (nonatomic, strong) NSWindow *window;
-@property (nonatomic, strong) NSTableView *table;
-@property (nonatomic, strong) NSPopUpButton *datasetPop, *groupPop, *group2Pop, *pivotPop;
-@property (nonatomic, strong) NSButton *grandTotalCheck;
-@property (nonatomic, strong) NSTextField *headerHField, *rowHField;
+@property (nonatomic, strong) IBOutlet NSWindow *window;
+@property (nonatomic, strong) IBOutlet NSTableView *table;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *datasetPop, *groupPop, *group2Pop, *pivotPop;
+@property (nonatomic, strong) IBOutlet NSButton *grandTotalCheck;
+@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *rowHField;
+@property (nonatomic, strong) IBOutlet NSButton *cancelButton;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
 @property (nonatomic, strong) RDLReport *report;
 @end
 
 @implementation PicaTablixEditor
-
-- (NSTextField *)label:(NSString *)t frame:(NSRect)f inView:(NSView *)v {
-  NSTextField *l = [[NSTextField alloc] initWithFrame:f];
-  [l setBezeled:NO];
-  [l setDrawsBackground:NO];
-  [l setEditable:NO];
-  [l setSelectable:NO];
-  [l setStringValue:t];
-  [l setFont:[NSFont userFontOfSize:10]];
-  [v addSubview:l];
-  return l;
-}
 
 - (RDLDataSet *)selectedDataset {
   NSString *name = [_datasetPop titleOfSelectedItem];
@@ -59,137 +40,37 @@ static NSArray *PicaAlignNames(void) {
   [self rebuildFieldPop:_pivotPop selecting:[_pivotPop titleOfSelectedItem]];
 }
 
+// Everything fixed about the panel -- the labels, the popup and field frames,
+// the five columns with their widths and their Align/Total combo lists, the
+// buttons and their actions -- is PicaTablixEditor.xib. What is left here is
+// what only the open report can supply: the dataset and field lists, and the
+// tablix's own values.
 - (void)buildPanelForTablix:(RDLItem *)tab {
-  _window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 640, 466)
-                                      styleMask:NSTitledWindowMask
-                                        backing:NSBackingStoreBuffered
-                                          defer:NO];
+  NSNib *nib = [[NSNib alloc] initWithNibNamed:@"PicaTablixEditor"
+                                        bundle:[NSBundle bundleForClass:[self class]]];
+  [nib instantiateWithOwner:self topLevelObjects:NULL];
 
-  // ARC releases this window too, so leaving releasedWhenClosed at its
+  // Two things the XIB cannot carry, both silently dropped by ibtool rather
+  // than reported: a table's header view, and Escape as a key equivalent
+  // (XML has no way to write U+001B at all).
+  [_table setHeaderView:[[NSTableHeaderView alloc]
+                            initWithFrame:NSMakeRect(0, 0, NSWidth([_table frame]), 23)]];
+  [_cancelButton setKeyEquivalent:@"\033"];
 
-  // default YES makes AppKit release it a second time: the window is
-
-  // deallocated early and AppKit then messages the freed pointer.
-
-  [_window setReleasedWhenClosed:NO];
   [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
-  NSView *cv = [_window contentView];
-  NSRect b = [cv bounds];
-  CGFloat top = NSHeight(b);
 
-  // Row 1: dataset, row group, grand total.
-  [self label:@"Dataset" frame:NSMakeRect(14, top - 34, 90, 14) inView:cv];
-  _datasetPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(14, top - 58, 170, 22) pullsDown:NO];
   for (RDLDataSet *ds in _report.dataSets)
     [_datasetPop addItemWithTitle:ds.name];
   if (tab.dataSetName && [_datasetPop itemWithTitle:tab.dataSetName])
     [_datasetPop selectItemWithTitle:tab.dataSetName];
-  [_datasetPop setTarget:self];
-  [_datasetPop setAction:@selector(datasetChanged:)];
-  [cv addSubview:_datasetPop];
-
-  [self label:@"Row group" frame:NSMakeRect(198, top - 34, 150, 14) inView:cv];
-  _groupPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(198, top - 58, 150, 22) pullsDown:NO];
-  [cv addSubview:_groupPop];
   [self rebuildFieldPop:_groupPop selecting:tab.groupBy];
-
-  [self label:@"Column group (pivot)" frame:NSMakeRect(362, top - 34, 150, 14) inView:cv];
-  _pivotPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(362, top - 58, 150, 22) pullsDown:NO];
-  [cv addSubview:_pivotPop];
   [self rebuildFieldPop:_pivotPop selecting:tab.pivotBy];
-
-  _grandTotalCheck = [[NSButton alloc] initWithFrame:NSMakeRect(524, top - 58, 110, 22)];
-  [_grandTotalCheck setButtonType:NSSwitchButton];
-  [_grandTotalCheck setTitle:@"Grand total row"];
-  [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
-  [cv addSubview:_grandTotalCheck];
-
-  // Row 2: nested child row group.
-  [self label:@"Child row group" frame:NSMakeRect(198, top - 66, 150, 14) inView:cv];
-  _group2Pop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(198, top - 90, 150, 22) pullsDown:NO];
-  [cv addSubview:_group2Pop];
   [self rebuildFieldPop:_group2Pop selecting:tab.groupBy2];
 
-  // Columns grid.
-  [self label:@"Columns — Total picks the aggregate; with a column group (pivot) the first column is the measure"
-        frame:NSMakeRect(14, top - 116, 560, 14)
-       inView:cv];
-  NSScrollView *sv = [[NSScrollView alloc] initWithFrame:NSMakeRect(14, 118, NSWidth(b) - 28, top - 116 - 128)];
-  [sv setHasVerticalScroller:YES];
-  [sv setBorderType:NSBezelBorder];
-  _table = [[NSTableView alloc] initWithFrame:[sv bounds]];
-  [_table setAllowsEmptySelection:YES];
-  struct {
-    NSString *ident, *title;
-    CGFloat width;
-  } defs[] = {
-      {@"header", @"Header", 110},
-      {@"value", @"Value", 210},
-      {@"width", @"Width in", 60},
-      {@"align", @"Align", 70},
-      {@"aggregate", @"Total", 90},
-  };
-  for (int i = 0; i < 5; i++) {
-    NSTableColumn *c = [[NSTableColumn alloc] initWithIdentifier:defs[i].ident];
-    [[c headerCell] setStringValue:defs[i].title];
-    [c setWidth:defs[i].width];
-    [c setEditable:YES];
-    if ([defs[i].ident isEqualToString:@"align"] || [defs[i].ident isEqualToString:@"aggregate"]) {
-      NSComboBoxCell *combo = [[NSComboBoxCell alloc] init];
-      [combo setEditable:YES];
-      [combo setCompletes:YES];
-      [combo addItemsWithObjectValues:[defs[i].ident isEqualToString:@"align"] ? PicaAlignNames()
-                                                                               : PicaAggregateNames()];
-      [c setDataCell:combo];
-    }
-    [_table addTableColumn:c];
-  }
-  [_table setDataSource:self];
-  [_table setDelegate:self];
-  [sv setDocumentView:_table];
-  [cv addSubview:sv];
-
-  // Column actions.
-  NSArray *actions = @[ @"Add", @"Remove", @"◀", @"▶" ];
-  SEL sels[] = {@selector(addColumn:), @selector(removeColumn:), @selector(moveLeft:),
-                @selector(moveRight:)};
-  CGFloat bx = 14;
-  for (NSUInteger i = 0; i < 4; i++) {
-    CGFloat w = i < 2 ? 80 : 40;
-    NSButton *btn = [[NSButton alloc] initWithFrame:NSMakeRect(bx, 86, w, 24)];
-    [btn setTitle:actions[i]];
-    [btn setBezelStyle:NSShadowlessSquareBezelStyle];
-    [btn setTarget:self];
-    [btn setAction:sels[i]];
-    [cv addSubview:btn];
-    bx += w + 6;
-  }
-
-  // Heights.
-  [self label:@"Header in" frame:NSMakeRect(14, 58, 80, 14) inView:cv];
-  _headerHField = [[NSTextField alloc] initWithFrame:NSMakeRect(96, 54, 70, 22)];
+  [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
   [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.headerHeight]];
-  [cv addSubview:_headerHField];
-  [self label:@"Row in" frame:NSMakeRect(182, 58, 60, 14) inView:cv];
-  _rowHField = [[NSTextField alloc] initWithFrame:NSMakeRect(240, 54, 70, 22)];
   [_rowHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.rowHeight]];
-  [cv addSubview:_rowHField];
-
-  // OK / Cancel.
-  NSButton *cancel = [[NSButton alloc] initWithFrame:NSMakeRect(NSWidth(b) - 190, 12, 80, 28)];
-  [cancel setTitle:@"Cancel"];
-  [cancel setBezelStyle:NSRoundedBezelStyle];
-  [cancel setKeyEquivalent:@"\e"];
-  [cancel setTarget:self];
-  [cancel setAction:@selector(cancel:)];
-  [cv addSubview:cancel];
-  NSButton *ok = [[NSButton alloc] initWithFrame:NSMakeRect(NSWidth(b) - 100, 12, 80, 28)];
-  [ok setTitle:@"OK"];
-  [ok setBezelStyle:NSRoundedBezelStyle];
-  [ok setKeyEquivalent:@"\r"];
-  [ok setTarget:self];
-  [ok setAction:@selector(accept:)];
-  [cv addSubview:ok];
+  [_table reloadData];
 }
 
 #pragma mark - Column actions
