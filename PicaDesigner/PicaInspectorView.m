@@ -129,9 +129,9 @@
 - (void)editTablix:(id)sender {
   (void)sender;
   RDLItem *it = [_context selectedItem];
-  if (it == nil || ![it.type isEqualToString:@"Tablix"])
+  if (it == nil || ![it isKindOfClass:[RDLTablix class]])
     return;
-  if ([PicaTablixEditor runForTablix:it context:_context]) {
+  if ([PicaTablixEditor runForTablix:(RDLTablix *)it context:_context]) {
     // -documentDidChange: suppresses reload for a property edit of the item on
     // show, which is right while the user is typing in a field but wrong when
     // a modal has just rewritten several of them.
@@ -163,11 +163,17 @@
   [_bindings bind:_fontField keyPath:@"style.fontFamily" scope:PicaFieldScopeItem
              kind:PicaFieldKindText values:nil placeholder:@"Georgia"];
   [_bindings bind:_sizeField keyPath:@"style.fontSize" scope:PicaFieldScopeItem
-             kind:PicaFieldKindText values:nil placeholder:@"10pt"];
+             kind:PicaFieldKindLength values:nil placeholder:@"10pt"];
+  // Vocabulary popups map menu index to the enum case, so the model value and
+  // the menu title no longer have to be the same word ("Roman" shows Normal).
   [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:PicaFieldScopeItem
-             kind:PicaFieldKindPopUpIndex values:@[ @"Normal", @"Bold" ] placeholder:nil];
+             kind:PicaFieldKindPopUpIndex
+           values:@[ @(RDLFontWeightNormal), @(RDLFontWeightBold) ]
+      placeholder:nil];
   [_bindings bind:_alignPop keyPath:@"style.textAlign" scope:PicaFieldScopeItem
-             kind:PicaFieldKindPopUpTitle];
+             kind:PicaFieldKindPopUpIndex
+           values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
+      placeholder:nil];
   [_bindings bind:_colorField keyPath:@"style.color" scope:PicaFieldScopeItem
              kind:PicaFieldKindText values:nil placeholder:@"#1a1916"];
   [_bindings bind:_formatField keyPath:@"style.format" scope:PicaFieldScopeItem
@@ -183,9 +189,14 @@
   [_bindings bind:_imageValueField keyPath:@"value" scope:PicaFieldScopeItem
              kind:PicaFieldKindText];
   [_bindings bind:_imageSourcePop keyPath:@"source" scope:PicaFieldScopeItem
-             kind:PicaFieldKindPopUpIndex values:@[ @"Embedded", @"External" ] placeholder:nil];
+             kind:PicaFieldKindPopUpIndex
+           values:@[ @(RDLImageSourceEmbedded), @(RDLImageSourceExternal) ]
+      placeholder:nil];
   [_bindings bind:_imageSizingPop keyPath:@"sizing" scope:PicaFieldScopeItem
-             kind:PicaFieldKindPopUpTitle];
+             kind:PicaFieldKindPopUpIndex
+           values:@[ @(RDLImageSizingFit), @(RDLImageSizingFitProportional),
+                     @(RDLImageSizingClip), @(RDLImageSizingAutoSize) ]
+      placeholder:nil];
 
   // Chart.
   [_bindings bind:_chartDatasetPop keyPath:@"dataSetName" scope:PicaFieldScopeItem
@@ -193,7 +204,10 @@
   [_bindings bind:_titleField keyPath:@"title" scope:PicaFieldScopeItem
              kind:PicaFieldKindText];
   [_bindings bind:_chartKindPop keyPath:@"chartType" scope:PicaFieldScopeItem
-             kind:PicaFieldKindPopUpTitle];
+             kind:PicaFieldKindPopUpIndex
+           values:@[ @(RDLChartTypeColumn), @(RDLChartTypeBar),
+                     @(RDLChartTypeLine), @(RDLChartTypePie) ]
+      placeholder:nil];
   [_bindings bind:_catField keyPath:@"categoryField" scope:PicaFieldScopeItem
              kind:PicaFieldKindText];
   [_bindings bind:_valField keyPath:@"valueField" scope:PicaFieldScopeItem
@@ -261,26 +275,28 @@
   RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
 
   if (it != nil) {
-    [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@", it.type, it.name]];
+      [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@",
+                                                           it.rdlElementName,
+                                                           it.name]];
     [_nameField setStringValue:it.name ?: @""];
     NSMutableArray *boxes = [NSMutableArray arrayWithObject:_geoBox];
     // The dataset popups are populated from the report before filling, since
     // their contents depend on it rather than being fixed at build time.
-    if ([it.type isEqualToString:@"Textbox"]) {
+    if ([it isKindOfClass:[RDLTextbox class]]) {
       [boxes addObject:_textBox];
-      [_valueField setStringValue:it.value ?: @""];
-    } else if ([it.type isEqualToString:@"Line"]) {
+        [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+    } else if ([it isKindOfClass:[RDLLine class]]) {
       [boxes addObject:_lineBox];
-    } else if ([it.type isEqualToString:@"Rectangle"]) {
+    } else if ([it isKindOfClass:[RDLRectangle class]]) {
       [boxes addObject:_rectBox];
-    } else if ([it.type isEqualToString:@"Image"]) {
+    } else if ([it isKindOfClass:[RDLImage class]]) {
       [boxes addObject:_imageBox];
-    } else if ([it.type isEqualToString:@"Chart"]) {
+    } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
-      [self rebuildDatasetPop:_chartDatasetPop selecting:it.dataSetName];
-    } else if ([it.type isEqualToString:@"Tablix"]) {
+        [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
+    } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
-      [self rebuildDatasetPop:_tablixDatasetPop selecting:it.dataSetName];
+        [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
     }
     [self stackBoxes:boxes];
   } else if (band != nil) {
@@ -339,7 +355,10 @@
     *index = 0;
   RDLItem *it = [_context selectedItem];
   PicaExpressionScope *scope =
-      [PicaExpressionScope scopeWithReport:_context.report dataSetName:it.dataSetName];
+        [PicaExpressionScope scopeWithReport:_context.report
+                                 dataSetName:[it isKindOfClass:[RDLDataRegion class]]
+                                                 ? [(RDLDataRegion *)it dataSetName]
+                                                 : nil];
   return PicaExpressionCompletions([textView string], charRange, scope);
 }
 

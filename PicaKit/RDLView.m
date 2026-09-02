@@ -7,16 +7,16 @@
 static const CGFloat kPicaDPI = 72.0;
 static const CGFloat kPageGap = 18.0;
 
-static CGFloat PicaViewPt(NSString *raw, CGFloat fallback) {
-  CGFloat v = (CGFloat)[raw doubleValue];
+static CGFloat PicaViewPt(RDLLength *length, CGFloat fallback) {
+  CGFloat v = length ? [length points] : 0;
   return v > 0 ? v : fallback;
 }
 
-static void PicaSetLineDash(NSBezierPath *p, NSString *style) {
-  if ([style isEqualToString:@"Dashed"]) {
+static void PicaSetLineDash(NSBezierPath *p, RDLBorderStyle style) {
+  if (style == RDLBorderStyleDashed) {
     CGFloat dash[2] = {6, 4};
     [p setLineDash:dash count:2 phase:0];
-  } else if ([style isEqualToString:@"Dotted"]) {
+  } else if (style == RDLBorderStyleDotted) {
     CGFloat dash[2] = {2, 3};
     [p setLineDash:dash count:2 phase:0];
   }
@@ -24,8 +24,9 @@ static void PicaSetLineDash(NSBezierPath *p, NSString *style) {
 
 static void PicaStrokeBorderEdge(NSPoint a, NSPoint b, RDLBorder *border, RDLBorder *fallback) {
   RDLBorder *use =
-      (border && [border.style length] && ![border.style isEqualToString:@"None"]) ? border : fallback;
-  if (use == nil || [use.style length] == 0 || [use.style isEqualToString:@"None"])
+      (border && border.style != RDLBorderStyleUnspecified &&
+       border.style != RDLBorderStyleNone) ? border : fallback;
+  if (use == nil || use.style == RDLBorderStyleUnspecified || use.style == RDLBorderStyleNone)
     return;
   NSBezierPath *p = [NSBezierPath bezierPath];
   [p moveToPoint:a];
@@ -41,11 +42,11 @@ static void PicaStrokeBorderEdge(NSPoint a, NSPoint b, RDLBorder *border, RDLBor
 // Text attribute translation and rich-run assembly live in RDLTextAttributes,
 // shared with the designer canvas and the rich-text codec; this file used to
 // carry a third, subtly different copy.
-static NSDictionary *PicaViewAttrs(RDLStyle *style, NSString *paraAlign) {
+static NSDictionary *PicaViewAttrs(RDLStyle *style, RDLTextAlign paraAlign) {
   return [RDLTextAttributes attributesForStyle:style paragraphAlign:paraAlign scale:1.0];
 }
 
-static NSAttributedString *PicaSpansAttributed(RDLLaidOutItem *it) {
+static NSAttributedString *PicaSpansAttributed(RDLLaidOutTextbox *it) {
   return [RDLTextAttributes attributedStringForParagraphs:it.spans
                                                baseStyle:it.style
                                                    scale:1.0];
@@ -55,7 +56,8 @@ static void PicaDrawBorders(NSRect r, RDLStyle *s) {
   if (s == nil)
     return;
   RDLBorder *all =
-      (s.border && [s.border.style length] && ![s.border.style isEqualToString:@"None"]) ? s.border : nil;
+      (s.border && s.border.style != RDLBorderStyleUnspecified &&
+       s.border.style != RDLBorderStyleNone) ? s.border : nil;
   PicaStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMinY(r)), s.borderTop, all);
   PicaStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMaxY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)), s.borderBottom,
                        all);
@@ -126,7 +128,7 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
 
   for (RDLLaidOutItem *it in page.items) {
     NSRect r = NSMakeRect(it.x * kPicaDPI, originY + it.y * kPicaDPI, it.w * kPicaDPI, it.h * kPicaDPI);
-    if ([it.kind isEqualToString:@"Line"]) {
+    if ([it isKindOfClass:[RDLLaidOutLine class]]) {
       RDLBorder *b = it.style.border;
       NSString *lc = (b && b.color.length) ? b.color : it.style.color;
       NSBezierPath *p = [NSBezierPath bezierPath];
@@ -146,30 +148,31 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
       [p stroke];
       continue;
     }
-    if ([it.kind isEqualToString:@"Rectangle"]) {
+    if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {
       PicaFillBackground(r, it.style);
       PicaDrawBorders(r, it.style);
       continue;
     }
-    if ([it.kind isEqualToString:@"Image"]) {
+    if ([it isKindOfClass:[RDLLaidOutImage class]]) {
+      RDLLaidOutImage *img0 = (RDLLaidOutImage *)it;
       PicaFillBackground(r, it.style);
       NSImage *img = nil;
-      if ([it.imageData length])
-        img = [[NSImage alloc] initWithData:it.imageData];
-      else if ([it.imageSrc length]) {
-        NSURL *u = [NSURL URLWithString:it.imageSrc];
-        if (u.isFileURL || [it.imageSrc hasPrefix:@"/"])
-          img = [[NSImage alloc] initWithContentsOfFile:u.isFileURL ? u.path : it.imageSrc];
+      if ([img0.imageData length])
+        img = [[NSImage alloc] initWithData:img0.imageData];
+      else if ([img0.imageSrc length]) {
+        NSURL *u = [NSURL URLWithString:img0.imageSrc];
+        if (u.isFileURL || [img0.imageSrc hasPrefix:@"/"])
+          img = [[NSImage alloc] initWithContentsOfFile:u.isFileURL ? u.path : img0.imageSrc];
       }
       if (img) {
         NSRect dst = r;
         NSSize sz = img.size;
-        NSString *sizing = it.sizing ?: @"Fit";
-        if (([sizing isEqualToString:@"FitProportional"] || [sizing isEqualToString:@"AutoSize"]) &&
+        RDLImageSizing sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingFit;
+        if ((sizing == RDLImageSizingFitProportional || sizing == RDLImageSizingAutoSize) &&
             sz.width > 0 && sz.height > 0) {
           CGFloat scale = MIN(NSWidth(r) / sz.width, NSHeight(r) / sz.height);
           dst.size = NSMakeSize(sz.width * scale, sz.height * scale);
-        } else if ([sizing isEqualToString:@"Clip"]) {
+        } else if (sizing == RDLImageSizingClip) {
           dst.size = sz;
         }
         [NSGraphicsContext saveGraphicsState];
@@ -185,23 +188,24 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
       PicaDrawBorders(r, it.style);
       continue;
     }
-    if ([it.kind isEqualToString:@"Chart"]) {
+    if ([it isKindOfClass:[RDLLaidOutChart class]]) {
+      RDLLaidOutChart *chart = (RDLLaidOutChart *)it;
       PicaFillBackground(r, it.style);
       [PicaColorFromHex(@"#1a1916") set];
-      NSString *type = [it.chartType lowercaseString] ?: @"column";
-      NSUInteger n = [it.values count];
+      RDLChartType type = chart.chartType;
+      NSUInteger n = [chart.values count];
       double max = 1, total = 0;
-      for (NSNumber *v in it.values) {
+      for (NSNumber *v in chart.values) {
         if ([v doubleValue] > max)
           max = [v doubleValue];
         total += fabs([v doubleValue]);
       }
-      if (n && [type isEqualToString:@"pie"]) {
+      if (n && type == RDLChartTypePie) {
         CGFloat cx = NSMidX(r), cy = NSMidY(r);
         CGFloat rad = MIN(NSWidth(r), NSHeight(r)) * 0.42;
         double startDeg = 90;
         for (NSUInteger i = 0; i < n; i++) {
-          double frac = total > 0 ? fabs([it.values[i] doubleValue]) / total : 1.0 / n;
+          double frac = total > 0 ? fabs([chart.values[i] doubleValue]) / total : 1.0 / n;
           double endDeg = startDeg - frac * 360;
           NSBezierPath *wedge = [NSBezierPath bezierPath];
           [wedge moveToPoint:NSMakePoint(cx, cy)];
@@ -216,11 +220,11 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
           [wedge fill];
           startDeg = endDeg;
         }
-      } else if (n && [type isEqualToString:@"line"]) {
+      } else if (n && type == RDLChartTypeLine) {
         NSBezierPath *pl = [NSBezierPath bezierPath];
         for (NSUInteger i = 0; i < n; i++) {
           CGFloat x = n > 1 ? NSMinX(r) + 10 + (NSWidth(r) - 20) * i / (n - 1) : NSMidX(r);
-          CGFloat y = NSMaxY(r) - 10 - ([it.values[i] doubleValue] / max) * (NSHeight(r) - 20);
+          CGFloat y = NSMaxY(r) - 10 - ([chart.values[i] doubleValue] / max) * (NSHeight(r) - 20);
           if (i == 0)
             [pl moveToPoint:NSMakePoint(x, y)];
           else
@@ -229,12 +233,12 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
         [pl setLineWidth:2];
         [PicaColorFromHex(@"#1a1916") set];
         [pl stroke];
-      } else if (n && [type isEqualToString:@"bar"]) {
+      } else if (n && type == RDLChartTypeBar) {
         CGFloat innerH = NSHeight(r) - 24;
         CGFloat gap = innerH / n;
         CGFloat bh = gap * 0.55;
         for (NSUInteger i = 0; i < n; i++) {
-          CGFloat bw = ([it.values[i] doubleValue] / max) * (NSWidth(r) - 24);
+          CGFloat bw = ([chart.values[i] doubleValue] / max) * (NSWidth(r) - 24);
           NSRect bar = NSMakeRect(NSMinX(r) + 12, NSMinY(r) + 12 + i * gap + (gap - bh) / 2, bw, bh);
           NSRectFill(bar);
         }
@@ -249,7 +253,7 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
         CGFloat gap = innerW / n;
         CGFloat bw = gap * 0.55;
         for (NSUInteger i = 0; i < n; i++) {
-          CGFloat bh = ([it.values[i] doubleValue] / max) * innerH;
+          CGFloat bh = ([chart.values[i] doubleValue] / max) * innerH;
           NSRect bar = NSMakeRect(NSMinX(r) + 12 + i * gap + (gap - bw) / 2, NSMaxY(r) - 12 - bh, bw, bh);
           NSRectFill(bar);
         }
@@ -259,7 +263,7 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
     }
     // Textbox
     PicaFillBackground(r, it.style);
-    NSDictionary *attrs = PicaViewAttrs(it.style, nil);
+    NSDictionary *attrs = PicaViewAttrs(it.style, RDLTextAlignUnspecified);
     // Padding inset.
     NSRect textRect = r;
     CGFloat padL = PicaViewPt(it.style.paddingLeft, 0);
@@ -270,10 +274,11 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
     textRect.origin.y += padT;
     textRect.size.width -= padL + padR;
     textRect.size.height -= padT + padB;
-    NSAttributedString *rich = [it.spans count] ? PicaSpansAttributed(it) : nil;
-    NSString *text = it.text ?: @"";
-    NSString *va = it.style.verticalAlign;
-    if ([va isEqualToString:@"Middle"] || [va isEqualToString:@"Bottom"]) {
+    RDLLaidOutTextbox *tb = (RDLLaidOutTextbox *)it;
+    NSAttributedString *rich = [tb.spans count] ? PicaSpansAttributed(tb) : nil;
+    NSString *text = tb.text ?: @"";
+    RDLVerticalAlign va = it.style.verticalAlign;
+    if (va == RDLVerticalAlignMiddle || va == RDLVerticalAlignBottom) {
       NSRect used =
           rich ? [rich boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
                                     options:NSStringDrawingUsesLineFragmentOrigin]
@@ -282,7 +287,7 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
                                  attributes:attrs];
       CGFloat dy = NSHeight(textRect) - NSHeight(used);
       if (dy > 0)
-        textRect.origin.y += [va isEqualToString:@"Middle"] ? dy / 2 : dy;
+        textRect.origin.y += va == RDLVerticalAlignMiddle ? dy / 2 : dy;
     }
     if (rich)
       [rich drawInRect:textRect];

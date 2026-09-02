@@ -26,7 +26,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   return self;
 }
 
-- (void)drawTablix:(RDLItem *)it inRect:(NSRect)r {
+- (void)drawTablix:(RDLTablix *)it inRect:(NSRect)r {
   CGFloat z = _ctx.zoom;
   NSArray *cols = it.columnSpecs ?: @[];
   CGFloat hh = [PicaTablixGeometry headerHeightOf:it zoom:z];
@@ -50,18 +50,18 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   }
 
   RDLStyle *headerStyle = [RDLStyle defaultStyle];
-  headerStyle.fontWeight = @"Bold";
-  headerStyle.fontSize = @"9";
+  headerStyle.fontWeight = RDLFontWeightBold;
+  headerStyle.fontSize = [RDLLength points:9];
   headerStyle.color = @"#1a1916";
   RDLStyle *valueStyle = [RDLStyle defaultStyle];
-  valueStyle.fontSize = @"9";
+  valueStyle.fontSize = [RDLLength points:9];
   valueStyle.color = @"#5c574e";
 
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i < [cols count]; i++) {
     NSDictionary *col = cols[i];
     CGFloat w = [col[@"width"] doubleValue] * PicaPointsPerInch * z;
-    NSString *align = col[@"align"];
+    RDLTextAlign align = RDLTextAlignFromString(col[@"align"]);
     headerStyle.textAlign = align;
     valueStyle.textAlign = align;
     // Leave the cell blank while its editor is open over it.
@@ -158,19 +158,20 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 - (void)drawItem:(RDLItem *)it origin:(NSPoint)origin {
   BOOL sel = it == [_ctx selectedItem];
   NSRect r = [_geometry rectForItem:it origin:origin];
-  if ([it.type isEqualToString:@"Line"]) {
+  if ([it isKindOfClass:[RDLLine class]]) {
     [PicaColorFromHex(it.style.color) set];
     NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
-  } else if ([it.type isEqualToString:@"Rectangle"]) {
+  } else if ([it isKindOfClass:[RDLRectangle class]]) {
     if (it.style.backgroundColor && ![it.style.backgroundColor isEqualToString:@"Transparent"]) {
       [PicaColorFromHex(it.style.backgroundColor) set];
       NSRectFill(r);
     }
-    for (RDLItem *child in it.items)
+    for (RDLItem *child in it.childItems)
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
-  } else if ([it.type isEqualToString:@"Tablix"]) {
-    [self drawTablix:it inRect:r];
-  } else if ([it.type isEqualToString:@"Chart"]) {
+  } else if ([it isKindOfClass:[RDLTablix class]]) {
+    [self drawTablix:(RDLTablix *)it inRect:r];
+  } else if ([it isKindOfClass:[RDLChart class]]) {
+    RDLChart *chart = (RDLChart *)it;
     [[NSColor colorWithCalibratedWhite:0.2 alpha:1] set];
     NSBezierPath *axis = [NSBezierPath bezierPath];
     [axis moveToPoint:NSMakePoint(NSMinX(r) + 6, NSMinY(r) + 6)];
@@ -179,7 +180,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [axis stroke];
     RDLDataSet *ds = nil;
     for (RDLDataSet *d in _ctx.report.dataSets)
-      if ([d.name isEqualToString:it.dataSetName])
+      if ([d.name isEqualToString:chart.dataSetName])
         ds = d;
     NSUInteger n = [ds.rows count];
     if (n == 0)
@@ -187,7 +188,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     double max = 1;
     NSMutableArray *vals = [NSMutableArray array];
     for (NSDictionary *row in ds.rows) {
-      id v = row[it.valueField];
+      id v = row[chart.valueField];
       double d = [v respondsToSelector:@selector(doubleValue)] ? [v doubleValue] : 1;
       [vals addObject:@(d)];
       if (d > max)
@@ -205,7 +206,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
           NSMakeRect(NSMinX(r) + 10 + i * gap + (gap - bw) / 2, NSMaxY(r) - 10 - bh, bw, bh);
       NSRectFill(bar);
     }
-    NSString *title = it.title.length ? it.title : @"Chart";
+    NSString *title = chart.title.length ? chart.title : @"Chart";
     [title drawAtPoint:NSMakePoint(NSMinX(r) + 10, NSMinY(r) + 4)
         withAttributes:@{
           NSFontAttributeName : [NSFont userFontOfSize:MAX(8, 9 * _ctx.zoom)],
@@ -220,25 +221,27 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       NSRectFill(r);
     }
     RDLBorder *b = it.style.border;
-    if (b && b.style.length && ![b.style isEqualToString:@"None"]) {
+    if (b && b.style != RDLBorderStyleUnspecified && b.style != RDLBorderStyleNone) {
       [PicaColorFromHex(b.color) set];
       NSFrameRect(r);
     }
-    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * PicaPointsPerInch * _ctx.zoom;
-    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * PicaPointsPerInch * _ctx.zoom;
-    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * PicaPointsPerInch * _ctx.zoom;
+    CGFloat padL = [it.style.paddingLeft inches] * PicaPointsPerInch * _ctx.zoom;
+    CGFloat padT = [it.style.paddingTop inches] * PicaPointsPerInch * _ctx.zoom;
+    CGFloat padR = [it.style.paddingRight inches] * PicaPointsPerInch * _ctx.zoom;
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
     BOOL editorCoversThisText =
         _overlay.editingItem == it && _overlay.editingCell == nil;
     if (!editorCoversThisText) {
-      if ([it.paragraphs count])
-        [[RDLTextAttributes attributedStringForParagraphs:it.paragraphs
+      RDLTextbox *tb = [it isKindOfClass:[RDLTextbox class]] ? (RDLTextbox *)it : nil;
+      if ([tb.paragraphs count])
+        [[RDLTextAttributes attributedStringForParagraphs:tb.paragraphs
                                                baseStyle:it.style
                                                    scale:_ctx.zoom]
             drawInRect:textRect];
       else
-        [PicaAttributedText(it.value ?: it.type, it.style, _ctx.zoom) drawInRect:textRect];
+        [PicaAttributedText(tb.value ?: it.rdlElementName, it.style, _ctx.zoom)
+            drawInRect:textRect];
     }
   }
   if (sel) {

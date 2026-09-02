@@ -171,10 +171,10 @@ static NSString * const kPicaItemPboardType = @"com.pica.rdl-item-xml";
   PicaInsertionPoint *point = [self insertionPoint];
   // A data region cannot live inside a Rectangle, so a pasted one goes to the
   // band instead of being silently dropped.
-  if (![PicaItemFactory kind:item.type isAllowedAt:point]) {
+  if (![PicaItemFactory kind:item.rdlElementName isAllowedAt:point]) {
     [_selection selectBandWithKey:point.bandKey];
     point = [self insertionPoint];
-    if (![PicaItemFactory kind:item.type isAllowedAt:point])
+    if (![PicaItemFactory kind:item.rdlElementName isAllowedAt:point])
       return;
   }
   [PicaItemFactory renameTreeUniquely:item inReport:self.report];

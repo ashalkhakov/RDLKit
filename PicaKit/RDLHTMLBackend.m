@@ -26,29 +26,32 @@ static NSString *PicaHTMLEsc(NSString *s) {
   return o;
 }
 
-static NSString *PicaCSSAlign(NSString *a) {
-  if ([a isEqualToString:@"Center"])
+static NSString *PicaCSSAlign(RDLTextAlign a) {
+  if (a == RDLTextAlignCenter)
     return @"center";
-  if ([a isEqualToString:@"Right"])
+  if (a == RDLTextAlignRight)
     return @"right";
+  if (a == RDLTextAlignJustify)
+    return @"justify";
   return @"left";
 }
 
-static NSString *PicaCSSBorderStyle(NSString *s) {
-  if ([s isEqualToString:@"Dashed"])
+static NSString *PicaCSSBorderStyle(RDLBorderStyle s) {
+  if (s == RDLBorderStyleDashed)
     return @"dashed";
-  if ([s isEqualToString:@"Dotted"])
+  if (s == RDLBorderStyleDotted)
     return @"dotted";
-  if ([s isEqualToString:@"Double"])
+  if (s == RDLBorderStyleDouble)
     return @"double";
   return @"solid";
 }
 
 static void PicaAppendCSSBorder(NSMutableString *st, NSString *side, RDLBorder *b, RDLBorder *fallback) {
-  RDLBorder *use = (b && [b.style length] && ![b.style isEqualToString:@"None"]) ? b : fallback;
-  if (use == nil || [use.style length] == 0 || [use.style isEqualToString:@"None"])
+  RDLBorder *use = (b && b.style != RDLBorderStyleUnspecified &&
+                    b.style != RDLBorderStyleNone) ? b : fallback;
+  if (use == nil || use.style == RDLBorderStyleUnspecified || use.style == RDLBorderStyleNone)
     return;
-  [st appendFormat:@"border-%@:%@ %@ %@;", side, use.width.length ? use.width : @"1pt",
+  [st appendFormat:@"border-%@:%@ %@ %@;", side, [use.width stringValue] ?: @"1pt",
                    PicaCSSBorderStyle(use.style), use.color.length ? use.color : @"#1a1916"];
 }
 
@@ -57,7 +60,7 @@ static void PicaAppendCSSBox(NSMutableString *st, RDLStyle *s) {
     return;
   if (s.backgroundColor.length && ![s.backgroundColor isEqualToString:@"Transparent"])
     [st appendFormat:@"background:%@;", s.backgroundColor];
-  RDLBorder *all = (s.border && [s.border.style length] && ![s.border.style isEqualToString:@"None"])
+  RDLBorder *all = (s.border && s.border.style != RDLBorderStyleUnspecified && s.border.style != RDLBorderStyleNone)
                        ? s.border
                        : nil;
   PicaAppendCSSBorder(st, @"top", s.borderTop, all);
@@ -69,23 +72,23 @@ static void PicaAppendCSSBox(NSMutableString *st, RDLStyle *s) {
 static void PicaAppendCSSPadding(NSMutableString *st, RDLStyle *s) {
   if (s == nil)
     return;
-  [st appendFormat:@"padding:%@ %@ %@ %@;", s.paddingTop.length ? s.paddingTop : @"0",
-                   s.paddingRight.length ? s.paddingRight : @"0",
-                   s.paddingBottom.length ? s.paddingBottom : @"0",
-                   s.paddingLeft.length ? s.paddingLeft : @"0"];
+  [st appendFormat:@"padding:%@ %@ %@ %@;", [s.paddingTop stringValue] ?: @"0",
+                   [s.paddingRight stringValue] ?: @"0",
+                   [s.paddingBottom stringValue] ?: @"0",
+                   [s.paddingLeft stringValue] ?: @"0"];
 }
 
-static NSString *PicaCSSTextDecoration(NSString *d) {
-  if ([d isEqualToString:@"Underline"])
+static NSString *PicaCSSTextDecoration(RDLTextDecoration d) {
+  if (d == RDLTextDecorationUnderline)
     return @"underline";
-  if ([d isEqualToString:@"LineThrough"])
+  if (d == RDLTextDecorationLineThrough)
     return @"line-through";
-  if ([d isEqualToString:@"Overline"])
+  if (d == RDLTextDecorationOverline)
     return @"overline";
   return nil;
 }
 
-static NSString *PicaChartSVG(RDLLaidOutItem *it) {
+static NSString *PicaChartSVG(RDLLaidOutChart *it) {
   NSUInteger n = [it.values count];
   NSMutableString *svg = [NSMutableString string];
   CGFloat W = 400, H = 300;
@@ -98,9 +101,9 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
       max = [v doubleValue];
     total += fabs([v doubleValue]);
   }
-  NSString *type = [it.chartType lowercaseString] ?: @"column";
+  RDLChartType type = it.chartType;
   NSString *ink = @"#1a1916";
-  if (n && [type isEqualToString:@"pie"]) {
+  if (n && type == RDLChartTypePie) {
     double cx = W / 2, cy = H / 2, r = MIN(W, H) * 0.42;
     double angle = -M_PI_2;
     for (NSUInteger i = 0; i < n; i++) {
@@ -115,7 +118,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
                         cx, cy, x1, y1, r, r, large, x2, y2, shade];
       angle = a2;
     }
-  } else if (n && [type isEqualToString:@"line"]) {
+  } else if (n && type == RDLChartTypeLine) {
     [svg appendString:@"<polyline fill=\"none\" stroke=\"#1a1916\" stroke-width=\"3\" points=\""];
     for (NSUInteger i = 0; i < n; i++) {
       double x = n > 1 ? (W - 20) * i / (n - 1) + 10 : W / 2;
@@ -123,7 +126,7 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
       [svg appendFormat:@"%.1f,%.1f ", x, y];
     }
     [svg appendString:@"\"/>"];
-  } else if (n && [type isEqualToString:@"bar"]) {
+  } else if (n && type == RDLChartTypeBar) {
     CGFloat gap = (H - 20) / n;
     for (NSUInteger i = 0; i < n; i++) {
       double w = ([it.values[i] doubleValue] / max) * (W - 20);
@@ -186,23 +189,23 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
                        it.x, it.y, it.w, it.h];
       NSString *color = it.style.color.length ? it.style.color : @"#1a1916";
       NSString *ff = it.style.fontFamily.length ? it.style.fontFamily : @"Georgia";
-      NSString *fs = it.style.fontSize.length ? it.style.fontSize : @"10pt";
-      NSString *fw = [it.style.fontWeight isEqualToString:@"Bold"] ? @"700" : @"400";
+      NSString *fs = [it.style.fontSize stringValue] ?: @"10pt";
+      NSString *fw = RDLFontWeightIsBold(it.style.fontWeight) ? @"700" : @"400";
       [st appendFormat:@"color:%@;font-family:%@;font-size:%@;font-weight:%@;text-align:%@;",
                        color, ff, fs, fw, PicaCSSAlign(it.style.textAlign)];
-      if ([it.style.fontStyle isEqualToString:@"Italic"])
+      if (it.style.fontStyle == RDLFontStyleItalic)
         [st appendString:@"font-style:italic;"];
       NSString *deco = PicaCSSTextDecoration(it.style.textDecoration);
       if (deco)
         [st appendFormat:@"text-decoration:%@;", deco];
-      if ([it.kind isEqualToString:@"Line"]) {
+      if ([it isKindOfClass:[RDLLaidOutLine class]]) {
         // General line: SVG so vertical and sloped lines work too.
         RDLBorder *b = it.style.border;
-        NSString *lw = (b && b.width.length) ? b.width : @"1pt";
+        NSString *lw = [b.width stringValue] ?: @"1pt";
         NSString *dash = @"";
-        if ([b.style isEqualToString:@"Dashed"])
+        if (b.style == RDLBorderStyleDashed)
           dash = @" stroke-dasharray=\"6,4\"";
-        else if ([b.style isEqualToString:@"Dotted"])
+        else if (b.style == RDLBorderStyleDotted)
           dash = @" stroke-dasharray=\"2,3\"";
         NSString *lc = (b && b.color.length) ? b.color : color;
         lc = PicaHTMLEsc(lc);
@@ -229,28 +232,29 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         continue;
       }
       PicaAppendCSSBox(st, it.style);
-      if ([it.kind isEqualToString:@"Rectangle"]) {
+      if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {
         [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Rectangle\" style=\"%@\"></div>\n", PicaHTMLEsc(st)];
         continue;
       }
-      if ([it.kind isEqualToString:@"Image"]) {
+      if ([it isKindOfClass:[RDLLaidOutImage class]]) {
+        RDLLaidOutImage *img = (RDLLaidOutImage *)it;
         NSString *src = nil;
-        if ([it.imageData length]) {
+        if ([img.imageData length]) {
           src = [NSString stringWithFormat:@"data:%@;base64,%@",
-                                           it.imageMIME.length ? it.imageMIME : @"image/png",
-                                           [it.imageData base64EncodedStringWithOptions:0]];
-        } else if ([it.imageSrc length]) {
-          src = it.imageSrc;
+                                           img.imageMIME.length ? img.imageMIME : @"image/png",
+                                           [img.imageData base64EncodedStringWithOptions:0]];
+        } else if ([img.imageSrc length]) {
+          src = img.imageSrc;
         }
         [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Image\" style=\"%@\">", PicaHTMLEsc(st)];
         if (src) {
           NSString *fit = @"contain";
-          NSString *sizing = it.sizing ?: @"Fit";
-          if ([sizing isEqualToString:@"Fit"])
+          RDLImageSizing sizing = img.sizing != RDLImageSizingUnspecified ? img.sizing : RDLImageSizingFit;
+          if (sizing == RDLImageSizingFit)
             fit = @"fill";
-          else if ([sizing isEqualToString:@"Clip"])
+          else if (sizing == RDLImageSizingClip)
             fit = @"none";
-          else if ([sizing isEqualToString:@"AutoSize"])
+          else if (sizing == RDLImageSizingAutoSize)
             fit = @"none";
           NSString *img = [NSString
               stringWithFormat:@"<img src=\"%@\" alt=\"%@\" "
@@ -264,25 +268,26 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         [html appendString:@"</div>\n"];
         continue;
       }
-      if ([it.kind isEqualToString:@"Chart"]) {
+      if ([it isKindOfClass:[RDLLaidOutChart class]]) {
         [html appendFormat:@"<div class=\"pica-item\" data-kind=\"Chart\" style=\"%@\">", PicaHTMLEsc(st)];
-        [html appendString:PicaChartSVG(it)];
+        [html appendString:PicaChartSVG((RDLLaidOutChart *)it)];
         [html appendString:@"</div>\n"];
         continue;
       }
       // Textbox
+      RDLLaidOutTextbox *tb = (RDLLaidOutTextbox *)it;
       PicaAppendCSSPadding(st, it.style);
-      NSString *va = it.style.verticalAlign;
-      if ([va isEqualToString:@"Middle"])
+      RDLVerticalAlign va = it.style.verticalAlign;
+      if (va == RDLVerticalAlignMiddle)
         [st appendString:@"display:flex;flex-direction:column;justify-content:center;"];
-      else if ([va isEqualToString:@"Bottom"])
+      else if (va == RDLVerticalAlignBottom)
         [st appendString:@"display:flex;flex-direction:column;justify-content:flex-end;"];
       NSString *body;
-      if ([it.spans count]) {
+      if ([tb.spans count]) {
         // Rich text: one div per paragraph, one span per styled run.
         NSMutableString *rich = [NSMutableString string];
-        for (RDLParagraph *para in it.spans) {
-          if ([para.style.textAlign length])
+        for (RDLParagraph *para in tb.spans) {
+          if (para.style.textAlign != RDLTextAlignUnspecified)
             [rich appendFormat:@"<div style=\"text-align:%@;\">",
                                PicaCSSAlign(para.style.textAlign)];
           else
@@ -294,12 +299,12 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
               [rs appendFormat:@"color:%@;", s.color];
             if ([s.fontFamily length])
               [rs appendFormat:@"font-family:%@;", s.fontFamily];
-            if ([s.fontSize length])
-              [rs appendFormat:@"font-size:%@;", s.fontSize];
-            if ([s.fontWeight length])
+            if (s.fontSize)
+              [rs appendFormat:@"font-size:%@;", [s.fontSize stringValue]];
+            if (s.fontWeight != RDLFontWeightUnspecified)
               [rs appendFormat:@"font-weight:%@;",
-                               [s.fontWeight isEqualToString:@"Bold"] ? @"700" : @"400"];
-            if ([s.fontStyle isEqualToString:@"Italic"])
+                               s.fontWeight == RDLFontWeightBold ? @"700" : @"400"];
+            if (s.fontStyle == RDLFontStyleItalic)
               [rs appendString:@"font-style:italic;"];
             NSString *rdeco = PicaCSSTextDecoration(s.textDecoration);
             if (rdeco)
@@ -314,13 +319,13 @@ static NSString *PicaChartSVG(RDLLaidOutItem *it) {
         }
         body = rich;
       } else {
-        body = PicaHTMLEsc(it.text ?: @"");
+        body = PicaHTMLEsc(tb.text ?: @"");
       }
       if ([it.hyperlink length])
         body = [NSString stringWithFormat:@"<a href=\"%@\" style=\"color:inherit;\">%@</a>",
                                           PicaHTMLEsc(it.hyperlink), body];
       [html appendFormat:@"<div class=\"pica-item\" data-kind=\"%@\" style=\"%@\">%@</div>\n",
-                         PicaHTMLEsc(it.kind ?: @"Textbox"), PicaHTMLEsc(st), body];
+                         PicaHTMLEsc(it.rdlElementName ?: @"Textbox"), PicaHTMLEsc(st), body];
     }
     [html appendString:@"</section>\n"];
   }

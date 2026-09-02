@@ -153,8 +153,13 @@ static NSDate *PicaAsDate(id v, NSDate *fallback) {
 
 @interface PicaTok : NSObject
 @property (nonatomic, copy) NSString *kind;
-@property (nonatomic, copy) NSString *s;
+@property (nonatomic, copy) NSString *s;   // decoded value (string escapes resolved)
 @property (nonatomic, assign) double n;
+// Losslessness: `text` is the exact lexeme as written and `leading` is the
+// whitespace and comments that preceded it, so concatenating leading+text over
+// the token stream reproduces the source byte for byte.
+@property (nonatomic, copy) NSString *text;
+@property (nonatomic, copy) NSString *leading;
 @end
 @implementation PicaTok
 @end
@@ -175,6 +180,16 @@ static NSDate *PicaAsDate(id v, NSDate *fallback) {
   return self;
 }
 @end
+
+// Attach the lexeme and the trivia that preceded it, then remember where this
+// token ended so the next one knows what to pick up.
+static void PicaTokAppend(NSMutableArray *out, PicaTok *t, NSString *src, NSUInteger start,
+                          NSUInteger end, NSUInteger *lastEnd) {
+  t.leading = [src substringWithRange:NSMakeRange(*lastEnd, start - *lastEnd)];
+  t.text = [src substringWithRange:NSMakeRange(start, end - start)];
+  *lastEnd = end;
+  [out addObject:t];
+}
 
 static PicaTok *PicaMkTok(NSString *kind, NSString *s, double n) {
   PicaTok *t = [[PicaTok alloc] init];
@@ -202,12 +217,16 @@ static PicaAst *PicaOp(NSString *op, PicaAst *l, PicaAst *r) {
   return a;
 }
 
-static NSArray *PicaLex(NSString *src) {
+// `outTrailing` receives the whitespace or comment after the last token, which
+// is the only part of the source no token can carry.
+static NSArray *PicaLexKeepingTrivia(NSString *src, NSString **outTrailing) {
   NSMutableArray *out = [NSMutableArray array];
   NSUInteger i = 0, n = src.length;
+  NSUInteger lastEnd = 0;
   NSCharacterSet *digits = [NSCharacterSet decimalDigitCharacterSet];
   NSCharacterSet *letters = [NSCharacterSet letterCharacterSet];
   while (i < n) {
+    NSUInteger start = i;
     unichar c = [src characterAtIndex:i];
     if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
       i += 1;
@@ -240,7 +259,7 @@ static NSArray *PicaLex(NSString *src) {
         [buf appendFormat:@"%C", q];
         i += 1;
       }
-      [out addObject:PicaMkTok(@"str", buf, 0)];
+      PicaTokAppend(out, PicaMkTok(@"str", buf, 0), src, start, i, &lastEnd);
       continue;
     }
     if ([digits characterIsMember:c] ||
@@ -254,7 +273,7 @@ static NSArray *PicaLex(NSString *src) {
           i += 1;
       }
       NSString *num = [src substringWithRange:NSMakeRange(start, i - start)];
-      [out addObject:PicaMkTok(@"num", num, [num doubleValue])];
+      PicaTokAppend(out, PicaMkTok(@"num", num, [num doubleValue]), src, start, i, &lastEnd);
       continue;
     }
     if ([letters characterIsMember:c] || c == '_') {
@@ -267,31 +286,38 @@ static NSArray *PicaLex(NSString *src) {
         else
           break;
       }
-      [out addObject:PicaMkTok(@"id", [src substringWithRange:NSMakeRange(start, i - start)], 0)];
+      PicaTokAppend(out, PicaMkTok(@"id", [src substringWithRange:NSMakeRange(start, i - start)], 0),
+                    src, start, i, &lastEnd);
       continue;
     }
     if (i + 1 < n) {
       NSString *two = [src substringWithRange:NSMakeRange(i, 2)];
       if ([two isEqualToString:@"<>"] || [two isEqualToString:@">="] || [two isEqualToString:@"<="]) {
-        [out addObject:PicaMkTok(@"op", two, 0)];
         i += 2;
+        PicaTokAppend(out, PicaMkTok(@"op", two, 0), src, start, i, &lastEnd);
         continue;
       }
     }
     NSString *one = [src substringWithRange:NSMakeRange(i, 1)];
     if ([@"+-*/\\^&=<>" rangeOfString:one].location != NSNotFound) {
-      [out addObject:PicaMkTok(@"op", one, 0)];
       i += 1;
+      PicaTokAppend(out, PicaMkTok(@"op", one, 0), src, start, i, &lastEnd);
       continue;
     }
     if ([@"(),.!" rangeOfString:one].location != NSNotFound) {
-      [out addObject:PicaMkTok(@"p", one, 0)];
       i += 1;
+      PicaTokAppend(out, PicaMkTok(@"p", one, 0), src, start, i, &lastEnd);
       continue;
     }
     i += 1;
   }
+  if (outTrailing)
+    *outTrailing = [src substringWithRange:NSMakeRange(lastEnd, n - lastEnd)];
   return out;
+}
+
+static NSArray *PicaLex(NSString *src) {
+  return PicaLexKeepingTrivia(src, NULL);
 }
 
 #pragma mark - Parser
@@ -677,13 +703,10 @@ static id PicaField(RDLEvalScope *scope, NSString *name, NSString *prop) {
       if (![f isKindOfClass:[RDLField class]])
         continue;
       RDLField *fld = (RDLField *)f;
-      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || [fld.value length] == 0)
+      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || fld.value == nil)
         continue;
-      PicaAst *ast = PicaParse(fld.value);
-      if (ast) {
-        v = PicaExec(ast, scope);
-        break;
-      }
+      v = [fld.value evaluateInScope:scope];
+      break;
     }
   }
   if (missing)
@@ -696,13 +719,13 @@ static id PicaCoerceParamValue(RDLParameter *hit, id raw, RDLEvalScope *scope) {
     raw = [RDLExpression evaluate:raw scope:scope];
   if (raw == nil || ([raw isKindOfClass:[NSString class]] && [(NSString *)raw length] == 0))
     return hit.nullable ? nil : @"";
-  if ([hit.dataType isEqualToString:@"Integer"] || [hit.dataType isEqualToString:@"Float"])
+  if (hit.dataType == RDLParameterDataTypeInteger || hit.dataType == RDLParameterDataTypeFloat)
     return @([[raw description] doubleValue]);
-  if ([hit.dataType isEqualToString:@"Boolean"]) {
+  if (hit.dataType == RDLParameterDataTypeBoolean) {
     NSString *s = [raw description];
     return PicaYes([s caseInsensitiveCompare:@"true"] == NSOrderedSame || [s isEqualToString:@"1"]);
   }
-  if ([hit.dataType isEqualToString:@"DateTime"])
+  if (hit.dataType == RDLParameterDataTypeDateTime)
     return PicaAsDate(raw, nil) ?: raw;
   return raw;
 }
@@ -716,12 +739,18 @@ static id PicaParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
     return hit.prompt.length ? hit.prompt : (hit.name ?: name);
   id raw = scope.paramValues[hit.name ?: name];
   if (raw == nil || ([raw isKindOfClass:[NSString class]] && [(NSString *)raw length] == 0)) {
-    if (hit.multiValue && [hit.defaultValues count])
-      raw = hit.defaultValues;
-    else if ([hit.defaultValues count])
-      raw = hit.defaultValues[0];
-    else
-      raw = hit.defaultValue;
+    // Defaults are RDLValues, so a default written as an expression is
+    // evaluated here rather than handed on as its own source text.
+    if (hit.multiValue && [hit.defaultValues count]) {
+      NSMutableArray *defs = [NSMutableArray array];
+      for (RDLValue *d in hit.defaultValues)
+        [defs addObject:[d evaluateInScope:scope] ?: @""];
+      raw = defs;
+    } else if ([hit.defaultValues count]) {
+      raw = [hit.defaultValues[0] evaluateInScope:scope];
+    } else {
+      raw = [hit.defaultValue evaluateInScope:scope];
+    }
   }
   if (hit.multiValue && [raw isKindOfClass:[NSString class]])
     raw = @[ raw ];
@@ -1537,6 +1566,115 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
 + (NSString *)translationOf:(NSString *)expr {
   PicaAst *ast = PicaParse(expr);
   return ast ? PicaPrint(ast) : @"";
+}
+
+@end
+
+#pragma mark - RDLValue
+
+@implementation RDLValue
+
++ (instancetype)valueWithSource:(NSString *)source {
+  if ([source length] == 0)
+    return nil;
+  RDLExpr *expr = [RDLExpr expressionWithSource:source];
+  return expr ? [self expression:expr] : [self literal:source];
+}
+
++ (instancetype)literal:(NSString *)text {
+  RDLValue *v = [[RDLValue alloc] init];
+  v->_literal = [text copy];
+  return v;
+}
+
++ (instancetype)expression:(RDLExpr *)expression {
+  RDLValue *v = [[RDLValue alloc] init];
+  v->_expression = expression;
+  return v;
+}
+
+- (BOOL)isExpression {
+  return _expression != nil;
+}
+
+- (NSString *)source {
+  return _expression ? [_expression source] : _literal;
+}
+
+- (id)evaluateInScope:(RDLEvalScope *)scope {
+  return _expression ? [_expression evaluateInScope:scope] : (_literal ?: @"");
+}
+
+- (NSString *)evaluateTextInScope:(RDLEvalScope *)scope {
+  return PicaStr([self evaluateInScope:scope]);
+}
+
+- (BOOL)evaluateBoolInScope:(RDLEvalScope *)scope {
+  id v = [self evaluateInScope:scope];
+  if ([v isKindOfClass:[NSNumber class]])
+    return [v boolValue];
+  NSString *s = PicaStr(v);
+  return [s caseInsensitiveCompare:@"true"] == NSOrderedSame || [s isEqualToString:@"1"];
+}
+
+- (NSString *)description {
+  return [NSString stringWithFormat:@"<RDLValue %@>", [self source]];
+}
+
+@end
+
+#pragma mark - RDLExpr
+
+@implementation RDLExpr {
+  NSString *_prefix;    // everything up to and including the leading "="
+  NSArray *_toks;       // each carries its lexeme and the trivia before it
+  NSString *_trailing;  // whitespace after the last token
+  PicaAst *_ast;
+}
+
++ (BOOL)isExpressionSource:(NSString *)source {
+  return [source hasPrefix:@"="];
+}
+
++ (instancetype)expressionWithSource:(NSString *)source {
+  if (![self isExpressionSource:source])
+    return nil;
+  RDLExpr *e = [[RDLExpr alloc] init];
+  e->_prefix = [source substringToIndex:1];
+  NSString *body = [source substringFromIndex:1];
+  NSString *trailing = @"";
+  e->_toks = PicaLexKeepingTrivia(body, &trailing);
+  e->_trailing = trailing;
+  PicaParser *p = [[PicaParser alloc] init];
+  p.toks = e->_toks;
+  p.i = 0;
+  e->_ast = [p parse];
+  return e;
+}
+
+- (NSString *)source {
+  NSMutableString *out = [NSMutableString stringWithString:_prefix ?: @""];
+  for (PicaTok *t in _toks) {
+    [out appendString:t.leading ?: @""];
+    [out appendString:t.text ?: @""];
+  }
+  [out appendString:_trailing ?: @""];
+  return out;
+}
+
+- (id)evaluateInScope:(RDLEvalScope *)scope {
+  if (_ast == nil)
+    return [self source];
+  id v = PicaExec(_ast, scope);
+  return v == nil ? @"" : v;
+}
+
+- (NSString *)evaluateTextInScope:(RDLEvalScope *)scope {
+  return PicaStr([self evaluateInScope:scope]);
+}
+
+- (NSString *)description {
+  return [NSString stringWithFormat:@"<RDLExpr %@>", [self source]];
 }
 
 @end

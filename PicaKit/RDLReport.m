@@ -1,17 +1,295 @@
 #import "RDLReport.h"
 
+#pragma mark - Enum <-> RDL wire strings
+
+// One table per vocabulary, index 0 being the Unspecified case. Matching is
+// case-insensitive because real .rdl files in the wild are inconsistent about
+// it; writing always uses MS-RDL's own spelling.
+static NSInteger PicaEnumFromString(NSString *s, const char *const *names, NSInteger count) {
+  if ([s length] == 0)
+    return 0;
+  NSString *trimmed = [s stringByTrimmingCharactersInSet:
+                              [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  for (NSInteger i = 1; i < count; i++) {
+    if ([trimmed caseInsensitiveCompare:@(names[i])] == NSOrderedSame)
+      return i;
+  }
+  return 0;
+}
+
+// nil for Unspecified, so a caller can tell "write nothing" from "write a value".
+static NSString *PicaStringFromEnum(NSInteger v, const char *const *names, NSInteger count) {
+  if (v <= 0 || v >= count)
+    return nil;
+  return @(names[v]);
+}
+
+static const char *const kRDLBorderStyleNames[] = {"", "Default", "None", "Dotted", "Dashed", "Solid", "Double", "Groove", "Ridge", "Inset", "WindowInset", "Outset"};
+static const NSInteger kRDLBorderStyleNamesCount = (NSInteger)(sizeof(kRDLBorderStyleNames) / sizeof(*kRDLBorderStyleNames));
+RDLBorderStyle RDLBorderStyleFromString(NSString *s) {
+  return (RDLBorderStyle)PicaEnumFromString(s, kRDLBorderStyleNames, kRDLBorderStyleNamesCount);
+}
+NSString *RDLStringFromBorderStyle(RDLBorderStyle v) {
+  return PicaStringFromEnum(v, kRDLBorderStyleNames, kRDLBorderStyleNamesCount);
+}
+
+static const char *const kRDLFontWeightNames[] = {"", "Lighter", "Normal", "Bold", "Bolder", "100", "200", "300", "400", "500", "600", "700", "800", "900", "SemiBold", "Heavy", "ExtraBold"};
+static const NSInteger kRDLFontWeightNamesCount = (NSInteger)(sizeof(kRDLFontWeightNames) / sizeof(*kRDLFontWeightNames));
+RDLFontWeight RDLFontWeightFromString(NSString *s) {
+  return (RDLFontWeight)PicaEnumFromString(s, kRDLFontWeightNames, kRDLFontWeightNamesCount);
+}
+NSString *RDLStringFromFontWeight(RDLFontWeight v) {
+  return PicaStringFromEnum(v, kRDLFontWeightNames, kRDLFontWeightNamesCount);
+}
+
+static const char *const kRDLFontStyleNames[] = {"", "Normal", "Italic"};
+static const NSInteger kRDLFontStyleNamesCount = (NSInteger)(sizeof(kRDLFontStyleNames) / sizeof(*kRDLFontStyleNames));
+RDLFontStyle RDLFontStyleFromString(NSString *s) {
+  return (RDLFontStyle)PicaEnumFromString(s, kRDLFontStyleNames, kRDLFontStyleNamesCount);
+}
+NSString *RDLStringFromFontStyle(RDLFontStyle v) {
+  return PicaStringFromEnum(v, kRDLFontStyleNames, kRDLFontStyleNamesCount);
+}
+
+static const char *const kRDLTextAlignNames[] = {"", "General", "Left", "Center", "Right", "Justify"};
+static const NSInteger kRDLTextAlignNamesCount = (NSInteger)(sizeof(kRDLTextAlignNames) / sizeof(*kRDLTextAlignNames));
+RDLTextAlign RDLTextAlignFromString(NSString *s) {
+  return (RDLTextAlign)PicaEnumFromString(s, kRDLTextAlignNames, kRDLTextAlignNamesCount);
+}
+NSString *RDLStringFromTextAlign(RDLTextAlign v) {
+  return PicaStringFromEnum(v, kRDLTextAlignNames, kRDLTextAlignNamesCount);
+}
+
+static const char *const kRDLVerticalAlignNames[] = {"", "Top", "Middle", "Bottom"};
+static const NSInteger kRDLVerticalAlignNamesCount = (NSInteger)(sizeof(kRDLVerticalAlignNames) / sizeof(*kRDLVerticalAlignNames));
+RDLVerticalAlign RDLVerticalAlignFromString(NSString *s) {
+  return (RDLVerticalAlign)PicaEnumFromString(s, kRDLVerticalAlignNames, kRDLVerticalAlignNamesCount);
+}
+NSString *RDLStringFromVerticalAlign(RDLVerticalAlign v) {
+  return PicaStringFromEnum(v, kRDLVerticalAlignNames, kRDLVerticalAlignNamesCount);
+}
+
+static const char *const kRDLTextDecorationNames[] = {"", "None", "Underline", "Overline", "LineThrough"};
+static const NSInteger kRDLTextDecorationNamesCount = (NSInteger)(sizeof(kRDLTextDecorationNames) / sizeof(*kRDLTextDecorationNames));
+RDLTextDecoration RDLTextDecorationFromString(NSString *s) {
+  return (RDLTextDecoration)PicaEnumFromString(s, kRDLTextDecorationNames, kRDLTextDecorationNamesCount);
+}
+NSString *RDLStringFromTextDecoration(RDLTextDecoration v) {
+  return PicaStringFromEnum(v, kRDLTextDecorationNames, kRDLTextDecorationNamesCount);
+}
+
+static const char *const kRDLImageSourceNames[] = {"", "External", "Embedded", "Database"};
+static const NSInteger kRDLImageSourceNamesCount = (NSInteger)(sizeof(kRDLImageSourceNames) / sizeof(*kRDLImageSourceNames));
+RDLImageSource RDLImageSourceFromString(NSString *s) {
+  return (RDLImageSource)PicaEnumFromString(s, kRDLImageSourceNames, kRDLImageSourceNamesCount);
+}
+NSString *RDLStringFromImageSource(RDLImageSource v) {
+  return PicaStringFromEnum(v, kRDLImageSourceNames, kRDLImageSourceNamesCount);
+}
+
+static const char *const kRDLImageSizingNames[] = {"", "AutoSize", "Fit", "FitProportional", "Clip"};
+static const NSInteger kRDLImageSizingNamesCount = (NSInteger)(sizeof(kRDLImageSizingNames) / sizeof(*kRDLImageSizingNames));
+RDLImageSizing RDLImageSizingFromString(NSString *s) {
+  return (RDLImageSizing)PicaEnumFromString(s, kRDLImageSizingNames, kRDLImageSizingNamesCount);
+}
+NSString *RDLStringFromImageSizing(RDLImageSizing v) {
+  return PicaStringFromEnum(v, kRDLImageSizingNames, kRDLImageSizingNamesCount);
+}
+
+static const char *const kRDLPageBreakLocationNames[] = {"", "None", "Start", "End", "StartAndEnd", "Between"};
+static const NSInteger kRDLPageBreakLocationNamesCount = (NSInteger)(sizeof(kRDLPageBreakLocationNames) / sizeof(*kRDLPageBreakLocationNames));
+RDLPageBreakLocation RDLPageBreakLocationFromString(NSString *s) {
+  return (RDLPageBreakLocation)PicaEnumFromString(s, kRDLPageBreakLocationNames, kRDLPageBreakLocationNamesCount);
+}
+NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v) {
+  return PicaStringFromEnum(v, kRDLPageBreakLocationNames, kRDLPageBreakLocationNamesCount);
+}
+
+static const char *const kRDLKeepWithGroupNames[] = {"", "None", "Before", "After"};
+static const NSInteger kRDLKeepWithGroupNamesCount = (NSInteger)(sizeof(kRDLKeepWithGroupNames) / sizeof(*kRDLKeepWithGroupNames));
+RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s) {
+  return (RDLKeepWithGroup)PicaEnumFromString(s, kRDLKeepWithGroupNames, kRDLKeepWithGroupNamesCount);
+}
+NSString *RDLStringFromKeepWithGroup(RDLKeepWithGroup v) {
+  return PicaStringFromEnum(v, kRDLKeepWithGroupNames, kRDLKeepWithGroupNamesCount);
+}
+
+static const char *const kRDLFilterOperatorNames[] = {"", "Equal", "NotEqual", "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual", "Like", "TopN", "BottomN", "TopPercent", "BottomPercent", "In", "Between", "Contains"};
+static const NSInteger kRDLFilterOperatorNamesCount = (NSInteger)(sizeof(kRDLFilterOperatorNames) / sizeof(*kRDLFilterOperatorNames));
+RDLFilterOperator RDLFilterOperatorFromString(NSString *s) {
+  return (RDLFilterOperator)PicaEnumFromString(s, kRDLFilterOperatorNames, kRDLFilterOperatorNamesCount);
+}
+NSString *RDLStringFromFilterOperator(RDLFilterOperator v) {
+  return PicaStringFromEnum(v, kRDLFilterOperatorNames, kRDLFilterOperatorNamesCount);
+}
+
+static const char *const kRDLSortDirectionNames[] = {"", "Ascending", "Descending"};
+static const NSInteger kRDLSortDirectionNamesCount = (NSInteger)(sizeof(kRDLSortDirectionNames) / sizeof(*kRDLSortDirectionNames));
+RDLSortDirection RDLSortDirectionFromString(NSString *s) {
+  return (RDLSortDirection)PicaEnumFromString(s, kRDLSortDirectionNames, kRDLSortDirectionNamesCount);
+}
+NSString *RDLStringFromSortDirection(RDLSortDirection v) {
+  return PicaStringFromEnum(v, kRDLSortDirectionNames, kRDLSortDirectionNamesCount);
+}
+
+static const char *const kRDLParameterDataTypeNames[] = {"", "Boolean", "DateTime", "Integer", "Float", "String"};
+static const NSInteger kRDLParameterDataTypeNamesCount = (NSInteger)(sizeof(kRDLParameterDataTypeNames) / sizeof(*kRDLParameterDataTypeNames));
+RDLParameterDataType RDLParameterDataTypeFromString(NSString *s) {
+  return (RDLParameterDataType)PicaEnumFromString(s, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
+}
+NSString *RDLStringFromParameterDataType(RDLParameterDataType v) {
+  return PicaStringFromEnum(v, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
+}
+
+static const char *const kRDLChartTypeNames[] = {"", "Column", "Bar", "Line", "Pie"};
+static const NSInteger kRDLChartTypeNamesCount = (NSInteger)(sizeof(kRDLChartTypeNames) / sizeof(*kRDLChartTypeNames));
+RDLChartType RDLChartTypeFromString(NSString *s) {
+  return (RDLChartType)PicaEnumFromString(s, kRDLChartTypeNames, kRDLChartTypeNamesCount);
+}
+NSString *RDLStringFromChartType(RDLChartType v) {
+  return PicaStringFromEnum(v, kRDLChartTypeNames, kRDLChartTypeNamesCount);
+}
+
+
+BOOL RDLFontWeightIsBold(RDLFontWeight weight) {
+  switch (weight) {
+    case RDLFontWeightBold:
+    case RDLFontWeightBolder:
+    case RDLFontWeight600:
+    case RDLFontWeight700:
+    case RDLFontWeight800:
+    case RDLFontWeight900:
+    case RDLFontWeightSemiBold:
+    case RDLFontWeightHeavy:
+    case RDLFontWeightExtraBold:
+      return YES;
+    default:
+      return NO;
+  }
+}
+
+BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op) {
+  return op == RDLFilterOperatorIn || op == RDLFilterOperatorBetween;
+}
+
+@implementation RDLLength
+
++ (instancetype)lengthWithValue:(double)value unit:(RDLLengthUnit)unit {
+  RDLLength *l = [[RDLLength alloc] init];
+  l->_value = value;
+  l->_unit = unit == RDLLengthUnitUnspecified ? RDLLengthUnitPoint : unit;
+  return l;
+}
+
++ (instancetype)points:(double)points {
+  return [self lengthWithValue:points unit:RDLLengthUnitPoint];
+}
+
++ (instancetype)inches:(double)inches {
+  return [self lengthWithValue:inches unit:RDLLengthUnitInch];
+}
+
++ (instancetype)lengthFromString:(NSString *)string {
+  NSString *t = [string stringByTrimmingCharactersInSet:
+                            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if ([t length] == 0)
+    return nil;
+  NSString *lower = [t lowercaseString];
+  RDLLengthUnit unit = RDLLengthUnitPoint;
+  if ([lower hasSuffix:@"in"])
+    unit = RDLLengthUnitInch;
+  else if ([lower hasSuffix:@"cm"])
+    unit = RDLLengthUnitCentimeter;
+  else if ([lower hasSuffix:@"mm"])
+    unit = RDLLengthUnitMillimeter;
+  else if ([lower hasSuffix:@"pc"])
+    unit = RDLLengthUnitPica;
+  return [self lengthWithValue:[t doubleValue] unit:unit];
+}
+
+static const char *PicaLengthUnitSuffix(RDLLengthUnit unit) {
+  switch (unit) {
+    case RDLLengthUnitInch:
+      return "in";
+    case RDLLengthUnitCentimeter:
+      return "cm";
+    case RDLLengthUnitMillimeter:
+      return "mm";
+    case RDLLengthUnitPica:
+      return "pc";
+    default:
+      return "pt";
+  }
+}
+
+- (NSString *)stringValue {
+  // %g so a whole number reads as "10pt" rather than "10.000000pt".
+  return [NSString stringWithFormat:@"%g%s", _value, PicaLengthUnitSuffix(_unit)];
+}
+
+- (CGFloat)points {
+  switch (_unit) {
+    case RDLLengthUnitInch:
+      return (CGFloat)(_value * 72.0);
+    case RDLLengthUnitCentimeter:
+      return (CGFloat)(_value / 2.54 * 72.0);
+    case RDLLengthUnitMillimeter:
+      return (CGFloat)(_value / 25.4 * 72.0);
+    case RDLLengthUnitPica:
+      return (CGFloat)(_value * 12.0);
+    default:
+      return (CGFloat)_value;
+  }
+}
+
+- (CGFloat)inches {
+  return [self points] / 72.0;
+}
+
+- (BOOL)isEqual:(id)other {
+  if (![other isKindOfClass:[RDLLength class]])
+    return NO;
+  RDLLength *o = other;
+  return o->_unit == _unit && fabs(o->_value - _value) < 1e-9;
+}
+
+- (NSUInteger)hash {
+  return (NSUInteger)(_value * 1000) ^ (NSUInteger)_unit;
+}
+
+- (NSString *)description {
+  return [self stringValue];
+}
+
+@end
+
+@implementation RDLStyleExpressions
+- (BOOL)isEmpty {
+  return _fontFamily == nil && _fontSize == nil && _fontWeight == nil && _fontStyle == nil &&
+         _color == nil && _backgroundColor == nil && _textAlign == nil && _verticalAlign == nil &&
+         _textDecoration == nil && _format == nil && _paddingLeft == nil && _paddingRight == nil &&
+         _paddingTop == nil && _paddingBottom == nil;
+}
+@end
+
+@implementation RDLBorderExpressions
+- (BOOL)isEmpty {
+  return _style == nil && _width == nil && _color == nil;
+}
+@end
+
 @implementation RDLBorder
 + (instancetype)none {
   RDLBorder *b = [[RDLBorder alloc] init];
-  b.style = @"None";
-  b.width = @"1pt";
+  b.style = RDLBorderStyleNone;
+  b.width = [RDLLength points:1];
   b.color = @"#1a1916";
   return b;
 }
 + (instancetype)solidColor:(NSString *)color {
   RDLBorder *b = [[RDLBorder alloc] init];
-  b.style = @"Solid";
-  b.width = @"1pt";
+  b.style = RDLBorderStyleSolid;
+  b.width = [RDLLength points:1];
   b.color = color ?: @"#1a1916";
   return b;
 }
@@ -21,18 +299,18 @@
 + (instancetype)defaultStyle {
   RDLStyle *s = [[RDLStyle alloc] init];
   s.fontFamily = @"Georgia";
-  s.fontSize = @"10pt";
-  s.fontWeight = @"Normal";
-  s.fontStyle = @"Normal";
+  s.fontSize = [RDLLength points:10];
+  s.fontWeight = RDLFontWeightNormal;
+  s.fontStyle = RDLFontStyleNormal;
   s.color = @"#1a1916";
   s.backgroundColor = @"Transparent";
-  s.textAlign = @"Left";
-  s.verticalAlign = @"Top";
-  s.textDecoration = @"None";
-  s.paddingLeft = @"4pt";
-  s.paddingRight = @"4pt";
-  s.paddingTop = @"2pt";
-  s.paddingBottom = @"2pt";
+  s.textAlign = RDLTextAlignLeft;
+  s.verticalAlign = RDLVerticalAlignTop;
+  s.textDecoration = RDLTextDecorationNone;
+  s.paddingLeft = [RDLLength points:4];
+  s.paddingRight = [RDLLength points:4];
+  s.paddingTop = [RDLLength points:2];
+  s.paddingBottom = [RDLLength points:2];
   s.border = [RDLBorder none];
   s.borderLeft = [RDLBorder none];
   s.borderRight = [RDLBorder none];
@@ -44,14 +322,15 @@
 + (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base {
   RDLStyle *s = [[RDLStyle alloc] init];
   s.fontFamily = [run.fontFamily length] ? run.fontFamily : base.fontFamily;
-  s.fontSize = [run.fontSize length] ? run.fontSize : base.fontSize;
-  s.fontWeight = [run.fontWeight length] ? run.fontWeight : base.fontWeight;
-  s.fontStyle = [run.fontStyle length] ? run.fontStyle : base.fontStyle;
+  s.fontSize = run.fontSize ?: base.fontSize;
+  s.fontWeight = run.fontWeight != RDLFontWeightUnspecified ? run.fontWeight : base.fontWeight;
+  s.fontStyle = run.fontStyle != RDLFontStyleUnspecified ? run.fontStyle : base.fontStyle;
   s.color = [run.color length] ? run.color : base.color;
   s.backgroundColor = [run.backgroundColor length] ? run.backgroundColor : base.backgroundColor;
-  s.textAlign = [run.textAlign length] ? run.textAlign : base.textAlign;
+  s.textAlign = run.textAlign != RDLTextAlignUnspecified ? run.textAlign : base.textAlign;
   s.verticalAlign = base.verticalAlign;
-  s.textDecoration = [run.textDecoration length] ? run.textDecoration : base.textDecoration;
+  s.textDecoration =
+      run.textDecoration != RDLTextDecorationUnspecified ? run.textDecoration : base.textDecoration;
   s.format = [run.format length] ? run.format : base.format;
   s.paddingLeft = base.paddingLeft;
   s.paddingRight = base.paddingRight;
@@ -121,7 +400,7 @@
     _groupExpressions = [NSMutableArray array];
     _sortExpressions = [NSMutableArray array];
     _filters = [NSMutableArray array];
-    _keepWithGroup = @"None";
+    _keepWithGroup = RDLKeepWithGroupNone;
   }
   return self;
 }
@@ -132,7 +411,7 @@
   self = [super init];
   if (self) {
     _values = [NSMutableArray array];
-    _oper = @"Equal";
+    _oper = RDLFilterOperatorEqual;
   }
   return self;
 }
@@ -142,7 +421,7 @@
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _direction = @"Ascending";
+    _direction = RDLSortDirectionAscending;
   }
   return self;
 }
@@ -163,6 +442,10 @@
 @end
 
 // One column of the designer table, resolved once per build.
+// The width of one dynamic row-group header column. -picaGroupMemberForField:
+// builds headers this wide, and the fit calculation has to agree with it.
+static const CGFloat kPicaGroupHeaderWidth = 1.2;
+
 @interface PicaColSpec : NSObject
 @property (nonatomic, copy) NSString *header, *value, *align, *aggregate, *field;
 @property (nonatomic, assign) CGFloat width;
@@ -170,7 +453,103 @@
 @implementation PicaColSpec
 @end
 
-@implementation RDLItem {
+@implementation RDLItem
+
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _style = [RDLStyle defaultStyle];
+  return self;
+}
+
+// Abstract: every concrete kind answers for itself.
+- (NSString *)rdlElementName {
+  return NSStringFromClass([self class]);
+}
+
+- (NSArray<RDLItem *> *)childItems {
+  return @[];
+}
+
+- (NSString *)description {
+  return [NSString stringWithFormat:@"<%@ %@>", NSStringFromClass([self class]), _name];
+}
+
+@end
+
+@implementation RDLTextbox
+
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _canGrow = YES;
+  return self;
+}
+
+- (NSString *)rdlElementName {
+  return @"Textbox";
+}
+
+@end
+
+@implementation RDLLine
+- (NSString *)rdlElementName {
+  return @"Line";
+}
+@end
+
+@implementation RDLRectangle
+
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _items = [NSMutableArray array];
+  return self;
+}
+
+- (NSString *)rdlElementName {
+  return @"Rectangle";
+}
+
+- (NSArray<RDLItem *> *)childItems {
+  return _items ?: @[];
+}
+
+@end
+
+@implementation RDLImage
+- (NSString *)rdlElementName {
+  return @"Image";
+}
+@end
+
+@implementation RDLDataRegion
+
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _filters = [NSMutableArray array];
+    _sortExpressions = [NSMutableArray array];
+  }
+  return self;
+}
+
+@end
+
+@implementation RDLChart
+- (NSString *)rdlElementName {
+  return @"Chart";
+}
+@end
+
+// CellContents may hold any report item; everything this file builds and reads
+// back puts a textbox there.
+static NSString *PicaCellValue(RDLTablixCell *cell) {
+  RDLItem *it = cell.item;
+  return [it isKindOfClass:[RDLTextbox class]] ? [(RDLTextbox *)it value] : nil;
+}
+
+@implementation RDLTablix {
   CGFloat _stashHeaderH;
   CGFloat _stashRowH;
 }
@@ -178,17 +557,15 @@
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _style = [RDLStyle defaultStyle];
-    _type = @"Textbox";
-    _canGrow = YES;
     _stashHeaderH = 0.3;
     _stashRowH = 0.28;
-    _items = [NSMutableArray array];
-    _filters = [NSMutableArray array];
-    _sortExpressions = [NSMutableArray array];
     _cornerRows = [NSMutableArray array];
   }
   return self;
+}
+
+- (NSString *)rdlElementName {
+  return @"Tablix";
 }
 
 - (BOOL)picaIsMatrix {
@@ -261,13 +638,13 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   if ([self.pivotBy length] && [self.groupBy length]) {
     // Matrix: one measure column; recover the designer spec from the data cell.
     RDLItem *cell = _tablixBody.rows.firstObject.cells.firstObject.item;
-    NSString *val = cell.value ?: @"";
+    NSString *val = PicaCellValue(_tablixBody.rows.firstObject.cells.firstObject) ?: @"";
     NSMutableDictionary *col = [NSMutableDictionary dictionary];
     col[@"width"] = @(_tablixBody.columns[0].width);
     col[@"header"] = @"";
     col[@"value"] = val;
-    if ([cell.style.textAlign length])
-      col[@"align"] = cell.style.textAlign;
+    if (cell.style.textAlign != RDLTextAlignUnspecified)
+      col[@"align"] = RDLStringFromTextAlign(cell.style.textAlign);
     NSString *agg = PicaAggregateOfValue(val);
     if (agg) {
       col[@"aggregate"] = agg;
@@ -294,17 +671,17 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     col[@"width"] = @(w);
     col[@"header"] = @"";
     col[@"value"] = @"";
-    if (i < [header.cells count] && header.cells[i].item.value)
-      col[@"header"] = header.cells[i].item.value;
+    if (i < [header.cells count] && PicaCellValue(header.cells[i]))
+      col[@"header"] = PicaCellValue(header.cells[i]);
     if (detail && i < [detail.cells count]) {
       RDLItem *dItem = detail.cells[i].item;
-      if (dItem.value)
-        col[@"value"] = dItem.value;
-      if ([dItem.style.textAlign length])
-        col[@"align"] = dItem.style.textAlign;
+      if (PicaCellValue(detail.cells[i]))
+        col[@"value"] = PicaCellValue(detail.cells[i]);
+      if (dItem.style.textAlign != RDLTextAlignUnspecified)
+        col[@"align"] = RDLStringFromTextAlign(dItem.style.textAlign);
     }
     if (aggRow && i < [aggRow.cells count]) {
-      NSString *agg = PicaAggregateOfValue(aggRow.cells[i].item.value ?: @"");
+      NSString *agg = PicaAggregateOfValue(PicaCellValue(aggRow.cells[i]) ?: @"");
       if (agg)
         col[@"aggregate"] = agg;
     }
@@ -313,10 +690,64 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   return cols;
 }
 
+- (CGFloat)picaRowHeaderWidthForGroupBy2:(BOOL)hasGroupBy2 {
+  return hasGroupBy2 ? 2 * kPicaGroupHeaderWidth : kPicaGroupHeaderWidth;
+}
+
+// The width this tablix has to live inside: its own, bounded by what is left
+// of the report body to its right. Zero when neither is known, which means
+// "unconstrained" and leaves the old grow-to-fit-content behaviour alone.
+- (CGFloat)picaAvailableWidth {
+  CGFloat avail = self.width;
+  RDLReport *report = self.report;
+  if (report != nil && report.width > 0) {
+    CGFloat toEdge = report.width - self.left;
+    if (avail <= 0 || avail > toEdge)
+      avail = toEdge;
+  }
+  return avail;
+}
+
+// Grouping prepends a row-header column that no column spec budgeted for, so a
+// tablix whose columns already filled its width would otherwise be pushed off
+// the page -- growing past the body on the canvas, and spilling its last
+// columns onto an extra horizontal page when rendered. Take the header's width
+// out of the columns instead, in proportion, so the tablix still ends where it
+// used to. Widths are written back to columnSpecs, which is what the next
+// rebuild reads: shrinking only the built columns would overflow again.
+- (NSArray<NSDictionary *> *)picaSpecsFittingWidth:(NSArray<NSDictionary *> *)specs {
+  if (![self.groupBy length] || [self.pivotBy length] || [specs count] == 0)
+    return specs; // no row header, or a matrix, which uses one measure column
+  CGFloat avail = [self picaAvailableWidth];
+  CGFloat headerW = [self picaRowHeaderWidthForGroupBy2:[self.groupBy2 length] > 0];
+  if (avail <= headerW)
+    return specs; // nothing sensible left to divide up
+  CGFloat total = 0;
+  for (NSDictionary *c in specs)
+    total += MAX([c[@"width"] doubleValue], 0);
+  CGFloat target = avail - headerW;
+  if (total <= target + 1e-6)
+    return specs; // already fits
+  CGFloat scale = target / total;
+  // The columns are being made to fit `avail`, so the frame drawn around them
+  // has to be `avail` too -- otherwise a tablix that started wider than the
+  // page keeps its old frame and still hangs off the edge on the canvas.
+  self.width = avail;
+  NSMutableArray *out = [NSMutableArray arrayWithCapacity:[specs count]];
+  for (NSDictionary *c in specs) {
+    NSMutableDictionary *m = [c mutableCopy];
+    m[@"width"] = @(MAX([c[@"width"] doubleValue], 0) * scale);
+    [out addObject:m];
+  }
+  _columnSpecs = [out copy];
+  return out;
+}
+
 - (void)rebuildTablix {
   NSArray *specs = _columnSpecs ?: [self picaDerivedColumns];
-  _type = @"Tablix";
-  [self picaBuildTable:specs headerHeight:self.headerHeight rowHeight:self.rowHeight];
+  [self picaBuildTable:[self picaSpecsFittingWidth:specs]
+          headerHeight:self.headerHeight
+             rowHeight:self.rowHeight];
 }
 
 - (void)inferColumnSpecsFromTablixBody {
@@ -338,14 +769,13 @@ static NSString *PicaAggregateOfValue(NSString *value) {
       anyExplicit = YES;
   for (NSInteger i = 0; i < n; i++) {
     PicaColSpec *s = specs[(NSUInteger)i];
-    RDLItem *t = [[RDLItem alloc] init];
-    t.type = @"Textbox";
+    RDLTextbox *t = [[RDLTextbox alloc] init];
     t.name = [NSString stringWithFormat:@"%@%@%ld", self.name ?: @"T", prefix, (long)i];
-    t.style.fontWeight = @"Bold";
+    t.style.fontWeight = RDLFontWeightBold;
     t.style.borderTop = [RDLBorder solidColor:@"#1a1916"];
-    t.style.borderTop.width = @"0.5pt";
+    t.style.borderTop.width = [RDLLength points:0.5];
     if ([s.align length])
-      t.style.textAlign = s.align;
+      t.style.textAlign = RDLTextAlignFromString(s.align);
     NSString *agg = nil;
     if (anyExplicit) {
       if ([s.aggregate length] && [s.field length])
@@ -357,7 +787,7 @@ static NSString *PicaAggregateOfValue(NSString *value) {
       t.value = agg;
     } else if (i == 0) {
       t.value = label;
-      t.style.fontStyle = @"Italic";
+      t.style.fontStyle = RDLFontStyleItalic;
       t.style.color = @"#5c574e";
     } else {
       t.value = @"";
@@ -393,11 +823,11 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   [body.columns addObject:tc];
   RDLTablixRow *data = [[RDLTablixRow alloc] init];
   data.height = rh;
-  RDLItem *cell = [[RDLItem alloc] init];
-  cell.type = @"Textbox";
+  RDLTextbox *cell = [[RDLTextbox alloc] init];
   cell.name = [NSString stringWithFormat:@"%@Cell", self.name ?: @"T"];
   cell.value = cellValue;
-  cell.style.textAlign = [m[@"align"] length] ? m[@"align"] : @"Right";
+  cell.style.textAlign = [m[@"align"] length] ? RDLTextAlignFromString(m[@"align"])
+                                             : RDLTextAlignRight;
   RDLTablixCell *dc = [[RDLTablixCell alloc] init];
   dc.item = cell;
   [data.cells addObject:dc];
@@ -406,16 +836,15 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   RDLTablixHierarchy *colH = [[RDLTablixHierarchy alloc] init];
   RDLTablixMember *cMem = [[RDLTablixMember alloc] init];
   cMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.pivotBy];
-  [cMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy]];
+  [cMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy]]];
   RDLTablixHeader *chd = [[RDLTablixHeader alloc] init];
   chd.size = hh;
-  RDLItem *cht = [[RDLItem alloc] init];
-  cht.type = @"Textbox";
+  RDLTextbox *cht = [[RDLTextbox alloc] init];
   cht.name = [NSString stringWithFormat:@"%@CHdr", self.name ?: @"T"];
   cht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy];
-  cht.style.fontWeight = @"Bold";
+  cht.style.fontWeight = RDLFontWeightBold;
   cht.style.backgroundColor = @"#ece6d8";
-  cht.style.textAlign = @"Center";
+  cht.style.textAlign = RDLTextAlignCenter;
   chd.item = cht;
   cMem.header = chd;
   [colH.members addObject:cMem];
@@ -423,15 +852,14 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   RDLTablixHierarchy *rowH = [[RDLTablixHierarchy alloc] init];
   RDLTablixMember *rMem = [[RDLTablixMember alloc] init];
   rMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.groupBy];
-  [rMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy]];
+  [rMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy]]];
   rMem.keepTogether = YES;
   RDLTablixHeader *rhd = [[RDLTablixHeader alloc] init];
   rhd.size = 1.2;
-  RDLItem *rht = [[RDLItem alloc] init];
-  rht.type = @"Textbox";
+  RDLTextbox *rht = [[RDLTextbox alloc] init];
   rht.name = [NSString stringWithFormat:@"%@RHdr", self.name ?: @"T"];
   rht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy];
-  rht.style.fontWeight = @"Bold";
+  rht.style.fontWeight = RDLFontWeightBold;
   rhd.item = rht;
   rMem.header = rhd;
   [rowH.members addObject:rMem];
@@ -441,20 +869,19 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     // column at dataset scope.
     RDLTablixRow *total = [[RDLTablixRow alloc] init];
     total.height = rh;
-    RDLItem *tcell = [[RDLItem alloc] init];
-    tcell.type = @"Textbox";
+    RDLTextbox *tcell = [[RDLTextbox alloc] init];
     tcell.name = [NSString stringWithFormat:@"%@GT", self.name ?: @"T"];
     tcell.value = cellValue;
-    tcell.style.fontWeight = @"Bold";
+    tcell.style.fontWeight = RDLFontWeightBold;
     tcell.style.textAlign = cell.style.textAlign;
     tcell.style.borderTop = [RDLBorder solidColor:@"#1a1916"];
-    tcell.style.borderTop.width = @"0.5pt";
+    tcell.style.borderTop.width = [RDLLength points:0.5];
     RDLTablixCell *tcc = [[RDLTablixCell alloc] init];
     tcc.item = tcell;
     [total.cells addObject:tcc];
     [body.rows addObject:total];
     RDLTablixMember *tMem = [[RDLTablixMember alloc] init];
-    tMem.keepWithGroup = @"Before";
+    tMem.keepWithGroup = RDLKeepWithGroupBefore;
     [rowH.members addObject:tMem];
   }
 
@@ -462,12 +889,11 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   if (![self.noRowsMessage length])
     self.noRowsMessage = @"No rows.";
   RDLTablixCell *corner = [[RDLTablixCell alloc] init];
-  RDLItem *ct = [[RDLItem alloc] init];
-  ct.type = @"Textbox";
+  RDLTextbox *ct = [[RDLTextbox alloc] init];
   ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
   ct.value = [NSString stringWithFormat:@"%@ \\ %@", self.groupBy, self.pivotBy];
-  ct.style.fontWeight = @"Bold";
-  ct.style.fontSize = @"8pt";
+  ct.style.fontWeight = RDLFontWeightBold;
+  ct.style.fontSize = [RDLLength points:8];
   ct.style.color = @"#5c574e";
   corner.item = ct;
   self.cornerRows = [NSMutableArray arrayWithObject:[NSMutableArray arrayWithObject:corner]];
@@ -489,17 +915,16 @@ static NSString *PicaAggregateOfValue(NSString *value) {
 - (RDLTablixMember *)picaGroupMemberForField:(NSString *)field suffix:(NSString *)suffix {
   RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
   gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
-  [gMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+  [gMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]]];
   gMem.keepTogether = YES;
   RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
-  th.size = 1.2;
-  RDLItem *gh = [[RDLItem alloc] init];
-  gh.type = @"Textbox";
+  th.size = kPicaGroupHeaderWidth;
+  RDLTextbox *gh = [[RDLTextbox alloc] init];
   gh.name = [NSString stringWithFormat:@"%@G%@", self.name ?: @"T", suffix];
   gh.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
-  gh.style.fontWeight = @"Bold";
+  gh.style.fontWeight = RDLFontWeightBold;
   gh.style.backgroundColor = @"#ece6d8";
-  gh.style.verticalAlign = @"Middle";
+  gh.style.verticalAlign = RDLVerticalAlignMiddle;
   th.item = gh;
   gMem.header = th;
   return gMem;
@@ -533,23 +958,21 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     [colH.members addObject:[[RDLTablixMember alloc] init]];
 
     NSString *align = c[@"align"];
-    RDLItem *ht = [[RDLItem alloc] init];
-    ht.type = @"Textbox";
+    RDLTextbox *ht = [[RDLTextbox alloc] init];
     ht.name = [NSString stringWithFormat:@"%@H%ld", self.name ?: @"T", (long)i];
     ht.value = [c[@"header"] description] ?: @"";
-    ht.style.fontWeight = @"Bold";
+    ht.style.fontWeight = RDLFontWeightBold;
     if ([align length])
-      ht.style.textAlign = align;
+      ht.style.textAlign = RDLTextAlignFromString(align);
     RDLTablixCell *hc = [[RDLTablixCell alloc] init];
     hc.item = ht;
     [header.cells addObject:hc];
 
-    RDLItem *dt = [[RDLItem alloc] init];
-    dt.type = @"Textbox";
+    RDLTextbox *dt = [[RDLTextbox alloc] init];
     dt.name = [NSString stringWithFormat:@"%@D%ld", self.name ?: @"T", (long)i];
     dt.value = [c[@"value"] description] ?: @"";
     if ([align length])
-      dt.style.textAlign = align;
+      dt.style.textAlign = RDLTextAlignFromString(align);
     RDLTablixCell *dc = [[RDLTablixCell alloc] init];
     dc.item = dt;
     [detail.cells addObject:dc];
@@ -579,7 +1002,7 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   RDLTablixHierarchy *rowH = [[RDLTablixHierarchy alloc] init];
   RDLTablixMember *hMem = [[RDLTablixMember alloc] init];
   hMem.repeatOnNewPage = YES;
-  hMem.keepWithGroup = @"After";
+  hMem.keepWithGroup = RDLKeepWithGroupAfter;
   [rowH.members addObject:hMem];
 
   NSInteger extraRows = 0;
@@ -606,11 +1029,11 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     RDLTablixMember *dMem = [[RDLTablixMember alloc] init];
     dMem.groupName = [NSString stringWithFormat:@"%@_Details", self.name ?: @"Tablix"];
     RDLTablixMember *fMem = [[RDLTablixMember alloc] init];
-    fMem.keepWithGroup = @"Before";
+    fMem.keepWithGroup = RDLKeepWithGroupBefore;
     if (groupBy2) {
       RDLTablixMember *g2 = [self picaGroupMemberForField:groupBy2 suffix:@"2"];
       RDLTablixMember *f2 = [[RDLTablixMember alloc] init];
-      f2.keepWithGroup = @"Before";
+      f2.keepWithGroup = RDLKeepWithGroupBefore;
       [g2.members addObject:dMem];
       [g2.members addObject:f2];
       [gMem.members addObject:g2];
@@ -624,12 +1047,11 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     if (![self.noRowsMessage length])
       self.noRowsMessage = @"No rows.";
     RDLTablixCell *corner = [[RDLTablixCell alloc] init];
-    RDLItem *ct = [[RDLItem alloc] init];
-    ct.type = @"Textbox";
+    RDLTextbox *ct = [[RDLTextbox alloc] init];
     ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
     ct.value = groupBy2 ? [NSString stringWithFormat:@"%@ / %@", groupBy, groupBy2] : groupBy;
-    ct.style.fontWeight = @"Bold";
-    ct.style.fontSize = @"8pt";
+    ct.style.fontWeight = RDLFontWeightBold;
+    ct.style.fontSize = [RDLLength points:8];
     ct.style.color = @"#5c574e";
     corner.item = ct;
     self.cornerRows = [NSMutableArray arrayWithObject:[NSMutableArray arrayWithObject:corner]];
@@ -647,7 +1069,7 @@ static NSString *PicaAggregateOfValue(NSString *value) {
                                          height:rh
                                   fallbackField:sumField]];
     RDLTablixMember *tMem = [[RDLTablixMember alloc] init];
-    tMem.keepWithGroup = @"Before";
+    tMem.keepWithGroup = RDLKeepWithGroupBefore;
     [rowH.members addObject:tMem];
     extraRows += 1;
   }
@@ -656,7 +1078,9 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     CGFloat bodyW = 0;
     for (RDLTablixColumn *tc in body.columns)
       bodyW += tc.width;
-    CGFloat headerW = groupBy2 ? 2.4 : 1.2;
+    // -picaSpecsFittingWidth: has already shrunk the columns if they had a
+    // width to fit inside, so this only grows a tablix that had none.
+    CGFloat headerW = [self picaRowHeaderWidthForGroupBy2:groupBy2 != nil];
     if (self.width < bodyW + headerW)
       self.width = bodyW + headerW;
   }
@@ -749,6 +1173,20 @@ static NSString *PicaAggregateOfValue(NSString *value) {
 @end
 
 @implementation RDLReport
+
+static void PicaAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
+  for (RDLItem *it in items) {
+    it.report = report;
+    PicaAdoptItems([it childItems], report);
+  }
+}
+
+- (void)adoptItems {
+  PicaAdoptItems(self.pageHeader.items, self);
+  PicaAdoptItems(self.body.items, self);
+  PicaAdoptItems(self.pageFooter.items, self);
+}
+
 + (instancetype)emptyReportNamed:(NSString *)name {
   RDLReport *r = [[RDLReport alloc] init];
   r.name = name ?: @"Untitled";
@@ -853,6 +1291,39 @@ static NSString *PicaAggregateOfValue(NSString *value) {
 @end
 
 @implementation RDLLaidOutItem
+- (NSString *)rdlElementName {
+  return NSStringFromClass([self class]);
+}
+@end
+
+@implementation RDLLaidOutTextbox
+- (NSString *)rdlElementName {
+  return @"Textbox";
+}
+@end
+
+@implementation RDLLaidOutLine
+- (NSString *)rdlElementName {
+  return @"Line";
+}
+@end
+
+@implementation RDLLaidOutRectangle
+- (NSString *)rdlElementName {
+  return @"Rectangle";
+}
+@end
+
+@implementation RDLLaidOutImage
+- (NSString *)rdlElementName {
+  return @"Image";
+}
+@end
+
+@implementation RDLLaidOutChart
+- (NSString *)rdlElementName {
+  return @"Chart";
+}
 @end
 
 @implementation RDLLaidOutPage

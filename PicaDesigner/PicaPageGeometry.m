@@ -95,8 +95,8 @@ static const CGFloat kColumnBorderSlop = 3.0;
       return YES;
     }
     // A Rectangle's children are positioned against its own top-left.
-    if ([it.items count] &&
-        [self findItem:target inItems:it.items origin:NSMakePoint(NSMinX(r), NSMinY(r))
+    if ([it.childItems count] &&
+        [self findItem:target inItems:it.childItems origin:NSMakePoint(NSMinX(r), NSMinY(r))
                   rect:outRect])
       return YES;
   }
@@ -140,8 +140,8 @@ static NSString *PicaHandleAt(NSRect r, NSPoint p) {
   // Later siblings draw on top, so search them first.
   for (RDLItem *it in [items reverseObjectEnumerator]) {
     NSRect r = [self rectForItem:it origin:origin];
-    if ([it.items count]) {
-      RDLItem *child = [self itemInItems:it.items
+    if ([it.childItems count]) {
+      RDLItem *child = [self itemInItems:it.childItems
                                   origin:NSMakePoint(NSMinX(r), NSMinY(r))
                                    point:point
                                     kind:outKind
@@ -198,14 +198,14 @@ static NSString *PicaHandleAt(NSRect r, NSPoint p) {
                     rects:(NSMutableArray *)outRects {
   for (RDLItem *it in items) {
     NSRect r = [self rectForItem:it origin:origin];
-    if ([it.type isEqualToString:@"Tablix"]) {
+    if ([it isKindOfClass:[RDLTablix class]]) {
       [outItems addObject:it];
       [outRects addObject:[NSValue valueWithRect:r]];
     }
     // Recurse regardless: a report loaded from disk may nest a data region in
     // a Rectangle even though the designer will not insert one there.
-    if ([it.items count])
-      [self collectTablixesIn:it.items
+    if ([it.childItems count])
+      [self collectTablixesIn:it.childItems
                        origin:NSMakePoint(NSMinX(r), NSMinY(r))
                         items:outItems
                         rects:outRects];
@@ -232,11 +232,11 @@ static NSString *PicaHandleAt(NSRect r, NSPoint p) {
 // The preview never draws a row thinner than this, or it stops being clickable.
 static const CGFloat kMinPreviewRowHeight = 12.0;
 
-+ (CGFloat)headerHeightOf:(RDLItem *)tablix zoom:(CGFloat)zoom {
++ (CGFloat)headerHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom {
   return MAX(kMinPreviewRowHeight, tablix.headerHeight * PicaPointsPerInch * zoom);
 }
 
-+ (CGFloat)rowHeightOf:(RDLItem *)tablix zoom:(CGFloat)zoom {
++ (CGFloat)rowHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom {
   return MAX(kMinPreviewRowHeight, tablix.rowHeight * PicaPointsPerInch * zoom);
 }
 
@@ -246,7 +246,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
   return [specs[index][@"width"] doubleValue] * PicaPointsPerInch * zoom;
 }
 
-+ (NSRect)cellRectOf:(RDLItem *)tablix
++ (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
               column:(NSUInteger)column
                 part:(NSString *)part
@@ -262,7 +262,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
                     header ? hh : [self rowHeightOf:tablix zoom:zoom]);
 }
 
-+ (BOOL)tablix:(RDLItem *)tablix
++ (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
         column:(NSUInteger *)outColumn
@@ -295,7 +295,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
   return NO;
 }
 
-+ (BOOL)tablix:(RDLItem *)tablix
++ (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     columnBorderAtPoint:(NSPoint)point
                  column:(NSUInteger *)outColumn

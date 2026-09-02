@@ -45,7 +45,7 @@
 // buttons and their actions -- is PicaTablixEditor.xib. What is left here is
 // what only the open report can supply: the dataset and field lists, and the
 // tablix's own values.
-- (void)buildPanelForTablix:(RDLItem *)tab {
+- (void)buildPanelForTablix:(RDLTablix *)tab {
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"PicaTablixEditor"
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
@@ -181,8 +181,8 @@
 
 #pragma mark - Entry point
 
-+ (BOOL)runForTablix:(RDLItem *)tablix context:(PicaEditingContext *)context {
-  if (tablix == nil || ![tablix.type isEqualToString:@"Tablix"])
++ (BOOL)runForTablix:(RDLTablix *)tablix context:(PicaEditingContext *)context {
+  if (tablix == nil || ![tablix isKindOfClass:[RDLTablix class]])
     return NO;
   PicaTablixEditor *ed = [[PicaTablixEditor alloc] init];
   ed.report = context.report;

@@ -12,9 +12,9 @@ static NSString *PicaHexFromColor(NSColor *color) {
 }
 
 static BOOL PicaStyleIsEmpty(RDLStyle *s) {
-  return ![s.fontFamily length] && ![s.fontSize length] && ![s.fontWeight length] &&
-         ![s.fontStyle length] && ![s.color length] && ![s.textDecoration length] &&
-         ![s.textAlign length];
+  return ![s.fontFamily length] && s.fontSize == nil && s.fontWeight == RDLFontWeightUnspecified &&
+         s.fontStyle == RDLFontStyleUnspecified && ![s.color length] && s.textDecoration == RDLTextDecorationUnspecified &&
+         s.textAlign == RDLTextAlignUnspecified;
 }
 
 // A style holding only what differs from the textbox base style. Every font
@@ -28,20 +28,20 @@ static RDLStyle *PicaSparseRunStyle(NSDictionary *attrs, RDLStyle *base) {
   NSFontTraitMask traits = [fm traitsOfFont:font];
   NSFontTraitMask baseTraits = [fm traitsOfFont:baseFont];
   BOOL bold = (traits & NSBoldFontMask) != 0;
-  BOOL baseBold = (baseTraits & NSBoldFontMask) != 0 || [base.fontWeight isEqualToString:@"Bold"];
+  BOOL baseBold = (baseTraits & NSBoldFontMask) != 0 || base.fontWeight == RDLFontWeightBold;
   if (bold != baseBold)
-    s.fontWeight = bold ? @"Bold" : @"Normal";
+    s.fontWeight = bold ? RDLFontWeightBold : RDLFontWeightNormal;
   BOOL italic = (traits & NSItalicFontMask) != 0;
   BOOL baseItalic =
-      (baseTraits & NSItalicFontMask) != 0 || [base.fontStyle isEqualToString:@"Italic"];
+      (baseTraits & NSItalicFontMask) != 0 || base.fontStyle == RDLFontStyleItalic;
   if (italic != baseItalic)
-    s.fontStyle = italic ? @"Italic" : @"Normal";
+    s.fontStyle = italic ? RDLFontStyleItalic : RDLFontStyleNormal;
   NSString *family = [font familyName] ?: [font fontName];
   NSString *baseFamily = [baseFont familyName] ?: [baseFont fontName];
   if ([family length] && [baseFamily length] && ![family isEqualToString:baseFamily])
     s.fontFamily = family;
   if (fabs([font pointSize] - [baseFont pointSize]) > 0.01)
-    s.fontSize = [NSString stringWithFormat:@"%gpt", (double)[font pointSize]];
+    s.fontSize = [RDLLength points:(double)[font pointSize]];
   NSColor *color = attrs[NSForegroundColorAttributeName];
   NSString *hex = color ? PicaHexFromColor(color) : nil;
   NSString *baseHex = [base.color length] ? [base.color lowercaseString] : @"#1a1916";
@@ -49,25 +49,21 @@ static RDLStyle *PicaSparseRunStyle(NSDictionary *attrs, RDLStyle *base) {
     s.color = hex;
   BOOL under = [attrs[NSUnderlineStyleAttributeName] integerValue] != 0;
   BOOL strike = [attrs[NSStrikethroughStyleAttributeName] integerValue] != 0;
-  NSString *deco = under ? @"Underline" : (strike ? @"LineThrough" : nil);
-  NSString *baseDeco =
-      ([base.textDecoration length] && ![base.textDecoration isEqualToString:@"None"])
-          ? base.textDecoration
-          : nil;
-  if (deco != baseDeco && ![deco isEqualToString:baseDeco])
-    s.textDecoration = deco ?: @"None";
+  RDLTextDecoration deco = under ? RDLTextDecorationUnderline
+                                 : (strike ? RDLTextDecorationLineThrough : RDLTextDecorationNone);
+  RDLTextDecoration baseDeco = base.textDecoration != RDLTextDecorationUnspecified
+                                   ? base.textDecoration
+                                   : RDLTextDecorationNone;
+  if (deco != baseDeco)
+    s.textDecoration = deco;
   return s;
 }
 
-static NSString *PicaAlignName(NSDictionary *attrs) {
+static RDLTextAlign PicaAlignName(NSDictionary *attrs) {
   NSParagraphStyle *ps = attrs[NSParagraphStyleAttributeName];
   if (ps == nil)
-    return nil;
-  if (ps.alignment == NSCenterTextAlignment)
-    return @"Center";
-  if (ps.alignment == NSRightTextAlignment)
-    return @"Right";
-  return @"Left";
+    return RDLTextAlignUnspecified;
+  return [RDLTextAttributes alignForTextAlignment:ps.alignment];
 }
 
 @interface PicaRichTextResult ()
@@ -80,7 +76,7 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
 @implementation PicaRichTextCodec
 
 + (PicaRichTextResult *)resultForAttributedString:(NSAttributedString *)text
-                                            item:(RDLItem *)item {
+                                            item:(RDLTextbox *)item {
   NSMutableArray *paragraphs = nil;
   NSString *flat = nil;
   BOOL rich = [self convert:text forItem:item paragraphs:&paragraphs flattened:&flat];
@@ -90,7 +86,7 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
   return r;
 }
 
-+ (NSAttributedString *)attributedStringForItem:(RDLItem *)item {
++ (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item {
   if ([item.paragraphs count] == 0)
     return [RDLTextAttributes attributedStringForText:item.value ?: @""
                                                 style:item.style
@@ -100,12 +96,12 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
                                                    scale:1.0];
 }
 
-+ (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLItem *)item {
++ (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLTextbox *)item {
   NSMutableArray *paragraphs = nil;
   return [self convert:text forItem:item paragraphs:&paragraphs flattened:NULL];
 }
 
-+ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLItem *)item {
++ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLTextbox *)item {
   PicaRichTextResult *r = [self resultForAttributedString:text item:item];
   item.value = r.text;
   item.paragraphs = r.paragraphs;
@@ -114,7 +110,7 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
 // Walks `text` paragraph by paragraph, run by run. Returns YES when the result
 // needs Paragraphs to be faithful.
 + (BOOL)convert:(NSAttributedString *)text
-        forItem:(RDLItem *)item
+        forItem:(RDLTextbox *)item
      paragraphs:(NSMutableArray **)outParagraphs
       flattened:(NSString **)outFlat {
   RDLStyle *base = item.style;
@@ -132,7 +128,7 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
     NSRange paraRange = NSMakeRange(paraStart, paraEnd - paraStart);
     RDLParagraph *para = [[RDLParagraph alloc] init];
     NSMutableString *paraText = [NSMutableString string];
-    NSString *paraAlign = nil;
+    RDLTextAlign paraAlign = RDLTextAlignUnspecified;
     NSUInteger loc = paraRange.location;
     while (loc < NSMaxRange(paraRange)) {
       NSRange eff;
@@ -145,7 +141,7 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
         run.style = sparse;
         rich = YES;
       }
-      if (paraAlign == nil)
+      if (paraAlign == RDLTextAlignUnspecified)
         paraAlign = PicaAlignName(attrs);
       [para.runs addObject:run];
       [paraText appendString:run.value];
@@ -156,8 +152,9 @@ static NSString *PicaAlignName(NSDictionary *attrs) {
       run.value = @"";
       [para.runs addObject:run];
     }
-    NSString *baseAlign = [base.textAlign length] ? base.textAlign : @"Left";
-    if (paraAlign && ![paraAlign isEqualToString:baseAlign]) {
+    RDLTextAlign baseAlign =
+        base.textAlign != RDLTextAlignUnspecified ? base.textAlign : RDLTextAlignLeft;
+    if (paraAlign != RDLTextAlignUnspecified && paraAlign != baseAlign) {
       RDLStyle *ps = [[RDLStyle alloc] init];
       ps.textAlign = paraAlign;
       para.style = ps;

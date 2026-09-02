@@ -17,8 +17,8 @@ static RDLReport *PicaMiniInvoice(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Mini Invoice"];
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = @"InvoiceNo";
-  p.dataType = @"String";
-  p.defaultValue = @"A-1";
+  p.dataType = RDLParameterDataTypeString;
+  p.defaultValue = [RDLValue literal:@"A-1"];
   [r.parameters addObject:p];
 
   RDLDataSet *ds = [[RDLDataSet alloc] init];
@@ -31,20 +31,18 @@ static RDLReport *PicaMiniInvoice(void) {
   ];
   [r.dataSets addObject:ds];
 
-  RDLItem *title = [[RDLItem alloc] init];
-  title.type = @"Textbox";
+  RDLTextbox *title = [[RDLTextbox alloc] init];
   title.name = @"Title";
   title.value = @"=Parameters!InvoiceNo.Value";
   title.left = 0.5;
   title.top = 0.1;
   title.width = 4;
   title.height = 0.35;
-  title.style.fontSize = @"16pt";
-  title.style.fontWeight = @"Bold";
+  title.style.fontSize = [RDLLength points:16];
+  title.style.fontWeight = RDLFontWeightBold;
   [r.pageHeader.items addObject:title];
 
-  RDLItem *note = [[RDLItem alloc] init];
-  note.type = @"Textbox";
+  RDLTextbox *note = [[RDLTextbox alloc] init];
   note.name = @"Note";
   note.value = @"A & B";
   note.left = 4.6;
@@ -53,8 +51,7 @@ static RDLReport *PicaMiniInvoice(void) {
   note.height = 0.25;
   [r.pageHeader.items addObject:note];
 
-  RDLItem *rule = [[RDLItem alloc] init];
-  rule.type = @"Line";
+  RDLLine *rule = [[RDLLine alloc] init];
   rule.name = @"Rule";
   rule.left = 0.5;
   rule.top = 0.48;
@@ -62,8 +59,7 @@ static RDLReport *PicaMiniInvoice(void) {
   rule.height = 0.01;
   [r.pageHeader.items addObject:rule];
 
-  RDLItem *folio = [[RDLItem alloc] init];
-  folio.type = @"Textbox";
+  RDLTextbox *folio = [[RDLTextbox alloc] init];
   folio.name = @"Folio";
   folio.value = @"=Globals!PageNumber";
   folio.left = 6.5;
@@ -72,8 +68,7 @@ static RDLReport *PicaMiniInvoice(void) {
   folio.height = 0.25;
   [r.pageFooter.items addObject:folio];
 
-  RDLItem *tab = [[RDLItem alloc] init];
-  tab.type = @"Tablix";
+  RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"Lines";
   tab.dataSetName = @"Items";
   tab.left = 0.5;
@@ -89,8 +84,7 @@ static RDLReport *PicaMiniInvoice(void) {
   [tab rebuildTablix];
   [r.body.items addObject:tab];
 
-  RDLItem *sum = [[RDLItem alloc] init];
-  sum.type = @"Textbox";
+  RDLTextbox *sum = [[RDLTextbox alloc] init];
   sum.name = @"Total";
   sum.value = @"=Sum(Fields!Amount.Value)";
   sum.left = 4.5;
@@ -107,6 +101,12 @@ static double PicaAsNum(id v) {
   if ([v isKindOfClass:[NSString class]])
     return [(NSString *)v doubleValue];
   return 0;
+}
+
+// Only a laid-out textbox carries text; asking anything else is a mistake the
+// class split now makes visible.
+static NSString *PicaLaidText(RDLLaidOutItem *it) {
+  return [it isKindOfClass:[RDLLaidOutTextbox class]] ? [(RDLLaidOutTextbox *)it text] : nil;
 }
 
 NSArray<NSString *> *PicaRunParserChecks(void) {
@@ -141,10 +141,10 @@ NSArray<NSString *> *PicaRunParserChecks(void) {
       PicaFail(fails, @"expected 1 dataset");
     else if ([parsed.dataSets[0].rows count] != 2)
       PicaFail(fails, @"dataset rows not restored from CommandText JSON");
-    RDLItem *tab = nil;
+    RDLTablix *tab = (RDLTablix *)nil;
     for (RDLItem *it in parsed.body.items) {
-      if ([it.type isEqualToString:@"Tablix"] || [it.name isEqualToString:@"Lines"])
-        tab = it;
+      if ([it isKindOfClass:[RDLTablix class]] || [it.name isEqualToString:@"Lines"])
+        tab = (RDLTablix *)it;
     }
     if (tab == nil)
       PicaFail(fails, @"tablix missing after round-trip");
@@ -386,6 +386,217 @@ NSArray<NSString *> *PicaRunExpressionLangChecks(void) {
   return fails;
 }
 
+// The tree is the only copy of an expression, so printing it back has to give
+// the source byte for byte -- otherwise saving a report silently rewrites the
+// spacing, parentheses and casing the user typed.
+NSArray<NSString *> *PicaRunExpressionRoundTripChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSArray *sources = @[
+    @"=1+2",
+    @"=1 + 2",
+    @"=  1   +   2  ",
+    @"=Sum(Fields!Amount.Value)",
+    @"=Sum( Fields!Amount.Value )",
+    @"=IIf(Fields!Qty.Value > 0, \"yes\", \"no\")",
+    @"=IIf( Fields!Qty.Value>0 , \"a b\" , \"c\" )",
+    @"=((1))",
+    @"= ( ( 1 ) ) ",
+    @"=Parameters!Shop.Value & \" - \" & Globals!PageNumber",
+    @"=\"quote \"\" inside\"",
+    @"=UPPER(fields!name.value)",
+    @"=1.5 * 2",
+    @"=A\n  + B",
+    @"=Fields!X.Value ' trailing comment",
+  ];
+  for (NSString *src in sources) {
+    RDLExpr *e = [RDLExpr expressionWithSource:src];
+    if (e == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"did not parse: %@", src]);
+      continue;
+    }
+    if (![[e source] isEqualToString:src])
+      PicaFail(fails, [NSString stringWithFormat:@"round trip changed %@ into %@", src, [e source]]);
+  }
+  if ([RDLExpr expressionWithSource:@"plain text"] != nil)
+    PicaFail(fails, @"a non-expression should not parse as one");
+  if ([RDLExpr isExpressionSource:@"plain text"])
+    PicaFail(fails, @"plain text reported as an expression");
+
+  // and it still evaluates
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.row = @{ @"Qty" : @4 };
+  RDLExpr *e = [RDLExpr expressionWithSource:@"=Fields!Qty.Value * 2"];
+  if (![[e evaluateTextInScope:scope] isEqualToString:@"8"])
+    PicaFail(fails, [NSString stringWithFormat:@"evaluate → %@", [e evaluateTextInScope:scope]]);
+  return fails;
+}
+
+// MS-RDL lets a Style property be computed, including the ones whose values
+// come from a fixed vocabulary. Those are enums on the model, so the expression
+// has to live beside the constant rather than inside it.
+NSArray<NSString *> *PicaRunStyleExpressionChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  // A body-level textbox has no row in scope, so the condition is written
+  // without Fields!; what is under test is that the expression resolves at
+  // all and lands in the enum, not the expression language itself.
+  NSString *align = @"=IIf(1 > 0, \"Right\", \"Left\")";
+  NSString *weight = @"=IIf(1 > 0, \"Bold\", \"Normal\")";
+  NSString *bg = @"=IIf(1 > 0, \"#00ff00\", \"#0000ff\")";
+  NSString *pad = @"=IIf(1 > 0, \"6pt\", \"2pt\")";
+  NSString *bw = @"=IIf(1 > 0, \"3pt\", \"1pt\")";
+  NSString *xml = [NSString stringWithFormat:
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+      @"<Width>7.5in</Width>"
+      @"<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth>"
+      @"<TopMargin>0.5in</TopMargin><BottomMargin>0.5in</BottomMargin>"
+      @"<LeftMargin>0.5in</LeftMargin><RightMargin>0.5in</RightMargin></Page>"
+      @"<DataSets><DataSet Name=\"D\"><Query><CommandText><![CDATA[[{\"Qty\":5}]]]></CommandText>"
+      @"</Query><Fields><Field Name=\"Qty\"><DataField>Qty</DataField></Field></Fields></DataSet></DataSets>"
+      @"<Body><Height>1in</Height><ReportItems>"
+      @"<Textbox Name=\"T\"><Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.3in</Height>"
+      @"<Value>hi</Value><Style>"
+      @"<TextAlign>%@</TextAlign><FontWeight>%@</FontWeight><BackgroundColor>%@</BackgroundColor>"
+      @"<PaddingLeft>%@</PaddingLeft>"
+      @"<Border><Style>Solid</Style><Width>%@</Width><Color>#112233</Color></Border>"
+      @"</Style></Textbox>"
+      @"</ReportItems></Body></Report>", align, weight, bg, pad, bw];
+
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  RDLTextbox *tb = (RDLTextbox *)r.body.items.firstObject;
+  if (tb == nil) {
+    PicaFail(fails, @"textbox not parsed");
+    return fails;
+  }
+
+  // The expression goes to the holder; the constant is left unset.
+  if (tb.style.expressions.textAlign == nil)
+    PicaFail(fails, @"TextAlign expression not captured");
+  else if (![[tb.style.expressions.textAlign source] isEqualToString:align])
+    PicaFail(fails, [NSString stringWithFormat:@"TextAlign expression → %@",
+                                               [tb.style.expressions.textAlign source]]);
+  if (tb.style.expressions.fontWeight == nil)
+    PicaFail(fails, @"FontWeight expression not captured");
+  if (tb.style.expressions.backgroundColor == nil)
+    PicaFail(fails, @"BackgroundColor expression not captured");
+  if (tb.style.expressions.paddingLeft == nil)
+    PicaFail(fails, @"PaddingLeft expression not captured");
+  if (tb.style.border.expressions.width == nil)
+    PicaFail(fails, @"Border Width expression not captured");
+
+  // It resolves per row at layout time, into the enum.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  RDLLaidOutItem *laid = nil;
+  for (RDLLaidOutPage *pg in pages)
+    for (RDLLaidOutItem *li in pg.items)
+      if ([li.name isEqualToString:@"T"])
+        laid = li;
+  if (laid == nil) {
+    NSMutableArray *seen = [NSMutableArray array];
+    for (RDLLaidOutPage *pg in pages)
+      for (RDLLaidOutItem *li in pg.items)
+        [seen addObject:[NSString stringWithFormat:@"%@/%@", li.rdlElementName, li.name ?: @"(nil)"]];
+    PicaFail(fails, [NSString stringWithFormat:@"laid-out textbox missing (%lu pages, items: %@)",
+                                               (unsigned long)[pages count],
+                                               [seen componentsJoinedByString:@", "]]);
+  } else {
+    if (laid.style.textAlign != RDLTextAlignRight)
+      PicaFail(fails, [NSString stringWithFormat:@"resolved TextAlign → %@",
+                                                 RDLStringFromTextAlign(laid.style.textAlign)]);
+    if (!RDLFontWeightIsBold(laid.style.fontWeight))
+      PicaFail(fails, @"resolved FontWeight should be bold");
+    if (![laid.style.backgroundColor isEqualToString:@"#00ff00"])
+      PicaFail(fails, [NSString stringWithFormat:@"resolved BackgroundColor → %@",
+                                                 laid.style.backgroundColor]);
+    if (fabs([laid.style.paddingLeft points] - 6.0) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"resolved PaddingLeft → %@",
+                                                 [laid.style.paddingLeft stringValue]]);
+    if (fabs([laid.style.border.width points] - 3.0) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"resolved Border Width → %@",
+                                                 [laid.style.border.width stringValue]]);
+  }
+
+  // The writer emits the user's own text, so a save/load cycle returns exactly
+  // the expressions that went in. (Comparing the parsed forms rather than
+  // searching the XML, which is escaped.)
+  NSString *back = [RDLWriter XMLStringFromReport:r];
+  RDLReport *again = [RDLParser reportFromXMLString:back error:&err];
+  RDLTextbox *tb2 = (RDLTextbox *)again.body.items.firstObject;
+  if (tb2 == nil) {
+    PicaFail(fails, @"textbox lost on round trip");
+    return fails;
+  }
+  if (![[tb2.style.expressions.textAlign source] isEqualToString:align])
+    PicaFail(fails, [NSString stringWithFormat:@"TextAlign did not round trip → %@",
+                                               [tb2.style.expressions.textAlign source]]);
+  if (![[tb2.style.expressions.fontWeight source] isEqualToString:weight])
+    PicaFail(fails, [NSString stringWithFormat:@"FontWeight did not round trip → %@",
+                                               [tb2.style.expressions.fontWeight source]]);
+  if (![[tb2.style.expressions.backgroundColor source] isEqualToString:bg])
+    PicaFail(fails, [NSString stringWithFormat:@"BackgroundColor did not round trip → %@",
+                                               [tb2.style.expressions.backgroundColor source]]);
+  if (![[tb2.style.expressions.paddingLeft source] isEqualToString:pad])
+    PicaFail(fails, [NSString stringWithFormat:@"PaddingLeft did not round trip → %@",
+                                               [tb2.style.expressions.paddingLeft source]]);
+  if (![[tb2.style.border.expressions.width source] isEqualToString:bw])
+    PicaFail(fails, [NSString stringWithFormat:@"Border Width did not round trip → %@",
+                                               [tb2.style.border.expressions.width source]]);
+  return fails;
+}
+
+// The writer pretty-prints, so this pins down that indentation never reaches
+// the text content of an element. NSXML only lays out between elements, but
+// that is a property of the framework rather than of this code, and losing it
+// would silently corrupt every report on save.
+NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSArray *values = @[
+    @"Hello ",            // trailing
+    @" Hello",            // leading
+    @"  Hello  ",         // both
+    @"one\ntwo",          // embedded newline
+    @"a\tb",              // tab
+    @"=IIf( 1 > 0 , \"a\" , \"b\" )",  // an expression's own spacing
+  ];
+  for (NSString *v in values) {
+    RDLReport *r = [RDLReport emptyReportNamed:@"WS"];
+    RDLTextbox *tb = [[RDLTextbox alloc] init];
+    tb.name = @"T";
+    tb.width = 2;
+    tb.height = 0.3;
+    tb.value = v;
+    [r.body.items addObject:tb];
+    NSError *err = nil;
+    RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
+    RDLTextbox *tb2 = (RDLTextbox *)back.body.items.firstObject;
+    if (![tb2.value isEqualToString:v])
+      PicaFail(fails, [NSString stringWithFormat:@"whitespace lost: '%@' came back as '%@'",
+                                                 v, tb2.value]);
+  }
+
+  // Known limitation, pinned so a change in behaviour is noticed: NSXML's
+  // reader drops a text node that is only whitespace, so a value of "   "
+  // cannot survive a save. xml:space="preserve" and NSXMLNodePreserveWhitespace
+  // both fail to bring it back -- see ../Patches.
+  RDLReport *r = [RDLReport emptyReportNamed:@"WS"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = @"   ";
+  [r.body.items addObject:tb];
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
+  RDLTextbox *tb2 = (RDLTextbox *)back.body.items.firstObject;
+  if ([tb2.value length] != 0)
+    PicaFail(fails, [NSString stringWithFormat:
+                                  @"whitespace-only value now survives ('%@') -- good news, but "
+                                  @"the Patches note and this check need updating",
+                                  tb2.value]);
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunLayoutChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   RDLReport *r = PicaMiniInvoice();
@@ -397,17 +608,17 @@ NSArray<NSString *> *PicaRunLayoutChecks(void) {
     PicaFail(fails, @"page size not letter");
   BOOL sawParam = NO, sawSku = NO, sawAmt = NO, sawLine = NO, sawAmp = NO, sawHeader = NO;
   for (RDLLaidOutItem *it in p0.items) {
-    if ([it.text isEqualToString:@"B-2"])
+    if ([PicaLaidText(it) isEqualToString:@"B-2"])
       sawParam = YES;
-    if ([it.text isEqualToString:@"W1"] || [it.text isEqualToString:@"W2"])
+    if ([PicaLaidText(it) isEqualToString:@"W1"] || [PicaLaidText(it) isEqualToString:@"W2"])
       sawSku = YES;
-    if ([it.text isEqualToString:@"10"] || [it.text isEqualToString:@"5"] || PicaAsNum(it.text) == 15)
+    if ([PicaLaidText(it) isEqualToString:@"10"] || [PicaLaidText(it) isEqualToString:@"5"] || PicaAsNum(PicaLaidText(it)) == 15)
       sawAmt = YES;
-    if ([it.kind isEqualToString:@"Line"])
+    if ([it isKindOfClass:[RDLLaidOutLine class]])
       sawLine = YES;
-    if ([it.text isEqualToString:@"A & B"])
+    if ([PicaLaidText(it) isEqualToString:@"A & B"])
       sawAmp = YES;
-    if ([it.text isEqualToString:@"Sku"])
+    if ([PicaLaidText(it) isEqualToString:@"Sku"])
       sawHeader = YES;
   }
   if (!sawParam)
@@ -426,7 +637,7 @@ NSArray<NSString *> *PicaRunLayoutChecks(void) {
   NSArray *defPages = [RDLGenerator pagesForReport:PicaMiniInvoice() parameters:@{}];
   BOOL sawDefault = NO;
   for (RDLLaidOutItem *it in [defPages.firstObject items]) {
-    if ([it.text isEqualToString:@"A-1"])
+    if ([PicaLaidText(it) isEqualToString:@"A-1"])
       sawDefault = YES;
   }
   if (!sawDefault)
@@ -440,7 +651,7 @@ NSArray<NSString *> *PicaRunLayoutChecks(void) {
   pages = [RDLGenerator pagesForReport:r parameters:@{}];
   BOOL sawZZ = NO;
   for (RDLLaidOutItem *it in [pages.firstObject items]) {
-    if ([it.text isEqualToString:@"ZZ"])
+    if ([PicaLaidText(it) isEqualToString:@"ZZ"])
       sawZZ = YES;
   }
   if (!sawZZ)
@@ -466,9 +677,9 @@ NSArray<NSString *> *PicaRunTablixChecks(void) {
   else {
     BOOL header2 = NO, row2 = NO;
     for (RDLLaidOutItem *it in [pages[1] items]) {
-      if ([it.text isEqualToString:@"Sku"])
+      if ([PicaLaidText(it) isEqualToString:@"Sku"])
         header2 = YES;
-      if ([it.text hasPrefix:@"S"])
+      if ([PicaLaidText(it) hasPrefix:@"S"])
         row2 = YES;
     }
     if (!header2)
@@ -479,7 +690,7 @@ NSArray<NSString *> *PicaRunTablixChecks(void) {
   BOOL noTablixKind = YES;
   for (RDLLaidOutPage *p in pages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.kind isEqualToString:@"Tablix"])
+      if ([it isKindOfClass:[RDLTablix class]])
         noTablixKind = NO;
     }
   }
@@ -504,8 +715,7 @@ static RDLReport *PicaGroupedJobs(void) {
     @{@"Job" : @"Frame", @"Finish" : @"Oil", @"Amount" : @95},
   ];
   [r.dataSets addObject:ds];
-  RDLItem *tab = [[RDLItem alloc] init];
-  tab.type = @"Tablix";
+  RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"JobsByFinish";
   tab.dataSetName = @"Jobs";
   tab.left = 0;
@@ -527,7 +737,7 @@ static RDLReport *PicaGroupedJobs(void) {
 NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   RDLReport *r = PicaGroupedJobs();
-  RDLItem *tab = r.body.items.firstObject;
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
   if ([tab.tablixBody.rows count] != 3)
     PicaFail(fails, [NSString stringWithFormat:@"grouped body rows %lu", (unsigned long)[tab.tablixBody.rows count]]);
   if ([tab.rowHierarchy.members count] != 2)
@@ -561,10 +771,10 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
   if (parsed == nil)
     PicaFail(fails, [NSString stringWithFormat:@"grouped parse failed: %@", err.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in parsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     if (![pt.groupBy isEqualToString:@"Finish"])
       PicaFail(fails, [NSString stringWithFormat:@"groupBy round-trip %@", pt.groupBy]);
     if ([pt.rowHierarchy.members[1].groupExpressions count] == 0)
@@ -582,19 +792,19 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
   double oilSum = 0;
   for (RDLLaidOutPage *p in pages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.kind isEqualToString:@"Tablix"])
+      if ([it isKindOfClass:[RDLTablix class]])
         noTablix = NO;
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         sawOil = YES;
-      if ([it.text isEqualToString:@"Lacquer"])
+      if ([PicaLaidText(it) isEqualToString:@"Lacquer"])
         sawLacquer = YES;
-      if ([it.text isEqualToString:@"Wax"])
+      if ([PicaLaidText(it) isEqualToString:@"Wax"])
         sawWax = YES;
-      if ([it.text isEqualToString:@"Subtotal"])
+      if ([PicaLaidText(it) isEqualToString:@"Subtotal"])
         sawSub = YES;
-      if ([it.text isEqualToString:@"Desk"])
+      if ([PicaLaidText(it) isEqualToString:@"Desk"])
         sawDesk = YES;
-      if (PicaAsNum(it.text) == 2355)
+      if (PicaAsNum(PicaLaidText(it)) == 2355)
         oilSum = 2355;
     }
   }
@@ -629,7 +839,7 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
   NSArray *emptyPages = [RDLGenerator pagesForReport:empty parameters:@{}];
   BOOL sawNoRows = NO;
   for (RDLLaidOutItem *it in [emptyPages.firstObject items]) {
-    if ([it.text isEqualToString:@"No jobs in this run."])
+    if ([PicaLaidText(it) isEqualToString:@"No jobs in this run."])
       sawNoRows = YES;
   }
   if (!sawNoRows)
@@ -637,17 +847,17 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
 
   RDLReport *filt = PicaGroupedJobs();
   RDLFilter *f = [[RDLFilter alloc] init];
-  f.expression = @"=Fields!Finish.Value";
-  f.oper = @"Equal";
-  [f.values addObject:@"Oil"];
-  [filt.body.items.firstObject.filters addObject:f];
+  f.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  f.oper = RDLFilterOperatorEqual;
+  [f.values addObject:[RDLValue literal:@"Oil"]];
+  [[(RDLTablix *)filt.body.items.firstObject filters] addObject:f];
   NSArray *fpages = [RDLGenerator pagesForReport:filt parameters:@{}];
   BOOL sawWaxF = NO, sawOilF = NO;
   for (RDLLaidOutPage *p in fpages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"Wax"])
+      if ([PicaLaidText(it) isEqualToString:@"Wax"])
         sawWaxF = YES;
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         sawOilF = YES;
     }
   }
@@ -657,7 +867,7 @@ NSArray<NSString *> *PicaRunTablixGroupChecks(void) {
     PicaFail(fails, @"filter Equal Oil should drop Wax group");
 
   RDLReport *brk = PicaGroupedJobs();
-  brk.body.items.firstObject.rowHierarchy.members[1].pageBreak = @"Between";
+  [(RDLTablix *)brk.body.items.firstObject rowHierarchy].members[1].pageBreak = RDLPageBreakLocationBetween;
   NSArray *bpages = [RDLGenerator pagesForReport:brk parameters:@{}];
   if ([bpages count] < 3)
     PicaFail(fails, [NSString stringWithFormat:@"PageBreak Between should span groups, pages=%lu",
@@ -671,7 +881,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
 
   // Explicit per-column aggregates drive subtotal cells (Report Builder style).
   RDLReport *r = PicaGroupedJobs();
-  RDLItem *tab = r.body.items.firstObject;
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
   tab.showGrandTotal = YES;
   tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
@@ -690,11 +900,11 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   if ([tab.rowHierarchy.members count] != 3)
     PicaFail(fails, @"expected header + group + grand-total members");
   RDLTablixRow *totalRow = tab.tablixBody.rows.lastObject;
-  if (![totalRow.cells.lastObject.item.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+  if (![[(RDLTextbox *)totalRow.cells.lastObject.item value] isEqualToString:@"=Sum(Fields!Amount.Value)"])
     PicaFail(fails, @"grand total should use explicit Sum aggregate");
-  if (![totalRow.cells.firstObject.item.value isEqualToString:@"Total"])
+  if (![[(RDLTextbox *)totalRow.cells.firstObject.item value] isEqualToString:@"Total"])
     PicaFail(fails, @"grand total first column should carry Total label");
-  if (![totalRow.cells.lastObject.item.style.textAlign isEqualToString:@"Right"])
+  if (totalRow.cells.lastObject.item.style.textAlign != RDLTextAlignRight)
     PicaFail(fails, @"aggregate row should inherit column align");
 
   // The columns getter should surface the derived designer metadata.
@@ -712,10 +922,10 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"editing round-trip parse failed: %@",
                                                err.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in parsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     if (![pt.groupBy isEqualToString:@"Finish"])
       PicaFail(fails, @"round-trip lost groupBy");
     if (!pt.showGrandTotal)
@@ -730,9 +940,9 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   BOOL sawTotal = NO, sawGrandSum = NO;
   for (RDLLaidOutPage *p in pages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"Total"])
+      if ([PicaLaidText(it) isEqualToString:@"Total"])
         sawTotal = YES;
-      if (PicaAsNum(it.text) == 3468)
+      if (PicaAsNum(PicaLaidText(it)) == 3468)
         sawGrandSum = YES;
     }
   }
@@ -743,7 +953,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
 
   // Flat tablix with a grand total: no group needed.
   RDLReport *flat = PicaGroupedJobs();
-  RDLItem *ftab = flat.body.items.firstObject;
+  RDLTablix *ftab = (RDLTablix *)flat.body.items.firstObject;
   ftab.groupBy = @"";
   ftab.showGrandTotal = YES;
   ftab.columnSpecs = @[
@@ -767,14 +977,14 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   BOOL flatTotal = NO;
   for (RDLLaidOutPage *p in fpages)
     for (RDLLaidOutItem *it in p.items)
-      if (PicaAsNum(it.text) == 3468)
+      if (PicaAsNum(PicaLaidText(it)) == 3468)
         flatTotal = YES;
   if (!flatTotal)
     PicaFail(fails, @"flat grand total should sum whole dataset");
 
   // Count aggregate on a non-numeric column.
   RDLReport *cnt = PicaGroupedJobs();
-  RDLItem *ctab = cnt.body.items.firstObject;
+  RDLTablix *ctab = (RDLTablix *)cnt.body.items.firstObject;
   ctab.columnSpecs = @[
     @{
       @"width" : @2.8,
@@ -786,14 +996,14 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   ];
   [ctab rebuildTablix];
   RDLTablixRow *sub = ctab.tablixBody.rows.lastObject;
-  if (![sub.cells.firstObject.item.value isEqualToString:@"=Count(Fields!Job.Value)"])
+  if (![[(RDLTextbox *)sub.cells.firstObject.item value] isEqualToString:@"=Count(Fields!Job.Value)"])
     PicaFail(fails, @"explicit Count should land in first column subtotal");
-  if ([sub.cells.lastObject.item.value length] != 0)
+  if ([[(RDLTextbox *)sub.cells.lastObject.item value] length] != 0)
     PicaFail(fails, @"explicit aggregates disable the last-column Sum fallback");
 
   // Matrix (crosstab) via the designer convenience: pivotBy + groupBy.
   RDLReport *mx = PicaGroupedJobs();
-  RDLItem *mtab = mx.body.items.firstObject;
+  RDLTablix *mtab = (RDLTablix *)mx.body.items.firstObject;
   mtab.groupBy = @"Finish";
   mtab.pivotBy = @"Job";
   mtab.showGrandTotal = YES;
@@ -807,11 +1017,11 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, @"matrix body should be 1 column x 2 rows (data + totals)");
   RDLTablixMember *cm = mtab.columnHierarchy.members.firstObject;
   if ([cm.groupExpressions count] == 0 ||
-      [cm.groupExpressions[0] rangeOfString:@"Job"].location == NSNotFound)
+      [[cm.groupExpressions[0] source] rangeOfString:@"Job"].location == NSNotFound)
     PicaFail(fails, @"matrix column hierarchy should group by Job");
   if (cm.header == nil)
     PicaFail(fails, @"matrix column group missing TablixHeader");
-  NSString *mcell = mtab.tablixBody.rows.firstObject.cells.firstObject.item.value;
+  NSString *mcell = [(RDLTextbox *)mtab.tablixBody.rows.firstObject.cells.firstObject.item value];
   if (![mcell isEqualToString:@"=Sum(Fields!Amount.Value)"])
     PicaFail(fails, [NSString stringWithFormat:@"matrix cell %@", mcell]);
 
@@ -829,19 +1039,19 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   CGFloat deskX = -1, chairX = -1;
   for (RDLLaidOutPage *p in mpages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"Desk"]) {
+      if ([PicaLaidText(it) isEqualToString:@"Desk"]) {
         mDesk = YES;
         deskX = it.x;
       }
-      if ([it.text isEqualToString:@"Chair"]) {
+      if ([PicaLaidText(it) isEqualToString:@"Chair"]) {
         mChair = YES;
         chairX = it.x;
       }
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         mOil = YES;
-      if ([it.text isEqualToString:@"Wax"])
+      if ([PicaLaidText(it) isEqualToString:@"Wax"])
         mWax = YES;
-      if (PicaAsNum(it.text) == 1840)
+      if (PicaAsNum(PicaLaidText(it)) == 1840)
         deskSums += 1;
     }
   }
@@ -862,10 +1072,10 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"matrix round-trip parse failed: %@",
                                                merr.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in mparsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     if (![pt.pivotBy isEqualToString:@"Job"])
       PicaFail(fails, [NSString stringWithFormat:@"round-trip pivotBy %@", pt.pivotBy]);
     if (![pt.groupBy isEqualToString:@"Finish"])
@@ -891,7 +1101,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   // Nested row groups: outer Finish, inner Job — two header levels, two
   // subtotal scopes, plus a grand total.
   RDLReport *nx = PicaGroupedJobs();
-  RDLItem *ntab = nx.body.items.firstObject;
+  RDLTablix *ntab = (RDLTablix *)nx.body.items.firstObject;
   ntab.groupBy = @"Finish";
   ntab.groupBy2 = @"Job";
   ntab.showGrandTotal = YES;
@@ -909,14 +1119,14 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   else {
     RDLTablixMember *og = ntab.rowHierarchy.members[1];
     if ([og.groupExpressions count] == 0 ||
-        [og.groupExpressions[0] rangeOfString:@"Finish"].location == NSNotFound)
+        [[og.groupExpressions[0] source] rangeOfString:@"Finish"].location == NSNotFound)
       PicaFail(fails, @"outer group should group by Finish");
     if ([og.members count] != 2)
       PicaFail(fails, @"outer group should nest inner group + footer");
     else {
       RDLTablixMember *ig = og.members[0];
       if ([ig.groupExpressions count] == 0 ||
-          [ig.groupExpressions[0] rangeOfString:@"Job"].location == NSNotFound)
+          [[ig.groupExpressions[0] source] rangeOfString:@"Job"].location == NSNotFound)
         PicaFail(fails, @"inner group should group by Job");
       if (ig.header == nil || og.header == nil)
         PicaFail(fails, @"both group levels should carry TablixHeader");
@@ -932,19 +1142,19 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   NSInteger subCount = 0;
   for (RDLLaidOutPage *p in npages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         nOil = YES;
-      if ([it.text isEqualToString:@"Desk"])
+      if ([PicaLaidText(it) isEqualToString:@"Desk"])
         nDesk = YES;
-      if ([it.text isEqualToString:@"Subtotal"])
+      if ([PicaLaidText(it) isEqualToString:@"Subtotal"])
         subCount += 1;
-      if ([it.text isEqualToString:@"Total"])
+      if ([PicaLaidText(it) isEqualToString:@"Total"])
         nTotal = YES;
-      if (PicaAsNum(it.text) == 2355)
+      if (PicaAsNum(PicaLaidText(it)) == 2355)
         nOilSum = YES;
-      if (PicaAsNum(it.text) == 3468)
+      if (PicaAsNum(PicaLaidText(it)) == 3468)
         nGrand = YES;
-      if (PicaAsNum(it.text) == 1840)
+      if (PicaAsNum(PicaLaidText(it)) == 1840)
         nDeskSum = YES;
     }
   }
@@ -967,10 +1177,10 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"nested round-trip parse failed: %@",
                                                nerr.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in nparsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     if (![pt.groupBy isEqualToString:@"Finish"])
       PicaFail(fails, @"nested round-trip lost outer groupBy");
     if (![pt.groupBy2 isEqualToString:@"Job"])
@@ -997,8 +1207,7 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
   // ---- Nested column groups: Finish > Job two-tier column headers. ----
   RDLReport *r = PicaGroupedJobs();
   [r.body.items removeAllObjects];
-  RDLItem *tab = [[RDLItem alloc] init];
-  tab.type = @"Tablix";
+  RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"NestedCols";
   tab.dataSetName = @"Jobs";
   tab.left = 0;
@@ -1011,8 +1220,7 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
   [nb.columns addObject:nc];
   RDLTablixRow *nr = [[RDLTablixRow alloc] init];
   nr.height = 0.28;
-  RDLItem *ncell = [[RDLItem alloc] init];
-  ncell.type = @"Textbox";
+  RDLTextbox *ncell = [[RDLTextbox alloc] init];
   ncell.name = @"NestedCell";
   ncell.value = @"=Sum(Fields!Amount.Value)";
   RDLTablixCell *ncc = [[RDLTablixCell alloc] init];
@@ -1024,11 +1232,10 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
   RDLTablixMember * (^colGroup)(NSString *) = ^RDLTablixMember *(NSString *field) {
     RDLTablixMember *m = [[RDLTablixMember alloc] init];
     m.groupName = [NSString stringWithFormat:@"g%@", field];
-    [m.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+    [m.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]]];
     RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
     h.size = 0.3;
-    RDLItem *ht = [[RDLItem alloc] init];
-    ht.type = @"Textbox";
+    RDLTextbox *ht = [[RDLTextbox alloc] init];
     ht.name = [NSString stringWithFormat:@"Hdr%@", field];
     ht.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
     h.item = ht;
@@ -1048,19 +1255,19 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
   NSMutableArray *sums = [NSMutableArray array];
   for (RDLLaidOutPage *p in pages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         oil = it;
-      else if ([it.text isEqualToString:@"Lacquer"])
+      else if ([PicaLaidText(it) isEqualToString:@"Lacquer"])
         lacq = it;
-      else if ([it.text isEqualToString:@"Wax"])
+      else if ([PicaLaidText(it) isEqualToString:@"Wax"])
         wax = it;
-      else if ([it.text isEqualToString:@"Desk"])
+      else if ([PicaLaidText(it) isEqualToString:@"Desk"])
         desk = it;
-      else if ([it.text isEqualToString:@"Chair"])
+      else if ([PicaLaidText(it) isEqualToString:@"Chair"])
         chair = it;
-      else if ([it.text isEqualToString:@"Shelf"])
+      else if ([PicaLaidText(it) isEqualToString:@"Shelf"])
         shelf = it;
-      else if (PicaAsNum(it.text) > 0)
+      else if (PicaAsNum(PicaLaidText(it)) > 0)
         [sums addObject:it];
     }
   }
@@ -1086,9 +1293,9 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
   }
   BOOL n1840 = NO, n610 = NO;
   for (RDLLaidOutItem *it in sums) {
-    if (PicaAsNum(it.text) == 1840 && desk && fabs(it.x - desk.x) < 0.01)
+    if (PicaAsNum(PicaLaidText(it)) == 1840 && desk && fabs(it.x - desk.x) < 0.01)
       n1840 = YES;
-    if (PicaAsNum(it.text) == 610 && shelf && fabs(it.x - shelf.x) < 0.01)
+    if (PicaAsNum(PicaLaidText(it)) == 610 && shelf && fabs(it.x - shelf.x) < 0.01)
       n610 = YES;
   }
   if (!n1840 || !n610)
@@ -1102,10 +1309,10 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"nested column round-trip parse failed: %@",
                                                nerr.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in nparsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     RDLTablixMember *po = pt.columnHierarchy.members.firstObject;
     if ([po.members count] != 1 || [po.members.firstObject.groupExpressions count] == 0)
       PicaFail(fails, @"round-trip lost the nested column group");
@@ -1117,7 +1324,7 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
     w.page.pageWidth = 4.5;
     w.page.leftMargin = 0.5;
     w.page.rightMargin = 0.5;
-    RDLItem *t = w.body.items.firstObject;
+    RDLTablix *t = (RDLTablix *)w.body.items.firstObject;
     t.columnSpecs = @[
       @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
       @{@"width" : @2.0, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
@@ -1134,17 +1341,17 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
     RDLLaidOutPage *p1 = wpages[0], *p2 = wpages[1];
     BOOL p1Desk = NO, p1Amt = NO, p2Oil = NO, p2Amt = NO, p2Desk = NO;
     for (RDLLaidOutItem *it in p1.items) {
-      if ([it.text isEqualToString:@"Desk"])
+      if ([PicaLaidText(it) isEqualToString:@"Desk"])
         p1Desk = YES;
-      if (PicaAsNum(it.text) == 1840)
+      if (PicaAsNum(PicaLaidText(it)) == 1840)
         p1Amt = YES;
     }
     for (RDLLaidOutItem *it in p2.items) {
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         p2Oil = YES;
-      if ([it.text isEqualToString:@"Desk"])
+      if ([PicaLaidText(it) isEqualToString:@"Desk"])
         p2Desk = YES;
-      if (PicaAsNum(it.text) == 1840)
+      if (PicaAsNum(PicaLaidText(it)) == 1840)
         p2Amt = YES;
     }
     if (!p1Desk || p1Amt)
@@ -1155,12 +1362,12 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
       PicaFail(fails, @"RepeatRowHeaders should repeat the Finish group header on page 2");
     for (RDLLaidOutItem *it in p2.items)
       if (it.x + it.w > 4.5 - 0.5 + 0.05 && it.zIndex >= 0)
-        PicaFail(fails, [NSString stringWithFormat:@"page 2 item '%@' overflows the page", it.text]);
+        PicaFail(fails, [NSString stringWithFormat:@"page 2 item '%@' overflows the page", PicaLaidText(it)]);
   }
   NSArray *npages = [RDLGenerator pagesForReport:wideReport(NO) parameters:@{}];
   if ([npages count] == 2) {
     for (RDLLaidOutItem *it in ((RDLLaidOutPage *)npages[1]).items)
-      if ([it.text isEqualToString:@"Oil"])
+      if ([PicaLaidText(it) isEqualToString:@"Oil"])
         PicaFail(fails, @"row headers should not repeat when RepeatRowHeaders is off");
   } else {
     PicaFail(fails, @"wide tablix without RepeatRowHeaders should still split into 2 pages");
@@ -1323,32 +1530,36 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
     PicaFail(fails, @"dataset Filters not parsed");
   BOOL sawCalc = NO;
   for (id f in r.dataSets.firstObject.fields)
-    if ([f isKindOfClass:[RDLField class]] && [[(RDLField *)f value] length])
+    if ([f isKindOfClass:[RDLField class]] && [(RDLField *)f value] != nil)
       sawCalc = YES;
   if (!sawCalc)
     PicaFail(fails, @"calculated field not parsed");
-  RDLItem *multi = nil, *ghost = nil, *chart = nil, *list = nil;
+  RDLTextbox *multi = nil;
+  RDLItem *ghost = nil;
+  RDLChart *chart = nil;
+  RDLTablix *list = nil;
   for (RDLItem *it in r.body.items) {
     if ([it.name isEqualToString:@"Multi"])
-      multi = it;
+      multi = (RDLTextbox *)it;
     if ([it.name isEqualToString:@"Ghost"])
       ghost = it;
     if ([it.name isEqualToString:@"C1"])
-      chart = it;
+      chart = (RDLChart *)it;
     if ([it.name isEqualToString:@"L1"])
-      list = it;
+      list = (RDLTablix *)it;
   }
   if (![multi.value isEqualToString:@"Hello World\nLine2"])
     PicaFail(fails, [NSString stringWithFormat:@"multi TextRun concat → %@", multi.value]);
-  if (![multi.hyperlink isEqualToString:@"https://example.com"])
+  if (![[multi.hyperlink source] isEqualToString:@"https://example.com"])
     PicaFail(fails, @"Hyperlink not parsed");
-  if (![ghost.hidden isEqualToString:@"true"])
+  if (![[ghost.hidden source] isEqualToString:@"true"])
     PicaFail(fails, @"Visibility/Hidden not parsed");
-  if (chart == nil || ![chart.type isEqualToString:@"Chart"])
+  if (chart == nil || ![chart isKindOfClass:[RDLChart class]])
     PicaFail(fails, @"real RDL Chart not parsed");
   else {
-    if (![[chart.chartType lowercaseString] isEqualToString:@"pie"])
-      PicaFail(fails, [NSString stringWithFormat:@"chart type → %@", chart.chartType]);
+    if (chart.chartType != RDLChartTypePie)
+      PicaFail(fails, [NSString stringWithFormat:@"chart type → %@",
+                                                 RDLStringFromChartType(chart.chartType)]);
     if ([chart.valueField rangeOfString:@"Amount"].location == NSNotFound)
       PicaFail(fails, @"chart valueField");
     if ([chart.categoryField rangeOfString:@"Sku"].location == NSNotFound)
@@ -1356,7 +1567,7 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
     if (![chart.title isEqualToString:@"Amounts"])
       PicaFail(fails, @"chart title");
   }
-  if (list == nil || ![list.type isEqualToString:@"Tablix"])
+  if (list == nil || ![list isKindOfClass:[RDLTablix class]])
     PicaFail(fails, @"List should map onto Tablix");
 
   // Layout: hidden item suppressed, hyperlink and image resolved, list expanded.
@@ -1364,15 +1575,17 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   BOOL sawSecret = NO, sawLink = NO, sawImg = NO, sawW1 = NO, sawChart = NO;
   for (RDLLaidOutPage *p in pages) {
     for (RDLLaidOutItem *it in p.items) {
-      if ([it.text isEqualToString:@"SECRET"])
+      if ([PicaLaidText(it) isEqualToString:@"SECRET"])
         sawSecret = YES;
       if ([it.hyperlink isEqualToString:@"https://example.com"])
         sawLink = YES;
-      if ([it.kind isEqualToString:@"Image"] && [it.imageData length] > 0)
+      if ([it isKindOfClass:[RDLLaidOutImage class]] &&
+            [[(RDLLaidOutImage *)it imageData] length] > 0)
         sawImg = YES;
-      if ([it.text isEqualToString:@"W1"])
+      if ([PicaLaidText(it) isEqualToString:@"W1"])
         sawW1 = YES;
-      if ([it.kind isEqualToString:@"Chart"] && [it.values count] == 2)
+      if ([it isKindOfClass:[RDLLaidOutChart class]] &&
+            [[(RDLLaidOutChart *)it values] count] == 2)
         sawChart = YES;
     }
   }
@@ -1419,34 +1632,35 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   ds.fields = @[ @"Sku", @"Amount" ];
   ds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
   [sr.dataSets addObject:ds];
-  RDLItem *tb = [[RDLItem alloc] init];
-  tb.type = @"Textbox";
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
   tb.name = @"Styled";
   tb.value = @"styled";
   tb.left = 0.5;
   tb.top = 0.2;
   tb.width = 3;
   tb.height = 0.3;
-  tb.style.fontStyle = @"Italic";
-  tb.style.textDecoration = @"Underline";
-  tb.style.verticalAlign = @"Middle";
-  tb.style.paddingLeft = @"6pt";
+  tb.style.fontStyle = RDLFontStyleItalic;
+  tb.style.textDecoration = RDLTextDecorationUnderline;
+  tb.style.verticalAlign = RDLVerticalAlignMiddle;
+  tb.style.paddingLeft = [RDLLength points:6];
   tb.style.border = [[RDLBorder alloc] init];
-  tb.style.border.style = @"Solid";
-  tb.style.border.width = @"2pt";
+  tb.style.border.style = RDLBorderStyleSolid;
+  tb.style.border.width = [RDLLength points:2];
   tb.style.border.color = @"#ff0000";
-  tb.style.backgroundColor = @"=IIf(1 > 0, \"#00ff00\", \"#0000ff\")";
+  // A computed style property lives in the style's expression holder now,
+  // rather than being a constant string that happens to start with "=".
+  tb.style.expressions = [[RDLStyleExpressions alloc] init];
+  tb.style.expressions.backgroundColor =
+      [RDLExpr expressionWithSource:@"=IIf(1 > 0, \"#00ff00\", \"#0000ff\")"];
   [sr.body.items addObject:tb];
-  RDLItem *vline = [[RDLItem alloc] init];
-  vline.type = @"Line";
+  RDLLine *vline = [[RDLLine alloc] init];
   vline.name = @"VLine";
   vline.left = 4;
   vline.top = 0.2;
   vline.width = 0;
   vline.height = 1;
   [sr.body.items addObject:vline];
-  RDLItem *below = [[RDLItem alloc] init];
-  below.type = @"Textbox";
+  RDLTextbox *below = [[RDLTextbox alloc] init];
   below.name = @"Below";
   below.value = @"below";
   below.left = 0.5;
@@ -1455,8 +1669,7 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   below.height = 0.2;
   below.zIndex = 3;
   [sr.body.items addObject:below];
-  RDLItem *grow = [[RDLItem alloc] init];
-  grow.type = @"Textbox";
+  RDLTextbox *grow = [[RDLTextbox alloc] init];
   grow.name = @"Grow";
   grow.value = @"word word word word word word word word word word word word word word word word "
                @"word word word word word word word word word word word word word word word word";
@@ -1517,13 +1730,12 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   fds.fields = @[ @"Sku", @"Amount" ];
   fds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
   RDLFilter *ff = [[RDLFilter alloc] init];
-  ff.expression = @"=Fields!Amount.Value";
-  ff.oper = @"GreaterThan";
-  [ff.values addObject:@"6"];
+  ff.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  ff.oper = RDLFilterOperatorGreaterThan;
+  [ff.values addObject:[RDLValue literal:@"6"]];
   [fds.filters addObject:ff];
   [fr.dataSets addObject:fds];
-  RDLItem *ftb = [[RDLItem alloc] init];
-  ftb.type = @"Textbox";
+  RDLTextbox *ftb = [[RDLTextbox alloc] init];
   ftb.name = @"FSum";
   ftb.value = @"=Sum(Fields!Amount.Value, \"Items\")";
   ftb.left = 0.5;
@@ -1535,7 +1747,7 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
     NSArray *fp = [RDLGenerator pagesForReport:fr parameters:@{}];
     BOOL saw10 = NO;
     for (RDLLaidOutItem *it in [fp.firstObject items])
-      if (PicaAsNum(it.text) == 10)
+      if (PicaAsNum(PicaLaidText(it)) == 10)
         saw10 = YES;
     if (!saw10)
       PicaFail(fails, [NSString stringWithFormat:@"dataset filter pass %d Sum != 10", pass]);
@@ -1583,8 +1795,6 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
        "<Textbox Name=\"T1\"><Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>0.3in</Height>"
        "<Paragraphs><Paragraph><TextRuns><TextRun><Value>=Parameters!Tags.Count</Value></TextRun>"
        "</TextRuns></Paragraph></Paragraphs></Textbox>"
-       "<Subreport Name=\"Sub1\"><Top>1in</Top><Left>0in</Left><Width>2in</Width><Height>1in</Height>"
-       "<ReportName>Other</ReportName></Subreport>"
        "</ReportItems></Body>"
        "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
        "</Report>";
@@ -1606,16 +1816,26 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
     PicaFail(fails, @"MultiValue parameter defaults not parsed");
   if ([tags.validValues count] != 3)
     PicaFail(fails, @"ValidValues not parsed");
-  if (![start.dataType isEqualToString:@"DateTime"])
+  if (start.dataType != RDLParameterDataTypeDateTime)
     PicaFail(fails, @"DateTime parameter not parsed");
   if (!note.nullable)
     PicaFail(fails, @"Nullable not parsed");
-  BOOL warned = NO;
-  for (NSString *w in r.warnings)
-    if ([w rangeOfString:@"Subreport"].location != NSNotFound)
-      warned = YES;
-  if (!warned)
-    PicaFail(fails, [NSString stringWithFormat:@"no warning for Subreport (warnings: %@)", r.warnings]);
+  // An element this kit does not model fails the parse rather than being
+  // skipped, so the report that comes back is always the report on disk.
+  NSString *withSubreport = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
+                                                          withString:
+      @"<Subreport Name=\"Sub1\"><Top>1in</Top><Left>0in</Left><Width>2in</Width>"
+      @"<Height>1in</Height><ReportName>Other</ReportName></Subreport>"
+      @"</ReportItems></Body>"];
+  NSError *subErr = nil;
+  RDLReport *rejected = [RDLParser reportFromXMLString:withSubreport error:&subErr];
+  if (rejected != nil)
+    PicaFail(fails, @"a Subreport should be rejected, not skipped");
+  else if ([subErr.localizedDescription rangeOfString:@"Subreport"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"Sub1"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"/Report"].location == NSNotFound)
+    PicaFail(fails, [NSString stringWithFormat:@"unhelpful error for Subreport: %@",
+                                               subErr.localizedDescription]);
   if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
     PicaFail(fails, @"Body Style not parsed");
 
@@ -1643,12 +1863,24 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   NSString *back = [RDLWriter XMLStringFromReport:r];
   for (NSString *needle in @[
          @"<MultiValue>true</MultiValue>", @"<Nullable>true</Nullable>", @"<ParameterValues>",
-         @"<Value>A</Value><Value>B</Value>", @"<BackgroundColor>#eeeeff</BackgroundColor>"
+         @"<BackgroundColor>#eeeeff</BackgroundColor>"
        ]) {
     if ([back rangeOfString:needle].location == NSNotFound)
       PicaFail(fails, [NSString stringWithFormat:@"writer omitted %@", needle]);
   }
   RDLReport *r2 = [RDLParser reportFromXMLString:back error:&err];
+  // The multi-value defaults are asserted through the model rather than as
+  // adjacent tags in the text, so the check does not depend on how the XML is
+  // laid out.
+  for (RDLParameter *rp in r2.parameters) {
+    if (![rp.name isEqualToString:@"Tags"])
+      continue;
+    if (!rp.multiValue)
+      PicaFail(fails, @"MultiValue lost on round trip");
+    if ([rp.defaultValues count] != 2 || ![[rp.defaultValues[0] source] isEqualToString:@"A"] ||
+        ![[rp.defaultValues[1] source] isEqualToString:@"B"])
+      PicaFail(fails, [NSString stringWithFormat:@"MultiValue defaults → %@", rp.defaultValues]);
+  }
   if (r2 == nil || [r2.parameters count] != 4)
     PicaFail(fails, @"subset2 re-parse failed");
   NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
@@ -1705,25 +1937,25 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   BOOL saw10 = NO, saw20 = NO, saw30 = NO, saw40 = NO;
   CGFloat q1x = -1, q2x = -1;
   for (RDLLaidOutItem *it in [cpages.firstObject items]) {
-    if ([it.text isEqualToString:@"Q1"]) {
+    if ([PicaLaidText(it) isEqualToString:@"Q1"]) {
       sawQ1 = YES;
       q1x = it.x;
     }
-    if ([it.text isEqualToString:@"Q2"]) {
+    if ([PicaLaidText(it) isEqualToString:@"Q2"]) {
       sawQ2 = YES;
       q2x = it.x;
     }
-    if ([it.text isEqualToString:@"North"])
+    if ([PicaLaidText(it) isEqualToString:@"North"])
       sawNorth = YES;
-    if ([it.text isEqualToString:@"South"])
+    if ([PicaLaidText(it) isEqualToString:@"South"])
       sawSouth = YES;
-    if (PicaAsNum(it.text) == 10)
+    if (PicaAsNum(PicaLaidText(it)) == 10)
       saw10 = YES;
-    if (PicaAsNum(it.text) == 20)
+    if (PicaAsNum(PicaLaidText(it)) == 20)
       saw20 = YES;
-    if (PicaAsNum(it.text) == 30)
+    if (PicaAsNum(PicaLaidText(it)) == 30)
       saw30 = YES;
-    if (PicaAsNum(it.text) == 40)
+    if (PicaAsNum(PicaLaidText(it)) == 40)
       saw40 = YES;
   }
   if (!sawQ1 || !sawQ2)
@@ -1737,19 +1969,17 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
 
   // ResetPageNumber + PageName on a group page break.
   RDLReport *brk = PicaGroupedJobs();
-  RDLTablixMember *gm = brk.body.items.firstObject.rowHierarchy.members[1];
-  gm.pageBreak = @"Between";
+  RDLTablixMember *gm = [(RDLTablix *)brk.body.items.firstObject rowHierarchy].members[1];
+  gm.pageBreak = RDLPageBreakLocationBetween;
   gm.resetPageNumber = YES;
-  gm.pageName = @"=Fields!Finish.Value";
-  RDLItem *hdrNum = [[RDLItem alloc] init];
-  hdrNum.type = @"Textbox";
+  gm.pageName = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  RDLTextbox *hdrNum = [[RDLTextbox alloc] init];
   hdrNum.name = @"HdrNum";
   hdrNum.value = @"=Globals!PageNumber";
   hdrNum.width = 1;
   hdrNum.height = 0.25;
   [brk.pageHeader.items addObject:hdrNum];
-  RDLItem *hdrName = [[RDLItem alloc] init];
-  hdrName.type = @"Textbox";
+  RDLTextbox *hdrName = [[RDLTextbox alloc] init];
   hdrName.name = @"HdrName";
   hdrName.value = @"=Globals!PageName";
   hdrName.left = 2;
@@ -1763,9 +1993,9 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
     NSString *p2num = nil, *p2name = nil;
     for (RDLLaidOutItem *it in [bpages[1] items]) {
       if ([it.name isEqualToString:@"HdrNum"])
-        p2num = it.text;
+        p2num = PicaLaidText(it);
       if ([it.name isEqualToString:@"HdrName"])
-        p2name = it.text;
+        p2name = PicaLaidText(it);
     }
     if (PicaAsNum(p2num) != 1)
       PicaFail(fails, [NSString stringWithFormat:@"ResetPageNumber: page 2 number → %@", p2num]);
@@ -1784,8 +2014,7 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   kt.page.topMargin = 0.5;
   kt.page.bottomMargin = 0.5;
   // bodyTop = 0.5 + default header 0.55; bodyBottom = 5 - 0.5 - default footer 0.4; avail ≈ 3.05
-  RDLItem *keep = [[RDLItem alloc] init];
-  keep.type = @"Textbox";
+  RDLTextbox *keep = [[RDLTextbox alloc] init];
   keep.name = @"KeepMe";
   keep.value = @"kept";
   keep.top = 2.5;
@@ -1800,10 +2029,10 @@ NSArray<NSString *> *PicaRunRDLSubset2Checks(void) {
   } else {
     BOOL onP1 = NO, onP2 = NO;
     for (RDLLaidOutItem *it in [kpages[0] items])
-      if ([it.text isEqualToString:@"kept"])
+      if ([PicaLaidText(it) isEqualToString:@"kept"])
         onP1 = YES;
     for (RDLLaidOutItem *it in [kpages[1] items])
-      if ([it.text isEqualToString:@"kept"])
+      if ([PicaLaidText(it) isEqualToString:@"kept"])
         onP2 = YES;
     if (onP1 || !onP2)
       PicaFail(fails, @"KeepTogether item should render only on page 2");
@@ -1817,11 +2046,10 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Rich"];
   RDLParameter *who = [[RDLParameter alloc] init];
   who.name = @"Who";
-  who.dataType = @"String";
-  who.defaultValue = @"Ada";
+  who.dataType = RDLParameterDataTypeString;
+  who.defaultValue = [RDLValue literal:@"Ada"];
   [r.parameters addObject:who];
-  RDLItem *tb = [[RDLItem alloc] init];
-  tb.type = @"Textbox";
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
   tb.name = @"RichBox";
   tb.width = 4;
   tb.height = 0.6;
@@ -1831,7 +2059,7 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   RDLTextRun *r2 = [[RDLTextRun alloc] init];
   r2.value = @"=Parameters!Who.Value";
   RDLStyle *bold = [[RDLStyle alloc] init];
-  bold.fontWeight = @"Bold";
+  bold.fontWeight = RDLFontWeightBold;
   bold.color = @"#aa0000";
   r2.style = bold;
   [p1.runs addObject:r1];
@@ -1840,7 +2068,7 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   RDLTextRun *r3 = [[RDLTextRun alloc] init];
   r3.value = @"second line";
   RDLStyle *centered = [[RDLStyle alloc] init];
-  centered.textAlign = @"Center";
+  centered.textAlign = RDLTextAlignCenter;
   p2.style = centered;
   [p2.runs addObject:r3];
   tb.paragraphs = [NSMutableArray arrayWithObjects:p1, p2, nil];
@@ -1848,8 +2076,20 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   [r.body.items addObject:tb];
 
   NSString *xml = [RDLWriter XMLStringFromReport:r];
-  if ([xml rangeOfString:@"<TextRun><Value>Hello </Value></TextRun>"].location == NSNotFound)
-    PicaFail(fails, @"richtext: writer should emit unstyled run without Style");
+  // An unstyled run must carry no Style element -- checked by re-parsing rather
+  // than by looking for adjacent tags, which would depend on XML formatting.
+  {
+    NSError *rtErr = nil;
+    RDLReport *rt = [RDLParser reportFromXMLString:xml error:&rtErr];
+    RDLTextbox *rtb = (RDLTextbox *)rt.body.items.firstObject;
+    RDLTextRun *firstRun = rtb.paragraphs.firstObject.runs.firstObject;
+    if (firstRun == nil)
+      PicaFail(fails, @"richtext: first run missing after round trip");
+    else if (![firstRun.value isEqualToString:@"Hello "])
+      PicaFail(fails, [NSString stringWithFormat:@"richtext: first run → %@", firstRun.value]);
+    else if (firstRun.style != nil)
+      PicaFail(fails, @"richtext: an unstyled run should come back with no Style");
+  }
   if ([xml rangeOfString:@"<FontWeight>Bold</FontWeight>"].location == NSNotFound)
     PicaFail(fails, @"richtext: writer should emit sparse run FontWeight");
   if ([xml rangeOfString:@"<TextAlign>Center</TextAlign>"].location == NSNotFound)
@@ -1857,19 +2097,19 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
 
   NSError *err = nil;
   RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
-  RDLItem *tb2 = back.body.items.firstObject;
+  RDLTextbox *tb2 = (RDLTextbox *)back.body.items.firstObject;
   if ([tb2.paragraphs count] != 2)
     PicaFail(fails, @"richtext: re-parse should keep 2 paragraphs");
   RDLParagraph *bp1 = tb2.paragraphs.firstObject;
   if ([bp1.runs count] != 2)
     PicaFail(fails, @"richtext: paragraph 1 should keep 2 runs");
   RDLTextRun *br2 = [bp1.runs count] > 1 ? bp1.runs[1] : nil;
-  if (![br2.style.fontWeight isEqualToString:@"Bold"] ||
+  if (br2.style.fontWeight != RDLFontWeightBold ||
       ![br2.style.color isEqualToString:@"#aa0000"])
     PicaFail(fails, @"richtext: run style should round-trip Bold + color");
   if (br2.style.fontFamily.length)
     PicaFail(fails, @"richtext: run style should stay sparse (no FontFamily)");
-  if (![[tb2.paragraphs[1] style].textAlign isEqualToString:@"Center"])
+  if ([tb2.paragraphs[1] style].textAlign != RDLTextAlignCenter)
     PicaFail(fails, @"richtext: paragraph style should round-trip TextAlign");
   if ([tb2.value rangeOfString:@"second line"].location == NSNotFound)
     PicaFail(fails, @"richtext: flattened value should include both paragraphs");
@@ -1883,12 +2123,12 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   if (li == nil) {
     PicaFail(fails, @"richtext: laid-out textbox missing");
   } else {
-    if ([li.spans count] != 2)
+    if ([[(RDLLaidOutTextbox *)li spans] count] != 2)
       PicaFail(fails, @"richtext: laid-out spans should keep 2 paragraphs");
-    RDLTextRun *lr2 = [[li.spans.firstObject runs] count] > 1 ? [li.spans.firstObject runs][1] : nil;
+    RDLTextRun *lr2 = [[[(RDLLaidOutTextbox *)li spans].firstObject runs] count] > 1 ? [[(RDLLaidOutTextbox *)li spans].firstObject runs][1] : nil;
     if (![lr2.value isEqualToString:@"Ada"])
       PicaFail(fails, @"richtext: run expression should evaluate to Ada");
-    if ([li.text rangeOfString:@"Hello Ada"].location == NSNotFound)
+    if ([PicaLaidText(li) rangeOfString:@"Hello Ada"].location == NSNotFound)
       PicaFail(fails, @"richtext: flattened laid-out text should read Hello Ada");
   }
 
@@ -1902,8 +2142,7 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
 
   // Plain textboxes stay plain: no paragraphs, no spans in HTML body text.
   RDLReport *plain = [RDLReport emptyReportNamed:@"Plain"];
-  RDLItem *ptb = [[RDLItem alloc] init];
-  ptb.type = @"Textbox";
+  RDLTextbox *ptb = [[RDLTextbox alloc] init];
   ptb.name = @"P";
   ptb.value = @"just text";
   ptb.width = 2;
@@ -1911,7 +2150,7 @@ NSArray<NSString *> *PicaRunRichTextChecks(void) {
   [plain.body.items addObject:ptb];
   NSString *pxml = [RDLWriter XMLStringFromReport:plain];
   RDLReport *pback = [RDLParser reportFromXMLString:pxml error:&err];
-  if ([pback.body.items.firstObject paragraphs] != nil)
+  if ([(RDLTextbox *)pback.body.items.firstObject paragraphs] != nil)
     PicaFail(fails, @"richtext: single unstyled run should parse as plain value");
   return fails;
 }
@@ -1966,7 +2205,7 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
   // "what the columns are" from "when to project them", so assignment order
   // no longer matters.
   RDLReport *r = PicaGroupedJobs();
-  RDLItem *tab = r.body.items.firstObject;
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
   tab.groupBy = @"";
   tab.showGrandTotal = NO;
   [tab rebuildTablix];
@@ -1991,9 +2230,9 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
   if ([tab.rowHierarchy.members count] != 3)
     PicaFail(fails, @"spec-then-group rebuild should give header + group + grand total");
   RDLTablixRow *totalRow = tab.tablixBody.rows.lastObject;
-  if (![totalRow.cells.lastObject.item.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+  if (![[(RDLTextbox *)totalRow.cells.lastObject.item value] isEqualToString:@"=Sum(Fields!Amount.Value)"])
     PicaFail(fails, [NSString stringWithFormat:@"grand total cell %@",
-                                               totalRow.cells.lastObject.item.value]);
+                                               [(RDLTextbox *)totalRow.cells.lastObject.item value]]);
 
   // The stored spec is what comes back out, verbatim.
   NSArray *specs = tab.columnSpecs;
@@ -2014,10 +2253,10 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"rebuild round-trip parse failed: %@",
                                                err.localizedDescription]);
   else {
-    RDLItem *pt = nil;
+    RDLTablix *pt = (RDLTablix *)nil;
     for (RDLItem *it in parsed.body.items)
-      if ([it.type isEqualToString:@"Tablix"])
-        pt = it;
+      if ([it isKindOfClass:[RDLTablix class]])
+        pt = (RDLTablix *)it;
     if ([pt.columnSpecs count] != 2)
       PicaFail(fails, [NSString stringWithFormat:@"parser should infer columnSpecs, got %lu",
                                                  (unsigned long)[pt.columnSpecs count]]);
@@ -2034,8 +2273,7 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
 
   // An item with no stored spec (an RDL 2005 List becomes a Tablix) must still
   // rebuild from whatever the body implies rather than wiping itself.
-  RDLItem *noSpec = [[RDLItem alloc] init];
-  noSpec.type = @"Tablix";
+  RDLTablix *noSpec = [[RDLTablix alloc] init];
   noSpec.name = @"Listish";
   noSpec.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"H", @"value" : @"=Fields!Job.Value"} ];
   [noSpec rebuildTablix];
@@ -2054,7 +2292,7 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
 NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   RDLStyle *base = [RDLStyle defaultStyle];
-  base.fontSize = @"12pt";
+  base.fontSize = [RDLLength points:12];
   base.color = @"#112233";
 
   NSFont *plain = [RDLTextAttributes fontForStyle:base scale:1.0];
@@ -2071,18 +2309,18 @@ NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
   NSFontManager *fm = [NSFontManager sharedFontManager];
   for (NSString *weight in @[ @"Bold", @"bold", @"SemiBold", @"Heavy", @"ExtraBold" ]) {
     RDLStyle *s = [RDLStyle defaultStyle];
-    s.fontWeight = weight;
+    s.fontWeight = RDLFontWeightFromString(weight);
     NSFont *f = [RDLTextAttributes fontForStyle:s scale:1.0];
     if (([fm traitsOfFont:f] & NSBoldFontMask) == 0)
       PicaFail(fails, [NSString stringWithFormat:@"weight %@ should render bold", weight]);
   }
   RDLStyle *normal = [RDLStyle defaultStyle];
-  normal.fontWeight = @"Normal";
+  normal.fontWeight = RDLFontWeightNormal;
   if (([fm traitsOfFont:[RDLTextAttributes fontForStyle:normal scale:1.0]] & NSBoldFontMask) != 0)
     PicaFail(fails, @"Normal weight should not render bold");
 
   RDLStyle *ital = [RDLStyle defaultStyle];
-  ital.fontStyle = @"italic";
+  ital.fontStyle = RDLFontStyleFromString(@"italic");
   if (([fm traitsOfFont:[RDLTextAttributes fontForStyle:ital scale:1.0]] & NSItalicFontMask) == 0)
     PicaFail(fails, @"italic should render italic regardless of case");
 
@@ -2093,33 +2331,33 @@ NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
   if ([RDLTextAttributes fontForStyle:missing scale:1.0] == nil)
     PicaFail(fails, @"a missing font family should fall back to the user font");
 
-  base.textAlign = @"Right";
-  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  base.textAlign = RDLTextAlignRight;
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:RDLTextAlignUnspecified scale:1.0];
   NSParagraphStyle *ps = attrs[NSParagraphStyleAttributeName];
   if (ps.alignment != NSRightTextAlignment)
     PicaFail(fails, @"style alignment should reach the paragraph style");
   // A paragraph's sparse alignment overrides the textbox's.
-  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:@"Center" scale:1.0];
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:RDLTextAlignCenter scale:1.0];
   ps = attrs[NSParagraphStyleAttributeName];
   if (ps.alignment != NSCenterTextAlignment)
     PicaFail(fails, @"paragraph alignment should override the style's");
 
-  base.textDecoration = @"Underline";
-  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  base.textDecoration = RDLTextDecorationUnderline;
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:RDLTextAlignUnspecified scale:1.0];
   if ([attrs[NSUnderlineStyleAttributeName] integerValue] == 0)
     PicaFail(fails, @"Underline should set the underline attribute");
-  base.textDecoration = @"LineThrough";
-  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  base.textDecoration = RDLTextDecorationLineThrough;
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:RDLTextAlignUnspecified scale:1.0];
   if ([attrs[NSStrikethroughStyleAttributeName] integerValue] == 0)
     PicaFail(fails, @"LineThrough should set the strikethrough attribute");
 
   // Runs merge over the base style, and the newline joining two paragraphs
   // keeps the *preceding* paragraph's alignment.
   RDLStyle *itemStyle = [RDLStyle defaultStyle];
-  itemStyle.textAlign = @"Left";
+  itemStyle.textAlign = RDLTextAlignLeft;
   RDLParagraph *p1 = [[RDLParagraph alloc] init];
   RDLStyle *pa1 = [[RDLStyle alloc] init];
-  pa1.textAlign = @"Right";
+  pa1.textAlign = RDLTextAlignRight;
   p1.style = pa1;
   RDLTextRun *run1 = [[RDLTextRun alloc] init];
   run1.value = @"one";
@@ -2128,7 +2366,7 @@ NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
   RDLTextRun *run2 = [[RDLTextRun alloc] init];
   run2.value = @"two";
   RDLStyle *boldRun = [[RDLStyle alloc] init];
-  boldRun.fontWeight = @"Bold";
+  boldRun.fontWeight = RDLFontWeightBold;
   run2.style = boldRun;
   [p2.runs addObject:run2];
 
@@ -2150,11 +2388,234 @@ NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
   return fails;
 }
 
+// The expression-or-literal split: which side a property landed on, and that
+// both sides come back out of a round trip exactly as they went in.
+NSArray<NSString *> *PicaRunValueChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  if ([RDLValue valueWithSource:nil] != nil || [RDLValue valueWithSource:@""] != nil)
+    PicaFail(fails, @"an absent value should be nil, not an empty literal");
+  RDLValue *lit = [RDLValue valueWithSource:@"true"];
+  if ([lit isExpression] || ![[lit source] isEqualToString:@"true"])
+    PicaFail(fails, @"\"true\" should be a literal");
+  RDLValue *ex = [RDLValue valueWithSource:@"=IIf( 1 > 0 , \"a\" , \"b\" )"];
+  if (![ex isExpression])
+    PicaFail(fails, @"a leading = should make an expression");
+  // The lossless AST: an expression's own spacing survives being parsed.
+  if (![[ex source] isEqualToString:@"=IIf( 1 > 0 , \"a\" , \"b\" )"])
+    PicaFail(fails, [NSString stringWithFormat:@"expression source → %@", [ex source]]);
+  // A literal that merely starts with a letter is never evaluated.
+  if (![[[RDLValue literal:@"=notreally"] source] isEqualToString:@"=notreally"])
+    PicaFail(fails, @"an explicit literal should stay a literal whatever it reads like");
+
+  RDLReport *r = [RDLReport emptyReportNamed:@"Values"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = @"x";
+  tb.hidden = [RDLValue valueWithSource:@"=Fields!Gone.Value"];
+  tb.hyperlink = [RDLValue valueWithSource:@"https://example.com"];
+  [r.body.items addObject:tb];
+
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Who";
+  p.dataType = RDLParameterDataTypeString;
+  p.defaultValue = [RDLValue valueWithSource:@"=User!UserID"];
+  [p.validValues addObject:[RDLValue literal:@"Ada"]];
+  [r.parameters addObject:p];
+
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"D";
+  ds.fields = @[ @"Amount" ];
+  RDLField *calc = [[RDLField alloc] init];
+  calc.name = @"Double";
+  calc.value = [RDLValue valueWithSource:@"=Fields!Amount.Value * 2"];
+  ds.fields = [ds.fields arrayByAddingObject:calc];
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  f.oper = RDLFilterOperatorGreaterThan;
+  [f.values addObject:[RDLValue literal:@"6"]];
+  [ds.filters addObject:f];
+  [r.dataSets addObject:ds];
+
+  NSError *err = nil;
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if (back == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"round trip failed: %@", err]);
+    return fails;
+  }
+  RDLTextbox *btb = (RDLTextbox *)back.body.items.firstObject;
+  if (![btb.hidden isExpression] || ![[btb.hidden source] isEqualToString:@"=Fields!Gone.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"hidden → %@", [btb.hidden source]]);
+  if ([btb.hyperlink isExpression] || ![[btb.hyperlink source] isEqualToString:@"https://example.com"])
+    PicaFail(fails, [NSString stringWithFormat:@"hyperlink → %@", [btb.hyperlink source]]);
+  RDLParameter *bp = back.parameters.firstObject;
+  if (![bp.defaultValue isExpression] || ![[bp.defaultValue source] isEqualToString:@"=User!UserID"])
+    PicaFail(fails, [NSString stringWithFormat:@"parameter default → %@", [bp.defaultValue source]]);
+  if ([bp.validValues count] != 1 || [bp.validValues[0] isExpression])
+    PicaFail(fails, @"a valid value written as a constant should come back a literal");
+  RDLDataSet *bds = back.dataSets.firstObject;
+  RDLFilter *bf = bds.filters.firstObject;
+  if (![bf.expression isExpression] || bf.oper != RDLFilterOperatorGreaterThan ||
+      [bf.values count] != 1 || [bf.values[0] isExpression])
+    PicaFail(fails, @"filter should be an expression tested against a literal");
+  RDLField *bcalc = nil;
+  for (id fl in bds.fields)
+    if ([fl isKindOfClass:[RDLField class]] && [[(RDLField *)fl name] isEqualToString:@"Double"])
+      bcalc = fl;
+  if (bcalc == nil || ![bcalc.value isExpression])
+    PicaFail(fails, @"calculated field should come back as an expression");
+
+  // A calculated field is resolved by evaluating the RDLValue it now holds,
+  // so check it actually computes rather than only surviving the round trip.
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = back;
+  scope.dataSet = bds;
+  scope.row = @{@"Amount" : @21};
+  id twice = [RDLExpression evaluate:@"=Fields!Double.Value" scope:scope];
+  if (![twice isKindOfClass:[NSNumber class]] || [twice doubleValue] != 42.0)
+    PicaFail(fails, [NSString stringWithFormat:@"calculated field evaluated to %@", twice]);
+
+  // Second pass byte-identical: nothing was normalised away on the way in.
+  if (![[RDLWriter XMLStringFromReport:back] isEqualToString:xml])
+    PicaFail(fails, @"write → parse → write should be byte-identical");
+  return fails;
+}
+
+// Grouping prepends a row-header column nobody budgeted for. It must come out
+// of the columns, not off the right-hand edge of the page: a tablix that used
+// to fill its width kept doing so and quietly pushed its last column onto an
+// extra horizontal page.
+static RDLTablix *PicaFitTablix(CGFloat width) {
+  RDLTablix *t = [[RDLTablix alloc] init];
+  t.name = @"T";
+  t.dataSetName = @"D";
+  t.left = 0;
+  t.width = width;
+  t.columnSpecs = @[
+    @{@"header" : @"A", @"value" : @"=Fields!A.Value", @"width" : @2.8, @"align" : @"Left"},
+    @{@"header" : @"B", @"value" : @"=Fields!B.Value", @"width" : @1.2, @"align" : @"Right"},
+    @{@"header" : @"C", @"value" : @"=Fields!C.Value", @"width" : @1.4, @"align" : @"Right"},
+    @{@"header" : @"D", @"value" : @"=Fields!D.Value", @"width" : @2.1, @"align" : @"Right"}
+  ];
+  return t;
+}
+
+static CGFloat PicaColumnsWidth(RDLTablix *t) {
+  CGFloat w = 0;
+  for (RDLTablixColumn *c in t.tablixBody.columns)
+    w += c.width;
+  return w;
+}
+
+NSArray<NSString *> *PicaRunTablixFitChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  // Ungrouped: nothing is taken away.
+  RDLTablix *plain = PicaFitTablix(7.5);
+  [plain rebuildTablix];
+  if (fabs(PicaColumnsWidth(plain) - 7.5) > 1e-6 || fabs(plain.width - 7.5) > 1e-6)
+    PicaFail(fails, @"an ungrouped tablix should keep its authored column widths");
+
+  // Grouped, columns already filling the width: the 1.2in header comes out of
+  // them and the tablix still ends where it did.
+  RDLTablix *grouped = PicaFitTablix(7.5);
+  grouped.groupBy = @"G";
+  [grouped rebuildTablix];
+  if (fabs(PicaColumnsWidth(grouped) - 6.3) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"grouped columns → %.4f, wanted 6.3",
+                                               PicaColumnsWidth(grouped)]);
+  if (fabs(grouped.width - 7.5) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"grouped tablix width → %.4f, wanted 7.5",
+                                               grouped.width]);
+  // Proportional, not equalised.
+  if (fabs([grouped.columnSpecs[0][@"width"] doubleValue] - 2.8 * (6.3 / 7.5)) > 1e-6)
+    PicaFail(fails, @"columns should shrink in proportion to what they were");
+  // And it has to settle: the widths are written back to columnSpecs, so a
+  // second rebuild must not shrink them again.
+  [grouped rebuildTablix];
+  if (fabs(PicaColumnsWidth(grouped) - 6.3) > 1e-6)
+    PicaFail(fails, @"rebuilding a fitted tablix should not shrink it again");
+
+  // Two group levels take two header columns' worth.
+  RDLTablix *nested = PicaFitTablix(7.5);
+  nested.groupBy = @"G";
+  nested.groupBy2 = @"H";
+  [nested rebuildTablix];
+  if (fabs(PicaColumnsWidth(nested) - 5.1) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"two-level grouped columns → %.4f, wanted 5.1",
+                                               PicaColumnsWidth(nested)]);
+
+  // Room to spare: left exactly as authored.
+  RDLTablix *roomy = PicaFitTablix(20.0);
+  roomy.groupBy = @"G";
+  [roomy rebuildTablix];
+  if (fabs(PicaColumnsWidth(roomy) - 7.5) > 1e-6)
+    PicaFail(fails, @"a tablix with room for the header should keep its columns");
+
+  // No width of its own: the report it was adopted into supplies the bound.
+  RDLReport *r = [RDLReport emptyReportNamed:@"Fit"]; // 7.5in body
+  RDLTablix *unsized = PicaFitTablix(0);
+  unsized.groupBy = @"G";
+  [r.body.items addObject:unsized];
+  [r adoptItems];
+  if (unsized.report != r)
+    PicaFail(fails, @"-adoptItems should give an item its report");
+  [unsized rebuildTablix];
+  if (fabs(PicaColumnsWidth(unsized) - 6.3) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"unsized grouped columns → %.4f, wanted 6.3",
+                                               PicaColumnsWidth(unsized)]);
+
+  // Already wider than the page: the report clamps both columns and frame.
+  RDLTablix *over = PicaFitTablix(9.0);
+  over.groupBy = @"G";
+  [r.body.items addObject:over];
+  [r adoptItems];
+  [over rebuildTablix];
+  if (fabs(over.width - 7.5) > 1e-6 || fabs(PicaColumnsWidth(over) - 6.3) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"over-wide tablix → width %.4f cols %.4f",
+                                               over.width, PicaColumnsWidth(over)]);
+
+  // The point of all of it: one page, not a horizontal spill.
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"D";
+  ds.fields = @[ @"A", @"B", @"C", @"D", @"G" ];
+  ds.rows = @[ @{@"A" : @"one", @"B" : @1, @"C" : @2, @"D" : @3, @"G" : @"x"} ];
+  [r.dataSets addObject:ds];
+  RDLReport *single = [RDLReport emptyReportNamed:@"Fit1"];
+  [single.dataSets addObject:ds];
+  RDLTablix *t = PicaFitTablix(7.5);
+  t.groupBy = @"G";
+  [single.body.items addObject:t];
+  [single adoptItems];
+  [t rebuildTablix];
+  NSArray<RDLLaidOutPage *> *pages = [RDLLayoutEngine pagesForReport:single paramValues:nil];
+  if ([pages count] != 1)
+    PicaFail(fails, [NSString stringWithFormat:@"fitted tablix laid out onto %lu pages, wanted 1",
+                                               (unsigned long)[pages count]]);
+  CGFloat rightmost = 0;
+  for (RDLLaidOutPage *pg in pages)
+    for (RDLLaidOutItem *li in pg.items)
+      rightmost = MAX(rightmost, li.x + li.w);
+  CGFloat margin = single.page.leftMargin;
+  if (rightmost > margin + single.width + 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"laid out %.4f past the body's right edge",
+                                               rightmost - margin - single.width]);
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
   [fails addObjectsFromArray:PicaRunExpressionChecks()];
   [fails addObjectsFromArray:PicaRunExpressionLangChecks()];
+  [fails addObjectsFromArray:PicaRunExpressionRoundTripChecks()];
+  [fails addObjectsFromArray:PicaRunStyleExpressionChecks()];
+  [fails addObjectsFromArray:PicaRunValueChecks()];
+  [fails addObjectsFromArray:PicaRunTablixFitChecks()];
+  [fails addObjectsFromArray:PicaRunWriterWhitespaceChecks()];
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];
   [fails addObjectsFromArray:PicaRunTablixGroupChecks()];

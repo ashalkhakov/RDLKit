@@ -70,8 +70,8 @@
     }
     _pendingEditItem = nil;
     NSUInteger borderCol = 0;
-    if ([hit.type isEqualToString:@"Tablix"] &&
-        [PicaTablixGeometry tablix:hit
+    if ([hit isKindOfClass:[RDLTablix class]] &&
+        [PicaTablixGeometry tablix:(RDLTablix *)hit
                          itemRect:itemRect
               columnBorderAtPoint:p
                            column:&borderCol
@@ -81,7 +81,7 @@
       _dragActive = NO;
       _dragStart = p;
       _dragColIndex = borderCol;
-      _origColW = [hit.columnSpecs[borderCol][@"width"] doubleValue];
+      _origColW = [[(RDLTablix *)hit columnSpecs][borderCol][@"width"] doubleValue];
       return;
     }
     _dragKind = kind;
@@ -129,7 +129,9 @@
   else if ([_dragKind isEqualToString:@"s"])
     [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW height:_origH + dy];
   else if ([_dragKind isEqualToString:@"tabcol"])
-    [_ctx.editor setTablixColumn:_dragColIndex width:_origColW + dx ofTablix:[_ctx selectedItem]];
+    [_ctx.editor setTablixColumn:_dragColIndex
+                           width:_origColW + dx
+                        ofTablix:(RDLTablix *)[_ctx selectedItem]];
 }
 
 - (void)mouseUp:(NSEvent *)event {
@@ -221,7 +223,7 @@
   NSArray *rects = nil;
   NSArray *tablixes = [[_host interactionGeometry] tablixItemsWithRects:&rects];
   for (NSUInteger i = 0; i < [tablixes count]; i++) {
-    RDLItem *it = tablixes[i];
+    RDLTablix *it = tablixes[i];
     NSRect ir = [rects[i] rectValue];
     NSUInteger bc = 0;
     if ([PicaTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {

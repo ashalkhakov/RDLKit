@@ -103,8 +103,10 @@
 - (void)syncParamValuesFromReport {
   NSMutableDictionary *pv = [NSMutableDictionary dictionary];
   for (RDLParameter *p in _report.parameters) {
+    // The binding is text the user can edit, so an expression default seeds
+    // the field with its source rather than a value nothing could reproduce.
     if ([p.name length])
-      pv[p.name] = p.defaultValue ?: @"";
+      pv[p.name] = [p.defaultValue source] ?: @"";
   }
   _paramValues = pv;
 }
@@ -183,6 +185,11 @@
 - (void)postChange:(PicaChange *)change {
   if (change == nil)
     return;
+  // The bands hold plain arrays, so nothing tells an item it has joined a
+  // report. This is the one place every load and every edit passes through, so
+  // the back-pointers are refreshed here rather than at each mutation.
+  if (change.scope == RDLChangeScopeStructure || change.scope == RDLChangeScopeReport)
+    [_report adoptItems];
   [[NSNotificationCenter defaultCenter]
       postNotificationName:PicaDocumentDidChangeNotification
                     object:self

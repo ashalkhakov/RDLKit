@@ -51,19 +51,20 @@
 }
 
 - (void)beginEditingHit:(RDLItem *)hit rect:(NSRect)itemRect point:(NSPoint)p {
-  if ([hit.type isEqualToString:@"Tablix"]) {
+  if ([hit isKindOfClass:[RDLTablix class]]) {
+    RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger col = 0;
     NSString *part = nil;
-    if ([PicaTablixGeometry tablix:hit
+    if ([PicaTablixGeometry tablix:tablixHit
                          itemRect:itemRect
                             point:p
                            column:&col
                              part:&part
                              zoom:_ctx.zoom])
-      [self beginEditingTablix:hit col:col part:part];
+      [self beginEditingTablix:tablixHit col:col part:part];
     return;
   }
-  if ([hit.type isEqualToString:@"Line"] || [hit.type isEqualToString:@"Chart"])
+  if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]])
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);
   r.size.height = MAX(NSHeight(r), 19);
@@ -72,17 +73,13 @@
   [self startFieldForItem:hit
                   context:nil
                     rect:r
-                 initial:hit.value ?: @""
+                 initial:[(RDLTextbox *)hit value] ?: @""
                     font:[RDLTextAttributes fontForStyle:hit.style scale:_ctx.zoom]
-                   align:[hit.style.textAlign isEqualToString:@"Center"]
-                             ? NSCenterTextAlignment
-                             : ([hit.style.textAlign isEqualToString:@"Right"]
-                                    ? NSRightTextAlignment
-                                    : NSLeftTextAlignment)
+                   align:[RDLTextAttributes textAlignmentForAlign:hit.style.textAlign]
                    color:PicaColorFromHex(hit.style.color)];
 }
 
-- (void)beginEditingTablix:(RDLItem *)tab col:(NSUInteger)col part:(NSString *)part {
+- (void)beginEditingTablix:(RDLTablix *)tab col:(NSUInteger)col part:(NSString *)part {
   NSArray *cols = tab.columnSpecs ?: @[];
   if (col >= [cols count])
     return;
@@ -165,7 +162,7 @@
     return;
   PicaEditor *editor = _ctx.editor;
   if (ctx == nil) {
-    if ([text isEqualToString:it.value ?: @""])
+    if ([text isEqualToString:[(RDLTextbox *)it value] ?: @""])
       return;
     [editor beginGroup:@"Edit Text"];
     [editor setValue:text forKeyPath:@"value" ofItem:it];
@@ -175,7 +172,8 @@
   }
   NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
   NSString *key = [ctx[@"part"] isEqualToString:@"header"] ? @"header" : @"value";
-  NSMutableArray *specs = [it.columnSpecs mutableCopy];
+  RDLTablix *tablix = (RDLTablix *)it;
+  NSMutableArray *specs = [tablix.columnSpecs mutableCopy];
   if (specs == nil || ci >= [specs count])
     return;
   if ([text isEqualToString:specs[ci][key] ?: @""])
@@ -183,7 +181,7 @@
   NSMutableDictionary *col = [specs[ci] mutableCopy];
   col[key] = text;
   specs[ci] = col;
-  [editor setColumnSpecs:specs ofTablix:it];
+  [editor setColumnSpecs:specs ofTablix:tablix];
 }
 
 // --- Editor field delegate ---------------------------------------------------
@@ -211,7 +209,10 @@
   if (index)
     *index = 0;
   PicaExpressionScope *scope =
-      [PicaExpressionScope scopeWithReport:_ctx.report dataSetName:_editItem.dataSetName];
+      [PicaExpressionScope scopeWithReport:_ctx.report
+                               dataSetName:[_editItem isKindOfClass:[RDLDataRegion class]]
+                                               ? [(RDLDataRegion *)_editItem dataSetName]
+                                               : nil];
   return PicaExpressionCompletions([textView string], charRange, scope);
 }
 
@@ -243,7 +244,7 @@
   // Word-like Tab navigation between tablix cells: header row wraps into the
   // value row (and back), so the whole grid tabs through.
   if (ctx && (movement == NSTabTextMovement || movement == NSBacktabTextMovement)) {
-    NSArray *cols = it.columnSpecs ?: @[];
+    NSArray *cols = [(RDLTablix *)it columnSpecs] ?: @[];
     NSInteger n2 = (NSInteger)[cols count];
     if (n2 == 0)
       return;
@@ -262,7 +263,9 @@
         header = !header;
       }
     }
-    [self beginEditingTablix:it col:(NSUInteger)ci part:header ? @"header" : @"value"];
+    [self beginEditingTablix:(RDLTablix *)it
+                           col:(NSUInteger)ci
+                          part:header ? @"header" : @"value"];
   } else {
     [[_hostView window] makeFirstResponder:_hostView];
   }

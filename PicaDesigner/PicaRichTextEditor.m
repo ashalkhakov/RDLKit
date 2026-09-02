@@ -14,11 +14,11 @@
 
 @implementation PicaRichTextEditor
 
-+ (NSAttributedString *)attributedStringForItem:(RDLItem *)item {
++ (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item {
   return [PicaRichTextCodec attributedStringForItem:item];
 }
 
-+ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLItem *)item {
++ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLTextbox *)item {
   [PicaRichTextCodec applyAttributedString:text toItem:item];
 }
 
@@ -36,8 +36,8 @@
   [self.window close];
 }
 
-+ (BOOL)runForTextbox:(RDLItem *)item context:(PicaEditingContext *)context {
-  if (item == nil || ![item.type isEqualToString:@"Textbox"])
++ (BOOL)runForTextbox:(RDLTextbox *)item context:(PicaEditingContext *)context {
+  if (item == nil || ![item isKindOfClass:[RDLTextbox class]])
     return NO;
   PicaRichTextEditor *ed = [[PicaRichTextEditor alloc] init];
   // The panel -- window, hint, text view and buttons, and the releasedWhenClosed
@@ -56,7 +56,7 @@
   [[tv textContainer] setWidthTracksTextView:YES];
   [[tv textStorage] setAttributedString:[self attributedStringForItem:item]];
   [tv setTypingAttributes:[RDLTextAttributes attributesForStyle:item.style
-                                                 paragraphAlign:nil
+                                                 paragraphAlign:RDLTextAlignUnspecified
                                                           scale:1.0]];
   [ed.window center];
   if ([NSApp runModalForWindow:ed.window] != NSModalResponseOK)

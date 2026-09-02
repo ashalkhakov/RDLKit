@@ -16,6 +16,7 @@
 #import "PicaEditor.h"
 #import "PicaSelection.h"
 #import "PicaItemFactory.h"
+#import "PicaSamples.h"
 #import "PicaPageGeometry.h"
 #import "PicaRichTextCodec.h"
 #import "PicaEditingContext.h"
@@ -40,9 +41,8 @@ static RDLReport *PicaEditableReport(void) {
   ds.rows = @[ @{@"Sku" : @"A", @"Amount" : @10} ];
   [r.dataSets addObject:ds];
 
-  RDLItem *text = [[RDLItem alloc] init];
+  RDLTextbox *text = [[RDLTextbox alloc] init];
   text.name = @"Title";
-  text.type = @"Textbox";
   text.value = @"Hello";
   text.left = 1.0;
   text.top = 1.0;
@@ -50,16 +50,14 @@ static RDLReport *PicaEditableReport(void) {
   text.height = 0.3;
   [r.body.items addObject:text];
 
-  RDLItem *rect = [[RDLItem alloc] init];
+  RDLRectangle *rect = [[RDLRectangle alloc] init];
   rect.name = @"Box";
-  rect.type = @"Rectangle";
   rect.left = 0.5;
   rect.top = 2.0;
   rect.width = 3.0;
   rect.height = 1.0;
-  RDLItem *child = [[RDLItem alloc] init];
+  RDLTextbox *child = [[RDLTextbox alloc] init];
   child.name = @"Inner";
-  child.type = @"Textbox";
   child.value = @"Nested";
   [rect.items addObject:child];
   [r.body.items addObject:rect];
@@ -82,8 +80,7 @@ static RDLReport *PicaGroupedJobs(void) {
     @{@"Job" : @"Frame", @"Finish" : @"Oil", @"Amount" : @95},
   ];
   [r.dataSets addObject:ds];
-  RDLItem *tab = [[RDLItem alloc] init];
-  tab.type = @"Tablix";
+  RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"JobsByFinish";
   tab.dataSetName = @"Jobs";
   tab.top = 0.1;
@@ -114,7 +111,7 @@ NSArray<NSString *> *PicaRunDocumentChecks(void) {
   // must not dirty the file.
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = @"Customer";
-  p.defaultValue = @"Acme";
+  p.defaultValue = [RDLValue literal:@"Acme"];
   [doc.report.parameters addObject:p];
   [doc syncParamValuesFromReport];
   if (![doc.paramValues[@"Customer"] isEqualToString:@"Acme"])
@@ -127,7 +124,7 @@ NSArray<NSString *> *PicaRunDocumentChecks(void) {
 
   // An edit dirties it.
   PicaEditor *ed = [[PicaEditor alloc] initWithDocument:doc];
-  RDLItem *title = doc.report.body.items.firstObject;
+  RDLTextbox *title = (RDLTextbox *)doc.report.body.items.firstObject;
   [ed setValue:@"Changed" forKeyPath:@"value" ofItem:title];
   if (!doc.isDirty)
     PicaFail(fails, @"an edit should dirty the document");
@@ -151,7 +148,7 @@ NSArray<NSString *> *PicaRunDocumentChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"openURL failed: %@",
                                                err.localizedDescription]);
   else {
-    RDLItem *t = reopened.report.body.items.firstObject;
+    RDLTextbox *t = (RDLTextbox *)reopened.report.body.items.firstObject;
     if (![t.value isEqualToString:@"Changed"])
       PicaFail(fails, @"reopened document lost the edit");
     if (reopened.isDirty)
@@ -191,7 +188,7 @@ NSArray<NSString *> *PicaRunUndoChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   PicaDocument *doc = [[PicaDocument alloc] initWithReport:PicaEditableReport()];
   PicaEditor *ed = [[PicaEditor alloc] initWithDocument:doc];
-  RDLItem *title = doc.report.body.items.firstObject;
+  RDLTextbox *title = (RDLTextbox *)doc.report.body.items.firstObject;
 
   // A no-op assignment registers nothing. AppKit re-sends a field's value on
   // every focus change, so without this the undo stack fills with nothing.
@@ -257,7 +254,7 @@ NSArray<NSString *> *PicaRunUndoChecks(void) {
   [doc.undoManager undo];
 
   // Structure: remove and undo restores position in the sibling order.
-  RDLItem *box = doc.report.body.items[1];
+  RDLRectangle *box = (RDLRectangle *)doc.report.body.items[1];
   if (![ed removeItem:box])
     PicaFail(fails, @"removeItem should find and remove the rectangle");
   if ([doc.report.body.items count] != 1)
@@ -277,9 +274,8 @@ NSArray<NSString *> *PicaRunUndoChecks(void) {
     PicaFail(fails, @"undo should put the nested child back");
 
   // Insert and undo.
-  RDLItem *fresh = [[RDLItem alloc] init];
+  RDLTextbox *fresh = [[RDLTextbox alloc] init];
   fresh.name = @"Added";
-  fresh.type = @"Textbox";
   [ed addItem:fresh into:doc.report.body.items bandKey:@"body"];
   if (doc.report.body.items.lastObject != fresh)
     PicaFail(fails, @"addItem should append");
@@ -314,7 +310,7 @@ NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
   RDLReport *r = PicaGroupedJobs();
   PicaDocument *doc = [[PicaDocument alloc] initWithReport:r];
   PicaEditor *ed = [[PicaEditor alloc] initWithDocument:doc];
-  RDLItem *tab = r.body.items.firstObject;
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
   NSUInteger baseCols = [tab.columnSpecs count];
 
   // Insert a column: the spec grows, the body rebuilds, the item widens, and
@@ -351,7 +347,7 @@ NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
   RDLReport *r2 = PicaGroupedJobs();
   PicaDocument *doc2 = [[PicaDocument alloc] initWithReport:r2];
   PicaEditor *ed2 = [[PicaEditor alloc] initWithDocument:doc2];
-  RDLItem *tab2 = r2.body.items.firstObject;
+  RDLTablix *tab2 = (RDLTablix *)r2.body.items.firstObject;
   [ed2 setTablixColumn:0 width:3.13 ofTablix:tab2];
   if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 3.15) > 0.0001)
     PicaFail(fails, [NSString stringWithFormat:@"column width should snap, got %@",
@@ -367,7 +363,7 @@ NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
   RDLReport *r3 = PicaGroupedJobs();
   PicaDocument *doc3 = [[PicaDocument alloc] initWithReport:r3];
   PicaEditor *ed3 = [[PicaEditor alloc] initWithDocument:doc3];
-  RDLItem *tab3 = r3.body.items.firstObject;
+  RDLTablix *tab3 = (RDLTablix *)r3.body.items.firstObject;
   NSArray *specsBefore = tab3.columnSpecs;
   NSString *groupBefore = tab3.groupBy;
   // The row hierarchy is what distinguishes the two states: grouped gives
@@ -405,7 +401,7 @@ NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
                                        ? tab3.rowHierarchy.members[1]
                                        : nil;
   if ([restoredGroup.groupExpressions count] == 0 ||
-      [restoredGroup.groupExpressions[0] rangeOfString:groupBefore].location == NSNotFound)
+      [[restoredGroup.groupExpressions[0] source] rangeOfString:groupBefore].location == NSNotFound)
     PicaFail(fails, @"the restored group member should group by the restored field");
 
   // Grand total toggles and untoggles.
@@ -432,7 +428,7 @@ NSArray<NSString *> *PicaRunSelectionChecks(void) {
   if (![sel.bandKey isEqualToString:@"body"])
     PicaFail(fails, @"selection should default to the body band");
 
-  RDLItem *title = r.body.items.firstObject;
+  RDLTextbox *title = (RDLTextbox *)r.body.items.firstObject;
   [sel selectItem:title inBandWithKey:@"body"];
   if (sel.scope != RDLSelectionScopeItem || sel.item != title)
     PicaFail(fails, @"selecting an item should hold the resolved reference");
@@ -460,9 +456,8 @@ NSArray<NSString *> *PicaRunSelectionChecks(void) {
     PicaFail(fails, @"validation should drop an item that is not in the report");
 
   // Validation corrects the band of an item that is in the report.
-  RDLItem *header = [[RDLItem alloc] init];
+  RDLTextbox *header = [[RDLTextbox alloc] init];
   header.name = @"HeaderText";
-  header.type = @"Textbox";
   [r.pageHeader.items addObject:header];
   [sel selectItem:header inBandWithKey:@"body"];
   [sel validateAgainstReport:r];
@@ -471,7 +466,7 @@ NSArray<NSString *> *PicaRunSelectionChecks(void) {
                                                sel.bandKey]);
 
   // A nested child is still found by validation.
-  RDLItem *box = r.body.items[1];
+  RDLRectangle *box = (RDLRectangle *)r.body.items[1];
   [sel selectItem:box.items.firstObject inBandWithKey:@"pageFooter"];
   [sel validateAgainstReport:r];
   if (![sel.bandKey isEqualToString:@"body"] || sel.scope != RDLSelectionScopeItem)
@@ -501,7 +496,7 @@ NSArray<NSString *> *PicaRunInsertionChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"description %@", [p localizedDescription]]);
 
   // A plain item selected: insert after it, as a sibling.
-  RDLItem *title = r.body.items.firstObject;
+  RDLTextbox *title = (RDLTextbox *)r.body.items.firstObject;
   [sel selectItem:title inBandWithKey:@"body"];
   p = [PicaItemFactory insertionPointInReport:r selection:sel];
   if (p.sibling != title || p.container != nil)
@@ -511,7 +506,7 @@ NSArray<NSString *> *PicaRunInsertionChecks(void) {
                                                [p localizedDescription]]);
 
   // A Rectangle selected: insert inside, and data regions are refused there.
-  RDLItem *box = r.body.items[1];
+  RDLRectangle *box = (RDLRectangle *)r.body.items[1];
   [sel selectItem:box inBandWithKey:@"body"];
   p = [PicaItemFactory insertionPointInReport:r selection:sel];
   if (p.container != box || p.items != box.items)
@@ -535,9 +530,8 @@ NSArray<NSString *> *PicaRunInsertionChecks(void) {
 
   // Unique naming looks inside Rectangles, which the report's own
   // -nextNameWithPrefix: does not.
-  RDLItem *clash = [[RDLItem alloc] init];
+  RDLTextbox *clash = [[RDLTextbox alloc] init];
   clash.name = @"Textbox1";
-  clash.type = @"Textbox";
   [box.items addObject:clash];
   NSString *name = [PicaItemFactory uniqueNameWithPrefix:@"Textbox" inReport:r];
   if ([name isEqualToString:@"Textbox1"])
@@ -546,7 +540,7 @@ NSArray<NSString *> *PicaRunInsertionChecks(void) {
   // Defaults: a new Tablix binds the first dataset and builds a real body.
   [sel selectReport];
   p = [PicaItemFactory insertionPointInReport:r selection:sel];
-  RDLItem *tab = [PicaItemFactory itemOfKind:@"Tablix" atPoint:p inReport:r];
+  RDLTablix *tab = (RDLTablix *)[PicaItemFactory itemOfKind:@"Tablix" atPoint:p inReport:r];
   if (![tab.dataSetName isEqualToString:@"Rows"])
     PicaFail(fails, @"a new Tablix should bind the first dataset");
   if ([tab.columnSpecs count] != 2)
@@ -556,7 +550,7 @@ NSArray<NSString *> *PicaRunInsertionChecks(void) {
   if (![tab.columnSpecs.firstObject[@"value"] isEqualToString:@"=Fields!Sku.Value"])
     PicaFail(fails, [NSString stringWithFormat:@"new tablix column value %@",
                                                tab.columnSpecs.firstObject[@"value"]]);
-  RDLItem *chart = [PicaItemFactory itemOfKind:@"Chart" atPoint:p inReport:r];
+  RDLChart *chart = (RDLChart *)[PicaItemFactory itemOfKind:@"Chart" atPoint:p inReport:r];
   if (![chart.categoryField isEqualToString:@"Sku"] ||
       ![chart.valueField isEqualToString:@"Amount"])
     PicaFail(fails, @"a new Chart should bind the first two fields");
@@ -586,7 +580,7 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void) {
   PicaEditor *ed = [[PicaEditor alloc] initWithDocument:doc];
 
   // A Rectangle with a child round-trips through RDL XML as a deep copy.
-  RDLItem *box = r.body.items[1];
+  RDLRectangle *box = (RDLRectangle *)r.body.items[1];
   NSString *xml = [PicaEditor XMLStringForItem:box];
   if ([xml length] == 0)
     PicaFail(fails, @"XMLStringForItem should produce XML");
@@ -600,18 +594,19 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void) {
   }
   if (copy == box)
     PicaFail(fails, @"the copy should be a distinct object");
-  if (![copy.type isEqualToString:@"Rectangle"])
-    PicaFail(fails, [NSString stringWithFormat:@"copy type %@", copy.type]);
-  if ([copy.items count] != 1)
+  if (![copy isKindOfClass:[RDLRectangle class]])
+    PicaFail(fails, [NSString stringWithFormat:@"copy type %@",
+                                               copy.rdlElementName]);
+  if ([[(RDLRectangle *)copy items] count] != 1)
     PicaFail(fails, @"the copy should keep its nested child");
-  if (copy.items.firstObject == box.items.firstObject)
+  if ([(RDLRectangle *)copy items].firstObject == box.items.firstObject)
     PicaFail(fails, @"the nested child should be a copy, not a shared reference");
 
   // Renaming the pasted tree makes every name unique, children included.
   [PicaItemFactory renameTreeUniquely:copy inReport:r];
   if ([copy.name isEqualToString:@"Box"])
     PicaFail(fails, @"a pasted item should get a fresh name");
-  if ([[copy.items.firstObject name] isEqualToString:@"Inner"])
+  if ([[[(RDLRectangle *)copy items].firstObject name] isEqualToString:@"Inner"])
     PicaFail(fails, @"a pasted child should get a fresh name too");
 
   [ed addItem:copy into:r.body.items bandKey:@"body"];
@@ -624,9 +619,10 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void) {
   // A tablix survives the round trip with its spec, since the carrier goes
   // through the real writer and parser.
   RDLReport *jobs = PicaGroupedJobs();
-  RDLItem *tab = jobs.body.items.firstObject;
-  RDLItem *tabCopy = [PicaEditor itemFromXMLString:[PicaEditor XMLStringForItem:tab]];
-  if (![tabCopy.type isEqualToString:@"Tablix"])
+  RDLTablix *tab = (RDLTablix *)jobs.body.items.firstObject;
+  RDLTablix *tabCopy =
+      (RDLTablix *)[PicaEditor itemFromXMLString:[PicaEditor XMLStringForItem:tab]];
+  if (![tabCopy isKindOfClass:[RDLTablix class]])
     PicaFail(fails, @"a copied tablix should still be a Tablix");
   if ([tabCopy.columnSpecs count] != [tab.columnSpecs count])
     PicaFail(fails, [NSString stringWithFormat:@"copied tablix specs %lu vs %lu",
@@ -643,10 +639,9 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void) {
 NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
 
-  RDLItem *item = [[RDLItem alloc] init];
-  item.type = @"Textbox";
+  RDLTextbox *item = [[RDLTextbox alloc] init];
   item.name = @"Box";
-  item.style.fontSize = @"10pt";
+  item.style.fontSize = [RDLLength points:10];
   item.style.color = @"#1a1916";
   item.value = @"plain text";
 
@@ -666,7 +661,7 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
       [[NSAttributedString alloc] initWithString:@"one\ntwo"
                                       attributes:[RDLTextAttributes
                                                      attributesForStyle:item.style
-                                                         paragraphAlign:nil
+                                                         paragraphAlign:RDLTextAlignUnspecified
                                                                   scale:1.0]];
   [PicaRichTextCodec applyAttributedString:multi toItem:item];
   if (item.paragraphs != nil)
@@ -678,7 +673,7 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
   NSMutableAttributedString *styled = [[NSMutableAttributedString alloc]
       initWithString:@"normal bold"
           attributes:[RDLTextAttributes attributesForStyle:item.style
-                                           paragraphAlign:nil
+                                           paragraphAlign:RDLTextAlignUnspecified
                                                     scale:1.0]];
   NSFont *boldFont = [[NSFontManager sharedFontManager]
       convertFont:[RDLTextAttributes fontForStyle:item.style scale:1.0]
@@ -698,7 +693,7 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
       RDLTextRun *second = para.runs[1];
       if (first.style != nil)
         PicaFail(fails, @"the run matching the item style should stay unstyled");
-      if (![second.style.fontWeight isEqualToString:@"Bold"])
+      if (second.style.fontWeight != RDLFontWeightBold)
         PicaFail(fails, [NSString stringWithFormat:@"bold run weight %@",
                                                    second.style.fontWeight]);
       if ([second.style.fontFamily length])
@@ -710,16 +705,16 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
 
   // Alignment differing from the item's makes the paragraph carry a style.
   RDLStyle *centered = [RDLStyle styleByMerging:nil over:item.style];
-  centered.textAlign = @"Center";
+  centered.textAlign = RDLTextAlignCenter;
   NSAttributedString *centeredText =
       [[NSAttributedString alloc] initWithString:@"middle"
                                       attributes:[RDLTextAttributes
                                                      attributesForStyle:centered
-                                                         paragraphAlign:nil
+                                                         paragraphAlign:RDLTextAlignUnspecified
                                                                   scale:1.0]];
   [PicaRichTextCodec applyAttributedString:centeredText toItem:item];
   if ([item.paragraphs count] != 1 ||
-      ![[item.paragraphs.firstObject style].textAlign isEqualToString:@"Center"])
+      [item.paragraphs.firstObject style].textAlign != RDLTextAlignCenter)
     PicaFail(fails, @"a differing paragraph alignment should be recorded");
 
   // A trailing newline means a real final empty paragraph, not a dropped one.
@@ -727,7 +722,7 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
       [[NSAttributedString alloc] initWithString:@"line\n"
                                       attributes:[RDLTextAttributes
                                                      attributesForStyle:item.style
-                                                         paragraphAlign:nil
+                                                         paragraphAlign:RDLTextAlignUnspecified
                                                                   scale:1.0]];
   NSMutableArray *paras = nil;
   [PicaRichTextCodec applyAttributedString:trailing toItem:item];
@@ -736,16 +731,15 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
   (void)paras;
 
   // Model → attributed → model preserves styled runs.
-  RDLItem *round = [[RDLItem alloc] init];
-  round.type = @"Textbox";
-  round.style.fontSize = @"10pt";
+  RDLTextbox *round = [[RDLTextbox alloc] init];
+  round.style.fontSize = [RDLLength points:10];
   RDLParagraph *rp = [[RDLParagraph alloc] init];
   RDLTextRun *ra = [[RDLTextRun alloc] init];
   ra.value = @"a";
   RDLTextRun *rb = [[RDLTextRun alloc] init];
   rb.value = @"b";
   RDLStyle *redBold = [[RDLStyle alloc] init];
-  redBold.fontWeight = @"Bold";
+  redBold.fontWeight = RDLFontWeightBold;
   redBold.color = @"#cc0000";
   rb.style = redBold;
   [rp.runs addObject:ra];
@@ -758,7 +752,7 @@ NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
     PicaFail(fails, @"a styled round trip should keep its two runs");
   else {
     RDLTextRun *back = [round.paragraphs.firstObject runs][1];
-    if (![back.style.fontWeight isEqualToString:@"Bold"])
+    if (back.style.fontWeight != RDLFontWeightBold)
       PicaFail(fails, @"round trip lost the run weight");
     if (![[back.style.color lowercaseString] isEqualToString:@"#cc0000"])
       PicaFail(fails, [NSString stringWithFormat:@"round trip colour %@", back.style.color]);
@@ -915,7 +909,7 @@ NSArray<NSString *> *PicaRunEditingContextChecks(void) {
   RDLItem *added = [ctx selectedItem];
   if (!(added != nil))
     PicaFail(fails, @"context: adding selects the new item");
-  if (!([added.type isEqualToString:@"Textbox"]))
+  if (!([added isKindOfClass:[RDLTextbox class]]))
     PicaFail(fails, @"context: added a Textbox");
   if (!(ctx.document.isDirty))
     PicaFail(fails, @"context: adding dirties the document");
@@ -926,8 +920,8 @@ NSArray<NSString *> *PicaRunEditingContextChecks(void) {
 
   // 4. A Rectangle refuses data regions.
   [ctx addItemOfKind:@"Rectangle"];
-  RDLItem *rect = [ctx selectedItem];
-  if (!([rect.type isEqualToString:@"Rectangle"]))
+  RDLRectangle *rect = (RDLRectangle *)[ctx selectedItem];
+  if (!([rect isKindOfClass:[RDLRectangle class]]))
     PicaFail(fails, @"context: added a Rectangle");
   if (!([[ctx allowedElementKinds] count] == 4))
     PicaFail(fails, @"context: a Rectangle allows four kinds");
@@ -961,7 +955,7 @@ NSArray<NSString *> *PicaRunEditingContextChecks(void) {
     PicaFail(fails, @"context: canPaste sees the item");
   NSUInteger rectKids = [rect.items count];
   [ctx pasteItem];
-  RDLItem *nested = [ctx selectedItem];
+  RDLRectangle *nested = (RDLRectangle *)[ctx selectedItem];
   if (!([rect.items count] == rectKids + 1))
     PicaFail(fails, @"context: pasting with a Rectangle selected nests inside it");
   if (!(nested != rect))
@@ -993,8 +987,8 @@ NSArray<NSString *> *PicaRunEditingContextChecks(void) {
   // Rectangle selected must fall back to the band rather than vanish.
   [ctx.selection selectReport];
   [ctx addItemOfKind:@"Tablix"];
-  RDLItem *tablix = [ctx selectedItem];
-  if (!(tablix != nil && [tablix.type isEqualToString:@"Tablix"]))
+  RDLTablix *tablix = (RDLTablix *)[ctx selectedItem];
+  if (!(tablix != nil && [tablix isKindOfClass:[RDLTablix class]]))
     PicaFail(fails, @"context: added a Tablix");
   if (!([ctx copySelectedItem]))
     PicaFail(fails, @"context: copy the tablix");
@@ -1116,25 +1110,22 @@ NSArray<NSString *> *PicaRunPageGeometryChecks(void) {
   r.body.height = 4.0;
   r.pageFooter.height = 0.5;
 
-  RDLItem *header = [[RDLItem alloc] init];
+  RDLTextbox *header = [[RDLTextbox alloc] init];
   header.name = @"HeaderText";
-  header.type = @"Textbox";
   header.left = 0.5;
   header.top = 0.25;
   header.width = 2.0;
   header.height = 0.3;
   [r.pageHeader.items addObject:header];
 
-  RDLItem *box = [[RDLItem alloc] init];
+  RDLRectangle *box = [[RDLRectangle alloc] init];
   box.name = @"Box";
-  box.type = @"Rectangle";
   box.left = 1.0;
   box.top = 1.0;
   box.width = 3.0;
   box.height = 2.0;
-  RDLItem *inner = [[RDLItem alloc] init];
+  RDLTextbox *inner = [[RDLTextbox alloc] init];
   inner.name = @"Inner";
-  inner.type = @"Textbox";
   inner.left = 0.5;
   inner.top = 0.5;
   inner.width = 1.0;
@@ -1253,14 +1244,12 @@ NSArray<NSString *> *PicaRunPageGeometryChecks(void) {
   // Tablix enumeration must reach one nested in a Rectangle. The old
   // per-band scan only looked at top-level items, so a nested tablix got no
   // hover highlight and no resize cursor.
-  RDLItem *nestedTablix = [[RDLItem alloc] init];
+  RDLTablix *nestedTablix = [[RDLTablix alloc] init];
   nestedTablix.name = @"NestedTable";
-  nestedTablix.type = @"Tablix";
   nestedTablix.columnSpecs = @[ @{@"width" : @1.0, @"header" : @"H", @"value" : @"" } ];
   [box.items addObject:nestedTablix];
-  RDLItem *topTablix = [[RDLItem alloc] init];
+  RDLTablix *topTablix = [[RDLTablix alloc] init];
   topTablix.name = @"TopTable";
-  topTablix.type = @"Tablix";
   topTablix.columnSpecs = @[ @{@"width" : @1.0, @"header" : @"H", @"value" : @"" } ];
   [r.body.items addObject:topTablix];
 
@@ -1280,8 +1269,7 @@ NSArray<NSString *> *PicaRunPageGeometryChecks(void) {
 
 NSArray<NSString *> *PicaRunTablixGeometryChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
-  RDLItem *t = [[RDLItem alloc] init];
-  t.type = @"Tablix";
+  RDLTablix *t = [[RDLTablix alloc] init];
   t.name = @"T";
   t.headerHeight = 0.5;
   t.rowHeight = 0.25;
@@ -1296,8 +1284,7 @@ NSArray<NSString *> *PicaRunTablixGeometryChecks(void) {
   if (fabs([PicaTablixGeometry rowHeightOf:t zoom:1.0] - 18.0) > 0.01)
     PicaFail(fails, @"row height in points");
   // A tiny row must stay clickable rather than collapsing to nothing.
-  RDLItem *tiny = [[RDLItem alloc] init];
-  tiny.type = @"Tablix";
+  RDLTablix *tiny = [[RDLTablix alloc] init];
   tiny.rowHeight = 0.001;
   if ([PicaTablixGeometry rowHeightOf:tiny zoom:1.0] < 8.0)
     PicaFail(fails, @"a very short row should still get a clickable minimum");
@@ -1349,8 +1336,7 @@ NSArray<NSString *> *PicaRunTablixGeometryChecks(void) {
                          column:NULL zoom:1.0])
     PicaFail(fails, @"the last column's right edge is the item's east handle, not a border");
   // A single-column tablix has no internal borders at all.
-  RDLItem *one = [[RDLItem alloc] init];
-  one.type = @"Tablix";
+  RDLTablix *one = [[RDLTablix alloc] init];
   one.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"A", @"value" : @""} ];
   if ([PicaTablixGeometry tablix:one itemRect:r columnBorderAtPoint:NSMakePoint(244, 210)
                          column:NULL zoom:1.0])
@@ -1378,14 +1364,12 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   PicaEditor *editor = [[PicaEditor alloc] initWithDocument:doc];
   RDLReport *report = doc.report;
 
-  RDLItem *item = [[RDLItem alloc] init];
+  RDLTextbox *item = [[RDLTextbox alloc] init];
   item.name = @"Box";
-  item.type = @"Textbox";
   item.left = 1.25;
   item.style.fontFamily = @"Courier";
-  item.style.fontWeight = @"Bold";
-  item.style.textAlign = @"Right";
-  item.source = @"External";
+  item.style.fontWeight = RDLFontWeightBold;
+  item.style.textAlign = RDLTextAlignRight;
   [report.body.items addObject:item];
 
   NSTextField *leftField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
@@ -1408,9 +1392,13 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   [bindings bind:formatField keyPath:@"style.format" scope:PicaFieldScopeItem
             kind:PicaFieldKindText];
   [bindings bind:weightPop keyPath:@"style.fontWeight" scope:PicaFieldScopeItem
-            kind:PicaFieldKindPopUpIndex values:@[ @"Normal", @"Bold" ] placeholder:nil];
+            kind:PicaFieldKindPopUpIndex
+          values:@[ @(RDLFontWeightNormal), @(RDLFontWeightBold) ]
+     placeholder:nil];
   [bindings bind:alignPop keyPath:@"style.textAlign" scope:PicaFieldScopeItem
-            kind:PicaFieldKindPopUpTitle];
+            kind:PicaFieldKindPopUpIndex
+          values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
+     placeholder:nil];
   [bindings bind:bandHField keyPath:@"height" scope:PicaFieldScopeBand
             kind:PicaFieldKindNumber];
   [bindings bind:docNameField keyPath:@"name" scope:PicaFieldScopeReport
@@ -1452,12 +1440,12 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
 
   [weightPop selectItemAtIndex:0];
   [bindings applyControl:weightPop editor:editor item:item bandKey:@"body"];
-  if (![item.style.fontWeight isEqualToString:@"Normal"])
+  if (item.style.fontWeight != RDLFontWeightNormal)
     PicaFail(fails, [NSString stringWithFormat:@"popup-index apply gave %@",
                                                item.style.fontWeight]);
   [alignPop selectItemWithTitle:@"Center"];
   [bindings applyControl:alignPop editor:editor item:item bandKey:@"body"];
-  if (![item.style.textAlign isEqualToString:@"Center"])
+  if (item.style.textAlign != RDLTextAlignCenter)
     PicaFail(fails, @"popup-title apply should write the title");
 
   // Clearing a text field removes the property rather than storing "", so a
@@ -1592,7 +1580,7 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
 
 // Opens the dialog, clicks `button`, and reports whether the dialog was
 // actually up and the click landed.
-static BOOL PicaRunTablixDialog(RDLItem *tablix, PicaEditingContext *ctx,
+static BOOL PicaRunTablixDialog(RDLTablix *tablix, PicaEditingContext *ctx,
                                  NSString *button, PicaDialogClicker **outClicker) {
   PicaDialogClicker *clicker = [[PicaDialogClicker alloc] init];
   clicker.title = button;
@@ -1614,7 +1602,7 @@ static BOOL PicaRunTablixDialog(RDLItem *tablix, PicaEditingContext *ctx,
 NSArray<NSString *> *PicaRunDialogLifecycleChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:PicaGroupedJobs()];
-  RDLItem *tab = ctx.report.body.items.firstObject;
+  RDLTablix *tab = (RDLTablix *)ctx.report.body.items.firstObject;
   NSString *groupBefore = tab.groupBy;
   NSUInteger specsBefore = [tab.columnSpecs count];
 
@@ -1767,6 +1755,41 @@ NSArray<NSString *> *PicaRunSharedPipelineChecks(void) {
   return fails;
 }
 
+// Every sample is what a new user sees first, so none of them may put an item
+// past the right edge of the body. "Workshop by Finish" did: its columns were
+// sized to fill the width, and then grouping added a row-header column in
+// front of them.
+NSArray<NSString *> *PicaRunSampleFitChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  for (NSDictionary *entry in [PicaSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    RDLReport *r = [PicaSamples reportWithId:sampleId];
+    if (r == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"sample '%@' did not build", sampleId]);
+      continue;
+    }
+    NSArray *bands = @[ r.pageHeader, r.body, r.pageFooter ];
+    for (RDLBand *band in bands) {
+      for (RDLItem *it in band.items) {
+        if (it.left + it.width > r.width + 1e-6)
+          PicaFail(fails, [NSString stringWithFormat:@"sample '%@': %@ ends at %.3f, past the %.3f body",
+                                                     sampleId, it.name, it.left + it.width, r.width]);
+      }
+    }
+    // And nothing may spill sideways onto an extra page.
+    NSArray<RDLLaidOutPage *> *pages = [RDLLayoutEngine pagesForReport:r paramValues:nil];
+    CGFloat limit = r.page.leftMargin + r.width + 1e-6;
+    for (RDLLaidOutPage *pg in pages)
+      for (RDLLaidOutItem *li in pg.items)
+        if (li.x + li.w > limit) {
+          PicaFail(fails, [NSString stringWithFormat:@"sample '%@': laid-out item ends at %.3f, past %.3f",
+                                                     sampleId, li.x + li.w, limit]);
+          break;
+        }
+  }
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunDocumentChecks()];
@@ -1785,5 +1808,6 @@ NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   [fails addObjectsFromArray:PicaRunDialogLifecycleChecks()];
   [fails addObjectsFromArray:PicaRunExportChecks()];
   [fails addObjectsFromArray:PicaRunSharedPipelineChecks()];
+  [fails addObjectsFromArray:PicaRunSampleFitChecks()];
   return fails;
 }

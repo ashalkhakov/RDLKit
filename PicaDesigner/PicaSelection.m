@@ -9,7 +9,7 @@ static BOOL PicaItemsContain(NSArray *items, RDLItem *target) {
   for (RDLItem *it in items) {
     if (it == target)
       return YES;
-    if ([it.items count] && PicaItemsContain(it.items, target))
+    if ([it.childItems count] && PicaItemsContain(it.childItems, target))
       return YES;
   }
   return NO;

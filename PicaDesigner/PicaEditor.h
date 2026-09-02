@@ -68,17 +68,17 @@
 // All of these go through columnSpecs + -rebuildTablix, so the inverse is
 // simply the previous spec, and the ordering hazard of the old implicit
 // rebuild-on-set does not arise.
-- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLItem *)tablix;
+- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix;
 // Apply several tablix properties and rebuild ONCE, as a single inverse.
 // Necessary rather than convenient: the rebuild reads columnSpecs, groupBy,
 // groupBy2, pivotBy, showGrandTotal and the heights together, so setting them
 // through separate undoable steps would undo them one at a time and rebuild
 // against a half-restored state. Values may be NSNull to mean nil.
-- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLItem *)tablix;
-- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLItem *)tablix;
-- (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
-- (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
-- (void)toggleGrandTotalOfTablix:(RDLItem *)tablix;
+- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix;
+- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix;
+- (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+- (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+- (void)toggleGrandTotalOfTablix:(RDLTablix *)tablix;
 
 // --- Rich text ------------------------------------------------------------
 // Sets `value` and `paragraphs` together from an attributed string, as one

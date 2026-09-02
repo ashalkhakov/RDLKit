@@ -10,6 +10,8 @@
 // of the full set of weight names, and nil-guarded.
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
+#import "RDLReport.h"
+#import "RDLReport.h"
 
 @class RDLStyle;
 @class RDLParagraph;
@@ -20,10 +22,18 @@
 // else passes 1.
 + (NSFont *)fontForStyle:(RDLStyle *)style scale:(CGFloat)scale;
 
-// `paragraphAlign` overrides the style's own alignment when non-empty, which
+// `paragraphAlign` overrides the style's own alignment unless it is
+// RDLTextAlignUnspecified, which
 // is how a paragraph's sparse TextAlign wins over the textbox's.
+// RDLTextAlign <-> NSTextAlignment. Here because three places had their own
+// copy of this ladder: the attribute builder below, the canvas's in-place
+// editor, and the rich-text codec reading an alignment back off a paragraph
+// style. RDLTextAlignUnspecified and General both mean Left.
++ (NSTextAlignment)textAlignmentForAlign:(RDLTextAlign)align;
++ (RDLTextAlign)alignForTextAlignment:(NSTextAlignment)alignment;
+
 + (NSDictionary *)attributesForStyle:(RDLStyle *)style
-                      paragraphAlign:(NSString *)paragraphAlign
+                      paragraphAlign:(RDLTextAlign)paragraphAlign
                                scale:(CGFloat)scale;
 
 + (NSAttributedString *)attributedStringForText:(NSString *)text

@@ -7,8 +7,8 @@ static void PicaCollectNames(NSArray *items, NSMutableSet *names) {
   for (RDLItem *it in items) {
     if (it.name)
       [names addObject:it.name];
-    if ([it.items count])
-      PicaCollectNames(it.items, names);
+    if ([it.childItems count])
+      PicaCollectNames(it.childItems, names);
   }
 }
 
@@ -21,8 +21,8 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
         *outParent = parent;
       return it;
     }
-    if ([it.items count]) {
-      RDLItem *found = PicaFindInItems(it.items, target, it, outParent);
+    if ([it.childItems count]) {
+      RDLItem *found = PicaFindInItems(it.childItems, target, it, outParent);
       if (found)
         return found;
     }
@@ -80,13 +80,14 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
       p.bandKey = foundKey;
       // Selecting a Rectangle means "put it inside"; anything else means
       // "put it after me, alongside".
-      if ([selection.item.type isEqualToString:@"Rectangle"]) {
+      if ([selection.item isKindOfClass:[RDLRectangle class]]) {
         p.container = selection.item;
-        p.items = selection.item.items; // RDLItem.init always creates this
+        p.items = [(RDLRectangle *)selection.item items];
       } else {
         p.sibling = selection.item;
         p.container = parent;
-        p.items = parent ? parent.items : [report bandWithKey:foundKey].items;
+        p.items = parent ? [(RDLRectangle *)parent items]
+                         : [report bandWithKey:foundKey].items;
       }
       return p;
     }
@@ -135,13 +136,13 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
 + (void)renameTree:(RDLItem *)item usedNames:(NSMutableSet *)used {
   if (item == nil)
     return;
-  NSString *prefix = item.type ?: @"Item";
+  NSString *prefix = item.rdlElementName ?: @"Item";
   NSInteger i = 1;
   while ([used containsObject:[NSString stringWithFormat:@"%@%ld", prefix, (long)i]])
     i += 1;
   item.name = [NSString stringWithFormat:@"%@%ld", prefix, (long)i];
   [used addObject:item.name];
-  for (RDLItem *child in item.items)
+  for (RDLItem *child in item.childItems)
     [self renameTree:child usedNames:used];
 }
 
@@ -152,9 +153,11 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
                 inReport:(RDLReport *)report {
   if ([kind length] == 0)
     return nil;
-  RDLItem *it = [[RDLItem alloc] init];
+  RDLItem *it = [self newItemNamed:kind];
+  if (it == nil)
+    return nil;
   it.name = [self uniqueNameWithPrefix:kind inReport:report];
-  [self applyDefaultsTo:it kind:kind report:report];
+  [self applyDefaultsTo:it report:report];
 
   // Position: follow the selection, tuck into a container, else inset on the page.
   if (point.sibling) {
@@ -170,42 +173,62 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
   return it;
 }
 
-+ (void)applyDefaultsTo:(RDLItem *)it kind:(NSString *)kind report:(RDLReport *)report {
-  it.type = kind;
+// The designer names element kinds the way RDL does, so the name picks the
+// class directly.
++ (RDLItem *)newItemNamed:(NSString *)elementName {
+  static NSDictionary *classes = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    classes = @{
+      @"Textbox" : [RDLTextbox class],
+      @"Line" : [RDLLine class],
+      @"Rectangle" : [RDLRectangle class],
+      @"Image" : [RDLImage class],
+      @"Chart" : [RDLChart class],
+      @"Tablix" : [RDLTablix class],
+    };
+  });
+  Class cls = classes[elementName ?: @""];
+  return cls ? [[cls alloc] init] : nil;
+}
+
++ (void)applyDefaultsTo:(RDLItem *)it report:(RDLReport *)report {
   it.width = 2.0;
   it.height = 0.32;
-  if ([kind isEqualToString:@"Textbox"]) {
-    it.value = @"Text";
-    it.style.fontSize = @"11pt";
-  } else if ([kind isEqualToString:@"Line"]) {
+  if ([it isKindOfClass:[RDLTextbox class]]) {
+    [(RDLTextbox *)it setValue:@"Text"];
+    it.style.fontSize = [RDLLength points:11];
+  } else if ([it isKindOfClass:[RDLLine class]]) {
     it.height = 0.02;
     it.width = 3.0;
-  } else if ([kind isEqualToString:@"Rectangle"]) {
+  } else if ([it isKindOfClass:[RDLRectangle class]]) {
     it.width = 2.4;
     it.height = 1.0;
     it.style.backgroundColor = @"#ece6d8";
-  } else if ([kind isEqualToString:@"Image"]) {
+  } else if ([it isKindOfClass:[RDLImage class]]) {
     it.width = 1.2;
     it.height = 1.2;
-  } else if ([kind isEqualToString:@"Chart"]) {
+  } else if ([it isKindOfClass:[RDLChart class]]) {
+    RDLChart *chart = (RDLChart *)it;
     it.width = 5.0;
     it.height = 2.2;
-    it.chartType = @"Column";
-    it.title = @"Chart";
+    chart.chartType = RDLChartTypeColumn;
+    chart.title = @"Chart";
     // Bind something plausible so a new chart draws instead of sitting empty.
     RDLDataSet *ds = [report.dataSets firstObject];
     if (ds) {
-      it.dataSetName = ds.name;
+      chart.dataSetName = ds.name;
       if ([ds.fields count] > 0)
-        it.categoryField = [self fieldNameAtIndex:0 ofDataSet:ds];
+        chart.categoryField = [self fieldNameAtIndex:0 ofDataSet:ds];
       if ([ds.fields count] > 1)
-        it.valueField = [self fieldNameAtIndex:1 ofDataSet:ds];
+        chart.valueField = [self fieldNameAtIndex:1 ofDataSet:ds];
     }
-  } else if ([kind isEqualToString:@"Tablix"]) {
-    it.headerHeight = 0.3;
-    it.rowHeight = 0.28;
+  } else if ([it isKindOfClass:[RDLTablix class]]) {
+    RDLTablix *tablix = (RDLTablix *)it;
+    tablix.headerHeight = 0.3;
+    tablix.rowHeight = 0.28;
     RDLDataSet *ds = [report.dataSets firstObject];
-    it.dataSetName = ds.name ?: @"";
+    tablix.dataSetName = ds.name ?: @"";
     NSMutableArray *specs = [NSMutableArray array];
     NSArray *fields = [ds.fields count] ? ds.fields : @[ @"Field" ];
     for (NSUInteger i = 0; i < [fields count]; i++) {
@@ -216,8 +239,8 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
         @"value" : [NSString stringWithFormat:@"=Fields!%@.Value", f]
       }];
     }
-    it.columnSpecs = specs;
-    [it rebuildTablix];
+    tablix.columnSpecs = specs;
+    [tablix rebuildTablix];
     it.width = 1.6 * [specs count];
     it.height = 0.6;
   }

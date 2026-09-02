@@ -86,12 +86,12 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   for (RDLItem *it in items) {
     PicaOutlineNode *n = [[PicaOutlineNode alloc] init];
     n.kind = PicaNodeItem;
-    n.title = [NSString stringWithFormat:@"%@  %@", it.type, it.name ?: @""];
+    n.title = [NSString stringWithFormat:@"%@  %@", it.rdlElementName, it.name ?: @""];
     n.bandKey = key;
     n.item = it;
     [parent.children addObject:n];
-    if ([it.items count])
-      [self addNodesForItems:it.items to:n bandKey:key];
+    if ([it.childItems count])
+      [self addNodesForItems:it.childItems to:n bandKey:key];
   }
 }
 

@@ -19,8 +19,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   for (RDLItem *it in items) {
     if (it == target)
       return items;
-    if ([it.items count]) {
-      NSMutableArray *found = PicaContainerIn(it.items, target);
+    if ([it.childItems count]) {
+      NSMutableArray *found = PicaContainerIn([(RDLRectangle *)it items], target);
       if (found)
         return found;
     }
@@ -267,8 +267,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
 
 #pragma mark - Tablix
 
-- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLItem *)tablix {
-  if (![tablix.type isEqualToString:@"Tablix"])
+- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix {
+  if (![tablix isKindOfClass:[RDLTablix class]])
     return;
   NSArray *old = tablix.columnSpecs;
   if (PicaValuesEqual(old, specs))
@@ -282,8 +282,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[PicaChange itemChange:tablix keys:@[ @"columnSpecs" ] bandKey:nil]];
 }
 
-- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLItem *)tablix {
-  if (![tablix.type isEqualToString:@"Tablix"] || [values count] == 0)
+- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix {
+  if (![tablix isKindOfClass:[RDLTablix class]] || [values count] == 0)
     return;
   NSMutableDictionary *old = [NSMutableDictionary dictionary];
   BOOL changed = NO;
@@ -310,7 +310,7 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[PicaChange itemChange:tablix keys:[values allKeys] bandKey:nil]];
 }
 
-- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLItem *)tablix {
+- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix {
   NSArray *specs = tablix.columnSpecs;
   if (index >= [specs count])
     return;
@@ -328,8 +328,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   [self endGroup];
 }
 
-- (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix {
-  if (![tablix.type isEqualToString:@"Tablix"])
+- (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
+  if (![tablix isKindOfClass:[RDLTablix class]])
     return;
   NSMutableArray *next = [tablix.columnSpecs mutableCopy] ?: [NSMutableArray array];
   NSUInteger i = MIN(index, [next count]);
@@ -340,7 +340,7 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   [self endGroup];
 }
 
-- (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix {
+- (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
   NSArray *specs = tablix.columnSpecs;
   // A tablix with no columns renders nothing, so the last one stays.
   if (index >= [specs count] || [specs count] <= 1)
@@ -354,8 +354,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
   [self endGroup];
 }
 
-- (void)toggleGrandTotalOfTablix:(RDLItem *)tablix {
-  if (![tablix.type isEqualToString:@"Tablix"])
+- (void)toggleGrandTotalOfTablix:(RDLTablix *)tablix {
+  if (![tablix isKindOfClass:[RDLTablix class]])
     return;
   [self beginGroup:@"Grand Total"];
   if ([self shouldRegisterInverseFor:tablix token:@"showGrandTotal"])
@@ -371,7 +371,8 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
 - (void)setAttributedString:(NSAttributedString *)text ofItem:(RDLItem *)item {
   if (item == nil)
     return;
-  PicaRichTextResult *r = [PicaRichTextCodec resultForAttributedString:text item:item];
+  PicaRichTextResult *r =
+      [PicaRichTextCodec resultForAttributedString:text item:(RDLTextbox *)item];
   [self beginGroup:@"Edit Text"];
   [self setValue:r.text forKeyPath:@"value" ofItem:item];
   [self setValue:r.paragraphs forKeyPath:@"paragraphs" ofItem:item];

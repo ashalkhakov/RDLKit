@@ -10,5 +10,5 @@
 @interface PicaTablixEditor : NSObject
 // Applies on OK through the context's editor, as one undo step. Returns YES
 // when the tablix was modified.
-+ (BOOL)runForTablix:(RDLItem *)tablix context:(PicaEditingContext *)context;
++ (BOOL)runForTablix:(RDLTablix *)tablix context:(PicaEditingContext *)context;
 @end

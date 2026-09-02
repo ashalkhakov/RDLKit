@@ -94,7 +94,9 @@
     [_stack addSubview:l];
     y += 16;
     NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(10, y, 220, 22)];
-    [f setStringValue:doc.paramValues[p.name] ?: (p.defaultValue ?: @"")];
+    // The default as written: an expression shows its source, which is what
+    // the user would have to type to restore it.
+    [f setStringValue:doc.paramValues[p.name] ?: ([p.defaultValue source] ?: @"")];
     [f setTag:tag];
     [f setDelegate:self];
     [f setTarget:self];

@@ -6,7 +6,7 @@
 
 + (NSFont *)fontForStyle:(RDLStyle *)style scale:(CGFloat)scale {
   CGFloat s = scale > 0 ? scale : 1.0;
-  CGFloat pt = [style.fontSize floatValue];
+  CGFloat pt = style.fontSize ? [style.fontSize points] : 0;
   if (pt <= 0)
     pt = 10;
   NSFont *font = [style.fontFamily length] ? [NSFont fontWithName:style.fontFamily
@@ -17,15 +17,12 @@
   NSFontManager *fm = [NSFontManager sharedFontManager];
   // RDL allows a range of weight names, not just "Bold"; anything at or above
   // semibold reads as bold on screen.
-  NSString *w = [style.fontWeight lowercaseString];
-  if ([w isEqualToString:@"bold"] || [w isEqualToString:@"semibold"] ||
-      [w isEqualToString:@"heavy"] || [w isEqualToString:@"extrabold"] ||
-      [w isEqualToString:@"bolder"]) {
+  if (RDLFontWeightIsBold(style.fontWeight)) {
     NSFont *b = [fm convertFont:font toHaveTrait:NSBoldFontMask];
     if (b)
       font = b;
   }
-  if ([[style.fontStyle lowercaseString] isEqualToString:@"italic"]) {
+  if (style.fontStyle == RDLFontStyleItalic) {
     NSFont *i = [fm convertFont:font toHaveTrait:NSItalicFontMask];
     if (i)
       font = i;
@@ -33,25 +30,46 @@
   return font;
 }
 
++ (NSTextAlignment)textAlignmentForAlign:(RDLTextAlign)align {
+  switch (align) {
+    case RDLTextAlignCenter:
+      return NSCenterTextAlignment;
+    case RDLTextAlignRight:
+      return NSRightTextAlignment;
+    case RDLTextAlignJustify:
+      return NSJustifiedTextAlignment;
+    default:
+      return NSLeftTextAlignment;
+  }
+}
+
++ (RDLTextAlign)alignForTextAlignment:(NSTextAlignment)alignment {
+  switch (alignment) {
+    case NSCenterTextAlignment:
+      return RDLTextAlignCenter;
+    case NSRightTextAlignment:
+      return RDLTextAlignRight;
+    case NSJustifiedTextAlignment:
+      return RDLTextAlignJustify;
+    default:
+      return RDLTextAlignLeft;
+  }
+}
+
 + (NSDictionary *)attributesForStyle:(RDLStyle *)style
-                      paragraphAlign:(NSString *)paragraphAlign
+                      paragraphAlign:(RDLTextAlign)paragraphAlign
                                scale:(CGFloat)scale {
   NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
   attrs[NSFontAttributeName] = [self fontForStyle:style scale:scale];
   attrs[NSForegroundColorAttributeName] = PicaColorFromHex(style.color);
-  NSString *deco = style.textDecoration;
-  if ([deco isEqualToString:@"Underline"])
+  if (style.textDecoration == RDLTextDecorationUnderline)
     attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-  else if ([deco isEqualToString:@"LineThrough"])
+  else if (style.textDecoration == RDLTextDecorationLineThrough)
     attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
   NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
-  NSString *align = [paragraphAlign length] ? paragraphAlign : style.textAlign;
-  if ([align isEqualToString:@"Center"])
-    ps.alignment = NSCenterTextAlignment;
-  else if ([align isEqualToString:@"Right"])
-    ps.alignment = NSRightTextAlignment;
-  else
-    ps.alignment = NSLeftTextAlignment;
+  RDLTextAlign align =
+      paragraphAlign != RDLTextAlignUnspecified ? paragraphAlign : style.textAlign;
+  ps.alignment = [self textAlignmentForAlign:align];
   ps.lineBreakMode = NSLineBreakByWordWrapping;
   attrs[NSParagraphStyleAttributeName] = ps;
   return attrs;
@@ -62,17 +80,17 @@
                                           scale:(CGFloat)scale {
   return [[NSAttributedString alloc]
       initWithString:text ?: @""
-          attributes:[self attributesForStyle:style paragraphAlign:nil scale:scale]];
+          attributes:[self attributesForStyle:style paragraphAlign:RDLTextAlignUnspecified scale:scale]];
 }
 
 + (NSAttributedString *)attributedStringForParagraphs:(NSArray<RDLParagraph *> *)paragraphs
                                             baseStyle:(RDLStyle *)baseStyle
                                                 scale:(CGFloat)scale {
   NSMutableAttributedString *out = [[NSMutableAttributedString alloc] init];
-  NSString *prevAlign = nil;
+  RDLTextAlign prevAlign = RDLTextAlignUnspecified;
   BOOL first = YES;
   for (RDLParagraph *para in paragraphs) {
-    NSString *align = para.style.textAlign;
+    RDLTextAlign align = para.style.textAlign;
     if (!first) {
       // The newline belongs to the paragraph it ends, so give it that
       // paragraph's alignment rather than the next one's.

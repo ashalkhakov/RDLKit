@@ -1,32 +1,280 @@
 #import "PicaCompatibility.h"
+#import "RDLExpression.h"
 
 // RDL 2010/01 object model (MS-RDL subset).
 // ReportItems live in Body / PageHeader / PageFooter.
 // Tablix follows TablixBody + TablixColumnHierarchy + TablixRowHierarchy.
 // Layout expands Tablix into laid-out elements; backends never see Tablix.
 
+// MS-RDL's closed vocabularies, as enums rather than bare strings.
+//
+// Every one of them has an `Unspecified` zero case, and it carries weight: a
+// property that was never set is not the same as one set to the RDL default.
+// Rich-text run styles are sparse, so `Unspecified` is what lets
+// +styleByMerging:over: inherit a field from the textbox, and it is what tells
+// the writer to omit the element instead of writing a value the source file
+// never had.
+//
+// Conversion goes through the RDL*FromString / RDLStringFrom* pairs below.
+// Reading an unrecognised value yields `Unspecified` and is reported through
+// RDLReport.warnings rather than being dropped silently.
+
+typedef NS_ENUM(NSInteger, RDLBorderStyle) {
+  RDLBorderStyleUnspecified = 0,
+  RDLBorderStyleDefault,
+  RDLBorderStyleNone,
+  RDLBorderStyleDotted,
+  RDLBorderStyleDashed,
+  RDLBorderStyleSolid,
+  RDLBorderStyleDouble,
+  RDLBorderStyleGroove,
+  RDLBorderStyleRidge,
+  RDLBorderStyleInset,
+  RDLBorderStyleWindowInset,
+  RDLBorderStyleOutset,
+};
+
+typedef NS_ENUM(NSInteger, RDLFontWeight) {
+  RDLFontWeightUnspecified = 0,
+  RDLFontWeightLighter,
+  RDLFontWeightNormal,
+  RDLFontWeightBold,
+  RDLFontWeightBolder,
+  RDLFontWeight100, RDLFontWeight200, RDLFontWeight300,
+  RDLFontWeight400, RDLFontWeight500, RDLFontWeight600,
+  RDLFontWeight700, RDLFontWeight800, RDLFontWeight900,
+  // Not MS-RDL, but the renderers have always drawn these bold, so they stay
+  // in the vocabulary rather than becoming unrecognised values on load.
+  RDLFontWeightSemiBold, RDLFontWeightHeavy, RDLFontWeightExtraBold,
+};
+// YES for Bold, Bolder and 600 and up -- the one question the renderers ask.
+FOUNDATION_EXPORT BOOL RDLFontWeightIsBold(RDLFontWeight weight);
+
+typedef NS_ENUM(NSInteger, RDLFontStyle) {
+  RDLFontStyleUnspecified = 0,
+  RDLFontStyleNormal,
+  RDLFontStyleItalic,
+};
+
+typedef NS_ENUM(NSInteger, RDLTextAlign) {
+  RDLTextAlignUnspecified = 0,
+  RDLTextAlignGeneral,
+  RDLTextAlignLeft,
+  RDLTextAlignCenter,
+  RDLTextAlignRight,
+  RDLTextAlignJustify,
+};
+
+typedef NS_ENUM(NSInteger, RDLVerticalAlign) {
+  RDLVerticalAlignUnspecified = 0,
+  RDLVerticalAlignTop,
+  RDLVerticalAlignMiddle,
+  RDLVerticalAlignBottom,
+};
+
+typedef NS_ENUM(NSInteger, RDLTextDecoration) {
+  RDLTextDecorationUnspecified = 0,
+  RDLTextDecorationNone,
+  RDLTextDecorationUnderline,
+  RDLTextDecorationOverline,
+  RDLTextDecorationLineThrough,
+};
+
+typedef NS_ENUM(NSInteger, RDLImageSource) {
+  RDLImageSourceUnspecified = 0,
+  RDLImageSourceExternal,
+  RDLImageSourceEmbedded,
+  RDLImageSourceDatabase,
+};
+
+typedef NS_ENUM(NSInteger, RDLImageSizing) {
+  RDLImageSizingUnspecified = 0,
+  RDLImageSizingAutoSize,
+  RDLImageSizingFit,
+  RDLImageSizingFitProportional,
+  RDLImageSizingClip,
+};
+
+typedef NS_ENUM(NSInteger, RDLPageBreakLocation) {
+  RDLPageBreakLocationUnspecified = 0,
+  RDLPageBreakLocationNone,
+  RDLPageBreakLocationStart,
+  RDLPageBreakLocationEnd,
+  RDLPageBreakLocationStartAndEnd,
+  RDLPageBreakLocationBetween,
+};
+
+typedef NS_ENUM(NSInteger, RDLKeepWithGroup) {
+  RDLKeepWithGroupUnspecified = 0,
+  RDLKeepWithGroupNone,
+  RDLKeepWithGroupBefore,
+  RDLKeepWithGroupAfter,
+};
+
+typedef NS_ENUM(NSInteger, RDLFilterOperator) {
+  RDLFilterOperatorUnspecified = 0,
+  RDLFilterOperatorEqual,
+  RDLFilterOperatorNotEqual,
+  RDLFilterOperatorGreaterThan,
+  RDLFilterOperatorGreaterThanOrEqual,
+  RDLFilterOperatorLessThan,
+  RDLFilterOperatorLessThanOrEqual,
+  RDLFilterOperatorLike,
+  RDLFilterOperatorTopN,
+  RDLFilterOperatorBottomN,
+  RDLFilterOperatorTopPercent,
+  RDLFilterOperatorBottomPercent,
+  RDLFilterOperatorIn,
+  RDLFilterOperatorBetween,
+  // Not MS-RDL. The layout engine has always honoured it, so it stays in the
+  // vocabulary rather than becoming an unrecognised value on load.
+  RDLFilterOperatorContains,
+};
+// In and Between read every value; the rest compare against the first.
+FOUNDATION_EXPORT BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op);
+
+typedef NS_ENUM(NSInteger, RDLSortDirection) {
+  RDLSortDirectionUnspecified = 0,
+  RDLSortDirectionAscending,
+  RDLSortDirectionDescending,
+};
+
+typedef NS_ENUM(NSInteger, RDLParameterDataType) {
+  RDLParameterDataTypeUnspecified = 0,
+  RDLParameterDataTypeBoolean,
+  RDLParameterDataTypeDateTime,
+  RDLParameterDataTypeInteger,
+  RDLParameterDataTypeFloat,
+  RDLParameterDataTypeString,
+};
+
+// Not MS-RDL: a chart is stored as a Rectangle plus Pica.* CustomProperties.
+typedef NS_ENUM(NSInteger, RDLChartType) {
+  RDLChartTypeUnspecified = 0,
+  RDLChartTypeColumn,
+  RDLChartTypeBar,
+  RDLChartTypeLine,
+  RDLChartTypePie,
+};
+
+
+FOUNDATION_EXPORT RDLBorderStyle RDLBorderStyleFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromBorderStyle(RDLBorderStyle v);
+FOUNDATION_EXPORT RDLFontWeight RDLFontWeightFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromFontWeight(RDLFontWeight v);
+FOUNDATION_EXPORT RDLFontStyle RDLFontStyleFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromFontStyle(RDLFontStyle v);
+FOUNDATION_EXPORT RDLTextAlign RDLTextAlignFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromTextAlign(RDLTextAlign v);
+FOUNDATION_EXPORT RDLVerticalAlign RDLVerticalAlignFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromVerticalAlign(RDLVerticalAlign v);
+FOUNDATION_EXPORT RDLTextDecoration RDLTextDecorationFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromTextDecoration(RDLTextDecoration v);
+FOUNDATION_EXPORT RDLImageSource RDLImageSourceFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromImageSource(RDLImageSource v);
+FOUNDATION_EXPORT RDLImageSizing RDLImageSizingFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromImageSizing(RDLImageSizing v);
+FOUNDATION_EXPORT RDLPageBreakLocation RDLPageBreakLocationFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v);
+FOUNDATION_EXPORT RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromKeepWithGroup(RDLKeepWithGroup v);
+FOUNDATION_EXPORT RDLFilterOperator RDLFilterOperatorFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromFilterOperator(RDLFilterOperator v);
+FOUNDATION_EXPORT RDLSortDirection RDLSortDirectionFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromSortDirection(RDLSortDirection v);
+FOUNDATION_EXPORT RDLParameterDataType RDLParameterDataTypeFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromParameterDataType(RDLParameterDataType v);
+FOUNDATION_EXPORT RDLChartType RDLChartTypeFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromChartType(RDLChartType v);
+
+// An RDL measurement: a number and the unit it was written in. RDL writes
+// these as "10pt", "0.5in", "3mm"; keeping the unit rather than normalising to
+// points means a report saves back in the units its author chose.
+typedef NS_ENUM(NSInteger, RDLLengthUnit) {
+  RDLLengthUnitUnspecified = 0,
+  RDLLengthUnitPoint,
+  RDLLengthUnitInch,
+  RDLLengthUnitCentimeter,
+  RDLLengthUnitMillimeter,
+  RDLLengthUnitPica,
+};
+
+@interface RDLLength : NSObject
+@property (nonatomic, readonly) double value;
+@property (nonatomic, readonly) RDLLengthUnit unit;
++ (instancetype)lengthWithValue:(double)value unit:(RDLLengthUnit)unit;
++ (instancetype)points:(double)points;
++ (instancetype)inches:(double)inches;
+// nil for an empty string; an unrecognised unit is read as points, which is
+// what the RDL default is when none is given.
++ (instancetype)lengthFromString:(NSString *)string;
+// As RDL writes it, in the unit it was given in.
+- (NSString *)stringValue;
+- (CGFloat)points;
+- (CGFloat)inches;
+@end
+
+// MS-RDL lets almost every Style property be computed per row rather than
+// fixed. So a style holds constants, and any property that was written as an
+// `=` expression instead lives here -- exactly one of the two is meaningful for
+// a given property. The layout engine evaluates these per row and hands the
+// backends a style whose constants are all filled in, so nothing downstream
+// ever has to ask whether a value was dynamic.
+@interface RDLStyleExpressions : NSObject
+@property (nonatomic, strong) RDLExpr *fontFamily;
+@property (nonatomic, strong) RDLExpr *fontSize;
+@property (nonatomic, strong) RDLExpr *fontWeight;
+@property (nonatomic, strong) RDLExpr *fontStyle;
+@property (nonatomic, strong) RDLExpr *color;
+@property (nonatomic, strong) RDLExpr *backgroundColor;
+@property (nonatomic, strong) RDLExpr *textAlign;
+@property (nonatomic, strong) RDLExpr *verticalAlign;
+@property (nonatomic, strong) RDLExpr *textDecoration;
+@property (nonatomic, strong) RDLExpr *format;
+@property (nonatomic, strong) RDLExpr *paddingLeft;
+@property (nonatomic, strong) RDLExpr *paddingRight;
+@property (nonatomic, strong) RDLExpr *paddingTop;
+@property (nonatomic, strong) RDLExpr *paddingBottom;
+// YES when no property carries an expression, so a static style can skip
+// resolution entirely.
+- (BOOL)isEmpty;
+@end
+
+// A border's three properties are computable in the same way; see
+// RDLStyleExpressions.
+@interface RDLBorderExpressions : NSObject
+@property (nonatomic, strong) RDLExpr *style;
+@property (nonatomic, strong) RDLExpr *width;
+@property (nonatomic, strong) RDLExpr *color;
+- (BOOL)isEmpty;
+@end
+
 @interface RDLBorder : NSObject
-@property (nonatomic, copy) NSString *style; // None, Solid, Dashed, Dotted
-@property (nonatomic, copy) NSString *width;
+@property (nonatomic, assign) RDLBorderStyle style;
+@property (nonatomic, strong) RDLLength *width;
 @property (nonatomic, copy) NSString *color;
+// nil on a border with no computed property.
+@property (nonatomic, strong) RDLBorderExpressions *expressions;
 + (instancetype)none;
 + (instancetype)solidColor:(NSString *)color;
 @end
 
 @interface RDLStyle : NSObject
 @property (nonatomic, copy) NSString *fontFamily;
-@property (nonatomic, copy) NSString *fontSize;
-@property (nonatomic, copy) NSString *fontWeight;
-@property (nonatomic, copy) NSString *fontStyle;
+@property (nonatomic, strong) RDLLength *fontSize;
+@property (nonatomic, assign) RDLFontWeight fontWeight;
+@property (nonatomic, assign) RDLFontStyle fontStyle;
 @property (nonatomic, copy) NSString *color;
 @property (nonatomic, copy) NSString *backgroundColor;
-@property (nonatomic, copy) NSString *textAlign;
-@property (nonatomic, copy) NSString *verticalAlign;
-@property (nonatomic, copy) NSString *textDecoration; // None, Underline, Overline, LineThrough
+@property (nonatomic, assign) RDLTextAlign textAlign;
+@property (nonatomic, assign) RDLVerticalAlign verticalAlign;
+@property (nonatomic, assign) RDLTextDecoration textDecoration;
 @property (nonatomic, copy) NSString *format;
-@property (nonatomic, copy) NSString *paddingLeft, *paddingRight, *paddingTop, *paddingBottom;
+@property (nonatomic, strong) RDLLength *paddingLeft, *paddingRight, *paddingTop, *paddingBottom;
 @property (nonatomic, strong) RDLBorder *border;
 @property (nonatomic, strong) RDLBorder *borderLeft, *borderRight, *borderTop, *borderBottom;
+// nil on a style with no computed property; see RDLStyleExpressions.
+@property (nonatomic, strong) RDLStyleExpressions *expressions;
 + (instancetype)defaultStyle;
 // New style taking every non-empty field of `run` over `base` (rich-text run
 // styles are sparse: unset fields inherit from the textbox style).
@@ -51,44 +299,83 @@
 @class RDLSortExpression;
 
 // ReportItem. `type` is the RDL element name (Textbox, Line, Rectangle, Image, Tablix, Chart).
+// A report item. Abstract: every item is one of the concrete kinds below, and
+// -kind says which without a cast. What used to be one class carrying every
+// property of every kind is now a small shared base plus one subclass per RDL
+// element, which is what MS-RDL itself describes.
 @interface RDLItem : NSObject
 @property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *type;
 @property (nonatomic, assign) CGFloat top, left, width, height;
 @property (nonatomic, assign) NSInteger zIndex;
 @property (nonatomic, strong) RDLStyle *style;
-// Visibility/Hidden: "true", "false", or an `=` expression evaluated at layout time.
-@property (nonatomic, copy) NSString *hidden;
-// Action/Hyperlink: constant URL or an `=` expression.
-@property (nonatomic, copy) NSString *hyperlink;
-// Textbox / Image
+// Visibility/Hidden: "true"/"false", or an expression evaluated per instance.
+@property (nonatomic, strong) RDLValue *hidden;
+// Action/Hyperlink: a URL, or an expression yielding one.
+@property (nonatomic, strong) RDLValue *hyperlink;
+// MS-RDL puts these on rectangles and data regions rather than on every item,
+// but they are harmless where they do not apply and every consumer reads them
+// uniformly.
+@property (nonatomic, assign) BOOL keepTogether;
+@property (nonatomic, assign) RDLPageBreakLocation pageBreak;
+@property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
+@property (nonatomic, strong) RDLValue *pageName;   // PageBreak/PageName → Globals!PageName
+// The RDL element this item is written as. There is no kind enum: the class
+// *is* the kind, so callers test with -isKindOfClass: and this is only for
+// messages and for the writer.
+@property (nonatomic, readonly) NSString *rdlElementName;
+// Items nested inside this one. Empty except on a Rectangle, so tree walks do
+// not have to ask what kind they are looking at.
+@property (nonatomic, readonly) NSArray<RDLItem *> *childItems;
+// The report this item sits in, so an item can consult the page it has to fit
+// on. Weak: the report owns the item, never the other way round. Stamped by
+// -[RDLReport adoptItems], so it is nil on an item built in isolation and
+// anything reading it must cope with that.
+@property (nonatomic, weak) RDLReport *report;
+@end
+
+@interface RDLTextbox : RDLItem
 @property (nonatomic, copy) NSString *value;
 // Rich text paragraphs; nil = plain `value`. Kept in sync: `value` always
 // holds the flattened text (runs joined, paragraphs separated by \n).
 @property (nonatomic, strong) NSMutableArray<RDLParagraph *> *paragraphs;
 @property (nonatomic, assign) BOOL canGrow;
-@property (nonatomic, copy) NSString *source; // Image: Embedded | External
-@property (nonatomic, copy) NSString *sizing; // Fit, FitProportional, Clip, AutoSize
-// Rectangle nested items
+@end
+
+@interface RDLLine : RDLItem
+@end
+
+@interface RDLRectangle : RDLItem
 @property (nonatomic, strong) NSMutableArray<RDLItem *> *items;
-// Data region
+@end
+
+@interface RDLImage : RDLItem
+// The image name, or an `=` expression yielding one.
+@property (nonatomic, copy) NSString *value;
+@property (nonatomic, assign) RDLImageSource source;
+@property (nonatomic, assign) RDLImageSizing sizing;
+@end
+
+// What a Tablix and a Chart have in common: they are bound to a dataset and
+// may filter and sort it.
+@interface RDLDataRegion : RDLItem
 @property (nonatomic, copy) NSString *dataSetName;
-// Chart stored as Rectangle + Pica.* CustomProperties
-@property (nonatomic, copy) NSString *chartType;
+@property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
+@property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
+@end
+
+// Not an MS-RDL element: written as a Rectangle plus Pica.* CustomProperties.
+@interface RDLChart : RDLDataRegion
+@property (nonatomic, assign) RDLChartType chartType;
 @property (nonatomic, copy) NSString *categoryField;
 @property (nonatomic, copy) NSString *valueField;
 @property (nonatomic, copy) NSString *title;
-// Tablix (MS-RDL)
+@end
+
+@interface RDLTablix : RDLDataRegion
 @property (nonatomic, strong) RDLTablixBody *tablixBody;
 @property (nonatomic, strong) RDLTablixHierarchy *columnHierarchy;
 @property (nonatomic, strong) RDLTablixHierarchy *rowHierarchy;
-@property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
-@property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 @property (nonatomic, copy) NSString *noRowsMessage;
-@property (nonatomic, assign) BOOL keepTogether;
-@property (nonatomic, copy) NSString *pageBreak; // None, Start, End, StartAndEnd, Between
-@property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
-@property (nonatomic, copy) NSString *pageName;     // PageBreak/PageName → Globals!PageName
 @property (nonatomic, assign) BOOL repeatColumnHeaders;
 @property (nonatomic, assign) BOOL repeatRowHeaders;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
@@ -139,14 +426,14 @@
 @end
 
 @interface RDLFilter : NSObject
-@property (nonatomic, copy) NSString *expression;
-@property (nonatomic, copy) NSString *oper; // Equal, NotEqual, GreaterThan, …
-@property (nonatomic, strong) NSMutableArray<NSString *> *values;
+@property (nonatomic, strong) RDLValue *expression;
+@property (nonatomic, assign) RDLFilterOperator oper;
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *values;
 @end
 
 @interface RDLSortExpression : NSObject
-@property (nonatomic, copy) NSString *expression;
-@property (nonatomic, copy) NSString *direction; // Ascending, Descending
+@property (nonatomic, strong) RDLValue *expression;
+@property (nonatomic, assign) RDLSortDirection direction;
 @end
 
 @interface RDLTablixHeader : NSObject
@@ -156,17 +443,17 @@
 
 @interface RDLTablixMember : NSObject
 @property (nonatomic, copy) NSString *groupName; // nil / empty = static member
-@property (nonatomic, copy) NSString *hidden;    // Visibility/Hidden expression
-@property (nonatomic, strong) NSMutableArray<NSString *> *groupExpressions;
+@property (nonatomic, strong) RDLValue *hidden;  // Visibility/Hidden
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *groupExpressions;
 @property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
 @property (nonatomic, strong) RDLTablixHeader *header;
-@property (nonatomic, copy) NSString *pageBreak; // None, Start, End, StartAndEnd, Between
+@property (nonatomic, assign) RDLPageBreakLocation pageBreak;
 @property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
-@property (nonatomic, copy) NSString *pageName;     // PageBreak/PageName → Globals!PageName
+@property (nonatomic, strong) RDLValue *pageName;   // PageBreak/PageName → Globals!PageName
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) BOOL repeatOnNewPage;
-@property (nonatomic, copy) NSString *keepWithGroup; // None, Before, After
+@property (nonatomic, assign) RDLKeepWithGroup keepWithGroup;
 @property (nonatomic, strong) NSMutableArray<RDLTablixMember *> *members;
 @end
 
@@ -186,7 +473,8 @@
 @interface RDLField : NSObject
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *dataField;
-@property (nonatomic, copy) NSString *value; // calculated field `=` expression
+// A calculated field: the expression that produces it, nil for a plain one.
+@property (nonatomic, strong) RDLValue *value;
 @end
 
 @interface RDLEmbeddedImage : NSObject
@@ -212,13 +500,13 @@
 
 @interface RDLParameter : NSObject
 @property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *dataType;
+@property (nonatomic, assign) RDLParameterDataType dataType;
 @property (nonatomic, copy) NSString *prompt;
-@property (nonatomic, copy) NSString *defaultValue;
+@property (nonatomic, strong) RDLValue *defaultValue;
 @property (nonatomic, assign) BOOL nullable;
 @property (nonatomic, assign) BOOL multiValue;
-@property (nonatomic, strong) NSMutableArray<NSString *> *defaultValues; // MultiValue defaults
-@property (nonatomic, strong) NSMutableArray<NSString *> *validValues;   // ValidValues/ParameterValues Value list
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *defaultValues; // MultiValue defaults
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *validValues;   // ValidValues/ParameterValues
 @end
 
 @interface RDLPage : NSObject
@@ -249,6 +537,10 @@
 @property (nonatomic, strong) NSMutableArray<NSString *> *warnings;
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
+// Stamp every item in the report with a back-pointer to it. Cheap, idempotent,
+// and called after anything that adds or moves items, because there is no hook
+// on the plain arrays the bands hold.
+- (void)adoptItems;
 // Canonical band identity, in render order: page header, body, page footer.
 // Layout, hit-testing and the designer all depend on that order. Iterate
 // -bandKeys with -bandWithKey: when you need the key alongside the band.
@@ -265,24 +557,43 @@
 @end
 
 // Layout IR. Tablix is gone; backends consume these elements only.
+// Layout IR. Tablix is gone by this point; backends consume these only. Split
+// per kind for the same reason the report items are: a backend that is drawing
+// an image has no business seeing chart fields.
 @interface RDLLaidOutItem : NSObject
-@property (nonatomic, copy) NSString *kind; // Textbox, Line, Rectangle, Image, Chart
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, assign) CGFloat x, y, w, h;
+@property (nonatomic, strong) RDLStyle *style;
+@property (nonatomic, assign) NSInteger zIndex;
+@property (nonatomic, copy) NSString *hyperlink; // resolved URL, or nil
+// The RDL element this came from, for diagnostics and for HTML's data-kind.
+@property (nonatomic, readonly) NSString *rdlElementName;
+@end
+
+@interface RDLLaidOutTextbox : RDLLaidOutItem
 @property (nonatomic, copy) NSString *text;
 // Rich text: evaluated paragraphs (run values resolved, styles sparse). When
 // nil, `text` with the item style is the whole content.
 @property (nonatomic, copy) NSArray<RDLParagraph *> *spans;
-@property (nonatomic, strong) RDLStyle *style;
-@property (nonatomic, assign) NSInteger zIndex;
-@property (nonatomic, copy) NSString *hyperlink; // resolved URL, or nil
+@end
+
+@interface RDLLaidOutLine : RDLLaidOutItem
+@end
+
+@interface RDLLaidOutRectangle : RDLLaidOutItem
+@end
+
+@interface RDLLaidOutImage : RDLLaidOutItem
 @property (nonatomic, copy) NSString *imageSrc;  // external URL / name
 @property (nonatomic, strong) NSData *imageData; // resolved embedded bytes
 @property (nonatomic, copy) NSString *imageMIME;
-@property (nonatomic, copy) NSString *sizing; // Fit, FitProportional, Clip, AutoSize
+@property (nonatomic, assign) RDLImageSizing sizing;
+@end
+
+@interface RDLLaidOutChart : RDLLaidOutItem
 @property (nonatomic, copy) NSArray<NSString *> *categories;
 @property (nonatomic, copy) NSArray<NSNumber *> *values;
-@property (nonatomic, copy) NSString *chartType;
+@property (nonatomic, assign) RDLChartType chartType;
 @property (nonatomic, copy) NSString *title;
 @end
 

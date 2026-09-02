@@ -3,6 +3,11 @@
 NSArray<NSString *> *PicaRunParserChecks(void);
 NSArray<NSString *> *PicaRunExpressionChecks(void);
 NSArray<NSString *> *PicaRunExpressionLangChecks(void);
+NSArray<NSString *> *PicaRunExpressionRoundTripChecks(void);
+NSArray<NSString *> *PicaRunStyleExpressionChecks(void);
+NSArray<NSString *> *PicaRunValueChecks(void);
+NSArray<NSString *> *PicaRunTablixFitChecks(void);
+NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void);
 NSArray<NSString *> *PicaRunLayoutChecks(void);
 NSArray<NSString *> *PicaRunTablixChecks(void);
 NSArray<NSString *> *PicaRunTablixGroupChecks(void);

@@ -26,6 +26,9 @@ typedef NS_ENUM(NSInteger, PicaFieldKind) {
   PicaFieldKindText = 0,
   // NSTextField holding an inch measurement, shown to three decimals.
   PicaFieldKindNumber,
+  // NSTextField holding an RDL measurement written with its unit ("10pt",
+  // "0.5in"), bound to an RDLLength rather than a string.
+  PicaFieldKindLength,
   // NSPopUpButton whose selected title IS the value.
   PicaFieldKindPopUpTitle,
   // NSPopUpButton whose selected index maps into `values`.

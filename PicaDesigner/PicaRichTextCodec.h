@@ -25,20 +25,20 @@
 // The values `text` implies for `item`, leaving `item` untouched. Needed so a
 // mutation layer can apply them through its own undoable path.
 + (PicaRichTextResult *)resultForAttributedString:(NSAttributedString *)text
-                                            item:(RDLItem *)item;
+                                            item:(RDLTextbox *)item;
 
 // Model → editable text. Falls back to the plain `value` when the item has no
 // paragraphs.
-+ (NSAttributedString *)attributedStringForItem:(RDLItem *)item;
++ (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item;
 
 // Text → model. Sets `value` to the flattened text always, and `paragraphs`
 // only when the text is genuinely rich — more than one run, a run that differs
 // from the item's style, or a paragraph that differs in alignment. Plain
 // single-run text stays a plain `value`, so an untouched textbox does not grow
 // a Paragraphs element it does not need.
-+ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLItem *)item;
++ (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLTextbox *)item;
 
 // YES when `text` would need Paragraphs to represent it faithfully against
 // `item`'s style. Exposed so a caller can tell a no-op edit from a real one.
-+ (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLItem *)item;
++ (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLTextbox *)item;
 @end

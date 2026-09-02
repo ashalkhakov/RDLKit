@@ -85,15 +85,15 @@ extern NSString * const PicaTablixPartValue;
 // Shared by drawing, hit-testing, hover and the in-place editor, which
 // previously each recomputed it.
 @interface PicaTablixGeometry : NSObject
-+ (CGFloat)headerHeightOf:(RDLItem *)tablix zoom:(CGFloat)zoom;
-+ (CGFloat)rowHeightOf:(RDLItem *)tablix zoom:(CGFloat)zoom;
-+ (NSRect)cellRectOf:(RDLItem *)tablix
++ (CGFloat)headerHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
++ (CGFloat)rowHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
++ (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
               column:(NSUInteger)column
                 part:(NSString *)part
                 zoom:(CGFloat)zoom;
 // The column and part under `point`, or NO outside the editable grid.
-+ (BOOL)tablix:(RDLItem *)tablix
++ (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
         column:(NSUInteger *)outColumn
@@ -102,7 +102,7 @@ extern NSString * const PicaTablixPartValue;
 // An INTERNAL column border under `point`, for width dragging. The last
 // column's right edge is deliberately excluded: that is the item's own east
 // resize handle. Returns the index of the column whose right border was hit.
-+ (BOOL)tablix:(RDLItem *)tablix
++ (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     columnBorderAtPoint:(NSPoint)point
                  column:(NSUInteger *)outColumn

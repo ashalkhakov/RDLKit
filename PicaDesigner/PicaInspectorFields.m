@@ -74,6 +74,12 @@
         [(NSTextField *)b.control
             setStringValue:[NSString stringWithFormat:@"%.3f", [value doubleValue]]];
         break;
+      case PicaFieldKindLength: {
+        RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
+        [(NSTextField *)b.control
+            setStringValue:len ? [len stringValue] : (b.placeholder ?: @"")];
+        break;
+      }
       case PicaFieldKindPopUpTitle: {
         NSPopUpButton *pop = (NSPopUpButton *)b.control;
         NSString *s = [value isKindOfClass:[NSString class]] ? value : nil;
@@ -114,6 +120,10 @@
       }
       case PicaFieldKindNumber:
         value = @([[(NSTextField *)b.control stringValue] doubleValue]);
+        break;
+      case PicaFieldKindLength:
+        // Clearing the field removes the measurement rather than storing zero.
+        value = [RDLLength lengthFromString:[(NSTextField *)b.control stringValue]];
         break;
       case PicaFieldKindPopUpTitle:
         value = [(NSPopUpButton *)b.control titleOfSelectedItem];

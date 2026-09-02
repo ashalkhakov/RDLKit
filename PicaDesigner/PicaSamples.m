@@ -5,26 +5,25 @@ static NSString *const kInk = @"#1a1916";
 static NSString *const kMuted = @"#5c574e";
 static NSString *const kShade = @"#ece6d8";
 
-static void PicaApplyStyle(RDLItem *it, NSString *font, NSString *size, NSString *weight,
-                           NSString *color, NSString *align) {
+static void PicaApplyStyle(RDLItem *it, NSString *font, RDLLength *size, RDLFontWeight weight,
+                           NSString *color, RDLTextAlign align) {
   if (font)
     it.style.fontFamily = font;
   if (size)
     it.style.fontSize = size;
-  if (weight)
+  if (weight != RDLFontWeightUnspecified)
     it.style.fontWeight = weight;
   if (color)
     it.style.color = color;
-  if (align)
+  if (align != RDLTextAlignUnspecified)
     it.style.textAlign = align;
 }
 
 static RDLItem *PicaTB(NSString *name, NSString *value, CGFloat x, CGFloat y, CGFloat w, CGFloat h,
-                       NSString *font, NSString *size, NSString *weight, NSString *color,
-                       NSString *align) {
-  RDLItem *it = [[RDLItem alloc] init];
+                       NSString *font, RDLLength *size, RDLFontWeight weight, NSString *color,
+                       RDLTextAlign align) {
+  RDLTextbox *it = [[RDLTextbox alloc] init];
   it.name = name;
-  it.type = @"Textbox";
   it.value = value;
   it.left = x;
   it.top = y;
@@ -35,9 +34,8 @@ static RDLItem *PicaTB(NSString *name, NSString *value, CGFloat x, CGFloat y, CG
 }
 
 static RDLItem *PicaLine(NSString *name, CGFloat x, CGFloat y, CGFloat w) {
-  RDLItem *it = [[RDLItem alloc] init];
+  RDLLine *it = [[RDLLine alloc] init];
   it.name = name;
-  it.type = @"Line";
   it.left = x;
   it.top = y;
   it.width = w;
@@ -47,9 +45,8 @@ static RDLItem *PicaLine(NSString *name, CGFloat x, CGFloat y, CGFloat w) {
 }
 
 static RDLItem *PicaRect(NSString *name, CGFloat x, CGFloat y, CGFloat w, CGFloat h, NSString *bg) {
-  RDLItem *it = [[RDLItem alloc] init];
+  RDLRectangle *it = [[RDLRectangle alloc] init];
   it.name = name;
-  it.type = @"Rectangle";
   it.left = x;
   it.top = y;
   it.width = w;
@@ -79,16 +76,15 @@ static RDLDataSet *PicaSet(NSString *name, NSArray *fields, NSArray *rows) {
 static RDLParameter *PicaPar(NSString *name, NSString *def) {
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = name;
-  p.dataType = @"String";
-  p.defaultValue = def ?: @"";
+  p.dataType = RDLParameterDataTypeString;
+  p.defaultValue = [RDLValue valueWithSource:def];
   return p;
 }
 
 static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, CGFloat w,
                            CGFloat headerH, CGFloat rowH, NSArray *cols) {
-  RDLItem *it = [[RDLItem alloc] init];
+  RDLTablix *it = [[RDLTablix alloc] init];
   it.name = name;
-  it.type = @"Tablix";
   it.dataSetName = ds;
   it.left = x;
   it.top = y;
@@ -162,22 +158,22 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
   RDLReport *r = [RDLReport emptyReportNamed:@"Letter"];
   r.reportDescription = @"Blank letter with running header and folio.";
   r.author = @"Pica";
-  [r.pageHeader.items addObject:PicaTB(@"Brand", @"PICA", 0, 0.08, 2.2, 0.28, @"Georgia", @"11pt",
-                                       @"Bold", kInk, @"Left")];
+  [r.pageHeader.items addObject:PicaTB(@"Brand", @"PICA", 0, 0.08, 2.2, 0.28, @"Georgia", [RDLLength points:11],
+                                       RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"DocTitle", @"=Parameters!Title.Value", 2.2, 0.1, 5.3, 0.24,
-                                       @"Helvetica", @"9pt", @"Normal", kMuted, @"Right")];
+                                       @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.42, 7.5)];
   [r.body.items addObject:PicaTB(@"Salutation", @"Dear reader,", 0, 0.2, 7.5, 0.3, @"Georgia",
-                                 @"12pt", @"Normal", kInk, @"Left")];
+                                 [RDLLength points:12], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.body.items
       addObject:PicaTB(@"BodyCopy",
                        @"Set the type. Bind a field. The page is a measure of 51 picas — enough "
                        @"room for a proper letter, an invoice, or a ledger.",
-                       0, 0.6, 7.5, 0.8, @"Georgia", @"11pt", @"Normal", kInk, @"Left")];
+                       0, 0.6, 7.5, 0.8, @"Georgia", [RDLLength points:11], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.02, 7.5)];
   [r.pageFooter.items
       addObject:PicaTB(@"Folio", @"=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",
-                       0, 0.1, 7.5, 0.22, @"Helvetica", @"8pt", @"Normal", kMuted, @"Center")];
+                       0, 0.1, 7.5, 0.22, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
   [r.parameters addObject:PicaPar(@"Title", @"Untitled letter")];
   return r;
 }
@@ -222,25 +218,25 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
              ])];
   r.pageHeader.height = 0.62;
   [r.pageHeader.items addObject:PicaTB(@"Studio", @"MERRICK & VALE", 0, 0.02, 4.6, 0.28, @"Georgia",
-                                       @"13pt", @"Bold", kInk, @"Left")];
+                                       [RDLLength points:13], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"Tag", @"Cabinetmakers · Est. 1978", 0, 0.28, 4.6, 0.18,
-                                       @"Helvetica", @"8pt", @"Normal", kMuted, @"Left")];
+                                       @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"InvLabel", @"INVOICE", 4.6, 0.02, 2.9, 0.28, @"Helvetica",
-                                       @"11pt", @"Bold", kMuted, @"Right")];
+                                       [RDLLength points:11], RDLFontWeightBold, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaTB(@"InvNo", @"=Parameters!InvoiceNo.Value", 4.6, 0.26, 2.9, 0.2,
-                                       @"Helvetica", @"9pt", @"Normal", kInk, @"Right")];
+                                       @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kInk, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.5, 7.5)];
   r.body.height = 5.4;
-  [r.body.items addObject:PicaTB(@"BillLbl", @"Bill to", 0, 0.12, 3.6, 0.18, @"Helvetica", @"8pt",
-                                 @"Bold", kMuted, @"Left")];
+  [r.body.items addObject:PicaTB(@"BillLbl", @"Bill to", 0, 0.12, 3.6, 0.18, @"Helvetica", [RDLLength points:8],
+                                 RDLFontWeightBold, kMuted, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"BillName", @"=Parameters!BillTo.Value", 0, 0.3, 3.6, 0.22,
-                                 @"Georgia", @"12pt", @"Normal", kInk, @"Left")];
+                                 @"Georgia", [RDLLength points:12], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"BillAddr", @"=Parameters!BillAddr.Value", 0, 0.52, 3.6, 0.2,
-                                 @"Helvetica", @"9pt", @"Normal", kMuted, @"Left")];
-  [r.body.items addObject:PicaTB(@"DateLbl", @"Date", 5.2, 0.12, 2.3, 0.18, @"Helvetica", @"8pt",
-                                 @"Bold", kMuted, @"Right")];
+                                 @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
+  [r.body.items addObject:PicaTB(@"DateLbl", @"Date", 5.2, 0.12, 2.3, 0.18, @"Helvetica", [RDLLength points:8],
+                                 RDLFontWeightBold, kMuted, RDLTextAlignRight)];
   [r.body.items addObject:PicaTB(@"DateVal", @"=Parameters!InvoiceDate.Value", 5.2, 0.3, 2.3, 0.22,
-                                 @"Georgia", @"12pt", @"Normal", kInk, @"Right")];
+                                 @"Georgia", [RDLLength points:12], RDLFontWeightNormal, kInk, RDLTextAlignRight)];
   [r.body.items addObject:PicaTablix(@"LineItems", @"Items", 0, 1.0, 7.5, 0.32, 0.3, @[
                  PicaCol(@"SKU", @"=Fields!Sku.Value", 0.9, @"Left"),
                  PicaCol(@"Description", @"=Fields!Description.Value", 3.5, @"Left"),
@@ -248,31 +244,31 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                  PicaCol(@"Unit", @"=Fields!Unit.Value", 1.1, @"Right"),
                  PicaCol(@"Amount", @"=Fields!Amount.Value", 1.3, @"Right")
                ])];
-  [r.body.items addObject:PicaTB(@"SubLbl", @"Subtotal", 4.6, 2.55, 1.4, 0.24, @"Helvetica", @"9pt",
-                                 @"Normal", kMuted, @"Right")];
+  [r.body.items addObject:PicaTB(@"SubLbl", @"Subtotal", 4.6, 2.55, 1.4, 0.24, @"Helvetica", [RDLLength points:9],
+                                 RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.body.items addObject:PicaTB(@"SubVal", @"=Format(Sum(Fields!Amount.Value), \"C\")", 6.0, 2.55,
-                                 1.5, 0.24, @"Helvetica", @"9pt", @"Normal", kInk, @"Right")];
-  [r.body.items addObject:PicaTB(@"TaxLbl", @"Tax 8%", 4.6, 2.8, 1.4, 0.24, @"Helvetica", @"9pt",
-                                 @"Normal", kMuted, @"Right")];
+                                 1.5, 0.24, @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kInk, RDLTextAlignRight)];
+  [r.body.items addObject:PicaTB(@"TaxLbl", @"Tax 8%", 4.6, 2.8, 1.4, 0.24, @"Helvetica", [RDLLength points:9],
+                                 RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.body.items addObject:PicaTB(@"TaxVal", @"=Format(Sum(Fields!Amount.Value) * 0.08, \"C\")", 6.0,
-                                 2.8, 1.5, 0.24, @"Helvetica", @"9pt", @"Normal", kInk, @"Right")];
+                                 2.8, 1.5, 0.24, @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kInk, RDLTextAlignRight)];
   [r.body.items addObject:PicaLine(@"TotRule", 4.6, 3.1, 2.9)];
-  [r.body.items addObject:PicaTB(@"TotLbl", @"Amount due", 4.6, 3.18, 1.4, 0.3, @"Georgia", @"11pt",
-                                 @"Bold", kInk, @"Right")];
+  [r.body.items addObject:PicaTB(@"TotLbl", @"Amount due", 4.6, 3.18, 1.4, 0.3, @"Georgia", [RDLLength points:11],
+                                 RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.body.items addObject:PicaTB(@"TotVal", @"=Format(Sum(Fields!Amount.Value) * 1.08, \"C\")", 6.0,
-                                 3.18, 1.5, 0.3, @"Georgia", @"11pt", @"Bold", kInk, @"Right")];
+                                 3.18, 1.5, 0.3, @"Georgia", [RDLLength points:11], RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.body.items
       addObject:PicaTB(@"Note",
                        @"Payable within 14 days. Pieces are made to order in the East End "
                        @"workshop. Thank you.",
-                       0, 3.7, 5.4, 0.5, @"Georgia", @"9pt", @"Normal", kMuted, @"Left")];
+                       0, 3.7, 5.4, 0.5, @"Georgia", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items addObject:PicaTB(@"Addr", @"Merrick & Vale  ·  88 Binder Lane  ·  Almaty", 0,
-                                       0.12, 4.8, 0.2, @"Helvetica", @"8pt", @"Normal", kMuted,
-                                       @"Left")];
+                                       0.12, 4.8, 0.2, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted,
+                                       RDLTextAlignLeft)];
   [r.pageFooter.items
       addObject:PicaTB(@"Folio", @"=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",
-                       4.8, 0.12, 2.7, 0.2, @"Helvetica", @"8pt", @"Normal", kMuted, @"Right")];
+                       4.8, 0.12, 2.7, 0.2, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   return r;
 }
 
@@ -310,23 +306,23 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                }
              ])];
   [r.pageHeader.items addObject:PicaTB(@"Brand", @"NORTH WHARF", 0, 0.04, 4, 0.26, @"Georgia",
-                                       @"13pt", @"Bold", kInk, @"Left")];
+                                       [RDLLength points:13], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"Kind", @"PACKING SLIP", 4, 0.08, 3.5, 0.22, @"Helvetica",
-                                       @"10pt", @"Bold", kMuted, @"Right")];
+                                       [RDLLength points:10], RDLFontWeightBold, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.42, 7.5)];
   [r.body.items addObject:PicaRect(@"ShipBox", 0, 0.15, 3.6, 1.15, kShade)];
-  [r.body.items addObject:PicaTB(@"ShipLbl", @"Ship to", 0.12, 0.22, 3.3, 0.18, @"Helvetica", @"8pt",
-                                 @"Bold", kMuted, @"Left")];
+  [r.body.items addObject:PicaTB(@"ShipLbl", @"Ship to", 0.12, 0.22, 3.3, 0.18, @"Helvetica", [RDLLength points:8],
+                                 RDLFontWeightBold, kMuted, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"ShipName", @"=Parameters!ShipTo.Value", 0.12, 0.42, 3.3, 0.28,
-                                 @"Georgia", @"13pt", @"Normal", kInk, @"Left")];
+                                 @"Georgia", [RDLLength points:13], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"ShipAddr", @"=Parameters!ShipAddr.Value", 0.12, 0.72, 3.3, 0.4,
-                                 @"Helvetica", @"9pt", @"Normal", kInk, @"Left")];
-  [r.body.items addObject:PicaTB(@"OrdLbl", @"Order", 4.2, 0.22, 3.3, 0.18, @"Helvetica", @"8pt",
-                                 @"Bold", kMuted, @"Left")];
+                                 @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
+  [r.body.items addObject:PicaTB(@"OrdLbl", @"Order", 4.2, 0.22, 3.3, 0.18, @"Helvetica", [RDLLength points:8],
+                                 RDLFontWeightBold, kMuted, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"OrdVal", @"=Parameters!OrderNo.Value", 4.2, 0.42, 3.3, 0.28,
-                                 @"Georgia", @"13pt", @"Normal", kInk, @"Left")];
+                                 @"Georgia", [RDLLength points:13], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"ShipDate", @"=Globals!ExecutionTime", 4.2, 0.72, 3.3, 0.22,
-                                 @"Helvetica", @"9pt", @"Normal", kMuted, @"Left")];
+                                 @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTablix(@"CartonTable", @"Carton", 0, 1.55, 7.5, 0.3, 0.28, @[
                  PicaCol(@"Item", @"=Fields!Item.Value", 3.0, @"Left"),
                  PicaCol(@"Finish", @"=Fields!Finish.Value", 2.2, @"Left"),
@@ -336,11 +332,11 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
   [r.body.items addObject:PicaTB(@"Note",
                                  @"Inspect on arrival. Shortages must be noted on the carrier's "
                                  @"copy. Cases ship standing, spines to the left.",
-                                 0, 3.1, 7.5, 0.5, @"Georgia", @"9pt", @"Normal", kMuted, @"Left")];
+                                 0, 3.1, 7.5, 0.5, @"Georgia", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items
       addObject:PicaTB(@"F", @"=\"North Wharf Bindery  ·  slip \" & Parameters!OrderNo.Value", 0,
-                       0.12, 7.5, 0.2, @"Helvetica", @"8pt", @"Normal", kMuted, @"Left")];
+                       0.12, 7.5, 0.2, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   return r;
 }
 
@@ -356,22 +352,21 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                @{@"Month" : @"September", @"Orders" : @47, @"Total" : @20115}
              ])];
   [r.pageHeader.items addObject:PicaTB(@"House", @"=Parameters!House.Value", 0, 0.02, 4.5, 0.24,
-                                       @"Georgia", @"12pt", @"Bold", kInk, @"Left")];
+                                       @"Georgia", [RDLLength points:12], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"Qtr", @"=Parameters!Quarter.Value", 4.5, 0.04, 3, 0.22,
-                                       @"Helvetica", @"10pt", @"Normal", kMuted, @"Right")];
+                                       @"Helvetica", [RDLLength points:10], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaTB(@"Kicker", @"Sales ledger", 0, 0.26, 7.5, 0.18, @"Helvetica",
-                                       @"8pt", @"Normal", kMuted, @"Left")];
+                                       [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.5, 7.5)];
   r.body.height = 4.6;
-  RDLItem *chart = [[RDLItem alloc] init];
+  RDLChart *chart = [[RDLChart alloc] init];
   chart.name = @"ByMonth";
-  chart.type = @"Chart";
   chart.left = 0;
   chart.top = 0.15;
   chart.width = 7.5;
   chart.height = 2.4;
   chart.dataSetName = @"Months";
-  chart.chartType = @"Column";
+  chart.chartType = RDLChartTypeColumn;
   chart.categoryField = @"Month";
   chart.valueField = @"Total";
   chart.title = @"Net receipts";
@@ -381,13 +376,13 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                  PicaCol(@"Orders", @"=Fields!Orders.Value", 2.5, @"Right"),
                  PicaCol(@"Net", @"=Fields!Total.Value", 2.5, @"Right")
                ])];
-  [r.body.items addObject:PicaTB(@"SumLbl", @"Quarter total", 0, 4.05, 4, 0.3, @"Georgia", @"12pt",
-                                 @"Bold", kInk, @"Left")];
+  [r.body.items addObject:PicaTB(@"SumLbl", @"Quarter total", 0, 4.05, 4, 0.3, @"Georgia", [RDLLength points:12],
+                                 RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"SumVal", @"=Format(Sum(Fields!Total.Value), \"C\")", 4, 4.05, 3.5,
-                                 0.3, @"Georgia", @"12pt", @"Bold", kInk, @"Right")];
+                                 0.3, @"Georgia", [RDLLength points:12], RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items addObject:PicaTB(@"F", @"=\"Confidential  ·  \" & Globals!ReportName", 0, 0.12,
-                                       7.5, 0.2, @"Helvetica", @"8pt", @"Normal", kMuted, @"Left")];
+                                       7.5, 0.2, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   return r;
 }
 
@@ -404,9 +399,9 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                @{@"Name" : @"J. Pica", @"Desk" : @"Press", @"Ext" : @"04", @"City" : @"Astoria"}
              ])];
   [r.pageHeader.items addObject:PicaTB(@"Title", @"Studio roster", 0, 0.04, 5, 0.3, @"Georgia",
-                                       @"16pt", @"Normal", kInk, @"Left")];
+                                       [RDLLength points:16], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"When", @"=Globals!ExecutionTime", 5, 0.1, 2.5, 0.22,
-                                       @"Helvetica", @"9pt", @"Normal", kMuted, @"Right")];
+                                       @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.46, 7.5)];
   [r.body.items addObject:PicaTablix(@"PeopleTable", @"People", 0, 0.15, 7.5, 0.3, 0.32, @[
                  PicaCol(@"Name", @"=Fields!Name.Value", 2.4, @"Left"),
@@ -415,10 +410,10 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                  PicaCol(@"City", @"=Fields!City.Value", 1.9, @"Left")
                ])];
   [r.body.items addObject:PicaTB(@"Count", @"=Count(Fields!Name.Value) & \" names on the floor\"", 0,
-                                 2.4, 7.5, 0.24, @"Georgia", @"10pt", @"Normal", kMuted, @"Left")];
+                                 2.4, 7.5, 0.24, @"Georgia", [RDLLength points:10], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items addObject:PicaTB(@"F", @"=\"Page \" & Globals!PageNumber", 0, 0.12, 7.5, 0.2,
-                                       @"Helvetica", @"8pt", @"Normal", kMuted, @"Center")];
+                                       @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
   return r;
 }
 
@@ -443,16 +438,15 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
                   ])];
   r.pageHeader.height = 0.62;
   [r.pageHeader.items addObject:PicaTB(@"Studio", @"=Parameters!Shop.Value", 0, 0.02, 4.6, 0.28, @"Georgia",
-                                       @"13pt", @"Bold", kInk, @"Left")];
+                                       [RDLLength points:13], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaTB(@"Kind", @"WORKSHOP BY FINISH", 4.6, 0.04, 2.9, 0.24, @"Helvetica",
-                                       @"10pt", @"Bold", kMuted, @"Right")];
+                                       [RDLLength points:10], RDLFontWeightBold, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:PicaTB(@"Tag", @"Group header, details, subtotal, and catalog rate via Lookup.", 0,
-                                       0.28, 7.5, 0.18, @"Helvetica", @"8pt", @"Normal", kMuted, @"Left")];
+                                       0.28, 7.5, 0.18, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageHeader.items addObject:PicaLine(@"HRule", 0, 0.5, 7.5)];
   r.body.height = 5.2;
-  RDLItem *tab = [[RDLItem alloc] init];
+  RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"JobsByFinish";
-  tab.type = @"Tablix";
   tab.dataSetName = @"Jobs";
   tab.left = 0;
   tab.top = 0.12;
@@ -461,28 +455,30 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
   tab.rowHeight = 0.28;
   tab.groupBy = @"Finish";
   tab.noRowsMessage = @"No jobs in this run.";
+  // 6.3in of columns, because grouping adds a 1.2in row-header column in front
+  // of them: 1.2 + 6.3 is the 7.5in body width the tablix is given above.
   tab.columnSpecs = @[
-    PicaCol(@"Job", @"=Fields!Job.Value", 2.8, @"Left"),
-    PicaCol(@"Hours", @"=Fields!Hours.Value", 1.2, @"Right"),
-    PicaCol(@"Rate", @"=Lookup(Fields!Finish.Value, Fields!Finish.Value, Fields!Rate.Value, \"Finishes\")", 1.4,
+    PicaCol(@"Job", @"=Fields!Job.Value", 2.4, @"Left"),
+    PicaCol(@"Hours", @"=Fields!Hours.Value", 1.0, @"Right"),
+    PicaCol(@"Rate", @"=Lookup(Fields!Finish.Value, Fields!Finish.Value, Fields!Rate.Value, \"Finishes\")", 1.1,
             @"Right"),
-    PicaCol(@"Amount", @"=Fields!Amount.Value", 2.1, @"Right")
+    PicaCol(@"Amount", @"=Fields!Amount.Value", 1.8, @"Right")
   ];
   [tab rebuildTablix];
   [r.body.items addObject:tab];
-  [r.body.items addObject:PicaTB(@"GrandLbl", @"Shop total", 0, 1.2, 4.2, 0.28, @"Georgia", @"12pt", @"Bold",
-                                 kInk, @"Left")];
+  [r.body.items addObject:PicaTB(@"GrandLbl", @"Shop total", 0, 1.2, 4.2, 0.28, @"Georgia", [RDLLength points:12], RDLFontWeightBold,
+                                 kInk, RDLTextAlignLeft)];
   [r.body.items addObject:PicaTB(@"GrandVal", @"=Format(Sum(Fields!Amount.Value), \"C\")", 4.2, 1.2, 3.3, 0.28,
-                                 @"Georgia", @"12pt", @"Bold", kInk, @"Right")];
+                                 @"Georgia", [RDLLength points:12], RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.body.items
       addObject:PicaTB(@"Tally",
                        @"=IIf(CountRows() = 0, \"No jobs\", CountRows() & \" jobs in \" & "
                        @"CountDistinct(Fields!Finish.Value) & \" finishes\")",
-                       0, 1.55, 7.5, 0.22, @"Helvetica", @"9pt", @"Normal", kMuted, @"Left")];
+                       0, 1.55, 7.5, 0.22, @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:PicaLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items
       addObject:PicaTB(@"F", @"=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages", 0, 0.12, 7.5,
-                       0.2, @"Helvetica", @"8pt", @"Normal", kMuted, @"Center")];
+                       0.2, @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
   return r;
 }
 

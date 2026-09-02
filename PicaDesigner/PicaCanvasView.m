@@ -249,18 +249,19 @@
   if (hit == nil)
     return nil;
   [_context.selection selectItem:hit inBandWithKey:bandKey];
-  if ([hit.type isEqualToString:@"Tablix"]) {
+  if ([hit isKindOfClass:[RDLTablix class]]) {
+    RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger col = 0;
     NSString *part = nil;
-    BOOL onCell = [PicaTablixGeometry tablix:hit
+    BOOL onCell = [PicaTablixGeometry tablix:tablixHit
                                    itemRect:itemRect
                                       point:p
                                      column:&col
                                        part:&part
                                        zoom:_context.zoom];
-    return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:hit];
+    return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:tablixHit];
   }
-  if ([hit.type isEqualToString:@"Textbox"]) {
+  if ([hit isKindOfClass:[RDLTextbox class]]) {
     NSMenu *m = [[NSMenu alloc] initWithTitle:@"Textbox"];
     [m addItem:[self tablixMenuItem:@"Edit Rich Text…"
                              action:@selector(ctxEditRichText:)
@@ -277,7 +278,7 @@
   return mi;
 }
 
-- (NSMenu *)tablixMenuForColumn:(NSInteger)col item:(RDLItem *)tab {
+- (NSMenu *)tablixMenuForColumn:(NSInteger)col item:(RDLTablix *)tab {
   NSMenu *m = [[NSMenu alloc] initWithTitle:@"Tablix"];
   if (col >= 0) {
     [m addItem:[self tablixMenuItem:@"Insert Column Before"
@@ -301,36 +302,36 @@
 
 - (void)ctxInsertColumnBefore:(NSMenuItem *)mi {
   [_context.editor insertTablixColumnAtIndex:(NSUInteger)[mi tag]
-                                    ofTablix:[_context selectedItem]];
+                                    ofTablix:(RDLTablix *)[_context selectedItem]];
 }
 
 - (void)ctxInsertColumnAfter:(NSMenuItem *)mi {
   [_context.editor insertTablixColumnAtIndex:(NSUInteger)[mi tag] + 1
-                                    ofTablix:[_context selectedItem]];
+                                    ofTablix:(RDLTablix *)[_context selectedItem]];
 }
 
 - (void)ctxDeleteColumn:(NSMenuItem *)mi {
   [_context.editor removeTablixColumnAtIndex:(NSUInteger)[mi tag]
-                                    ofTablix:[_context selectedItem]];
+                                    ofTablix:(RDLTablix *)[_context selectedItem]];
 }
 
 - (void)ctxToggleGrandTotal:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  [_context.editor toggleGrandTotalOfTablix:[_context selectedItem]];
+  [_context.editor toggleGrandTotalOfTablix:(RDLTablix *)[_context selectedItem]];
 }
 
 - (void)ctxEditGroup:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
   RDLItem *it = [_context selectedItem];
-  if (it && [it.type isEqualToString:@"Tablix"])
-    [PicaTablixEditor runForTablix:it context:_context];
+  if (it && [it isKindOfClass:[RDLTablix class]])
+    [PicaTablixEditor runForTablix:(RDLTablix *)it context:_context];
 }
 
 - (void)ctxEditRichText:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
   RDLItem *it = [_context selectedItem];
-  if (it && [it.type isEqualToString:@"Textbox"])
-    [PicaRichTextEditor runForTextbox:it context:_context];
+  if (it && [it isKindOfClass:[RDLTextbox class]])
+    [PicaRichTextEditor runForTextbox:(RDLTextbox *)it context:_context];
 }
 
 // --- Hover tracking (tablix cell highlight + column-resize cursor) ----------
