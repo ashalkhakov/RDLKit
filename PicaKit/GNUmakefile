@@ -17,7 +17,10 @@ PicaKit_HEADER_FILES = \
   RDLSelection.h \
   RDLDocument.h \
   RDLEditor.h \
-  RDLItemFactory.h
+  RDLItemFactory.h \
+  RDLTextAttributes.h \
+  RDLRichTextCodec.h \
+  RDLExpressionCompletion.h
 PicaKit_OBJC_FILES = \
   RDLReport.m \
   RDLParser.m \
@@ -31,6 +34,9 @@ PicaKit_OBJC_FILES = \
   RDLSelection.m \
   RDLDocument.m \
   RDLEditor.m \
-  RDLItemFactory.m
+  RDLItemFactory.m \
+  RDLTextAttributes.m \
+  RDLRichTextCodec.m \
+  RDLExpressionCompletion.m
 
 include $(GNUSTEP_MAKEFILES)/library.make

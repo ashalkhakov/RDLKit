@@ -62,6 +62,12 @@
 		86FBF933120B32F29879240C /* RDLEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */; };
 		D4704492705E498BC4AC6B96 /* RDLItemFactory.h in Headers */ = {isa = PBXBuildFile; fileRef = 6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1CAD8C23F22E73ECA81584BF /* RDLItemFactory.m in Sources */ = {isa = PBXBuildFile; fileRef = 635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */; };
+		855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */ = {isa = PBXBuildFile; fileRef = 3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */ = {isa = PBXBuildFile; fileRef = F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */; };
+		71A8A5A0BAA994C49E22E959 /* RDLRichTextCodec.h in Headers */ = {isa = PBXBuildFile; fileRef = 1E1AA8CE24DAD4EDF52EA7DA /* RDLRichTextCodec.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		F198EB2080F2BA6867B747EB /* RDLRichTextCodec.m in Sources */ = {isa = PBXBuildFile; fileRef = A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */; };
+		C04581B9472B69127D1FEFA1 /* RDLExpressionCompletion.h in Headers */ = {isa = PBXBuildFile; fileRef = 01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		583B89AD82F0768151C07CC9 /* RDLExpressionCompletion.m in Sources */ = {isa = PBXBuildFile; fileRef = AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -187,6 +193,12 @@
 		4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLEditor.m; sourceTree = "<group>"; };
 		6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLItemFactory.h; sourceTree = "<group>"; };
 		635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLItemFactory.m; sourceTree = "<group>"; };
+		3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTextAttributes.h; sourceTree = "<group>"; };
+		F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextAttributes.m; sourceTree = "<group>"; };
+		1E1AA8CE24DAD4EDF52EA7DA /* RDLRichTextCodec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLRichTextCodec.h; sourceTree = "<group>"; };
+		A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRichTextCodec.m; sourceTree = "<group>"; };
+		01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionCompletion.h; sourceTree = "<group>"; };
+		AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionCompletion.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -306,6 +318,12 @@
 				4A5C7792C58E9F34EBD0CA74 /* RDLEditor.m */,
 				6BA81F54E8EBA245A43AFD04 /* RDLItemFactory.h */,
 				635D5B8B74FFF708A1B01FBA /* RDLItemFactory.m */,
+				3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */,
+				F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */,
+				1E1AA8CE24DAD4EDF52EA7DA /* RDLRichTextCodec.h */,
+				A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */,
+				01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */,
+				AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */,
 			);
 			path = PicaKit;
 			sourceTree = "<group>";
@@ -379,6 +397,9 @@
 				9EA144B556EC3C8824474A84 /* RDLDocument.h in Headers */,
 				5B798427BD838772C209ACA6 /* RDLEditor.h in Headers */,
 				D4704492705E498BC4AC6B96 /* RDLItemFactory.h in Headers */,
+				855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */,
+				71A8A5A0BAA994C49E22E959 /* RDLRichTextCodec.h in Headers */,
+				C04581B9472B69127D1FEFA1 /* RDLExpressionCompletion.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -566,6 +587,9 @@
 				A24E1FB7D1DD26468279BD57 /* RDLDocument.m in Sources */,
 				86FBF933120B32F29879240C /* RDLEditor.m in Sources */,
 				1CAD8C23F22E73ECA81584BF /* RDLItemFactory.m in Sources */,
+				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
+				F198EB2080F2BA6867B747EB /* RDLRichTextCodec.m in Sources */,
+				583B89AD82F0768151C07CC9 /* RDLExpressionCompletion.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

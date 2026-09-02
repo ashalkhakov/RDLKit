@@ -1,4 +1,5 @@
 #import "RDLView.h"
+#import "RDLTextAttributes.h"
 #import "RDLReport.h"
 #import "RDLLayoutEngine.h"
 #import "PicaCompatibility.h"
@@ -37,69 +38,17 @@ static void PicaStrokeBorderEdge(NSPoint a, NSPoint b, RDLBorder *border, RDLBor
 
 // Font + text attributes for a resolved style (used both for the plain text
 // path and for each rich-text run merged over the textbox style).
-static NSFont *PicaViewFont(RDLStyle *style) {
-  CGFloat pt = [style.fontSize floatValue];
-  if (pt <= 0)
-    pt = 10;
-  NSFont *font = [NSFont fontWithName:style.fontFamily size:pt];
-  if (font == nil)
-    font = [NSFont userFontOfSize:pt];
-  NSFontManager *fm = [NSFontManager sharedFontManager];
-  if ([style.fontWeight isEqualToString:@"Bold"]) {
-    NSFont *b = [fm convertFont:font toHaveTrait:NSBoldFontMask];
-    if (b)
-      font = b;
-  }
-  if ([style.fontStyle isEqualToString:@"Italic"]) {
-    NSFont *i2 = [fm convertFont:font toHaveTrait:NSItalicFontMask];
-    if (i2)
-      font = i2;
-  }
-  return font;
-}
-
+// Text attribute translation and rich-run assembly live in RDLTextAttributes,
+// shared with the designer canvas and the rich-text codec; this file used to
+// carry a third, subtly different copy.
 static NSDictionary *PicaViewAttrs(RDLStyle *style, NSString *paraAlign) {
-  NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
-  attrs[NSFontAttributeName] = PicaViewFont(style);
-  attrs[NSForegroundColorAttributeName] = PicaColorFromHex(style.color);
-  if ([style.textDecoration isEqualToString:@"Underline"])
-    attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-  else if ([style.textDecoration isEqualToString:@"LineThrough"])
-    attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
-  NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
-  NSString *align = [paraAlign length] ? paraAlign : style.textAlign;
-  if ([align isEqualToString:@"Center"])
-    ps.alignment = NSCenterTextAlignment;
-  else if ([align isEqualToString:@"Right"])
-    ps.alignment = NSRightTextAlignment;
-  else
-    ps.alignment = NSLeftTextAlignment;
-  ps.lineBreakMode = NSLineBreakByWordWrapping;
-  attrs[NSParagraphStyleAttributeName] = ps;
-  return attrs;
+  return [RDLTextAttributes attributesForStyle:style paragraphAlign:paraAlign scale:1.0];
 }
 
-// Rich text: paragraphs joined by \n, each run merged over the textbox style.
 static NSAttributedString *PicaSpansAttributed(RDLLaidOutItem *it) {
-  NSMutableAttributedString *out = [[NSMutableAttributedString alloc] init];
-  NSString *prevAlign = nil;
-  BOOL first = YES;
-  for (RDLParagraph *para in it.spans) {
-    NSString *paraAlign = para.style.textAlign;
-    if (!first)
-      [out appendAttributedString:
-               [[NSAttributedString alloc] initWithString:@"\n"
-                                                attributes:PicaViewAttrs(it.style, prevAlign)]];
-    first = NO;
-    prevAlign = paraAlign;
-    for (RDLTextRun *run in para.runs) {
-      RDLStyle *merged = [RDLStyle styleByMerging:run.style over:it.style];
-      [out appendAttributedString:
-               [[NSAttributedString alloc] initWithString:run.value ?: @""
-                                                attributes:PicaViewAttrs(merged, paraAlign)]];
-    }
-  }
-  return out;
+  return [RDLTextAttributes attributedStringForParagraphs:it.spans
+                                               baseStyle:it.style
+                                                   scale:1.0];
 }
 
 static void PicaDrawBorders(NSRect r, RDLStyle *s) {

@@ -2571,6 +2571,328 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void) {
   return fails;
 }
 
+// --- Stage 3: text attributes, rich-text codec, expression completion ------
+
+NSArray<NSString *> *PicaRunTextAttributeChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLStyle *base = [RDLStyle defaultStyle];
+  base.fontSize = @"12pt";
+  base.color = @"#112233";
+
+  NSFont *plain = [RDLTextAttributes fontForStyle:base scale:1.0];
+  if (fabs([plain pointSize] - 12.0) > 0.01)
+    PicaFail(fails, [NSString stringWithFormat:@"font size %g", (double)[plain pointSize]]);
+
+  // The canvas passes its zoom as the scale; nothing else should have to.
+  NSFont *zoomed = [RDLTextAttributes fontForStyle:base scale:2.0];
+  if (fabs([zoomed pointSize] - 24.0) > 0.01)
+    PicaFail(fails, @"scale should multiply the point size");
+
+  // The three old copies disagreed here: only the canvas recognised weights
+  // other than exactly "Bold".
+  NSFontManager *fm = [NSFontManager sharedFontManager];
+  for (NSString *weight in @[ @"Bold", @"bold", @"SemiBold", @"Heavy", @"ExtraBold" ]) {
+    RDLStyle *s = [RDLStyle defaultStyle];
+    s.fontWeight = weight;
+    NSFont *f = [RDLTextAttributes fontForStyle:s scale:1.0];
+    if (([fm traitsOfFont:f] & NSBoldFontMask) == 0)
+      PicaFail(fails, [NSString stringWithFormat:@"weight %@ should render bold", weight]);
+  }
+  RDLStyle *normal = [RDLStyle defaultStyle];
+  normal.fontWeight = @"Normal";
+  if (([fm traitsOfFont:[RDLTextAttributes fontForStyle:normal scale:1.0]] & NSBoldFontMask) != 0)
+    PicaFail(fails, @"Normal weight should not render bold");
+
+  RDLStyle *ital = [RDLStyle defaultStyle];
+  ital.fontStyle = @"italic";
+  if (([fm traitsOfFont:[RDLTextAttributes fontForStyle:ital scale:1.0]] & NSItalicFontMask) == 0)
+    PicaFail(fails, @"italic should render italic regardless of case");
+
+  // A missing family must fall back rather than yield a nil font, which would
+  // make an attributed string draw nothing.
+  RDLStyle *missing = [RDLStyle defaultStyle];
+  missing.fontFamily = @"NoSuchFontFamilyReally";
+  if ([RDLTextAttributes fontForStyle:missing scale:1.0] == nil)
+    PicaFail(fails, @"a missing font family should fall back to the user font");
+
+  base.textAlign = @"Right";
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  NSParagraphStyle *ps = attrs[NSParagraphStyleAttributeName];
+  if (ps.alignment != NSRightTextAlignment)
+    PicaFail(fails, @"style alignment should reach the paragraph style");
+  // A paragraph's sparse alignment overrides the textbox's.
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:@"Center" scale:1.0];
+  ps = attrs[NSParagraphStyleAttributeName];
+  if (ps.alignment != NSCenterTextAlignment)
+    PicaFail(fails, @"paragraph alignment should override the style's");
+
+  base.textDecoration = @"Underline";
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  if ([attrs[NSUnderlineStyleAttributeName] integerValue] == 0)
+    PicaFail(fails, @"Underline should set the underline attribute");
+  base.textDecoration = @"LineThrough";
+  attrs = [RDLTextAttributes attributesForStyle:base paragraphAlign:nil scale:1.0];
+  if ([attrs[NSStrikethroughStyleAttributeName] integerValue] == 0)
+    PicaFail(fails, @"LineThrough should set the strikethrough attribute");
+
+  // Runs merge over the base style, and the newline joining two paragraphs
+  // keeps the *preceding* paragraph's alignment.
+  RDLStyle *itemStyle = [RDLStyle defaultStyle];
+  itemStyle.textAlign = @"Left";
+  RDLParagraph *p1 = [[RDLParagraph alloc] init];
+  RDLStyle *pa1 = [[RDLStyle alloc] init];
+  pa1.textAlign = @"Right";
+  p1.style = pa1;
+  RDLTextRun *run1 = [[RDLTextRun alloc] init];
+  run1.value = @"one";
+  [p1.runs addObject:run1];
+  RDLParagraph *p2 = [[RDLParagraph alloc] init];
+  RDLTextRun *run2 = [[RDLTextRun alloc] init];
+  run2.value = @"two";
+  RDLStyle *boldRun = [[RDLStyle alloc] init];
+  boldRun.fontWeight = @"Bold";
+  run2.style = boldRun;
+  [p2.runs addObject:run2];
+
+  NSAttributedString *rich =
+      [RDLTextAttributes attributedStringForParagraphs:@[ p1, p2 ]
+                                            baseStyle:itemStyle
+                                                scale:1.0];
+  if (![[rich string] isEqualToString:@"one\ntwo"])
+    PicaFail(fails, [NSString stringWithFormat:@"assembled string %@", [rich string]]);
+  NSParagraphStyle *nlStyle = [rich attribute:NSParagraphStyleAttributeName
+                                      atIndex:3
+                               effectiveRange:NULL];
+  if (nlStyle.alignment != NSRightTextAlignment)
+    PicaFail(fails, @"the newline should carry the preceding paragraph's alignment");
+  NSFont *secondFont = [rich attribute:NSFontAttributeName atIndex:4 effectiveRange:NULL];
+  if (([fm traitsOfFont:secondFont] & NSBoldFontMask) == 0)
+    PicaFail(fails, @"a run's sparse weight should merge over the base style");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunRichTextCodecChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  RDLItem *item = [[RDLItem alloc] init];
+  item.type = @"Textbox";
+  item.name = @"Box";
+  item.style.fontSize = @"10pt";
+  item.style.color = @"#1a1916";
+  item.value = @"plain text";
+
+  // Plain in, plain out: an untouched textbox must not grow a Paragraphs
+  // element it does not need.
+  NSAttributedString *plain = [RDLRichTextCodec attributedStringForItem:item];
+  if (![[plain string] isEqualToString:@"plain text"])
+    PicaFail(fails, @"codec should surface the plain value");
+  [RDLRichTextCodec applyAttributedString:plain toItem:item];
+  if (item.paragraphs != nil)
+    PicaFail(fails, @"round-tripping plain text should leave paragraphs nil");
+  if (![item.value isEqualToString:@"plain text"])
+    PicaFail(fails, @"round-tripping plain text should preserve the value");
+
+  // Multi-line but unstyled is still not rich: it round-trips through `value`.
+  NSAttributedString *multi =
+      [[NSAttributedString alloc] initWithString:@"one\ntwo"
+                                      attributes:[RDLTextAttributes
+                                                     attributesForStyle:item.style
+                                                         paragraphAlign:nil
+                                                                  scale:1.0]];
+  [RDLRichTextCodec applyAttributedString:multi toItem:item];
+  if (item.paragraphs != nil)
+    PicaFail(fails, @"plain multi-line text should not need Paragraphs");
+  if (![item.value isEqualToString:@"one\ntwo"])
+    PicaFail(fails, [NSString stringWithFormat:@"multi-line value %@", item.value]);
+
+  // A bold span makes it rich, and only the differing run carries a style.
+  NSMutableAttributedString *styled = [[NSMutableAttributedString alloc]
+      initWithString:@"normal bold"
+          attributes:[RDLTextAttributes attributesForStyle:item.style
+                                           paragraphAlign:nil
+                                                    scale:1.0]];
+  NSFont *boldFont = [[NSFontManager sharedFontManager]
+      convertFont:[RDLTextAttributes fontForStyle:item.style scale:1.0]
+      toHaveTrait:NSBoldFontMask];
+  [styled addAttribute:NSFontAttributeName value:boldFont range:NSMakeRange(7, 4)];
+  [RDLRichTextCodec applyAttributedString:styled toItem:item];
+  if ([item.paragraphs count] != 1) {
+    PicaFail(fails, [NSString stringWithFormat:@"styled text should give 1 paragraph, got %lu",
+                                               (unsigned long)[item.paragraphs count]]);
+  } else {
+    RDLParagraph *para = item.paragraphs.firstObject;
+    if ([para.runs count] != 2)
+      PicaFail(fails, [NSString stringWithFormat:@"expected 2 runs, got %lu",
+                                                 (unsigned long)[para.runs count]]);
+    else {
+      RDLTextRun *first = para.runs[0];
+      RDLTextRun *second = para.runs[1];
+      if (first.style != nil)
+        PicaFail(fails, @"the run matching the item style should stay unstyled");
+      if (![second.style.fontWeight isEqualToString:@"Bold"])
+        PicaFail(fails, [NSString stringWithFormat:@"bold run weight %@",
+                                                   second.style.fontWeight]);
+      if ([second.style.fontFamily length])
+        PicaFail(fails, @"a run style should be sparse, not restate the family");
+    }
+  }
+  if (![item.value isEqualToString:@"normal bold"])
+    PicaFail(fails, @"the flattened value should hold the whole text");
+
+  // Alignment differing from the item's makes the paragraph carry a style.
+  RDLStyle *centered = [RDLStyle styleByMerging:nil over:item.style];
+  centered.textAlign = @"Center";
+  NSAttributedString *centeredText =
+      [[NSAttributedString alloc] initWithString:@"middle"
+                                      attributes:[RDLTextAttributes
+                                                     attributesForStyle:centered
+                                                         paragraphAlign:nil
+                                                                  scale:1.0]];
+  [RDLRichTextCodec applyAttributedString:centeredText toItem:item];
+  if ([item.paragraphs count] != 1 ||
+      ![[item.paragraphs.firstObject style].textAlign isEqualToString:@"Center"])
+    PicaFail(fails, @"a differing paragraph alignment should be recorded");
+
+  // A trailing newline means a real final empty paragraph, not a dropped one.
+  NSAttributedString *trailing =
+      [[NSAttributedString alloc] initWithString:@"line\n"
+                                      attributes:[RDLTextAttributes
+                                                     attributesForStyle:item.style
+                                                         paragraphAlign:nil
+                                                                  scale:1.0]];
+  NSMutableArray *paras = nil;
+  [RDLRichTextCodec applyAttributedString:trailing toItem:item];
+  if (![item.value isEqualToString:@"line\n"])
+    PicaFail(fails, [NSString stringWithFormat:@"trailing newline value %@", item.value]);
+  (void)paras;
+
+  // Model → attributed → model preserves styled runs.
+  RDLItem *round = [[RDLItem alloc] init];
+  round.type = @"Textbox";
+  round.style.fontSize = @"10pt";
+  RDLParagraph *rp = [[RDLParagraph alloc] init];
+  RDLTextRun *ra = [[RDLTextRun alloc] init];
+  ra.value = @"a";
+  RDLTextRun *rb = [[RDLTextRun alloc] init];
+  rb.value = @"b";
+  RDLStyle *redBold = [[RDLStyle alloc] init];
+  redBold.fontWeight = @"Bold";
+  redBold.color = @"#cc0000";
+  rb.style = redBold;
+  [rp.runs addObject:ra];
+  [rp.runs addObject:rb];
+  round.paragraphs = [NSMutableArray arrayWithObject:rp];
+  round.value = @"ab";
+  NSAttributedString *asText = [RDLRichTextCodec attributedStringForItem:round];
+  [RDLRichTextCodec applyAttributedString:asText toItem:round];
+  if ([round.paragraphs count] != 1 || [[round.paragraphs.firstObject runs] count] != 2)
+    PicaFail(fails, @"a styled round trip should keep its two runs");
+  else {
+    RDLTextRun *back = [round.paragraphs.firstObject runs][1];
+    if (![back.style.fontWeight isEqualToString:@"Bold"])
+      PicaFail(fails, @"round trip lost the run weight");
+    if (![[back.style.color lowercaseString] isEqualToString:@"#cc0000"])
+      PicaFail(fails, [NSString stringWithFormat:@"round trip colour %@", back.style.color]);
+  }
+
+  if (![RDLRichTextCodec attributedStringIsRich:styled forItem:item])
+    PicaFail(fails, @"attributedStringIsRich: should agree that styled text is rich");
+  if ([RDLRichTextCodec attributedStringIsRich:multi forItem:item])
+    PicaFail(fails, @"attributedStringIsRich: should call plain multi-line text plain");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunCompletionChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = [RDLReport emptyReportNamed:@"Completion"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Items";
+  ds.fields = @[ @"Sku", @"Amount", @"Note" ];
+  [r.dataSets addObject:ds];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"InvoiceNo";
+  [r.parameters addObject:p];
+  RDLExpressionScope *scope = [RDLExpressionScope scopeWithReport:r dataSetName:@"Items"];
+
+  if ([scope.fieldNames count] != 3)
+    PicaFail(fails, @"scope should read the dataset's fields");
+  if (![scope.parameterNames isEqualToArray:@[ @"InvoiceNo" ]])
+    PicaFail(fails, @"scope should read the report's parameters");
+  // An unknown dataset falls back to the first, which is what single-dataset
+  // reports rely on.
+  RDLExpressionScope *fallback = [RDLExpressionScope scopeWithReport:r dataSetName:@"Nope"];
+  if ([fallback.fieldNames count] != 3)
+    PicaFail(fails, @"an unknown dataset name should fall back to the first dataset");
+
+  // Right after `Fields!` the whole accessor is the range, so completions come
+  // back carrying the prefix.
+  NSString *text = @"=Fields!";
+  NSRange range = RDLExpressionCompletionRange(text, [text length]);
+  if (range.location == NSNotFound)
+    PicaFail(fails, @"the range right after Fields! should be completable");
+  NSArray *out = RDLExpressionCompletions(text, range, scope);
+  if ([out count] != 3)
+    PicaFail(fails, [NSString stringWithFormat:@"expected 3 field completions, got %@", out]);
+  if (![out containsObject:@"Fields!Sku.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"completions should carry the prefix: %@", out]);
+
+  // A member prefix filters, case-insensitively.
+  text = @"=Fields!am";
+  range = RDLExpressionCompletionRange(text, [text length]);
+  out = RDLExpressionCompletions(text, range, scope);
+  if ([out count] != 1 || ![out.firstObject isEqualToString:@"Fields!Amount.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"prefix filter gave %@", out]);
+
+  text = @"=Parameters!";
+  range = RDLExpressionCompletionRange(text, [text length]);
+  out = RDLExpressionCompletions(text, range, scope);
+  if (![out containsObject:@"Parameters!InvoiceNo.Value"])
+    PicaFail(fails, [NSString stringWithFormat:@"parameter completions %@", out]);
+
+  text = @"=Globals!";
+  range = RDLExpressionCompletionRange(text, [text length]);
+  out = RDLExpressionCompletions(text, range, scope);
+  if (![out containsObject:@"Globals!PageNumber"])
+    PicaFail(fails, @"Globals! should list the built-ins");
+
+  // Function names complete from a prefix.
+  text = @"=Form";
+  range = RDLExpressionCompletionRange(text, [text length]);
+  out = RDLExpressionCompletions(text, range, scope);
+  if (![out containsObject:@"Format"])
+    PicaFail(fails, [NSString stringWithFormat:@"function completions %@", out]);
+  // But an empty non-member prefix must not dump the entire vocabulary.
+  out = RDLExpressionCompletions(@"=", NSMakeRange(1, 0), scope);
+  if ([out count] != 0)
+    PicaFail(fails, @"an empty prefix outside a member context should offer nothing");
+
+  // Auto-pop rules.
+  if (!RDLExpressionShouldAutoComplete(@"=Fields!", NSMakeRange(8, 0)))
+    PicaFail(fails, @"a bang should pop the list");
+  if (!RDLExpressionShouldAutoComplete(@"=Fields!Sk", NSMakeRange(10, 0)))
+    PicaFail(fails, @"a member prefix should keep the list up");
+  if (RDLExpressionShouldAutoComplete(@"Fields!", NSMakeRange(7, 0)))
+    PicaFail(fails, @"text that is not an = expression should not auto-complete");
+  if (RDLExpressionShouldAutoComplete(@"=1 + 2", NSMakeRange(6, 0)))
+    PicaFail(fails, @"arithmetic should not auto-complete");
+
+  // The range is never empty right after the bang, because Cocoa's -complete:
+  // just beeps on an empty partial word.
+  range = RDLExpressionCompletionRange(@"=Fields!", 8);
+  if (range.length == 0)
+    PicaFail(fails, @"the completion range must not be empty after a bang");
+  range = RDLExpressionCompletionRange(@"plain text", 5);
+  if (range.location != NSNotFound)
+    PicaFail(fails, @"a non-expression should have no completion range");
+
+  if ([RDLExpressionFunctionNames() count] < 50)
+    PicaFail(fails, @"the function vocabulary looks truncated");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -2586,6 +2908,9 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunSelectionChecks()];
   [fails addObjectsFromArray:PicaRunInsertionChecks()];
   [fails addObjectsFromArray:PicaRunItemTransferChecks()];
+  [fails addObjectsFromArray:PicaRunTextAttributeChecks()];
+  [fails addObjectsFromArray:PicaRunRichTextCodecChecks()];
+  [fails addObjectsFromArray:PicaRunCompletionChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];

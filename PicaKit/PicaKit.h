@@ -16,3 +16,8 @@
 #import "RDLDocument.h"
 #import "RDLEditor.h"
 #import "RDLItemFactory.h"
+// Text: one style->AppKit translation, the rich-text codec, and expression
+// completion (all UI-free so they can be checked).
+#import "RDLTextAttributes.h"
+#import "RDLRichTextCodec.h"
+#import "RDLExpressionCompletion.h"

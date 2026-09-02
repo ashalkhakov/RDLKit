@@ -71,6 +71,15 @@
 - (void)testItemTransfer {
   PICA_ASSERT_NO_FAILURES(PicaRunItemTransferChecks());
 }
+- (void)testTextAttributes {
+  PICA_ASSERT_NO_FAILURES(PicaRunTextAttributeChecks());
+}
+- (void)testRichTextCodec {
+  PICA_ASSERT_NO_FAILURES(PicaRunRichTextCodecChecks());
+}
+- (void)testExpressionCompletion {
+  PICA_ASSERT_NO_FAILURES(PicaRunCompletionChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE
