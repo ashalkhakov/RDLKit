@@ -2,13 +2,14 @@
 #import "PicaDesignerWindow.h"
 #import "PicaGeneratorWindow.h"
 #import "PicaWelcomeWindow.h"
-#import "PicaController.h"
+#import "PicaEditingContext.h"
 #import "PicaSamples.h"
 
 @implementation PicaAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
   (void)n;
+  _context = [[PicaEditingContext alloc] init];
   [self buildMenu];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(showDesigner:)
@@ -109,7 +110,7 @@
 
 - (void)ensureDesigner {
   if (_designer == nil)
-    _designer = [[PicaDesignerWindow alloc] init];
+    _designer = [[PicaDesignerWindow alloc] initWithContext:_context];
 }
 
 - (void)ensureGenerator {
@@ -153,13 +154,13 @@
     [_generator loadSample:cat[i][@"id"]];
     return;
   }
-  [[PicaController sharedController] loadSample:cat[i][@"id"]];
+  [_context loadSampleWithId:cat[i][@"id"]];
   [self showDesigner:nil];
 }
 
 - (void)newDocument:(id)sender {
   (void)sender;
-  [[PicaController sharedController] newReport];
+  [_context loadBlankReport];
   [self showDesigner:nil];
 }
 
@@ -175,25 +176,34 @@
   [p setCanChooseDirectories:NO];
   if ([p runModal] == NSOKButton) {
     NSError *err = nil;
-    if (![[PicaController sharedController] openURL:[p URL] error:&err]) {
+    if (![_context.document openURL:[p URL] error:&err]) {
       NSAlert *a = [[NSAlert alloc] init];
       [a setMessageText:@"Could not open RDL"];
       [a setInformativeText:err.localizedDescription ?: @""];
       [a runModal];
       return;
     }
+    // The old report's items are gone with it.
+    [_context.selection reset];
     [self showDesigner:nil];
   }
 }
 
 - (void)saveDocument:(id)sender {
-  PicaController *c = [PicaController sharedController];
-  if (c.fileURL) {
+  if (_context.document.fileURL) {
     NSError *err = nil;
-    [c saveToURL:c.fileURL error:&err];
+    if (![_context.document saveWithError:&err])
+      [self presentError:err title:@"Could not save RDL"];
     return;
   }
   [self saveDocumentAs:sender];
+}
+
+- (void)presentError:(NSError *)error title:(NSString *)title {
+  NSAlert *a = [[NSAlert alloc] init];
+  [a setMessageText:title];
+  [a setInformativeText:error.localizedDescription ?: @""];
+  [a runModal];
 }
 
 - (void)saveDocumentAs:(id)sender {
@@ -202,10 +212,11 @@
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"rdl" ]];
   [p setNameFieldStringValue:
-      [([PicaController sharedController].report.name ?: @"report") stringByAppendingPathExtension:@"rdl"]];
+          [(_context.report.name ?: @"report") stringByAppendingPathExtension:@"rdl"]];
   if ([p runModal] == NSOKButton) {
     NSError *err = nil;
-    [[PicaController sharedController] saveToURL:[p URL] error:&err];
+    if (![_context.document saveToURL:[p URL] error:&err])
+      [self presentError:err title:@"Could not save RDL"];
   }
 }
 
@@ -227,7 +238,7 @@
 
 - (void)delete:(id)sender {
   (void)sender;
-  [[PicaController sharedController] removeSelected];
+  [_context deleteSelectedItem];
 }
 
 - (void)addElement:(id)sender {
@@ -240,26 +251,17 @@
 
 - (void)toggleGrid:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.showsGrid = !c.showsGrid;
-  [c noteChange];
-  c.dirty = NO;
+  [_context toggleGrid];
 }
 
 - (void)zoomIn:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.zoom = MIN(2.0, c.zoom + 0.1);
-  [c noteChange];
-  c.dirty = NO;
+  [_context zoomIn];
 }
 
 - (void)zoomOut:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.zoom = MAX(0.4, c.zoom - 0.1);
-  [c noteChange];
-  c.dirty = NO;
+  [_context zoomOut];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {

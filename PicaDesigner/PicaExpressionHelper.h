@@ -6,8 +6,10 @@
 
 // Completions for the partial word in `charRange` of `text`. `dataSetName`
 // scopes Fields! members (nil falls back to the report's first dataset).
+// The report is passed in rather than reached for, so this works for any
+// document the caller happens to be editing.
 NSArray<NSString *> *PicaExpressionCompletions(NSString *text, NSRange charRange,
-                                               NSString *dataSetName);
+                                               NSString *dataSetName, RDLReport *report);
 
 // YES when the text just typed should auto-pop the completion list (an `!`
 // collection accessor inside an `=` expression, or a member prefix after one).

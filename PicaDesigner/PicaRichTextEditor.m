@@ -1,4 +1,5 @@
 #import "PicaRichTextEditor.h"
+#import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 
 // The attributed-string <-> Paragraphs/TextRuns conversion lives in
@@ -31,7 +32,7 @@
   [NSApp stopModalWithCode:0];
 }
 
-+ (BOOL)runForTextbox:(RDLItem *)item {
++ (BOOL)runForTextbox:(RDLItem *)item context:(PicaEditingContext *)context {
   if (item == nil || ![item.type isEqualToString:@"Textbox"])
     return NO;
   PicaRichTextEditor *ed = [[PicaRichTextEditor alloc] init];
@@ -96,7 +97,7 @@
   [ed.panel orderOut:nil];
   if (code != 1)
     return NO;
-  [self applyAttributedString:[ed.textView textStorage] toItem:item];
+  [context.editor setAttributedString:[ed.textView textStorage] ofItem:item];
   return YES;
 }
 

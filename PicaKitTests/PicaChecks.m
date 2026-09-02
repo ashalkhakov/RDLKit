@@ -1,4 +1,5 @@
 #import "PicaChecks.h"
+#import "PicaEditingContext.h"
 #if __has_include(<PicaKit/PicaKit.h>)
 #import <PicaKit/PicaKit.h>
 #else
@@ -2341,6 +2342,54 @@ NSArray<NSString *> *PicaRunEditorTablixChecks(void) {
   if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 2.8) > 0.0001)
     PicaFail(fails, @"one undo should revert the column resize");
 
+  // The modal tablix editor changes the groups AND the column spec at once.
+  // Those must undo as ONE unit: -rebuildTablix reads both, so undoing them
+  // separately would restore the spec, rebuild against the still-new groups,
+  // then revert the groups with no rebuild -- leaving the body inconsistent.
+  RDLReport *r3 = PicaGroupedJobs();
+  RDLDocument *doc3 = [[RDLDocument alloc] initWithReport:r3];
+  RDLEditor *ed3 = [[RDLEditor alloc] initWithDocument:doc3];
+  RDLItem *tab3 = r3.body.items.firstObject;
+  NSArray *specsBefore = tab3.columnSpecs;
+  NSString *groupBefore = tab3.groupBy;
+  // The row hierarchy is what distinguishes the two states: grouped gives
+  // header + group (2 members), flat-with-total gives header + details + total
+  // (3). The body row COUNT happens to be 3 either way, which is exactly the
+  // kind of coincidence that would hide this bug.
+  NSUInteger membersBefore = [tab3.rowHierarchy.members count];
+  [ed3 setTablixValues:@{
+    @"groupBy" : @"",
+    @"showGrandTotal" : @YES,
+    @"columnSpecs" : @[
+      @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+      @{@"width" : @2.0, @"header" : @"Amt", @"value" : @"=Fields!Amount.Value",
+        @"aggregate" : @"Sum"},
+    ]
+  }
+              ofTablix:tab3];
+  if ([tab3.groupBy length] != 0 || !tab3.showGrandTotal)
+    PicaFail(fails, @"combined tablix apply did not take effect");
+  if ([tab3.rowHierarchy.members count] == membersBefore)
+    PicaFail(fails, @"combined tablix apply should have rebuilt the row hierarchy");
+  [doc3.undoManager undo];
+  if (![tab3.groupBy isEqualToString:groupBefore])
+    PicaFail(fails, @"undo should restore groupBy");
+  if (![tab3.columnSpecs isEqualToArray:specsBefore])
+    PicaFail(fails, @"undo should restore the column spec");
+  // The restored body must agree with the restored grouping, rather than being
+  // a rebuild made against half-reverted state.
+  if ([tab3.rowHierarchy.members count] != membersBefore)
+    PicaFail(fails, [NSString stringWithFormat:
+                                  @"restored hierarchy should match restored groupBy: %lu vs %lu members",
+                                  (unsigned long)[tab3.rowHierarchy.members count],
+                                  (unsigned long)membersBefore]);
+  RDLTablixMember *restoredGroup = [tab3.rowHierarchy.members count] > 1
+                                       ? tab3.rowHierarchy.members[1]
+                                       : nil;
+  if ([restoredGroup.groupExpressions count] == 0 ||
+      [restoredGroup.groupExpressions[0] rangeOfString:groupBefore].location == NSNotFound)
+    PicaFail(fails, @"the restored group member should group by the restored field");
+
   // Grand total toggles and untoggles.
   BOOL before = tab2.showGrandTotal;
   [ed2 toggleGrandTotalOfTablix:tab2];
@@ -2893,6 +2942,190 @@ NSArray<NSString *> *PicaRunCompletionChecks(void) {
   return fails;
 }
 
+// --- Stage 4: the designer's editing context -------------------------------
+//
+// PicaEditingContext coordinates the three core objects: it asks
+// RDLItemFactory where a new element goes, mutates through RDLEditor so it
+// undoes, then moves the selection. It replaced the PicaController singleton,
+// and it is compiled into this test target so that coordination is covered --
+// the designer's views around it still are not.
+
+NSArray<NSString *> *PicaRunEditingContextChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  // 1. Construction and defaults.
+  PicaEditingContext *ctx = [[PicaEditingContext alloc] init];
+  if (!(ctx.document != nil))
+    PicaFail(fails, @"context: document created");
+  if (!(ctx.selection != nil))
+    PicaFail(fails, @"context: selection created");
+  if (!(ctx.editor != nil))
+    PicaFail(fails, @"context: editor created");
+  if (!(ctx.report != nil))
+    PicaFail(fails, @"context: report available");
+  if (!(ctx.zoom == 1.0))
+    PicaFail(fails, @"context: zoom defaults to 1");
+  if (!(ctx.showsGrid))
+    PicaFail(fails, @"context: grid on by default");
+
+  // 2. View state does not dirty the document (the old code needed a
+  //  noteChange-then-reset-dirty workaround for this).
+  [ctx zoomIn];
+  if (!(fabs(ctx.zoom - 1.1) < 0.0001))
+    PicaFail(fails, @"context: zoomIn steps by 0.1");
+  if (!(!ctx.document.isDirty))
+    PicaFail(fails, @"context: zoom must not dirty the document");
+  if (!(!ctx.document.undoManager.canUndo))
+    PicaFail(fails, @"context: zoom must not be undoable");
+  for (int i = 0; i < 20; i++) [ctx zoomIn];
+  if (!(ctx.zoom <= 2.0))
+    PicaFail(fails, @"context: zoom clamps at 2.0");
+  for (int i = 0; i < 40; i++) [ctx zoomOut];
+  if (!(ctx.zoom >= 0.4))
+    PicaFail(fails, @"context: zoom clamps at 0.4");
+  [ctx toggleGrid];
+  if (!(!ctx.showsGrid))
+    PicaFail(fails, @"context: grid toggles");
+  if (!(!ctx.document.isDirty))
+    PicaFail(fails, @"context: grid must not dirty the document");
+
+  // 3. Insertion honours policy and selects what it made.
+  [ctx.selection selectReport];
+  if (!([[ctx allowedElementKinds] count] == 6))
+    PicaFail(fails, @"context: band level allows six kinds");
+  [ctx addItemOfKind:@"Textbox"];
+  RDLItem *added = [ctx selectedItem];
+  if (!(added != nil))
+    PicaFail(fails, @"context: adding selects the new item");
+  if (!([added.type isEqualToString:@"Textbox"]))
+    PicaFail(fails, @"context: added a Textbox");
+  if (!(ctx.document.isDirty))
+    PicaFail(fails, @"context: adding dirties the document");
+  NSUInteger bodyCount = [ctx.report.body.items count];
+  [ctx.document.undoManager undo];
+  if (!([ctx.report.body.items count] == bodyCount - 1))
+    PicaFail(fails, @"context: undo removes the added item");
+
+  // 4. A Rectangle refuses data regions.
+  [ctx addItemOfKind:@"Rectangle"];
+  RDLItem *rect = [ctx selectedItem];
+  if (!([rect.type isEqualToString:@"Rectangle"]))
+    PicaFail(fails, @"context: added a Rectangle");
+  if (!([[ctx allowedElementKinds] count] == 4))
+    PicaFail(fails, @"context: a Rectangle allows four kinds");
+  NSUInteger before = [ctx.report.body.items count];
+  [ctx addItemOfKind:@"Tablix"];
+  if (!([ctx.report.body.items count] == before))
+    PicaFail(fails, @"context: a Tablix must not go into a Rectangle");
+  [ctx addItemOfKind:@"Textbox"];
+  if (!([rect.items count] == 1))
+    PicaFail(fails, @"context: a Textbox goes inside the Rectangle");
+
+  // 5. New elements land next to the selection, not at the end of the band.
+  [ctx.selection selectReport];
+  [ctx addItemOfKind:@"Textbox"];
+  RDLItem *first = [ctx selectedItem];
+  [ctx addItemOfKind:@"Textbox"];
+  RDLItem *second = [ctx selectedItem];
+  NSUInteger i1 = [ctx.report.body.items indexOfObjectIdenticalTo:first];
+  NSUInteger i2 = [ctx.report.body.items indexOfObjectIdenticalTo:second];
+  if (!(i2 == i1 + 1))
+    PicaFail(fails, @"context: the second item is inserted right after the first");
+
+  // 6. Clipboard. Note the paste target follows the insertion point, so a
+  //  Rectangle selection pastes INSIDE it -- preserved from the original
+  //  behaviour. Select a plain item first for a band-level paste.
+  [ctx.selection selectItem:first inBandWithKey:@"body"];
+  [ctx.selection selectItem:rect inBandWithKey:@"body"];
+  if (!([ctx copySelectedItem]))
+    PicaFail(fails, @"context: copy succeeds");
+  if (!([ctx canPaste]))
+    PicaFail(fails, @"context: canPaste sees the item");
+  NSUInteger rectKids = [rect.items count];
+  [ctx pasteItem];
+  RDLItem *nested = [ctx selectedItem];
+  if (!([rect.items count] == rectKids + 1))
+    PicaFail(fails, @"context: pasting with a Rectangle selected nests inside it");
+  if (!(nested != rect))
+    PicaFail(fails, @"context: the paste is a distinct object");
+  if (!(![nested.name isEqualToString:rect.name]))
+    PicaFail(fails, @"context: the paste gets a fresh name");
+  if (!([nested.items count] == rectKids))
+    PicaFail(fails, @"context: the paste kept the children it was copied with");
+  [ctx.document.undoManager undo];
+  if (!([rect.items count] == rectKids))
+    PicaFail(fails, @"context: one undo removes the nested paste");
+
+  // Band-level paste, with a plain item selected.
+  [ctx.selection selectItem:first inBandWithKey:@"body"];
+  NSUInteger n = [ctx.report.body.items count];
+  [ctx pasteItem];
+  RDLItem *pasted = [ctx selectedItem];
+  if (!([ctx.report.body.items count] == n + 1))
+    PicaFail(fails, @"context: paste inserts at band level");
+  if (!(pasted != rect))
+    PicaFail(fails, @"context: the band-level paste is a distinct object");
+  if (!(pasted.left != rect.left || pasted.top != rect.top))
+    PicaFail(fails, @"context: the paste is offset");
+  [ctx.document.undoManager undo];
+  if (!([ctx.report.body.items count] == n))
+    PicaFail(fails, @"context: one undo removes the paste");
+
+  // A data region cannot live in a Rectangle, so pasting one with a
+  // Rectangle selected must fall back to the band rather than vanish.
+  [ctx.selection selectReport];
+  [ctx addItemOfKind:@"Tablix"];
+  RDLItem *tablix = [ctx selectedItem];
+  if (!(tablix != nil && [tablix.type isEqualToString:@"Tablix"]))
+    PicaFail(fails, @"context: added a Tablix");
+  if (!([ctx copySelectedItem]))
+    PicaFail(fails, @"context: copy the tablix");
+  [ctx.selection selectItem:rect inBandWithKey:@"body"];
+  rectKids = [rect.items count];
+  n = [ctx.report.body.items count];
+  [ctx pasteItem];
+  if (!([rect.items count] == rectKids))
+    PicaFail(fails, @"context: a pasted Tablix must not enter the Rectangle");
+  if (!([ctx.report.body.items count] == n + 1))
+    PicaFail(fails, @"context: a pasted Tablix falls back to the band");
+
+  // 7. Duplicate does not disturb the pasteboard.
+  [ctx.selection selectItem:first inBandWithKey:@"body"];
+  n = [ctx.report.body.items count];
+  [ctx duplicateSelectedItem];
+  if (!([ctx.report.body.items count] == n + 1))
+    PicaFail(fails, @"context: duplicate inserts");
+  if (!([ctx selectedItem] != first))
+    PicaFail(fails, @"context: duplicate selects the copy");
+  [ctx.document.undoManager undo];
+  if (!([ctx.report.body.items count] == n))
+    PicaFail(fails, @"context: one undo removes the duplicate");
+
+  // 8. Delete moves the selection to the band rather than dangling.
+  [ctx.selection selectItem:rect inBandWithKey:@"body"];
+  [ctx deleteSelectedItem];
+  if (!([ctx selectedItem] == nil))
+    PicaFail(fails, @"context: deleting clears the item selection");
+  if (!(ctx.selection.scope == RDLSelectionScopeBand))
+    PicaFail(fails, @"context: deleting falls back to the band");
+  if (!(![ctx.report.body.items containsObject:rect]))
+    PicaFail(fails, @"context: the item is gone");
+  [ctx.document.undoManager undo];
+  if (!([ctx.report.body.items containsObject:rect]))
+    PicaFail(fails, @"context: undo restores the deleted item");
+
+  // 9. Loading a report resets the selection, since its items are gone.
+  [ctx.selection selectItem:ctx.report.body.items.firstObject inBandWithKey:@"body"];
+  [ctx loadSampleWithId:@"invoice"];
+  if (!([ctx selectedItem] == nil))
+    PicaFail(fails, @"context: loading resets the selection");
+  if (!(!ctx.document.isDirty))
+    PicaFail(fails, @"context: a freshly loaded report is not dirty");
+  if (!(!ctx.document.undoManager.canUndo))
+    PicaFail(fails, @"context: loading clears undo");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -2911,6 +3144,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTextAttributeChecks()];
   [fails addObjectsFromArray:PicaRunRichTextCodecChecks()];
   [fails addObjectsFromArray:PicaRunCompletionChecks()];
+  [fails addObjectsFromArray:PicaRunEditingContextChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];

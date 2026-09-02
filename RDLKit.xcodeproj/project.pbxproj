@@ -37,7 +37,6 @@
 		A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */ = {isa = PBXBuildFile; fileRef = 5287B31A4A81269C168B694D /* RDLView.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 388AD53F1764907577168AE8 /* RDLLayoutEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */ = {isa = PBXBuildFile; fileRef = CB30BBD185439ABC015B8C91 /* RDLReport.m */; };
-		BC70D011C9198B007BFB52C1 /* PicaController.m in Sources */ = {isa = PBXBuildFile; fileRef = BF28DDAD906EBA44CFC1AE51 /* PicaController.m */; };
 		C3EB649CC42680C456B883E3 /* RDLParser.h in Headers */ = {isa = PBXBuildFile; fileRef = BB224C8B29C878CC6C92E994 /* RDLParser.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C64526DBC3B8898C885ECA7F /* PicaWelcomeWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */; };
 		CD16E8E89FDBE601591035CC /* PicaAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */; };
@@ -68,6 +67,9 @@
 		F198EB2080F2BA6867B747EB /* RDLRichTextCodec.m in Sources */ = {isa = PBXBuildFile; fileRef = A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */; };
 		C04581B9472B69127D1FEFA1 /* RDLExpressionCompletion.h in Headers */ = {isa = PBXBuildFile; fileRef = 01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		583B89AD82F0768151C07CC9 /* RDLExpressionCompletion.m in Sources */ = {isa = PBXBuildFile; fileRef = AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */; };
+		AA17E816AF371EBB10F5333E /* PicaEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */; };
+		BF3CDBCB888B1DD6A659E871 /* PicaEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */; };
+		802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */ = {isa = PBXBuildFile; fileRef = E46BA8ED30D063FB448EB1DE /* PicaSamples.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -136,7 +138,6 @@
 		4670AACF804D5A7D49B095FE /* PicaTestMacros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaTestMacros.h; sourceTree = "<group>"; };
 		4A7EC759B31E5CE35348B9B5 /* PicaChecks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaChecks.h; sourceTree = "<group>"; };
 		4BBD021D6129910A18C54E70 /* PicaAppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaAppDelegate.h; sourceTree = "<group>"; };
-		4FF506E0765CCD79D8C4346E /* PicaController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaController.h; sourceTree = "<group>"; };
 		5287B31A4A81269C168B694D /* RDLView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLView.h; sourceTree = "<group>"; };
 		52D939EF9898701ED8C0484C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		56FF59445895326DCEBE3E51 /* PicaDataView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaDataView.m; sourceTree = "<group>"; };
@@ -163,7 +164,6 @@
 		B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaAppDelegate.m; sourceTree = "<group>"; };
 		BB06AE65D2508BE359426E27 /* RDLLayoutEngine.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLLayoutEngine.m; sourceTree = "<group>"; };
 		BB224C8B29C878CC6C92E994 /* RDLParser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLParser.h; sourceTree = "<group>"; };
-		BF28DDAD906EBA44CFC1AE51 /* PicaController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaController.m; sourceTree = "<group>"; };
 		C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaWelcomeWindow.m; sourceTree = "<group>"; };
 		C4EBE709B7C0EB54DA16CA66 /* Pica-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Pica-Info.plist"; sourceTree = "<group>"; };
 		C6645C70B8F9A09B3D8DCEA5 /* PicaInspectorView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaInspectorView.h; sourceTree = "<group>"; };
@@ -199,6 +199,8 @@
 		A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRichTextCodec.m; sourceTree = "<group>"; };
 		01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionCompletion.h; sourceTree = "<group>"; };
 		AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionCompletion.m; sourceTree = "<group>"; };
+		ED8FB43465A94113819D4184 /* PicaEditingContext.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaEditingContext.h; sourceTree = "<group>"; };
+		DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaEditingContext.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -263,7 +265,6 @@
 				CEBAF52A30470D1500D62319 /* PicaTablixEditor.m */,
 				4BBD021D6129910A18C54E70 /* PicaAppDelegate.h */,
 				9C93A8A6979B659C019D9C82 /* PicaCanvasView.h */,
-				4FF506E0765CCD79D8C4346E /* PicaController.h */,
 				E36F1417AB3C67B3E26DEFF8 /* PicaDataView.h */,
 				B621BC81F65752457F397A3D /* PicaDesignerWindow.h */,
 				716F81F62762E1B81C134DB0 /* PicaGeneratorWindow.h */,
@@ -273,7 +274,6 @@
 				DC31C18582DB97C5DF6573CD /* main.m */,
 				B76A829D5C13583285D1B6F4 /* PicaAppDelegate.m */,
 				AF7A0C2EA618F5BE947043F1 /* PicaCanvasView.m */,
-				BF28DDAD906EBA44CFC1AE51 /* PicaController.m */,
 				56FF59445895326DCEBE3E51 /* PicaDataView.m */,
 				88F0BDB43861D06A9D120937 /* PicaDesignerWindow.m */,
 				9AB735B023E47621763374DB /* PicaGeneratorWindow.m */,
@@ -282,6 +282,8 @@
 				C05560EE328D33A16E4611F9 /* PicaWelcomeWindow.m */,
 				C4EBE709B7C0EB54DA16CA66 /* Pica-Info.plist */,
 				E7F4AAE5DA543577DD26E124 /* README.md */,
+				ED8FB43465A94113819D4184 /* PicaEditingContext.h */,
+				DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */,
 			);
 			path = PicaDesigner;
 			sourceTree = "<group>";
@@ -547,6 +549,8 @@
 			files = (
 				F3C696E6D8C4268736CDE752 /* PicaChecks.m in Sources */,
 				E49064EFAA718365E67147C5 /* PicaKitTests.m in Sources */,
+				BF3CDBCB888B1DD6A659E871 /* PicaEditingContext.m in Sources */,
+				802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -567,6 +571,7 @@
 				C64526DBC3B8898C885ECA7F /* PicaWelcomeWindow.m in Sources */,
 				CEBAF52B30470D1500D62319 /* PicaExpressionHelper.m in Sources */,
 				CEBAF52C30470D1500D62319 /* PicaTablixEditor.m in Sources */,
+				AA17E816AF371EBB10F5333E /* PicaEditingContext.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -697,6 +702,7 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/PicaKit",
 					"$(SRCROOT)/PicaKitTests",
+					"$(SRCROOT)/PicaDesigner",
 				);
 			};
 			name = Debug;
@@ -740,6 +746,7 @@
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/PicaKit",
 					"$(SRCROOT)/PicaKitTests",
+					"$(SRCROOT)/PicaDesigner",
 				);
 			};
 			name = Release;

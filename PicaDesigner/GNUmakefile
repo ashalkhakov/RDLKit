@@ -5,7 +5,7 @@ Pica_NEEDS_GUI = yes
 Pica_OBJCFLAGS += -fobjc-arc -Wall -I../PicaKit
 Pica_OBJC_FILES = \
   main.m \
-  PicaController.m \
+  PicaEditingContext.m \
   PicaCanvasView.m \
   PicaDesignerWindow.m \
   PicaGeneratorWindow.m \

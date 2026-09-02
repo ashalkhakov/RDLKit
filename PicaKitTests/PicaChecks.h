@@ -17,6 +17,7 @@ NSArray<NSString *> *PicaRunItemTransferChecks(void);
 NSArray<NSString *> *PicaRunTextAttributeChecks(void);
 NSArray<NSString *> *PicaRunRichTextCodecChecks(void);
 NSArray<NSString *> *PicaRunCompletionChecks(void);
+NSArray<NSString *> *PicaRunEditingContextChecks(void);
 NSArray<NSString *> *PicaRunTablixEditingChecks(void);
 NSArray<NSString *> *PicaRunTablixAdvancedChecks(void);
 NSArray<NSString *> *PicaRunHTMLBackendChecks(void);

@@ -1,10 +1,11 @@
 #import "PicaDesignerWindow.h"
 #import "PicaCanvasView.h"
-#import "PicaController.h"
+#import "PicaEditingContext.h"
 #import "PicaInspectorView.h"
 #import "PicaDataView.h"
 #import "PicaExpressionHelper.h"
 #import "PicaKit.h"
+#import "PicaCompatibility.h"
 
 typedef NS_ENUM(NSInteger, PicaNodeKind) {
   PicaNodeReport = 0,
@@ -16,7 +17,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 @property (nonatomic, assign) PicaNodeKind kind;
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *bandKey;
-@property (nonatomic, copy) NSString *itemName;
+@property (nonatomic, strong) RDLItem *item;
 @property (nonatomic, strong) NSMutableArray<PicaOutlineNode *> *children;
 @end
 
@@ -30,6 +31,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 @end
 
 @interface PicaDesignerWindow () <NSOutlineViewDataSource, NSOutlineViewDelegate>
+@property (nonatomic, strong, readwrite) PicaEditingContext *context;
 @property (nonatomic, strong) NSSplitView *split;
 @property (nonatomic, strong) PicaCanvasView *canvas;
 @property (nonatomic, strong) NSScrollView *canvasScroll;
@@ -69,10 +71,10 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 // edited (field editors keep their own typing undo via allowsUndo).
 - (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window {
   (void)window;
-  return [[PicaController sharedController] undoManager];
+  return _context.document.undoManager;
 }
 
-- (instancetype)init {
+- (instancetype)initWithContext:(PicaEditingContext *)context {
   NSWindow *win = [[NSWindow alloc]
       initWithContentRect:NSMakeRect(60, 40, 1280, 780)
                 styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask |
@@ -82,19 +84,40 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [win setTitle:@"Pica Designer"];
   self = [super initWithWindow:win];
   if (self) {
+    _context = context;
     [win setDelegate:(id)self];
     [self buildUI];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(reloadUI:)
-                                                 name:PicaReportDidChangeNotification
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(reloadUI:)
-                                                 name:PicaSelectionDidChangeNotification
-                                               object:nil];
-    [self reloadUI:nil];
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:self
+           selector:@selector(documentDidChange:)
+               name:RDLDocumentDidChangeNotification
+             object:context.document];
+    [nc addObserver:self
+           selector:@selector(selectionDidChange:)
+               name:RDLSelectionDidChangeNotification
+             object:context.selection];
+    [self reloadUI];
   }
   return self;
+}
+
+// The outline mirrors the report tree, so it only needs rebuilding when the
+// tree or the report itself changes -- not when an item property is tweaked,
+// unless that property is the name or type the row displays.
+- (void)documentDidChange:(NSNotification *)note {
+  RDLChange *change = [note userInfo][RDLChangeKey];
+  BOOL affectsTree = change.scope == RDLChangeScopeStructure ||
+                     change.scope == RDLChangeScopeReport ||
+                     [change affectsKeyPath:@"name"] || [change affectsKeyPath:@"type"];
+  if (affectsTree)
+    [self reloadUI];
+  else
+    [self updateWindowTitle];
+}
+
+- (void)selectionDidChange:(NSNotification *)note {
+  PICA_UNUSED(note);
+  [self syncOutlineSelection];
 }
 
 - (void)dealloc {
@@ -161,7 +184,8 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [left addSubview:remove];
 
   // Center pane: page canvas.
-  _canvas = [[PicaCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 800, 1100)];
+  _canvas = [[PicaCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 800, 1100)
+                                          context:_context];
   _canvasScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 600, 400)];
   [_canvasScroll setHasVerticalScroller:YES];
   [_canvasScroll setHasHorizontalScroller:YES];
@@ -178,13 +202,15 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [_inspectorScroll setHasVerticalScroller:YES];
   [_inspectorScroll setBorderType:NSBezelBorder];
   [_inspectorScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  _inspector = [[PicaInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)];
+  _inspector = [[PicaInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
+                                               context:_context];
   [_inspectorScroll setDocumentView:_inspector];
   NSScrollView *dataScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, 280, 140)];
   [dataScroll setHasVerticalScroller:YES];
   [dataScroll setBorderType:NSBezelBorder];
   [dataScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  _dataView = [[PicaDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)];
+  _dataView = [[PicaDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
+                                         context:_context];
   [dataScroll setDocumentView:_dataView];
   [right addSubview:_inspectorScroll];
   [right addSubview:dataScroll];
@@ -204,7 +230,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
     n.kind = PicaNodeItem;
     n.title = [NSString stringWithFormat:@"%@  %@", it.type, it.name ?: @""];
     n.bandKey = key;
-    n.itemName = it.name;
+    n.item = it;
     [parent.children addObject:n];
     if ([it.items count])
       [self addNodesForItems:it.items to:n bandKey:key];
@@ -212,32 +238,30 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 }
 
 - (void)rebuildTree {
-  PicaController *c = [PicaController sharedController];
+  RDLReport *report = _context.report;
   PicaOutlineNode *root = [[PicaOutlineNode alloc] init];
   root.kind = PicaNodeReport;
-  root.title = c.report.name ?: @"Report";
-  NSArray *keys = [RDLReport bandKeys];
-  NSArray *titles = @[ @"Page Header", @"Body", @"Page Footer" ];
-  for (NSUInteger i = 0; i < 3; i++) {
+  root.title = report.name ?: @"Report";
+  for (NSString *key in [RDLReport bandKeys]) {
     PicaOutlineNode *bn = [[PicaOutlineNode alloc] init];
     bn.kind = PicaNodeBand;
-    bn.title = titles[i];
-    bn.bandKey = keys[i];
+    bn.title = [RDLItemFactory titleForBandKey:key];
+    bn.bandKey = key;
     [root.children addObject:bn];
-    [self addNodesForItems:[c.report bandWithKey:keys[i]].items to:bn bandKey:keys[i]];
+    [self addNodesForItems:[report bandWithKey:key].items to:bn bandKey:key];
   }
   self.rootNode = root;
 }
 
 - (PicaOutlineNode *)findSelectedNodeIn:(PicaOutlineNode *)node {
-  PicaController *c = [PicaController sharedController];
-  if (c.selectionScope == PicaSelectionReport && node.kind == PicaNodeReport)
+  RDLSelection *sel = _context.selection;
+  if (sel.scope == RDLSelectionScopeReport && node.kind == PicaNodeReport)
     return node;
-  if (c.selectionScope == PicaSelectionBand && node.kind == PicaNodeBand &&
-      [node.bandKey isEqualToString:c.selectedBandKey])
+  if (sel.scope == RDLSelectionScopeBand && node.kind == PicaNodeBand &&
+      [node.bandKey isEqualToString:sel.bandKey])
     return node;
-  if (c.selectionScope == PicaSelectionItem && node.kind == PicaNodeItem &&
-      [node.itemName isEqualToString:c.selectedName])
+  if (sel.scope == RDLSelectionScopeItem && node.kind == PicaNodeItem &&
+      node.item == sel.item)
     return node;
   for (PicaOutlineNode *child in node.children) {
     PicaOutlineNode *f = [self findSelectedNodeIn:child];
@@ -253,32 +277,46 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
     [self expandAllFrom:child];
 }
 
-- (void)reloadUI:(NSNotification *)n {
-  (void)n;
+- (void)reloadUI {
+  // The guard is against feedback, not storms: -selectRowIndexes: below makes
+  // the outline call back into -outlineViewSelectionDidChange:, which would
+  // otherwise re-post a selection change.
   if (_reloading)
     return;
   _reloading = YES;
   [self rebuildTree];
   [_outline reloadData];
   [self expandAllFrom:self.rootNode];
-  PicaOutlineNode *sel = [self findSelectedNodeIn:self.rootNode];
-  if (sel) {
-    NSInteger row = [_outline rowForItem:sel];
-    if (row >= 0)
-      [_outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
-            byExtendingSelection:NO];
-  } else {
+  [self selectOutlineRowForSelection];
+  _reloading = NO;
+  [self updateWindowTitle];
+}
+
+- (void)syncOutlineSelection {
+  if (_reloading)
+    return;
+  _reloading = YES;
+  [self selectOutlineRowForSelection];
+  _reloading = NO;
+}
+
+- (void)selectOutlineRowForSelection {
+  PicaOutlineNode *node = [self findSelectedNodeIn:self.rootNode];
+  if (node == nil) {
     [_outline deselectAll:nil];
+    return;
   }
-  [_inspector reload];
-  [_dataView reload];
-  [_canvas setNeedsDisplay:YES];
-  PicaController *c = [PicaController sharedController];
-  NSString *title = c.report.name ?: @"Pica";
-  if (c.dirty)
+  NSInteger row = [_outline rowForItem:node];
+  if (row >= 0)
+    [_outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+          byExtendingSelection:NO];
+}
+
+- (void)updateWindowTitle {
+  NSString *title = _context.report.name ?: @"Pica";
+  if (_context.document.isDirty)
     title = [title stringByAppendingString:@" — edited"];
   [[self window] setTitle:title];
-  _reloading = NO;
 }
 
 #pragma mark - NSOutlineViewDataSource
@@ -333,21 +371,20 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   if (row < 0)
     return;
   PicaOutlineNode *node = [_outline itemAtRow:row];
-  PicaController *c = [PicaController sharedController];
+  RDLSelection *sel = _context.selection;
   if (node.kind == PicaNodeReport)
-    [c selectReport];
+    [sel selectReport];
   else if (node.kind == PicaNodeBand)
-    [c selectBandWithKey:node.bandKey];
+    [sel selectBandWithKey:node.bandKey];
   else
-    [c selectItemNamed:node.itemName bandKey:node.bandKey];
+    [sel selectItem:node.item inBandWithKey:node.bandKey];
 }
 
 #pragma mark - Add / remove elements
 
 - (void)addElement:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  NSArray *kinds = [c allowedElementKinds];
+  NSArray *kinds = [_context allowedElementKinds];
   NSPanel *panel = [[NSPanel alloc]
       initWithContentRect:NSMakeRect(0, 0, 260, 92 + 30 * (CGFloat)[kinds count])
                 styleMask:NSTitledWindowMask
@@ -363,7 +400,8 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [info setDrawsBackground:NO];
   [info setEditable:NO];
   [info setSelectable:NO];
-  [info setStringValue:[NSString stringWithFormat:@"Insert %@", [c insertionDescription]]];
+  [info setStringValue:[NSString stringWithFormat:@"Insert %@",
+                                                 [_context insertionDescription]]];
   [info setFont:[NSFont userFontOfSize:10]];
   [cv addSubview:info];
 
@@ -393,7 +431,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   NSInteger code = [NSApp runModalForWindow:panel];
   [panel orderOut:nil];
   if (code >= 1 && code <= (NSInteger)[kinds count])
-    [c addItemOfKind:kinds[(NSUInteger)(code - 1)]];
+    [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
 }
 
 - (void)paletteChoose:(NSButton *)sender {
@@ -402,14 +440,13 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 
 - (void)removeElement:(id)sender {
   (void)sender;
-  [[PicaController sharedController] removeSelected];
+  [_context deleteSelectedItem];
 }
 
 #pragma mark - Preview / export
 
 - (void)showPreview:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
   if (_previewWindow == nil) {
     _previewWindow = [[NSWindow alloc]
         initWithContentRect:NSMakeRect(140, 40, 720, 860)
@@ -424,8 +461,8 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
     [sv setDocumentView:_previewView];
     [[_previewWindow contentView] addSubview:sv];
   }
-  _previewView.report = c.report;
-  _previewView.paramValues = c.paramValues;
+  _previewView.report = _context.report;
+  _previewView.paramValues = _context.document.paramValues;
   [_previewView reloadLayout];
   [_previewWindow makeKeyAndOrderFront:nil];
 }
@@ -436,12 +473,13 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 
 - (void)exportPDF:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"pdf" ]];
-  [p setNameFieldStringValue:[(c.report.name ?: @"report") stringByAppendingPathExtension:@"pdf"]];
+  [p setNameFieldStringValue:
+          [(_context.report.name ?: @"report") stringByAppendingPathExtension:@"pdf"]];
   if ([p runModal] == NSOKButton) {
-    NSData *pdf = [RDLGenerator PDFForReport:c.report parameters:c.paramValues];
+    NSData *pdf = [RDLGenerator PDFForReport:_context.report
+                                  parameters:_context.document.paramValues];
     [pdf writeToURL:[p URL] atomically:YES];
   }
 }

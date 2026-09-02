@@ -14,6 +14,7 @@
 
 @class RDLDocument;
 @class RDLItem;
+@class NSAttributedString;
 
 @interface RDLEditor : NSObject
 - (instancetype)initWithDocument:(RDLDocument *)document;
@@ -59,10 +60,21 @@
 // simply the previous spec, and the ordering hazard of the old implicit
 // rebuild-on-set does not arise.
 - (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLItem *)tablix;
+// Apply several tablix properties and rebuild ONCE, as a single inverse.
+// Necessary rather than convenient: the rebuild reads columnSpecs, groupBy,
+// groupBy2, pivotBy, showGrandTotal and the heights together, so setting them
+// through separate undoable steps would undo them one at a time and rebuild
+// against a half-restored state. Values may be NSNull to mean nil.
+- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLItem *)tablix;
 - (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLItem *)tablix;
 - (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLItem *)tablix;
 - (void)toggleGrandTotalOfTablix:(RDLItem *)tablix;
+
+// --- Rich text ------------------------------------------------------------
+// Sets `value` and `paragraphs` together from an attributed string, as one
+// undo step. Plain text clears `paragraphs` rather than leaving stale runs.
+- (void)setAttributedString:(NSAttributedString *)text ofItem:(RDLItem *)item;
 
 // --- Item transfer (clipboard, duplicate) ---------------------------------
 // An item round-trips as RDL XML by hosting it in an otherwise empty report, so

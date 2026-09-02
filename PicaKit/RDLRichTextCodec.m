@@ -71,7 +71,25 @@ static NSString *RDLAlignName(NSDictionary *attrs) {
   return @"Left";
 }
 
+@interface RDLRichTextResult ()
+@property (nonatomic, copy) NSString *text;
+@property (nonatomic, strong) NSMutableArray *paragraphs;
+@end
+@implementation RDLRichTextResult
+@end
+
 @implementation RDLRichTextCodec
+
++ (RDLRichTextResult *)resultForAttributedString:(NSAttributedString *)text
+                                            item:(RDLItem *)item {
+  NSMutableArray *paragraphs = nil;
+  NSString *flat = nil;
+  BOOL rich = [self convert:text forItem:item paragraphs:&paragraphs flattened:&flat];
+  RDLRichTextResult *r = [[RDLRichTextResult alloc] init];
+  r.text = flat;
+  r.paragraphs = rich ? paragraphs : nil;
+  return r;
+}
 
 + (NSAttributedString *)attributedStringForItem:(RDLItem *)item {
   if ([item.paragraphs count] == 0)
@@ -89,11 +107,9 @@ static NSString *RDLAlignName(NSDictionary *attrs) {
 }
 
 + (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLItem *)item {
-  NSMutableArray *paragraphs = nil;
-  NSString *flat = nil;
-  BOOL rich = [self convert:text forItem:item paragraphs:&paragraphs flattened:&flat];
-  item.value = flat;
-  item.paragraphs = rich ? paragraphs : nil;
+  RDLRichTextResult *r = [self resultForAttributedString:text item:item];
+  item.value = r.text;
+  item.paragraphs = r.paragraphs;
 }
 
 // Walks `text` paragraph by paragraph, run by run. Returns YES when the result

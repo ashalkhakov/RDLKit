@@ -1,4 +1,5 @@
 #import "PicaTablixEditor.h"
+#import "PicaEditingContext.h"
 
 static NSArray *PicaAggregateNames(void) {
   return @[ @"", @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ];
@@ -289,13 +290,13 @@ static NSArray *PicaAlignNames(void) {
 
 #pragma mark - Entry point
 
-+ (BOOL)runForTablix:(RDLItem *)tablix report:(RDLReport *)report {
++ (BOOL)runForTablix:(RDLItem *)tablix context:(PicaEditingContext *)context {
   if (tablix == nil || ![tablix.type isEqualToString:@"Tablix"])
     return NO;
   PicaTablixEditor *ed = [[PicaTablixEditor alloc] init];
-  ed.report = report;
+  ed.report = context.report;
   NSMutableArray *cols = [NSMutableArray array];
-  for (NSDictionary *c in tablix.columns)
+  for (NSDictionary *c in tablix.columnSpecs)
     [cols addObject:[c mutableCopy]];
   if ([cols count] == 0)
     [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
@@ -306,18 +307,26 @@ static NSArray *PicaAlignNames(void) {
   [ed.panel orderOut:nil];
   if (code != 1)
     return NO;
-  tablix.dataSetName = [ed.datasetPop titleOfSelectedItem] ?: tablix.dataSetName;
+
+  // One registration for the whole dialog. It has to be one: -rebuildTablix
+  // reads the groups, the heights AND the column spec together, so applying
+  // them as separate undoable steps would undo them one at a time and rebuild
+  // the body against a half-restored state.
   NSString *group = [ed.groupPop indexOfSelectedItem] > 0 ? [ed.groupPop titleOfSelectedItem] : @"";
-  tablix.groupBy = group;
   NSString *group2 = [ed.group2Pop indexOfSelectedItem] > 0 ? [ed.group2Pop titleOfSelectedItem] : @"";
-  tablix.groupBy2 = [group length] ? group2 : @"";
   NSString *pivot = [ed.pivotPop indexOfSelectedItem] > 0 ? [ed.pivotPop titleOfSelectedItem] : @"";
-  tablix.pivotBy = pivot;
-  tablix.showGrandTotal = [ed.grandTotalCheck state] == NSOnState;
-  // Note: heights must be set before columns; setColumns rebuilds the Tablix.
-  tablix.headerHeight = [[ed.headerHField stringValue] doubleValue];
-  tablix.rowHeight = [[ed.rowHField stringValue] doubleValue];
-  tablix.columns = ed.cols; // triggers the full Tablix rebuild
+  [context.editor setTablixValues:@{
+    @"dataSetName" : [ed.datasetPop titleOfSelectedItem] ?: (tablix.dataSetName ?: @""),
+    @"groupBy" : group,
+    // A child group without an outer group is meaningless.
+    @"groupBy2" : [group length] ? group2 : @"",
+    @"pivotBy" : pivot,
+    @"showGrandTotal" : @([ed.grandTotalCheck state] == NSOnState),
+    @"headerHeight" : @([[ed.headerHField stringValue] doubleValue]),
+    @"rowHeight" : @([[ed.rowHField stringValue] doubleValue]),
+    @"columnSpecs" : ed.cols ?: @[]
+  }
+                         ofTablix:tablix];
   return YES;
 }
 

@@ -1,5 +1,5 @@
 #import "PicaCanvasView.h"
-#import "PicaController.h"
+#import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 #import "PicaExpressionHelper.h"
 #import "PicaTablixEditor.h"
@@ -12,83 +12,15 @@ static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
                     it.width * kDPI * zoom, MAX(1, it.height * kDPI * zoom));
 }
 
-// WYSIWYG text attributes for a style: family, size, bold/italic traits,
-// color, underline/strikethrough and paragraph alignment.
-static NSFont *PicaFontForStyle(RDLStyle *style, CGFloat zoom) {
-  CGFloat pt = [style.fontSize floatValue];
-  if (pt <= 0)
-    pt = 10;
-  NSFont *font = style.fontFamily ? [NSFont fontWithName:style.fontFamily size:pt * zoom] : nil;
-  if (font == nil)
-    font = [NSFont userFontOfSize:pt * zoom];
-  NSFontManager *fm = [NSFontManager sharedFontManager];
-  NSString *w = [style.fontWeight lowercaseString];
-  if ([w isEqualToString:@"bold"] || [w isEqualToString:@"semibold"] ||
-      [w isEqualToString:@"heavy"] || [w isEqualToString:@"extrabold"])
-    font = [fm convertFont:font toHaveTrait:NSBoldFontMask];
-  if ([[style.fontStyle lowercaseString] isEqualToString:@"italic"])
-    font = [fm convertFont:font toHaveTrait:NSItalicFontMask];
-  return font;
-}
-
-static NSDictionary *PicaTextAttributes(RDLStyle *style, CGFloat zoom) {
-  NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
-  attrs[NSFontAttributeName] = PicaFontForStyle(style, zoom);
-  attrs[NSForegroundColorAttributeName] = PicaColorFromHex(style.color);
-  NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
-  if ([style.textAlign isEqualToString:@"Center"])
-    ps.alignment = NSCenterTextAlignment;
-  else if ([style.textAlign isEqualToString:@"Right"])
-    ps.alignment = NSRightTextAlignment;
-  else
-    ps.alignment = NSLeftTextAlignment;
-  ps.lineBreakMode = NSLineBreakByWordWrapping;
-  attrs[NSParagraphStyleAttributeName] = ps;
-  NSString *deco = style.textDecoration;
-  if ([deco isEqualToString:@"Underline"])
-    attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);
-  else if ([deco isEqualToString:@"LineThrough"])
-    attrs[NSStrikethroughStyleAttributeName] = @(NSUnderlineStyleSingle);
-  return attrs;
-}
-
-// Rich text preview: paragraphs of styled runs merged over the item style.
-static NSAttributedString *PicaParagraphsAttributed(RDLItem *it, CGFloat zoom) {
-  NSMutableAttributedString *out = [[NSMutableAttributedString alloc] init];
-  NSString *prevAlign = nil;
-  BOOL first = YES;
-  for (RDLParagraph *para in it.paragraphs) {
-    NSString *align = para.style.textAlign;
-    if (!first) {
-      RDLStyle *sepStyle = [RDLStyle styleByMerging:nil over:it.style];
-      if ([prevAlign length])
-        sepStyle.textAlign = prevAlign;
-      [out appendAttributedString:[[NSAttributedString alloc]
-                                      initWithString:@"\n"
-                                          attributes:PicaTextAttributes(sepStyle, zoom)]];
-    }
-    first = NO;
-    prevAlign = align;
-    for (RDLTextRun *run in para.runs) {
-      RDLStyle *merged = [RDLStyle styleByMerging:run.style over:it.style];
-      if ([align length])
-        merged.textAlign = align;
-      [out appendAttributedString:[[NSAttributedString alloc]
-                                      initWithString:run.value ?: @""
-                                          attributes:PicaTextAttributes(merged, zoom)]];
-    }
-  }
-  return out;
-}
-
-// Text spans render as attributed strings: paragraphs split on newlines keep
-// the item style so the canvas previews what the report will look like.
+// Style -> AppKit attribute translation lives in PicaKit's RDLTextAttributes,
+// shared with RDLView's preview and the rich-text codec. The canvas is the one
+// caller that passes a scale other than 1: its zoom.
 static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, CGFloat zoom) {
-  return [[NSAttributedString alloc] initWithString:text ?: @""
-                                         attributes:PicaTextAttributes(style, zoom)];
+  return [RDLTextAttributes attributedStringForText:text style:style scale:zoom];
 }
 
 @interface PicaCanvasView () <NSTextFieldDelegate>
+@property (nonatomic, strong) PicaEditingContext *context;
 @end
 
 @implementation PicaCanvasView {
@@ -123,13 +55,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 // --- Tablix preview & cell geometry ----------------------------------------
 
 - (CGFloat)tablixHeaderHeight:(RDLItem *)it {
-  PicaController *c = [PicaController sharedController];
-  return MAX(12, it.headerHeight * kDPI * c.zoom);
+  return MAX(12, it.headerHeight * kDPI * _context.zoom);
 }
 
 - (CGFloat)tablixRowHeight:(RDLItem *)it {
-  PicaController *c = [PicaController sharedController];
-  return MAX(12, it.rowHeight * kDPI * c.zoom);
+  return MAX(12, it.rowHeight * kDPI * _context.zoom);
 }
 
 // Rect of a preview cell. `part` is "header" or "value".
@@ -137,12 +67,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                 itemRect:(NSRect)r
                      col:(NSUInteger)ci
                     part:(NSString *)part {
-  PicaController *c = [PicaController sharedController];
-  NSArray *cols = it.columns ?: @[];
+  NSArray *cols = it.columnSpecs ?: @[];
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i < ci && i < [cols count]; i++)
-    x += [cols[i][@"width"] doubleValue] * kDPI * c.zoom;
-  CGFloat w = ci < [cols count] ? [cols[ci][@"width"] doubleValue] * kDPI * c.zoom : 60;
+    x += [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
+  CGFloat w = ci < [cols count] ? [cols[ci][@"width"] doubleValue] * kDPI * _context.zoom : 60;
   CGFloat hh = [self tablixHeaderHeight:it];
   BOOL header = [part isEqualToString:@"header"];
   CGFloat y = header ? NSMinY(r) : NSMinY(r) + hh;
@@ -156,8 +85,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
          point:(NSPoint)p
            col:(NSUInteger *)outCol
           part:(NSString **)outPart {
-  PicaController *c = [PicaController sharedController];
-  NSArray *cols = it.columns ?: @[];
+  NSArray *cols = it.columnSpecs ?: @[];
   if ([cols count] == 0 || !NSPointInRect(p, r))
     return NO;
   CGFloat hh = [self tablixHeaderHeight:it];
@@ -171,7 +99,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return NO;
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i < [cols count]; i++) {
-    CGFloat w = [cols[i][@"width"] doubleValue] * kDPI * c.zoom;
+    CGFloat w = [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
     if (p.x >= x && p.x < x + w) {
       if (outCol)
         *outCol = i;
@@ -191,8 +119,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                   itemRect:(NSRect)r
                      point:(NSPoint)p
                        col:(NSUInteger *)outCol {
-  PicaController *c = [PicaController sharedController];
-  NSArray *cols = it.columns ?: @[];
+  NSArray *cols = it.columnSpecs ?: @[];
   if ([cols count] < 2)
     return NO;
   CGFloat gridBottom = NSMinY(r) + [self tablixHeaderHeight:it] + [self tablixRowHeight:it];
@@ -200,7 +127,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return NO;
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i + 1 < [cols count]; i++) {
-    x += [cols[i][@"width"] doubleValue] * kDPI * c.zoom;
+    x += [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
     if (fabs(p.x - x) <= 3) {
       if (outCol)
         *outCol = i;
@@ -211,9 +138,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)drawTablix:(RDLItem *)it inRect:(NSRect)r {
-  PicaController *c = [PicaController sharedController];
-  CGFloat z = c.zoom;
-  NSArray *cols = it.columns ?: @[];
+  CGFloat z = _context.zoom;
+  NSArray *cols = it.columnSpecs ?: @[];
   CGFloat hh = [self tablixHeaderHeight:it];
   CGFloat rh = [self tablixRowHeight:it];
 
@@ -276,23 +202,51 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSFrameRect(r);
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
-  self = [super initWithFrame:frameRect];
+- (instancetype)initWithFrame:(NSRect)frame context:(PicaEditingContext *)context {
+  self = [super initWithFrame:frame];
   if (self) {
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(refresh:)
-                                                 name:PicaReportDidChangeNotification
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(refresh:)
-                                                 name:PicaSelectionDidChangeNotification
-                                               object:nil];
+    _context = context;
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:self
+           selector:@selector(documentDidChange:)
+               name:RDLDocumentDidChangeNotification
+             object:context.document];
+    [nc addObserver:self
+           selector:@selector(selectionDidChange:)
+               name:RDLSelectionDidChangeNotification
+             object:context.selection];
+    // Zoom and grid have their own channel: they are not document edits.
+    [nc addObserver:self
+           selector:@selector(viewStateDidChange:)
+               name:PicaViewStateDidChangeNotification
+             object:context];
   }
   return self;
 }
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+// A property edit only needs a redraw; anything that can move things about
+// needs the frame re-measured against the page first.
+- (void)documentDidChange:(NSNotification *)note {
+  RDLChange *change = [note userInfo][RDLChangeKey];
+  if ([change affectsLayout])
+    [self sizeToPage];
+  [self setNeedsDisplay:YES];
+}
+
+- (void)selectionDidChange:(NSNotification *)note {
+  PICA_UNUSED(note);
+  // A selection change never moves anything, so no re-measure.
+  [self setNeedsDisplay:YES];
+}
+
+- (void)viewStateDidChange:(NSNotification *)note {
+  PICA_UNUSED(note);
+  [self sizeToPage];
+  [self setNeedsDisplay:YES];
 }
 
 - (BOOL)isFlipped {
@@ -307,32 +261,23 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   return YES;
 }
 
-- (void)refresh:(NSNotification *)n {
-  (void)n;
-  [self sizeToPage];
-  [self setNeedsDisplay:YES];
-}
-
 - (void)sizeToPage {
-  PicaController *c = [PicaController sharedController];
-  RDLPage *p = c.report.page;
-  CGFloat z = c.zoom;
+  RDLPage *p = _context.report.page;
+  CGFloat z = _context.zoom;
   CGFloat pad = 48;
   [self setFrameSize:NSMakeSize(p.pageWidth * kDPI * z + pad * 2, p.pageHeight * kDPI * z + pad * 2)];
 }
 
 - (NSRect)paperRect {
-  PicaController *c = [PicaController sharedController];
-  RDLPage *p = c.report.page;
-  CGFloat z = c.zoom;
+  RDLPage *p = _context.report.page;
+  CGFloat z = _context.zoom;
   return NSMakeRect(48, 36, p.pageWidth * kDPI * z, p.pageHeight * kDPI * z);
 }
 
 - (void)drawRect:(NSRect)dirty {
   (void)dirty;
-  PicaController *c = [PicaController sharedController];
-  RDLReport *r = c.report;
-  CGFloat z = c.zoom;
+  RDLReport *r = _context.report;
+  CGFloat z = _context.zoom;
   [[NSColor colorWithCalibratedWhite:0.11 alpha:1] set];
   NSRectFill(self.bounds);
   NSRect paper = [self paperRect];
@@ -368,7 +313,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     RDLBand *band = pair[1];
     CGFloat bh = band.height * kDPI * z;
     NSRect br = NSMakeRect(x, y, cw, bh);
-    if (c.showsGrid) {
+    if (_context.showsGrid) {
       [[NSColor colorWithCalibratedWhite:0.1 alpha:0.08] set];
       CGFloat step = 0.25 * kDPI * z;
       for (CGFloat gx = NSMinX(br); gx < NSMaxX(br); gx += step)
@@ -395,9 +340,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)drawItem:(RDLItem *)it originX:(CGFloat)ox originY:(CGFloat)oy {
-  PicaController *c = [PicaController sharedController];
-  BOOL sel = c.selectionScope == PicaSelectionItem && [it.name isEqualToString:c.selectedName];
-  NSRect r = PicaItemRect(it, ox, oy, c.zoom);
+  BOOL sel = it == [_context selectedItem];
+  NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
   if ([it.type isEqualToString:@"Line"]) {
     [PicaColorFromHex(it.style.color) set];
     NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
@@ -418,7 +362,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [axis lineToPoint:NSMakePoint(NSMaxX(r) - 6, NSMaxY(r) - 6)];
     [axis stroke];
     RDLDataSet *ds = nil;
-    for (RDLDataSet *d in c.report.dataSets)
+    for (RDLDataSet *d in _context.report.dataSets)
       if ([d.name isEqualToString:it.dataSetName])
         ds = d;
     NSUInteger n = [ds.rows count];
@@ -448,7 +392,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     NSString *title = it.title.length ? it.title : @"Chart";
     [title drawAtPoint:NSMakePoint(NSMinX(r) + 10, NSMinY(r) + 4)
         withAttributes:@{
-          NSFontAttributeName : [NSFont userFontOfSize:MAX(8, 9 * c.zoom)],
+          NSFontAttributeName : [NSFont userFontOfSize:MAX(8, 9 * _context.zoom)],
           NSForegroundColorAttributeName : PicaColorFromHex(@"#1a1916")
         }];
   } else {
@@ -464,16 +408,19 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       [PicaColorFromHex(b.color) set];
       NSFrameRect(r);
     }
-    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * kDPI * c.zoom;
-    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * kDPI * c.zoom;
-    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * kDPI * c.zoom;
+    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * kDPI * _context.zoom;
+    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * kDPI * _context.zoom;
+    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * kDPI * _context.zoom;
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
     if (!(_editorField && _editItem == it && _editContext == nil)) {
       if ([it.paragraphs count])
-        [PicaParagraphsAttributed(it, c.zoom) drawInRect:textRect];
+        [[RDLTextAttributes attributedStringForParagraphs:it.paragraphs
+                                               baseStyle:it.style
+                                                   scale:_context.zoom]
+            drawInRect:textRect];
       else
-        [PicaAttributedText(it.value ?: it.type, it.style, c.zoom) drawInRect:textRect];
+        [PicaAttributedText(it.value ?: it.type, it.style, _context.zoom) drawInRect:textRect];
     }
   }
   if (sel) {
@@ -493,8 +440,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
         originY:(CGFloat)oy
           point:(NSPoint)p
            kind:(NSString **)kind {
-  PicaController *c = [PicaController sharedController];
-  NSRect r = PicaItemRect(it, ox, oy, c.zoom);
+  NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
   NSRect se = NSMakeRect(NSMaxX(r) - 4, NSMaxY(r) - 4, 8, 8);
   NSRect e = NSMakeRect(NSMaxX(r) - 4, NSMidY(r) - 4, 8, 8);
   NSRect s = NSMakeRect(NSMidX(r) - 4, NSMaxY(r) - 4, 8, 8);
@@ -527,10 +473,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                   point:(NSPoint)p
                    kind:(NSString **)kind
                    rect:(NSRect *)outRect {
-  PicaController *c = [PicaController sharedController];
   for (RDLItem *it in [items reverseObjectEnumerator]) {
     if ([it.items count]) {
-      NSRect r = PicaItemRect(it, ox, oy, c.zoom);
+      NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
       RDLItem *child = [self hitInItems:it.items
                                 originX:NSMinX(r)
                                 originY:NSMinY(r)
@@ -542,7 +487,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     }
     if ([self hitItem:it originX:ox originY:oy point:p kind:kind]) {
       if (outRect)
-        *outRect = PicaItemRect(it, ox, oy, c.zoom);
+        *outRect = PicaItemRect(it, ox, oy, _context.zoom);
       return it;
     }
   }
@@ -555,9 +500,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                originX:(CGFloat)ox
                originY:(CGFloat)oy
                   rect:(NSRect *)outRect {
-  PicaController *c = [PicaController sharedController];
   for (RDLItem *it in items) {
-    NSRect r = PicaItemRect(it, ox, oy, c.zoom);
+    NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
     if (it == target) {
       if (outRect)
         *outRect = r;
@@ -571,9 +515,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (BOOL)findRectOfItem:(RDLItem *)target rect:(NSRect *)outRect {
-  PicaController *c = [PicaController sharedController];
-  RDLReport *r = c.report;
-  CGFloat z = c.zoom;
+  RDLReport *r = _context.report;
+  CGFloat z = _context.zoom;
   NSRect paper = [self paperRect];
   CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
   CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
@@ -586,14 +529,13 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)mouseDown:(NSEvent *)event {
-  PicaController *c = [PicaController sharedController];
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
   [self commitEditor];
   // Take keyboard focus so Return-to-edit and Delete work after a click
   // (Cocoa does not focus a view on click by itself).
   [[self window] makeFirstResponder:self];
-  RDLReport *r = c.report;
-  CGFloat z = c.zoom;
+  RDLReport *r = _context.report;
+  CGFloat z = _context.zoom;
   NSRect paper = [self paperRect];
   CGFloat ml = r.page.leftMargin * kDPI * z;
   CGFloat mt = r.page.topMargin * kDPI * z;
@@ -609,7 +551,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     NSRect itemRect = NSZeroRect;
     RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
     if (hit) {
-      [c selectItemNamed:hit.name bandKey:key];
+      [_context.selection selectItem:hit inBandWithKey:key];
       if ([event clickCount] >= 2) {
         // The edit starts from mouseUp: (the reliable Cocoa pattern);
         // remember what was hit so the second click's release begins it.
@@ -627,7 +569,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
         _dragActive = NO;
         _dragStart = p;
         _dragColIndex = borderCol;
-        _origColW = [hit.columns[borderCol][@"width"] doubleValue];
+        _origColW = [hit.columnSpecs[borderCol][@"width"] doubleValue];
         return;
       }
       _dragKind = kind;
@@ -640,14 +582,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       return;
     }
     if (NSPointInRect(p, br)) {
-      [c selectBandWithKey:key];
+      [_context.selection selectBandWithKey:key];
       _dragKind = nil;
       _pendingEditItem = nil;
       return;
     }
     y += bh;
   }
-  [c selectReport];
+  [_context.selection selectReport];
   _dragKind = nil;
   _pendingEditItem = nil;
 }
@@ -655,7 +597,6 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 - (void)mouseDragged:(NSEvent *)event {
   if (_dragKind == nil)
     return;
-  PicaController *c = [PicaController sharedController];
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
   if (!_dragActive) {
     // Slop threshold: the jiggle between the clicks of a double-click (or a
@@ -665,26 +606,26 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       return;
     _dragActive = YES;
     _pendingEditItem = nil;
-    [c beginUndoCoalescing]; // the whole drag is one undo step
+    [_context.editor beginGroup:@"Move"]; // the whole drag is one undo step
   }
-  CGFloat z = c.zoom;
+  CGFloat z = _context.zoom;
   CGFloat dx = (p.x - _dragStart.x) / (kDPI * z);
   CGFloat dy = (p.y - _dragStart.y) / (kDPI * z);
   if ([_dragKind isEqualToString:@"move"])
-    [c moveSelectedToLeft:_origLeft + dx top:_origTop + dy];
+    [_context.editor moveItem:[_context selectedItem] toLeft:_origLeft + dx top:_origTop + dy];
   else if ([_dragKind isEqualToString:@"se"])
-    [c resizeSelectedToWidth:_origW + dx height:_origH + dy];
+    [_context.editor resizeItem:[_context selectedItem] toWidth:_origW + dx height:_origH + dy];
   else if ([_dragKind isEqualToString:@"e"])
-    [c resizeSelectedToWidth:_origW + dx height:_origH];
+    [_context.editor resizeItem:[_context selectedItem] toWidth:_origW + dx height:_origH];
   else if ([_dragKind isEqualToString:@"s"])
-    [c resizeSelectedToWidth:_origW height:_origH + dy];
+    [_context.editor resizeItem:[_context selectedItem] toWidth:_origW height:_origH + dy];
   else if ([_dragKind isEqualToString:@"tabcol"])
-    [c tablixSetColumn:_dragColIndex width:_origColW + dx];
+    [_context.editor setTablixColumn:_dragColIndex width:_origColW + dx ofTablix:[_context selectedItem]];
 }
 
 - (void)mouseUp:(NSEvent *)event {
   if (_dragActive)
-    [[PicaController sharedController] endUndoCoalescing];
+    [_context.editor endGroup];
   _dragKind = nil;
   _dragActive = NO;
   if (_pendingEditItem && [event clickCount] >= 2) {
@@ -703,8 +644,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   }
   if ([ch isEqualToString:@"\r"] || [ch isEqualToString:@"\n"]) {
     // Return starts in-place editing of the selected item, Word-style.
-    PicaController *c = [PicaController sharedController];
-    RDLItem *it = [c selectedItem];
+      RDLItem *it = [_context selectedItem];
     NSRect r;
     if (it && [self findRectOfItem:it rect:&r]) {
       [self beginEditingHit:it rect:r point:NSMakePoint(NSMinX(r) + 1, NSMinY(r) + 1)];
@@ -712,7 +652,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     }
   }
   if ([ch isEqualToString:[NSString stringWithFormat:@"%C", 0x007f]] || [ch isEqualToString:@"\b"]) {
-    [[PicaController sharedController] removeSelected];
+    [_context deleteSelectedItem];
     return;
   }
   [super keyDown:event];
@@ -721,8 +661,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 // Arrow keys move the selected item one grid step; Shift+arrow resizes.
 // A burst of presses coalesces into a single undo step.
 - (BOOL)nudgeWithKey:(unichar)key shift:(BOOL)shift {
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
+  RDLItem *it = [_context selectedItem];
   if (it == nil)
     return NO;
   CGFloat step = 0.05;
@@ -732,23 +671,23 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
                                            : (key == NSDownArrowFunctionKey ? step : 0);
   if (!_nudging) {
     _nudging = YES;
-    [c beginUndoCoalescing];
+    [_context.editor beginGroup:shift ? @"Resize" : @"Move"];
   }
   [NSObject cancelPreviousPerformRequestsWithTarget:self
                                            selector:@selector(endNudge)
                                              object:nil];
   [self performSelector:@selector(endNudge) withObject:nil afterDelay:0.5];
   if (shift)
-    [c resizeSelectedToWidth:it.width + dx height:it.height + dy];
+    [_context.editor resizeItem:it toWidth:it.width + dx height:it.height + dy];
   else
-    [c moveSelectedToLeft:it.left + dx top:it.top + dy];
+    [_context.editor moveItem:it toLeft:it.left + dx top:it.top + dy];
   return YES;
 }
 
 - (void)endNudge {
   if (_nudging) {
     _nudging = NO;
-    [[PicaController sharedController] endUndoCoalescing];
+    [_context.editor endGroup];
   }
 }
 
@@ -756,45 +695,44 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)copy:(id)sender {
   PICA_UNUSED(sender);
-  [[PicaController sharedController] copySelected];
+  [_context copySelectedItem];
 }
 
 - (void)cut:(id)sender {
   PICA_UNUSED(sender);
-  [[PicaController sharedController] cutSelected];
+  [_context cutSelectedItem];
 }
 
 - (void)paste:(id)sender {
   PICA_UNUSED(sender);
-  [[PicaController sharedController] pasteFromPasteboard];
+  [_context pasteItem];
 }
 
 - (void)duplicate:(id)sender {
   PICA_UNUSED(sender);
-  [[PicaController sharedController] duplicateSelected];
+  [_context duplicateSelectedItem];
 }
 
 - (void)delete:(id)sender {
   PICA_UNUSED(sender);
-  [[PicaController sharedController] removeSelected];
+  [_context deleteSelectedItem];
 }
 
 // Select All on the canvas widens the selection to the current band instead
 // of beeping (item → its band, otherwise → body).
 - (void)selectAll:(id)sender {
   PICA_UNUSED(sender);
-  PicaController *c = [PicaController sharedController];
-  [c selectBandWithKey:c.selectedBandKey ?: @"body"];
+  // Select All on the canvas widens to the current band rather than beeping.
+  [_context.selection selectBandWithKey:_context.selection.bandKey];
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
   SEL a = [item action];
-  PicaController *c = [PicaController sharedController];
   if (a == @selector(copy:) || a == @selector(cut:) || a == @selector(duplicate:) ||
       a == @selector(delete:))
-    return [c selectedItem] != nil;
+    return [_context selectedItem] != nil;
   if (a == @selector(paste:))
-    return [c canPaste];
+    return [_context canPaste];
   return YES;
 }
 
@@ -802,9 +740,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (NSMenu *)menuForEvent:(NSEvent *)event {
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
-  PicaController *c = [PicaController sharedController];
-  RDLReport *r = c.report;
-  CGFloat z = c.zoom;
+  RDLReport *r = _context.report;
+  CGFloat z = _context.zoom;
   NSRect paper = [self paperRect];
   CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
   CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
@@ -815,7 +752,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     NSRect itemRect = NSZeroRect;
     RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
     if (hit) {
-      [c selectItemNamed:hit.name bandKey:keys[bi]];
+      [_context.selection selectItem:hit inBandWithKey:keys[bi]];
       if ([hit.type isEqualToString:@"Tablix"]) {
         NSUInteger col = 0;
         NSString *part = nil;
@@ -852,7 +789,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [m addItem:[self tablixMenuItem:@"Insert Column After"
                              action:@selector(ctxInsertColumnAfter:)
                                 tag:col]];
-    if ([tab.columns count] > 1)
+    if ([tab.columnSpecs count] > 1)
       [m addItem:[self tablixMenuItem:@"Delete Column"
                                action:@selector(ctxDeleteColumn:)
                                   tag:col]];
@@ -866,41 +803,37 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)ctxInsertColumnBefore:(NSMenuItem *)mi {
-  PicaController *c = [PicaController sharedController];
-  [c tablixInsertColumnAt:(NSUInteger)[mi tag] inItem:[c selectedItem]];
+  [_context.editor insertTablixColumnAtIndex:(NSUInteger)[mi tag]
+                                    ofTablix:[_context selectedItem]];
 }
 
 - (void)ctxInsertColumnAfter:(NSMenuItem *)mi {
-  PicaController *c = [PicaController sharedController];
-  [c tablixInsertColumnAt:(NSUInteger)[mi tag] + 1 inItem:[c selectedItem]];
+  [_context.editor insertTablixColumnAtIndex:(NSUInteger)[mi tag] + 1
+                                    ofTablix:[_context selectedItem]];
 }
 
 - (void)ctxDeleteColumn:(NSMenuItem *)mi {
-  PicaController *c = [PicaController sharedController];
-  [c tablixDeleteColumn:(NSUInteger)[mi tag] inItem:[c selectedItem]];
+  [_context.editor removeTablixColumnAtIndex:(NSUInteger)[mi tag]
+                                    ofTablix:[_context selectedItem]];
 }
 
 - (void)ctxToggleGrandTotal:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  PicaController *c = [PicaController sharedController];
-  [c tablixToggleGrandTotal:[c selectedItem]];
+  [_context.editor toggleGrandTotalOfTablix:[_context selectedItem]];
 }
 
 - (void)ctxEditGroup:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
-  if (it && [it.type isEqualToString:@"Tablix"] &&
-      [PicaTablixEditor runForTablix:it report:c.report])
-    [c noteChange];
+  RDLItem *it = [_context selectedItem];
+  if (it && [it.type isEqualToString:@"Tablix"])
+    [PicaTablixEditor runForTablix:it context:_context];
 }
 
 - (void)ctxEditRichText:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
-  if (it && [it.type isEqualToString:@"Textbox"] && [PicaRichTextEditor runForTextbox:it])
-    [c noteChange];
+  RDLItem *it = [_context selectedItem];
+  if (it && [it.type isEqualToString:@"Textbox"])
+    [PicaRichTextEditor runForTextbox:it context:_context];
 }
 
 // --- Hover tracking (tablix cell highlight + column-resize cursor) ----------
@@ -931,9 +864,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)mouseMoved:(NSEvent *)event {
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
-  PicaController *c = [PicaController sharedController];
-  RDLReport *r = c.report;
-  CGFloat z = c.zoom;
+  RDLReport *r = _context.report;
+  CGFloat z = _context.zoom;
   NSRect paper = [self paperRect];
   CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
   CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
@@ -1009,14 +941,13 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);
   r.size.height = MAX(NSHeight(r), 19);
-  PicaController *c = [PicaController sharedController];
   // The editor mirrors the attributed preview: same font (family, size,
   // weight, italic — all zoom-scaled), alignment and text color.
   [self beginEditingItem:hit
                  context:nil
                     rect:r
                  initial:hit.value ?: @""
-                    font:PicaFontForStyle(hit.style, c.zoom)
+                    font:[RDLTextAttributes fontForStyle:hit.style scale:_context.zoom]
                    align:[hit.style.textAlign isEqualToString:@"Center"]
                              ? NSCenterTextAlignment
                              : ([hit.style.textAlign isEqualToString:@"Right"]
@@ -1026,7 +957,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)beginEditingTablix:(RDLItem *)tab col:(NSUInteger)col part:(NSString *)part {
-  NSArray *cols = tab.columns ?: @[];
+  NSArray *cols = tab.columnSpecs ?: @[];
   if (col >= [cols count])
     return;
   NSRect itemRect;
@@ -1102,25 +1033,27 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   [self tearDownEditor];
   if (cancelled || it == nil)
     return;
+  RDLEditor *editor = _context.editor;
   if (ctx == nil) {
     if ([text isEqualToString:it.value ?: @""])
       return;
-    it.value = text;
-    it.paragraphs = nil; // plain edit replaces any rich-text runs
-  } else {
-    NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
-    NSString *key = [ctx[@"part"] isEqualToString:@"header"] ? @"header" : @"value";
-    NSMutableArray *cols = [it.columns mutableCopy];
-    if (cols == nil || ci >= [cols count])
-      return;
-    if ([text isEqualToString:cols[ci][key] ?: @""])
-      return;
-    NSMutableDictionary *col = [cols[ci] mutableCopy];
-    col[key] = text;
-    cols[ci] = col;
-    it.columns = cols;
+    [editor beginGroup:@"Edit Text"];
+    [editor setValue:text forKeyPath:@"value" ofItem:it];
+    [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it]; // plain edit drops the runs
+    [editor endGroup];
+    return;
   }
-  [[PicaController sharedController] noteChange];
+  NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
+  NSString *key = [ctx[@"part"] isEqualToString:@"header"] ? @"header" : @"value";
+  NSMutableArray *specs = [it.columnSpecs mutableCopy];
+  if (specs == nil || ci >= [specs count])
+    return;
+  if ([text isEqualToString:specs[ci][key] ?: @""])
+    return;
+  NSMutableDictionary *col = [specs[ci] mutableCopy];
+  col[key] = text;
+  specs[ci] = col;
+  [editor setColumnSpecs:specs ofTablix:it];
 }
 
 // --- Editor field delegate ---------------------------------------------------
@@ -1147,7 +1080,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   PICA_UNUSED(words);
   if (index)
     *index = 0;
-  return PicaExpressionCompletions([textView string], charRange, _editItem.dataSetName);
+  return PicaExpressionCompletions([textView string], charRange,
+                                   _editItem.dataSetName, _context.report);
 }
 
 - (BOOL)control:(NSControl *)control
@@ -1178,7 +1112,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   // Word-like Tab navigation between tablix cells: header row wraps into the
   // value row (and back), so the whole grid tabs through.
   if (ctx && (movement == NSTabTextMovement || movement == NSBacktabTextMovement)) {
-    NSArray *cols = it.columns ?: @[];
+    NSArray *cols = it.columnSpecs ?: @[];
     NSInteger n2 = (NSInteger)[cols count];
     if (n2 == 0)
       return;

@@ -11,7 +11,19 @@
 
 @class RDLItem;
 
+// What an attributed string implies for an item, computed without touching it.
+@interface RDLRichTextResult : NSObject
+@property (nonatomic, readonly, copy) NSString *text;
+// nil when the text is plain enough not to need Paragraphs.
+@property (nonatomic, readonly, strong) NSMutableArray *paragraphs;
+@end
+
 @interface RDLRichTextCodec : NSObject
+
+// The values `text` implies for `item`, leaving `item` untouched. Needed so a
+// mutation layer can apply them through its own undoable path.
++ (RDLRichTextResult *)resultForAttributedString:(NSAttributedString *)text
+                                            item:(RDLItem *)item;
 
 // Model → editable text. Falls back to the plain `value` when the item has no
 // paragraphs.

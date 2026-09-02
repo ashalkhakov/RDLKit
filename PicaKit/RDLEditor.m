@@ -2,6 +2,7 @@
 #import "RDLDocument.h"
 #import "RDLReport.h"
 #import "RDLParser.h"
+#import "RDLRichTextCodec.h"
 
 static NSString * const kRDLEditActionName = @"Edit Report";
 
@@ -256,6 +257,34 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[RDLChange itemChange:tablix keys:@[ @"columnSpecs" ] bandKey:nil]];
 }
 
+- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLItem *)tablix {
+  if (![tablix.type isEqualToString:@"Tablix"] || [values count] == 0)
+    return;
+  NSMutableDictionary *old = [NSMutableDictionary dictionary];
+  BOOL changed = NO;
+  for (NSString *keyPath in values) {
+    id current = [tablix valueForKeyPath:keyPath];
+    old[keyPath] = current ?: [NSNull null];
+    id wanted = values[keyPath];
+    if (wanted == [NSNull null])
+      wanted = nil;
+    if (!RDLValuesEqual(current, wanted))
+      changed = YES;
+  }
+  if (!changed)
+    return;
+  [self beginGroup:@"Edit Table"];
+  if ([self shouldRegisterInverseFor:tablix token:@"tablixValues"])
+    [[self undoProxy] setTablixValues:old ofTablix:tablix];
+  for (NSString *keyPath in values) {
+    id wanted = values[keyPath];
+    [tablix setValue:(wanted == [NSNull null] ? nil : wanted) forKeyPath:keyPath];
+  }
+  [tablix rebuildTablix];
+  [self endGroup];
+  [self noteChange:[RDLChange itemChange:tablix keys:[values allKeys] bandKey:nil]];
+}
+
 - (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLItem *)tablix {
   NSArray *specs = tablix.columnSpecs;
   if (index >= [specs count])
@@ -310,6 +339,18 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   [tablix rebuildTablix];
   [self endGroup];
   [self noteChange:[RDLChange itemChange:tablix keys:@[ @"showGrandTotal" ] bandKey:nil]];
+}
+
+#pragma mark - Rich text
+
+- (void)setAttributedString:(NSAttributedString *)text ofItem:(RDLItem *)item {
+  if (item == nil)
+    return;
+  RDLRichTextResult *r = [RDLRichTextCodec resultForAttributedString:text item:item];
+  [self beginGroup:@"Edit Text"];
+  [self setValue:r.text forKeyPath:@"value" ofItem:item];
+  [self setValue:r.paragraphs forKeyPath:@"paragraphs" ofItem:item];
+  [self endGroup];
 }
 
 #pragma mark - Item transfer

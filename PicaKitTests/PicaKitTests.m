@@ -80,6 +80,9 @@
 - (void)testExpressionCompletion {
   PICA_ASSERT_NO_FAILURES(PicaRunCompletionChecks());
 }
+- (void)testEditingContext {
+  PICA_ASSERT_NO_FAILURES(PicaRunEditingContextChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

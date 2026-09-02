@@ -1,5 +1,5 @@
 #import "PicaInspectorView.h"
-#import "PicaController.h"
+#import "PicaEditingContext.h"
 #import "PicaKit.h"
 #import "PicaTablixEditor.h"
 #import "PicaExpressionHelper.h"
@@ -7,6 +7,7 @@
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
 @interface PicaInspectorView () <NSTextFieldDelegate>
+@property (nonatomic, strong) PicaEditingContext *context;
 @property (nonatomic, strong) NSTextField *kindLabel;
 // Report section
 @property (nonatomic, strong) NSView *docBox;
@@ -96,9 +97,10 @@ static const CGFloat kHalf2X = 136;
   return f;
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
-  self = [super initWithFrame:frameRect];
+- (instancetype)initWithFrame:(NSRect)frame context:(PicaEditingContext *)context {
+  self = [super initWithFrame:frame];
   if (self) {
+    _context = context;
     _kindLabel = [self label:@"Report" frame:NSMakeRect(10, 8, kFieldW, 16) inView:self];
     [_kindLabel setFont:[NSFont boldSystemFontOfSize:11]];
 
@@ -113,13 +115,13 @@ static const CGFloat kHalf2X = 136;
     [self buildTablixBox];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(reload)
-                                                 name:PicaReportDidChangeNotification
-                                               object:nil];
+                                             selector:@selector(documentDidChange:)
+                                                 name:RDLDocumentDidChangeNotification
+                                               object:context.document];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(reload)
-                                                 name:PicaSelectionDidChangeNotification
-                                               object:nil];
+                                                 name:RDLSelectionDidChangeNotification
+                                               object:context.selection];
     [self reload];
   }
   return self;
@@ -131,6 +133,17 @@ static const CGFloat kHalf2X = 136;
 
 - (BOOL)isFlipped {
   return YES;
+}
+
+// An edit the inspector itself just made comes back as a notification. Filling
+// the fields again from the model would fight the user's cursor, so only
+// reload when the change was not a property edit of what is already shown.
+- (void)documentDidChange:(NSNotification *)note {
+  RDLChange *change = [note userInfo][RDLChangeKey];
+  if (change.scope == RDLChangeScopeItem && change.item == [_context selectedItem] &&
+      [change.keys count] > 0)
+    return;
+  [self reload];
 }
 
 #pragma mark - Section construction
@@ -306,12 +319,10 @@ static const CGFloat kHalf2X = 136;
 // Opens the Report-Builder-style tablix editor for the selected tablix.
 - (void)editTablix:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
+  RDLItem *it = [_context selectedItem];
   if (it == nil || ![it.type isEqualToString:@"Tablix"])
     return;
-  if ([PicaTablixEditor runForTablix:it report:c.report])
-    [c noteChange];
+  [PicaTablixEditor runForTablix:it context:_context];
 }
 
 #pragma mark - Fill (model → UI)
@@ -334,9 +345,8 @@ static const CGFloat kHalf2X = 136;
 }
 
 - (void)rebuildDatasetPop:(NSPopUpButton *)pop selecting:(NSString *)name {
-  PicaController *c = [PicaController sharedController];
   [pop removeAllItems];
-  for (RDLDataSet *ds in c.report.dataSets)
+  for (RDLDataSet *ds in _context.report.dataSets)
     [pop addItemWithTitle:ds.name];
   if (name && [pop itemWithTitle:name])
     [pop selectItemWithTitle:name];
@@ -346,9 +356,10 @@ static const CGFloat kHalf2X = 136;
   if (_reloading)
     return;
   _reloading = YES;
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
-  if (c.selectionScope == PicaSelectionItem && it != nil) {
+  RDLReport *report = _context.report;
+  RDLSelection *sel = _context.selection;
+  RDLItem *it = [_context selectedItem];
+  if (it != nil) {
     [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@", it.type, it.name]];
     [_nameField setStringValue:it.name ?: @""];
     [_leftField setStringValue:[NSString stringWithFormat:@"%.3f", it.left]];
@@ -399,32 +410,27 @@ static const CGFloat kHalf2X = 136;
       [_tablixRowHField setStringValue:[NSString stringWithFormat:@"%.3f", it.rowHeight]];
     }
     [self stackBoxes:boxes];
-  } else if (c.selectionScope == PicaSelectionBand) {
-    RDLBand *band = [c.report bandWithKey:c.selectedBandKey];
-    NSString *title = [c.selectedBandKey isEqualToString:@"pageHeader"]
-                          ? @"Page Header"
-                          : ([c.selectedBandKey isEqualToString:@"pageFooter"] ? @"Page Footer"
-                                                                               : @"Body");
-    [_kindLabel setStringValue:title];
+  } else if (sel.scope == RDLSelectionScopeBand) {
+    RDLBand *band = [report bandWithKey:sel.bandKey];
+    [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
     [_bandHField setStringValue:[NSString stringWithFormat:@"%.3f", band.height]];
-    BOOL isBody = ![c.selectedBandKey isEqualToString:@"pageHeader"] &&
-                  ![c.selectedBandKey isEqualToString:@"pageFooter"];
+    BOOL isBody = [sel.bandKey isEqualToString:@"body"];
     [_bandBGField setEditable:isBody];
     [_bandBGField setEnabled:isBody];
     [_bandBGField setStringValue:isBody ? (band.style.backgroundColor ?: @"") : @""];
     [_bandBGField setToolTip:isBody ? nil : @"Background is supported on the Body band only"];
     [self stackBoxes:@[ _bandBox ]];
   } else {
-    [_kindLabel setStringValue:c.report.name ?: @"Report"];
-    [_docNameField setStringValue:c.report.name ?: @""];
-    [_authorField setStringValue:c.report.author ?: @""];
-    [_descField setStringValue:c.report.reportDescription ?: @""];
-    BOOL a4 = fabs(c.report.page.pageWidth - 8.27) < 0.05;
+    [_kindLabel setStringValue:report.name ?: @"Report"];
+    [_docNameField setStringValue:report.name ?: @""];
+    [_authorField setStringValue:report.author ?: @""];
+    [_descField setStringValue:report.reportDescription ?: @""];
+    BOOL a4 = fabs(report.page.pageWidth - 8.27) < 0.05;
     [_pagePop selectItemAtIndex:a4 ? 1 : 0];
-    [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.pageHeader.height]];
-    [_bodyHField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.body.height]];
-    [_footerHField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.pageFooter.height]];
-    [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", c.report.page.leftMargin]];
+    [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", report.pageHeader.height]];
+    [_bodyHField setStringValue:[NSString stringWithFormat:@"%.3f", report.body.height]];
+    [_footerHField setStringValue:[NSString stringWithFormat:@"%.3f", report.pageFooter.height]];
+    [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", report.page.leftMargin]];
     [self stackBoxes:@[ _docBox ]];
   }
   _reloading = NO;
@@ -460,113 +466,166 @@ static const CGFloat kHalf2X = 136;
   (void)words;
   if (index)
     *index = 0;
-  RDLItem *it = [[PicaController sharedController] selectedItem];
-  return PicaExpressionCompletions([textView string], charRange, it.dataSetName);
+  RDLItem *it = [_context selectedItem];
+  return PicaExpressionCompletions([textView string], charRange, it.dataSetName,
+                                   _context.report);
 }
 
 - (void)changed:(id)sender {
   if (_reloading)
     return;
-  PicaController *c = [PicaController sharedController];
-  RDLItem *it = [c selectedItem];
-  if (c.selectionScope == PicaSelectionItem && it != nil) {
-    if (sender == _leftField)
-      it.left = [[_leftField stringValue] doubleValue];
-    else if (sender == _topField)
-      it.top = [[_topField stringValue] doubleValue];
-    else if (sender == _widthField)
-      it.width = [[_widthField stringValue] doubleValue];
-    else if (sender == _heightField)
-      it.height = [[_heightField stringValue] doubleValue];
-    else if (sender == _valueField) {
-      it.value = [_valueField stringValue];
-      it.paragraphs = nil; // plain edit replaces any rich-text runs
-    }
-    else if (sender == _fontField)
-      it.style.fontFamily = [_fontField stringValue];
-    else if (sender == _sizeField)
-      it.style.fontSize = [_sizeField stringValue];
-    else if (sender == _weightPop)
-      it.style.fontWeight = [_weightPop indexOfSelectedItem] == 1 ? @"Bold" : @"Normal";
-    else if (sender == _alignPop)
-      it.style.textAlign = [_alignPop titleOfSelectedItem];
-    else if (sender == _colorField)
-      it.style.color = [_colorField stringValue];
-    else if (sender == _formatField)
-      it.style.format = [_formatField stringValue];
-    else if (sender == _lineColorField)
-      it.style.color = [_lineColorField stringValue];
-    else if (sender == _rectBGField)
-      it.style.backgroundColor = [_rectBGField stringValue];
-    else if (sender == _imageValueField)
-      it.value = [_imageValueField stringValue];
-    else if (sender == _imageSourcePop)
-      it.source = [_imageSourcePop titleOfSelectedItem];
-    else if (sender == _imageSizingPop)
-      it.sizing = [_imageSizingPop titleOfSelectedItem];
-    else if (sender == _chartDatasetPop)
-      it.dataSetName = [_chartDatasetPop titleOfSelectedItem];
-    else if (sender == _titleField)
-      it.title = [_titleField stringValue];
-    else if (sender == _chartKindPop)
-      it.chartType = [_chartKindPop titleOfSelectedItem];
-    else if (sender == _catField)
-      it.categoryField = [_catField stringValue];
-    else if (sender == _valField)
-      it.valueField = [_valField stringValue];
-    else if (sender == _tablixDatasetPop)
-      it.dataSetName = [_tablixDatasetPop titleOfSelectedItem];
-    else if (sender == _tablixHeaderHField)
-      it.headerHeight = [[_tablixHeaderHField stringValue] doubleValue];
-    else if (sender == _tablixRowHField)
-      it.rowHeight = [[_tablixRowHField stringValue] doubleValue];
-    else
+  RDLEditor *editor = _context.editor;
+  RDLSelection *sel = _context.selection;
+  RDLItem *it = [_context selectedItem];
+
+  // Every branch now goes through RDLEditor, so an inspector edit is undoable
+  // like any other. Values are not snapped to the grid here: a typed 1.234 is
+  // deliberate, and rounding it would fight the user.
+  if (it != nil) {
+    NSString *keyPath = nil;
+    id value = nil;
+    if (sender == _leftField) {
+      keyPath = @"left";
+      value = @([[_leftField stringValue] doubleValue]);
+    } else if (sender == _topField) {
+      keyPath = @"top";
+      value = @([[_topField stringValue] doubleValue]);
+    } else if (sender == _widthField) {
+      keyPath = @"width";
+      value = @([[_widthField stringValue] doubleValue]);
+    } else if (sender == _heightField) {
+      keyPath = @"height";
+      value = @([[_heightField stringValue] doubleValue]);
+    } else if (sender == _valueField) {
+      // A plain edit replaces any rich-text runs, so both keys move together.
+      [editor beginGroup:@"Edit Text"];
+      [editor setValue:[_valueField stringValue] forKeyPath:@"value" ofItem:it];
+      [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it];
+      [editor endGroup];
       return;
-    [c noteChange];
+    } else if (sender == _fontField) {
+      keyPath = @"style.fontFamily";
+      value = [_fontField stringValue];
+    } else if (sender == _sizeField) {
+      keyPath = @"style.fontSize";
+      value = [_sizeField stringValue];
+    } else if (sender == _weightPop) {
+      keyPath = @"style.fontWeight";
+      value = [_weightPop indexOfSelectedItem] == 1 ? @"Bold" : @"Normal";
+    } else if (sender == _alignPop) {
+      keyPath = @"style.textAlign";
+      value = [_alignPop titleOfSelectedItem];
+    } else if (sender == _colorField) {
+      keyPath = @"style.color";
+      value = [_colorField stringValue];
+    } else if (sender == _formatField) {
+      keyPath = @"style.format";
+      value = [_formatField stringValue];
+    } else if (sender == _lineColorField) {
+      keyPath = @"style.color";
+      value = [_lineColorField stringValue];
+    } else if (sender == _rectBGField) {
+      keyPath = @"style.backgroundColor";
+      value = [_rectBGField stringValue];
+    } else if (sender == _imageValueField) {
+      keyPath = @"value";
+      value = [_imageValueField stringValue];
+    } else if (sender == _imageSourcePop) {
+      keyPath = @"source";
+      value = [_imageSourcePop titleOfSelectedItem];
+    } else if (sender == _imageSizingPop) {
+      keyPath = @"sizing";
+      value = [_imageSizingPop titleOfSelectedItem];
+    } else if (sender == _chartDatasetPop) {
+      keyPath = @"dataSetName";
+      value = [_chartDatasetPop titleOfSelectedItem];
+    } else if (sender == _titleField) {
+      keyPath = @"title";
+      value = [_titleField stringValue];
+    } else if (sender == _chartKindPop) {
+      keyPath = @"chartType";
+      value = [_chartKindPop titleOfSelectedItem];
+    } else if (sender == _catField) {
+      keyPath = @"categoryField";
+      value = [_catField stringValue];
+    } else if (sender == _valField) {
+      keyPath = @"valueField";
+      value = [_valField stringValue];
+    } else if (sender == _tablixDatasetPop) {
+      keyPath = @"dataSetName";
+      value = [_tablixDatasetPop titleOfSelectedItem];
+    } else if (sender == _tablixHeaderHField) {
+      keyPath = @"headerHeight";
+      value = @([[_tablixHeaderHField stringValue] doubleValue]);
+    } else if (sender == _tablixRowHField) {
+      keyPath = @"rowHeight";
+      value = @([[_tablixRowHField stringValue] doubleValue]);
+    }
+    if (keyPath == nil)
+      return;
+    [editor setValue:value forKeyPath:keyPath ofItem:it];
     return;
   }
-  if (c.selectionScope == PicaSelectionBand) {
-    RDLBand *band = [c.report bandWithKey:c.selectedBandKey];
-    if (sender == _bandHField)
-      band.height = [[_bandHField stringValue] doubleValue];
-    else if (sender == _bandBGField) {
+
+  if (sel.scope == RDLSelectionScopeBand) {
+    if (sender == _bandHField) {
+      [editor setValue:@([[_bandHField stringValue] doubleValue])
+            forKeyPath:@"height"
+         ofBandWithKey:sel.bandKey];
+    } else if (sender == _bandBGField) {
+      RDLBand *band = [_context.report bandWithKey:sel.bandKey];
+      [editor beginGroup:@"Band Background"];
+      // Creating the style is part of the same undo step, so undoing does not
+      // leave an empty Style behind for the writer to emit.
       if (band.style == nil)
-        band.style = [[RDLStyle alloc] init];
-      band.style.backgroundColor = [_bandBGField stringValue];
-    } else
-      return;
-    [c noteChange];
+        [editor setValue:[[RDLStyle alloc] init] forKeyPath:@"style" ofBandWithKey:sel.bandKey];
+      [editor setValue:[_bandBGField stringValue]
+            forKeyPath:@"style.backgroundColor"
+         ofBandWithKey:sel.bandKey];
+      [editor endGroup];
+    }
     return;
   }
+
+  // Report scope.
   if (sender == _docNameField)
-    c.report.name = [_docNameField stringValue];
+    [editor setReportValue:[_docNameField stringValue] forKeyPath:@"name"];
   else if (sender == _authorField)
-    c.report.author = [_authorField stringValue];
+    [editor setReportValue:[_authorField stringValue] forKeyPath:@"author"];
   else if (sender == _descField)
-    c.report.reportDescription = [_descField stringValue];
+    [editor setReportValue:[_descField stringValue] forKeyPath:@"reportDescription"];
   else if (sender == _headerHField)
-    c.report.pageHeader.height = [[_headerHField stringValue] doubleValue];
+    [editor setValue:@([[_headerHField stringValue] doubleValue])
+          forKeyPath:@"height"
+       ofBandWithKey:@"pageHeader"];
   else if (sender == _bodyHField)
-    c.report.body.height = [[_bodyHField stringValue] doubleValue];
+    [editor setValue:@([[_bodyHField stringValue] doubleValue])
+          forKeyPath:@"height"
+       ofBandWithKey:@"body"];
   else if (sender == _footerHField)
-    c.report.pageFooter.height = [[_footerHField stringValue] doubleValue];
+    [editor setValue:@([[_footerHField stringValue] doubleValue])
+          forKeyPath:@"height"
+       ofBandWithKey:@"pageFooter"];
   else if (sender == _marginField) {
+    // One margin field drives all four edges, and the body width follows.
     CGFloat m = [[_marginField stringValue] doubleValue];
-    c.report.page.leftMargin = c.report.page.rightMargin = c.report.page.topMargin =
-        c.report.page.bottomMargin = m;
-    c.report.width = c.report.page.pageWidth - 2 * m;
+    RDLPage *page = _context.report.page;
+    [editor beginGroup:@"Margins"];
+    for (NSString *edge in @[ @"leftMargin", @"rightMargin", @"topMargin", @"bottomMargin" ])
+      [editor setReportValue:@(m)
+                  forKeyPath:[@"page." stringByAppendingString:edge]];
+    [editor setReportValue:@(page.pageWidth - 2 * m) forKeyPath:@"width"];
+    [editor endGroup];
   } else if (sender == _pagePop) {
-    if ([_pagePop indexOfSelectedItem] == 1) {
-      c.report.page.pageWidth = 8.27;
-      c.report.page.pageHeight = 11.69;
-    } else {
-      c.report.page.pageWidth = 8.5;
-      c.report.page.pageHeight = 11.0;
-    }
-    c.report.width = c.report.page.pageWidth - c.report.page.leftMargin - c.report.page.rightMargin;
-  } else
-    return;
-  [c noteChange];
+    BOOL a4 = [_pagePop indexOfSelectedItem] == 1;
+    RDLPage *page = _context.report.page;
+    [editor beginGroup:@"Page Size"];
+    [editor setReportValue:@(a4 ? 8.27 : 8.5) forKeyPath:@"page.pageWidth"];
+    [editor setReportValue:@(a4 ? 11.69 : 11.0) forKeyPath:@"page.pageHeight"];
+    [editor setReportValue:@((a4 ? 8.27 : 8.5) - page.leftMargin - page.rightMargin)
+                forKeyPath:@"width"];
+    [editor endGroup];
+  }
 }
 
 @end

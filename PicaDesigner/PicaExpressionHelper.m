@@ -1,5 +1,4 @@
 #import "PicaExpressionHelper.h"
-#import "PicaController.h"
 
 // The completion vocabulary and the `!`-accessor grammar live in PicaKit's
 // RDLExpressionCompletion, which takes an explicit scope rather than reaching
@@ -7,10 +6,9 @@
 // editor subclass and the "is this ordinary typing?" event test.
 
 NSArray<NSString *> *PicaExpressionCompletions(NSString *text, NSRange charRange,
-                                               NSString *dataSetName) {
-  RDLExpressionScope *scope =
-      [RDLExpressionScope scopeWithReport:[PicaController sharedController].report
-                              dataSetName:dataSetName];
+                                               NSString *dataSetName, RDLReport *report) {
+  RDLExpressionScope *scope = [RDLExpressionScope scopeWithReport:report
+                                                     dataSetName:dataSetName];
   return RDLExpressionCompletions(text, charRange, scope);
 }
 
