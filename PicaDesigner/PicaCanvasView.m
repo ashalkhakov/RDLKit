@@ -307,8 +307,17 @@
   [_context.editor toggleGrandTotalOfTablix:[_context selectedItem]];
 }
 
+// Both of these open a modal panel, and a menu action runs while the menu's
+// own tracking loop is still unwinding. Starting a modal session from inside
+// that loop can leave the panel unable to process events -- it appears, but
+// clicks and key equivalents go nowhere. Letting the menu finish first is the
+// standard remedy, so the modal is opened on the next pass of the run loop.
 - (void)ctxEditGroup:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
+  [self performSelector:@selector(openTablixEditor) withObject:nil afterDelay:0];
+}
+
+- (void)openTablixEditor {
   RDLItem *it = [_context selectedItem];
   if (it && [it.type isEqualToString:@"Tablix"])
     [PicaTablixEditor runForTablix:it context:_context];
@@ -316,6 +325,10 @@
 
 - (void)ctxEditRichText:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
+  [self performSelector:@selector(openRichTextEditor) withObject:nil afterDelay:0];
+}
+
+- (void)openRichTextEditor {
   RDLItem *it = [_context selectedItem];
   if (it && [it.type isEqualToString:@"Textbox"])
     [PicaRichTextEditor runForTextbox:it context:_context];

@@ -328,7 +328,12 @@ static const CGFloat kHalf2X = 136;
   RDLItem *it = [_context selectedItem];
   if (it == nil || ![it.type isEqualToString:@"Tablix"])
     return;
-  [PicaTablixEditor runForTablix:it context:_context];
+  if ([PicaTablixEditor runForTablix:it context:_context]) {
+    // -documentDidChange: suppresses reload for a property edit of the item on
+    // show, which is right while the user is typing in a field but wrong when
+    // a modal has just rewritten several of them.
+    [self reload];
+  }
 }
 
 #pragma mark - Field bindings
