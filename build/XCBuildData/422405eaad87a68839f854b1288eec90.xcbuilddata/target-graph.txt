@@ -1,4 +1,0 @@
-Target dependency graph (2 targets)
-Target 'PicaDesignerTests' in project 'RDLKit'
-➜ Explicit dependency on target 'PicaKit' in project 'RDLKit'
-Target 'PicaKit' in project 'RDLKit' (no dependencies)

@@ -1,6 +1,0 @@
-framework module PicaKit {
-  umbrella header "PicaKit.h"
-  export *
-
-  module * { export * }
-}
