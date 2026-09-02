@@ -1021,7 +1021,7 @@ static void PicaAppendMember(NSMutableString *xml, RDLTablixMember *m) {
 
 static void PicaAppendTablix(NSMutableString *xml, RDLItem *it) {
   if (it.tablixBody == nil || [it.tablixBody.rows count] == 0)
-    [it rebuildTableFromColumns];
+    [it rebuildTablix];
   [xml appendFormat:@"<Tablix Name=\"%@\">", PicaEsc(it.name)];
   PicaAppendBox(xml, it);
   [xml appendFormat:@"<DataSetName>%@</DataSetName>", PicaEsc(it.dataSetName)];

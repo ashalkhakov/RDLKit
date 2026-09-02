@@ -57,7 +57,8 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 ## Tests (macOS)
 
 ```
-swift test
+xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
+xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests -destination 'platform=macOS' test
 ```
 
 Or in Xcode: open `RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
@@ -95,4 +96,6 @@ xcodebuild -project RDLKit.xcodeproj -scheme Pica -configuration Debug build
 xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test
 ```
 
-SwiftPM still works for the kit + tests only: `swift test`.
+There are two test schemes: `PicaKitTests` for the library and
+`PicaDesignerTests` for the app. Use those rather than `swift test` --
+SwiftPM is not part of the build story, which has to work under GNUstep too.

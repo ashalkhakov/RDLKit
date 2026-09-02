@@ -92,10 +92,11 @@ static RDLReport *PicaGroupedJobs(void) {
   tab.rowHeight = 0.28;
   tab.groupBy = @"Finish";
   tab.noRowsMessage = @"No jobs in this run.";
-  tab.columns = @[
+  tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
     @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
   ];
+  [tab rebuildTablix];
   [r.body.items addObject:tab];
   return r;
 }

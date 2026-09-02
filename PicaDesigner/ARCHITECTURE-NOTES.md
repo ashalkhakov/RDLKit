@@ -1,5 +1,30 @@
 # Pica Designer — responsibility notes
 
+> **Status.** This began as an audit of the pre-refactor code and the record of
+> the decisions taken from it. The refactor described here has been carried out;
+> the audit below is kept because it explains *why* the current structure looks
+> the way it does, and the numbers in it are the "before" figures.
+>
+> Where things ended up:
+>
+> | Then | Now |
+> | --- | --- |
+> | `PicaController` singleton, 13 concerns, reached from 6 files | deleted; `PicaEditingContext` injected, holding `PicaDocument` / `PicaSelection` / `PicaEditor` |
+> | Undo = whole report serialized to RDL XML per edit | per-edit inverses on `NSUndoManager`, one step per gesture |
+> | Selection = `(scope, name, bandKey)` strings, re-resolved everywhere | a resolved `RDLItem` reference |
+> | `PicaCanvasView`, 1208 lines, 19 concerns | 353 lines + renderer / interaction / in-place editor / `PicaPageGeometry` |
+> | Inspector: the same table written twice, hand-synced | one `PicaInspectorFields` binding per field |
+> | Band keys as a literal in 11 places | `+[RDLReport bandKeys]` |
+> | `RDLItem.columns`: rebuild-on-set, spec reverse-engineered from the body | stored `columnSpecs` + explicit `-rebuildTablix` |
+> | Generator window: its own report, params, loading and data pane | shares the designer's `PicaDocument` |
+> | Style→attributes translation in 3 places | `RDLTextAttributes` in the kit |
+> | Zero tests for the designer | `PicaDesignerTests`, 17 cases |
+>
+> Editing logic lives in the app, not in PicaKit: the library is the report
+> generator, and an editor concern does not become a library concern. The one
+> piece that stayed is `RDLTextAttributes`, because `RDLView`'s own preview
+> needs the same translation.
+
 Working notes for a cohesion/coupling pass over `PicaDesigner`. Each class is
 listed with the *distinct* jobs it currently does, then the cross-cutting
 duplication, then the seams worth extracting. Line references are to the

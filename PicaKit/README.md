@@ -76,7 +76,7 @@ Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`)
 ## Tests (macOS)
 
 ```
-cd .. && swift test
+cd .. && xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
 ```
 
 See `../PicaKitTests/README.md`. GNUstep harness later: call `PicaRunAllChecks()`.

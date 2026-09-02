@@ -313,20 +313,6 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   return cols;
 }
 
-// The stored spec when there is one, else recovered from the built body so
-// callers that never assigned a spec (parsed List items) behave as before.
-- (NSArray *)columns {
-  return _columnSpecs ?: [self picaDerivedColumns];
-}
-
-// Deprecated: stores the spec AND rebuilds at once, which is why every other
-// tablix property has to be set first. Prefer columnSpecs + -rebuildTablix.
-- (void)setColumns:(NSArray *)cols {
-  _columnSpecs = [cols copy];
-  _type = @"Tablix";
-  [self picaBuildTable:cols headerHeight:_stashHeaderH rowHeight:_stashRowH];
-}
-
 - (void)rebuildTablix {
   NSArray *specs = _columnSpecs ?: [self picaDerivedColumns];
   _type = @"Tablix";
@@ -337,9 +323,6 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   _columnSpecs = [[self picaDerivedColumns] copy];
 }
 
-- (void)rebuildTableFromColumns {
-  [self rebuildTablix];
-}
 
 - (RDLTablixRow *)picaAggregateRow:(NSArray<PicaColSpec *> *)specs
                              label:(NSString *)label

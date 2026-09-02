@@ -96,7 +96,8 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
   it.headerHeight = headerH;
   it.rowHeight = rowH;
   it.height = headerH + rowH;
-  it.columns = cols;
+  it.columnSpecs = cols;
+  [it rebuildTablix];
   return it;
 }
 
@@ -460,13 +461,14 @@ static RDLItem *PicaTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y, C
   tab.rowHeight = 0.28;
   tab.groupBy = @"Finish";
   tab.noRowsMessage = @"No jobs in this run.";
-  tab.columns = @[
+  tab.columnSpecs = @[
     PicaCol(@"Job", @"=Fields!Job.Value", 2.8, @"Left"),
     PicaCol(@"Hours", @"=Fields!Hours.Value", 1.2, @"Right"),
     PicaCol(@"Rate", @"=Lookup(Fields!Finish.Value, Fields!Finish.Value, Fields!Rate.Value, \"Finishes\")", 1.4,
             @"Right"),
     PicaCol(@"Amount", @"=Fields!Amount.Value", 2.1, @"Right")
   ];
+  [tab rebuildTablix];
   [r.body.items addObject:tab];
   [r.body.items addObject:PicaTB(@"GrandLbl", @"Shop total", 0, 1.2, 4.2, 0.28, @"Georgia", @"12pt", @"Bold",
                                  kInk, @"Left")];

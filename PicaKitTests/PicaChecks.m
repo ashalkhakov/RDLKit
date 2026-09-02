@@ -82,10 +82,11 @@ static RDLReport *PicaMiniInvoice(void) {
   tab.height = 0.6;
   tab.headerHeight = 0.3;
   tab.rowHeight = 0.28;
-  tab.columns = @[
+  tab.columnSpecs = @[
     @{@"width" : @3, @"header" : @"Sku", @"value" : @"=Fields!Sku.Value"},
     @{@"width" : @2, @"header" : @"Amt", @"value" : @"=Fields!Amount.Value"},
   ];
+  [tab rebuildTablix];
   [r.body.items addObject:tab];
 
   RDLItem *sum = [[RDLItem alloc] init];
@@ -148,8 +149,8 @@ NSArray<NSString *> *PicaRunParserChecks(void) {
     if (tab == nil)
       PicaFail(fails, @"tablix missing after round-trip");
     else {
-      if ([tab.columns count] != 2)
-        PicaFail(fails, [NSString stringWithFormat:@"tablix columns %lu", (unsigned long)[tab.columns count]]);
+      if ([tab.columnSpecs count] != 2)
+        PicaFail(fails, [NSString stringWithFormat:@"tablix columns %lu", (unsigned long)[tab.columnSpecs count]]);
       if ([tab.tablixBody.rows count] != 2)
         PicaFail(fails, @"tablixBody should have header + details rows");
       if ([tab.rowHierarchy.members count] != 2)
@@ -514,10 +515,11 @@ static RDLReport *PicaGroupedJobs(void) {
   tab.rowHeight = 0.28;
   tab.groupBy = @"Finish";
   tab.noRowsMessage = @"No jobs in this run.";
-  tab.columns = @[
+  tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
     @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
   ];
+  [tab rebuildTablix];
   [r.body.items addObject:tab];
   return r;
 }
@@ -671,7 +673,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   RDLReport *r = PicaGroupedJobs();
   RDLItem *tab = r.body.items.firstObject;
   tab.showGrandTotal = YES;
-  tab.columns = @[
+  tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
     @{
       @"width" : @2.1,
@@ -681,6 +683,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
       @"aggregate" : @"Sum"
     },
   ];
+  [tab rebuildTablix];
   if ([tab.tablixBody.rows count] != 4)
     PicaFail(fails, [NSString stringWithFormat:@"grouped+total body rows %lu",
                                                (unsigned long)[tab.tablixBody.rows count]]);
@@ -695,7 +698,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, @"aggregate row should inherit column align");
 
   // The columns getter should surface the derived designer metadata.
-  NSArray *derived = tab.columns;
+  NSArray *derived = tab.columnSpecs;
   if (![derived.lastObject[@"aggregate"] isEqualToString:@"Sum"])
     PicaFail(fails, [NSString stringWithFormat:@"derived aggregate %@", derived.lastObject[@"aggregate"]]);
   if (![derived.lastObject[@"align"] isEqualToString:@"Right"])
@@ -717,7 +720,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
       PicaFail(fails, @"round-trip lost groupBy");
     if (!pt.showGrandTotal)
       PicaFail(fails, @"round-trip lost showGrandTotal");
-    NSArray *pcols = pt.columns;
+    NSArray *pcols = pt.columnSpecs;
     if (![pcols.lastObject[@"aggregate"] isEqualToString:@"Sum"])
       PicaFail(fails, @"round-trip lost column aggregate");
   }
@@ -743,7 +746,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   RDLItem *ftab = flat.body.items.firstObject;
   ftab.groupBy = @"";
   ftab.showGrandTotal = YES;
-  ftab.columns = @[
+  ftab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
     @{
       @"width" : @2.1,
@@ -752,6 +755,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
       @"aggregate" : @"Sum"
     },
   ];
+  [ftab rebuildTablix];
   if ([ftab.tablixBody.rows count] != 3)
     PicaFail(fails, [NSString stringWithFormat:@"flat+total body rows %lu",
                                                (unsigned long)[ftab.tablixBody.rows count]]);
@@ -771,7 +775,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   // Count aggregate on a non-numeric column.
   RDLReport *cnt = PicaGroupedJobs();
   RDLItem *ctab = cnt.body.items.firstObject;
-  ctab.columns = @[
+  ctab.columnSpecs = @[
     @{
       @"width" : @2.8,
       @"header" : @"Job",
@@ -780,6 +784,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     },
     @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
   ];
+  [ctab rebuildTablix];
   RDLTablixRow *sub = ctab.tablixBody.rows.lastObject;
   if (![sub.cells.firstObject.item.value isEqualToString:@"=Count(Fields!Job.Value)"])
     PicaFail(fails, @"explicit Count should land in first column subtotal");
@@ -792,11 +797,12 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   mtab.groupBy = @"Finish";
   mtab.pivotBy = @"Job";
   mtab.showGrandTotal = YES;
-  mtab.columns = @[ @{
+  mtab.columnSpecs = @[ @{
     @"width" : @1.5,
     @"value" : @"=Fields!Amount.Value",
     @"aggregate" : @"Sum"
   } ];
+  [mtab rebuildTablix];
   if ([mtab.tablixBody.columns count] != 1 || [mtab.tablixBody.rows count] != 2)
     PicaFail(fails, @"matrix body should be 1 column x 2 rows (data + totals)");
   RDLTablixMember *cm = mtab.columnHierarchy.members.firstObject;
@@ -810,7 +816,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
     PicaFail(fails, [NSString stringWithFormat:@"matrix cell %@", mcell]);
 
   // The columns getter should recover the measure spec.
-  NSArray *mcols = mtab.columns;
+  NSArray *mcols = mtab.columnSpecs;
   if ([mcols count] != 1 || ![mcols.firstObject[@"aggregate"] isEqualToString:@"Sum"] ||
       ![mcols.firstObject[@"value"] isEqualToString:@"=Fields!Amount.Value"])
     PicaFail(fails, [NSString stringWithFormat:@"matrix derived columns %@", mcols]);
@@ -866,7 +872,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
       PicaFail(fails, @"matrix round-trip lost groupBy");
     if (!pt.showGrandTotal)
       PicaFail(fails, @"matrix round-trip lost showGrandTotal");
-    NSArray *pcols = pt.columns;
+    NSArray *pcols = pt.columnSpecs;
     if (![pcols.firstObject[@"aggregate"] isEqualToString:@"Sum"])
       PicaFail(fails, @"matrix round-trip lost measure aggregate");
   }
@@ -874,10 +880,11 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   // Clearing pivotBy falls back to the plain table build.
   mtab.pivotBy = @"";
   mtab.showGrandTotal = NO;
-  mtab.columns = @[
+  mtab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
     @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
   ];
+  [mtab rebuildTablix];
   if ([mtab.tablixBody.columns count] != 2 || [mtab.tablixBody.rows count] != 3)
     PicaFail(fails, @"clearing pivotBy should rebuild the grouped table");
 
@@ -888,10 +895,11 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   ntab.groupBy = @"Finish";
   ntab.groupBy2 = @"Job";
   ntab.showGrandTotal = YES;
-  ntab.columns = @[
+  ntab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Item", @"value" : @"=Fields!Job.Value"},
     @{@"width" : @2.1, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum"},
   ];
+  [ntab rebuildTablix];
   // Rows: header, detail, inner subtotal, outer subtotal, grand total.
   if ([ntab.tablixBody.rows count] != 5)
     PicaFail(fails, [NSString stringWithFormat:@"nested body rows %lu",
@@ -974,7 +982,7 @@ NSArray<NSString *> *PicaRunTablixEditingChecks(void) {
   // Clearing the child group falls back to single-level grouping.
   ntab.groupBy2 = @"";
   ntab.showGrandTotal = NO;
-  [ntab rebuildTableFromColumns];
+  [ntab rebuildTablix];
   if ([ntab.tablixBody.rows count] != 3)
     PicaFail(fails, @"clearing groupBy2 should rebuild the single-level table");
 
@@ -1110,10 +1118,11 @@ NSArray<NSString *> *PicaRunTablixAdvancedChecks(void) {
     w.page.leftMargin = 0.5;
     w.page.rightMargin = 0.5;
     RDLItem *t = w.body.items.firstObject;
-    t.columns = @[
+    t.columnSpecs = @[
       @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
       @{@"width" : @2.0, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
     ];
+    [t rebuildTablix];
     t.repeatRowHeaders = repeat;
     return w;
   };
@@ -1996,12 +2005,6 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
   if ([tab.tablixBody.rows count] != 4)
     PicaFail(fails, @"-rebuildTablix should be idempotent");
 
-  // The deprecated setter still stores the spec, so both APIs agree.
-  RDLReport *r2 = PicaGroupedJobs();
-  RDLItem *t2 = r2.body.items.firstObject;
-  if (![t2.columnSpecs isEqualToArray:t2.columns])
-    PicaFail(fails, @"the columns setter should store columnSpecs too");
-
   // A report parsed from disk must arrive with a spec, not just a built body,
   // so the designer can rebuild it without first reverse-engineering one.
   NSString *xml = [RDLWriter XMLStringFromReport:r];
@@ -2034,7 +2037,8 @@ NSArray<NSString *> *PicaRunTablixRebuildChecks(void) {
   RDLItem *noSpec = [[RDLItem alloc] init];
   noSpec.type = @"Tablix";
   noSpec.name = @"Listish";
-  noSpec.columns = @[ @{@"width" : @2.0, @"header" : @"H", @"value" : @"=Fields!Job.Value"} ];
+  noSpec.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"H", @"value" : @"=Fields!Job.Value"} ];
+  [noSpec rebuildTablix];
   noSpec.columnSpecs = nil;
   [noSpec rebuildTablix];
   if ([noSpec.tablixBody.columns count] != 1)

@@ -102,10 +102,6 @@
 // groupBy, groupBy2, pivotBy, showGrandTotal, name and the heights, so with an
 // implicit rebuild-on-set those all had to be assigned *before* the columns.
 @property (nonatomic, copy) NSArray<NSDictionary *> *columnSpecs;
-// Deprecated: assigns columnSpecs AND rebuilds immediately, so it still carries
-// the set-everything-else-first ordering requirement. Prefer columnSpecs +
-// -rebuildTablix. Kept so existing callers keep working; slated for removal.
-@property (nonatomic, copy) NSArray *columns; // @{width, header, value, align?, aggregate?}
 @property (nonatomic, assign) CGFloat headerHeight;
 @property (nonatomic, assign) CGFloat rowHeight;
 @property (nonatomic, copy) NSString *groupBy; // rebuilds grouped header + details + footer
@@ -120,7 +116,6 @@
 // parser so a report loaded from disk arrives with a spec; the recovery is
 // lossy (the aggregate is read back out of "=Sum(Fields!X.Value)" text).
 - (void)inferColumnSpecsFromTablixBody;
-- (void)rebuildTableFromColumns; // deprecated alias for -rebuildTablix
 @end
 
 @interface RDLTablixColumn : NSObject

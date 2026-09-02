@@ -723,7 +723,7 @@ static NSArray *PicaApplyPageRules(NSArray<PicaTablixInst *> *insts, CGFloat bod
 static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLItem *tab, RDLReport *report, RDLEvalScope *scope,
                                                    CGFloat bodyAvail, CGFloat tablixTop) {
   if (tab.tablixBody == nil || [tab.tablixBody.rows count] == 0)
-    [tab rebuildTableFromColumns];
+    [tab rebuildTablix];
   RDLTablixBody *body = tab.tablixBody;
   if ([body.rows count] == 0)
     return @[];

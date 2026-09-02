@@ -1,5 +1,8 @@
 # PicaKitTests
 
+Checks for **PicaKit**, the report library. The app has its own target,
+`../PicaDesignerTests`.
+
 Mac **XCTest** suite for the generator’s basic features. The checks themselves
 (`PicaChecks`) are plain Foundation — later a GNUstep runner can call the same
 functions without XCTest.
@@ -24,7 +27,7 @@ Foundation-only. PDF uses AppKit `dataWithPDFInsideRect:` (macOS; GNUstep PDF la
 From this folder’s parent:
 
 ```
-swift test
+xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
 ```
 
 Or open `../RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
