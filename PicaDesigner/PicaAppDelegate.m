@@ -62,7 +62,7 @@
   [file addItem:[self item:@"Designer" action:@selector(showDesigner:) key:@""]];
   [file addItem:[NSMenuItem separatorItem]];
   [file addItem:[self item:@"New Letter" action:@selector(newDocument:) key:@"n"]];
-  [file addItem:[self item:@"Open…" action:@selector(openDocument:) key:@"o"]];
+  [file addItem:[self responderItem:@"Open…" action:@selector(openDocument:) key:@"o"]];
   [file addItem:[self item:@"Save" action:@selector(saveDocument:) key:@"s"]];
   [file addItem:[self item:@"Save As…" action:@selector(saveDocumentAs:) key:@"S"]];
   [file addItem:[NSMenuItem separatorItem]];
@@ -81,7 +81,7 @@
   [file addItem:samplesItem];
   [file addItem:[NSMenuItem separatorItem]];
   [file addItem:[self item:@"Preview" action:@selector(preview:) key:@"p"]];
-  [file addItem:[self item:@"Export PDF…" action:@selector(exportPDF:) key:@"e"]];
+  [file addItem:[self responderItem:@"Export PDF…" action:@selector(exportPDF:) key:@"e"]];
   [fileItem setSubmenu:file];
 
   NSMenuItem *editItem = [[NSMenuItem alloc] init];
@@ -114,10 +114,8 @@
 }
 
 - (void)ensureGenerator {
-  if (_generator == nil) {
-    _generator = [[PicaGeneratorWindow alloc] init];
-    [_generator loadSample:@"invoice"];
-  }
+  if (_generator == nil)
+    _generator = [[PicaGeneratorWindow alloc] initWithDocument:_context.document];
 }
 
 - (void)showDesigner:(id)sender {
@@ -141,21 +139,15 @@
   [[_welcome window] makeKeyAndOrderFront:nil];
 }
 
-- (BOOL)generatorIsFront {
-  return _generator != nil && [[_generator window] isKeyWindow];
-}
-
 - (void)openSample:(NSMenuItem *)sender {
   NSArray *cat = [PicaSamples catalog];
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[cat count])
     return;
-  if ([self generatorIsFront]) {
-    [_generator loadSample:cat[i][@"id"]];
-    return;
-  }
+  // One document, so the sample lands wherever the user is looking.
   [_context loadSampleWithId:cat[i][@"id"]];
-  [self showDesigner:nil];
+  if (![[_generator window] isKeyWindow])
+    [self showDesigner:nil];
 }
 
 - (void)newDocument:(id)sender {
@@ -164,12 +156,10 @@
   [self showDesigner:nil];
 }
 
+// Only reached when no window handled it -- each window controller implements
+// -openDocument: for itself, and the responder chain gets there first.
 - (void)openDocument:(id)sender {
   (void)sender;
-  if ([self generatorIsFront]) {
-    [_generator openRdl:sender];
-    return;
-  }
   NSOpenPanel *p = [NSOpenPanel openPanel];
   [p setAllowedFileTypes:@[ @"rdl", @"rdlc", @"xml" ]];
   [p setCanChooseFiles:YES];
@@ -220,18 +210,13 @@
   }
 }
 
+// Fallbacks for when the front window does not handle these itself.
 - (void)preview:(id)sender {
-  if ([self generatorIsFront])
-    return;
   [self ensureDesigner];
   [_designer showPreview:sender];
 }
 
 - (void)exportPDF:(id)sender {
-  if ([self generatorIsFront]) {
-    [_generator exportPDF:sender];
-    return;
-  }
   [self ensureDesigner];
   [_designer exportPDF:sender];
 }
@@ -242,8 +227,6 @@
 }
 
 - (void)addElement:(id)sender {
-  if ([self generatorIsFront])
-    return;
   [self ensureDesigner];
   [[_designer window] makeKeyAndOrderFront:nil];
   [_designer addElement:sender];

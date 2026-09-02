@@ -1,11 +1,11 @@
 #import "PicaDataView.h"
 #import "PicaChange.h"
 #import "PicaDocument.h"
-#import "PicaEditingContext.h"
+#import "PicaDocument.h"
 #import "PicaKit.h"
 
 @interface PicaDataView () <NSTextFieldDelegate, NSTextViewDelegate>
-@property (nonatomic, strong) PicaEditingContext *context;
+@property (nonatomic, strong) PicaDocument *document;
 @property (nonatomic, strong) NSView *stack;
 @property (nonatomic, strong) NSTextView *jsonView;
 @property (nonatomic, copy) NSString *editingDataset;
@@ -15,16 +15,16 @@
   BOOL _reloading;
 }
 
-- (instancetype)initWithFrame:(NSRect)frame context:(PicaEditingContext *)context {
+- (instancetype)initWithFrame:(NSRect)frame document:(PicaDocument *)document {
   self = [super initWithFrame:frame];
   if (self) {
-    _context = context;
+    _document = document;
     _stack = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 240, 400)];
     [self addSubview:_stack];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(documentDidChange:)
                                                  name:PicaDocumentDidChangeNotification
-                                               object:context.document];
+                                               object:document];
     [self reload];
   }
   return self;
@@ -67,8 +67,8 @@
   NSArray *subs = [_stack.subviews copy];
   for (NSView *v in subs)
     [v removeFromSuperview];
-  PicaDocument *doc = _context.document;
-  RDLReport *report = _context.report;
+  PicaDocument *doc = _document;
+  RDLReport *report = _document.report;
   CGFloat y = 8;
   [_stack addSubview:[self label:@"Parameters" frame:NSMakeRect(10, y, 220, 16)]];
   y += 20;
@@ -146,7 +146,7 @@
 - (void)toggleDataset:(NSButton *)sender {
   if (_reloading)
     return;
-  NSArray *dataSets = _context.report.dataSets;
+  NSArray *dataSets = _document.report.dataSets;
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[dataSets count])
     return;
@@ -161,11 +161,11 @@
 - (void)paramChanged:(NSTextField *)sender {
   if (_reloading)
     return;
-  NSArray *params = _context.report.parameters;
+  NSArray *params = _document.report.parameters;
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[params count])
     return;
-  [_context.document setParamValue:[sender stringValue]
+  [_document setParamValue:[sender stringValue]
                            forName:[params[i] name]];
 }
 
@@ -180,7 +180,7 @@
   if (_reloading || _jsonView == nil || _editingDataset == nil)
     return;
   NSError *err = nil;
-  if (![_context.document bindJSON:[_jsonView string]
+  if (![_document bindJSON:[_jsonView string]
                     toDataSetNamed:_editingDataset
                              error:&err]) {
     // Bad JSON while typing is expected; surface it without a modal.

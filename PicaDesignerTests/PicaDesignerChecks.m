@@ -1656,6 +1656,116 @@ NSArray<NSString *> *PicaRunDialogLifecycleChecks(void) {
   return fails;
 }
 
+// --- Stage 6: one document pipeline ----------------------------------------
+//
+// The generator window used to carry its own report, parameter values, open
+// and load methods, and its own copy of the parameter/dataset pane. Both
+// windows now share one PicaDocument, and export is a document operation
+// generic over whatever backends the kit offers rather than PDF and HTML
+// special cases.
+
+NSArray<NSString *> *PicaRunExportChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  PicaDocument *doc = [[PicaDocument alloc] initWithReport:PicaGroupedJobs()];
+
+  NSArray *backends = [doc exportBackends];
+  if ([backends count] < 2)
+    PicaFail(fails, [NSString stringWithFormat:@"expected at least two backends, got %lu",
+                                               (unsigned long)[backends count]]);
+  // Looked up by extension, so a window never has to know the backend list.
+  id<RDLBackend> pdf = [doc exportBackendForPathExtension:@"pdf"];
+  id<RDLBackend> html = [doc exportBackendForPathExtension:@"html"];
+  if (pdf == nil)
+    PicaFail(fails, @"no backend for the pdf extension");
+  if (html == nil)
+    PicaFail(fails, @"no backend for the html extension");
+  if ([doc exportBackendForPathExtension:@"PDF"] == nil)
+    PicaFail(fails, @"the extension lookup should ignore case");
+  if ([doc exportBackendForPathExtension:@"docx"] != nil)
+    PicaFail(fails, @"an unknown extension should find no backend");
+
+  // The suggested name comes from the report until the document has a file,
+  // after which the file's own name is the better answer.
+  NSString *name = [doc suggestedFileNameForBackend:pdf];
+  if (![name isEqualToString:@"Grouped Jobs.pdf"])
+    PicaFail(fails, [NSString stringWithFormat:@"suggested name %@", name]);
+  NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:@"pica-export.rdl"];
+  NSError *err = nil;
+  if (![doc saveToURL:[NSURL fileURLWithPath:tmp] error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"save failed: %@", err.localizedDescription]);
+  if (![[doc suggestedFileNameForBackend:html] isEqualToString:@"pica-export.html"])
+    PicaFail(fails, [NSString stringWithFormat:@"after saving, suggested name %@",
+                                               [doc suggestedFileNameForBackend:html]]);
+  [[NSFileManager defaultManager] removeItemAtPath:tmp error:NULL];
+
+  // Rendering goes through the kit's backend, so the bytes should look right.
+  NSData *pdfData = [doc exportDataUsingBackend:pdf];
+  if ([pdfData length] == 0)
+    PicaFail(fails, @"the PDF export produced no data");
+  else if (![[[NSString alloc] initWithData:[pdfData subdataWithRange:NSMakeRange(0, 4)]
+                                   encoding:NSASCIIStringEncoding] isEqualToString:@"%PDF"])
+    PicaFail(fails, @"the PDF export does not start with %PDF");
+  NSData *htmlData = [doc exportDataUsingBackend:html];
+  NSString *htmlText = [[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding];
+  if ([htmlText rangeOfString:@"<html" options:NSCaseInsensitiveSearch].location == NSNotFound)
+    PicaFail(fails, @"the HTML export does not look like HTML");
+  if ([doc exportDataUsingBackend:nil] != nil)
+    PicaFail(fails, @"exporting with no backend should produce nothing");
+
+  // Writing to disk, and reporting failure rather than silently doing nothing.
+  NSString *out = [NSTemporaryDirectory() stringByAppendingPathComponent:@"pica-export-check.html"];
+  NSURL *outURL = [NSURL fileURLWithPath:out];
+  if (![doc exportUsingBackend:html toURL:outURL error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"export write failed: %@",
+                                               err.localizedDescription]);
+  if (![[NSFileManager defaultManager] fileExistsAtPath:out])
+    PicaFail(fails, @"the exported file is not on disk");
+  [[NSFileManager defaultManager] removeItemAtPath:out error:NULL];
+  err = nil;
+  if ([doc exportUsingBackend:html
+                        toURL:[NSURL fileURLWithPath:@"/nonexistent-dir/x.html"]
+                        error:&err])
+    PicaFail(fails, @"exporting to an unwritable path should fail");
+  if (err == nil)
+    PicaFail(fails, @"a failed export should report an error");
+
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunSharedPipelineChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  // One document behind both windows: what the generator binds, the designer
+  // sees, because there is no second copy of the report any more.
+  PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:PicaGroupedJobs()];
+  PicaDocument *doc = ctx.document;
+
+  [doc setParamValue:@"Acme" forName:@"Customer"];
+  if (![doc.paramValues[@"Customer"] isEqualToString:@"Acme"])
+    PicaFail(fails, @"the document should hold the parameter bindings");
+
+  NSError *err = nil;
+  if (![doc bindJSON:@"[{\"Job\":\"Bench\",\"Finish\":\"Oil\",\"Amount\":11}]"
+      toDataSetNamed:@"Jobs"
+               error:&err])
+    PicaFail(fails, [NSString stringWithFormat:@"bind failed: %@", err.localizedDescription]);
+  if ([[doc.report.dataSets.firstObject rows] count] != 1)
+    PicaFail(fails, @"binding through the document should reach the report");
+  // And the same report object is what the editing side works on.
+  if (ctx.report != doc.report)
+    PicaFail(fails, @"the context and the document must share one report");
+
+  // Loading replaces it for both, and resets the editing state.
+  [ctx loadSampleWithId:@"invoice"];
+  if (doc.isDirty)
+    PicaFail(fails, @"a freshly loaded report is not dirty");
+  if ([ctx selectedItem] != nil)
+    PicaFail(fails, @"loading should reset the selection");
+  if (ctx.report != doc.report)
+    PicaFail(fails, @"after loading, the context and document still share one report");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunDocumentChecks()];
@@ -1672,5 +1782,7 @@ NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixGeometryChecks()];
   [fails addObjectsFromArray:PicaRunFieldBindingChecks()];
   [fails addObjectsFromArray:PicaRunDialogLifecycleChecks()];
+  [fails addObjectsFromArray:PicaRunExportChecks()];
+  [fails addObjectsFromArray:PicaRunSharedPipelineChecks()];
   return fails;
 }

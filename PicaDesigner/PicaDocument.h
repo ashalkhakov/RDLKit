@@ -37,6 +37,19 @@
 // and the headless path agree on field inference.
 - (BOOL)bindJSON:(NSString *)json toDataSetNamed:(NSString *)name error:(NSError **)error;
 
+// --- Export ---------------------------------------------------------------
+// The document owns the report and the parameter bindings, which is everything
+// a render needs, so the decisions live here and only the save panel stays in
+// the window. Generic over whatever backends the kit offers rather than
+// special-casing PDF and HTML: each one supplies its own name and extension.
+- (NSArray<id<RDLBackend>> *)exportBackends;
+- (id<RDLBackend>)exportBackendForPathExtension:(NSString *)pathExtension;
+- (NSString *)suggestedFileNameForBackend:(id<RDLBackend>)backend;
+- (NSData *)exportDataUsingBackend:(id<RDLBackend>)backend;
+- (BOOL)exportUsingBackend:(id<RDLBackend>)backend
+                     toURL:(NSURL *)url
+                     error:(NSError **)error;
+
 // Serialized RDL for the current report — used for save, and by tests.
 - (NSString *)XMLString;
 

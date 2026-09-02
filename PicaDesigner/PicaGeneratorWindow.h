@@ -1,10 +1,15 @@
 #import <AppKit/AppKit.h>
-@class RDLReport;
 
+@class PicaDocument;
+
+// Open an RDL, bind parameters and JSON datasets, read the pages, export.
+// Shares its document with the designer, so a report opened in one is the
+// report the other sees.
 @interface PicaGeneratorWindow : NSWindowController
-- (void)loadReport:(RDLReport *)report;
-- (void)loadSample:(NSString *)sampleId;
-- (BOOL)openURL:(NSURL *)url error:(NSError **)error;
+- (instancetype)initWithDocument:(PicaDocument *)document;
+// Not named `document`: NSWindowController already has one, and shadowing it
+// suppresses synthesis of the backing ivar.
+@property (nonatomic, readonly, strong) PicaDocument *reportDocument;
 - (void)openRdl:(id)sender;
 - (void)exportPDF:(id)sender;
 - (void)exportHTML:(id)sender;

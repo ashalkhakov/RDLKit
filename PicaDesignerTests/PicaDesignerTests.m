@@ -27,6 +27,12 @@
 - (void)testEditingContext {
   PICA_ASSERT_NO_FAILURES(PicaRunEditingContextChecks());
 }
+- (void)testExport {
+  PICA_ASSERT_NO_FAILURES(PicaRunExportChecks());
+}
+- (void)testSharedPipeline {
+  PICA_ASSERT_NO_FAILURES(PicaRunSharedPipelineChecks());
+}
 @end
 
 @interface PicaCanvasTests : PICA_TEST_CASE

@@ -194,7 +194,7 @@
   [dataScroll setBorderType:NSBezelBorder];
   [dataScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
   _dataView = [[PicaDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
-                                         context:_context];
+                                        document:_context.document];
   [dataScroll setDocumentView:_dataView];
   [right addSubview:_inspectorScroll];
   [right addSubview:dataScroll];
@@ -318,15 +318,34 @@
 }
 
 - (void)exportPDF:(id)sender {
-  (void)sender;
+  PICA_UNUSED(sender);
+  [self exportUsingBackend:[_context.document exportBackendForPathExtension:@"pdf"]];
+}
+
+// One path for every backend the kit offers; the panel's chosen extension
+// picks which, so adding a backend needs no change here.
+- (void)exportUsingBackend:(id<RDLBackend>)backend {
+  PicaDocument *doc = _context.document;
+  if (backend == nil)
+    return;
+  NSMutableArray *types = [NSMutableArray array];
+  for (id<RDLBackend> b in [doc exportBackends])
+    [types addObject:b.pathExtension];
   NSSavePanel *p = [NSSavePanel savePanel];
-  [p setAllowedFileTypes:@[ @"pdf" ]];
-  [p setNameFieldStringValue:
-          [(_context.report.name ?: @"report") stringByAppendingPathExtension:@"pdf"]];
-  if ([p runModal] == NSOKButton) {
-    NSData *pdf = [RDLGenerator PDFForReport:_context.report
-                                  parameters:_context.document.paramValues];
-    [pdf writeToURL:[p URL] atomically:YES];
+  [p setAllowedFileTypes:types];
+  [p setNameFieldStringValue:[doc suggestedFileNameForBackend:backend]];
+  if ([p runModal] != NSOKButton)
+    return;
+  NSURL *url = [p URL];
+  // Honour the extension the user actually chose.
+  id<RDLBackend> chosen =
+      [doc exportBackendForPathExtension:[url pathExtension]] ?: backend;
+  NSError *err = nil;
+  if (![doc exportUsingBackend:chosen toURL:url error:&err]) {
+    NSAlert *a = [[NSAlert alloc] init];
+    [a setMessageText:@"Could not export"];
+    [a setInformativeText:err.localizedDescription ?: @""];
+    [a runModal];
   }
 }
 

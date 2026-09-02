@@ -128,6 +128,51 @@
   return YES;
 }
 
+#pragma mark - Export
+
+- (NSArray<id<RDLBackend>> *)exportBackends {
+  return [RDLGenerator backends];
+}
+
+- (id<RDLBackend>)exportBackendForPathExtension:(NSString *)pathExtension {
+  for (id<RDLBackend> b in [self exportBackends]) {
+    if ([b.pathExtension caseInsensitiveCompare:pathExtension] == NSOrderedSame)
+      return b;
+  }
+  return nil;
+}
+
+- (NSString *)suggestedFileNameForBackend:(id<RDLBackend>)backend {
+  // The file on disk, when there is one, is a better basis than the report
+  // name: it is what the user last chose to call this.
+  NSString *base = [[_fileURL lastPathComponent] stringByDeletingPathExtension];
+  if ([base length] == 0)
+    base = [_report.name length] ? _report.name : @"report";
+  return [base stringByAppendingPathExtension:backend.pathExtension];
+}
+
+- (NSData *)exportDataUsingBackend:(id<RDLBackend>)backend {
+  if (backend == nil)
+    return nil;
+  return [RDLGenerator renderReport:_report
+                         parameters:_paramValues
+                       usingBackend:backend];
+}
+
+- (BOOL)exportUsingBackend:(id<RDLBackend>)backend
+                     toURL:(NSURL *)url
+                     error:(NSError **)error {
+  NSData *data = [self exportDataUsingBackend:backend];
+  if (data == nil || url == nil) {
+    if (error)
+      *error = [NSError errorWithDomain:@"PicaDocument" code:2 userInfo:@{
+        NSLocalizedDescriptionKey : @"Nothing to export"
+      }];
+    return NO;
+  }
+  return [data writeToURL:url options:NSDataWritingAtomic error:error];
+}
+
 #pragma mark - Change publication
 
 - (void)noteChange:(PicaChange *)change {
