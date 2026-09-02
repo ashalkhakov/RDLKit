@@ -167,9 +167,10 @@ static const CGFloat kHalf2X = 136;
   _descField = [self row:@"Description" y:&y inView:_docBox height:44];
   [self label:@"Page" frame:NSMakeRect(kFieldX, y, kFieldW, 14) inView:_docBox];
   y += 16;
-  _pagePop = [self popIn:_docBox
-                   frame:NSMakeRect(kFieldX, y, kFieldW, 22)
-                  titles:@[ @"Letter 8.5 × 11", @"A4 210 × 297 mm" ]];
+  NSMutableArray *pageNames = [NSMutableArray array];
+  for (NSDictionary *size in [RDLPage standardSizes])
+    [pageNames addObject:size[@"name"]];
+  _pagePop = [self popIn:_docBox frame:NSMakeRect(kFieldX, y, kFieldW, 22) titles:pageNames];
   y += 28;
   [self label:@"Header in" frame:NSMakeRect(kFieldX, y, kHalfW, 14) inView:_docBox];
   [self label:@"Body in" frame:NSMakeRect(kHalf2X, y, kHalfW, 14) inView:_docBox];
@@ -478,7 +479,7 @@ static const CGFloat kHalf2X = 136;
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
     // Only the Body carries a background in RDL, so the field is disabled
     // elsewhere rather than silently doing nothing.
-    BOOL isBody = [sel.bandKey isEqualToString:@"body"];
+    BOOL isBody = [RDLReport bandKeySupportsBackground:sel.bandKey];
     [_bandBGField setEditable:isBody];
     [_bandBGField setEnabled:isBody];
     [_bandBGField setStringValue:isBody ? (band.style.backgroundColor ?: @"") : @""];
@@ -486,8 +487,10 @@ static const CGFloat kHalf2X = 136;
     [self stackBoxes:@[ _bandBox ]];
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
-    BOOL a4 = fabs(report.page.pageWidth - 8.27) < 0.05;
-    [_pagePop selectItemAtIndex:a4 ? 1 : 0];
+    NSDictionary *size = [report.page matchingStandardSize];
+    NSUInteger sizeIndex = size ? [[RDLPage standardSizes] indexOfObject:size] : NSNotFound;
+    if (sizeIndex != NSNotFound)
+      [_pagePop selectItemAtIndex:(NSInteger)sizeIndex];
     [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", report.page.leftMargin]];
     [self stackBoxes:@[ _docBox ]];
   }
@@ -567,27 +570,21 @@ static const CGFloat kHalf2X = 136;
     return;
   }
 
+  // Page dimensions and margins carry the body width with them, so the
+  // dependency lives in RDLEditor rather than here.
   if (sender == _marginField) {
-    // One field drives all four edges, and the body width follows.
-    CGFloat m = [[_marginField stringValue] doubleValue];
-    RDLPage *page = _context.report.page;
-    [editor beginGroup:@"Margins"];
-    for (NSString *edge in @[ @"leftMargin", @"rightMargin", @"topMargin", @"bottomMargin" ])
-      [editor setReportValue:@(m) forKeyPath:[@"page." stringByAppendingString:edge]];
-    [editor setReportValue:@(page.pageWidth - 2 * m) forKeyPath:@"width"];
-    [editor endGroup];
+    [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
     return;
   }
 
   if (sender == _pagePop) {
-    BOOL a4 = [_pagePop indexOfSelectedItem] == 1;
-    RDLPage *page = _context.report.page;
-    [editor beginGroup:@"Page Size"];
-    [editor setReportValue:@(a4 ? 8.27 : 8.5) forKeyPath:@"page.pageWidth"];
-    [editor setReportValue:@(a4 ? 11.69 : 11.0) forKeyPath:@"page.pageHeight"];
-    [editor setReportValue:@((a4 ? 8.27 : 8.5) - page.leftMargin - page.rightMargin)
-                forKeyPath:@"width"];
-    [editor endGroup];
+    NSArray *sizes = [RDLPage standardSizes];
+    NSInteger i = [_pagePop indexOfSelectedItem];
+    if (i >= 0 && i < (NSInteger)[sizes count]) {
+      NSDictionary *size = sizes[(NSUInteger)i];
+      [editor setPageWidth:[size[@"width"] doubleValue]
+                    height:[size[@"height"] doubleValue]];
+    }
     return;
   }
 }

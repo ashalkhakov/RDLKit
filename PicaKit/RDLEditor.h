@@ -45,6 +45,14 @@
 - (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top;
 - (void)resizeItem:(RDLItem *)item toWidth:(CGFloat)width height:(CGFloat)height;
 
+// --- Page setup -----------------------------------------------------------
+// Page dimensions and margins are not independent of the body width: RDL's
+// Width is the printable width, so changing either has to adjust it. These
+// apply the whole set as one undo step rather than leaving the caller to
+// remember the dependency.
+- (void)setPageWidth:(CGFloat)width height:(CGFloat)height;
+- (void)setUniformMargin:(CGFloat)margin;
+
 // --- Structure ------------------------------------------------------------
 - (void)insertItem:(RDLItem *)item
               into:(NSMutableArray *)container

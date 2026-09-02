@@ -3562,6 +3562,53 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   if (![report.name isEqualToString:@"Renamed"])
     PicaFail(fails, @"a report binding should write the report");
 
+  // Page setup: the dimensions and the body width are not independent, so the
+  // editor applies them together as one undo step. This rule used to be
+  // hardcoded in the inspector.
+  RDLDocument *pdoc = [[RDLDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Page"]];
+  RDLEditor *ped = [[RDLEditor alloc] initWithDocument:pdoc];
+  pdoc.report.page.leftMargin = pdoc.report.page.rightMargin = 1.0;
+  NSArray *sizes = [RDLPage standardSizes];
+  if ([sizes count] < 2)
+    PicaFail(fails, @"expected at least Letter and A4 among the standard sizes");
+  NSDictionary *a4 = sizes[1];
+  [ped setPageWidth:[a4[@"width"] doubleValue] height:[a4[@"height"] doubleValue]];
+  if (fabs(pdoc.report.page.pageWidth - 8.27) > 0.001)
+    PicaFail(fails, @"page width should be applied");
+  if (fabs(pdoc.report.width - (8.27 - 2.0)) > 0.001)
+    PicaFail(fails, [NSString stringWithFormat:@"body width should follow the page, got %g",
+                                               (double)pdoc.report.width]);
+  [pdoc.undoManager undo];
+  if (fabs(pdoc.report.page.pageWidth - 8.5) > 0.001 ||
+      fabs(pdoc.report.page.pageHeight - 11.0) > 0.001)
+    PicaFail(fails, @"one undo should restore both page dimensions");
+
+  [ped setUniformMargin:0.75];
+  RDLPage *page = pdoc.report.page;
+  if (fabs(page.leftMargin - 0.75) > 0.001 || fabs(page.rightMargin - 0.75) > 0.001 ||
+      fabs(page.topMargin - 0.75) > 0.001 || fabs(page.bottomMargin - 0.75) > 0.001)
+    PicaFail(fails, @"a uniform margin should set all four edges");
+  if (fabs(pdoc.report.width - (8.5 - 1.5)) > 0.001)
+    PicaFail(fails, @"body width should follow the margins");
+  [pdoc.undoManager undo];
+  if (fabs(page.leftMargin - 1.0) > 0.001)
+    PicaFail(fails, @"one undo should restore all four margins");
+
+  // Matching a page back to a preset, which is how the popup shows the
+  // current size. A4 in inches is not exact, so the match is loose.
+  if (![[pdoc.report.page matchingStandardSize][@"name"] hasPrefix:@"Letter"])
+    PicaFail(fails, @"a Letter page should match the Letter preset");
+  pdoc.report.page.pageWidth = 20.0;
+  if ([pdoc.report.page matchingStandardSize] != nil)
+    PicaFail(fails, @"a custom size should match no preset");
+
+  // Only the Body carries a background in the RDL this writes.
+  if (![RDLReport bandKeySupportsBackground:@"body"])
+    PicaFail(fails, @"the body should support a background");
+  if ([RDLReport bandKeySupportsBackground:@"pageHeader"] ||
+      [RDLReport bandKeySupportsBackground:@"pageFooter"])
+    PicaFail(fails, @"header and footer bands should not claim background support");
+
   // An unbound control is reported as unhandled, so the caller can deal with
   // the composite fields itself.
   NSTextField *stray = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];

@@ -229,6 +229,12 @@
 @interface RDLPage : NSObject
 @property (nonatomic, assign) CGFloat pageWidth, pageHeight;
 @property (nonatomic, assign) CGFloat leftMargin, rightMargin, topMargin, bottomMargin;
+// The paper sizes the designer offers, as @{name, width, height} in inches.
+// Here rather than in the UI because they are facts about paper, and because
+// the writer and the layout engine care about the same numbers.
++ (NSArray<NSDictionary *> *)standardSizes;
+// The entry matching this page's dimensions, or nil for a custom size.
+- (NSDictionary *)matchingStandardSize;
 @end
 
 @interface RDLReport : NSObject
@@ -252,6 +258,10 @@
 // Layout, hit-testing and the designer all depend on that order. Iterate
 // -bandKeys with -bandWithKey: when you need the key alongside the band.
 + (NSArray<NSString *> *)bandKeys;
+// Only the Body carries a Style in the RDL this writes, so a background set on
+// a page header or footer would be silently dropped. Asked by the inspector
+// rather than reimplemented there.
++ (BOOL)bandKeySupportsBackground:(NSString *)bandKey;
 - (NSArray<RDLBand *> *)allBands;
 - (RDLBand *)bandWithKey:(NSString *)key;
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand;

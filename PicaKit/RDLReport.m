@@ -743,6 +743,26 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   }
   return self;
 }
++ (NSArray<NSDictionary *> *)standardSizes {
+  static NSArray *sizes = nil;
+  if (sizes == nil) {
+    sizes = @[
+      @{ @"name" : @"Letter 8.5 × 11", @"width" : @8.5, @"height" : @11.0 },
+      @{ @"name" : @"A4 210 × 297 mm", @"width" : @8.27, @"height" : @11.69 },
+    ];
+  }
+  return sizes;
+}
+
+- (NSDictionary *)matchingStandardSize {
+  for (NSDictionary *size in [RDLPage standardSizes]) {
+    // Loose, because A4 in inches is not exact.
+    if (fabs(self.pageWidth - [size[@"width"] doubleValue]) < 0.05 &&
+        fabs(self.pageHeight - [size[@"height"] doubleValue]) < 0.05)
+      return size;
+  }
+  return nil;
+}
 @end
 
 @implementation RDLReport
@@ -779,6 +799,10 @@ static NSString *PicaAggregateOfValue(NSString *value) {
     if ([img.name caseInsensitiveCompare:name] == NSOrderedSame)
       return img;
   return nil;
+}
+
++ (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
+  return [bandKey isEqualToString:@"body"];
 }
 
 + (NSArray<NSString *> *)bandKeys {

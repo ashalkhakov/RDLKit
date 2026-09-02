@@ -186,6 +186,31 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[RDLChange itemChange:item keys:@[ @"width", @"height" ] bandKey:nil]];
 }
 
+#pragma mark - Page setup
+
+- (void)setPageWidth:(CGFloat)width height:(CGFloat)height {
+  RDLReport *report = _document.report;
+  if (report == nil)
+    return;
+  [self beginGroup:@"Page Size"];
+  [self setReportValue:@(width) forKeyPath:@"page.pageWidth"];
+  [self setReportValue:@(height) forKeyPath:@"page.pageHeight"];
+  [self setReportValue:@(width - report.page.leftMargin - report.page.rightMargin)
+            forKeyPath:@"width"];
+  [self endGroup];
+}
+
+- (void)setUniformMargin:(CGFloat)margin {
+  RDLReport *report = _document.report;
+  if (report == nil)
+    return;
+  [self beginGroup:@"Margins"];
+  for (NSString *edge in @[ @"leftMargin", @"rightMargin", @"topMargin", @"bottomMargin" ])
+    [self setReportValue:@(margin) forKeyPath:[@"page." stringByAppendingString:edge]];
+  [self setReportValue:@(report.page.pageWidth - 2 * margin) forKeyPath:@"width"];
+  [self endGroup];
+}
+
 #pragma mark - Structure
 
 - (NSMutableArray *)containerOfItem:(RDLItem *)item bandKey:(NSString **)outBandKey {
