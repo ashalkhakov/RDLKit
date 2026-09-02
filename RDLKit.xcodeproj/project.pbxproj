@@ -73,6 +73,9 @@
 		2ACEF60D3170E8981F7CAEFA /* PicaExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */; };
 		DE7A818B1EE4CD3FD1FAA8B8 /* RDLPageGeometry.h in Headers */ = {isa = PBXBuildFile; fileRef = CB443B8E5CF1FAC0D327C5A6 /* RDLPageGeometry.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		6A8FBFD572C0B2C4937E716E /* RDLPageGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 45C57A82F0BA088F2943BADE /* RDLPageGeometry.m */; };
+		6B7978C883C96349279108D8 /* PicaCanvasRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = FD46A1AE98C8CBB1F8B7FD5C /* PicaCanvasRenderer.m */; };
+		822F8F131161C58584227764 /* PicaInPlaceEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 15F2DE9F3205E7B493B22D39 /* PicaInPlaceEditor.m */; };
+		EDA9EEB9706A25D81CA75AFD /* PicaCanvasInteraction.m in Sources */ = {isa = PBXBuildFile; fileRef = 1C7BAEB02EB104C0A3D3FD1C /* PicaCanvasInteraction.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -206,6 +209,12 @@
 		DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaEditingContext.m; sourceTree = "<group>"; };
 		CB443B8E5CF1FAC0D327C5A6 /* RDLPageGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPageGeometry.h; sourceTree = "<group>"; };
 		45C57A82F0BA088F2943BADE /* RDLPageGeometry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPageGeometry.m; sourceTree = "<group>"; };
+		7ED4103CA65B712F3FBE7DB0 /* PicaCanvasRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaCanvasRenderer.h; sourceTree = "<group>"; };
+		FD46A1AE98C8CBB1F8B7FD5C /* PicaCanvasRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaCanvasRenderer.m; sourceTree = "<group>"; };
+		1D34F79EB19926E545BF9C88 /* PicaInPlaceEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaInPlaceEditor.h; sourceTree = "<group>"; };
+		15F2DE9F3205E7B493B22D39 /* PicaInPlaceEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaInPlaceEditor.m; sourceTree = "<group>"; };
+		6889074C60A6765F66175242 /* PicaCanvasInteraction.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaCanvasInteraction.h; sourceTree = "<group>"; };
+		1C7BAEB02EB104C0A3D3FD1C /* PicaCanvasInteraction.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaCanvasInteraction.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -289,6 +298,12 @@
 				E7F4AAE5DA543577DD26E124 /* README.md */,
 				ED8FB43465A94113819D4184 /* PicaEditingContext.h */,
 				DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */,
+				7ED4103CA65B712F3FBE7DB0 /* PicaCanvasRenderer.h */,
+				FD46A1AE98C8CBB1F8B7FD5C /* PicaCanvasRenderer.m */,
+				1D34F79EB19926E545BF9C88 /* PicaInPlaceEditor.h */,
+				15F2DE9F3205E7B493B22D39 /* PicaInPlaceEditor.m */,
+				6889074C60A6765F66175242 /* PicaCanvasInteraction.h */,
+				1C7BAEB02EB104C0A3D3FD1C /* PicaCanvasInteraction.m */,
 			);
 			path = PicaDesigner;
 			sourceTree = "<group>";
@@ -581,6 +596,9 @@
 				CEBAF52B30470D1500D62319 /* PicaExpressionHelper.m in Sources */,
 				CEBAF52C30470D1500D62319 /* PicaTablixEditor.m in Sources */,
 				AA17E816AF371EBB10F5333E /* PicaEditingContext.m in Sources */,
+				6B7978C883C96349279108D8 /* PicaCanvasRenderer.m in Sources */,
+				822F8F131161C58584227764 /* PicaInPlaceEditor.m in Sources */,
+				EDA9EEB9706A25D81CA75AFD /* PicaCanvasInteraction.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

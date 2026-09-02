@@ -7,6 +7,9 @@ Pica_OBJC_FILES = \
   main.m \
   PicaEditingContext.m \
   PicaCanvasView.m \
+  PicaCanvasRenderer.m \
+  PicaInPlaceEditor.m \
+  PicaCanvasInteraction.m \
   PicaDesignerWindow.m \
   PicaGeneratorWindow.m \
   PicaAppDelegate.m \
