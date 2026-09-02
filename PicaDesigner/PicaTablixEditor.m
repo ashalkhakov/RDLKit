@@ -19,19 +19,6 @@ static NSArray *PicaAlignNames(void) {
 @property (nonatomic, strong) RDLReport *report;
 @end
 
-static void PicaTraceModal(NSString *format, ...) {
-  static int enabled = -1;
-  if (enabled < 0)
-    enabled = getenv("PICA_TRACE_MODAL") != NULL ? 1 : 0;
-  if (!enabled)
-    return;
-  va_list args;
-  va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
-  va_end(args);
-  fprintf(stderr, "[pica.modal] %s\n", [msg UTF8String]);
-}
-
 @implementation PicaTablixEditor
 
 - (NSTextField *)label:(NSString *)t frame:(NSRect)f inView:(NSView *)v {
@@ -253,14 +240,12 @@ static void PicaTraceModal(NSString *format, ...) {
 
 - (void)accept:(id)sender {
   (void)sender;
-  PicaTraceModal(@"accept: clicked");
   [self commitTableEditing];
   [NSApp stopModalWithCode:1];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
-  PicaTraceModal(@"cancel: clicked");
   [NSApp stopModalWithCode:0];
 }
 
@@ -318,9 +303,7 @@ static void PicaTraceModal(NSString *format, ...) {
   ed.cols = cols;
   [ed buildPanelForTablix:tablix];
   [ed.panel center];
-  PicaTraceModal(@"runModalForWindow: entering");
   NSInteger code = [NSApp runModalForWindow:ed.panel];
-  PicaTraceModal(@"runModalForWindow: returned %ld", (long)code);
   [ed.panel orderOut:nil];
   if (code != 1)
     return NO;

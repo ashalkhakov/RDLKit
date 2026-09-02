@@ -310,52 +310,16 @@
   [_context.editor toggleGrandTotalOfTablix:[_context selectedItem]];
 }
 
-// Both of these open a modal panel from a context-menu action, i.e. while the
-// menu's own tracking loop is unwinding. Starting a modal session there can
-// leave the panel unable to process events -- it appears but ignores clicks
-// and key equivalents -- so the modal is opened on the next pass of the run
-// loop, once the menu has finished.
-//
-// Set PICA_TRACE_MODAL=1 to log the sequence, which is the only way to see
-// where this path stalls: it cannot be reproduced without a real menu.
-static void PicaTraceModal(NSString *format, ...) {
-  static int enabled = -1;
-  if (enabled < 0)
-    enabled = getenv("PICA_TRACE_MODAL") != NULL ? 1 : 0;
-  if (!enabled)
-    return;
-  va_list args;
-  va_start(args, format);
-  NSString *msg = [[NSString alloc] initWithFormat:format arguments:args];
-  va_end(args);
-  fprintf(stderr, "[pica.modal] %s\n", [msg UTF8String]);
-}
-
 - (void)ctxEditGroup:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  PicaTraceModal(@"ctxEditGroup: entered, selection=%@", [[_context selectedItem] name]);
-  [self performSelector:@selector(openTablixEditor) withObject:nil afterDelay:0];
-}
-
-- (void)openTablixEditor {
   RDLItem *it = [_context selectedItem];
-  PicaTraceModal(@"openTablixEditor: item=%@ type=%@ keyWindow=%@ modal=%@", it.name, it.type,
-                 [[NSApp keyWindow] title], [[NSApp modalWindow] title]);
-  if (it && [it.type isEqualToString:@"Tablix"]) {
-    BOOL changed = [PicaTablixEditor runForTablix:it context:_context];
-    PicaTraceModal(@"openTablixEditor: dialog closed, changed=%d", (int)changed);
-  }
+  if (it && [it.type isEqualToString:@"Tablix"])
+    [PicaTablixEditor runForTablix:it context:_context];
 }
 
 - (void)ctxEditRichText:(NSMenuItem *)mi {
   PICA_UNUSED(mi);
-  PicaTraceModal(@"ctxEditRichText: entered");
-  [self performSelector:@selector(openRichTextEditor) withObject:nil afterDelay:0];
-}
-
-- (void)openRichTextEditor {
   RDLItem *it = [_context selectedItem];
-  PicaTraceModal(@"openRichTextEditor: item=%@ type=%@", it.name, it.type);
   if (it && [it.type isEqualToString:@"Textbox"])
     [PicaRichTextEditor runForTextbox:it context:_context];
 }
