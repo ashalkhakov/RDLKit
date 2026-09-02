@@ -5,13 +5,6 @@
 #import "PicaTablixEditor.h"
 #import "PicaRichTextEditor.h"
 
-static const CGFloat kDPI = 72.0;
-
-static NSRect PicaItemRect(RDLItem *it, CGFloat ox, CGFloat oy, CGFloat zoom) {
-  return NSMakeRect(ox + it.left * kDPI * zoom, oy + it.top * kDPI * zoom,
-                    it.width * kDPI * zoom, MAX(1, it.height * kDPI * zoom));
-}
-
 // Style -> AppKit attribute translation lives in PicaKit's RDLTextAttributes,
 // shared with RDLView's preview and the rich-text codec. The canvas is the one
 // caller that passes a scale other than 1: its zoom.
@@ -21,6 +14,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 @interface PicaCanvasView () <NSTextFieldDelegate>
 @property (nonatomic, strong) PicaEditingContext *context;
+// Rebuilt on demand from the report, zoom and view origin. All five of the
+// canvas's former band traversals now go through this.
+@property (nonatomic, strong) RDLPageGeometry *geometry;
 @end
 
 @implementation PicaCanvasView {
@@ -52,96 +48,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSPoint _pendingEditPoint;
 }
 
-// --- Tablix preview & cell geometry ----------------------------------------
-
-- (CGFloat)tablixHeaderHeight:(RDLItem *)it {
-  return MAX(12, it.headerHeight * kDPI * _context.zoom);
-}
-
-- (CGFloat)tablixRowHeight:(RDLItem *)it {
-  return MAX(12, it.rowHeight * kDPI * _context.zoom);
-}
-
-// Rect of a preview cell. `part` is "header" or "value".
-- (NSRect)tablixCellRect:(RDLItem *)it
-                itemRect:(NSRect)r
-                     col:(NSUInteger)ci
-                    part:(NSString *)part {
-  NSArray *cols = it.columnSpecs ?: @[];
-  CGFloat x = NSMinX(r);
-  for (NSUInteger i = 0; i < ci && i < [cols count]; i++)
-    x += [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
-  CGFloat w = ci < [cols count] ? [cols[ci][@"width"] doubleValue] * kDPI * _context.zoom : 60;
-  CGFloat hh = [self tablixHeaderHeight:it];
-  BOOL header = [part isEqualToString:@"header"];
-  CGFloat y = header ? NSMinY(r) : NSMinY(r) + hh;
-  CGFloat h = header ? hh : [self tablixRowHeight:it];
-  return NSMakeRect(x, y, w, h);
-}
-
-// Column index + part under a point, or NO when outside the editable grid.
-- (BOOL)tablix:(RDLItem *)it
-      itemRect:(NSRect)r
-         point:(NSPoint)p
-           col:(NSUInteger *)outCol
-          part:(NSString **)outPart {
-  NSArray *cols = it.columnSpecs ?: @[];
-  if ([cols count] == 0 || !NSPointInRect(p, r))
-    return NO;
-  CGFloat hh = [self tablixHeaderHeight:it];
-  CGFloat rh = [self tablixRowHeight:it];
-  NSString *part;
-  if (p.y < NSMinY(r) + hh)
-    part = @"header";
-  else if (p.y < NSMinY(r) + hh + rh)
-    part = @"value";
-  else
-    return NO;
-  CGFloat x = NSMinX(r);
-  for (NSUInteger i = 0; i < [cols count]; i++) {
-    CGFloat w = [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
-    if (p.x >= x && p.x < x + w) {
-      if (outCol)
-        *outCol = i;
-      if (outPart)
-        *outPart = part;
-      return YES;
-    }
-    x += w;
-  }
-  return NO;
-}
-
-// Column border under the point (for width-resize dragging). Only internal
-// borders count: the right edge of the last column is the item's own east
-// resize handle. Returns the index of the column whose right border is hit.
-- (BOOL)tablixColumnBorder:(RDLItem *)it
-                  itemRect:(NSRect)r
-                     point:(NSPoint)p
-                       col:(NSUInteger *)outCol {
-  NSArray *cols = it.columnSpecs ?: @[];
-  if ([cols count] < 2)
-    return NO;
-  CGFloat gridBottom = NSMinY(r) + [self tablixHeaderHeight:it] + [self tablixRowHeight:it];
-  if (p.y < NSMinY(r) || p.y > gridBottom)
-    return NO;
-  CGFloat x = NSMinX(r);
-  for (NSUInteger i = 0; i + 1 < [cols count]; i++) {
-    x += [cols[i][@"width"] doubleValue] * kDPI * _context.zoom;
-    if (fabs(p.x - x) <= 3) {
-      if (outCol)
-        *outCol = i;
-      return YES;
-    }
-  }
-  return NO;
-}
-
 - (void)drawTablix:(RDLItem *)it inRect:(NSRect)r {
   CGFloat z = _context.zoom;
   NSArray *cols = it.columnSpecs ?: @[];
-  CGFloat hh = [self tablixHeaderHeight:it];
-  CGFloat rh = [self tablixRowHeight:it];
+  CGFloat hh = [RDLTablixGeometry headerHeightOf:it zoom:z];
+  CGFloat rh = [RDLTablixGeometry rowHeightOf:it zoom:z];
 
   // Header band with the same background picaBuildTable uses.
   NSRect hr = NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), MIN(hh, NSHeight(r)));
@@ -150,7 +61,11 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
   // Hovered cell highlight: shows which region a double-click would edit.
   if (_hoverTablix == it && _hoverPart != nil && _editorField == nil) {
-    NSRect cell = [self tablixCellRect:it itemRect:r col:_hoverCol part:_hoverPart];
+    NSRect cell = [RDLTablixGeometry cellRectOf:it
+                                       itemRect:r
+                                         column:_hoverCol
+                                           part:_hoverPart
+                                           zoom:z];
     [[NSColor colorWithCalibratedRed:0.55 green:0.62 blue:0.85 alpha:0.18] set];
     NSRectFillUsingOperation(cell, NSCompositeSourceOver);
   }
@@ -166,7 +81,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i < [cols count]; i++) {
     NSDictionary *col = cols[i];
-    CGFloat w = [col[@"width"] doubleValue] * kDPI * z;
+    CGFloat w = [col[@"width"] doubleValue] * RDLPointsPerInch * z;
     NSString *align = col[@"align"];
     headerStyle.textAlign = align;
     valueStyle.textAlign = align;
@@ -233,7 +148,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 - (void)documentDidChange:(NSNotification *)note {
   RDLChange *change = [note userInfo][RDLChangeKey];
   if ([change affectsLayout])
-    [self sizeToPage];
+    [self sizeToPage]; // also invalidates the geometry
+  else
+    [self invalidateGeometry];
   [self setNeedsDisplay:YES];
 }
 
@@ -245,7 +162,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)viewStateDidChange:(NSNotification *)note {
   PICA_UNUSED(note);
-  [self sizeToPage];
+  [self sizeToPage]; // zoom changed
   [self setNeedsDisplay:YES];
 }
 
@@ -262,60 +179,58 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 }
 
 - (void)sizeToPage {
-  RDLPage *p = _context.report.page;
-  CGFloat z = _context.zoom;
-  CGFloat pad = 48;
-  [self setFrameSize:NSMakeSize(p.pageWidth * kDPI * z + pad * 2, p.pageHeight * kDPI * z + pad * 2)];
+  _geometry = nil; // the page changed shape
+  [self setFrameSize:[RDLPageGeometry canvasSizeForReport:_context.report
+                                                     zoom:_context.zoom]];
 }
 
-- (NSRect)paperRect {
-  RDLPage *p = _context.report.page;
-  CGFloat z = _context.zoom;
-  return NSMakeRect(48, 36, p.pageWidth * kDPI * z, p.pageHeight * kDPI * z);
+// One snapshot per draw or event, cached until something invalidates it. It
+// holds no model state, so rebuilding is cheap and always current.
+- (RDLPageGeometry *)geometry {
+  if (_geometry == nil)
+    _geometry = [RDLPageGeometry geometryForReport:_context.report
+                                              zoom:_context.zoom
+                                       paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
+  return _geometry;
+}
+
+- (void)invalidateGeometry {
+  _geometry = nil;
 }
 
 - (void)drawRect:(NSRect)dirty {
-  (void)dirty;
+  PICA_UNUSED(dirty);
+  RDLPageGeometry *geo = [self geometry];
   RDLReport *r = _context.report;
   CGFloat z = _context.zoom;
+  CGFloat scale = RDLPointsPerInch * z;
   [[NSColor colorWithCalibratedWhite:0.11 alpha:1] set];
   NSRectFill(self.bounds);
-  NSRect paper = [self paperRect];
+  NSRect paper = geo.paperRect;
   [PicaColorFromHex(@"#f6f1e8") set];
   NSRectFill(paper);
   NSFrameRect(paper);
 
-  CGFloat ml = r.page.leftMargin * kDPI * z;
-  CGFloat mt = r.page.topMargin * kDPI * z;
-  CGFloat mr = r.page.rightMargin * kDPI * z;
-  CGFloat mb = r.page.bottomMargin * kDPI * z;
-  NSColor *gutter = [NSColor colorWithCalibratedWhite:0.86 alpha:0.45];
-  [gutter set];
+  // Shade the margins so the printable area reads as the page.
+  CGFloat ml = r.page.leftMargin * scale;
+  CGFloat mt = r.page.topMargin * scale;
+  CGFloat mr = r.page.rightMargin * scale;
+  CGFloat mb = r.page.bottomMargin * scale;
+  [[NSColor colorWithCalibratedWhite:0.86 alpha:0.45] set];
   NSRectFill(NSMakeRect(NSMinX(paper), NSMinY(paper), NSWidth(paper), mt));
   NSRectFill(NSMakeRect(NSMinX(paper), NSMaxY(paper) - mb, NSWidth(paper), mb));
   NSRectFill(NSMakeRect(NSMinX(paper), NSMinY(paper) + mt, ml, NSHeight(paper) - mt - mb));
   NSRectFill(NSMakeRect(NSMaxX(paper) - mr, NSMinY(paper) + mt, mr, NSHeight(paper) - mt - mb));
 
-  CGFloat y = NSMinY(paper) + mt;
-  CGFloat x = NSMinX(paper) + ml;
-  CGFloat cw = NSWidth(paper) - ml - mr;
-  NSArray *bands = @[
-    @[ @"pageHeader", r.pageHeader ],
-    @[ @"body", r.body ],
-    @[ @"pageFooter", r.pageFooter ]
-  ];
   NSDictionary *labelAttr = @{
     NSFontAttributeName : [NSFont userFontOfSize:9],
     NSForegroundColorAttributeName : [NSColor colorWithCalibratedWhite:0.4 alpha:1]
   };
-  for (NSArray *pair in bands) {
-    NSString *key = pair[0];
-    RDLBand *band = pair[1];
-    CGFloat bh = band.height * kDPI * z;
-    NSRect br = NSMakeRect(x, y, cw, bh);
+  for (RDLBandFrame *bf in geo.bandFrames) {
+    NSRect br = bf.frame;
     if (_context.showsGrid) {
       [[NSColor colorWithCalibratedWhite:0.1 alpha:0.08] set];
-      CGFloat step = 0.25 * kDPI * z;
+      CGFloat step = 0.25 * scale;
       for (CGFloat gx = NSMinX(br); gx < NSMaxX(br); gx += step)
         NSFrameRect(NSMakeRect(gx, NSMinY(br), 1, NSHeight(br)));
       for (CGFloat gy = NSMinY(br); gy < NSMaxY(br); gy += step)
@@ -323,25 +238,25 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     }
     [[NSColor colorWithCalibratedWhite:0.55 alpha:1] set];
     NSFrameRect(br);
-    NSString *lab = [key isEqualToString:@"pageHeader"]
-                        ? @"Page header"
-                        : ([key isEqualToString:@"pageFooter"] ? @"Page footer" : @"Body");
+
+    // The band name runs up the left edge, rotated.
     [[NSGraphicsContext currentContext] saveGraphicsState];
     NSAffineTransform *xf = [NSAffineTransform transform];
     [xf translateXBy:NSMinX(br) - 12 yBy:NSMinY(br) + 8];
     [xf rotateByDegrees:90];
     [xf concat];
-    [lab drawAtPoint:NSZeroPoint withAttributes:labelAttr];
+    [[RDLItemFactory titleForBandKey:bf.bandKey] drawAtPoint:NSZeroPoint
+                                              withAttributes:labelAttr];
     [[NSGraphicsContext currentContext] restoreGraphicsState];
-    for (RDLItem *it in band.items)
-      [self drawItem:it originX:x originY:y];
-    y += bh;
+
+    for (RDLItem *it in bf.band.items)
+      [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
   }
 }
 
-- (void)drawItem:(RDLItem *)it originX:(CGFloat)ox originY:(CGFloat)oy {
+- (void)drawItem:(RDLItem *)it origin:(NSPoint)origin {
   BOOL sel = it == [_context selectedItem];
-  NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
+  NSRect r = [[self geometry] rectForItem:it origin:origin];
   if ([it.type isEqualToString:@"Line"]) {
     [PicaColorFromHex(it.style.color) set];
     NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
@@ -351,7 +266,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       NSRectFill(r);
     }
     for (RDLItem *child in it.items)
-      [self drawItem:child originX:NSMinX(r) originY:NSMinY(r)];
+      [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it.type isEqualToString:@"Tablix"]) {
     [self drawTablix:it inRect:r];
   } else if ([it.type isEqualToString:@"Chart"]) {
@@ -408,9 +323,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       [PicaColorFromHex(b.color) set];
       NSFrameRect(r);
     }
-    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * kDPI * _context.zoom;
-    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * kDPI * _context.zoom;
-    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * kDPI * _context.zoom;
+    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * RDLPointsPerInch * _context.zoom;
+    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * RDLPointsPerInch * _context.zoom;
+    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * RDLPointsPerInch * _context.zoom;
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
     if (!(_editorField && _editItem == it && _editContext == nil)) {
@@ -435,161 +350,58 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   }
 }
 
-- (BOOL)hitItem:(RDLItem *)it
-        originX:(CGFloat)ox
-        originY:(CGFloat)oy
-          point:(NSPoint)p
-           kind:(NSString **)kind {
-  NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
-  NSRect se = NSMakeRect(NSMaxX(r) - 4, NSMaxY(r) - 4, 8, 8);
-  NSRect e = NSMakeRect(NSMaxX(r) - 4, NSMidY(r) - 4, 8, 8);
-  NSRect s = NSMakeRect(NSMidX(r) - 4, NSMaxY(r) - 4, 8, 8);
-  if (NSPointInRect(p, se)) {
-    if (kind)
-      *kind = @"se";
-    return YES;
-  }
-  if (NSPointInRect(p, e)) {
-    if (kind)
-      *kind = @"e";
-    return YES;
-  }
-  if (NSPointInRect(p, s)) {
-    if (kind)
-      *kind = @"s";
-    return YES;
-  }
-  if (NSPointInRect(p, r)) {
-    if (kind)
-      *kind = @"move";
-    return YES;
-  }
-  return NO;
-}
-
-- (RDLItem *)hitInItems:(NSArray *)items
-                originX:(CGFloat)ox
-                originY:(CGFloat)oy
-                  point:(NSPoint)p
-                   kind:(NSString **)kind
-                   rect:(NSRect *)outRect {
-  for (RDLItem *it in [items reverseObjectEnumerator]) {
-    if ([it.items count]) {
-      NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
-      RDLItem *child = [self hitInItems:it.items
-                                originX:NSMinX(r)
-                                originY:NSMinY(r)
-                                  point:p
-                                   kind:kind
-                                   rect:outRect];
-      if (child)
-        return child;
-    }
-    if ([self hitItem:it originX:ox originY:oy point:p kind:kind]) {
-      if (outRect)
-        *outRect = PicaItemRect(it, ox, oy, _context.zoom);
-      return it;
-    }
-  }
-  return nil;
-}
-
-// View-coordinate rect of an item, searching all bands (and nested
-// rectangles). Returns NO when the item is no longer in the report.
-- (BOOL)findRectOfItem:(RDLItem *)target inItems:(NSArray *)items
-               originX:(CGFloat)ox
-               originY:(CGFloat)oy
-                  rect:(NSRect *)outRect {
-  for (RDLItem *it in items) {
-    NSRect r = PicaItemRect(it, ox, oy, _context.zoom);
-    if (it == target) {
-      if (outRect)
-        *outRect = r;
-      return YES;
-    }
-    if ([it.items count] &&
-        [self findRectOfItem:target inItems:it.items originX:NSMinX(r) originY:NSMinY(r) rect:outRect])
-      return YES;
-  }
-  return NO;
-}
-
-- (BOOL)findRectOfItem:(RDLItem *)target rect:(NSRect *)outRect {
-  RDLReport *r = _context.report;
-  CGFloat z = _context.zoom;
-  NSRect paper = [self paperRect];
-  CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
-  CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
-  for (RDLBand *band in [r allBands]) {
-    if ([self findRectOfItem:target inItems:band.items originX:x originY:y rect:outRect])
-      return YES;
-    y += band.height * kDPI * z;
-  }
-  return NO;
-}
-
 - (void)mouseDown:(NSEvent *)event {
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
   [self commitEditor];
-  // Take keyboard focus so Return-to-edit and Delete work after a click
-  // (Cocoa does not focus a view on click by itself).
+  // Take keyboard focus so Return-to-edit and Delete work after a click;
+  // Cocoa does not focus a view on click by itself.
   [[self window] makeFirstResponder:self];
-  RDLReport *r = _context.report;
-  CGFloat z = _context.zoom;
-  NSRect paper = [self paperRect];
-  CGFloat ml = r.page.leftMargin * kDPI * z;
-  CGFloat mt = r.page.topMargin * kDPI * z;
-  CGFloat x = NSMinX(paper) + ml;
-  CGFloat y = NSMinY(paper) + mt;
-  NSArray *keys = [RDLReport bandKeys];
-  for (NSInteger bi = 0; bi < (NSInteger)[keys count]; bi++) {
-    NSString *key = keys[bi];
-    RDLBand *band = [r bandWithKey:key];
-    CGFloat bh = band.height * kDPI * z;
-    NSRect br = NSMakeRect(x, y, NSWidth(paper) - ml - r.page.rightMargin * kDPI * z, bh);
-    NSString *kind = nil;
-    NSRect itemRect = NSZeroRect;
-    RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
-    if (hit) {
-      [_context.selection selectItem:hit inBandWithKey:key];
-      if ([event clickCount] >= 2) {
-        // The edit starts from mouseUp: (the reliable Cocoa pattern);
-        // remember what was hit so the second click's release begins it.
-        _dragKind = nil;
-        _pendingEditItem = hit;
-        _pendingEditPoint = p;
-        return;
-      }
-      _pendingEditItem = nil;
-      NSUInteger borderCol = 0;
-      if ([hit.type isEqualToString:@"Tablix"] &&
-          [self tablixColumnBorder:hit itemRect:itemRect point:p col:&borderCol]) {
-        // Drag an internal column border to resize that column's width.
-        _dragKind = @"tabcol";
-        _dragActive = NO;
-        _dragStart = p;
-        _dragColIndex = borderCol;
-        _origColW = [hit.columnSpecs[borderCol][@"width"] doubleValue];
-        return;
-      }
-      _dragKind = kind;
+
+  NSString *kind = nil;
+  NSString *bandKey = nil;
+  NSRect itemRect = NSZeroRect;
+  RDLItem *hit = [[self geometry] itemAtPoint:p kind:&kind bandKey:&bandKey rect:&itemRect];
+  if (hit) {
+    [_context.selection selectItem:hit inBandWithKey:bandKey];
+    if ([event clickCount] >= 2) {
+      // The edit starts from mouseUp: -- the reliable Cocoa pattern -- so
+      // remember what was hit for the second click's release to act on.
+      _dragKind = nil;
+      _pendingEditItem = hit;
+      _pendingEditPoint = p;
+      return;
+    }
+    _pendingEditItem = nil;
+    NSUInteger borderCol = 0;
+    if ([hit.type isEqualToString:@"Tablix"] &&
+        [RDLTablixGeometry tablix:hit
+                         itemRect:itemRect
+              columnBorderAtPoint:p
+                           column:&borderCol
+                             zoom:_context.zoom]) {
+      // Dragging an internal column border resizes that column.
+      _dragKind = @"tabcol";
       _dragActive = NO;
       _dragStart = p;
-      _origLeft = hit.left;
-      _origTop = hit.top;
-      _origW = hit.width;
-      _origH = hit.height;
+      _dragColIndex = borderCol;
+      _origColW = [hit.columnSpecs[borderCol][@"width"] doubleValue];
       return;
     }
-    if (NSPointInRect(p, br)) {
-      [_context.selection selectBandWithKey:key];
-      _dragKind = nil;
-      _pendingEditItem = nil;
-      return;
-    }
-    y += bh;
+    _dragKind = kind;
+    _dragActive = NO;
+    _dragStart = p;
+    _origLeft = hit.left;
+    _origTop = hit.top;
+    _origW = hit.width;
+    _origH = hit.height;
+    return;
   }
-  [_context.selection selectReport];
+
+  NSString *band = [[self geometry] bandKeyAtPoint:p];
+  if (band)
+    [_context.selection selectBandWithKey:band];
+  else
+    [_context.selection selectReport];
   _dragKind = nil;
   _pendingEditItem = nil;
 }
@@ -609,8 +421,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [_context.editor beginGroup:@"Move"]; // the whole drag is one undo step
   }
   CGFloat z = _context.zoom;
-  CGFloat dx = (p.x - _dragStart.x) / (kDPI * z);
-  CGFloat dy = (p.y - _dragStart.y) / (kDPI * z);
+  CGFloat dx = (p.x - _dragStart.x) / (RDLPointsPerInch * z);
+  CGFloat dy = (p.y - _dragStart.y) / (RDLPointsPerInch * z);
   if ([_dragKind isEqualToString:@"move"])
     [_context.editor moveItem:[_context selectedItem] toLeft:_origLeft + dx top:_origTop + dy];
   else if ([_dragKind isEqualToString:@"se"])
@@ -646,7 +458,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     // Return starts in-place editing of the selected item, Word-style.
       RDLItem *it = [_context selectedItem];
     NSRect r;
-    if (it && [self findRectOfItem:it rect:&r]) {
+    if (it && [[self geometry] findRectOfItem:it rect:&r]) {
       [self beginEditingHit:it rect:r point:NSMakePoint(NSMinX(r) + 1, NSMinY(r) + 1)];
       return;
     }
@@ -740,35 +552,29 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (NSMenu *)menuForEvent:(NSEvent *)event {
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
-  RDLReport *r = _context.report;
-  CGFloat z = _context.zoom;
-  NSRect paper = [self paperRect];
-  CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
-  CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
-  NSArray *keys = [RDLReport bandKeys];
-  for (NSInteger bi = 0; bi < (NSInteger)[keys count]; bi++) {
-    RDLBand *band = [r bandWithKey:keys[bi]];
-    NSString *kind = nil;
-    NSRect itemRect = NSZeroRect;
-    RDLItem *hit = [self hitInItems:band.items originX:x originY:y point:p kind:&kind rect:&itemRect];
-    if (hit) {
-      [_context.selection selectItem:hit inBandWithKey:keys[bi]];
-      if ([hit.type isEqualToString:@"Tablix"]) {
-        NSUInteger col = 0;
-        NSString *part = nil;
-        BOOL onCell = [self tablix:hit itemRect:itemRect point:p col:&col part:&part];
-        return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:hit];
-      }
-      if ([hit.type isEqualToString:@"Textbox"]) {
-        NSMenu *m = [[NSMenu alloc] initWithTitle:@"Textbox"];
-        [m addItem:[self tablixMenuItem:@"Edit Rich Text…"
-                                 action:@selector(ctxEditRichText:)
-                                    tag:0]];
-        return m;
-      }
-      return nil;
-    }
-    y += band.height * kDPI * z;
+  NSString *bandKey = nil;
+  NSRect itemRect = NSZeroRect;
+  RDLItem *hit = [[self geometry] itemAtPoint:p kind:NULL bandKey:&bandKey rect:&itemRect];
+  if (hit == nil)
+    return nil;
+  [_context.selection selectItem:hit inBandWithKey:bandKey];
+  if ([hit.type isEqualToString:@"Tablix"]) {
+    NSUInteger col = 0;
+    NSString *part = nil;
+    BOOL onCell = [RDLTablixGeometry tablix:hit
+                                   itemRect:itemRect
+                                      point:p
+                                     column:&col
+                                       part:&part
+                                       zoom:_context.zoom];
+    return [self tablixMenuForColumn:onCell ? (NSInteger)col : -1 item:hit];
+  }
+  if ([hit.type isEqualToString:@"Textbox"]) {
+    NSMenu *m = [[NSMenu alloc] initWithTitle:@"Textbox"];
+    [m addItem:[self tablixMenuItem:@"Edit Rich Text…"
+                             action:@selector(ctxEditRichText:)
+                                tag:0]];
+    return m;
   }
   return nil;
 }
@@ -864,38 +670,35 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 - (void)mouseMoved:(NSEvent *)event {
   NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
-  RDLReport *r = _context.report;
   CGFloat z = _context.zoom;
-  NSRect paper = [self paperRect];
-  CGFloat x = NSMinX(paper) + r.page.leftMargin * kDPI * z;
-  CGFloat y = NSMinY(paper) + r.page.topMargin * kDPI * z;
   RDLItem *hoverTab = nil;
   NSUInteger hoverCol = 0;
   NSString *hoverPart = nil;
   BOOL onBorder = NO;
-  for (RDLBand *band in [r allBands]) {
-    for (RDLItem *it in band.items) {
-      if (![it.type isEqualToString:@"Tablix"])
-        continue;
-      NSRect ir = PicaItemRect(it, x, y, z);
-      NSUInteger bc = 0;
-      if ([self tablixColumnBorder:it itemRect:ir point:p col:&bc]) {
-        onBorder = YES;
-        break;
-      }
-      NSUInteger col = 0;
-      NSString *part = nil;
-      if ([self tablix:it itemRect:ir point:p col:&col part:&part]) {
-        hoverTab = it;
-        hoverCol = col;
-        hoverPart = part;
-        break;
-      }
-    }
-    if (onBorder || hoverTab)
+
+  // Every tablix in the report, nested ones included. The old per-band scan
+  // only looked at top-level items, so a tablix inside a Rectangle got
+  // neither the hover highlight nor the resize cursor.
+  NSArray *rects = nil;
+  NSArray *tablixes = [[self geometry] tablixItemsWithRects:&rects];
+  for (NSUInteger i = 0; i < [tablixes count]; i++) {
+    RDLItem *it = tablixes[i];
+    NSRect ir = [rects[i] rectValue];
+    NSUInteger bc = 0;
+    if ([RDLTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {
+      onBorder = YES;
       break;
-    y += band.height * kDPI * z;
+    }
+    NSUInteger col = 0;
+    NSString *part = nil;
+    if ([RDLTablixGeometry tablix:it itemRect:ir point:p column:&col part:&part zoom:z]) {
+      hoverTab = it;
+      hoverCol = col;
+      hoverPart = part;
+      break;
+    }
   }
+
   [onBorder ? [NSCursor resizeLeftRightCursor] : [NSCursor arrowCursor] set];
   if (hoverTab != _hoverTablix || hoverCol != _hoverCol ||
       (hoverPart != _hoverPart && ![hoverPart isEqualToString:_hoverPart])) {
@@ -925,7 +728,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     return;
   // The report may have changed since the click; re-resolve the rect.
   NSRect r;
-  if ([self findRectOfItem:hit rect:&r])
+  if ([[self geometry] findRectOfItem:hit rect:&r])
     [self beginEditingHit:hit rect:r point:_pendingEditPoint];
 }
 
@@ -933,7 +736,12 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   if ([hit.type isEqualToString:@"Tablix"]) {
     NSUInteger col = 0;
     NSString *part = nil;
-    if ([self tablix:hit itemRect:itemRect point:p col:&col part:&part])
+    if ([RDLTablixGeometry tablix:hit
+                         itemRect:itemRect
+                            point:p
+                           column:&col
+                             part:&part
+                             zoom:_context.zoom])
       [self beginEditingTablix:hit col:col part:part];
     return;
   }
@@ -961,9 +769,13 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   if (col >= [cols count])
     return;
   NSRect itemRect;
-  if (![self findRectOfItem:tab rect:&itemRect])
+  if (![[self geometry] findRectOfItem:tab rect:&itemRect])
     return;
-  NSRect cell = [self tablixCellRect:tab itemRect:itemRect col:col part:part];
+  NSRect cell = [RDLTablixGeometry cellRectOf:tab
+                                     itemRect:itemRect
+                                       column:col
+                                         part:part
+                                         zoom:_context.zoom];
   cell.size.height = MAX(NSHeight(cell), 19);
   NSString *initial = [part isEqualToString:@"header"] ? (cols[col][@"header"] ?: @"")
                                                        : (cols[col][@"value"] ?: @"");

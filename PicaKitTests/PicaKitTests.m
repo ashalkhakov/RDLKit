@@ -86,6 +86,12 @@
 - (void)testTextInput {
   PICA_ASSERT_NO_FAILURES(PicaRunTextInputChecks());
 }
+- (void)testPageGeometry {
+  PICA_ASSERT_NO_FAILURES(PicaRunPageGeometryChecks());
+}
+- (void)testTablixGeometry {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixGeometryChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

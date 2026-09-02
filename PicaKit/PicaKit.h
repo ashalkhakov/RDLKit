@@ -21,3 +21,5 @@
 #import "RDLTextAttributes.h"
 #import "RDLRichTextCodec.h"
 #import "RDLExpressionCompletion.h"
+// Page geometry: coordinate transform, band placement, hit testing.
+#import "RDLPageGeometry.h"

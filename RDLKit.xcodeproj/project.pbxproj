@@ -71,6 +71,8 @@
 		BF3CDBCB888B1DD6A659E871 /* PicaEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */; };
 		802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */ = {isa = PBXBuildFile; fileRef = E46BA8ED30D063FB448EB1DE /* PicaSamples.m */; };
 		2ACEF60D3170E8981F7CAEFA /* PicaExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */; };
+		DE7A818B1EE4CD3FD1FAA8B8 /* RDLPageGeometry.h in Headers */ = {isa = PBXBuildFile; fileRef = CB443B8E5CF1FAC0D327C5A6 /* RDLPageGeometry.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		6A8FBFD572C0B2C4937E716E /* RDLPageGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 45C57A82F0BA088F2943BADE /* RDLPageGeometry.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -202,6 +204,8 @@
 		AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionCompletion.m; sourceTree = "<group>"; };
 		ED8FB43465A94113819D4184 /* PicaEditingContext.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaEditingContext.h; sourceTree = "<group>"; };
 		DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaEditingContext.m; sourceTree = "<group>"; };
+		CB443B8E5CF1FAC0D327C5A6 /* RDLPageGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPageGeometry.h; sourceTree = "<group>"; };
+		45C57A82F0BA088F2943BADE /* RDLPageGeometry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPageGeometry.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -327,6 +331,8 @@
 				A10AE3E6982CEB80C27834B7 /* RDLRichTextCodec.m */,
 				01F0357FB024874E7CCEB162 /* RDLExpressionCompletion.h */,
 				AABC33756E4D2CFCE1CA66AE /* RDLExpressionCompletion.m */,
+				CB443B8E5CF1FAC0D327C5A6 /* RDLPageGeometry.h */,
+				45C57A82F0BA088F2943BADE /* RDLPageGeometry.m */,
 			);
 			path = PicaKit;
 			sourceTree = "<group>";
@@ -403,6 +409,7 @@
 				855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */,
 				71A8A5A0BAA994C49E22E959 /* RDLRichTextCodec.h in Headers */,
 				C04581B9472B69127D1FEFA1 /* RDLExpressionCompletion.h in Headers */,
+				DE7A818B1EE4CD3FD1FAA8B8 /* RDLPageGeometry.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -597,6 +604,7 @@
 				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
 				F198EB2080F2BA6867B747EB /* RDLRichTextCodec.m in Sources */,
 				583B89AD82F0768151C07CC9 /* RDLExpressionCompletion.m in Sources */,
+				6A8FBFD572C0B2C4937E716E /* RDLPageGeometry.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
