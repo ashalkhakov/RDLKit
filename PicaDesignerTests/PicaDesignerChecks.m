@@ -21,7 +21,7 @@
 #import "PicaEditingContext.h"
 #import "PicaExpressionHelper.h"
 #import "PicaInspectorFields.h"
-#import "PicaModalSession.h"
+#import "PicaTablixEditor.h"
 
 static void PicaFail(NSMutableArray *fails, NSString *msg) {
   [fails addObject:msg];
@@ -1539,96 +1539,122 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   return fails;
 }
 
-// --- Modal panels must be dismissable --------------------------------------
+// --- Opening a modal dialog twice ------------------------------------------
 //
-// A regression check for a bug that took three rounds to pin down: the tablix
-// dialog opened from the canvas context menu could not be cancelled or saved.
-// The modal loop had started nested inside the menu's tracking loop, so
-// -[NSApplication stopModalWithCode:] did not end the session AppKit was
-// running -- the button action fired, stopModal was called, and
-// -runModalForWindow: never returned. PicaModalSession owns the exit condition
-// instead.
+// The reported bug: the tablix dialog could not be cancelled or saved when
+// opened from the canvas context menu, and after that was addressed, "it only
+// works once". Both are about the dialog's lifecycle rather than its contents,
+// which is what this drives: open it, dismiss it, open it again, dismiss it
+// again, and check the second round behaves like the first.
 //
-// The check sets the result from a timer rather than from an event and asserts
-// the session returns the right code promptly and orders the panel out.
-//
-// It does NOT prove the wake-up path: removing both the posted wake event and
-// the bounded wait still passes here, because -nextEventMatchingMask: returns
-// on timer activity in a test process. Both remain in PicaModalSession as
-// cheap insurance for the real app, where the first attempt at that runner did
-// hang; this check would not have caught that, and it is worth knowing which
-// part is guarded and which is not.
+// The button is clicked rather than the session ended directly, so the whole
+// path is exercised: the panel's action reaches the editor, which ends the
+// session, which unwinds the loop.
 
-@interface PicaModalEnder : NSObject
-@property (nonatomic, strong) PicaModalSession *session;
-@property (nonatomic, assign) NSInteger code;
+@interface PicaDialogClicker : NSObject
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, assign) BOOL foundButton;
+@property (nonatomic, assign) BOOL sawModal;
 @end
-@implementation PicaModalEnder
-- (void)end {
-  [_session endWithCode:_code];
+@implementation PicaDialogClicker
+- (NSButton *)findIn:(NSView *)view {
+  for (NSView *v in [view subviews]) {
+    if ([v isKindOfClass:[NSButton class]] &&
+        [[(NSButton *)v title] isEqualToString:_title])
+      return (NSButton *)v;
+    NSButton *b = [self findIn:v];
+    if (b)
+      return b;
+  }
+  return nil;
+}
+- (void)click {
+  NSWindow *modal = [NSApp modalWindow];
+  _sawModal = modal != nil;
+  if (modal == nil)
+    return;
+  NSButton *b = [self findIn:[modal contentView]];
+  _foundButton = b != nil;
+  if (b)
+    [b performClick:nil];
+  else
+    [NSApp abortModal]; // do not hang the suite
+}
+- (void)bail {
+  if ([NSApp modalWindow])
+    [NSApp abortModal];
 }
 @end
 
-NSArray<NSString *> *PicaRunModalSessionChecks(void) {
-  NSMutableArray *fails = [NSMutableArray array];
-
-  for (NSNumber *wanted in @[ @1, @0 ]) {
-    NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 200, 120)
-                                                styleMask:NSTitledWindowMask
-                                                  backing:NSBackingStoreBuffered
-                                                    defer:NO];
-    [panel setTitle:@"Check"];
-    PicaModalSession *session = [[PicaModalSession alloc] initWithPanel:panel];
-    PicaModalEnder *ender = [[PicaModalEnder alloc] init];
-    ender.session = session;
-    ender.code = [wanted integerValue];
-    // From a timer, in the mode a modal session runs in.
-    NSTimer *t = [NSTimer timerWithTimeInterval:0.1
-                                         target:ender
-                                       selector:@selector(end)
-                                       userInfo:nil
-                                        repeats:NO];
+// Opens the dialog, clicks `button`, and reports whether the dialog was
+// actually up and the click landed.
+static BOOL PicaRunTablixDialog(RDLItem *tablix, PicaEditingContext *ctx,
+                                 NSString *button, PicaDialogClicker **outClicker) {
+  PicaDialogClicker *clicker = [[PicaDialogClicker alloc] init];
+  clicker.title = button;
+  NSTimer *click = [NSTimer timerWithTimeInterval:0.05 target:clicker
+                                         selector:@selector(click)
+                                         userInfo:nil repeats:NO];
+  NSTimer *bail = [NSTimer timerWithTimeInterval:10.0 target:clicker
+                                        selector:@selector(bail)
+                                        userInfo:nil repeats:NO];
+  for (NSTimer *t in @[ click, bail ])
     [[NSRunLoop currentRunLoop] addTimer:t forMode:NSModalPanelRunLoopMode];
-    // A watchdog, so a hang fails the check instead of hanging the suite.
-    PicaModalEnder *watchdog = [[PicaModalEnder alloc] init];
-    watchdog.session = session;
-    watchdog.code = 99;
-    NSTimer *w = [NSTimer timerWithTimeInterval:5.0
-                                         target:watchdog
-                                       selector:@selector(end)
-                                       userInfo:nil
-                                        repeats:NO];
-    [[NSRunLoop currentRunLoop] addTimer:w forMode:NSModalPanelRunLoopMode];
+  BOOL changed = [PicaTablixEditor runForTablix:tablix context:ctx];
+  [bail invalidate];
+  if (outClicker)
+    *outClicker = clicker;
+  return changed;
+}
 
-    NSDate *started = [NSDate date];
-    NSInteger code = [session run];
-    NSTimeInterval took = -[started timeIntervalSinceNow];
+NSArray<NSString *> *PicaRunDialogLifecycleChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:PicaGroupedJobs()];
+  RDLItem *tab = ctx.report.body.items.firstObject;
+  NSString *groupBefore = tab.groupBy;
+  NSUInteger specsBefore = [tab.columnSpecs count];
 
-    if (code != [wanted integerValue])
-      PicaFail(fails, [NSString stringWithFormat:@"modal session returned %ld, wanted %@",
-                                                 (long)code, wanted]);
-    if (took > 2.0)
-      PicaFail(fails, [NSString stringWithFormat:@"modal session took %.1fs: it is not "
-                                                 @"waking on -endWithCode:", took]);
-    if ([panel isVisible])
-      PicaFail(fails, @"the panel should be ordered out when the session ends");
-    [w invalidate];
-  }
+  // First open: cancel. Nothing should change.
+  PicaDialogClicker *first = nil;
+  BOOL changed = PicaRunTablixDialog(tab, ctx, @"Cancel", &first);
+  if (!first.sawModal)
+    PicaFail(fails, @"first open: the dialog never became the modal window");
+  if (!first.foundButton)
+    PicaFail(fails, @"first open: no Cancel button in the panel");
+  if (changed)
+    PicaFail(fails, @"cancelling should report no change");
+  if (![tab.groupBy isEqualToString:groupBefore])
+    PicaFail(fails, @"cancelling must not touch the tablix");
+  if (ctx.document.undoManager.canUndo)
+    PicaFail(fails, @"cancelling must not put anything on the undo stack");
 
-  // The first result wins, so a second click cannot turn an OK into a cancel.
-  NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 200, 120)
-                                              styleMask:NSTitledWindowMask
-                                                backing:NSBackingStoreBuffered
-                                                  defer:NO];
-  PicaModalSession *twice = [[PicaModalSession alloc] initWithPanel:panel];
-  [twice endWithCode:1];
-  [twice endWithCode:0];
-  if ([twice run] != 1)
-    PicaFail(fails, @"the first result should win");
+  // Second open: this is the case that was reported as broken. The dialog has
+  // to come up and dismiss exactly as it did the first time.
+  PicaDialogClicker *second = nil;
+  changed = PicaRunTablixDialog(tab, ctx, @"OK", &second);
+  if (!second.sawModal)
+    PicaFail(fails, @"second open: the dialog never became the modal window");
+  if (!second.foundButton)
+    PicaFail(fails, @"second open: no OK button in the panel");
+  if (!changed)
+    PicaFail(fails, @"accepting should report a change");
+  if (![tab.groupBy isEqualToString:groupBefore])
+    PicaFail(fails, @"an OK with no edits must preserve the row group");
+  if ([tab.columnSpecs count] != specsBefore)
+    PicaFail(fails, @"an OK with no edits must preserve the columns");
+  if (!ctx.document.undoManager.canUndo)
+    PicaFail(fails, @"the dialog's changes should be undoable");
+
+  // And a third, to catch anything that only breaks once state accumulates.
+  PicaDialogClicker *third = nil;
+  PicaRunTablixDialog(tab, ctx, @"Cancel", &third);
+  if (!third.sawModal || !third.foundButton)
+    PicaFail(fails, @"third open: the dialog did not come up cleanly");
+  if ([NSApp modalWindow] != nil)
+    PicaFail(fails, @"no modal session should be left running");
 
   return fails;
 }
-
 
 NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
@@ -1645,6 +1671,6 @@ NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   [fails addObjectsFromArray:PicaRunPageGeometryChecks()];
   [fails addObjectsFromArray:PicaRunTablixGeometryChecks()];
   [fails addObjectsFromArray:PicaRunFieldBindingChecks()];
-  [fails addObjectsFromArray:PicaRunModalSessionChecks()];
+  [fails addObjectsFromArray:PicaRunDialogLifecycleChecks()];
   return fails;
 }

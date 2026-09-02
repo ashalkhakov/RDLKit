@@ -55,8 +55,8 @@
 - (void)testTextInput {
   PICA_ASSERT_NO_FAILURES(PicaRunTextInputChecks());
 }
-- (void)testModalSession {
-  PICA_ASSERT_NO_FAILURES(PicaRunModalSessionChecks());
+- (void)testDialogLifecycle {
+  PICA_ASSERT_NO_FAILURES(PicaRunDialogLifecycleChecks());
 }
 - (void)testAllDesignerChecks {
   PICA_ASSERT_NO_FAILURES(PicaRunAllDesignerChecks());

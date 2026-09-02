@@ -14,5 +14,5 @@ NSArray<NSString *> *PicaRunTextInputChecks(void);
 NSArray<NSString *> *PicaRunPageGeometryChecks(void);
 NSArray<NSString *> *PicaRunTablixGeometryChecks(void);
 NSArray<NSString *> *PicaRunFieldBindingChecks(void);
-NSArray<NSString *> *PicaRunModalSessionChecks(void);
+NSArray<NSString *> *PicaRunDialogLifecycleChecks(void);
 NSArray<NSString *> *PicaRunAllDesignerChecks(void);
