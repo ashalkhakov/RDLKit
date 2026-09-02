@@ -44,6 +44,7 @@
 		CE65B5EED5EC5A3A470E38EE /* PicaKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* PicaKit.framework */; };
 		CEBAF52B30470D1500D62319 /* PicaExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */; };
 		CEBAF52C30470D1500D62319 /* PicaTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* PicaTablixEditor.m */; };
+		CEBAF52F30473A9E00D62319 /* PicaRichTextEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52E30473A9E00D62319 /* PicaRichTextEditor.m */; };
 		DD27E7C9DFCA6B68D3BD3521 /* PicaKit.h in Headers */ = {isa = PBXBuildFile; fileRef = 03EB33FD7A64B360E76AF94E /* PicaKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		E49064EFAA718365E67147C5 /* PicaKitTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 2EF02D16E9FF2F88CA6B2C23 /* PicaKitTests.m */; };
 		E97A29A2AD303803BF10C5E8 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
@@ -156,6 +157,8 @@
 		CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaExpressionHelper.m; sourceTree = "<group>"; };
 		CEBAF52930470D1500D62319 /* PicaTablixEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaTablixEditor.h; sourceTree = "<group>"; };
 		CEBAF52A30470D1500D62319 /* PicaTablixEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaTablixEditor.m; sourceTree = "<group>"; };
+		CEBAF52D30473A9E00D62319 /* PicaRichTextEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaRichTextEditor.h; sourceTree = "<group>"; };
+		CEBAF52E30473A9E00D62319 /* PicaRichTextEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaRichTextEditor.m; sourceTree = "<group>"; };
 		DAB2A7A5AE6E5BE964549133 /* RDLPDFBackend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPDFBackend.m; sourceTree = "<group>"; };
 		DC31C18582DB97C5DF6573CD /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLParser.m; sourceTree = "<group>"; };
@@ -220,6 +223,8 @@
 		367BDD79C0EB7824B717F2C6 /* PicaDesigner */ = {
 			isa = PBXGroup;
 			children = (
+				CEBAF52D30473A9E00D62319 /* PicaRichTextEditor.h */,
+				CEBAF52E30473A9E00D62319 /* PicaRichTextEditor.m */,
 				CEBAF52730470D1500D62319 /* PicaExpressionHelper.h */,
 				CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */,
 				CEBAF52930470D1500D62319 /* PicaTablixEditor.h */,
@@ -497,6 +502,7 @@
 				CD16E8E89FDBE601591035CC /* PicaAppDelegate.m in Sources */,
 				5E857B5DEB5C69384F67F2C2 /* PicaCanvasView.m in Sources */,
 				BC70D011C9198B007BFB52C1 /* PicaController.m in Sources */,
+				CEBAF52F30473A9E00D62319 /* PicaRichTextEditor.m in Sources */,
 				207F62C4B325286E32DA36CC /* PicaDataView.m in Sources */,
 				44DAA7FC14DCD3C38A4D90BC /* PicaDesignerWindow.m in Sources */,
 				948181811E10DEB424788F78 /* PicaGeneratorWindow.m in Sources */,
