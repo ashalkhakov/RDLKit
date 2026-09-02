@@ -95,6 +95,9 @@
 - (void)testInspectorFieldBindings {
   PICA_ASSERT_NO_FAILURES(PicaRunFieldBindingChecks());
 }
+- (void)testModalSession {
+  PICA_ASSERT_NO_FAILURES(PicaRunModalSessionChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

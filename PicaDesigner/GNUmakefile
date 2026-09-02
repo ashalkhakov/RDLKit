@@ -18,6 +18,7 @@ Pica_OBJC_FILES = \
   PicaInspectorView.m \
   PicaInspectorFields.m \
   PicaExpressionHelper.m \
+  PicaModalSession.m \
   PicaTablixEditor.m \
   PicaRichTextEditor.m \
   PicaDataView.m \

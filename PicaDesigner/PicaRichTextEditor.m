@@ -1,5 +1,6 @@
 #import "PicaRichTextEditor.h"
 #import "PicaEditingContext.h"
+#import "PicaModalSession.h"
 #import "PicaCompatibility.h"
 
 // The attributed-string <-> Paragraphs/TextRuns conversion lives in
@@ -8,6 +9,7 @@
 @interface PicaRichTextEditor ()
 @property (nonatomic, strong) NSPanel *panel;
 @property (nonatomic, strong) NSTextView *textView;
+@property (nonatomic, strong) PicaModalSession *session;
 @end
 
 @implementation PicaRichTextEditor
@@ -24,12 +26,12 @@
 
 - (void)accept:(id)sender {
   (void)sender;
-  [NSApp stopModalWithCode:1];
+  [_session endWithCode:1];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
-  [NSApp stopModalWithCode:0];
+  [_session endWithCode:0];
 }
 
 + (BOOL)runForTextbox:(RDLItem *)item context:(PicaEditingContext *)context {
@@ -92,9 +94,8 @@
   [content addSubview:cancel];
 
   [ed.panel setInitialFirstResponder:tv];
-  [ed.panel center];
-  NSInteger code = [NSApp runModalForWindow:ed.panel];
-  [ed.panel orderOut:nil];
+  ed.session = [[PicaModalSession alloc] initWithPanel:ed.panel];
+  NSInteger code = [ed.session run];
   if (code != 1)
     return NO;
   [context.editor setAttributedString:[ed.textView textStorage] ofItem:item];

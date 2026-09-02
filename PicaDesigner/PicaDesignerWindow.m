@@ -5,6 +5,7 @@
 #import "PicaDataView.h"
 #import "PicaExpressionHelper.h"
 #import "PicaOutlineDataSource.h"
+#import "PicaModalSession.h"
 #import "PicaKit.h"
 #import "PicaCompatibility.h"
 
@@ -24,6 +25,7 @@
 
 @implementation PicaDesignerWindow {
   PicaExpressionFieldEditor *_fieldEditor;
+  PicaModalSession *_paletteSession;
 }
 
 // Text fields get an expression-aware field editor so `complete:` uses the
@@ -263,15 +265,17 @@
   [cancel setAction:@selector(paletteChoose:)];
   [cv addSubview:cancel];
 
-  [panel center];
-  NSInteger code = [NSApp runModalForWindow:panel];
-  [panel orderOut:nil];
+  // Also runs from the Edit menu, so it needs the same explicit session as the
+  // other panels rather than -runModalForWindow:.
+  _paletteSession = [[PicaModalSession alloc] initWithPanel:panel];
+  NSInteger code = [_paletteSession run];
+  _paletteSession = nil;
   if (code >= 1 && code <= (NSInteger)[kinds count])
     [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
 }
 
 - (void)paletteChoose:(NSButton *)sender {
-  [NSApp stopModalWithCode:[sender tag]];
+  [_paletteSession endWithCode:[sender tag]];
 }
 
 - (void)removeElement:(id)sender {

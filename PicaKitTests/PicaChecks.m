@@ -2,6 +2,7 @@
 #import "PicaEditingContext.h"
 #import "PicaExpressionHelper.h"
 #import "PicaInspectorFields.h"
+#import "PicaModalSession.h"
 #if __has_include(<PicaKit/PicaKit.h>)
 #import <PicaKit/PicaKit.h>
 #else
@@ -3623,6 +3624,96 @@ NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
   return fails;
 }
 
+// --- Modal panels must be dismissable --------------------------------------
+//
+// A regression check for a bug that took three rounds to pin down: the tablix
+// dialog opened from the canvas context menu could not be cancelled or saved.
+// The modal loop had started nested inside the menu's tracking loop, so
+// -[NSApplication stopModalWithCode:] did not end the session AppKit was
+// running -- the button action fired, stopModal was called, and
+// -runModalForWindow: never returned. PicaModalSession owns the exit condition
+// instead.
+//
+// The check sets the result from a timer rather than from an event and asserts
+// the session returns the right code promptly and orders the panel out.
+//
+// It does NOT prove the wake-up path: removing both the posted wake event and
+// the bounded wait still passes here, because -nextEventMatchingMask: returns
+// on timer activity in a test process. Both remain in PicaModalSession as
+// cheap insurance for the real app, where the first attempt at that runner did
+// hang; this check would not have caught that, and it is worth knowing which
+// part is guarded and which is not.
+
+@interface PicaModalEnder : NSObject
+@property (nonatomic, strong) PicaModalSession *session;
+@property (nonatomic, assign) NSInteger code;
+@end
+@implementation PicaModalEnder
+- (void)end {
+  [_session endWithCode:_code];
+}
+@end
+
+NSArray<NSString *> *PicaRunModalSessionChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  for (NSNumber *wanted in @[ @1, @0 ]) {
+    NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 200, 120)
+                                                styleMask:NSTitledWindowMask
+                                                  backing:NSBackingStoreBuffered
+                                                    defer:NO];
+    [panel setTitle:@"Check"];
+    PicaModalSession *session = [[PicaModalSession alloc] initWithPanel:panel];
+    PicaModalEnder *ender = [[PicaModalEnder alloc] init];
+    ender.session = session;
+    ender.code = [wanted integerValue];
+    // From a timer, in the mode a modal session runs in.
+    NSTimer *t = [NSTimer timerWithTimeInterval:0.1
+                                         target:ender
+                                       selector:@selector(end)
+                                       userInfo:nil
+                                        repeats:NO];
+    [[NSRunLoop currentRunLoop] addTimer:t forMode:NSModalPanelRunLoopMode];
+    // A watchdog, so a hang fails the check instead of hanging the suite.
+    PicaModalEnder *watchdog = [[PicaModalEnder alloc] init];
+    watchdog.session = session;
+    watchdog.code = 99;
+    NSTimer *w = [NSTimer timerWithTimeInterval:5.0
+                                         target:watchdog
+                                       selector:@selector(end)
+                                       userInfo:nil
+                                        repeats:NO];
+    [[NSRunLoop currentRunLoop] addTimer:w forMode:NSModalPanelRunLoopMode];
+
+    NSDate *started = [NSDate date];
+    NSInteger code = [session run];
+    NSTimeInterval took = -[started timeIntervalSinceNow];
+
+    if (code != [wanted integerValue])
+      PicaFail(fails, [NSString stringWithFormat:@"modal session returned %ld, wanted %@",
+                                                 (long)code, wanted]);
+    if (took > 2.0)
+      PicaFail(fails, [NSString stringWithFormat:@"modal session took %.1fs: it is not "
+                                                 @"waking on -endWithCode:", took]);
+    if ([panel isVisible])
+      PicaFail(fails, @"the panel should be ordered out when the session ends");
+    [w invalidate];
+  }
+
+  // The first result wins, so a second click cannot turn an OK into a cancel.
+  NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 200, 120)
+                                              styleMask:NSTitledWindowMask
+                                                backing:NSBackingStoreBuffered
+                                                  defer:NO];
+  PicaModalSession *twice = [[PicaModalSession alloc] initWithPanel:panel];
+  [twice endWithCode:1];
+  [twice endWithCode:0];
+  if ([twice run] != 1)
+    PicaFail(fails, @"the first result should win");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -3646,6 +3737,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunPageGeometryChecks()];
   [fails addObjectsFromArray:PicaRunTablixGeometryChecks()];
   [fails addObjectsFromArray:PicaRunFieldBindingChecks()];
+  [fails addObjectsFromArray:PicaRunModalSessionChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];

@@ -1,5 +1,6 @@
 #import "PicaTablixEditor.h"
 #import "PicaEditingContext.h"
+#import "PicaModalSession.h"
 
 static NSArray *PicaAggregateNames(void) {
   return @[ @"", @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ];
@@ -17,6 +18,7 @@ static NSArray *PicaAlignNames(void) {
 @property (nonatomic, strong) NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
 @property (nonatomic, strong) RDLReport *report;
+@property (nonatomic, strong) PicaModalSession *session;
 @end
 
 static void PicaTraceModal(NSString *format, ...) {
@@ -255,14 +257,13 @@ static void PicaTraceModal(NSString *format, ...) {
   (void)sender;
   PicaTraceModal(@"accept: clicked");
   [self commitTableEditing];
-  PicaTraceModal(@"accept: table editing committed, stopping modal");
-  [NSApp stopModalWithCode:1];
+  [_session endWithCode:1];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
-  PicaTraceModal(@"cancel: clicked, stopping modal");
-  [NSApp stopModalWithCode:0];
+  PicaTraceModal(@"cancel: clicked");
+  [_session endWithCode:0];
 }
 
 #pragma mark - Table data source
@@ -318,12 +319,10 @@ static void PicaTraceModal(NSString *format, ...) {
     [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
   ed.cols = cols;
   [ed buildPanelForTablix:tablix];
-  [ed.panel center];
-  PicaTraceModal(@"runModalForWindow: entering (panel=%@ canBecomeKey=%d)",
-                 [ed.panel title], (int)[ed.panel canBecomeKeyWindow]);
-  NSInteger code = [NSApp runModalForWindow:ed.panel];
-  PicaTraceModal(@"runModalForWindow: returned %ld", (long)code);
-  [ed.panel orderOut:nil];
+  ed.session = [[PicaModalSession alloc] initWithPanel:ed.panel];
+  PicaTraceModal(@"modal session: entering");
+  NSInteger code = [ed.session run];
+  PicaTraceModal(@"modal session: returned %ld", (long)code);
   if (code != 1)
     return NO;
 

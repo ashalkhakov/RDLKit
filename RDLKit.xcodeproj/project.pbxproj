@@ -79,6 +79,8 @@
 		C81B37A201B3B486F2605ABE /* PicaInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* PicaInspectorFields.m */; };
 		6E1A1C16A260C62237F22758 /* PicaInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* PicaInspectorFields.m */; };
 		2DFB5C7E09C9DCC1AA15EC1C /* PicaOutlineDataSource.m in Sources */ = {isa = PBXBuildFile; fileRef = 67866694DB877F0F4DA854A9 /* PicaOutlineDataSource.m */; };
+		42FF5628B9ACF135D71109B7 /* PicaModalSession.m in Sources */ = {isa = PBXBuildFile; fileRef = 57FC08FEC7DB48D675D9306D /* PicaModalSession.m */; };
+		A0FEC6C03775959331DF793F /* PicaModalSession.m in Sources */ = {isa = PBXBuildFile; fileRef = 57FC08FEC7DB48D675D9306D /* PicaModalSession.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -222,6 +224,8 @@
 		91729268250D3DF7575FC73D /* PicaInspectorFields.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaInspectorFields.m; sourceTree = "<group>"; };
 		D71BB3CC463536F2A922B52E /* PicaOutlineDataSource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaOutlineDataSource.h; sourceTree = "<group>"; };
 		67866694DB877F0F4DA854A9 /* PicaOutlineDataSource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaOutlineDataSource.m; sourceTree = "<group>"; };
+		8275C1311BFA96F67656F6ED /* PicaModalSession.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaModalSession.h; sourceTree = "<group>"; };
+		57FC08FEC7DB48D675D9306D /* PicaModalSession.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaModalSession.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -315,6 +319,8 @@
 				91729268250D3DF7575FC73D /* PicaInspectorFields.m */,
 				D71BB3CC463536F2A922B52E /* PicaOutlineDataSource.h */,
 				67866694DB877F0F4DA854A9 /* PicaOutlineDataSource.m */,
+				8275C1311BFA96F67656F6ED /* PicaModalSession.h */,
+				57FC08FEC7DB48D675D9306D /* PicaModalSession.m */,
 			);
 			path = PicaDesigner;
 			sourceTree = "<group>";
@@ -587,6 +593,7 @@
 				802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */,
 				2ACEF60D3170E8981F7CAEFA /* PicaExpressionHelper.m in Sources */,
 				6E1A1C16A260C62237F22758 /* PicaInspectorFields.m in Sources */,
+				A0FEC6C03775959331DF793F /* PicaModalSession.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -613,6 +620,7 @@
 				EDA9EEB9706A25D81CA75AFD /* PicaCanvasInteraction.m in Sources */,
 				C81B37A201B3B486F2605ABE /* PicaInspectorFields.m in Sources */,
 				2DFB5C7E09C9DCC1AA15EC1C /* PicaOutlineDataSource.m in Sources */,
+				42FF5628B9ACF135D71109B7 /* PicaModalSession.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
