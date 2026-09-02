@@ -4,48 +4,25 @@
 #import "PicaInspectorView.h"
 #import "PicaDataView.h"
 #import "PicaExpressionHelper.h"
+#import "PicaOutlineDataSource.h"
 #import "PicaKit.h"
 #import "PicaCompatibility.h"
 
-typedef NS_ENUM(NSInteger, PicaNodeKind) {
-  PicaNodeReport = 0,
-  PicaNodeBand,
-  PicaNodeItem
-};
-
-@interface PicaOutlineNode : NSObject
-@property (nonatomic, assign) PicaNodeKind kind;
-@property (nonatomic, copy) NSString *title;
-@property (nonatomic, copy) NSString *bandKey;
-@property (nonatomic, strong) RDLItem *item;
-@property (nonatomic, strong) NSMutableArray<PicaOutlineNode *> *children;
-@end
-
-@implementation PicaOutlineNode
-- (instancetype)init {
-  self = [super init];
-  if (self)
-    _children = [NSMutableArray array];
-  return self;
-}
-@end
-
-@interface PicaDesignerWindow () <NSOutlineViewDataSource, NSOutlineViewDelegate>
+@interface PicaDesignerWindow ()
 @property (nonatomic, strong, readwrite) PicaEditingContext *context;
 @property (nonatomic, strong) NSSplitView *split;
 @property (nonatomic, strong) PicaCanvasView *canvas;
 @property (nonatomic, strong) NSScrollView *canvasScroll;
 @property (nonatomic, strong) NSOutlineView *outline;
+@property (nonatomic, strong) PicaOutlineDataSource *outlineSource;
 @property (nonatomic, strong) PicaInspectorView *inspector;
 @property (nonatomic, strong) NSScrollView *inspectorScroll;
 @property (nonatomic, strong) PicaDataView *dataView;
 @property (nonatomic, strong) NSWindow *previewWindow;
 @property (nonatomic, strong) RDLView *previewView;
-@property (nonatomic, strong) PicaOutlineNode *rootNode;
 @end
 
 @implementation PicaDesignerWindow {
-  BOOL _reloading;
   PicaExpressionFieldEditor *_fieldEditor;
 }
 
@@ -122,7 +99,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 
 - (void)selectionDidChange:(NSNotification *)note {
   PICA_UNUSED(note);
-  [self syncOutlineSelection];
+  [_outlineSource syncSelection];
 }
 
 - (void)dealloc {
@@ -166,10 +143,10 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [col setWidth:196];
   [_outline addTableColumn:col];
   [_outline setOutlineTableColumn:col];
-  [_outline setDataSource:self];
-  [_outline setDelegate:self];
   [_outline setHeaderView:nil];
   [_outline setIndentationPerLevel:12];
+  _outlineSource = [[PicaOutlineDataSource alloc] initWithOutlineView:_outline
+                                                             context:_context];
   [leftScroll setDocumentView:_outline];
   [left addSubview:leftScroll];
 
@@ -227,94 +204,9 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   [_canvas sizeToPage];
 }
 
-#pragma mark - Outline tree
-
-- (void)addNodesForItems:(NSArray *)items to:(PicaOutlineNode *)parent bandKey:(NSString *)key {
-  for (RDLItem *it in items) {
-    PicaOutlineNode *n = [[PicaOutlineNode alloc] init];
-    n.kind = PicaNodeItem;
-    n.title = [NSString stringWithFormat:@"%@  %@", it.type, it.name ?: @""];
-    n.bandKey = key;
-    n.item = it;
-    [parent.children addObject:n];
-    if ([it.items count])
-      [self addNodesForItems:it.items to:n bandKey:key];
-  }
-}
-
-- (void)rebuildTree {
-  RDLReport *report = _context.report;
-  PicaOutlineNode *root = [[PicaOutlineNode alloc] init];
-  root.kind = PicaNodeReport;
-  root.title = report.name ?: @"Report";
-  for (NSString *key in [RDLReport bandKeys]) {
-    PicaOutlineNode *bn = [[PicaOutlineNode alloc] init];
-    bn.kind = PicaNodeBand;
-    bn.title = [RDLItemFactory titleForBandKey:key];
-    bn.bandKey = key;
-    [root.children addObject:bn];
-    [self addNodesForItems:[report bandWithKey:key].items to:bn bandKey:key];
-  }
-  self.rootNode = root;
-}
-
-- (PicaOutlineNode *)findSelectedNodeIn:(PicaOutlineNode *)node {
-  RDLSelection *sel = _context.selection;
-  if (sel.scope == RDLSelectionScopeReport && node.kind == PicaNodeReport)
-    return node;
-  if (sel.scope == RDLSelectionScopeBand && node.kind == PicaNodeBand &&
-      [node.bandKey isEqualToString:sel.bandKey])
-    return node;
-  if (sel.scope == RDLSelectionScopeItem && node.kind == PicaNodeItem &&
-      node.item == sel.item)
-    return node;
-  for (PicaOutlineNode *child in node.children) {
-    PicaOutlineNode *f = [self findSelectedNodeIn:child];
-    if (f)
-      return f;
-  }
-  return nil;
-}
-
-- (void)expandAllFrom:(PicaOutlineNode *)node {
-  [_outline expandItem:node];
-  for (PicaOutlineNode *child in node.children)
-    [self expandAllFrom:child];
-}
-
 - (void)reloadUI {
-  // The guard is against feedback, not storms: -selectRowIndexes: below makes
-  // the outline call back into -outlineViewSelectionDidChange:, which would
-  // otherwise re-post a selection change.
-  if (_reloading)
-    return;
-  _reloading = YES;
-  [self rebuildTree];
-  [_outline reloadData];
-  [self expandAllFrom:self.rootNode];
-  [self selectOutlineRowForSelection];
-  _reloading = NO;
+  [_outlineSource reload];
   [self updateWindowTitle];
-}
-
-- (void)syncOutlineSelection {
-  if (_reloading)
-    return;
-  _reloading = YES;
-  [self selectOutlineRowForSelection];
-  _reloading = NO;
-}
-
-- (void)selectOutlineRowForSelection {
-  PicaOutlineNode *node = [self findSelectedNodeIn:self.rootNode];
-  if (node == nil) {
-    [_outline deselectAll:nil];
-    return;
-  }
-  NSInteger row = [_outline rowForItem:node];
-  if (row >= 0)
-    [_outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
-          byExtendingSelection:NO];
 }
 
 - (void)updateWindowTitle {
@@ -322,67 +214,6 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   if (_context.document.isDirty)
     title = [title stringByAppendingString:@" — edited"];
   [[self window] setTitle:title];
-}
-
-#pragma mark - NSOutlineViewDataSource
-
-- (NSInteger)outlineView:(NSOutlineView *)outline numberOfChildrenOfItem:(id)item {
-  (void)outline;
-  if (item == nil)
-    return self.rootNode ? 1 : 0;
-  return (NSInteger)[((PicaOutlineNode *)item).children count];
-}
-
-- (id)outlineView:(NSOutlineView *)outline child:(NSInteger)index ofItem:(id)item {
-  (void)outline;
-  if (item == nil)
-    return self.rootNode;
-  return ((PicaOutlineNode *)item).children[(NSUInteger)index];
-}
-
-- (BOOL)outlineView:(NSOutlineView *)outline isItemExpandable:(id)item {
-  (void)outline;
-  return [((PicaOutlineNode *)item).children count] > 0;
-}
-
-- (id)outlineView:(NSOutlineView *)outline
-    objectValueForTableColumn:(NSTableColumn *)column
-                       byItem:(id)item {
-  (void)outline;
-  (void)column;
-  return ((PicaOutlineNode *)item).title ?: @"";
-}
-
-- (void)outlineView:(NSOutlineView *)outline
-    willDisplayCell:(id)cell
-     forTableColumn:(NSTableColumn *)column
-               item:(id)item {
-  (void)outline;
-  (void)column;
-  PicaOutlineNode *node = item;
-  if ([cell isKindOfClass:[NSTextFieldCell class]]) {
-    BOOL structural = node.kind != PicaNodeItem;
-    [cell setFont:structural ? [NSFont boldSystemFontOfSize:11] : [NSFont systemFontOfSize:11]];
-  }
-}
-
-#pragma mark - NSOutlineViewDelegate
-
-- (void)outlineViewSelectionDidChange:(NSNotification *)notification {
-  (void)notification;
-  if (_reloading)
-    return;
-  NSInteger row = [_outline selectedRow];
-  if (row < 0)
-    return;
-  PicaOutlineNode *node = [_outline itemAtRow:row];
-  RDLSelection *sel = _context.selection;
-  if (node.kind == PicaNodeReport)
-    [sel selectReport];
-  else if (node.kind == PicaNodeBand)
-    [sel selectBandWithKey:node.bandKey];
-  else
-    [sel selectItem:node.item inBandWithKey:node.bandKey];
 }
 
 #pragma mark - Add / remove elements

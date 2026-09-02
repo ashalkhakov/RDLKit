@@ -1,6 +1,7 @@
 #import "PicaChecks.h"
 #import "PicaEditingContext.h"
 #import "PicaExpressionHelper.h"
+#import "PicaInspectorFields.h"
 #if __has_include(<PicaKit/PicaKit.h>)
 #import <PicaKit/PicaKit.h>
 #else
@@ -3447,6 +3448,134 @@ NSArray<NSString *> *PicaRunTablixGeometryChecks(void) {
   return fails;
 }
 
+// --- Stage 5: inspector field bindings -------------------------------------
+//
+// The inspector's first coverage of any kind. It used to hold the same table
+// twice in opposite directions -- thirty model reads in -reload, thirty
+// `sender ==` branches in -changed: -- kept in step by hand. A binding is one
+// declaration driving both, so this exercises that both directions agree.
+
+NSArray<NSString *> *PicaRunFieldBindingChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Fields"]];
+  RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
+  RDLReport *report = doc.report;
+
+  RDLItem *item = [[RDLItem alloc] init];
+  item.name = @"Box";
+  item.type = @"Textbox";
+  item.left = 1.25;
+  item.style.fontFamily = @"Courier";
+  item.style.fontWeight = @"Bold";
+  item.style.textAlign = @"Right";
+  item.source = @"External";
+  [report.body.items addObject:item];
+
+  NSTextField *leftField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  NSTextField *fontField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  NSTextField *formatField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  NSPopUpButton *weightPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)
+                                                        pullsDown:NO];
+  [weightPop addItemsWithTitles:@[ @"Roman", @"Bold" ]];
+  NSPopUpButton *alignPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)
+                                                       pullsDown:NO];
+  [alignPop addItemsWithTitles:@[ @"Left", @"Center", @"Right" ]];
+  NSTextField *bandHField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  NSTextField *docNameField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+
+  PicaFieldBindings *bindings = [[PicaFieldBindings alloc] init];
+  [bindings bind:leftField keyPath:@"left" scope:PicaFieldScopeItem
+            kind:PicaFieldKindNumber];
+  [bindings bind:fontField keyPath:@"style.fontFamily" scope:PicaFieldScopeItem
+            kind:PicaFieldKindText values:nil placeholder:@"Georgia"];
+  [bindings bind:formatField keyPath:@"style.format" scope:PicaFieldScopeItem
+            kind:PicaFieldKindText];
+  [bindings bind:weightPop keyPath:@"style.fontWeight" scope:PicaFieldScopeItem
+            kind:PicaFieldKindPopUpIndex values:@[ @"Normal", @"Bold" ] placeholder:nil];
+  [bindings bind:alignPop keyPath:@"style.textAlign" scope:PicaFieldScopeItem
+            kind:PicaFieldKindPopUpTitle];
+  [bindings bind:bandHField keyPath:@"height" scope:PicaFieldScopeBand
+            kind:PicaFieldKindNumber];
+  [bindings bind:docNameField keyPath:@"name" scope:PicaFieldScopeReport
+            kind:PicaFieldKindText];
+
+  // Model -> UI.
+  [bindings fillFromItem:item band:report.body report:report];
+  if (![[leftField stringValue] isEqualToString:@"1.250"])
+    PicaFail(fails, [NSString stringWithFormat:@"number fill gave %@", [leftField stringValue]]);
+  if (![[fontField stringValue] isEqualToString:@"Courier"])
+    PicaFail(fails, @"text fill should show the model value");
+  if ([weightPop indexOfSelectedItem] != 1)
+    PicaFail(fails, @"popup-index fill should map Bold to index 1");
+  if (![[alignPop titleOfSelectedItem] isEqualToString:@"Right"])
+    PicaFail(fails, @"popup-title fill should select by title");
+  if (![[bandHField stringValue] isEqualToString:@"4.000"])
+    PicaFail(fails, [NSString stringWithFormat:@"band fill gave %@", [bandHField stringValue]]);
+  if (![[docNameField stringValue] isEqualToString:@"Fields"])
+    PicaFail(fails, @"report fill should show the report name");
+
+  // A placeholder stands in for an empty value, so the field reads as a
+  // default rather than as blank.
+  if (![[formatField stringValue] isEqualToString:@""])
+    PicaFail(fails, @"a field with no placeholder should fill empty");
+  item.style.fontFamily = nil;
+  [bindings fillFromItem:item band:report.body report:report];
+  if (![[fontField stringValue] isEqualToString:@"Georgia"])
+    PicaFail(fails, @"an empty value should show its placeholder");
+
+  // UI -> model, through the editor so every field is undoable.
+  [leftField setStringValue:@"2.5"];
+  if (![bindings applyControl:leftField editor:editor item:item bandKey:@"body"])
+    PicaFail(fails, @"applyControl should recognise a bound control");
+  if (fabs(item.left - 2.5) > 0.0001)
+    PicaFail(fails, @"number apply should write the model");
+  [doc.undoManager undo];
+  if (fabs(item.left - 1.25) > 0.0001)
+    PicaFail(fails, @"an inspector edit should be undoable");
+
+  [weightPop selectItemAtIndex:0];
+  [bindings applyControl:weightPop editor:editor item:item bandKey:@"body"];
+  if (![item.style.fontWeight isEqualToString:@"Normal"])
+    PicaFail(fails, [NSString stringWithFormat:@"popup-index apply gave %@",
+                                               item.style.fontWeight]);
+  [alignPop selectItemWithTitle:@"Center"];
+  [bindings applyControl:alignPop editor:editor item:item bandKey:@"body"];
+  if (![item.style.textAlign isEqualToString:@"Center"])
+    PicaFail(fails, @"popup-title apply should write the title");
+
+  // Clearing a text field removes the property rather than storing "", so a
+  // cleared style does not end up in the saved RDL as an empty element.
+  [fontField setStringValue:@""];
+  item.style.fontFamily = @"Courier";
+  [bindings applyControl:fontField editor:editor item:item bandKey:@"body"];
+  if (item.style.fontFamily != nil)
+    PicaFail(fails, [NSString stringWithFormat:@"clearing a field should write nil, got %@",
+                                               item.style.fontFamily]);
+
+  // Band and report scopes reach the right target.
+  [bandHField setStringValue:@"6.5"];
+  [bindings applyControl:bandHField editor:editor item:item bandKey:@"pageHeader"];
+  if (fabs(report.pageHeader.height - 6.5) > 0.0001)
+    PicaFail(fails, @"a band binding should write the named band");
+  [docNameField setStringValue:@"Renamed"];
+  [bindings applyControl:docNameField editor:editor item:item bandKey:@"body"];
+  if (![report.name isEqualToString:@"Renamed"])
+    PicaFail(fails, @"a report binding should write the report");
+
+  // An unbound control is reported as unhandled, so the caller can deal with
+  // the composite fields itself.
+  NSTextField *stray = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  if ([bindings applyControl:stray editor:editor item:item bandKey:@"body"])
+    PicaFail(fails, @"an unbound control should not be claimed");
+
+  // A nil target must not crash or write.
+  [bindings fillFromItem:nil band:nil report:report];
+  if (![[docNameField stringValue] isEqualToString:@"Renamed"])
+    PicaFail(fails, @"filling with a nil item should still fill the report fields");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -3469,6 +3598,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTextInputChecks()];
   [fails addObjectsFromArray:PicaRunPageGeometryChecks()];
   [fails addObjectsFromArray:PicaRunTablixGeometryChecks()];
+  [fails addObjectsFromArray:PicaRunFieldBindingChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];

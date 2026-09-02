@@ -92,6 +92,9 @@
 - (void)testTablixGeometry {
   PICA_ASSERT_NO_FAILURES(PicaRunTablixGeometryChecks());
 }
+- (void)testInspectorFieldBindings {
+  PICA_ASSERT_NO_FAILURES(PicaRunFieldBindingChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

@@ -3,11 +3,14 @@
 #import "PicaKit.h"
 #import "PicaTablixEditor.h"
 #import "PicaExpressionHelper.h"
+#import "PicaInspectorFields.h"
 
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
 @interface PicaInspectorView () <NSTextFieldDelegate>
 @property (nonatomic, strong) PicaEditingContext *context;
+// One declaration per field drives both directions; see PicaInspectorFields.
+@property (nonatomic, strong) PicaFieldBindings *bindings;
 @property (nonatomic, strong) NSTextField *kindLabel;
 // Report section
 @property (nonatomic, strong) NSView *docBox;
@@ -113,6 +116,8 @@ static const CGFloat kHalf2X = 136;
     [self buildImageBox];
     [self buildChartBox];
     [self buildTablixBox];
+
+    [self declareBindings];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(documentDidChange:)
@@ -325,6 +330,91 @@ static const CGFloat kHalf2X = 136;
   [PicaTablixEditor runForTablix:it context:_context];
 }
 
+#pragma mark - Field bindings
+
+// Every field that is a plain read-and-write of one model value. The four that
+// are not -- value (which also clears rich-text runs), the margin field (four
+// edges plus the body width), the page popup (two dimensions plus the width),
+// and the band background (which may have to create the style) -- stay in
+// -changed: below, because each is a composite that must undo as one step.
+- (void)declareBindings {
+  _bindings = [[PicaFieldBindings alloc] init];
+
+  // Item geometry.
+  [_bindings bind:_leftField keyPath:@"left" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_topField keyPath:@"top" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_widthField keyPath:@"width" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_heightField keyPath:@"height" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+
+  // Textbox.
+  [_bindings bind:_fontField keyPath:@"style.fontFamily" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText values:nil placeholder:@"Georgia"];
+  [_bindings bind:_sizeField keyPath:@"style.fontSize" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText values:nil placeholder:@"10pt"];
+  [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpIndex values:@[ @"Normal", @"Bold" ] placeholder:nil];
+  [_bindings bind:_alignPop keyPath:@"style.textAlign" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpTitle];
+  [_bindings bind:_colorField keyPath:@"style.color" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_formatField keyPath:@"style.format" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+
+  // Line and Rectangle each expose one style property.
+  [_bindings bind:_lineColorField keyPath:@"style.color" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+
+  // Image.
+  [_bindings bind:_imageValueField keyPath:@"value" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+  [_bindings bind:_imageSourcePop keyPath:@"source" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpIndex values:@[ @"Embedded", @"External" ] placeholder:nil];
+  [_bindings bind:_imageSizingPop keyPath:@"sizing" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpTitle];
+
+  // Chart.
+  [_bindings bind:_chartDatasetPop keyPath:@"dataSetName" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpTitle];
+  [_bindings bind:_titleField keyPath:@"title" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+  [_bindings bind:_chartKindPop keyPath:@"chartType" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpTitle];
+  [_bindings bind:_catField keyPath:@"categoryField" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+  [_bindings bind:_valField keyPath:@"valueField" scope:PicaFieldScopeItem
+             kind:PicaFieldKindText];
+
+  // Tablix.
+  [_bindings bind:_tablixDatasetPop keyPath:@"dataSetName" scope:PicaFieldScopeItem
+             kind:PicaFieldKindPopUpTitle];
+  [_bindings bind:_tablixHeaderHField keyPath:@"headerHeight" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_tablixRowHField keyPath:@"rowHeight" scope:PicaFieldScopeItem
+             kind:PicaFieldKindNumber];
+
+  // Band and report.
+  [_bindings bind:_bandHField keyPath:@"height" scope:PicaFieldScopeBand
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_docNameField keyPath:@"name" scope:PicaFieldScopeReport
+             kind:PicaFieldKindText];
+  [_bindings bind:_authorField keyPath:@"author" scope:PicaFieldScopeReport
+             kind:PicaFieldKindText];
+  [_bindings bind:_descField keyPath:@"reportDescription" scope:PicaFieldScopeReport
+             kind:PicaFieldKindText];
+  [_bindings bind:_headerHField keyPath:@"pageHeader.height" scope:PicaFieldScopeReport
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_bodyHField keyPath:@"body.height" scope:PicaFieldScopeReport
+             kind:PicaFieldKindNumber];
+  [_bindings bind:_footerHField keyPath:@"pageFooter.height" scope:PicaFieldScopeReport
+             kind:PicaFieldKindNumber];
+}
+
 #pragma mark - Fill (model → UI)
 
 - (void)stackBoxes:(NSArray *)boxes {
@@ -359,61 +449,35 @@ static const CGFloat kHalf2X = 136;
   RDLReport *report = _context.report;
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
+  RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
+
   if (it != nil) {
     [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@", it.type, it.name]];
     [_nameField setStringValue:it.name ?: @""];
-    [_leftField setStringValue:[NSString stringWithFormat:@"%.3f", it.left]];
-    [_topField setStringValue:[NSString stringWithFormat:@"%.3f", it.top]];
-    [_widthField setStringValue:[NSString stringWithFormat:@"%.3f", it.width]];
-    [_heightField setStringValue:[NSString stringWithFormat:@"%.3f", it.height]];
     NSMutableArray *boxes = [NSMutableArray arrayWithObject:_geoBox];
+    // The dataset popups are populated from the report before filling, since
+    // their contents depend on it rather than being fixed at build time.
     if ([it.type isEqualToString:@"Textbox"]) {
       [boxes addObject:_textBox];
       [_valueField setStringValue:it.value ?: @""];
-      [_fontField setStringValue:it.style.fontFamily ?: @"Georgia"];
-      [_sizeField setStringValue:it.style.fontSize ?: @"10pt"];
-      [_weightPop selectItemAtIndex:[it.style.fontWeight isEqualToString:@"Bold"] ? 1 : 0];
-      NSInteger ai = 0;
-      if ([it.style.textAlign isEqualToString:@"Center"])
-        ai = 1;
-      else if ([it.style.textAlign isEqualToString:@"Right"])
-        ai = 2;
-      [_alignPop selectItemAtIndex:ai];
-      [_colorField setStringValue:it.style.color ?: @"#1a1916"];
-      [_formatField setStringValue:it.style.format ?: @""];
     } else if ([it.type isEqualToString:@"Line"]) {
       [boxes addObject:_lineBox];
-      [_lineColorField setStringValue:it.style.color ?: @"#1a1916"];
     } else if ([it.type isEqualToString:@"Rectangle"]) {
       [boxes addObject:_rectBox];
-      [_rectBGField setStringValue:it.style.backgroundColor ?: @""];
     } else if ([it.type isEqualToString:@"Image"]) {
       [boxes addObject:_imageBox];
-      [_imageValueField setStringValue:it.value ?: @""];
-      [_imageSourcePop selectItemAtIndex:[it.source isEqualToString:@"External"] ? 1 : 0];
-      if (it.sizing && [_imageSizingPop itemWithTitle:it.sizing])
-        [_imageSizingPop selectItemWithTitle:it.sizing];
-      else
-        [_imageSizingPop selectItemAtIndex:0];
     } else if ([it.type isEqualToString:@"Chart"]) {
       [boxes addObject:_chartBox];
       [self rebuildDatasetPop:_chartDatasetPop selecting:it.dataSetName];
-      [_titleField setStringValue:it.title ?: @""];
-      if (it.chartType && [_chartKindPop itemWithTitle:it.chartType])
-        [_chartKindPop selectItemWithTitle:it.chartType];
-      [_catField setStringValue:it.categoryField ?: @""];
-      [_valField setStringValue:it.valueField ?: @""];
     } else if ([it.type isEqualToString:@"Tablix"]) {
       [boxes addObject:_tablixBox];
       [self rebuildDatasetPop:_tablixDatasetPop selecting:it.dataSetName];
-      [_tablixHeaderHField setStringValue:[NSString stringWithFormat:@"%.3f", it.headerHeight]];
-      [_tablixRowHField setStringValue:[NSString stringWithFormat:@"%.3f", it.rowHeight]];
     }
     [self stackBoxes:boxes];
-  } else if (sel.scope == RDLSelectionScopeBand) {
-    RDLBand *band = [report bandWithKey:sel.bandKey];
+  } else if (band != nil) {
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
-    [_bandHField setStringValue:[NSString stringWithFormat:@"%.3f", band.height]];
+    // Only the Body carries a background in RDL, so the field is disabled
+    // elsewhere rather than silently doing nothing.
     BOOL isBody = [sel.bandKey isEqualToString:@"body"];
     [_bandBGField setEditable:isBody];
     [_bandBGField setEnabled:isBody];
@@ -422,17 +486,13 @@ static const CGFloat kHalf2X = 136;
     [self stackBoxes:@[ _bandBox ]];
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
-    [_docNameField setStringValue:report.name ?: @""];
-    [_authorField setStringValue:report.author ?: @""];
-    [_descField setStringValue:report.reportDescription ?: @""];
     BOOL a4 = fabs(report.page.pageWidth - 8.27) < 0.05;
     [_pagePop selectItemAtIndex:a4 ? 1 : 0];
-    [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", report.pageHeader.height]];
-    [_bodyHField setStringValue:[NSString stringWithFormat:@"%.3f", report.body.height]];
-    [_footerHField setStringValue:[NSString stringWithFormat:@"%.3f", report.pageFooter.height]];
     [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", report.page.leftMargin]];
     [self stackBoxes:@[ _docBox ]];
   }
+
+  [_bindings fillFromItem:it band:band report:report];
   _reloading = NO;
 }
 
@@ -478,145 +538,48 @@ static const CGFloat kHalf2X = 136;
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
 
-  // Every branch now goes through RDLEditor, so an inspector edit is undoable
-  // like any other. Values are not snapped to the grid here: a typed 1.234 is
-  // deliberate, and rounding it would fight the user.
-  if (it != nil) {
-    NSString *keyPath = nil;
-    id value = nil;
-    if (sender == _leftField) {
-      keyPath = @"left";
-      value = @([[_leftField stringValue] doubleValue]);
-    } else if (sender == _topField) {
-      keyPath = @"top";
-      value = @([[_topField stringValue] doubleValue]);
-    } else if (sender == _widthField) {
-      keyPath = @"width";
-      value = @([[_widthField stringValue] doubleValue]);
-    } else if (sender == _heightField) {
-      keyPath = @"height";
-      value = @([[_heightField stringValue] doubleValue]);
-    } else if (sender == _valueField) {
-      // A plain edit replaces any rich-text runs, so both keys move together.
-      [editor beginGroup:@"Edit Text"];
-      [editor setValue:[_valueField stringValue] forKeyPath:@"value" ofItem:it];
-      [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it];
-      [editor endGroup];
-      return;
-    } else if (sender == _fontField) {
-      keyPath = @"style.fontFamily";
-      value = [_fontField stringValue];
-    } else if (sender == _sizeField) {
-      keyPath = @"style.fontSize";
-      value = [_sizeField stringValue];
-    } else if (sender == _weightPop) {
-      keyPath = @"style.fontWeight";
-      value = [_weightPop indexOfSelectedItem] == 1 ? @"Bold" : @"Normal";
-    } else if (sender == _alignPop) {
-      keyPath = @"style.textAlign";
-      value = [_alignPop titleOfSelectedItem];
-    } else if (sender == _colorField) {
-      keyPath = @"style.color";
-      value = [_colorField stringValue];
-    } else if (sender == _formatField) {
-      keyPath = @"style.format";
-      value = [_formatField stringValue];
-    } else if (sender == _lineColorField) {
-      keyPath = @"style.color";
-      value = [_lineColorField stringValue];
-    } else if (sender == _rectBGField) {
-      keyPath = @"style.backgroundColor";
-      value = [_rectBGField stringValue];
-    } else if (sender == _imageValueField) {
-      keyPath = @"value";
-      value = [_imageValueField stringValue];
-    } else if (sender == _imageSourcePop) {
-      keyPath = @"source";
-      value = [_imageSourcePop titleOfSelectedItem];
-    } else if (sender == _imageSizingPop) {
-      keyPath = @"sizing";
-      value = [_imageSizingPop titleOfSelectedItem];
-    } else if (sender == _chartDatasetPop) {
-      keyPath = @"dataSetName";
-      value = [_chartDatasetPop titleOfSelectedItem];
-    } else if (sender == _titleField) {
-      keyPath = @"title";
-      value = [_titleField stringValue];
-    } else if (sender == _chartKindPop) {
-      keyPath = @"chartType";
-      value = [_chartKindPop titleOfSelectedItem];
-    } else if (sender == _catField) {
-      keyPath = @"categoryField";
-      value = [_catField stringValue];
-    } else if (sender == _valField) {
-      keyPath = @"valueField";
-      value = [_valField stringValue];
-    } else if (sender == _tablixDatasetPop) {
-      keyPath = @"dataSetName";
-      value = [_tablixDatasetPop titleOfSelectedItem];
-    } else if (sender == _tablixHeaderHField) {
-      keyPath = @"headerHeight";
-      value = @([[_tablixHeaderHField stringValue] doubleValue]);
-    } else if (sender == _tablixRowHField) {
-      keyPath = @"rowHeight";
-      value = @([[_tablixRowHField stringValue] doubleValue]);
-    }
-    if (keyPath == nil)
-      return;
-    [editor setValue:value forKeyPath:keyPath ofItem:it];
+  // Most fields are a plain read-and-write of one model value.
+  if ([_bindings applyControl:sender editor:editor item:it bandKey:sel.bandKey])
+    return;
+
+  // The rest are composites: each writes more than one property and must undo
+  // as a single step.
+  if (sender == _valueField && it != nil) {
+    [editor beginGroup:@"Edit Text"];
+    [editor setValue:[_valueField stringValue] forKeyPath:@"value" ofItem:it];
+    // A plain edit replaces any rich-text runs.
+    [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it];
+    [editor endGroup];
     return;
   }
 
-  if (sel.scope == RDLSelectionScopeBand) {
-    if (sender == _bandHField) {
-      [editor setValue:@([[_bandHField stringValue] doubleValue])
-            forKeyPath:@"height"
-         ofBandWithKey:sel.bandKey];
-    } else if (sender == _bandBGField) {
-      RDLBand *band = [_context.report bandWithKey:sel.bandKey];
-      [editor beginGroup:@"Band Background"];
-      // Creating the style is part of the same undo step, so undoing does not
-      // leave an empty Style behind for the writer to emit.
-      if (band.style == nil)
-        [editor setValue:[[RDLStyle alloc] init] forKeyPath:@"style" ofBandWithKey:sel.bandKey];
-      [editor setValue:[_bandBGField stringValue]
-            forKeyPath:@"style.backgroundColor"
-         ofBandWithKey:sel.bandKey];
-      [editor endGroup];
-    }
+  if (sender == _bandBGField && sel.scope == RDLSelectionScopeBand) {
+    RDLBand *band = [_context.report bandWithKey:sel.bandKey];
+    [editor beginGroup:@"Band Background"];
+    // Creating the style belongs to the same step, so undoing does not leave
+    // an empty Style behind for the writer to emit.
+    if (band.style == nil)
+      [editor setValue:[[RDLStyle alloc] init] forKeyPath:@"style" ofBandWithKey:sel.bandKey];
+    [editor setValue:[_bandBGField stringValue]
+          forKeyPath:@"style.backgroundColor"
+       ofBandWithKey:sel.bandKey];
+    [editor endGroup];
     return;
   }
 
-  // Report scope.
-  if (sender == _docNameField)
-    [editor setReportValue:[_docNameField stringValue] forKeyPath:@"name"];
-  else if (sender == _authorField)
-    [editor setReportValue:[_authorField stringValue] forKeyPath:@"author"];
-  else if (sender == _descField)
-    [editor setReportValue:[_descField stringValue] forKeyPath:@"reportDescription"];
-  else if (sender == _headerHField)
-    [editor setValue:@([[_headerHField stringValue] doubleValue])
-          forKeyPath:@"height"
-       ofBandWithKey:@"pageHeader"];
-  else if (sender == _bodyHField)
-    [editor setValue:@([[_bodyHField stringValue] doubleValue])
-          forKeyPath:@"height"
-       ofBandWithKey:@"body"];
-  else if (sender == _footerHField)
-    [editor setValue:@([[_footerHField stringValue] doubleValue])
-          forKeyPath:@"height"
-       ofBandWithKey:@"pageFooter"];
-  else if (sender == _marginField) {
-    // One margin field drives all four edges, and the body width follows.
+  if (sender == _marginField) {
+    // One field drives all four edges, and the body width follows.
     CGFloat m = [[_marginField stringValue] doubleValue];
     RDLPage *page = _context.report.page;
     [editor beginGroup:@"Margins"];
     for (NSString *edge in @[ @"leftMargin", @"rightMargin", @"topMargin", @"bottomMargin" ])
-      [editor setReportValue:@(m)
-                  forKeyPath:[@"page." stringByAppendingString:edge]];
+      [editor setReportValue:@(m) forKeyPath:[@"page." stringByAppendingString:edge]];
     [editor setReportValue:@(page.pageWidth - 2 * m) forKeyPath:@"width"];
     [editor endGroup];
-  } else if (sender == _pagePop) {
+    return;
+  }
+
+  if (sender == _pagePop) {
     BOOL a4 = [_pagePop indexOfSelectedItem] == 1;
     RDLPage *page = _context.report.page;
     [editor beginGroup:@"Page Size"];
@@ -625,6 +588,7 @@ static const CGFloat kHalf2X = 136;
     [editor setReportValue:@((a4 ? 8.27 : 8.5) - page.leftMargin - page.rightMargin)
                 forKeyPath:@"width"];
     [editor endGroup];
+    return;
   }
 }
 

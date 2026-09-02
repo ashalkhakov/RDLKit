@@ -11,10 +11,12 @@ Pica_OBJC_FILES = \
   PicaInPlaceEditor.m \
   PicaCanvasInteraction.m \
   PicaDesignerWindow.m \
+  PicaOutlineDataSource.m \
   PicaGeneratorWindow.m \
   PicaAppDelegate.m \
   PicaSamples.m \
   PicaInspectorView.m \
+  PicaInspectorFields.m \
   PicaExpressionHelper.m \
   PicaTablixEditor.m \
   PicaRichTextEditor.m \
