@@ -6,6 +6,13 @@ Pica_OBJCFLAGS += -fobjc-arc -Wall -I../PicaKit
 Pica_OBJC_FILES = \
   main.m \
   PicaEditingContext.m \
+  PicaChange.m \
+  PicaSelection.m \
+  PicaDocument.m \
+  PicaEditor.m \
+  PicaItemFactory.m \
+  PicaPageGeometry.m \
+  PicaRichTextCodec.m \
   PicaCanvasView.m \
   PicaCanvasRenderer.m \
   PicaInPlaceEditor.m \

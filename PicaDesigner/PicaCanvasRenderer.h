@@ -8,7 +8,7 @@
 
 @class PicaEditingContext;
 @class RDLItem;
-@class RDLPageGeometry;
+@class PicaPageGeometry;
 
 // The transient view state the renderer cannot get from the model: which cell
 // the pointer is over, and which text is currently hidden behind an editor.
@@ -26,7 +26,7 @@
 
 @interface PicaCanvasRenderer : NSObject
 - (instancetype)initWithContext:(PicaEditingContext *)context;
-- (void)drawGeometry:(RDLPageGeometry *)geometry
+- (void)drawGeometry:(PicaPageGeometry *)geometry
              overlay:(PicaCanvasOverlay *)overlay
               bounds:(NSRect)bounds;
 @end

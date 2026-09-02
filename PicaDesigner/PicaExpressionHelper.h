@@ -1,31 +1,44 @@
-// PicaExpressionHelper — completion support for RDL `=` expressions, in the
-// spirit of an XPath editor: typing `Fields!`, `Parameters!`, `Globals!` or
-// `User!` pops a member list, and elsewhere function names complete.
+// PicaExpressionHelper — completion for RDL `=` expressions, in the spirit of
+// an XPath editor: typing `Fields!`, `Parameters!`, `Globals!` or `User!` pops
+// a member list, and elsewhere function names complete.
+//
+// The vocabulary and the `!`-accessor grammar are plain functions over an
+// explicit scope, so they can be checked headlessly; only the field editor
+// subclass and the "is this ordinary typing?" event test need AppKit state.
 #import <AppKit/AppKit.h>
 #import "PicaKit.h"
 
-// Completions for the partial word in `charRange` of `text`. `dataSetName`
-// scopes Fields! members (nil falls back to the report's first dataset).
-// The report is passed in rather than reached for, so this works for any
-// document the caller happens to be editing.
-NSArray<NSString *> *PicaExpressionCompletions(NSString *text, NSRange charRange,
-                                               NSString *dataSetName, RDLReport *report);
+// The field and parameter vocabulary a completion runs against.
+@interface PicaExpressionScope : NSObject
++ (instancetype)scopeWithReport:(RDLReport *)report dataSetName:(NSString *)dataSetName;
++ (instancetype)scopeWithFieldNames:(NSArray<NSString *> *)fieldNames
+                     parameterNames:(NSArray<NSString *> *)parameterNames;
+@property (nonatomic, readonly, copy) NSArray<NSString *> *fieldNames;
+@property (nonatomic, readonly, copy) NSArray<NSString *> *parameterNames;
+@end
 
-// YES when the text just typed should auto-pop the completion list (an `!`
-// collection accessor inside an `=` expression, or a member prefix after one).
+// Completions for the partial word in `charRange` of `text`.
+NSArray<NSString *> *PicaExpressionCompletions(NSString *text, NSRange charRange,
+                                              PicaExpressionScope *scope);
+
+// YES when what was just typed should pop the list unprompted: an `!`
+// collection accessor inside an `=` expression, or a member prefix after one.
 BOOL PicaShouldAutoComplete(NSString *text, NSRange selectedRange);
+
+// The completion range ending at `caret`: the member prefix plus, when the
+// caret sits inside a `Coll!member` accessor, the collection name and the `!`.
+// Cocoa's -complete: refuses an empty partial-word range (it just beeps), so
+// keeping the collection in the range is what makes completion work right
+// after the `!`. Returns {NSNotFound, 0} when not applicable.
+NSRange PicaExpressionCompletionRange(NSString *text, NSUInteger caret);
+
+// The built-in function vocabulary.
+NSArray<NSString *> *PicaExpressionFunctionNames(void);
 
 // YES when the current event is ordinary typing. Auto-completion must not
 // re-trigger for deletions or the arrow keys that navigate the completion
 // list (Cocoa re-posts controlTextDidChange: for those).
 BOOL PicaIsTypingEvent(void);
-
-// The completion range ending at `caret`: the member prefix plus, when the
-// caret sits inside a `Coll!member` accessor, the collection name and the `!`.
-// Cocoa's `complete:` refuses empty partial-word ranges (it just beeps), so a
-// field editor overriding -rangeForUserCompletion with this keeps the range
-// non-empty right after `!`. Returns {NSNotFound, 0} when not applicable.
-NSRange PicaExpressionCompletionRange(NSString *text, NSUInteger caret);
 
 // Field editor that scopes user completion to the RDL expression grammar.
 // Install from the window delegate's -windowWillReturnFieldEditor:toObject:.

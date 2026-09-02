@@ -1,4 +1,6 @@
 #import "PicaOutlineDataSource.h"
+#import "PicaItemFactory.h"
+#import "PicaSelection.h"
 #import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 
@@ -101,7 +103,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   for (NSString *key in [RDLReport bandKeys]) {
     PicaOutlineNode *bn = [[PicaOutlineNode alloc] init];
     bn.kind = PicaNodeBand;
-    bn.title = [RDLItemFactory titleForBandKey:key];
+    bn.title = [PicaItemFactory titleForBandKey:key];
     bn.bandKey = key;
     [root.children addObject:bn];
     [self addNodesForItems:[report bandWithKey:key].items to:bn bandKey:key];
@@ -110,7 +112,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
 }
 
 - (PicaOutlineNode *)findSelectedNodeIn:(PicaOutlineNode *)node {
-  RDLSelection *sel = _ctx.selection;
+  PicaSelection *sel = _ctx.selection;
   if (sel.scope == RDLSelectionScopeReport && node.kind == PicaNodeReport)
     return node;
   if (sel.scope == RDLSelectionScopeBand && node.kind == PicaNodeBand &&
@@ -185,7 +187,7 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
   if (row < 0)
     return;
   PicaOutlineNode *node = [_outlineView itemAtRow:row];
-  RDLSelection *sel = _ctx.selection;
+  PicaSelection *sel = _ctx.selection;
   if (node.kind == PicaNodeReport)
     [sel selectReport];
   else if (node.kind == PicaNodeBand)

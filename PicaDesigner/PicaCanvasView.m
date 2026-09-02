@@ -1,4 +1,7 @@
 #import "PicaCanvasView.h"
+#import "PicaChange.h"
+#import "PicaPageGeometry.h"
+#import "PicaSelection.h"
 #import "PicaCanvasRenderer.h"
 #import "PicaInPlaceEditor.h"
 #import "PicaCanvasInteraction.h"
@@ -12,7 +15,7 @@
 @property (nonatomic, strong) PicaEditingContext *context;
 // Rebuilt on demand from the report, zoom and view origin. All five of the
 // canvas's former band traversals now go through this.
-@property (nonatomic, strong) RDLPageGeometry *geometry;
+@property (nonatomic, strong) PicaPageGeometry *geometry;
 @property (nonatomic, strong) PicaCanvasRenderer *renderer;
 @property (nonatomic, strong) PicaCanvasOverlay *overlay;
 @property (nonatomic, strong) PicaInPlaceEditor *inPlaceEditor;
@@ -38,11 +41,11 @@
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
     [nc addObserver:self
            selector:@selector(documentDidChange:)
-               name:RDLDocumentDidChangeNotification
+               name:PicaDocumentDidChangeNotification
              object:context.document];
     [nc addObserver:self
            selector:@selector(selectionDidChange:)
-               name:RDLSelectionDidChangeNotification
+               name:PicaSelectionDidChangeNotification
              object:context.selection];
     // Zoom and grid have their own channel: they are not document edits.
     [nc addObserver:self
@@ -60,7 +63,7 @@
 // A property edit only needs a redraw; anything that can move things about
 // needs the frame re-measured against the page first.
 - (void)documentDidChange:(NSNotification *)note {
-  RDLChange *change = [note userInfo][RDLChangeKey];
+  PicaChange *change = [note userInfo][PicaChangeKey];
   if ([change affectsLayout])
     [self sizeToPage]; // also invalidates the geometry
   else
@@ -94,17 +97,17 @@
 
 - (void)sizeToPage {
   _geometry = nil; // the page changed shape
-  [self setFrameSize:[RDLPageGeometry canvasSizeForReport:_context.report
+  [self setFrameSize:[PicaPageGeometry canvasSizeForReport:_context.report
                                                      zoom:_context.zoom]];
 }
 
 // One snapshot per draw or event, cached until something invalidates it. It
 // holds no model state, so rebuilding is cheap and always current.
-- (RDLPageGeometry *)geometry {
+- (PicaPageGeometry *)geometry {
   if (_geometry == nil)
-    _geometry = [RDLPageGeometry geometryForReport:_context.report
+    _geometry = [PicaPageGeometry geometryForReport:_context.report
                                               zoom:_context.zoom
-                                       paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
+                                       paperOrigin:[PicaPageGeometry defaultPaperOrigin]];
   return _geometry;
 }
 
@@ -144,7 +147,7 @@
 
 #pragma mark - PicaCanvasInteractionHost
 
-- (RDLPageGeometry *)interactionGeometry {
+- (PicaPageGeometry *)interactionGeometry {
   return [self geometry];
 }
 
@@ -164,7 +167,7 @@
 
 #pragma mark - PicaInPlaceEditorHost
 
-- (RDLPageGeometry *)editorGeometry {
+- (PicaPageGeometry *)editorGeometry {
   return [self geometry];
 }
 
@@ -240,7 +243,7 @@
   if ([hit.type isEqualToString:@"Tablix"]) {
     NSUInteger col = 0;
     NSString *part = nil;
-    BOOL onCell = [RDLTablixGeometry tablix:hit
+    BOOL onCell = [PicaTablixGeometry tablix:hit
                                    itemRect:itemRect
                                       point:p
                                      column:&col

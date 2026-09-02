@@ -10,7 +10,7 @@
 #import <AppKit/AppKit.h>
 
 @class RDLBand;
-@class RDLEditor;
+@class PicaEditor;
 @class RDLItem;
 @class RDLReport;
 
@@ -63,7 +63,7 @@ typedef NS_ENUM(NSInteger, PicaFieldKind) {
 // UI -> model, through the editor so it undoes. Returns NO when `control` is
 // not bound, so the caller can handle the composite fields itself.
 - (BOOL)applyControl:(id)control
-              editor:(RDLEditor *)editor
+              editor:(PicaEditor *)editor
                 item:(RDLItem *)item
              bandKey:(NSString *)bandKey;
 @end

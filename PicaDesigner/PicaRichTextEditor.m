@@ -1,10 +1,11 @@
 #import "PicaRichTextEditor.h"
+#import "PicaRichTextCodec.h"
 #import "PicaEditingContext.h"
 #import "PicaModalSession.h"
 #import "PicaCompatibility.h"
 
 // The attributed-string <-> Paragraphs/TextRuns conversion lives in
-// PicaKit's RDLRichTextCodec, where it is UI-free and covered by checks; this
+// PicaKit's PicaRichTextCodec, where it is UI-free and covered by checks; this
 // file is now just the panel around it.
 @interface PicaRichTextEditor ()
 @property (nonatomic, strong) NSPanel *panel;
@@ -15,11 +16,11 @@
 @implementation PicaRichTextEditor
 
 + (NSAttributedString *)attributedStringForItem:(RDLItem *)item {
-  return [RDLRichTextCodec attributedStringForItem:item];
+  return [PicaRichTextCodec attributedStringForItem:item];
 }
 
 + (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLItem *)item {
-  [RDLRichTextCodec applyAttributedString:text toItem:item];
+  [PicaRichTextCodec applyAttributedString:text toItem:item];
 }
 
 #pragma mark - Modal panel

@@ -1,4 +1,5 @@
 #import "PicaCanvasInteraction.h"
+#import "PicaPageGeometry.h"
 #import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 
@@ -70,7 +71,7 @@
     _pendingEditItem = nil;
     NSUInteger borderCol = 0;
     if ([hit.type isEqualToString:@"Tablix"] &&
-        [RDLTablixGeometry tablix:hit
+        [PicaTablixGeometry tablix:hit
                          itemRect:itemRect
               columnBorderAtPoint:p
                            column:&borderCol
@@ -117,8 +118,8 @@
     [_ctx.editor beginGroup:@"Move"]; // the whole drag is one undo step
   }
   CGFloat z = _ctx.zoom;
-  CGFloat dx = (p.x - _dragStart.x) / (RDLPointsPerInch * z);
-  CGFloat dy = (p.y - _dragStart.y) / (RDLPointsPerInch * z);
+  CGFloat dx = (p.x - _dragStart.x) / (PicaPointsPerInch * z);
+  CGFloat dy = (p.y - _dragStart.y) / (PicaPointsPerInch * z);
   if ([_dragKind isEqualToString:@"move"])
     [_ctx.editor moveItem:[_ctx selectedItem] toLeft:_origLeft + dx top:_origTop + dy];
   else if ([_dragKind isEqualToString:@"se"])
@@ -223,13 +224,13 @@
     RDLItem *it = tablixes[i];
     NSRect ir = [rects[i] rectValue];
     NSUInteger bc = 0;
-    if ([RDLTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {
+    if ([PicaTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {
       onBorder = YES;
       break;
     }
     NSUInteger col = 0;
     NSString *part = nil;
-    if ([RDLTablixGeometry tablix:it itemRect:ir point:p column:&col part:&part zoom:z]) {
+    if ([PicaTablixGeometry tablix:it itemRect:ir point:p column:&col part:&part zoom:z]) {
       hoverTab = it;
       hoverCol = col;
       hoverPart = part;

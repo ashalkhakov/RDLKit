@@ -1,4 +1,8 @@
 #import "PicaEditingContext.h"
+#import "PicaDocument.h"
+#import "PicaEditor.h"
+#import "PicaItemFactory.h"
+#import "PicaSelection.h"
 #import "PicaSamples.h"
 
 NSString * const PicaViewStateDidChangeNotification = @"PicaViewStateDidChangeNotification";
@@ -8,9 +12,9 @@ NSString * const PicaViewStateDidChangeNotification = @"PicaViewStateDidChangeNo
 - (instancetype)initWithReport:(RDLReport *)report {
   self = [super init];
   if (self) {
-    _document = [[RDLDocument alloc] initWithReport:report ?: [PicaSamples blankLetter]];
-    _selection = [[RDLSelection alloc] init];
-    _editor = [[RDLEditor alloc] initWithDocument:_document];
+    _document = [[PicaDocument alloc] initWithReport:report ?: [PicaSamples blankLetter]];
+    _selection = [[PicaSelection alloc] init];
+    _editor = [[PicaEditor alloc] initWithDocument:_document];
     _zoom = 1.0;
     _showsGrid = YES;
   }
@@ -84,12 +88,12 @@ NSString * const PicaViewStateDidChangeNotification = @"PicaViewStateDidChangeNo
 
 #pragma mark - Selection-driven operations
 
-- (RDLInsertionPoint *)insertionPoint {
-  return [RDLItemFactory insertionPointInReport:self.report selection:_selection];
+- (PicaInsertionPoint *)insertionPoint {
+  return [PicaItemFactory insertionPointInReport:self.report selection:_selection];
 }
 
 - (NSArray<NSString *> *)allowedElementKinds {
-  return [RDLItemFactory elementKindsAllowedAt:[self insertionPoint]];
+  return [PicaItemFactory elementKindsAllowedAt:[self insertionPoint]];
 }
 
 - (NSString *)insertionDescription {
@@ -97,10 +101,10 @@ NSString * const PicaViewStateDidChangeNotification = @"PicaViewStateDidChangeNo
 }
 
 - (void)addItemOfKind:(NSString *)kind {
-  RDLInsertionPoint *point = [self insertionPoint];
-  if (![RDLItemFactory kind:kind isAllowedAt:point])
+  PicaInsertionPoint *point = [self insertionPoint];
+  if (![PicaItemFactory kind:kind isAllowedAt:point])
     return;
-  RDLItem *item = [RDLItemFactory itemOfKind:kind atPoint:point inReport:self.report];
+  RDLItem *item = [PicaItemFactory itemOfKind:kind atPoint:point inReport:self.report];
   if (item == nil)
     return;
   // Insert directly after the selection when there is one, so the new element
@@ -130,7 +134,7 @@ NSString * const PicaViewStateDidChangeNotification = @"PicaViewStateDidChangeNo
 static NSString * const kPicaItemPboardType = @"com.pica.rdl-item-xml";
 
 - (BOOL)copySelectedItem {
-  NSString *xml = [RDLEditor XMLStringForItem:[self selectedItem]];
+  NSString *xml = [PicaEditor XMLStringForItem:[self selectedItem]];
   if (xml == nil)
     return NO;
   NSPasteboard *pb = [NSPasteboard generalPasteboard];
@@ -152,32 +156,32 @@ static NSString * const kPicaItemPboardType = @"com.pica.rdl-item-xml";
 
 - (void)pasteItem {
   NSString *xml = [[NSPasteboard generalPasteboard] stringForType:kPicaItemPboardType];
-  [self insertCopiedItem:[RDLEditor itemFromXMLString:xml]];
+  [self insertCopiedItem:[PicaEditor itemFromXMLString:xml]];
 }
 
 - (void)duplicateSelectedItem {
   // Copy and paste in one step, without disturbing the pasteboard.
-  NSString *xml = [RDLEditor XMLStringForItem:[self selectedItem]];
-  [self insertCopiedItem:[RDLEditor itemFromXMLString:xml]];
+  NSString *xml = [PicaEditor XMLStringForItem:[self selectedItem]];
+  [self insertCopiedItem:[PicaEditor itemFromXMLString:xml]];
 }
 
 - (void)insertCopiedItem:(RDLItem *)item {
   if (item == nil)
     return;
-  RDLInsertionPoint *point = [self insertionPoint];
+  PicaInsertionPoint *point = [self insertionPoint];
   // A data region cannot live inside a Rectangle, so a pasted one goes to the
   // band instead of being silently dropped.
-  if (![RDLItemFactory kind:item.type isAllowedAt:point]) {
+  if (![PicaItemFactory kind:item.type isAllowedAt:point]) {
     [_selection selectBandWithKey:point.bandKey];
     point = [self insertionPoint];
-    if (![RDLItemFactory kind:item.type isAllowedAt:point])
+    if (![PicaItemFactory kind:item.type isAllowedAt:point])
       return;
   }
-  [RDLItemFactory renameTreeUniquely:item inReport:self.report];
+  [PicaItemFactory renameTreeUniquely:item inReport:self.report];
   // Offset the copy so it does not hide exactly behind the original.
-  CGFloat step = [RDLEditor gridStep] * 2;
-  item.left = [RDLEditor snap:item.left + step];
-  item.top = [RDLEditor snap:item.top + step];
+  CGFloat step = [PicaEditor gridStep] * 2;
+  item.left = [PicaEditor snap:item.left + step];
+  item.top = [PicaEditor snap:item.top + step];
   [_editor beginGroup:@"Paste"];
   [_editor insertItem:item into:point.items bandKey:point.bandKey atIndex:[point.items count]];
   [_editor endGroup];

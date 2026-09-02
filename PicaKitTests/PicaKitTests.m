@@ -50,56 +50,6 @@
 }
 @end
 
-@interface PicaEditorTests : PICA_TEST_CASE
-@end
-@implementation PicaEditorTests
-- (void)testDocument {
-  PICA_ASSERT_NO_FAILURES(PicaRunDocumentChecks());
-}
-- (void)testGranularUndo {
-  PICA_ASSERT_NO_FAILURES(PicaRunUndoChecks());
-}
-- (void)testEditorTablixOps {
-  PICA_ASSERT_NO_FAILURES(PicaRunEditorTablixChecks());
-}
-- (void)testSelection {
-  PICA_ASSERT_NO_FAILURES(PicaRunSelectionChecks());
-}
-- (void)testInsertionPolicy {
-  PICA_ASSERT_NO_FAILURES(PicaRunInsertionChecks());
-}
-- (void)testItemTransfer {
-  PICA_ASSERT_NO_FAILURES(PicaRunItemTransferChecks());
-}
-- (void)testTextAttributes {
-  PICA_ASSERT_NO_FAILURES(PicaRunTextAttributeChecks());
-}
-- (void)testRichTextCodec {
-  PICA_ASSERT_NO_FAILURES(PicaRunRichTextCodecChecks());
-}
-- (void)testExpressionCompletion {
-  PICA_ASSERT_NO_FAILURES(PicaRunCompletionChecks());
-}
-- (void)testEditingContext {
-  PICA_ASSERT_NO_FAILURES(PicaRunEditingContextChecks());
-}
-- (void)testTextInput {
-  PICA_ASSERT_NO_FAILURES(PicaRunTextInputChecks());
-}
-- (void)testPageGeometry {
-  PICA_ASSERT_NO_FAILURES(PicaRunPageGeometryChecks());
-}
-- (void)testTablixGeometry {
-  PICA_ASSERT_NO_FAILURES(PicaRunTablixGeometryChecks());
-}
-- (void)testInspectorFieldBindings {
-  PICA_ASSERT_NO_FAILURES(PicaRunFieldBindingChecks());
-}
-- (void)testModalSession {
-  PICA_ASSERT_NO_FAILURES(PicaRunModalSessionChecks());
-}
-@end
-
 @interface PicaBackendTests : PICA_TEST_CASE
 @end
 @implementation PicaBackendTests

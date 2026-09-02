@@ -9,6 +9,13 @@
 // instead of reached for at the point of use.
 #import <AppKit/AppKit.h>
 #import "PicaKit.h"
+// The context exposes these as its API surface, so anything holding a context
+// gets the types it needs. None of them import this header back.
+#import "PicaDocument.h"
+#import "PicaEditor.h"
+#import "PicaSelection.h"
+#import "PicaItemFactory.h"
+
 
 // Zoom and grid are not document content. They used to be published through
 // the document-changed notification, which meant every zoom marked the report
@@ -17,9 +24,9 @@
 extern NSString * const PicaViewStateDidChangeNotification;
 
 @interface PicaEditingContext : NSObject
-@property (nonatomic, readonly, strong) RDLDocument *document;
-@property (nonatomic, readonly, strong) RDLSelection *selection;
-@property (nonatomic, readonly, strong) RDLEditor *editor;
+@property (nonatomic, readonly, strong) PicaDocument *document;
+@property (nonatomic, readonly, strong) PicaSelection *selection;
+@property (nonatomic, readonly, strong) PicaEditor *editor;
 
 // Canvas view state.
 @property (nonatomic, assign) CGFloat zoom;
@@ -32,7 +39,7 @@ extern NSString * const PicaViewStateDidChangeNotification;
 - (RDLReport *)report;
 - (RDLItem *)selectedItem;
 
-// Loading. These live here rather than on RDLDocument because PicaSamples is
+// Loading. These live here rather than on PicaDocument because PicaSamples is
 // part of the designer, not the kit.
 - (void)loadBlankReport;
 - (void)loadSampleWithId:(NSString *)sampleId;
@@ -43,8 +50,8 @@ extern NSString * const PicaViewStateDidChangeNotification;
 - (void)toggleGrid;
 
 // --- Selection-driven operations ------------------------------------------
-// These coordinate the three core objects: ask RDLItemFactory where a new item
-// goes, mutate through RDLEditor so it undoes, then move the selection. Views
+// These coordinate the three core objects: ask PicaItemFactory where a new item
+// goes, mutate through PicaEditor so it undoes, then move the selection. Views
 // call these rather than assembling the sequence themselves.
 - (void)addItemOfKind:(NSString *)kind;
 - (NSArray<NSString *> *)allowedElementKinds;

@@ -1,4 +1,5 @@
 #import "PicaInspectorFields.h"
+#import "PicaEditor.h"
 #import "PicaKit.h"
 
 @implementation PicaFieldBinding
@@ -97,7 +98,7 @@
 #pragma mark - UI -> model
 
 - (BOOL)applyControl:(id)control
-              editor:(RDLEditor *)editor
+              editor:(PicaEditor *)editor
                 item:(RDLItem *)item
              bandKey:(NSString *)bandKey {
   for (PicaFieldBinding *b in _bindings) {

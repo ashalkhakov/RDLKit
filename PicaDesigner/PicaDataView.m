@@ -1,4 +1,6 @@
 #import "PicaDataView.h"
+#import "PicaChange.h"
+#import "PicaDocument.h"
 #import "PicaEditingContext.h"
 #import "PicaKit.h"
 
@@ -21,7 +23,7 @@
     [self addSubview:_stack];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(documentDidChange:)
-                                                 name:RDLDocumentDidChangeNotification
+                                                 name:PicaDocumentDidChangeNotification
                                                object:context.document];
     [self reload];
   }
@@ -32,7 +34,7 @@
 // none of its business. Rebuilding on every change is what made the old
 // design need re-entrancy guards everywhere.
 - (void)documentDidChange:(NSNotification *)note {
-  RDLChange *change = [note userInfo][RDLChangeKey];
+  PicaChange *change = [note userInfo][PicaChangeKey];
   if (change.scope == RDLChangeScopeReport || change.scope == RDLChangeScopeData)
     [self reload];
 }
@@ -65,7 +67,7 @@
   NSArray *subs = [_stack.subviews copy];
   for (NSView *v in subs)
     [v removeFromSuperview];
-  RDLDocument *doc = _context.document;
+  PicaDocument *doc = _context.document;
   RDLReport *report = _context.report;
   CGFloat y = 8;
   [_stack addSubview:[self label:@"Parameters" frame:NSMakeRect(10, y, 220, 16)]];

@@ -1,4 +1,6 @@
 #import "PicaInPlaceEditor.h"
+#import "PicaEditor.h"
+#import "PicaPageGeometry.h"
 #import "PicaEditingContext.h"
 #import "PicaExpressionHelper.h"
 #import "PicaCompatibility.h"
@@ -52,7 +54,7 @@
   if ([hit.type isEqualToString:@"Tablix"]) {
     NSUInteger col = 0;
     NSString *part = nil;
-    if ([RDLTablixGeometry tablix:hit
+    if ([PicaTablixGeometry tablix:hit
                          itemRect:itemRect
                             point:p
                            column:&col
@@ -87,7 +89,7 @@
   NSRect itemRect;
   if (![[_host editorGeometry] findRectOfItem:tab rect:&itemRect])
     return;
-  NSRect cell = [RDLTablixGeometry cellRectOf:tab
+  NSRect cell = [PicaTablixGeometry cellRectOf:tab
                                      itemRect:itemRect
                                        column:col
                                          part:part
@@ -161,7 +163,7 @@
   [self tearDownEditor];
   if (cancelled || it == nil)
     return;
-  RDLEditor *editor = _ctx.editor;
+  PicaEditor *editor = _ctx.editor;
   if (ctx == nil) {
     if ([text isEqualToString:it.value ?: @""])
       return;
@@ -208,8 +210,9 @@
   PICA_UNUSED(words);
   if (index)
     *index = 0;
-  return PicaExpressionCompletions([textView string], charRange,
-                                   _editItem.dataSetName, _ctx.report);
+  PicaExpressionScope *scope =
+      [PicaExpressionScope scopeWithReport:_ctx.report dataSetName:_editItem.dataSetName];
+  return PicaExpressionCompletions([textView string], charRange, scope);
 }
 
 - (BOOL)control:(NSControl *)control

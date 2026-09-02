@@ -1,4 +1,6 @@
 #import "PicaCanvasRenderer.h"
+#import "PicaItemFactory.h"
+#import "PicaPageGeometry.h"
 #import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 
@@ -13,7 +15,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 
 @implementation PicaCanvasRenderer {
   PicaEditingContext *_ctx;
-  RDLPageGeometry *_geometry;
+  PicaPageGeometry *_geometry;
   PicaCanvasOverlay *_overlay;
 }
 
@@ -27,8 +29,8 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
 - (void)drawTablix:(RDLItem *)it inRect:(NSRect)r {
   CGFloat z = _ctx.zoom;
   NSArray *cols = it.columnSpecs ?: @[];
-  CGFloat hh = [RDLTablixGeometry headerHeightOf:it zoom:z];
-  CGFloat rh = [RDLTablixGeometry rowHeightOf:it zoom:z];
+  CGFloat hh = [PicaTablixGeometry headerHeightOf:it zoom:z];
+  CGFloat rh = [PicaTablixGeometry rowHeightOf:it zoom:z];
 
   // Header band with the same background picaBuildTable uses.
   NSRect hr = NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), MIN(hh, NSHeight(r)));
@@ -38,7 +40,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   // Hovered cell highlight: shows which region a double-click would edit.
   if (_overlay.hoverTablix == it && _overlay.hoverPart != nil &&
       _overlay.editingItem == nil) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it
+    NSRect cell = [PicaTablixGeometry cellRectOf:it
                                        itemRect:r
                                          column:_overlay.hoverColumn
                                            part:_overlay.hoverPart
@@ -58,7 +60,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   CGFloat x = NSMinX(r);
   for (NSUInteger i = 0; i < [cols count]; i++) {
     NSDictionary *col = cols[i];
-    CGFloat w = [col[@"width"] doubleValue] * RDLPointsPerInch * z;
+    CGFloat w = [col[@"width"] doubleValue] * PicaPointsPerInch * z;
     NSString *align = col[@"align"];
     headerStyle.textAlign = align;
     valueStyle.textAlign = align;
@@ -66,9 +68,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     NSDictionary *edit = (_overlay.editingItem == it) ? _overlay.editingCell : nil;
     BOOL editingThisColumn = edit && [edit[@"col"] unsignedIntegerValue] == i;
     BOOL editingHeader = editingThisColumn &&
-                         [edit[@"part"] isEqualToString:RDLTablixPartHeader];
+                         [edit[@"part"] isEqualToString:PicaTablixPartHeader];
     BOOL editingValue = editingThisColumn &&
-                        [edit[@"part"] isEqualToString:RDLTablixPartValue];
+                        [edit[@"part"] isEqualToString:PicaTablixPartValue];
     if (!editingHeader) {
       NSRect cell = NSMakeRect(x, NSMinY(r), w, hh);
       [PicaAttributedText(col[@"header"] ?: @"", headerStyle, z)
@@ -95,14 +97,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   NSFrameRect(r);
 }
 
-- (void)drawGeometry:(RDLPageGeometry *)geo
+- (void)drawGeometry:(PicaPageGeometry *)geo
              overlay:(PicaCanvasOverlay *)overlay
               bounds:(NSRect)bounds {
   _overlay = overlay;
   _geometry = geo;
   RDLReport *r = _ctx.report;
   CGFloat z = _ctx.zoom;
-  CGFloat scale = RDLPointsPerInch * z;
+  CGFloat scale = PicaPointsPerInch * z;
   [[NSColor colorWithCalibratedWhite:0.11 alpha:1] set];
   NSRectFill(bounds);
   NSRect paper = geo.paperRect;
@@ -125,7 +127,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     NSFontAttributeName : [NSFont userFontOfSize:9],
     NSForegroundColorAttributeName : [NSColor colorWithCalibratedWhite:0.4 alpha:1]
   };
-  for (RDLBandFrame *bf in geo.bandFrames) {
+  for (PicaBandFrame *bf in geo.bandFrames) {
     NSRect br = bf.frame;
     if (_ctx.showsGrid) {
       [[NSColor colorWithCalibratedWhite:0.1 alpha:0.08] set];
@@ -144,7 +146,7 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
     [xf translateXBy:NSMinX(br) - 12 yBy:NSMinY(br) + 8];
     [xf rotateByDegrees:90];
     [xf concat];
-    [[RDLItemFactory titleForBandKey:bf.bandKey] drawAtPoint:NSZeroPoint
+    [[PicaItemFactory titleForBandKey:bf.bandKey] drawAtPoint:NSZeroPoint
                                               withAttributes:labelAttr];
     [[NSGraphicsContext currentContext] restoreGraphicsState];
 
@@ -222,9 +224,9 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
       [PicaColorFromHex(b.color) set];
       NSFrameRect(r);
     }
-    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * RDLPointsPerInch * _ctx.zoom;
+    CGFloat padL = PicaInchesFromString(it.style.paddingLeft) * PicaPointsPerInch * _ctx.zoom;
+    CGFloat padT = PicaInchesFromString(it.style.paddingTop) * PicaPointsPerInch * _ctx.zoom;
+    CGFloat padR = PicaInchesFromString(it.style.paddingRight) * PicaPointsPerInch * _ctx.zoom;
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
     BOOL editorCoversThisText =

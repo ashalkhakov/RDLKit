@@ -12,12 +12,12 @@
 @class PicaEditingContext;
 @class PicaInPlaceEditor;
 @class RDLItem;
-@class RDLPageGeometry;
+@class PicaPageGeometry;
 
 @protocol PicaInPlaceEditorHost <NSObject>
 // The current geometry snapshot. Asked for fresh each time, because the report
 // may have changed between the click and the edit actually starting.
-- (RDLPageGeometry *)editorGeometry;
+- (PicaPageGeometry *)editorGeometry;
 // The session began or ended: the text under the editor must stop or resume
 // being drawn.
 - (void)editorSessionDidChange;

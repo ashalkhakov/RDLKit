@@ -1,4 +1,6 @@
 #import "PicaDesignerWindow.h"
+#import "PicaChange.h"
+#import "PicaSelection.h"
 #import "PicaCanvasView.h"
 #import "PicaEditingContext.h"
 #import "PicaInspectorView.h"
@@ -74,11 +76,11 @@
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
     [nc addObserver:self
            selector:@selector(documentDidChange:)
-               name:RDLDocumentDidChangeNotification
+               name:PicaDocumentDidChangeNotification
              object:context.document];
     [nc addObserver:self
            selector:@selector(selectionDidChange:)
-               name:RDLSelectionDidChangeNotification
+               name:PicaSelectionDidChangeNotification
              object:context.selection];
     [self reloadUI];
   }
@@ -89,7 +91,7 @@
 // tree or the report itself changes -- not when an item property is tweaked,
 // unless that property is the name or type the row displays.
 - (void)documentDidChange:(NSNotification *)note {
-  RDLChange *change = [note userInfo][RDLChangeKey];
+  PicaChange *change = [note userInfo][PicaChangeKey];
   BOOL affectsTree = change.scope == RDLChangeScopeStructure ||
                      change.scope == RDLChangeScopeReport ||
                      [change affectsKeyPath:@"name"] || [change affectsKeyPath:@"type"];

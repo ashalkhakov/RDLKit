@@ -11,10 +11,10 @@
 @class PicaCanvasInteraction;
 @class PicaEditingContext;
 @class RDLItem;
-@class RDLPageGeometry;
+@class PicaPageGeometry;
 
 @protocol PicaCanvasInteractionHost <NSObject>
-- (RDLPageGeometry *)interactionGeometry;
+- (PicaPageGeometry *)interactionGeometry;
 - (void)interactionNeedsRedraw;
 // A double-click's edit begins on mouse-up, once the event sequence is over.
 - (void)interactionBeginEditingItem:(RDLItem *)item

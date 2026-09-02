@@ -1,4 +1,8 @@
 #import "PicaInspectorView.h"
+#import "PicaChange.h"
+#import "PicaEditor.h"
+#import "PicaItemFactory.h"
+#import "PicaSelection.h"
 #import "PicaEditingContext.h"
 #import "PicaKit.h"
 #import "PicaTablixEditor.h"
@@ -121,11 +125,11 @@ static const CGFloat kHalf2X = 136;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(documentDidChange:)
-                                                 name:RDLDocumentDidChangeNotification
+                                                 name:PicaDocumentDidChangeNotification
                                                object:context.document];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(reload)
-                                                 name:RDLSelectionDidChangeNotification
+                                                 name:PicaSelectionDidChangeNotification
                                                object:context.selection];
     [self reload];
   }
@@ -144,7 +148,7 @@ static const CGFloat kHalf2X = 136;
 // the fields again from the model would fight the user's cursor, so only
 // reload when the change was not a property edit of what is already shown.
 - (void)documentDidChange:(NSNotification *)note {
-  RDLChange *change = [note userInfo][RDLChangeKey];
+  PicaChange *change = [note userInfo][PicaChangeKey];
   if (change.scope == RDLChangeScopeItem && change.item == [_context selectedItem] &&
       [change.keys count] > 0)
     return;
@@ -453,7 +457,7 @@ static const CGFloat kHalf2X = 136;
     return;
   _reloading = YES;
   RDLReport *report = _context.report;
-  RDLSelection *sel = _context.selection;
+  PicaSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
   RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
 
@@ -481,7 +485,7 @@ static const CGFloat kHalf2X = 136;
     }
     [self stackBoxes:boxes];
   } else if (band != nil) {
-    [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
+    [_kindLabel setStringValue:[PicaItemFactory titleForBandKey:sel.bandKey]];
     // Only the Body carries a background in RDL, so the field is disabled
     // elsewhere rather than silently doing nothing.
     BOOL isBody = [RDLReport bandKeySupportsBackground:sel.bandKey];
@@ -535,15 +539,16 @@ static const CGFloat kHalf2X = 136;
   if (index)
     *index = 0;
   RDLItem *it = [_context selectedItem];
-  return PicaExpressionCompletions([textView string], charRange, it.dataSetName,
-                                   _context.report);
+  PicaExpressionScope *scope =
+      [PicaExpressionScope scopeWithReport:_context.report dataSetName:it.dataSetName];
+  return PicaExpressionCompletions([textView string], charRange, scope);
 }
 
 - (void)changed:(id)sender {
   if (_reloading)
     return;
-  RDLEditor *editor = _context.editor;
-  RDLSelection *sel = _context.selection;
+  PicaEditor *editor = _context.editor;
+  PicaSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
 
   // Most fields are a plain read-and-write of one model value.
@@ -576,7 +581,7 @@ static const CGFloat kHalf2X = 136;
   }
 
   // Page dimensions and margins carry the body width with them, so the
-  // dependency lives in RDLEditor rather than here.
+  // dependency lives in PicaEditor rather than here.
   if (sender == _marginField) {
     [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
     return;
