@@ -29,7 +29,19 @@ NSRange PicaExpressionCompletionRange(NSString *text, NSUInteger caret);
 
 // Field editor that scopes user completion to the RDL expression grammar.
 // Install from the window delegate's -windowWillReturnFieldEditor:toObject:.
+//
+// It also carries its OWN undo manager. A field editor with allowsUndo
+// registers typing undo on whatever -undoManager returns, which by default is
+// the window's -- and the designer's window vends the document's undo manager
+// so Cmd+Z undoes report edits. Sharing the two breaks both: the document's
+// manager groups explicitly rather than per event, and AppKit's registration
+// throws against it, swallowing the keystroke. Keeping typing undo local also
+// gives the better behaviour: Cmd+Z in a field undoes typing, Cmd+Z elsewhere
+// undoes the document.
 @interface PicaExpressionFieldEditor : NSTextView
+// Call when the editor is handed to a different control, so typing undo does
+// not reach back into the field previously being edited.
+- (void)resetTypingUndo;
 @end
 
 // GNUstep declares the completion delegate's index as `int *`, Cocoa as

@@ -64,11 +64,16 @@ typedef NS_ENUM(NSInteger, PicaNodeKind) {
     // Cmd+Z stops working in every text field of the window.
     [_fieldEditor setAllowsUndo:YES];
   }
+  // One field editor serves every text field in the window, so clear its
+  // typing history when it moves to a different control.
+  [_fieldEditor resetTypingUndo];
   return _fieldEditor;
 }
 
-// Route Cmd+Z to the report-level undo manager when no text field is being
-// edited (field editors keep their own typing undo via allowsUndo).
+// Cmd+Z reaches this only when no text field is being edited: a field editor
+// is asked first and returns its own typing undo manager (see
+// PicaExpressionFieldEditor), which is also what keeps AppKit from registering
+// against a manager that groups explicitly.
 - (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window {
   (void)window;
   return _context.document.undoManager;

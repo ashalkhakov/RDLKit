@@ -70,6 +70,7 @@
 		AA17E816AF371EBB10F5333E /* PicaEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */; };
 		BF3CDBCB888B1DD6A659E871 /* PicaEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* PicaEditingContext.m */; };
 		802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */ = {isa = PBXBuildFile; fileRef = E46BA8ED30D063FB448EB1DE /* PicaSamples.m */; };
+		2ACEF60D3170E8981F7CAEFA /* PicaExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* PicaExpressionHelper.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -551,6 +552,7 @@
 				E49064EFAA718365E67147C5 /* PicaKitTests.m in Sources */,
 				BF3CDBCB888B1DD6A659E871 /* PicaEditingContext.m in Sources */,
 				802DCD68AFEAA4DD7306F323 /* PicaSamples.m in Sources */,
+				2ACEF60D3170E8981F7CAEFA /* PicaExpressionHelper.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -83,6 +83,9 @@
 - (void)testEditingContext {
   PICA_ASSERT_NO_FAILURES(PicaRunEditingContextChecks());
 }
+- (void)testTextInput {
+  PICA_ASSERT_NO_FAILURES(PicaRunTextInputChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE

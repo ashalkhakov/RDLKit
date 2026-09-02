@@ -35,7 +35,20 @@ BOOL PicaIsTypingEvent(void) {
   return YES;
 }
 
-@implementation PicaExpressionFieldEditor
+@implementation PicaExpressionFieldEditor {
+  NSUndoManager *_typingUndoManager;
+}
+
+// Never the window's (see the header): that one belongs to the document.
+- (NSUndoManager *)undoManager {
+  if (_typingUndoManager == nil)
+    _typingUndoManager = [[NSUndoManager alloc] init];
+  return _typingUndoManager;
+}
+
+- (void)resetTypingUndo {
+  [_typingUndoManager removeAllActions];
+}
 
 - (NSRange)rangeForUserCompletion {
   NSRange r = PicaExpressionCompletionRange([self string],

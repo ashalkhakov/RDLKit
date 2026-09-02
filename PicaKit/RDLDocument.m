@@ -10,10 +10,18 @@
   if (self) {
     _report = report ?: [RDLReport emptyReportNamed:@"Untitled"];
     _undoManager = [[NSUndoManager alloc] init];
-    // RDLEditor groups every mutation explicitly, so leaving the automatic
-    // per-event grouping on would wrap unrelated edits into one step and make
-    // undo granularity depend on run-loop timing.
+    // RDLEditor brackets every mutation in an explicit group, so the automatic
+    // per-event grouping would only add an outer layer that collapses
+    // unrelated edits and makes granularity depend on run-loop timing.
+    //
+    // IMPORTANT: because of this, do NOT hand this undo manager to AppKit for
+    // text editing. AppKit registers typing undo without opening a group of
+    // its own, which with grouping-by-event off throws "must begin a group
+    // before registering undo" -- and the exception is swallowed along with
+    // the keystroke, so text fields quietly stop accepting input. Give field
+    // editors their own manager instead (see PicaExpressionFieldEditor).
     [_undoManager setGroupsByEvent:NO];
+
     _paramValues = @{};
     [self syncParamValuesFromReport];
   }

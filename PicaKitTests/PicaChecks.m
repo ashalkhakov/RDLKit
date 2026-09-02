@@ -1,5 +1,6 @@
 #import "PicaChecks.h"
 #import "PicaEditingContext.h"
+#import "PicaExpressionHelper.h"
 #if __has_include(<PicaKit/PicaKit.h>)
 #import <PicaKit/PicaKit.h>
 #else
@@ -3126,6 +3127,64 @@ NSArray<NSString *> *PicaRunEditingContextChecks(void) {
   return fails;
 }
 
+// --- Text input must survive the undo wiring -------------------------------
+//
+// A regression check for a real, silent failure: the designer's window vends
+// the document's undo manager so Cmd+Z undoes report edits, and its field
+// editor has allowsUndo. When those were the SAME manager, AppKit's typing
+// registration threw against a manager that groups explicitly rather than per
+// event -- and the exception took the keystroke with it, so every text field
+// in the window ignored input while looking perfectly normal. Nothing in the
+// build or the model checks noticed; only using the app did.
+
+NSArray<NSString *> *PicaRunTextInputChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:nil];
+
+  // The field editor must not adopt the document's undo manager.
+  PicaExpressionFieldEditor *editor =
+      [[PicaExpressionFieldEditor alloc] initWithFrame:NSMakeRect(0, 0, 200, 22)];
+  [editor setFieldEditor:YES];
+  [editor setRichText:NO];
+  [editor setAllowsUndo:YES];
+  if ([editor undoManager] == doc.undoManager)
+    PicaFail(fails, @"a field editor must not share the document's undo manager");
+  if ([editor undoManager] == nil)
+    PicaFail(fails, @"a field editor needs an undo manager of its own for typing undo");
+
+  // Typing must actually land. This is the check that would have caught it.
+  @try {
+    [editor insertText:@"Hello" replacementRange:NSMakeRange(0, 0)];
+  } @catch (NSException *e) {
+    PicaFail(fails, [NSString stringWithFormat:@"typing raised %@: %@",
+                                               [e name], [e reason]]);
+  }
+  if (![[editor string] isEqualToString:@"Hello"])
+    PicaFail(fails, [NSString stringWithFormat:@"typing was swallowed; field holds \"%@\"",
+                                               [editor string]]);
+
+  // Typing undo works, and stays local to the field.
+  [[editor undoManager] undo];
+  if ([[editor string] isEqualToString:@"Hello"])
+    PicaFail(fails, @"typing undo should revert the field's text");
+  if (doc.undoManager.canUndo)
+    PicaFail(fails, @"typing must not put anything on the document's undo stack");
+
+  // Re-targeting the shared editor clears its typing history, so undo cannot
+  // reach back into the field that was being edited before.
+  [editor setString:@"fresh"];
+  [editor resetTypingUndo];
+  if ([[editor undoManager] canUndo])
+    PicaFail(fails, @"resetTypingUndo should clear the field editor's undo stack");
+
+  // And the document's own manager still groups per operation, which is what
+  // made sharing it unsafe in the first place.
+  if ([doc.undoManager groupsByEvent])
+    PicaFail(fails, @"the document's undo manager should group explicitly, not per event");
+
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -3145,6 +3204,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunRichTextCodecChecks()];
   [fails addObjectsFromArray:PicaRunCompletionChecks()];
   [fails addObjectsFromArray:PicaRunEditingContextChecks()];
+  [fails addObjectsFromArray:PicaRunTextInputChecks()];
   [fails addObjectsFromArray:PicaRunTablixRebuildChecks()];
   [fails addObjectsFromArray:PicaRunTablixEditingChecks()];
   [fails addObjectsFromArray:PicaRunTablixAdvancedChecks()];
