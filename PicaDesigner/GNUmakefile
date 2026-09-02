@@ -5,14 +5,28 @@ Pica_NEEDS_GUI = yes
 Pica_OBJCFLAGS += -fobjc-arc -Wall -I../PicaKit
 Pica_OBJC_FILES = \
   main.m \
-  PicaController.m \
+  PicaEditingContext.m \
+  PicaChange.m \
+  PicaSelection.m \
+  PicaDocument.m \
+  PicaEditor.m \
+  PicaItemFactory.m \
+  PicaPageGeometry.m \
+  PicaRichTextCodec.m \
   PicaCanvasView.m \
+  PicaCanvasRenderer.m \
+  PicaInPlaceEditor.m \
+  PicaCanvasInteraction.m \
   PicaDesignerWindow.m \
+  PicaOutlineDataSource.m \
   PicaGeneratorWindow.m \
   PicaAppDelegate.m \
   PicaSamples.m \
-  PicaToolboxView.m \
   PicaInspectorView.m \
+  PicaInspectorFields.m \
+  PicaExpressionHelper.m \
+  PicaTablixEditor.m \
+  PicaRichTextEditor.m \
   PicaDataView.m \
   PicaWelcomeWindow.m
 Pica_OBJC_LIBS += -lPicaKit

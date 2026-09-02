@@ -9,3 +9,6 @@
 #import "RDLView.h"
 #import "RDLBackend.h"
 #import "RDLGenerator.h"
+// Style -> AppKit text attributes, shared with the designer canvas and its
+// rich-text codec because RDLView's preview needs the same translation.
+#import "RDLTextAttributes.h"

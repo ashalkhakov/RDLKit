@@ -2,13 +2,14 @@
 #import "PicaDesignerWindow.h"
 #import "PicaGeneratorWindow.h"
 #import "PicaWelcomeWindow.h"
-#import "PicaController.h"
+#import "PicaEditingContext.h"
 #import "PicaSamples.h"
 
 @implementation PicaAppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
   (void)n;
+  _context = [[PicaEditingContext alloc] init];
   [self buildMenu];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(showDesigner:)
@@ -29,6 +30,12 @@
   NSMenuItem *it = [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:key ?: @""];
   [it setTarget:self];
   return it;
+}
+
+// Nil-target item: the action goes to the first responder (field editor,
+// canvas, window undo manager…) instead of the app delegate.
+- (NSMenuItem *)responderItem:(NSString *)title action:(SEL)sel key:(NSString *)key {
+  return [[NSMenuItem alloc] initWithTitle:title action:sel keyEquivalent:key ?: @""];
 }
 
 - (void)buildMenu {
@@ -55,7 +62,7 @@
   [file addItem:[self item:@"Designer" action:@selector(showDesigner:) key:@""]];
   [file addItem:[NSMenuItem separatorItem]];
   [file addItem:[self item:@"New Letter" action:@selector(newDocument:) key:@"n"]];
-  [file addItem:[self item:@"Open…" action:@selector(openDocument:) key:@"o"]];
+  [file addItem:[self responderItem:@"Open…" action:@selector(openDocument:) key:@"o"]];
   [file addItem:[self item:@"Save" action:@selector(saveDocument:) key:@"s"]];
   [file addItem:[self item:@"Save As…" action:@selector(saveDocumentAs:) key:@"S"]];
   [file addItem:[NSMenuItem separatorItem]];
@@ -74,12 +81,24 @@
   [file addItem:samplesItem];
   [file addItem:[NSMenuItem separatorItem]];
   [file addItem:[self item:@"Preview" action:@selector(preview:) key:@"p"]];
-  [file addItem:[self item:@"Export PDF…" action:@selector(exportPDF:) key:@"e"]];
+  [file addItem:[self responderItem:@"Export PDF…" action:@selector(exportPDF:) key:@"e"]];
   [fileItem setSubmenu:file];
 
   NSMenuItem *editItem = [[NSMenuItem alloc] init];
   [menubar addItem:editItem];
   NSMenu *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
+  // Standard editing items dispatch through the responder chain (nil target);
+  // without them Cmd+Z/X/C/V/A never reach text fields or the undo manager.
+  [edit addItem:[self responderItem:@"Undo" action:@selector(undo:) key:@"z"]];
+  [edit addItem:[self responderItem:@"Redo" action:@selector(redo:) key:@"Z"]];
+  [edit addItem:[NSMenuItem separatorItem]];
+  [edit addItem:[self responderItem:@"Cut" action:@selector(cut:) key:@"x"]];
+  [edit addItem:[self responderItem:@"Copy" action:@selector(copy:) key:@"c"]];
+  [edit addItem:[self responderItem:@"Paste" action:@selector(paste:) key:@"v"]];
+  [edit addItem:[self responderItem:@"Select All" action:@selector(selectAll:) key:@"a"]];
+  [edit addItem:[self responderItem:@"Duplicate" action:@selector(duplicate:) key:@"d"]];
+  [edit addItem:[NSMenuItem separatorItem]];
+  [edit addItem:[self item:@"Add Element…" action:@selector(addElement:) key:@"A"]];
   [edit addItem:[self item:@"Delete" action:@selector(delete:) key:@"\b"]];
   [edit addItem:[self item:@"Toggle Grid" action:@selector(toggleGrid:) key:@"g"]];
   [edit addItem:[self item:@"Zoom In" action:@selector(zoomIn:) key:@"="]];
@@ -91,14 +110,12 @@
 
 - (void)ensureDesigner {
   if (_designer == nil)
-    _designer = [[PicaDesignerWindow alloc] init];
+    _designer = [[PicaDesignerWindow alloc] initWithContext:_context];
 }
 
 - (void)ensureGenerator {
-  if (_generator == nil) {
-    _generator = [[PicaGeneratorWindow alloc] init];
-    [_generator loadSample:@"invoice"];
-  }
+  if (_generator == nil)
+    _generator = [[PicaGeneratorWindow alloc] initWithDocument:_context.document];
 }
 
 - (void)showDesigner:(id)sender {
@@ -122,60 +139,61 @@
   [[_welcome window] makeKeyAndOrderFront:nil];
 }
 
-- (BOOL)generatorIsFront {
-  return _generator != nil && [[_generator window] isKeyWindow];
-}
-
 - (void)openSample:(NSMenuItem *)sender {
   NSArray *cat = [PicaSamples catalog];
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[cat count])
     return;
-  if ([self generatorIsFront]) {
-    [_generator loadSample:cat[i][@"id"]];
-    return;
-  }
-  [[PicaController sharedController] loadSample:cat[i][@"id"]];
-  [self showDesigner:nil];
+  // One document, so the sample lands wherever the user is looking.
+  [_context loadSampleWithId:cat[i][@"id"]];
+  if (![[_generator window] isKeyWindow])
+    [self showDesigner:nil];
 }
 
 - (void)newDocument:(id)sender {
   (void)sender;
-  [[PicaController sharedController] newReport];
+  [_context loadBlankReport];
   [self showDesigner:nil];
 }
 
+// Only reached when no window handled it -- each window controller implements
+// -openDocument: for itself, and the responder chain gets there first.
 - (void)openDocument:(id)sender {
   (void)sender;
-  if ([self generatorIsFront]) {
-    [_generator openRdl:sender];
-    return;
-  }
   NSOpenPanel *p = [NSOpenPanel openPanel];
   [p setAllowedFileTypes:@[ @"rdl", @"rdlc", @"xml" ]];
   [p setCanChooseFiles:YES];
   [p setCanChooseDirectories:NO];
   if ([p runModal] == NSOKButton) {
     NSError *err = nil;
-    if (![[PicaController sharedController] openURL:[p URL] error:&err]) {
+    if (![_context.document openURL:[p URL] error:&err]) {
       NSAlert *a = [[NSAlert alloc] init];
       [a setMessageText:@"Could not open RDL"];
       [a setInformativeText:err.localizedDescription ?: @""];
       [a runModal];
       return;
     }
+    // The old report's items are gone with it.
+    [_context.selection reset];
     [self showDesigner:nil];
   }
 }
 
 - (void)saveDocument:(id)sender {
-  PicaController *c = [PicaController sharedController];
-  if (c.fileURL) {
+  if (_context.document.fileURL) {
     NSError *err = nil;
-    [c saveToURL:c.fileURL error:&err];
+    if (![_context.document saveWithError:&err])
+      [self presentError:err title:@"Could not save RDL"];
     return;
   }
   [self saveDocumentAs:sender];
+}
+
+- (void)presentError:(NSError *)error title:(NSString *)title {
+  NSAlert *a = [[NSAlert alloc] init];
+  [a setMessageText:title];
+  [a setInformativeText:error.localizedDescription ?: @""];
+  [a runModal];
 }
 
 - (void)saveDocumentAs:(id)sender {
@@ -184,56 +202,49 @@
   NSSavePanel *p = [NSSavePanel savePanel];
   [p setAllowedFileTypes:@[ @"rdl" ]];
   [p setNameFieldStringValue:
-      [([PicaController sharedController].report.name ?: @"report") stringByAppendingPathExtension:@"rdl"]];
+          [(_context.report.name ?: @"report") stringByAppendingPathExtension:@"rdl"]];
   if ([p runModal] == NSOKButton) {
     NSError *err = nil;
-    [[PicaController sharedController] saveToURL:[p URL] error:&err];
+    if (![_context.document saveToURL:[p URL] error:&err])
+      [self presentError:err title:@"Could not save RDL"];
   }
 }
 
+// Fallbacks for when the front window does not handle these itself.
 - (void)preview:(id)sender {
-  if ([self generatorIsFront])
-    return;
   [self ensureDesigner];
   [_designer showPreview:sender];
 }
 
 - (void)exportPDF:(id)sender {
-  if ([self generatorIsFront]) {
-    [_generator exportPDF:sender];
-    return;
-  }
   [self ensureDesigner];
   [_designer exportPDF:sender];
 }
 
 - (void)delete:(id)sender {
   (void)sender;
-  [[PicaController sharedController] removeSelected];
+  [_context deleteSelectedItem];
+}
+
+- (void)addElement:(id)sender {
+  [self ensureDesigner];
+  [[_designer window] makeKeyAndOrderFront:nil];
+  [_designer addElement:sender];
 }
 
 - (void)toggleGrid:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.showsGrid = !c.showsGrid;
-  [c noteChange];
-  c.dirty = NO;
+  [_context toggleGrid];
 }
 
 - (void)zoomIn:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.zoom = MIN(2.0, c.zoom + 0.1);
-  [c noteChange];
-  c.dirty = NO;
+  [_context zoomIn];
 }
 
 - (void)zoomOut:(id)sender {
   (void)sender;
-  PicaController *c = [PicaController sharedController];
-  c.zoom = MAX(0.4, c.zoom - 0.1);
-  [c noteChange];
-  c.dirty = NO;
+  [_context zoomOut];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {

@@ -1,8 +1,11 @@
 #import "PicaDataView.h"
-#import "PicaController.h"
+#import "PicaChange.h"
+#import "PicaDocument.h"
+#import "PicaDocument.h"
 #import "PicaKit.h"
 
 @interface PicaDataView () <NSTextFieldDelegate, NSTextViewDelegate>
+@property (nonatomic, strong) PicaDocument *document;
 @property (nonatomic, strong) NSView *stack;
 @property (nonatomic, strong) NSTextView *jsonView;
 @property (nonatomic, copy) NSString *editingDataset;
@@ -12,18 +15,28 @@
   BOOL _reloading;
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
-  self = [super initWithFrame:frameRect];
+- (instancetype)initWithFrame:(NSRect)frame document:(PicaDocument *)document {
+  self = [super initWithFrame:frame];
   if (self) {
+    _document = document;
     _stack = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 240, 400)];
     [self addSubview:_stack];
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(reload)
-                                                 name:PicaReportDidChangeNotification
-                                               object:nil];
+                                             selector:@selector(documentDidChange:)
+                                                 name:PicaDocumentDidChangeNotification
+                                               object:document];
     [self reload];
   }
   return self;
+}
+
+// This pane shows parameters and datasets only, so an item or band edit is
+// none of its business. Rebuilding on every change is what made the old
+// design need re-entrancy guards everywhere.
+- (void)documentDidChange:(NSNotification *)note {
+  PicaChange *change = [note userInfo][PicaChangeKey];
+  if (change.scope == RDLChangeScopeReport || change.scope == RDLChangeScopeData)
+    [self reload];
 }
 
 - (void)dealloc {
@@ -46,30 +59,33 @@
 }
 
 - (void)reload {
+  // Not a notification guard: tearing down the subviews below can end an
+  // active field edit, which calls back into -paramChanged: mid-rebuild.
   if (_reloading)
     return;
   _reloading = YES;
   NSArray *subs = [_stack.subviews copy];
   for (NSView *v in subs)
     [v removeFromSuperview];
-  PicaController *c = [PicaController sharedController];
+  PicaDocument *doc = _document;
+  RDLReport *report = _document.report;
   CGFloat y = 8;
   [_stack addSubview:[self label:@"Parameters" frame:NSMakeRect(10, y, 220, 16)]];
   y += 20;
-  if ([c.report.parameters count] == 0) {
+  if ([report.parameters count] == 0) {
     NSTextField *empty = [self label:@"No parameters on this report." frame:NSMakeRect(10, y, 220, 16)];
     [empty setFont:[NSFont userFontOfSize:10]];
     [_stack addSubview:empty];
     y += 22;
   }
   NSInteger tag = 0;
-  for (RDLParameter *p in c.report.parameters) {
+  for (RDLParameter *p in report.parameters) {
     NSTextField *l = [self label:p.name frame:NSMakeRect(10, y, 220, 14)];
     [l setFont:[NSFont userFontOfSize:10]];
     [_stack addSubview:l];
     y += 16;
     NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(10, y, 220, 22)];
-    [f setStringValue:c.paramValues[p.name] ?: (p.defaultValue ?: @"")];
+    [f setStringValue:doc.paramValues[p.name] ?: (p.defaultValue ?: @"")];
     [f setTag:tag];
     [f setDelegate:self];
     [f setTarget:self];
@@ -81,7 +97,7 @@
   y += 8;
   [_stack addSubview:[self label:@"Datasets" frame:NSMakeRect(10, y, 220, 16)]];
   y += 20;
-  if ([c.report.dataSets count] == 0) {
+  if ([report.dataSets count] == 0) {
     NSTextField *empty =
         [self label:@"Add a tablix or bind JSON to create a dataset." frame:NSMakeRect(10, y, 220, 32)];
     [empty setFont:[NSFont userFontOfSize:10]];
@@ -89,7 +105,7 @@
     y += 36;
   }
   NSInteger dsi = 0;
-  for (RDLDataSet *ds in c.report.dataSets) {
+  for (RDLDataSet *ds in report.dataSets) {
     NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(10, y, 220, 22)];
     [b setTitle:[NSString stringWithFormat:@"%@  ·  %lu rows", ds.name, (unsigned long)[ds.rows count]]];
     [b setBezelStyle:NSShadowlessSquareBezelStyle];
@@ -130,11 +146,11 @@
 - (void)toggleDataset:(NSButton *)sender {
   if (_reloading)
     return;
-  PicaController *c = [PicaController sharedController];
+  NSArray *dataSets = _document.report.dataSets;
   NSInteger i = [sender tag];
-  if (i < 0 || i >= (NSInteger)[c.report.dataSets count])
+  if (i < 0 || i >= (NSInteger)[dataSets count])
     return;
-  NSString *name = c.report.dataSets[i].name;
+  NSString *name = [dataSets[i] name];
   if ([_editingDataset isEqualToString:name])
     _editingDataset = nil;
   else
@@ -145,12 +161,12 @@
 - (void)paramChanged:(NSTextField *)sender {
   if (_reloading)
     return;
-  PicaController *c = [PicaController sharedController];
+  NSArray *params = _document.report.parameters;
   NSInteger i = [sender tag];
-  if (i < 0 || i >= (NSInteger)[c.report.parameters count])
+  if (i < 0 || i >= (NSInteger)[params count])
     return;
-  RDLParameter *p = c.report.parameters[i];
-  [c setParam:p.name value:[sender stringValue]];
+  [_document setParamValue:[sender stringValue]
+                           forName:[params[i] name]];
 }
 
 - (void)controlTextDidEndEditing:(NSNotification *)obj {
@@ -163,7 +179,13 @@
   (void)notification;
   if (_reloading || _jsonView == nil || _editingDataset == nil)
     return;
-  [[PicaController sharedController] setDatasetJSON:[_jsonView string] name:_editingDataset];
+  NSError *err = nil;
+  if (![_document bindJSON:[_jsonView string]
+                    toDataSetNamed:_editingDataset
+                             error:&err]) {
+    // Bad JSON while typing is expected; surface it without a modal.
+    NSLog(@"Pica: dataset JSON not applied: %@", err.localizedDescription);
+  }
 }
 
 @end

@@ -28,6 +28,7 @@
   s.backgroundColor = @"Transparent";
   s.textAlign = @"Left";
   s.verticalAlign = @"Top";
+  s.textDecoration = @"None";
   s.paddingLeft = @"4pt";
   s.paddingRight = @"4pt";
   s.paddingTop = @"2pt";
@@ -38,6 +39,41 @@
   s.borderTop = [RDLBorder none];
   s.borderBottom = [RDLBorder none];
   return s;
+}
+
++ (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base {
+  RDLStyle *s = [[RDLStyle alloc] init];
+  s.fontFamily = [run.fontFamily length] ? run.fontFamily : base.fontFamily;
+  s.fontSize = [run.fontSize length] ? run.fontSize : base.fontSize;
+  s.fontWeight = [run.fontWeight length] ? run.fontWeight : base.fontWeight;
+  s.fontStyle = [run.fontStyle length] ? run.fontStyle : base.fontStyle;
+  s.color = [run.color length] ? run.color : base.color;
+  s.backgroundColor = [run.backgroundColor length] ? run.backgroundColor : base.backgroundColor;
+  s.textAlign = [run.textAlign length] ? run.textAlign : base.textAlign;
+  s.verticalAlign = base.verticalAlign;
+  s.textDecoration = [run.textDecoration length] ? run.textDecoration : base.textDecoration;
+  s.format = [run.format length] ? run.format : base.format;
+  s.paddingLeft = base.paddingLeft;
+  s.paddingRight = base.paddingRight;
+  s.paddingTop = base.paddingTop;
+  s.paddingBottom = base.paddingBottom;
+  s.border = base.border;
+  s.borderLeft = base.borderLeft;
+  s.borderRight = base.borderRight;
+  s.borderTop = base.borderTop;
+  s.borderBottom = base.borderBottom;
+  return s;
+}
+@end
+
+@implementation RDLTextRun
+@end
+
+@implementation RDLParagraph
+- (instancetype)init {
+  if ((self = [super init]))
+    _runs = [NSMutableArray array];
+  return self;
 }
 @end
 
@@ -126,6 +162,14 @@
 }
 @end
 
+// One column of the designer table, resolved once per build.
+@interface PicaColSpec : NSObject
+@property (nonatomic, copy) NSString *header, *value, *align, *aggregate, *field;
+@property (nonatomic, assign) CGFloat width;
+@end
+@implementation PicaColSpec
+@end
+
 @implementation RDLItem {
   CGFloat _stashHeaderH;
   CGFloat _stashRowH;
@@ -147,7 +191,15 @@
   return self;
 }
 
+- (BOOL)picaIsMatrix {
+  return [self.pivotBy length] > 0 && [self.groupBy length] > 0;
+}
+
 - (CGFloat)headerHeight {
+  if ([self picaIsMatrix]) {
+    RDLTablixHeader *h = self.columnHierarchy.members.firstObject.header;
+    return h ? h.size : _stashHeaderH;
+  }
   if ([_tablixBody.rows count])
     return _tablixBody.rows[0].height;
   return _stashHeaderH;
@@ -155,11 +207,19 @@
 
 - (void)setHeaderHeight:(CGFloat)h {
   _stashHeaderH = h;
+  if ([self picaIsMatrix]) {
+    RDLTablixHeader *hd = self.columnHierarchy.members.firstObject.header;
+    if (hd)
+      hd.size = h;
+    return;
+  }
   if ([_tablixBody.rows count])
     _tablixBody.rows[0].height = h;
 }
 
 - (CGFloat)rowHeight {
+  if ([self picaIsMatrix])
+    return [_tablixBody.rows count] ? _tablixBody.rows[0].height : _stashRowH;
   if ([_tablixBody.rows count] > 1)
     return _tablixBody.rows[1].height;
   return _stashRowH;
@@ -167,37 +227,282 @@
 
 - (void)setRowHeight:(CGFloat)h {
   _stashRowH = h;
+  if ([self picaIsMatrix]) {
+    if ([_tablixBody.rows count])
+      _tablixBody.rows[0].height = h;
+    return;
+  }
   if ([_tablixBody.rows count] > 1)
     _tablixBody.rows[1].height = h;
 }
 
-- (NSArray *)columns {
+// "=Sum(Fields!Amount.Value)" → aggregate "Sum". Returns nil when the value
+// is not a plain aggregate call.
+static NSString *PicaAggregateOfValue(NSString *value) {
+  if (![value hasPrefix:@"="])
+    return nil;
+  NSRange paren = [value rangeOfString:@"("];
+  if (paren.location == NSNotFound || paren.location < 2)
+    return nil;
+  NSString *fn = [value substringWithRange:NSMakeRange(1, paren.location - 1)];
+  static NSSet *known = nil;
+  if (known == nil)
+    known = [NSSet setWithArray:@[ @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ]];
+  return [known containsObject:fn] ? fn : nil;
+}
+
+// Recover the designer column spec from a built tablixBody. Lossy: the
+// aggregate and (for a matrix) the header are read back out of the cell
+// expression text. Used by -inferColumnSpecsFromTablixBody and as the
+// fallback for items that never had a spec stored (e.g. an RDL 2005 List).
+- (NSArray *)picaDerivedColumns {
   if ([_tablixBody.columns count] == 0)
     return @[];
+  if ([self.pivotBy length] && [self.groupBy length]) {
+    // Matrix: one measure column; recover the designer spec from the data cell.
+    RDLItem *cell = _tablixBody.rows.firstObject.cells.firstObject.item;
+    NSString *val = cell.value ?: @"";
+    NSMutableDictionary *col = [NSMutableDictionary dictionary];
+    col[@"width"] = @(_tablixBody.columns[0].width);
+    col[@"header"] = @"";
+    col[@"value"] = val;
+    if ([cell.style.textAlign length])
+      col[@"align"] = cell.style.textAlign;
+    NSString *agg = PicaAggregateOfValue(val);
+    if (agg) {
+      col[@"aggregate"] = agg;
+      NSRange bang = [val rangeOfString:@"Fields!"];
+      if (bang.location != NSNotFound) {
+        NSString *rest = [val substringFromIndex:bang.location + 7];
+        NSRange dot = [rest rangeOfString:@"."];
+        NSString *field = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+        col[@"header"] = field;
+        col[@"value"] = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+      }
+    }
+    return @[ col ];
+  }
   RDLTablixRow *header = _tablixBody.rows.firstObject;
   RDLTablixRow *detail = [_tablixBody.rows count] > 1 ? _tablixBody.rows[1] : header;
+  // Aggregate metadata lives in the subtotal / grand total rows, if present.
+  RDLTablixRow *aggRow = [_tablixBody.rows count] > 2 ? _tablixBody.rows.lastObject : nil;
   NSMutableArray *cols = [NSMutableArray array];
   NSUInteger n = [_tablixBody.columns count];
   for (NSUInteger i = 0; i < n; i++) {
     CGFloat w = _tablixBody.columns[i].width;
-    NSString *h = @"";
-    NSString *v = @"";
+    NSMutableDictionary *col = [NSMutableDictionary dictionary];
+    col[@"width"] = @(w);
+    col[@"header"] = @"";
+    col[@"value"] = @"";
     if (i < [header.cells count] && header.cells[i].item.value)
-      h = header.cells[i].item.value;
-    if (detail && i < [detail.cells count] && detail.cells[i].item.value)
-      v = detail.cells[i].item.value;
-    [cols addObject:@{@"width" : @(w), @"header" : h, @"value" : v}];
+      col[@"header"] = header.cells[i].item.value;
+    if (detail && i < [detail.cells count]) {
+      RDLItem *dItem = detail.cells[i].item;
+      if (dItem.value)
+        col[@"value"] = dItem.value;
+      if ([dItem.style.textAlign length])
+        col[@"align"] = dItem.style.textAlign;
+    }
+    if (aggRow && i < [aggRow.cells count]) {
+      NSString *agg = PicaAggregateOfValue(aggRow.cells[i].item.value ?: @"");
+      if (agg)
+        col[@"aggregate"] = agg;
+    }
+    [cols addObject:col];
   }
   return cols;
 }
 
-- (void)setColumns:(NSArray *)cols {
+- (void)rebuildTablix {
+  NSArray *specs = _columnSpecs ?: [self picaDerivedColumns];
   _type = @"Tablix";
-  [self picaBuildTable:cols headerHeight:_stashHeaderH rowHeight:_stashRowH];
+  [self picaBuildTable:specs headerHeight:self.headerHeight rowHeight:self.rowHeight];
 }
 
-- (void)rebuildTableFromColumns {
-  [self picaBuildTable:self.columns headerHeight:self.headerHeight rowHeight:self.rowHeight];
+- (void)inferColumnSpecsFromTablixBody {
+  _columnSpecs = [[self picaDerivedColumns] copy];
+}
+
+
+- (RDLTablixRow *)picaAggregateRow:(NSArray<PicaColSpec *> *)specs
+                             label:(NSString *)label
+                            prefix:(NSString *)prefix
+                            height:(CGFloat)h
+                      fallbackField:(NSString *)fallbackField {
+  RDLTablixRow *row = [[RDLTablixRow alloc] init];
+  row.height = h;
+  NSInteger n = (NSInteger)[specs count];
+  BOOL anyExplicit = NO;
+  for (PicaColSpec *s in specs)
+    if ([s.aggregate length] && [s.field length])
+      anyExplicit = YES;
+  for (NSInteger i = 0; i < n; i++) {
+    PicaColSpec *s = specs[(NSUInteger)i];
+    RDLItem *t = [[RDLItem alloc] init];
+    t.type = @"Textbox";
+    t.name = [NSString stringWithFormat:@"%@%@%ld", self.name ?: @"T", prefix, (long)i];
+    t.style.fontWeight = @"Bold";
+    t.style.borderTop = [RDLBorder solidColor:@"#1a1916"];
+    t.style.borderTop.width = @"0.5pt";
+    if ([s.align length])
+      t.style.textAlign = s.align;
+    NSString *agg = nil;
+    if (anyExplicit) {
+      if ([s.aggregate length] && [s.field length])
+        agg = [NSString stringWithFormat:@"=%@(Fields!%@.Value)", s.aggregate, s.field];
+    } else if (i == n - 1 && [fallbackField length]) {
+      agg = [NSString stringWithFormat:@"=Sum(Fields!%@.Value)", fallbackField];
+    }
+    if (agg) {
+      t.value = agg;
+    } else if (i == 0) {
+      t.value = label;
+      t.style.fontStyle = @"Italic";
+      t.style.color = @"#5c574e";
+    } else {
+      t.value = @"";
+    }
+    RDLTablixCell *c = [[RDLTablixCell alloc] init];
+    c.item = t;
+    [row.cells addObject:c];
+  }
+  return row;
+}
+
+// Crosstab (matrix): row group × dynamic column group with one aggregated
+// measure cell, mapped onto TablixColumnHierarchy the way Report Builder does.
+- (void)picaBuildMatrix:(NSArray *)cols headerHeight:(CGFloat)hh rowHeight:(CGFloat)rh {
+  NSDictionary *m = cols.firstObject ?: @{};
+  CGFloat cw = [m[@"width"] doubleValue];
+  if (cw <= 0)
+    cw = 1.5;
+  NSString *val = [m[@"value"] description] ?: @"";
+  NSString *field = nil;
+  NSRange bang = [val rangeOfString:@"Fields!"];
+  if (bang.location != NSNotFound) {
+    NSString *rest = [val substringFromIndex:bang.location + 7];
+    NSRange dot = [rest rangeOfString:@"."];
+    field = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+  }
+  NSString *agg = [m[@"aggregate"] length] ? m[@"aggregate"] : @"Sum";
+  NSString *cellValue = field ? [NSString stringWithFormat:@"=%@(Fields!%@.Value)", agg, field] : val;
+
+  RDLTablixBody *body = [[RDLTablixBody alloc] init];
+  RDLTablixColumn *tc = [[RDLTablixColumn alloc] init];
+  tc.width = cw;
+  [body.columns addObject:tc];
+  RDLTablixRow *data = [[RDLTablixRow alloc] init];
+  data.height = rh;
+  RDLItem *cell = [[RDLItem alloc] init];
+  cell.type = @"Textbox";
+  cell.name = [NSString stringWithFormat:@"%@Cell", self.name ?: @"T"];
+  cell.value = cellValue;
+  cell.style.textAlign = [m[@"align"] length] ? m[@"align"] : @"Right";
+  RDLTablixCell *dc = [[RDLTablixCell alloc] init];
+  dc.item = cell;
+  [data.cells addObject:dc];
+  [body.rows addObject:data];
+
+  RDLTablixHierarchy *colH = [[RDLTablixHierarchy alloc] init];
+  RDLTablixMember *cMem = [[RDLTablixMember alloc] init];
+  cMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.pivotBy];
+  [cMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy]];
+  RDLTablixHeader *chd = [[RDLTablixHeader alloc] init];
+  chd.size = hh;
+  RDLItem *cht = [[RDLItem alloc] init];
+  cht.type = @"Textbox";
+  cht.name = [NSString stringWithFormat:@"%@CHdr", self.name ?: @"T"];
+  cht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy];
+  cht.style.fontWeight = @"Bold";
+  cht.style.backgroundColor = @"#ece6d8";
+  cht.style.textAlign = @"Center";
+  chd.item = cht;
+  cMem.header = chd;
+  [colH.members addObject:cMem];
+
+  RDLTablixHierarchy *rowH = [[RDLTablixHierarchy alloc] init];
+  RDLTablixMember *rMem = [[RDLTablixMember alloc] init];
+  rMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.groupBy];
+  [rMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy]];
+  rMem.keepTogether = YES;
+  RDLTablixHeader *rhd = [[RDLTablixHeader alloc] init];
+  rhd.size = 1.2;
+  RDLItem *rht = [[RDLItem alloc] init];
+  rht.type = @"Textbox";
+  rht.name = [NSString stringWithFormat:@"%@RHdr", self.name ?: @"T"];
+  rht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy];
+  rht.style.fontWeight = @"Bold";
+  rhd.item = rht;
+  rMem.header = rhd;
+  [rowH.members addObject:rMem];
+
+  if (self.showGrandTotal) {
+    // Column totals: a trailing static row whose cell aggregates each pivot
+    // column at dataset scope.
+    RDLTablixRow *total = [[RDLTablixRow alloc] init];
+    total.height = rh;
+    RDLItem *tcell = [[RDLItem alloc] init];
+    tcell.type = @"Textbox";
+    tcell.name = [NSString stringWithFormat:@"%@GT", self.name ?: @"T"];
+    tcell.value = cellValue;
+    tcell.style.fontWeight = @"Bold";
+    tcell.style.textAlign = cell.style.textAlign;
+    tcell.style.borderTop = [RDLBorder solidColor:@"#1a1916"];
+    tcell.style.borderTop.width = @"0.5pt";
+    RDLTablixCell *tcc = [[RDLTablixCell alloc] init];
+    tcc.item = tcell;
+    [total.cells addObject:tcc];
+    [body.rows addObject:total];
+    RDLTablixMember *tMem = [[RDLTablixMember alloc] init];
+    tMem.keepWithGroup = @"Before";
+    [rowH.members addObject:tMem];
+  }
+
+  self.repeatColumnHeaders = YES;
+  if (![self.noRowsMessage length])
+    self.noRowsMessage = @"No rows.";
+  RDLTablixCell *corner = [[RDLTablixCell alloc] init];
+  RDLItem *ct = [[RDLItem alloc] init];
+  ct.type = @"Textbox";
+  ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
+  ct.value = [NSString stringWithFormat:@"%@ \\ %@", self.groupBy, self.pivotBy];
+  ct.style.fontWeight = @"Bold";
+  ct.style.fontSize = @"8pt";
+  ct.style.color = @"#5c574e";
+  corner.item = ct;
+  self.cornerRows = [NSMutableArray arrayWithObject:[NSMutableArray arrayWithObject:corner]];
+
+  if (self.width < 1.2 + 2 * cw)
+    self.width = 1.2 + 2 * cw;
+  CGFloat wantH = hh + rh + (self.showGrandTotal ? rh : 0);
+  if (self.height < wantH)
+    self.height = wantH;
+
+  self.tablixBody = body;
+  self.columnHierarchy = colH;
+  self.rowHierarchy = rowH;
+  _stashHeaderH = hh;
+  _stashRowH = rh;
+}
+
+// Dynamic group member with a 1.2in bold row header showing the field value.
+- (RDLTablixMember *)picaGroupMemberForField:(NSString *)field suffix:(NSString *)suffix {
+  RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
+  gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
+  [gMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+  gMem.keepTogether = YES;
+  RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
+  th.size = 1.2;
+  RDLItem *gh = [[RDLItem alloc] init];
+  gh.type = @"Textbox";
+  gh.name = [NSString stringWithFormat:@"%@G%@", self.name ?: @"T", suffix];
+  gh.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  gh.style.fontWeight = @"Bold";
+  gh.style.backgroundColor = @"#ece6d8";
+  gh.style.verticalAlign = @"Middle";
+  th.item = gh;
+  gMem.header = th;
+  return gMem;
 }
 
 - (void)picaBuildTable:(NSArray *)cols headerHeight:(CGFloat)hh rowHeight:(CGFloat)rh {
@@ -205,6 +510,10 @@
     hh = 0.3;
   if (rh <= 0)
     rh = 0.28;
+  if ([self.pivotBy length] && [self.groupBy length]) {
+    [self picaBuildMatrix:cols headerHeight:hh rowHeight:rh];
+    return;
+  }
   NSString *groupBy = [self.groupBy length] ? self.groupBy : nil;
   RDLTablixBody *body = [[RDLTablixBody alloc] init];
   RDLTablixRow *header = [[RDLTablixRow alloc] init];
@@ -214,6 +523,7 @@
   RDLTablixHierarchy *colH = [[RDLTablixHierarchy alloc] init];
   NSInteger i = 0;
   NSString *sumField = nil;
+  NSMutableArray<PicaColSpec *> *specs = [NSMutableArray array];
   for (NSDictionary *c in cols) {
     RDLTablixColumn *tc = [[RDLTablixColumn alloc] init];
     tc.width = [c[@"width"] doubleValue];
@@ -222,12 +532,12 @@
     [body.columns addObject:tc];
     [colH.members addObject:[[RDLTablixMember alloc] init]];
 
+    NSString *align = c[@"align"];
     RDLItem *ht = [[RDLItem alloc] init];
     ht.type = @"Textbox";
     ht.name = [NSString stringWithFormat:@"%@H%ld", self.name ?: @"T", (long)i];
     ht.value = [c[@"header"] description] ?: @"";
     ht.style.fontWeight = @"Bold";
-    NSString *align = c[@"align"];
     if ([align length])
       ht.style.textAlign = align;
     RDLTablixCell *hc = [[RDLTablixCell alloc] init];
@@ -245,12 +555,22 @@
     [detail.cells addObject:dc];
 
     NSString *val = [c[@"value"] description] ?: @"";
+    NSString *field = nil;
     NSRange bang = [val rangeOfString:@"Fields!"];
     if (bang.location != NSNotFound) {
       NSString *rest = [val substringFromIndex:bang.location + 7];
       NSRange dot = [rest rangeOfString:@"."];
-      sumField = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+      field = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+      sumField = field;
     }
+    PicaColSpec *spec = [[PicaColSpec alloc] init];
+    spec.header = [c[@"header"] description] ?: @"";
+    spec.value = val;
+    spec.align = align;
+    spec.aggregate = c[@"aggregate"];
+    spec.field = field;
+    spec.width = tc.width;
+    [specs addObject:spec];
     i += 1;
   }
   [body.rows addObject:header];
@@ -262,56 +582,41 @@
   hMem.keepWithGroup = @"After";
   [rowH.members addObject:hMem];
 
+  NSInteger extraRows = 0;
+  NSString *groupBy2 = (groupBy && [self.groupBy2 length]) ? self.groupBy2 : nil;
   if (groupBy) {
-    RDLTablixRow *footer = [[RDLTablixRow alloc] init];
-    footer.height = rh;
-    NSInteger n = (NSInteger)[cols count];
-    for (NSInteger fi = 0; fi < n; fi++) {
-      NSDictionary *c = cols[(NSUInteger)fi];
-      NSString *align = c[@"align"];
-      RDLItem *ft = [[RDLItem alloc] init];
-      ft.type = @"Textbox";
-      ft.name = [NSString stringWithFormat:@"%@F%ld", self.name ?: @"T", (long)fi];
-      ft.style.fontWeight = @"Bold";
-      ft.style.borderTop = [RDLBorder solidColor:@"#1a1916"];
-      ft.style.borderTop.width = @"0.5pt";
-      if ([align length])
-        ft.style.textAlign = align;
-      if (fi == 0) {
-        ft.value = @"Subtotal";
-        ft.style.fontStyle = @"Italic";
-        ft.style.color = @"#5c574e";
-      } else if (fi == n - 1 && [sumField length]) {
-        ft.value = [NSString stringWithFormat:@"=Sum(Fields!%@.Value)", sumField];
-      } else {
-        ft.value = @"";
-      }
-      RDLTablixCell *fc = [[RDLTablixCell alloc] init];
-      fc.item = ft;
-      [footer.cells addObject:fc];
+    // Body row order must match the hierarchy's leaf order: details, inner
+    // subtotal (nested only), outer subtotal.
+    if (groupBy2) {
+      [body.rows addObject:[self picaAggregateRow:specs
+                                            label:@"Subtotal"
+                                           prefix:@"F2"
+                                           height:rh
+                                    fallbackField:sumField]];
+      extraRows += 1;
     }
-    [body.rows addObject:footer];
+    [body.rows addObject:[self picaAggregateRow:specs
+                                          label:@"Subtotal"
+                                         prefix:@"F"
+                                         height:rh
+                                  fallbackField:sumField]];
+    extraRows += 1;
 
-    RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
-    gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", groupBy];
-    [gMem.groupExpressions addObject:[NSString stringWithFormat:@"=Fields!%@.Value", groupBy]];
-    gMem.keepTogether = YES;
-    RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
-    th.size = 1.2;
-    RDLItem *gh = [[RDLItem alloc] init];
-    gh.type = @"Textbox";
-    gh.name = [NSString stringWithFormat:@"%@G", self.name ?: @"T"];
-    gh.value = [NSString stringWithFormat:@"=Fields!%@.Value", groupBy];
-    gh.style.fontWeight = @"Bold";
-    gh.style.backgroundColor = @"#ece6d8";
-    gh.style.verticalAlign = @"Middle";
-    th.item = gh;
-    gMem.header = th;
+    RDLTablixMember *gMem = [self picaGroupMemberForField:groupBy suffix:@""];
     RDLTablixMember *dMem = [[RDLTablixMember alloc] init];
     dMem.groupName = [NSString stringWithFormat:@"%@_Details", self.name ?: @"Tablix"];
     RDLTablixMember *fMem = [[RDLTablixMember alloc] init];
     fMem.keepWithGroup = @"Before";
-    [gMem.members addObject:dMem];
+    if (groupBy2) {
+      RDLTablixMember *g2 = [self picaGroupMemberForField:groupBy2 suffix:@"2"];
+      RDLTablixMember *f2 = [[RDLTablixMember alloc] init];
+      f2.keepWithGroup = @"Before";
+      [g2.members addObject:dMem];
+      [g2.members addObject:f2];
+      [gMem.members addObject:g2];
+    } else {
+      [gMem.members addObject:dMem];
+    }
     [gMem.members addObject:fMem];
     [rowH.members addObject:gMem];
 
@@ -322,26 +627,41 @@
     RDLItem *ct = [[RDLItem alloc] init];
     ct.type = @"Textbox";
     ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
-    ct.value = groupBy;
+    ct.value = groupBy2 ? [NSString stringWithFormat:@"%@ / %@", groupBy, groupBy2] : groupBy;
     ct.style.fontWeight = @"Bold";
     ct.style.fontSize = @"8pt";
     ct.style.color = @"#5c574e";
     corner.item = ct;
     self.cornerRows = [NSMutableArray arrayWithObject:[NSMutableArray arrayWithObject:corner]];
-    CGFloat bodyW = 0;
-    for (RDLTablixColumn *tc in body.columns)
-      bodyW += tc.width;
-    if (self.width < bodyW + 1.2)
-      self.width = bodyW + 1.2;
-    if (self.height < hh + rh + rh)
-      self.height = hh + rh + rh;
   } else {
     RDLTablixMember *dMem = [[RDLTablixMember alloc] init];
     dMem.groupName = [NSString stringWithFormat:@"%@_Details", self.name ?: @"Tablix"];
     [rowH.members addObject:dMem];
-    if (self.height < hh + rh)
-      self.height = hh + rh;
+    self.cornerRows = [NSMutableArray array];
   }
+
+  if (self.showGrandTotal) {
+    [body.rows addObject:[self picaAggregateRow:specs
+                                          label:@"Total"
+                                         prefix:@"GT"
+                                         height:rh
+                                  fallbackField:sumField]];
+    RDLTablixMember *tMem = [[RDLTablixMember alloc] init];
+    tMem.keepWithGroup = @"Before";
+    [rowH.members addObject:tMem];
+    extraRows += 1;
+  }
+
+  if (groupBy) {
+    CGFloat bodyW = 0;
+    for (RDLTablixColumn *tc in body.columns)
+      bodyW += tc.width;
+    CGFloat headerW = groupBy2 ? 2.4 : 1.2;
+    if (self.width < bodyW + headerW)
+      self.width = bodyW + headerW;
+  }
+  if (self.height < hh + rh + extraRows * rh)
+    self.height = hh + rh + extraRows * rh;
 
   self.tablixBody = body;
   self.columnHierarchy = colH;
@@ -369,13 +689,31 @@
 @implementation RDLField
 @end
 
+@implementation RDLEmbeddedImage
+@end
+
 @implementation RDLDataSet
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _filters = [NSMutableArray array];
+  }
+  return self;
+}
 @end
 
 @implementation RDLDataSource
 @end
 
 @implementation RDLParameter
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _defaultValues = [NSMutableArray array];
+    _validValues = [NSMutableArray array];
+  }
+  return self;
+}
 @end
 
 @implementation RDLPage
@@ -387,6 +725,26 @@
     _leftMargin = _rightMargin = _topMargin = _bottomMargin = 0.5;
   }
   return self;
+}
++ (NSArray<NSDictionary *> *)standardSizes {
+  static NSArray *sizes = nil;
+  if (sizes == nil) {
+    sizes = @[
+      @{ @"name" : @"Letter 8.5 × 11", @"width" : @8.5, @"height" : @11.0 },
+      @{ @"name" : @"A4 210 × 297 mm", @"width" : @8.27, @"height" : @11.69 },
+    ];
+  }
+  return sizes;
+}
+
+- (NSDictionary *)matchingStandardSize {
+  for (NSDictionary *size in [RDLPage standardSizes]) {
+    // Loose, because A4 in inches is not exact.
+    if (fabs(self.pageWidth - [size[@"width"] doubleValue]) < 0.05 &&
+        fabs(self.pageHeight - [size[@"height"] doubleValue]) < 0.05)
+      return size;
+  }
+  return nil;
 }
 @end
 
@@ -412,7 +770,42 @@
   [r.dataSources addObject:dsrc];
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
+  r.embeddedImages = [NSMutableArray array];
+  r.warnings = [NSMutableArray array];
   return r;
+}
+
+- (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLEmbeddedImage *img in self.embeddedImages)
+    if ([img.name caseInsensitiveCompare:name] == NSOrderedSame)
+      return img;
+  return nil;
+}
+
++ (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
+  return [bandKey isEqualToString:@"body"];
+}
+
++ (NSArray<NSString *> *)bandKeys {
+  static NSArray *keys = nil;
+  if (keys == nil)
+    keys = @[ @"pageHeader", @"body", @"pageFooter" ];
+  return keys;
+}
+
+// The bands that exist, in -bandKeys order. A bare RDLReport may not have all
+// three yet, so this skips nils; pair -bandKeys with -bandWithKey: when you
+// need the key alongside the band.
+- (NSArray<RDLBand *> *)allBands {
+  NSMutableArray *bands = [NSMutableArray array];
+  for (NSString *k in [RDLReport bandKeys]) {
+    RDLBand *b = [self bandWithKey:k];
+    if (b)
+      [bands addObject:b];
+  }
+  return bands;
 }
 
 - (RDLBand *)bandWithKey:(NSString *)key {
@@ -432,8 +825,7 @@
 }
 
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand {
-  NSArray *keys = @[ @"pageHeader", @"body", @"pageFooter" ];
-  for (NSString *k in keys) {
+  for (NSString *k in [RDLReport bandKeys]) {
     RDLBand *b = [self bandWithKey:k];
     for (RDLItem *it in b.items) {
       if ([it.name isEqualToString:name]) {

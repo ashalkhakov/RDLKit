@@ -43,11 +43,15 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
+# xcodebuild
+build/
+
 # GNUstep
 obj/
 *.so
 *.dylib
 *.a
+*.app/
 
 # OS
 .DS_Store

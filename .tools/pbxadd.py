@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Register source/header/resource files in RDLKit.xcodeproj/project.pbxproj.
+
+The project uses classic explicit registration (objectVersion 56, no
+PBXFileSystemSynchronizedRootGroup), so every added file needs a
+PBXFileReference, a PBXBuildFile, a group `children` entry and a build-phase
+`files` entry. Doing that by hand for a multi-file refactor is error-prone;
+this does it idempotently.
+
+    python3 .tools/pbxadd.py PicaKit RDLDocument.h RDLDocument.m ...
+    python3 .tools/pbxadd.py Pica PicaCanvasRenderer.h PicaCanvasRenderer.m
+    python3 .tools/pbxadd.py Pica --resource PicaWelcomeWindow.xib
+"""
+import hashlib, os, re, sys
+
+PROJ = 'RDLKit.xcodeproj/project.pbxproj'
+
+TARGETS = {
+    # name: (group, sources phase, headers phase or None, resources phase or None)
+    'PicaKit': ('45316B45CB436116EC434408', 'BBD96B25C463E4F2194995B6',
+                '7904DBFDD0ABC4FECE1D6E19', None),
+    'Pica':    ('367BDD79C0EB7824B717F2C6', '9A62AC01A2B00BE761FA3E90',
+                None, 'F0BE7C60351F60A2424990B8'),
+}
+
+FILETYPE = {
+    '.h': 'sourcecode.c.h', '.m': 'sourcecode.c.objc',
+    '.xib': 'file.xib', '.plist': 'text.plist.xml',
+}
+
+
+def uid(seed):
+    """Stable 24-hex id, so re-running does not churn the file."""
+    return hashlib.sha1(seed.encode()).hexdigest()[:24].upper()
+
+
+def insert_into_list(s, section_id, label, entry):
+    """Append `entry` to the files=/children=( ... ) list of a given object."""
+    m = re.search(r'(\t\t%s /\* [^*]*\*/ = \{.*?\n\t\t\t%s = \(\n)(.*?)(\n\t\t\t\);)'
+                  % (section_id, label), s, re.S)
+    if not m:
+        raise SystemExit('could not find %s list of %s' % (label, section_id))
+    body = m.group(2)
+    if entry.strip() in body:
+        return s, False
+    new = m.group(1) + (body + '\n' if body.strip() else '') + entry + m.group(3)
+    return s[:m.start()] + new + s[m.end():], True
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        raise SystemExit(__doc__)
+    target, args = args[0], args[1:]
+    as_resource = '--resource' in args
+    files = [a for a in args if not a.startswith('--')]
+    if target not in TARGETS:
+        raise SystemExit('unknown target %r; known: %s' % (target, ', '.join(TARGETS)))
+    group, src_phase, hdr_phase, res_phase = TARGETS[target]
+
+    s = open(PROJ).read()
+    added = []
+    for path in files:
+        base = os.path.basename(path)
+        ext = os.path.splitext(base)[1]
+        ftype = FILETYPE.get(ext)
+        if not ftype:
+            raise SystemExit('unhandled extension %r' % ext)
+
+        fref = uid('fileRef:%s:%s' % (target, base))
+        bfile = uid('buildFile:%s:%s' % (target, base))
+
+        # 1. PBXFileReference
+        if ('%s /* %s */' % (fref, base)) not in s:
+            anchor = '/* End PBXFileReference section */'
+            line = ('\t\t%s /* %s */ = {isa = PBXFileReference; '
+                    'lastKnownFileType = %s; path = %s; sourceTree = "<group>"; };\n'
+                    % (fref, base, ftype, base))
+            s = s.replace(anchor, line + anchor, 1)
+
+        # 2. PBXBuildFile — headers of a framework target are Public
+        if ext == '.h' and hdr_phase:
+            phase, kind, settings = hdr_phase, 'Headers', ' settings = {ATTRIBUTES = (Public, ); };'
+        elif as_resource or ext == '.xib':
+            phase, kind, settings = res_phase, 'Resources', ''
+        elif ext == '.m':
+            phase, kind, settings = src_phase, 'Sources', ''
+        else:
+            phase = None
+        if phase:
+            if ('%s /* %s in %s */' % (bfile, base, kind)) not in s:
+                anchor = '/* End PBXBuildFile section */'
+                line = ('\t\t%s /* %s in %s */ = {isa = PBXBuildFile; fileRef = %s /* %s */;%s };\n'
+                        % (bfile, base, kind, fref, base, settings))
+                s = s.replace(anchor, line + anchor, 1)
+            s, _ = insert_into_list(s, phase, 'files',
+                                    '\t\t\t\t%s /* %s in %s */,' % (bfile, base, kind))
+
+        # 3. Group membership
+        s, _ = insert_into_list(s, group, 'children',
+                                '\t\t\t\t%s /* %s */,' % (fref, base))
+        added.append(base)
+
+    open(PROJ, 'w').write(s)
+    print('registered in %s: %s' % (target, ', '.join(added)))
+
+
+if __name__ == '__main__':
+    main()

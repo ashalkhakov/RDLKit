@@ -30,18 +30,23 @@ NSData *html = [backend renderPages:pages title:report.name];
 
 ## RDL model (MS-RDL 2010/01 subset)
 
-`RDLItem` is a ReportItem. `type` is the element name (Textbox, Line, Rectangle, Image, Tablix, Chart).
+`RDLItem` is a ReportItem. `type` is the element name (Textbox, Line, Rectangle, Image, Tablix, Chart). `List` is parsed as a single-cell grouped Tablix.
+
+ReportItem features: `Visibility/Hidden` (static or expression), `ActionInfo/Hyperlink`, `ZIndex`, `CanGrow` (textboxes grow, pages reflow), multi-`Paragraph`/`TextRun` textboxes with per-run styles (font, weight, style, color, decoration; per-paragraph `TextAlign`) preserved through the model, both backends and the writer, `EmbeddedImages` + Image `Source`/`Sizing`, style properties as `=` expressions (evaluated per instance), per-side borders and padding rendered by both backends.
 
 Tablix follows the spec:
 
 - `TablixBody` → `TablixColumn` / `TablixRow` / `TablixCell` / CellContents (`ColSpan` / `RowSpan`)
 - `TablixColumnHierarchy` / `TablixRowHierarchy` → `TablixMember`
 - static member vs `Group` (`GroupExpressions`, nested members, `TablixHeader`)
-- `Filters`, `SortExpressions`, `PageBreak` (Between / Start), `KeepTogether`
+- one dynamic column-group member pivots columns (crosstab): each group instance repeats the body column, `TablixHeader` becomes the column caption, and cell aggregates evaluate over the row-rows ∩ column-rows intersection
+- `Filters`, `SortExpressions`, `PageBreak` (Between / Start, plus `ResetPageNumber` / `PageName`), `KeepTogether`
 - `NoRowsMessage`, `RepeatColumnHeaders` / `RepeatRowHeaders`, `TablixCorner`
 - group-scoped `Sum` / `Count` (current group rows, or a named dataset)
 
 Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebuild those structures (header + optional group header + details + subtotal footer).
+
+Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Subreport, Gauge, Map, …) are collected into `report.warnings` by the parser.
 
 ## Public entry
 
@@ -62,7 +67,7 @@ Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebui
 | Class | Role |
 | --- | --- |
 | `RDLParser` / `RDLWriter` | RDL 2010 XML ↔ `RDLReport` |
-| `RDLExpression` | VB-style expressions: tokenize → AST → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates (group or named dataset), Format, string/math/date |
+| `RDLExpression` | VB-style expressions: tokenize → AST → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
 | `RDLLayoutEngine` | Banded pages + tablix expansion → laid-out elements |
 | `RDLView` | Flipped `NSView`; stacked pages; PDF from pages |
 | `RDLPDFBackend` | PDF backend (`renderPages:`) |
@@ -71,7 +76,7 @@ Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebui
 ## Tests (macOS)
 
 ```
-cd .. && swift test
+cd .. && xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
 ```
 
 See `../PicaKitTests/README.md`. GNUstep harness later: call `PicaRunAllChecks()`.

@@ -32,6 +32,22 @@
 - (void)testTablixGroupsFiltersNoRows {
   PICA_ASSERT_NO_FAILURES(PicaRunTablixGroupChecks());
 }
+
+- (void)testTablixEditing {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixEditingChecks());
+}
+- (void)testBandEnumeration {
+  PICA_ASSERT_NO_FAILURES(PicaRunBandEnumerationChecks());
+}
+- (void)testTablixExplicitRebuild {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixRebuildChecks());
+}
+- (void)testRichTextSpans {
+  PICA_ASSERT_NO_FAILURES(PicaRunRichTextChecks());
+}
+- (void)testTablixAdvanced {
+  PICA_ASSERT_NO_FAILURES(PicaRunTablixAdvancedChecks());
+}
 @end
 
 @interface PicaBackendTests : PICA_TEST_CASE
@@ -42,6 +58,12 @@
 }
 - (void)testHTMLBackend {
   PICA_ASSERT_NO_FAILURES(PicaRunHTMLBackendChecks());
+}
+- (void)testRDLSubsetFeatures {
+  PICA_ASSERT_NO_FAILURES(PicaRunRDLSubsetChecks());
+}
+- (void)testRDLSubset2Features {
+  PICA_ASSERT_NO_FAILURES(PicaRunRDLSubset2Checks());
 }
 - (void)testPDFBackend {
   PICA_ASSERT_NO_FAILURES(PicaRunPDFBackendChecks());
