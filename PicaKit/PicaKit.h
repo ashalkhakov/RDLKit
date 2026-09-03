@@ -6,6 +6,7 @@
 #import "RDLParser.h"
 #import "RDLUpgrader.h"
 #import "RDLChartRenderer.h"
+#import "RDLChecker.h"
 #import "RDLExpression.h"
 #import "RDLLayoutEngine.h"
 #import "RDLView.h"

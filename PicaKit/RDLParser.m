@@ -1047,10 +1047,15 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
       if (fn == nil)
         continue;
       NSString *calc = PicaText(PicaChild(fe, @"Value"));
-      if ([calc length]) {
+      RDLFieldDataType type = RDLFieldDataTypeFromString(PicaText(PicaChild(fe, @"TypeName")));
+      // A bare name stays a bare name; anything the report actually said about
+      // the field needs an RDLField to hold it.
+      if ([calc length] || type != RDLFieldDataTypeUnknown) {
         RDLField *fld = [[RDLField alloc] init];
         fld.name = fn;
+        fld.dataField = PicaText(PicaChild(fe, @"DataField"));
         fld.value = [RDLValue valueWithSource:calc];
+        fld.dataType = type;
         [fields addObject:fld];
       } else {
         [fields addObject:fn];
@@ -1782,11 +1787,15 @@ static void PicaAddBand(NSXMLElement *parent, RDLBand *b) {
       if (fld && fld.value != nil) {
         PicaAddAttr(fe, @"Name", fld.name);
         PicaAddValue(fe, @"Value", fld.value);
+        if (fld.dataType != RDLFieldDataTypeUnknown)
+          PicaAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
       } else {
         NSString *name = fld ? fld.name : [f description];
         NSString *df = fld ? fld.dataField : name;
         PicaAddAttr(fe, @"Name", name);
         PicaAdd(fe, @"DataField", [df length] ? df : name);
+        if (fld.dataType != RDLFieldDataTypeUnknown)
+          PicaAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
       }
       [fields addChild:fe];
     }

@@ -19,6 +19,7 @@ PicaKit_OBJC_FILES = \
   RDLParser.m \
   RDLUpgrader.m \
   RDLChartRenderer.m \
+  RDLChecker.m \
   RDLExpression.m \
   RDLLayoutEngine.m \
   RDLView.m \

@@ -6,14 +6,60 @@
 @implementation RDLEvalScope
 @end
 
-static id PicaLookup(NSDictionary *row, NSString *name) {
-  if (row == nil || name == nil)
+// Work out how this row spells the field named `key`, and return that spelling
+// -- the dictionary key as the dictionary has it, or the KVC key the object
+// answers to. nil when the row has no such field.
+//
+// This is the expensive half: a dictionary that spells the key differently
+// costs a linear scan, and a KVC object costs two selector lookups plus a
+// string to build. Measured at three to five times the cost of the lookup it
+// enables, and the KVC case that needs the retry is the *common* one, since
+// RDL field names are capitalised and Objective-C properties are not. So
+// callers in a loop resolve once and fetch many; see -[RDLExprNode
+// valueFromRow:].
+@interface RDLExprNode (PicaRowMemo)
+- (id)valueFromRow:(id)row;
+@end
+
+static NSString *PicaResolveRowKey(id row, NSString *key) {
+  if ([row isKindOfClass:[NSDictionary class]]) {
+    NSDictionary *dict = (NSDictionary *)row;
+    if ([dict objectForKey:key] != nil)
+      return key;
+    // RDL matches field names without regard to case.
+    for (NSString *k in dict)
+      if ([k isKindOfClass:[NSString class]] && [k caseInsensitiveCompare:key] == NSOrderedSame)
+        return k;
     return nil;
-  for (NSString *k in row) {
-    if ([k caseInsensitiveCompare:name] == NSOrderedSame)
-      return row[k];
   }
+  // Guarded, because -valueForKey: raises for a key the object does not have,
+  // and a report naming a field its data lacks is the checker's business
+  // rather than a crash.
+  if ([row respondsToSelector:NSSelectorFromString(key)])
+    return key;
+  NSString *lower = [[[key substringToIndex:1] lowercaseString]
+      stringByAppendingString:[key substringFromIndex:1]];
+  if (![lower isEqualToString:key] && [row respondsToSelector:NSSelectorFromString(lower)])
+    return lower;
   return nil;
+}
+
+static id PicaFetchRowKey(id row, NSString *resolved) {
+  if (resolved == nil)
+    return nil;
+  if ([row isKindOfClass:[NSDictionary class]])
+    return [(NSDictionary *)row objectForKey:resolved];
+  return [row valueForKey:resolved];
+}
+
+id RDLRowValue(id row, NSString *key) {
+  if (row == nil || [key length] == 0)
+    return nil;
+  return PicaFetchRowKey(row, PicaResolveRowKey(row, key));
+}
+
+static id PicaLookup(id row, NSString *name) {
+  return RDLRowValue(row, name);
 }
 
 static BOOL PicaIsNothing(id v) {
@@ -164,20 +210,44 @@ static NSDate *PicaAsDate(id v, NSDate *fallback) {
 @implementation PicaTok
 @end
 
-@interface PicaAst : NSObject
-@property (nonatomic, copy) NSString *kind;
-@property (nonatomic, strong) id value;
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *prop;
-@property (nonatomic, copy) NSString *op;
-@property (nonatomic, strong) NSMutableArray *args;
-@end
-@implementation PicaAst
+@implementation RDLExprNode {
+  // How the last row's class spelled this node's field name. Rows in a
+  // dataset are homogeneous, so this hits on every row after the first and
+  // takes the resolution cost out of the loop entirely. Private: it is a
+  // cache, not part of the tree.
+  Class _memoClass;
+  NSString *_memoKey;
+}
+
 - (instancetype)init {
   self = [super init];
   if (self)
     _args = [NSMutableArray array];
   return self;
+}
+
+// This node's field, out of `row`.
+- (id)valueFromRow:(id)row {
+  if (row == nil || [_name length] == 0)
+    return nil;
+  Class cls = [row class];
+  if (cls != _memoClass) {
+    _memoKey = PicaResolveRowKey(row, _name);
+    _memoClass = cls;
+  }
+  if (_memoKey == nil)
+    return nil;
+  id v = PicaFetchRowKey(row, _memoKey);
+  // Dictionaries of the same class can still differ in their keys, so a miss
+  // means resolve again rather than report the field as absent.
+  if (v == nil && [row isKindOfClass:[NSDictionary class]]) {
+    NSString *fresh = PicaResolveRowKey(row, _name);
+    if (fresh != nil && ![fresh isEqualToString:_memoKey]) {
+      _memoKey = fresh;
+      v = PicaFetchRowKey(row, fresh);
+    }
+  }
+  return v;
 }
 @end
 
@@ -199,16 +269,47 @@ static PicaTok *PicaMkTok(NSString *kind, NSString *s, double n) {
   return t;
 }
 
-static PicaAst *PicaLit(id v) {
-  PicaAst *a = [[PicaAst alloc] init];
-  a.kind = @"lit";
+static RDLExprNode *PicaLit(id v) {
+  RDLExprNode *a = [[RDLExprNode alloc] init];
+  a.kind = RDLExprNodeKindLiteral;
   a.value = v;
   return a;
 }
 
-static PicaAst *PicaOp(NSString *op, PicaAst *l, PicaAst *r) {
-  PicaAst *a = [[PicaAst alloc] init];
-  a.kind = @"op";
+NSString *RDLStringFromExprOperator(RDLExprOperator op) {
+  switch (op) {
+  case RDLExprOperatorAdd: return @"+";
+  case RDLExprOperatorSubtract: return @"-";
+  case RDLExprOperatorMultiply: return @"*";
+  case RDLExprOperatorDivide: return @"/";
+  case RDLExprOperatorIntegerDivide: return @"\\";
+  case RDLExprOperatorModulo: return @"Mod";
+  case RDLExprOperatorPower: return @"^";
+  case RDLExprOperatorNegate: return @"-";
+  case RDLExprOperatorConcat: return @"&";
+  case RDLExprOperatorEqual: return @"=";
+  case RDLExprOperatorNotEqual: return @"<>";
+  case RDLExprOperatorLess: return @"<";
+  case RDLExprOperatorGreater: return @">";
+  case RDLExprOperatorLessOrEqual: return @"<=";
+  case RDLExprOperatorGreaterOrEqual: return @">=";
+  case RDLExprOperatorLike: return @"Like";
+  case RDLExprOperatorIs: return @"Is";
+  case RDLExprOperatorIsNot: return @"IsNot";
+  case RDLExprOperatorAnd: return @"And";
+  case RDLExprOperatorOr: return @"Or";
+  case RDLExprOperatorXor: return @"Xor";
+  case RDLExprOperatorNot: return @"Not";
+  case RDLExprOperatorAndAlso: return @"AndAlso";
+  case RDLExprOperatorOrElse: return @"OrElse";
+  case RDLExprOperatorNone: break;
+  }
+  return @"?";
+}
+
+static RDLExprNode *PicaOp(RDLExprOperator op, RDLExprNode *l, RDLExprNode *r) {
+  RDLExprNode *a = [[RDLExprNode alloc] init];
+  a.kind = RDLExprNodeKindOperator;
   a.op = op;
   if (l)
     [a.args addObject:l];
@@ -299,7 +400,7 @@ static NSArray *PicaLexKeepingTrivia(NSString *src, NSString **outTrailing) {
       }
     }
     NSString *one = [src substringWithRange:NSMakeRange(i, 1)];
-    if ([@"+-*/\\^&=<>" rangeOfString:one].location != NSNotFound) {
+    if ([@"+-*/\\^&=<>%" rangeOfString:one].location != NSNotFound) {
       i += 1;
       PicaTokAppend(out, PicaMkTok(@"op", one, 0), src, start, i, &lastEnd);
       continue;
@@ -309,7 +410,12 @@ static NSArray *PicaLexKeepingTrivia(NSString *src, NSString **outTrailing) {
       PicaTokAppend(out, PicaMkTok(@"p", one, 0), src, start, i, &lastEnd);
       continue;
     }
+    // A character no rule above claimed. Dropping it silently is how
+    // `a % 2 = 0` turned into `a 2 = 0` and an IIf quietly lost two
+    // arguments, so it becomes a token the parser will refuse to consume --
+    // which is what makes the expression report as only partly understood.
     i += 1;
+    PicaTokAppend(out, PicaMkTok(@"bad", one, 0), src, start, i, &lastEnd);
   }
   if (outTrailing)
     *outTrailing = [src substringWithRange:NSMakeRange(lastEnd, n - lastEnd)];
@@ -325,7 +431,7 @@ static NSArray *PicaLex(NSString *src) {
 @interface PicaParser : NSObject
 @property (nonatomic, strong) NSArray *toks;
 @property (nonatomic, assign) NSUInteger i;
-- (PicaAst *)parse;
+- (RDLExprNode *)parse;
 @end
 
 @implementation PicaParser
@@ -368,114 +474,129 @@ static NSArray *PicaLex(NSString *src) {
   return NO;
 }
 
-- (PicaAst *)parse {
+- (RDLExprNode *)parse {
   if ([_toks count] == 0)
     return PicaLit(@"");
   return [self parseOr];
 }
-- (PicaAst *)parseOr {
-  PicaAst *left = [self parseAnd];
+- (RDLExprNode *)parseOr {
+  RDLExprNode *left = [self parseAnd];
   for (;;) {
     if ([self matchOp:@"orelse"])
-      left = PicaOp(@"orelse", left, [self parseAnd]);
+      left = PicaOp(RDLExprOperatorOrElse, left, [self parseAnd]);
     else if ([self matchOp:@"or"])
-      left = PicaOp(@"or", left, [self parseAnd]);
+      left = PicaOp(RDLExprOperatorOr, left, [self parseAnd]);
     else if ([self matchOp:@"xor"])
-      left = PicaOp(@"xor", left, [self parseAnd]);
+      left = PicaOp(RDLExprOperatorXor, left, [self parseAnd]);
     else
       break;
   }
   return left;
 }
-- (PicaAst *)parseAnd {
-  PicaAst *left = [self parseNot];
+- (RDLExprNode *)parseAnd {
+  RDLExprNode *left = [self parseNot];
   for (;;) {
     if ([self matchOp:@"andalso"])
-      left = PicaOp(@"andalso", left, [self parseNot]);
+      left = PicaOp(RDLExprOperatorAndAlso, left, [self parseNot]);
     else if ([self matchOp:@"and"])
-      left = PicaOp(@"and", left, [self parseNot]);
+      left = PicaOp(RDLExprOperatorAnd, left, [self parseNot]);
     else
       break;
   }
   return left;
 }
-- (PicaAst *)parseNot {
+- (RDLExprNode *)parseNot {
   if ([self matchOp:@"not"])
-    return PicaOp(@"not", [self parseNot], nil);
+    return PicaOp(RDLExprOperatorNot, [self parseNot], nil);
   return [self parseCmp];
 }
-- (PicaAst *)parseCmp {
-  PicaAst *left = [self parseConcat];
+- (RDLExprNode *)parseCmp {
+  RDLExprNode *left = [self parseConcat];
   PicaTok *t = [self peek];
-  NSString *op = nil;
-  if (t && [t.kind isEqualToString:@"op"] &&
-      [@[ @"=", @"<>", @">", @"<", @">=", @"<=" ] containsObject:t.s])
-    op = t.s;
-  else if (t && [t.kind isEqualToString:@"id"] && [t.s caseInsensitiveCompare:@"like"] == NSOrderedSame)
-    op = @"like";
-  else if (t && [t.kind isEqualToString:@"id"] && [t.s caseInsensitiveCompare:@"isnot"] == NSOrderedSame)
-    op = @"isnot";
-  else if (t && [t.kind isEqualToString:@"id"] && [t.s caseInsensitiveCompare:@"is"] == NSOrderedSame)
-    op = @"is";
-  if (op) {
+  RDLExprOperator op = RDLExprOperatorNone;
+  if (t && [t.kind isEqualToString:@"op"]) {
+    static NSDictionary *byText = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      byText = @{
+        @"=" : @(RDLExprOperatorEqual),
+        @"<>" : @(RDLExprOperatorNotEqual),
+        @">" : @(RDLExprOperatorGreater),
+        @"<" : @(RDLExprOperatorLess),
+        @">=" : @(RDLExprOperatorGreaterOrEqual),
+        @"<=" : @(RDLExprOperatorLessOrEqual)
+      };
+    });
+    NSNumber *found = byText[t.s ?: @""];
+    if (found)
+      op = (RDLExprOperator)[found integerValue];
+  } else if (t && [t.kind isEqualToString:@"id"]) {
+    if ([t.s caseInsensitiveCompare:@"like"] == NSOrderedSame)
+      op = RDLExprOperatorLike;
+    else if ([t.s caseInsensitiveCompare:@"isnot"] == NSOrderedSame)
+      op = RDLExprOperatorIsNot;
+    else if ([t.s caseInsensitiveCompare:@"is"] == NSOrderedSame)
+      op = RDLExprOperatorIs;
+  }
+  if (op != RDLExprOperatorNone) {
     [self eat];
     left = PicaOp(op, left, [self parseConcat]);
   }
   return left;
 }
-- (PicaAst *)parseConcat {
-  PicaAst *left = [self parseAdd];
+- (RDLExprNode *)parseConcat {
+  RDLExprNode *left = [self parseAdd];
   while ([self matchOp:@"&"])
-    left = PicaOp(@"&", left, [self parseAdd]);
+    left = PicaOp(RDLExprOperatorConcat, left, [self parseAdd]);
   return left;
 }
-- (PicaAst *)parseAdd {
-  PicaAst *left = [self parseMul];
+- (RDLExprNode *)parseAdd {
+  RDLExprNode *left = [self parseMul];
   for (;;) {
     if ([self matchOp:@"+"])
-      left = PicaOp(@"+", left, [self parseMul]);
+      left = PicaOp(RDLExprOperatorAdd, left, [self parseMul]);
     else if ([self matchOp:@"-"])
-      left = PicaOp(@"-", left, [self parseMul]);
+      left = PicaOp(RDLExprOperatorSubtract, left, [self parseMul]);
     else
       break;
   }
   return left;
 }
-- (PicaAst *)parseMul {
-  PicaAst *left = [self parsePow];
+- (RDLExprNode *)parseMul {
+  RDLExprNode *left = [self parsePow];
   for (;;) {
     if ([self matchOp:@"*"])
-      left = PicaOp(@"*", left, [self parsePow]);
+      left = PicaOp(RDLExprOperatorMultiply, left, [self parsePow]);
     else if ([self matchOp:@"/"])
-      left = PicaOp(@"/", left, [self parsePow]);
+      left = PicaOp(RDLExprOperatorDivide, left, [self parsePow]);
     else if ([self matchOp:@"\\"])
-      left = PicaOp(@"\\", left, [self parsePow]);
-    else if ([self matchOp:@"mod"])
-      left = PicaOp(@"mod", left, [self parsePow]);
+      left = PicaOp(RDLExprOperatorIntegerDivide, left, [self parsePow]);
+    else if ([self matchOp:@"mod"] || [self matchOp:@"%"])
+      left = PicaOp(RDLExprOperatorModulo, left, [self parsePow]);
     else
       break;
   }
   return left;
 }
-- (PicaAst *)parsePow {
-  PicaAst *left = [self parseUnary];
+- (RDLExprNode *)parsePow {
+  RDLExprNode *left = [self parseUnary];
   if ([self matchOp:@"^"])
-    return PicaOp(@"^", left, [self parsePow]);
+    return PicaOp(RDLExprOperatorPower, left, [self parsePow]);
   return left;
 }
-- (PicaAst *)parseUnary {
+- (RDLExprNode *)parseUnary {
   if ([self matchOp:@"-"])
-    return PicaOp(@"neg", [self parseUnary], nil);
+    return PicaOp(RDLExprOperatorNegate, [self parseUnary], nil);
   if ([self matchOp:@"+"])
     return [self parseUnary];
   if ([self matchOp:@"not"])
-    return PicaOp(@"not", [self parseUnary], nil);
+    return PicaOp(RDLExprOperatorNot, [self parseUnary], nil);
   return [self parsePrimary];
 }
-- (PicaAst *)parseCall:(NSString *)name {
+- (RDLExprNode *)parseCall:(NSString *)name {
   [self matchP:@"("];
-  PicaAst *a = [[PicaAst alloc] init];
-  a.kind = @"call";
+  RDLExprNode *a = [[RDLExprNode alloc] init];
+  a.kind = RDLExprNodeKindCall;
   a.name = name;
   if (![[self peek].kind isEqualToString:@"p"] || ![[self peek].s isEqualToString:@")"]) {
     [a.args addObject:[self parseOr]];
@@ -485,7 +606,7 @@ static NSArray *PicaLex(NSString *src) {
   [self matchP:@")"];
   return a;
 }
-- (PicaAst *)parseIdent {
+- (RDLExprNode *)parseIdent {
   PicaTok *idTok = [self eat];
   NSString *ident = idTok.s ?: @"";
   NSString *low = [ident lowercaseString];
@@ -495,12 +616,22 @@ static NSArray *PicaLex(NSString *src) {
     return PicaLit(PicaYes(NO));
   if ([low isEqualToString:@"nothing"] || [low isEqualToString:@"null"])
     return PicaLit([NSNull null]);
+  // VB's line-break constants. They are constants rather than functions, so
+  // they belong here beside True and Nothing.
+  if ([low isEqualToString:@"vbcrlf"] || [low isEqualToString:@"vbnewline"])
+    return PicaLit(@"\r\n");
+  if ([low isEqualToString:@"vblf"])
+    return PicaLit(@"\n");
+  if ([low isEqualToString:@"vbcr"])
+    return PicaLit(@"\r");
+  if ([low isEqualToString:@"vbtab"])
+    return PicaLit(@"\t");
   PicaTok *next = [self peek];
   if (next && [next.kind isEqualToString:@"p"] && [next.s isEqualToString:@"("])
     return [self parseCall:ident];
   if ([low isEqualToString:@"now"] || [low isEqualToString:@"today"]) {
-    PicaAst *c = [[PicaAst alloc] init];
-    c.kind = @"call";
+    RDLExprNode *c = [[RDLExprNode alloc] init];
+    c.kind = RDLExprNodeKindCall;
     c.name = ident;
     return c;
   }
@@ -513,27 +644,48 @@ static NSArray *PicaLex(NSString *src) {
       if (p.s)
         prop = p.s;
     }
-    PicaAst *a = [[PicaAst alloc] init];
+    RDLExprNode *a = [[RDLExprNode alloc] init];
     a.name = name;
     a.prop = prop;
     if ([low isEqualToString:@"fields"])
-      a.kind = @"field";
+      a.kind = RDLExprNodeKindField;
     else if ([low isEqualToString:@"parameters"])
-      a.kind = @"param";
+      a.kind = RDLExprNodeKindParameter;
     else if ([low isEqualToString:@"globals"])
-      a.kind = @"global";
+      a.kind = RDLExprNodeKindGlobal;
     else if ([low isEqualToString:@"user"])
-      a.kind = @"user";
+      a.kind = RDLExprNodeKindUser;
     else
-      a.kind = @"ident";
+      a.kind = RDLExprNodeKindIdentifier;
     return a;
   }
-  PicaAst *a = [[PicaAst alloc] init];
-  a.kind = @"ident";
+  // A dotted member: Code.Fn(...) for an embedded <Code> block, or
+  // Instance.Method(...) for a custom assembly. We cannot execute either, but
+  // the tree has to be complete -- parsing `Code` alone and stopping left the
+  // rest of the expression on the floor, so an enclosing IIf silently lost two
+  // of its three arguments.
+  if ([self matchP:@"."]) {
+    PicaTok *memberTok = [self eat];
+    NSString *member = memberTok.s ?: @"";
+    RDLExprNode *a = [[RDLExprNode alloc] init];
+    a.kind = RDLExprNodeKindMember;
+    a.name = [NSString stringWithFormat:@"%@.%@", ident, member];
+    if ([self matchP:@"("]) {
+      if (![self matchP:@")"]) {
+        do {
+          [a.args addObject:[self parseOr]];
+        } while ([self matchP:@","]);
+        [self matchP:@")"];
+      }
+    }
+    return a;
+  }
+  RDLExprNode *a = [[RDLExprNode alloc] init];
+  a.kind = RDLExprNodeKindIdentifier;
   a.name = ident;
   return a;
 }
-- (PicaAst *)parsePrimary {
+- (RDLExprNode *)parsePrimary {
   PicaTok *t = [self peek];
   if (t == nil)
     return PicaLit([NSNull null]);
@@ -547,7 +699,7 @@ static NSArray *PicaLex(NSString *src) {
   }
   if ([t.kind isEqualToString:@"p"] && [t.s isEqualToString:@"("]) {
     [self eat];
-    PicaAst *v = [self parseOr];
+    RDLExprNode *v = [self parseOr];
     [self matchP:@")"];
     return v;
   }
@@ -558,19 +710,35 @@ static NSArray *PicaLex(NSString *src) {
 }
 @end
 
-static PicaAst *PicaParse(NSString *src) {
+static RDLExprNode *PicaParseReportingRest(NSString *src, BOOL *outComplete);
+
+static RDLExprNode *PicaParse(NSString *src) {
+  return PicaParseReportingRest(src, NULL);
+}
+
+// The parser stops at the first thing it does not understand and returns what
+// it had, which is how `=IIf(a % 2 = 0, "x", "y")` quietly became a one-
+// argument IIf. The tree is left exactly as it was -- changing it would change
+// what existing reports render -- but the caller can now find out that
+// something was left over, which is what RDLChecker reports.
+static RDLExprNode *PicaParseReportingRest(NSString *src, BOOL *outComplete) {
+  if (outComplete)
+    *outComplete = YES;
   if (src == nil || ![src hasPrefix:@"="])
     return nil;
   PicaParser *p = [[PicaParser alloc] init];
   p.toks = PicaLex([src substringFromIndex:1]);
   p.i = 0;
-  return [p parse];
+  RDLExprNode *root = [p parse];
+  if (outComplete)
+    *outComplete = p.i >= [p.toks count];
+  return root;
 }
 
-static NSString *PicaPrint(PicaAst *a) {
+static NSString *PicaPrint(RDLExprNode *a) {
   if (a == nil)
     return @"";
-  if ([a.kind isEqualToString:@"lit"]) {
+  if (a.kind == RDLExprNodeKindLiteral) {
     if (PicaIsNothing(a.value))
       return @"Nothing";
     BOOL pv = NO;
@@ -580,32 +748,33 @@ static NSString *PicaPrint(PicaAst *a) {
       return [NSString stringWithFormat:@"\"%@\"", a.value];
     return PicaStr(a.value);
   }
-  if ([a.kind isEqualToString:@"field"])
+  if (a.kind == RDLExprNodeKindField)
     return [NSString stringWithFormat:@"Fields!%@.%@", a.name, a.prop];
-  if ([a.kind isEqualToString:@"param"])
+  if (a.kind == RDLExprNodeKindParameter)
     return [NSString stringWithFormat:@"Parameters!%@.%@", a.name, a.prop];
-  if ([a.kind isEqualToString:@"global"])
+  if (a.kind == RDLExprNodeKindGlobal)
     return [NSString stringWithFormat:@"Globals!%@", a.name];
-  if ([a.kind isEqualToString:@"user"])
+  if (a.kind == RDLExprNodeKindUser)
     return [NSString stringWithFormat:@"User!%@", a.name];
-  if ([a.kind isEqualToString:@"ident"])
+  if (a.kind == RDLExprNodeKindIdentifier)
     return a.name ?: @"";
-  if ([a.kind isEqualToString:@"call"]) {
+  if (a.kind == RDLExprNodeKindCall) {
     NSMutableArray *parts = [NSMutableArray array];
-    for (PicaAst *c in a.args)
+    for (RDLExprNode *c in a.args)
       [parts addObject:PicaPrint(c)];
     return [NSString stringWithFormat:@"%@(%@)", a.name, [parts componentsJoinedByString:@","]];
   }
+  NSString *op = RDLStringFromExprOperator(a.op);
   if ([a.args count] == 1)
-    return [NSString stringWithFormat:@"(%@ %@)", a.op, PicaPrint(a.args[0])];
+    return [NSString stringWithFormat:@"(%@ %@)", op, PicaPrint(a.args[0])];
   if ([a.args count] >= 2)
-    return [NSString stringWithFormat:@"(%@ %@ %@)", PicaPrint(a.args[0]), a.op, PicaPrint(a.args[1])];
-  return a.op ?: @"";
+    return [NSString stringWithFormat:@"(%@ %@ %@)", PicaPrint(a.args[0]), op, PicaPrint(a.args[1])];
+  return op;
 }
 
 #pragma mark - Execute
 
-static id PicaExec(PicaAst *ast, RDLEvalScope *scope);
+static id PicaExec(RDLExprNode *ast, RDLEvalScope *scope);
 
 static NSArray *PicaRows(RDLEvalScope *scope, NSString *dsName) {
   if ([dsName length] == 0 && [scope.groupRows count])
@@ -650,53 +819,55 @@ static BOOL PicaLike(NSString *value, NSString *pattern) {
   return [rx numberOfMatchesInString:val options:0 range:NSMakeRange(0, val.length)] > 0;
 }
 
-static BOOL PicaCmp(id a, NSString *op, id b) {
-  NSString *o = [op lowercaseString];
-  if ([o isEqualToString:@"is"])
+static BOOL PicaCmp(id a, RDLExprOperator op, id b) {
+  if (op == RDLExprOperatorIs)
     return PicaIsNothing(a) == PicaIsNothing(b) || (b == [NSNull null] && PicaIsNothing(a));
-  if ([o isEqualToString:@"isnot"])
+  if (op == RDLExprOperatorIsNot)
     return !(PicaIsNothing(a) == PicaIsNothing(b) || (b == [NSNull null] && PicaIsNothing(a)));
-  if ([o isEqualToString:@"like"])
+  if (op == RDLExprOperatorLike)
     return PicaLike(PicaStr(a), PicaStr(b));
   BOOL numeric = [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
   if (numeric) {
     double l = PicaNum(a), r = PicaNum(b);
-    if ([o isEqualToString:@"="])
+    if (op == RDLExprOperatorEqual)
       return l == r;
-    if ([o isEqualToString:@"<>"])
+    if (op == RDLExprOperatorNotEqual)
       return l != r;
-    if ([o isEqualToString:@">"])
+    if (op == RDLExprOperatorGreater)
       return l > r;
-    if ([o isEqualToString:@"<"])
+    if (op == RDLExprOperatorLess)
       return l < r;
-    if ([o isEqualToString:@">="])
+    if (op == RDLExprOperatorGreaterOrEqual)
       return l >= r;
-    if ([o isEqualToString:@"<="])
+    if (op == RDLExprOperatorLessOrEqual)
       return l <= r;
   } else {
     NSString *l = PicaStr(a), *r = PicaStr(b);
     NSComparisonResult c = [l compare:r];
-    if ([o isEqualToString:@"="])
+    if (op == RDLExprOperatorEqual)
       return c == NSOrderedSame;
-    if ([o isEqualToString:@"<>"])
+    if (op == RDLExprOperatorNotEqual)
       return c != NSOrderedSame;
-    if ([o isEqualToString:@">"])
+    if (op == RDLExprOperatorGreater)
       return c == NSOrderedDescending;
-    if ([o isEqualToString:@"<"])
+    if (op == RDLExprOperatorLess)
       return c == NSOrderedAscending;
-    if ([o isEqualToString:@">="])
+    if (op == RDLExprOperatorGreaterOrEqual)
       return c != NSOrderedAscending;
-    if ([o isEqualToString:@"<="])
+    if (op == RDLExprOperatorLessOrEqual)
       return c != NSOrderedDescending;
   }
   return NO;
 }
 
-static id PicaField(RDLEvalScope *scope, NSString *name, NSString *prop) {
-  BOOL missing = [prop caseInsensitiveCompare:@"IsMissing"] == NSOrderedSame;
+static id PicaField(RDLEvalScope *scope, RDLExprNode *node) {
+  NSString *name = node.name;
+  BOOL missing = [node.prop caseInsensitiveCompare:@"IsMissing"] == NSOrderedSame;
   if (scope.row == nil)
     return missing ? PicaYes(YES) : @"";
-  id v = PicaLookup(scope.row, name);
+  // Through the node's memo: this runs once per row of the dataset, and
+  // resolving the key each time costs several times the lookup.
+  id v = [node valueFromRow:scope.row];
   if (v == nil) {
     // Calculated field on the current dataset.
     for (id f in scope.dataSet.fields) {
@@ -795,7 +966,7 @@ static id PicaUser(RDLEvalScope *scope, NSString *name) {
   return @"";
 }
 
-static NSString *PicaDsName(PicaAst *arg, RDLEvalScope *scope) {
+static NSString *PicaDsName(RDLExprNode *arg, RDLEvalScope *scope) {
   if (arg == nil)
     return nil;
   id v = PicaExec(arg, scope);
@@ -806,15 +977,19 @@ static NSString *PicaDsName(PicaAst *arg, RDLEvalScope *scope) {
 static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
   NSString *ds = [args count] > 1 ? PicaDsName(args[1], scope) : nil;
   NSArray *rows = PicaRows(scope, ds);
-  PicaAst *expr = [args count] ? args[0] : nil;
-  if ([n isEqualToString:@"countrows"])
+  RDLExprNode *expr = [args count] ? args[0] : nil;
+  if ([n isEqualToString:@"countrows"] || [n isEqualToString:@"rowcount"])
     return @((double)[rows count]);
+  // Which row we are on. The layout engine numbers rows as it expands a data
+  // region; outside one there is no row, and 0 says so.
+  if ([n isEqualToString:@"rownumber"])
+    return @((double)scope.rowNumber);
   if ([n isEqualToString:@"count"]) {
     if (expr == nil)
       return @((double)[rows count]);
     NSInteger c = 0;
     NSDictionary *saved = scope.row;
-    for (NSDictionary *row in rows) {
+    for (id row in rows) {
       scope.row = row;
       if (!PicaIsNothing(PicaExec(expr, scope)))
         c += 1;
@@ -825,7 +1000,7 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
   if ([n isEqualToString:@"countdistinct"]) {
     NSMutableSet *seen = [NSMutableSet set];
     NSDictionary *saved = scope.row;
-    for (NSDictionary *row in rows) {
+    for (id row in rows) {
       scope.row = row;
       id v = expr ? PicaExec(expr, scope) : @"";
       if (!PicaIsNothing(v))
@@ -835,7 +1010,7 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
     return @((double)[seen count]);
   }
   if ([n isEqualToString:@"first"] || [n isEqualToString:@"last"]) {
-    NSDictionary *row = [n isEqualToString:@"first"] ? rows.firstObject : rows.lastObject;
+    id row = [n isEqualToString:@"first"] ? rows.firstObject : rows.lastObject;
     if (row == nil)
       return @"";
     NSDictionary *saved = scope.row;
@@ -849,7 +1024,7 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
   BOOL any = NO;
   double mn = 0, mx = 0;
   NSDictionary *saved = scope.row;
-  for (NSDictionary *row in rows) {
+  for (id row in rows) {
     scope.row = row;
     double x = expr ? PicaNum(PicaExec(expr, scope)) : 0;
     if (!any) {
@@ -895,7 +1070,7 @@ static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
 // RunningValue(expr, "Function", ["Scope"]) — aggregate over rows up to and
 // including the current row.
 static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
-  PicaAst *expr = [args count] ? args[0] : nil;
+  RDLExprNode *expr = [args count] ? args[0] : nil;
   NSString *fn = [args count] > 1 ? [PicaStr(PicaExec(args[1], scope)) lowercaseString] : @"sum";
   NSString *ds = [args count] > 2 ? PicaDsName(args[2], scope) : nil;
   NSArray *rows = PicaRows(scope, ds);
@@ -914,7 +1089,7 @@ static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
   BOOL any = NO;
   double mn = 0, mx = 0;
   NSUInteger idx = 0;
-  for (NSDictionary *row in rows) {
+  for (id row in rows) {
     scope.row = row;
     id v = expr ? PicaExec(expr, scope) : nil;
     double x = PicaNum(v);
@@ -947,8 +1122,8 @@ static id PicaExecRunningValue(NSArray *args, RDLEvalScope *scope) {
 
 static id PicaExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
   id source = [args count] ? PicaExec(args[0], scope) : nil;
-  PicaAst *destExpr = [args count] > 1 ? args[1] : nil;
-  PicaAst *resultExpr = [args count] > 2 ? args[2] : nil;
+  RDLExprNode *destExpr = [args count] > 1 ? args[1] : nil;
+  RDLExprNode *resultExpr = [args count] > 2 ? args[2] : nil;
   NSString *ds = [args count] > 3 ? PicaDsName(args[3], scope) : nil;
   NSArray *rows = PicaRows(scope, ds);
   NSMutableArray *keys = [NSMutableArray array];
@@ -968,7 +1143,7 @@ static id PicaExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
   NSMutableArray *hits = [NSMutableArray array];
   NSDictionary *saved = scope.row;
   for (id key in keys) {
-    for (NSDictionary *row in rows) {
+    for (id row in rows) {
       if (destExpr == nil)
         break;
       scope.row = row;
@@ -1031,6 +1206,21 @@ static id PicaCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *s
     return [RDLExpression formatValue:a0 format:@"P"];
   if ([n isEqualToString:@"cstr"])
     return PicaStr(a0);
+  if ([n isEqualToString:@"csng"] || [n isEqualToString:@"cbyte"])
+    return @(PicaNum(a0));
+  if ([n isEqualToString:@"cchar"]) {
+    NSString *str = PicaStr(a0);
+    return [str length] ? [str substringToIndex:1] : @"";
+  }
+  // CType(value, type) cannot be honoured without .NET types, so it passes
+  // the value through rather than pretending to convert it.
+  if ([n isEqualToString:@"ctype"])
+    return a0;
+  if ([n isEqualToString:@"rgb"]) {
+    int r = (int)PicaNum(a0), g = (int)PicaNum(a1), b = (int)PicaNum(a2);
+    return [NSString stringWithFormat:@"#%02X%02X%02X", MAX(MIN(r, 255), 0), MAX(MIN(g, 255), 0),
+                                      MAX(MIN(b, 255), 0)];
+  }
   if ([n isEqualToString:@"cdbl"] || [n isEqualToString:@"cdec"] || [n isEqualToString:@"val"])
     return @(PicaNum(a0));
   if ([n isEqualToString:@"cint"] || [n isEqualToString:@"clng"])
@@ -1350,78 +1540,112 @@ static id PicaCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *s
   return a0 ?: @"";
 }
 
-static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
+static id PicaExec(RDLExprNode *ast, RDLEvalScope *scope) {
   if (ast == nil)
     return @"";
-  if ([ast.kind isEqualToString:@"lit"])
+  if (ast.kind == RDLExprNodeKindLiteral)
     return ast.value == [NSNull null] ? nil : ast.value;
-  if ([ast.kind isEqualToString:@"field"])
-    return PicaField(scope, ast.name, ast.prop);
-  if ([ast.kind isEqualToString:@"param"])
+  if (ast.kind == RDLExprNodeKindField)
+    return PicaField(scope, ast);
+  if (ast.kind == RDLExprNodeKindParameter)
     return PicaParam(scope, ast.name, ast.prop);
-  if ([ast.kind isEqualToString:@"global"])
+  if (ast.kind == RDLExprNodeKindGlobal)
     return PicaGlobal(scope, ast.name);
-  if ([ast.kind isEqualToString:@"user"])
+  if (ast.kind == RDLExprNodeKindUser)
     return PicaUser(scope, ast.name);
-  if ([ast.kind isEqualToString:@"ident"])
+  if (ast.kind == RDLExprNodeKindIdentifier)
     return ast.name ?: @"";
-  if ([ast.kind isEqualToString:@"op"]) {
-    NSString *o = [ast.op lowercaseString];
-    if ([o isEqualToString:@"not"] || [o isEqualToString:@"neg"]) {
+  if (ast.kind == RDLExprNodeKindOperator) {
+    RDLExprOperator op = ast.op;
+    if (op == RDLExprOperatorNot || op == RDLExprOperatorNegate) {
       id v = PicaExec(ast.args[0], scope);
-      return [o isEqualToString:@"not"] ? PicaYes(!PicaBool(v)) : @(-PicaNum(v));
+      return op == RDLExprOperatorNot ? PicaYes(!PicaBool(v)) : @(-PicaNum(v));
     }
-    if ([o isEqualToString:@"andalso"]) {
+    if (op == RDLExprOperatorAndAlso) {
       if (!PicaBool(PicaExec(ast.args[0], scope)))
         return PicaYes(NO);
       return PicaYes(PicaBool(PicaExec(ast.args[1], scope)));
     }
-    if ([o isEqualToString:@"orelse"]) {
+    if (op == RDLExprOperatorOrElse) {
       if (PicaBool(PicaExec(ast.args[0], scope)))
         return PicaYes(YES);
       return PicaYes(PicaBool(PicaExec(ast.args[1], scope)));
     }
     id a = PicaExec(ast.args[0], scope);
     id b = [ast.args count] > 1 ? PicaExec(ast.args[1], scope) : nil;
-    if ([o isEqualToString:@"&"])
+    if (op == RDLExprOperatorConcat)
       return [PicaStr(a) stringByAppendingString:PicaStr(b)];
-    if ([o isEqualToString:@"+"]) {
+    if (op == RDLExprOperatorAdd) {
       if (PicaNumericLike(a) && PicaNumericLike(b))
         return @(PicaNum(a) + PicaNum(b));
       return [PicaStr(a) stringByAppendingString:PicaStr(b)];
     }
-    if ([o isEqualToString:@"-"])
+    if (op == RDLExprOperatorSubtract)
       return @(PicaNum(a) - PicaNum(b));
-    if ([o isEqualToString:@"*"])
+    if (op == RDLExprOperatorMultiply)
       return @(PicaNum(a) * PicaNum(b));
-    if ([o isEqualToString:@"/"]) {
+    if (op == RDLExprOperatorDivide) {
       double d = PicaNum(b);
       return @(d == 0 ? 0 : PicaNum(a) / d);
     }
-    if ([o isEqualToString:@"\\"]) {
+    if (op == RDLExprOperatorIntegerDivide) {
       double d = PicaNum(b);
       return @(d == 0 ? 0 : trunc(PicaNum(a) / d));
     }
-    if ([o isEqualToString:@"mod"]) {
+    if (op == RDLExprOperatorModulo) {
       double d = PicaNum(b);
       return @(d == 0 ? 0 : fmod(PicaNum(a), d));
     }
-    if ([o isEqualToString:@"^"])
+    if (op == RDLExprOperatorPower)
       return @(pow(PicaNum(a), PicaNum(b)));
-    if ([o isEqualToString:@"and"])
+    if (op == RDLExprOperatorAnd)
       return PicaYes(PicaBool(a) && PicaBool(b));
-    if ([o isEqualToString:@"or"])
+    if (op == RDLExprOperatorOr)
       return PicaYes(PicaBool(a) || PicaBool(b));
-    if ([o isEqualToString:@"xor"])
+    if (op == RDLExprOperatorXor)
       return PicaYes(PicaBool(a) != PicaBool(b));
-    return PicaYes(PicaCmp(a, o, b));
+    return PicaYes(PicaCmp(a, op, b));
   }
-  if ([ast.kind isEqualToString:@"call"]) {
+  if (ast.kind == RDLExprNodeKindCall) {
     NSString *n = [ast.name lowercaseString];
+    // Union(a, b): the two sets together, in order, without repeats. A set
+    // here is what LookupSet returns, an array.
+    if ([n isEqualToString:@"union"]) {
+      NSMutableArray *out = [NSMutableArray array];
+      for (RDLExprNode *arg in ast.args) {
+        id v = PicaExec(arg, scope);
+        NSArray *items = [v isKindOfClass:[NSArray class]] ? v : (v ? @[ v ] : @[]);
+        for (id item in items)
+          if (![out containsObject:item])
+            [out addObject:item];
+      }
+      return out;
+    }
+    // InScope("Name"): is that scope one of the ones we are inside?
+    if ([n isEqualToString:@"inscope"]) {
+      NSString *want = [ast.args count] ? PicaStr(PicaExec(ast.args[0], scope)) : @"";
+      for (NSString *name in scope.activeScopes)
+        if ([name caseInsensitiveCompare:want] == NSOrderedSame)
+          return PicaYes(YES);
+      return PicaYes(NO);
+    }
+    // Level(): how deep the innermost scope is, counting the dataset as 0.
+    // Level("Name"): how deep that scope is. -1 for a scope we are not in,
+    // which is what RDL returns.
+    if ([n isEqualToString:@"level"]) {
+      NSArray *scopes = scope.activeScopes ?: @[];
+      if ([ast.args count] == 0)
+        return @((double)MAX((NSInteger)[scopes count] - 1, 0));
+      NSString *want = PicaStr(PicaExec(ast.args[0], scope));
+      for (NSUInteger i = 0; i < [scopes count]; i++)
+        if ([scopes[i] caseInsensitiveCompare:want] == NSOrderedSame)
+          return @((double)i);
+      return @(-1.0);
+    }
     if ([n isEqualToString:@"iif"]) {
       BOOL cond = PicaBool(PicaExec([ast.args count] ? ast.args[0] : PicaLit(PicaYes(NO)), scope));
-      PicaAst *t = [ast.args count] > 1 ? ast.args[1] : PicaLit([NSNull null]);
-      PicaAst *f = [ast.args count] > 2 ? ast.args[2] : PicaLit([NSNull null]);
+      RDLExprNode *t = [ast.args count] > 1 ? ast.args[1] : PicaLit([NSNull null]);
+      RDLExprNode *f = [ast.args count] > 2 ? ast.args[2] : PicaLit([NSNull null]);
       return PicaExec(cond ? t : f, scope);
     }
     if ([n isEqualToString:@"switch"]) {
@@ -1451,7 +1675,8 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
         [n isEqualToString:@"avg"] || [n isEqualToString:@"first"] || [n isEqualToString:@"last"] ||
         [n isEqualToString:@"min"] || [n isEqualToString:@"max"] || [n isEqualToString:@"countrows"] ||
         [n isEqualToString:@"stdev"] || [n isEqualToString:@"stdevp"] || [n isEqualToString:@"var"] ||
-        [n isEqualToString:@"varp"] || [n isEqualToString:@"aggregate"])
+        [n isEqualToString:@"varp"] || [n isEqualToString:@"aggregate"] ||
+        [n isEqualToString:@"rowcount"] || [n isEqualToString:@"rownumber"])
       return PicaExecAgg(n, ast.args, scope);
     if ([n isEqualToString:@"runningvalue"])
       return PicaExecRunningValue(ast.args, scope);
@@ -1478,7 +1703,7 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
       return [parts componentsJoinedByString:delim];
     }
     NSMutableArray *vals = [NSMutableArray array];
-    for (PicaAst *c in ast.args) {
+    for (RDLExprNode *c in ast.args) {
       id v = PicaExec(c, scope);
       [vals addObject:v ?: [NSNull null]];
     }
@@ -1552,7 +1777,7 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
     return @"";
   if (![expr hasPrefix:@"="])
     return expr;
-  PicaAst *ast = PicaParse(expr);
+  RDLExprNode *ast = PicaParse(expr);
   if (ast == nil)
     return expr;
   id v = PicaExec(ast, scope);
@@ -1564,7 +1789,7 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
 }
 
 + (NSString *)translationOf:(NSString *)expr {
-  PicaAst *ast = PicaParse(expr);
+  RDLExprNode *ast = PicaParse(expr);
   return ast ? PicaPrint(ast) : @"";
 }
 
@@ -1629,7 +1854,8 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
   NSString *_prefix;    // everything up to and including the leading "="
   NSArray *_toks;       // each carries its lexeme and the trivia before it
   NSString *_trailing;  // whitespace after the last token
-  PicaAst *_ast;
+  RDLExprNode *_ast;
+  BOOL _complete;
 }
 
 + (BOOL)isExpressionSource:(NSString *)source {
@@ -1649,6 +1875,7 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
   p.toks = e->_toks;
   p.i = 0;
   e->_ast = [p parse];
+  e->_complete = p.i >= [p.toks count];
   return e;
 }
 
@@ -1660,6 +1887,15 @@ static id PicaExec(PicaAst *ast, RDLEvalScope *scope) {
   }
   [out appendString:_trailing ?: @""];
   return out;
+}
+
+
+- (RDLExprNode *)root {
+  return _ast;
+}
+
+- (BOOL)parsedCompletely {
+  return _complete;
 }
 
 - (id)evaluateInScope:(RDLEvalScope *)scope {

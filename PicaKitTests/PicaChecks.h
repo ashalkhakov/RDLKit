@@ -10,6 +10,7 @@ NSArray<NSString *> *PicaRunTablixFitChecks(void);
 NSArray<NSString *> *PicaRunUpgraderChecks(void);
 NSArray<NSString *> *PicaRunChartChecks(void);
 NSArray<NSString *> *PicaRunWholeTextboxStyleChecks(void);
+NSArray<NSString *> *PicaRunCheckerChecks(void);
 NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void);
 NSArray<NSString *> *PicaRunLayoutChecks(void);
 NSArray<NSString *> *PicaRunTablixChecks(void);

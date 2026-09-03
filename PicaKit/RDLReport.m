@@ -141,6 +141,28 @@ NSString *RDLStringFromParameterDataType(RDLParameterDataType v) {
   return PicaStringFromEnum(v, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
 }
 
+// RDL writes .NET type names, sometimes with the "System." prefix.
+static const char *const kRDLFieldDataTypeNames[] = {"",        "Boolean", "DateTime", "Integer",
+                                                     "Float",   "Decimal", "String"};
+static const NSInteger kRDLFieldDataTypeNamesCount =
+    (NSInteger)(sizeof(kRDLFieldDataTypeNames) / sizeof(*kRDLFieldDataTypeNames));
+RDLFieldDataType RDLFieldDataTypeFromString(NSString *s) {
+  NSString *bare = [s hasPrefix:@"System."] ? [s substringFromIndex:7] : s;
+  // The names RDL uses are not all the names .NET uses.
+  if ([bare caseInsensitiveCompare:@"Int32"] == NSOrderedSame ||
+      [bare caseInsensitiveCompare:@"Int16"] == NSOrderedSame ||
+      [bare caseInsensitiveCompare:@"Int64"] == NSOrderedSame)
+    bare = @"Integer";
+  else if ([bare caseInsensitiveCompare:@"Double"] == NSOrderedSame ||
+           [bare caseInsensitiveCompare:@"Single"] == NSOrderedSame)
+    bare = @"Float";
+  return (RDLFieldDataType)PicaEnumFromString(bare, kRDLFieldDataTypeNames,
+                                              kRDLFieldDataTypeNamesCount);
+}
+NSString *RDLStringFromFieldDataType(RDLFieldDataType v) {
+  return PicaStringFromEnum(v, kRDLFieldDataTypeNames, kRDLFieldDataTypeNamesCount);
+}
+
 static const char *const kRDLChartTypeNames[] = {"",     "Column",   "Bar",     "Line",  "Area",
                                                  "Pie",  "Doughnut", "Scatter", "Bubble"};
 static const NSInteger kRDLChartTypeNamesCount = (NSInteger)(sizeof(kRDLChartTypeNames) / sizeof(*kRDLChartTypeNames));

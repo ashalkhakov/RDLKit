@@ -191,6 +191,23 @@ the elements parse: `VBFunctionsTests`, `VBFunctionsCrystalTest`,
 page boundary), `CanShrinkTest`, `ImageSizingTests`, `HtmlTextboxTest`
 (`MarkupType` HTML), and `BarCodeEAN13Test`.
 
+## What static checking says about the corpus
+
+`RDLChecker` over the same 86 files: **55 clean**, the rest carrying real
+problems — the `Fields.Name.Value` dot dialect (fyiReporting's, not RDL's),
+`{PLACEHOLDER}` templating that is not RDL syntax at all, and calls to
+functions this kit has not implemented. Re-run with
+`PicaDemo <file> --check`.
+
+Writing the checker turned up three bugs in our own expression parser, each of
+the same shape: it stopped at the first thing it did not understand and
+silently kept the fragment. `Code.Fn(x)` parsed as the bare identifier `Code`
+and discarded the rest, so an enclosing `IIf` lost two of its three arguments;
+the lexer dropped any character it had no rule for, so `a % 2 = 0` became
+`a 2 = 0`. Dotted member calls now parse, unknown characters become tokens the
+parser refuses, and `RDLExpr.parsedCompletely` says when the tree is only a
+prefix of what was written.
+
 ## Suggested order
 
 1. **Subreport**, then `CustomReportItem` — both real MS-RDL, both currently

@@ -28,8 +28,12 @@
 @property (nonatomic, copy) NSString *pageName;
 @property (nonatomic, assign) CGFloat keepTogetherHeight;
 @property (nonatomic, strong) NSMutableArray<PicaTablixCellInst *> *cells;
-@property (nonatomic, copy) NSDictionary *row;
+@property (nonatomic, strong) id row;
 @property (nonatomic, copy) NSArray *groupRows;
+// 1-based position of this row within its group, for RowNumber().
+@property (nonatomic, assign) NSInteger rowNumber;
+// The scopes enclosing this row, outermost first, for InScope() and Level().
+@property (nonatomic, copy) NSArray<NSString *> *activeScopes;
 @end
 @implementation PicaTablixInst
 @end
@@ -123,16 +127,16 @@ static NSString *PicaFieldOf(NSString *expr) {
 // A grouping/sort/filter value against one row. A literal that names a field
 // ("Fields!Total.Value" written without the "=") still resolves against the
 // row, which is why this is not just -[RDLValue evaluateInScope:].
-static id PicaEvalRow(RDLValue *value, NSDictionary *row, RDLEvalScope *scope) {
+static id PicaEvalRow(RDLValue *value, id row, RDLEvalScope *scope) {
   if (value == nil)
     return @"";
   NSString *source = [value source];
   if (![value isExpression]) {
     NSString *f = PicaFieldOf(source);
     if (f && row) {
-      for (NSString *k in row)
-        if ([k caseInsensitiveCompare:f] == NSOrderedSame)
-          return row[k];
+      id v = RDLRowValue(row, f);
+      if (v != nil)
+        return v;
     }
     return source;
   }
@@ -146,9 +150,9 @@ static id PicaEvalRow(RDLValue *value, NSDictionary *row, RDLEvalScope *scope) {
   // No scope to evaluate in: fall back to the field the expression names.
   NSString *f = PicaFieldOf(source);
   if (f && row) {
-    for (NSString *k in row)
-      if ([k caseInsensitiveCompare:f] == NSOrderedSame)
-        return row[k];
+    id v = RDLRowValue(row, f);
+    if (v != nil)
+      return v;
   }
   return [source substringFromIndex:1];
 }
@@ -324,7 +328,7 @@ static BOOL PicaLike(NSString *value, NSString *pattern) {
   return [re numberOfMatchesInString:val options:0 range:NSMakeRange(0, val.length)] > 0;
 }
 
-static BOOL PicaPassesFilter(NSDictionary *row, RDLFilter *f, RDLEvalScope *scope) {
+static BOOL PicaPassesFilter(id row, RDLFilter *f, RDLEvalScope *scope) {
   id left = PicaEvalRow(f.expression, row, scope);
   RDLFilterOperator op = f.oper != RDLFilterOperatorUnspecified ? f.oper : RDLFilterOperatorEqual;
   id right = [f.values count] ? PicaEvalRow(f.values[0], row, scope) : @"";
@@ -363,7 +367,7 @@ static NSArray *PicaApplyFilters(NSArray *rows, NSArray<RDLFilter *> *filters, R
   if ([filters count] == 0)
     return rows;
   NSMutableArray *out = [NSMutableArray array];
-  for (NSDictionary *row in rows) {
+  for (id row in rows) {
     BOOL ok = YES;
     for (RDLFilter *f in filters) {
       if (!PicaPassesFilter(row, f, scope)) {
@@ -399,7 +403,7 @@ static NSArray *PicaApplySort(NSArray *rows, NSArray<RDLSortExpression *> *sorts
 static NSArray *PicaPartition(NSArray *rows, NSArray<RDLValue *> *exprs, RDLEvalScope *scope) {
   NSMutableArray *order = [NSMutableArray array];
   NSMutableDictionary *map = [NSMutableDictionary dictionary];
-  for (NSDictionary *row in rows) {
+  for (id row in rows) {
     NSMutableString *key = [NSMutableString string];
     for (RDLValue *e in exprs) {
       [key appendString:PicaAsStr(PicaEvalRow(e, row, scope))];
@@ -600,7 +604,8 @@ static void PicaApplyRowSpan(NSArray<PicaTablixInst *> *insts) {
 }
 
 static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray *currentRows,
-                             BOOL dynamic, NSDictionary *row, NSArray *groupRows, RDLTablix *tab,
+                             BOOL dynamic, id row, NSArray *groupRows, RDLTablix *tab,
+                             NSArray<NSString *> *scopeNames,
                              CGFloat headerW, NSArray<PicaColPlanEntry *> *plan) {
   CGFloat h = bodyRow.height > 0 ? bodyRow.height : 0.28;
   BOOL repeat = m.repeatOnNewPage || (tab.repeatColumnHeaders && m.keepWithGroup == RDLKeepWithGroupAfter &&
@@ -608,6 +613,7 @@ static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray 
   NSArray *runs = dynamic ? ([currentRows count] ? currentRows : @[ @{} ])
                           : @[ row ?: [NSNull null] ];
   NSMutableArray *local = [NSMutableArray array];
+  NSInteger ordinal = 0;
   for (id r in runs) {
     PicaTablixInst *inst = [[PicaTablixInst alloc] init];
     inst.height = h;
@@ -615,6 +621,8 @@ static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray 
     inst.cells = PicaBodyCells(bodyRow, tab.tablixBody.columns, headerW, h, plan);
     inst.row = (r == [NSNull null]) ? nil : r;
     inst.groupRows = groupRows;
+    inst.rowNumber = ++ordinal;
+    inst.activeScopes = scopeNames;
     [local addObject:inst];
   }
   return local;
@@ -622,11 +630,11 @@ static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray 
 
 static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
-                                NSArray<PicaColPlanEntry *> *plan);
+                                NSArray<PicaColPlanEntry *> *plan, NSArray<NSString *> *scopeNames);
 
 static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
-                                NSArray<PicaColPlanEntry *> *plan) {
+                                NSArray<PicaColPlanEntry *> *plan, NSArray<NSString *> *scopeNames) {
   NSMutableArray *out = [NSMutableArray array];
   NSInteger leaf = leafStart;
   RDLTablixBody *body = tab.tablixBody;
@@ -634,6 +642,9 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
     BOOL nested = [m.members count] > 0;
     NSInteger count = nested ? PicaLeafCount(m.members) : 1;
     BOOL hasGroup = [m.groupName length] > 0;
+    // A group adds its name to the chain for everything inside it.
+    NSArray<NSString *> *innerScopes =
+        hasGroup ? [(scopeNames ?: @[]) arrayByAddingObject:m.groupName] : (scopeNames ?: @[]);
     NSArray *exprs = m.groupExpressions;
     CGFloat childX = headerX + m.header.size;
     if (PicaIsHiddenExpr(m.hidden, scope)) {
@@ -671,9 +682,12 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
       }
       NSInteger partIndex = 0;
       for (NSArray *part in parts) {
-        NSArray *childInsts = nested ? PicaWalkMembers(m.members, part, childX, leaf, tab, scope, headerW, plan)
-                                     : PicaEmitRuns(m, leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : nil,
-                                                    part, NO, [part firstObject], part, tab, headerW, plan);
+        NSArray *childInsts =
+            nested ? PicaWalkMembers(m.members, part, childX, leaf, tab, scope, headerW, plan,
+                                     innerScopes)
+                   : PicaEmitRuns(m, leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : nil,
+                                  part, NO, [part firstObject], part, tab, innerScopes, headerW,
+                                  plan);
         if ([childInsts count] == 0) {
           partIndex += 1;
           continue;
@@ -722,13 +736,15 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
 
     if (hasGroup && !nested) {
       RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
-      [out addObjectsFromArray:PicaEmitRuns(m, br, currentRows, YES, nil, currentRows, tab, headerW, plan)];
+      [out addObjectsFromArray:PicaEmitRuns(m, br, currentRows, YES, nil, currentRows, tab,
+                                            innerScopes, headerW, plan)];
       leaf += 1;
       continue;
     }
 
     if (nested) {
-      NSArray *childInsts = PicaWalkMembers(m.members, currentRows, childX, leaf, tab, scope, headerW, plan);
+      NSArray *childInsts = PicaWalkMembers(m.members, currentRows, childX, leaf, tab, scope,
+                                            headerW, plan, innerScopes);
       [out addObjectsFromArray:childInsts];
       leaf += count;
       continue;
@@ -736,6 +752,7 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
 
     RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
     [out addObjectsFromArray:PicaEmitRuns(m, br, currentRows, NO, [currentRows firstObject], currentRows, tab,
+                                          innerScopes,
                                           headerW, plan)];
     leaf += 1;
   }
@@ -805,9 +822,12 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLTablix *tab, RDLReport *re
   NSArray<PicaColPlanEntry *> *plan = PicaColumnPlan(tab, dataRows, scope);
   NSArray *members = tab.rowHierarchy.members;
   CGFloat headerW = PicaHeaderWidth(members);
+  // The outermost scope is the dataset itself, which is what an unqualified
+  // InScope("Sales") is asking about.
+  NSArray<NSString *> *rootScopes = [ds.name length] ? @[ ds.name ] : @[];
   NSArray *walked;
   if ([members count]) {
-    walked = PicaWalkMembers(members, rows, 0, 0, tab, scope, headerW, plan);
+    walked = PicaWalkMembers(members, rows, 0, 0, tab, scope, headerW, plan, rootScopes);
   } else {
     NSMutableArray *synth = [NSMutableArray array];
     for (NSUInteger i = 0; i < [body.rows count]; i++) {
@@ -820,7 +840,7 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLTablix *tab, RDLReport *re
       }
       [synth addObject:m];
     }
-    walked = PicaWalkMembers(synth, rows, 0, 0, tab, scope, headerW, plan);
+    walked = PicaWalkMembers(synth, rows, 0, 0, tab, scope, headerW, plan, rootScopes);
   }
 
   // Crosstab: emit one column-header row per column-group tier. Consecutive
@@ -930,6 +950,8 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLTablix *tab, RDLReport *re
     for (PicaTablixInst *inst in walked) {
       if (inst.row)
         scope.row = inst.row;
+        scope.rowNumber = inst.rowNumber;
+        scope.activeScopes = inst.activeScopes;
       if (inst.groupRows)
         scope.groupRows = inst.groupRows;
       CGFloat grown = inst.height;
@@ -1031,7 +1053,7 @@ static PicaChartBuckets *PicaGroupForChart(NSArray *rows, RDLChartMember *member
     out.labels[@""] = @"";
     return out;
   }
-  for (NSDictionary *row in rows) {
+  for (id row in rows) {
     NSMutableString *key = [NSMutableString string];
     for (RDLValue *e in member.groupExpressions) {
       [key appendString:PicaAsStr(PicaEvalRow(e, row, scope))];
@@ -1329,6 +1351,10 @@ static void PicaLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *
   NSArray *savedGroup = scope.groupRows;
   if (inst.row)
     scope.row = inst.row;
+  // Set whether or not there is a row: a group header has no row of its own
+  // but is still inside the scopes that RowNumber, InScope and Level report.
+  scope.rowNumber = inst.rowNumber;
+  scope.activeScopes = inst.activeScopes;
   scope.dataSet = PicaFindSet(scope.report, tab.dataSetName) ?: savedSet;
   if (inst.groupRows)
     scope.groupRows = inst.groupRows;

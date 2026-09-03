@@ -97,6 +97,8 @@
 		591545F14DDDF7A8CDCA8180 /* RDLChartRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = C8C4A40041B77E07028495EC /* RDLChartRenderer.m */; };
 		6A42D0D007C753EA81406391 /* PicaRichTextFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = 701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */; };
 		0EF8A1B103C3BAC6DA99890B /* PicaRichTextFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = 701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */; };
+		A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */ = {isa = PBXBuildFile; fileRef = A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		D698F948027CE30144A0F09A /* RDLChecker.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E46887EEBE88948C77788A7 /* RDLChecker.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -260,6 +262,8 @@
 		C8C4A40041B77E07028495EC /* RDLChartRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChartRenderer.m; sourceTree = "<group>"; };
 		59052354FED2A23FCBB86CE3 /* PicaRichTextFormatter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaRichTextFormatter.h; sourceTree = "<group>"; };
 		701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaRichTextFormatter.m; sourceTree = "<group>"; };
+		A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChecker.h; sourceTree = "<group>"; };
+		5E46887EEBE88948C77788A7 /* RDLChecker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChecker.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -418,6 +422,8 @@
 				F6A6288C68C9B7B336B41990 /* RDLUpgrader.m */,
 				D58DAAC10D914F13B6654E2A /* RDLChartRenderer.h */,
 				C8C4A40041B77E07028495EC /* RDLChartRenderer.m */,
+				A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */,
+				5E46887EEBE88948C77788A7 /* RDLChecker.m */,
 			);
 			path = PicaKit;
 			sourceTree = "<group>";
@@ -504,6 +510,7 @@
 				855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */,
 				E1455B7A4E59E9EC65FE8340 /* RDLUpgrader.h in Headers */,
 				F02041FC1136A1CBE9435FF9 /* RDLChartRenderer.h in Headers */,
+				A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -737,6 +744,7 @@
 				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
 				7F76015BA9F94F61D881BA25 /* RDLUpgrader.m in Sources */,
 				591545F14DDDF7A8CDCA8180 /* RDLChartRenderer.m in Sources */,
+				D698F948027CE30144A0F09A /* RDLChecker.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

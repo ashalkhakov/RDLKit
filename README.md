@@ -113,6 +113,59 @@ Stacked, PercentStacked and Exploded.
 PDF backend, the HTML backend and the designer canvas all paint that one plan
 — so the canvas shows the chart that gets exported rather than a placeholder.
 
+## Binding data
+
+`RDLDataSet.rows` takes an `NSArray` of either `NSDictionary` keyed by field
+name **or any object that answers to key-value coding** — so a host
+application can hand over the model objects it already has instead of
+converting them to dictionaries first. Dictionary keys match without regard to
+case, the way RDL matches field names; a KVC object is asked only for keys it
+actually has, so a field it lacks reads as empty rather than raising. See
+`RDLRowValue`.
+
+Working out *how* a row spells a field is the expensive half — a differently
+cased dictionary key costs a linear scan, and a KVC object costs two selector
+lookups plus a string to build. Measured at three to five times the lookup it
+enables, and the KVC case that needs the retry is the common one, since RDL
+field names are capitalised and Objective-C properties are not. So each field
+node in an expression memoises the spelling per row class: resolved once,
+fetched per row. All three shapes then cost the same. The memo re-resolves when
+the row class changes, and when a cached key misses on a dictionary, so rows
+need not all be alike.
+
+## Checking a report without running it
+
+`RDLChecker` resolves and type-checks a report's expressions statically — no
+data bound, nothing laid out. `RDLDataContract` describes the data the report
+needs, so a caller can validate what it is about to supply.
+
+```
+PicaDemo report.rdl --check      # diagnostics; non-zero exit on errors
+PicaDemo report.rdl --contract   # JSON: datasets, field types, parameters
+```
+
+It works over a small type language rather than a flat set of scalars: a
+dataset row is a **record** (field name → type), a dataset is a **table** of
+those, a `LookupSet` result is a **set**, and every function has a **type** — so arity and result type are one
+signature instead of two tables that can disagree, and "an aggregate takes a
+value and optionally the name of a scope" is written once. `Unknown` is the top
+type and never provokes a complaint, which is how the checker stays quiet about
+the parts of RDL that really are dynamically typed: an undeclared field, a
+parameter arriving as text, `+` meaning either addition or concatenation.
+
+What it decides: whether a field exists in the dataset in scope, whether a
+parameter or global is declared, whether a function exists and is given
+arguments of the right count and type, whether an aggregate has rows to
+summarise, and whether an expression parsed all the way to its end. Types are
+checked only where the report declared them with `TypeName`, since an
+undeclared field could hold anything and a false accusation is worse than a
+missed one. Diagnostics carry a `rule` for filtering, and an RDL function this
+kit has not implemented reads as a warning rather than as a typo.
+
+The contract speaks Objective-C — `objcClass`, and the `objcType` a number
+wraps — so a caller sees what to put in the dictionary rather than a .NET type
+name. The report's own declaration comes along as `rdlType` for reference.
+
 ## RDL coverage
 
 `RDL-COVERAGE.md` scores the parser against 86 real report definitions from the

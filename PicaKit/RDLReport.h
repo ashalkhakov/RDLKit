@@ -148,6 +148,19 @@ typedef NS_ENUM(NSInteger, RDLParameterDataType) {
   RDLParameterDataTypeString,
 };
 
+// What a dataset field holds. RDL writes these as .NET type names, with or
+// without the "System." prefix; Unknown means the report did not say, which is
+// common and is not an error -- it only means nothing can be checked about it.
+typedef NS_ENUM(NSInteger, RDLFieldDataType) {
+  RDLFieldDataTypeUnknown = 0,
+  RDLFieldDataTypeBoolean,
+  RDLFieldDataTypeDateTime,
+  RDLFieldDataTypeInteger,
+  RDLFieldDataTypeFloat,
+  RDLFieldDataTypeDecimal,
+  RDLFieldDataTypeString,
+};
+
 typedef NS_ENUM(NSInteger, RDLChartType) {
   RDLChartTypeUnspecified = 0,
   RDLChartTypeColumn,
@@ -236,6 +249,8 @@ FOUNDATION_EXPORT RDLSortDirection RDLSortDirectionFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromSortDirection(RDLSortDirection v);
 FOUNDATION_EXPORT RDLParameterDataType RDLParameterDataTypeFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromParameterDataType(RDLParameterDataType v);
+FOUNDATION_EXPORT RDLFieldDataType RDLFieldDataTypeFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromFieldDataType(RDLFieldDataType v);
 FOUNDATION_EXPORT RDLChartType RDLChartTypeFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromChartType(RDLChartType v);
 FOUNDATION_EXPORT RDLChartSubtype RDLChartSubtypeFromString(NSString *s);
@@ -589,6 +604,7 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *dataField;
 // A calculated field: the expression that produces it, nil for a plain one.
 @property (nonatomic, strong) RDLValue *value;
+@property (nonatomic, assign) RDLFieldDataType dataType;
 @end
 
 @interface RDLEmbeddedImage : NSObject
@@ -603,7 +619,9 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *commandText;
 @property (nonatomic, strong) NSArray *fields; // NSString or RDLField
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
-@property (nonatomic, strong) NSArray<NSDictionary *> *rows;
+// One entry per row: an NSDictionary keyed by field name, or any object that
+// answers to key-value coding. See RDLRowValue.
+@property (nonatomic, strong) NSArray *rows;
 @end
 
 @interface RDLDataSource : NSObject

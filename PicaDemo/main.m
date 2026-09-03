@@ -5,7 +5,9 @@ static void PicaUsage(void) {
   fprintf(stderr,
           "Pica generator — RDL + data + parameters → PDF or HTML\n"
           "usage: PicaDemo report.rdl [-o out.pdf|out.html] [-f pdf|html]\n"
-          "                 [-p Name=Value] [-d DataSet=file.json]\n");
+          "                 [-p Name=Value] [-d DataSet=file.json]\n"
+          "       PicaDemo report.rdl --check      static check, no data needed\n"
+          "       PicaDemo report.rdl --contract   the data shape the report needs\n");
 }
 
 int main(int argc, const char *argv[]) {
@@ -19,6 +21,7 @@ int main(int argc, const char *argv[]) {
     NSString *format = nil;
     NSMutableDictionary *params = [NSMutableDictionary dictionary];
     NSMutableArray *binds = [NSMutableArray array];
+    BOOL check = NO, contract = NO;
     for (int i = 1; i < argc; i++) {
       NSString *a = [NSString stringWithUTF8String:argv[i]];
       if ([a isEqualToString:@"-o"] && i + 1 < argc) {
@@ -32,6 +35,10 @@ int main(int argc, const char *argv[]) {
           params[[kv substringToIndex:eq.location]] = [kv substringFromIndex:eq.location + 1];
       } else if ([a isEqualToString:@"-d"] && i + 1 < argc) {
         [binds addObject:[NSString stringWithUTF8String:argv[++i]]];
+      } else if ([a isEqualToString:@"--check"]) {
+        check = YES;
+      } else if ([a isEqualToString:@"--contract"]) {
+        contract = YES;
       } else if (![a hasPrefix:@"-"] && rdlPath == nil) {
         rdlPath = a;
       } else {
@@ -43,6 +50,35 @@ int main(int argc, const char *argv[]) {
       PicaUsage();
       return 2;
     }
+    // Both of these answer questions about the report itself, so they run
+    // before any data is bound and exit without rendering anything.
+    if (check || contract) {
+      NSError *err = nil;
+      NSString *xml = [NSString stringWithContentsOfFile:rdlPath encoding:NSUTF8StringEncoding
+                                                   error:&err];
+      RDLReport *report = xml ? [RDLParser reportFromXMLString:xml error:&err] : nil;
+      if (report == nil) {
+        fprintf(stderr, "%s: %s\n", [rdlPath UTF8String],
+                [[err localizedDescription] ?: @"could not be read" UTF8String]);
+        return 1;
+      }
+      if (contract) {
+        printf("%s\n", [[RDLDataContract JSONContractForReport:report] UTF8String]);
+        return 0;
+      }
+      NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:report];
+      NSUInteger errors = 0;
+      for (RDLDiagnostic *d in ds) {
+        printf("%s: %s\n", [rdlPath UTF8String], [[d oneLineDescription] UTF8String]);
+        if (d.severity == RDLDiagnosticSeverityError)
+          errors++;
+      }
+      fprintf(stderr, "%lu problem%s (%lu error%s)\n", (unsigned long)[ds count],
+              [ds count] == 1 ? "" : "s", (unsigned long)errors, errors == 1 ? "" : "s");
+      // Non-zero only for errors, so this can gate a build.
+      return errors > 0 ? 1 : 0;
+    }
+
     if (format == nil) {
       if ([[outPath pathExtension] caseInsensitiveCompare:@"html"] == NSOrderedSame)
         format = @"html";
