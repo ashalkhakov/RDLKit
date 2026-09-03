@@ -13,6 +13,7 @@ Pica_OBJC_FILES = \
   PicaItemFactory.m \
   PicaPageGeometry.m \
   PicaRichTextCodec.m \
+  PicaRichTextFormatter.m \
   PicaCanvasView.m \
   PicaCanvasRenderer.m \
   PicaInPlaceEditor.m \

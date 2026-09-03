@@ -17,8 +17,12 @@
 #import "PicaSelection.h"
 #import "PicaItemFactory.h"
 #import "PicaSamples.h"
+#import "PicaRichTextFormatter.h"
+#import "PicaRichTextCodec.h"
+#import "PicaInspectorFields.h"
 #import "PicaPageGeometry.h"
 #import "PicaRichTextCodec.h"
+#import "PicaInspectorFields.h"
 #import "PicaEditingContext.h"
 #import "PicaExpressionHelper.h"
 #import "PicaInspectorFields.h"
@@ -1790,6 +1794,263 @@ NSArray<NSString *> *PicaRunSampleFitChecks(void) {
   return fails;
 }
 
+// The rich-text formatting bar, driven without a window. Everything the
+// toolbar buttons do goes through PicaRichTextFormatter, so this is where the
+// behaviour is checked; the panel itself is only wiring.
+static NSMutableAttributedString *PicaSampleRichText(void) {
+  NSFont *base = [NSFont fontWithName:@"Helvetica" size:12] ?: [NSFont systemFontOfSize:12];
+  NSMutableAttributedString *s =
+      [[NSMutableAttributedString alloc] initWithString:@"Hello world\nSecond line"
+                                            attributes:@{NSFontAttributeName : base}];
+  return s;
+}
+
+NSArray<NSString *> *PicaRunRichTextFormatterChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSFontManager *fm = [NSFontManager sharedFontManager];
+
+  // Reading a uniform selection.
+  NSMutableAttributedString *text = PicaSampleRichText();
+  PicaRichTextState *state = [PicaRichTextFormatter stateOfText:text
+                                                         range:NSMakeRange(0, 5)
+                                              typingAttributes:@{}];
+  if (state.bold != PicaTriStateOff || state.italic != PicaTriStateOff)
+    PicaFail(fails, @"plain text should read as unbold and unitalic");
+  if (![state.fontFamily isEqualToString:@"Helvetica"] || fabs(state.fontSize - 12) > 0.01)
+    PicaFail(fails, [NSString stringWithFormat:@"family/size read as %@/%g", state.fontFamily,
+                                               (double)state.fontSize]);
+
+  // Bold the first word, then a selection spanning both must read as mixed --
+  // a button showing plain "on" or "off" there would be lying.
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitBold
+                               on:YES
+                           inText:text
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  PicaRichTextState *boldPart = [PicaRichTextFormatter stateOfText:text
+                                                            range:NSMakeRange(0, 5)
+                                                 typingAttributes:@{}];
+  if (boldPart.bold != PicaTriStateOn)
+    PicaFail(fails, @"the bolded run should read as bold");
+  PicaRichTextState *spanning = [PicaRichTextFormatter stateOfText:text
+                                                            range:NSMakeRange(0, 11)
+                                                 typingAttributes:@{}];
+  if (spanning.bold != PicaTriStateMixed)
+    PicaFail(fails, @"a selection of bold and unbold text should read as mixed");
+
+  // Turning bold off again restores the original face.
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitBold
+                               on:NO
+                           inText:text
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  if ([PicaRichTextFormatter stateOfText:text range:NSMakeRange(0, 11) typingAttributes:@{}].bold !=
+      PicaTriStateOff)
+    PicaFail(fails, @"unbolding should undo bolding");
+
+  // With no selection only the typing attributes change, so what gets typed
+  // next is italic and nothing already written moves.
+  NSMutableAttributedString *untouched = PicaSampleRichText();
+  NSString *before = [untouched string];
+  NSDictionary *typing = [PicaRichTextFormatter
+        setTrait:PicaRichTextTraitItalic
+              on:YES
+          inText:untouched
+           range:NSMakeRange(3, 0)
+typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:12]
+                                             ?: [NSFont systemFontOfSize:12]}];
+  if (![[untouched string] isEqualToString:before])
+    PicaFail(fails, @"an empty selection should not change the text");
+  if (([fm traitsOfFont:typing[NSFontAttributeName]] & NSItalicFontMask) == 0)
+    PicaFail(fails, @"an empty selection should leave italic in the typing attributes");
+  if ([PicaRichTextFormatter stateOfText:untouched
+                                   range:NSMakeRange(3, 0)
+                        typingAttributes:typing].italic != PicaTriStateOn)
+    PicaFail(fails, @"the bar should read the typing attributes when there is no selection");
+
+  // Underline and strikethrough are attributes rather than faces.
+  NSMutableAttributedString *marks = PicaSampleRichText();
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitUnderline
+                               on:YES
+                           inText:marks
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitStrikethrough
+                               on:YES
+                           inText:marks
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  PicaRichTextState *marked = [PicaRichTextFormatter stateOfText:marks
+                                                           range:NSMakeRange(0, 5)
+                                                typingAttributes:@{}];
+  if (marked.underline != PicaTriStateOn || marked.strikethrough != PicaTriStateOn)
+    PicaFail(fails, @"underline and strikethrough should both apply");
+
+  // Changing the family keeps each run's size and bold, which is the whole
+  // reason this goes through NSFontManager rather than building a font.
+  NSMutableAttributedString *mixed = PicaSampleRichText();
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitBold
+                               on:YES
+                           inText:mixed
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  [PicaRichTextFormatter setFontSize:20
+                              inText:mixed
+                               range:NSMakeRange(6, 5)
+                    typingAttributes:@{}];
+  [PicaRichTextFormatter setFontFamily:@"Times New Roman"
+                                inText:mixed
+                                 range:NSMakeRange(0, 11)
+                      typingAttributes:@{}];
+  NSFont *firstFont = [mixed attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL];
+  NSFont *lastFont = [mixed attribute:NSFontAttributeName atIndex:8 effectiveRange:NULL];
+  if (([fm traitsOfFont:firstFont] & NSBoldFontMask) == 0)
+    PicaFail(fails, @"changing the family should not drop bold");
+  if (fabs([lastFont pointSize] - 20) > 0.01)
+    PicaFail(fails, @"changing the family should not drop a run's size");
+
+  // Colour.
+  NSMutableAttributedString *coloured = PicaSampleRichText();
+  [PicaRichTextFormatter setColor:[NSColor redColor]
+                           inText:coloured
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  NSColor *got = [coloured attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
+  if (![got isEqual:[NSColor redColor]])
+    PicaFail(fails, @"the colour well should colour the selection");
+
+  // Alignment is a paragraph property: selecting one word must align the
+  // whole line, and must not touch the next paragraph.
+  NSMutableAttributedString *aligned = PicaSampleRichText();
+  [PicaRichTextFormatter setAlignment:NSCenterTextAlignment
+                               inText:aligned
+                                range:NSMakeRange(2, 1)
+                     typingAttributes:@{}];
+  NSParagraphStyle *firstPara =
+      [aligned attribute:NSParagraphStyleAttributeName atIndex:9 effectiveRange:NULL];
+  NSParagraphStyle *secondPara =
+      [aligned attribute:NSParagraphStyleAttributeName atIndex:15 effectiveRange:NULL];
+  if ([firstPara alignment] != NSCenterTextAlignment)
+    PicaFail(fails, @"aligning part of a line should align the whole paragraph");
+  if (secondPara != nil && [secondPara alignment] == NSCenterTextAlignment)
+    PicaFail(fails, @"aligning one paragraph should leave the next alone");
+  PicaRichTextState *bothParas = [PicaRichTextFormatter stateOfText:aligned
+                                                             range:NSMakeRange(0, [aligned length])
+                                                  typingAttributes:@{}];
+  if (!bothParas.alignmentMixed)
+    PicaFail(fails, @"two differently aligned paragraphs should read as mixed");
+
+  // Rich runs must survive the inspector's value field merely losing focus.
+  // Opening the rich-text panel does exactly that, and clearing the runs on
+  // every "end editing" wiped the formatting the instant the panel closed.
+  {
+    PicaDocument *doc = [[PicaDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Runs"]];
+    PicaEditor *editor = [[PicaEditor alloc] initWithDocument:doc];
+    RDLTextbox *item = [[RDLTextbox alloc] init];
+    item.name = @"Greeting";
+    item.value = @"Dear reader,";
+    item.style.fontFamily = @"Georgia";
+    item.style.fontSize = [RDLLength points:12];
+    [doc.report.body.items addObject:item];
+
+    NSMutableAttributedString *rich =
+        [[PicaRichTextCodec attributedStringForItem:item] mutableCopy];
+    [PicaRichTextFormatter setTrait:PicaRichTextTraitBold
+                                 on:YES
+                             inText:rich
+                              range:NSMakeRange(0, [rich length])
+                   typingAttributes:@{}];
+    [editor setAttributedString:rich ofItem:item];
+    if ([item.paragraphs count] == 0) {
+      PicaFail(fails, @"bolding the whole value should store Paragraphs");
+    } else {
+      // The field reports the value it already shows: not an edit.
+      [editor setPlainValue:@"Dear reader," ofItem:item];
+      if ([item.paragraphs count] == 0)
+        PicaFail(fails, @"an unchanged value field must not clear the rich-text runs");
+      NSAttributedString *back = [PicaRichTextCodec attributedStringForItem:item];
+      if ([PicaRichTextFormatter stateOfText:back
+                                       range:NSMakeRange(0, [back length])
+                            typingAttributes:@{}].bold != PicaTriStateOn)
+        PicaFail(fails, @"bold should still be there after the field loses focus");
+      // Actually typing something else does replace the runs.
+      [editor setPlainValue:@"Hello there," ofItem:item];
+      if ([item.paragraphs count] != 0)
+        PicaFail(fails, @"typing a new value should replace the rich-text runs");
+      if (![item.value isEqualToString:@"Hello there,"])
+        PicaFail(fails, @"typing a new value should store it");
+    }
+  }
+
+  // The real failure was not in the panel at all. The inspector fills itself
+  // from a change notification, and it asked every item-scoped binding for its
+  // value -- including `source`, which only an image has. On a textbox that
+  // raised, and because -setAttributedString:ofItem: writes the value and then
+  // the paragraphs, the throw landed between the two: the text was stored and
+  // the formatting silently was not.
+  {
+    RDLTextbox *box = [[RDLTextbox alloc] init];
+    box.name = @"Greeting";
+    box.value = @"Dear reader,";
+    // Reading a key a textbox does not have must not raise out of the fill.
+    PicaFieldBindings *bindings = [[PicaFieldBindings alloc] init];
+    NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 100, 22)];
+    [bindings bind:field
+           keyPath:@"source"
+             scope:PicaFieldScopeItem
+              kind:PicaFieldKindPopUpIndex
+            values:@[ @0, @1 ]
+       placeholder:nil];
+    @try {
+      [bindings fillFromItem:box band:nil report:nil];
+    } @catch (NSException *e) {
+      PicaFail(fails, [NSString stringWithFormat:
+                          @"filling a binding a textbox lacks raised %@", [e name]]);
+    }
+  }
+
+  // The point of all of it: formatting done here has to survive the save.
+  // Anything the toolbar can do that RDL cannot store would be lost silently.
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"T";
+  box.value = @"Hello world";
+  NSMutableAttributedString *toSave = PicaSampleRichText();
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitBold
+                               on:YES
+                           inText:toSave
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  [PicaRichTextFormatter setTrait:PicaRichTextTraitUnderline
+                               on:YES
+                           inText:toSave
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  [PicaRichTextFormatter setColor:[NSColor redColor]
+                           inText:toSave
+                            range:NSMakeRange(0, 5)
+                 typingAttributes:@{}];
+  [PicaRichTextFormatter setAlignment:NSCenterTextAlignment
+                               inText:toSave
+                                range:NSMakeRange(0, 5)
+                     typingAttributes:@{}];
+  [PicaRichTextCodec applyAttributedString:toSave toItem:box];
+  if ([box.paragraphs count] == 0) {
+    PicaFail(fails, @"formatted text should produce Paragraphs");
+    return fails;
+  }
+  NSAttributedString *reloaded = [PicaRichTextCodec attributedStringForItem:box];
+  PicaRichTextState *back = [PicaRichTextFormatter stateOfText:reloaded
+                                                        range:NSMakeRange(0, 5)
+                                             typingAttributes:@{}];
+  if (back.bold != PicaTriStateOn)
+    PicaFail(fails, @"bold should survive the round trip through RDL");
+  if (back.underline != PicaTriStateOn)
+    PicaFail(fails, @"underline should survive the round trip through RDL");
+  if (back.alignment != NSCenterTextAlignment)
+    PicaFail(fails, @"alignment should survive the round trip through RDL");
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunDocumentChecks()];
@@ -1809,5 +2070,6 @@ NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   [fails addObjectsFromArray:PicaRunExportChecks()];
   [fails addObjectsFromArray:PicaRunSharedPipelineChecks()];
   [fails addObjectsFromArray:PicaRunSampleFitChecks()];
+  [fails addObjectsFromArray:PicaRunRichTextFormatterChecks()];
   return fails;
 }

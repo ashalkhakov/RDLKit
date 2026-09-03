@@ -171,6 +171,9 @@
 
   [_palettePanel center];
   NSInteger code = [NSApp runModalForWindow:_palettePanel];
+  // Off screen before the last reference goes, or the panel would be
+  // deallocated while still visible.
+  [_palettePanel orderOut:nil];
   _palettePanel = nil;
   if (code >= 1 && code <= (NSInteger)[kinds count])
     [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
@@ -178,9 +181,6 @@
 
 - (void)paletteChoose:(NSButton *)sender {
   [NSApp stopModalWithCode:[sender tag]];
-  // The palette, not -[self window]: closing the latter here shut the whole
-  // designer down whenever an element was added.
-  [_palettePanel close];
 }
 
 - (void)removeElement:(id)sender {

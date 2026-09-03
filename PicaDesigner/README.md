@@ -31,7 +31,8 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `PicaInspectorFields` | One binding declaration per field — control, key path, scope, kind — driving both the fill and the write-back |
 | `PicaTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total), row group with subtotal, nested child row group, column group (crosstab pivot), grand-total row. Applies as one undo step |
-| `PicaRichTextEditor` | Modal rich-text editor (right-click → Edit Rich Text…): an NSTextView with the standard Cmd+B/I/U shortcuts and alignment |
+| `PicaRichTextEditor` | Modal rich-text editor (right-click → Edit Rich Text…): a formatting bar over an NSTextView. Wiring only |
+| `PicaRichTextFormatter` | What the formatting bar does — read the state of a selection (on / off / mixed) and change font, size, colour, bold, italic, underline, strikethrough and paragraph alignment. No window, so checks drive it directly |
 | `PicaRichTextCodec` | Attributed string ⇄ RDL `Paragraphs`/`TextRuns` with sparse per-run styles. Plain text — multi-line included — stays a plain `value` |
 | `PicaDataView` | Parameters and dataset JSON, for either window |
 | `PicaExpressionHelper` | Expression completion: typing `!` after `Fields`/`Parameters`/`Globals`/`User` pops the member list; function names complete elsewhere. Also the field editor, which carries its own typing undo so Cmd+Z in a field does not reach the document |
@@ -49,7 +50,7 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaGeneratorWindow.xib` | The window, the toolbar row, the split and both panes | The sample list, and one export button per backend the kit offers |
 | `PicaInspectorSections.xib` | All nine sections as top-level views: every label, field, popup and frame | Which sections are shown and where they stack (`-stackBoxes:`), and the dataset/page popup contents |
 | `PicaTablixEditor.xib` | The panel, the five columns with their widths and their Align/Total combo lists, the buttons | The dataset and field lists, and the tablix's own values |
-| `PicaRichTextEditor.xib` | Everything | The text being edited |
+| `PicaRichTextEditor.xib` | The window, the formatting bar and its controls, the text view and the buttons | The installed font families, and the text being edited |
 | `PicaAddElementPanel.xib` | The panel, its caption and Cancel | One button per allowed element kind, and the height to hold them |
 | `PicaPreviewWindow.xib` | Everything | — |
 
@@ -84,9 +85,12 @@ top-level object was given in the file. `PicaInspectorSections.xib` has ten of
 them — the nine sections, whose positions `-stackBoxes:` sets anyway, and the
 kind label, which `-buildSections` now places explicitly for the same reason.
 
-Modal panels are plain `NSWindow` with `runModalForWindow:` / `stopModalWithCode:`,
-and the XIB sets `releasedWhenClosed="NO"` — the default releases the window a
-second time under ARC, which deallocates it while AppKit still holds a pointer.
+Modal panels are plain `NSWindow` with `runModalForWindow:` / `stopModalWithCode:`.
+The button action only ends the session; the window is ordered out once, on
+both paths, after `runModalForWindow:` returns. Nothing calls `-close`.
+
+The app's own windows are closable and so keep `releasedWhenClosed="NO"`, since
+a nib-loaded window defaults to YES and that release is a second one under ARC.
 
 Every property MS-RDL lets you write as either a constant or an `=` expression
 is an `RDLValue` in the model — `hidden`, `hyperlink`, `pageName`, filter and

@@ -1,15 +1,29 @@
 #import "PicaRichTextEditor.h"
 #import "PicaRichTextCodec.h"
+#import "PicaRichTextFormatter.h"
 #import "PicaEditingContext.h"
 #import "PicaCompatibility.h"
 
 // The attributed-string <-> Paragraphs/TextRuns conversion lives in
-// PicaKit's PicaRichTextCodec, where it is UI-free and covered by checks; this
-// file is now just the panel around it.
-@interface PicaRichTextEditor ()
+// PicaRichTextCodec and the formatting itself in PicaRichTextFormatter, both
+// UI-free and covered by checks; this file is the panel around them, so it is
+// wiring and nothing else.
+@interface PicaRichTextEditor () <NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
 @property (nonatomic, strong) IBOutlet NSTextView *textView;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
+// The formatting bar.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *fontPopup;
+@property (nonatomic, strong) IBOutlet NSComboBox *sizeCombo;
+@property (nonatomic, strong) IBOutlet NSColorWell *colorWell;
+@property (nonatomic, strong) IBOutlet NSButton *boldButton;
+@property (nonatomic, strong) IBOutlet NSButton *italicButton;
+@property (nonatomic, strong) IBOutlet NSButton *underlineButton;
+@property (nonatomic, strong) IBOutlet NSButton *strikeButton;
+@property (nonatomic, strong) IBOutlet NSButton *alignLeftButton;
+@property (nonatomic, strong) IBOutlet NSButton *alignCenterButton;
+@property (nonatomic, strong) IBOutlet NSButton *alignRightButton;
+@property (nonatomic, strong) IBOutlet NSButton *alignJustifyButton;
 @end
 
 @implementation PicaRichTextEditor
@@ -22,26 +36,192 @@
   [PicaRichTextCodec applyAttributedString:text toItem:item];
 }
 
+#pragma mark - Toolbar
+
+- (NSArray<NSButton *> *)allToolbarButtons {
+  return @[
+    _boldButton, _italicButton, _underlineButton, _strikeButton, _alignLeftButton,
+    _alignCenterButton, _alignRightButton, _alignJustifyButton
+  ];
+}
+
+- (void)prepareToolbar {
+  // The installed families are a fact about the machine, so the popup is
+  // filled here rather than in the XIB.
+  [_fontPopup removeAllItems];
+  [_fontPopup addItemsWithTitles:[[NSFontManager sharedFontManager] availableFontFamilies]];
+  for (NSNumber *size in [PicaRichTextFormatter standardFontSizes])
+    [_sizeCombo addItemWithObjectValue:[size stringValue]];
+
+  for (NSButton *b in [self allToolbarButtons]) {
+    // Push-on/push-off so a button can show that the selection is already
+    // bold. Set here because the raw XIB spelling for a toggle is fiddly and
+    // this is provably right.
+    [b setButtonType:NSPushOnPushOffButton];
+    // Without this a click moves focus out of the text view, which drops the
+    // selection the button was about to format.
+    [b setRefusesFirstResponder:YES];
+  }
+  [_fontPopup setRefusesFirstResponder:YES];
+  [_colorWell setRefusesFirstResponder:YES];
+  [_textView setDelegate:self];
+}
+
+// Mirror the selection into the bar. A mixed selection leaves its button off
+// rather than claiming the whole run is bold.
+- (void)syncToolbar {
+  PicaRichTextState *state =
+      [PicaRichTextFormatter stateOfText:[_textView textStorage]
+                                   range:[_textView selectedRange]
+                        typingAttributes:[_textView typingAttributes]];
+  [_boldButton setState:state.bold == PicaTriStateOn ? NSOnState : NSOffState];
+  [_italicButton setState:state.italic == PicaTriStateOn ? NSOnState : NSOffState];
+  [_underlineButton setState:state.underline == PicaTriStateOn ? NSOnState : NSOffState];
+  [_strikeButton setState:state.strikethrough == PicaTriStateOn ? NSOnState : NSOffState];
+  if (state.fontFamily)
+    [_fontPopup selectItemWithTitle:state.fontFamily];
+  [_sizeCombo setStringValue:state.fontSize > 0
+                                 ? [NSString stringWithFormat:@"%g", (double)state.fontSize]
+                                 : @""];
+  if (state.color)
+    [_colorWell setColor:state.color];
+  NSTextAlignment a = state.alignment;
+  BOOL mixed = state.alignmentMixed;
+  [_alignLeftButton setState:(!mixed && a == NSLeftTextAlignment) ? NSOnState : NSOffState];
+  [_alignCenterButton setState:(!mixed && a == NSCenterTextAlignment) ? NSOnState : NSOffState];
+  [_alignRightButton setState:(!mixed && a == NSRightTextAlignment) ? NSOnState : NSOffState];
+  [_alignJustifyButton setState:(!mixed && a == NSJustifiedTextAlignment) ? NSOnState : NSOffState];
+}
+
+- (void)textViewDidChangeSelection:(NSNotification *)note {
+  PICA_UNUSED(note);
+  [self syncToolbar];
+}
+
+// One path for every formatting change: ask the formatter, take back the
+// typing attributes, then re-read the selection so the bar tells the truth.
+- (void)applyChange:(NSDictionary * (^)(NSMutableAttributedString *storage, NSRange range,
+                                        NSDictionary *typing))change {
+  NSTextView *tv = _textView;
+  NSRange range = [tv selectedRange];
+  NSTextStorage *storage = [tv textStorage];
+  // Through the text view's own undo manager, so Cmd+Z in the panel steps
+  // back through formatting the same way it steps back through typing.
+  if (range.length && ![tv shouldChangeTextInRange:range replacementString:nil])
+    return;
+  NSDictionary *typing = change(storage, range, [tv typingAttributes]);
+  if (range.length)
+    [tv didChangeText];
+  if (typing)
+    [tv setTypingAttributes:typing];
+  [self syncToolbar];
+}
+
+- (void)toggleTrait:(PicaRichTextTrait)trait fromButton:(NSButton *)sender {
+  BOOL on = [sender state] == NSOnState;
+  [self applyChange:^NSDictionary *(NSMutableAttributedString *storage, NSRange range,
+                                   NSDictionary *typing) {
+    return [PicaRichTextFormatter setTrait:trait
+                                        on:on
+                                    inText:storage
+                                     range:range
+                          typingAttributes:typing];
+  }];
+}
+
+- (void)toggleBold:(id)sender {
+  [self toggleTrait:PicaRichTextTraitBold fromButton:sender];
+}
+- (void)toggleItalic:(id)sender {
+  [self toggleTrait:PicaRichTextTraitItalic fromButton:sender];
+}
+- (void)toggleUnderline:(id)sender {
+  [self toggleTrait:PicaRichTextTraitUnderline fromButton:sender];
+}
+- (void)toggleStrikethrough:(id)sender {
+  [self toggleTrait:PicaRichTextTraitStrikethrough fromButton:sender];
+}
+
+- (void)applyAlignment:(NSTextAlignment)alignment {
+  [self applyChange:^NSDictionary *(NSMutableAttributedString *storage, NSRange range,
+                                   NSDictionary *typing) {
+    return [PicaRichTextFormatter setAlignment:alignment
+                                        inText:storage
+                                         range:range
+                              typingAttributes:typing];
+  }];
+}
+
+- (void)alignLeft:(id)sender {
+  PICA_UNUSED(sender);
+  [self applyAlignment:NSLeftTextAlignment];
+}
+- (void)alignCenter:(id)sender {
+  PICA_UNUSED(sender);
+  [self applyAlignment:NSCenterTextAlignment];
+}
+- (void)alignRight:(id)sender {
+  PICA_UNUSED(sender);
+  [self applyAlignment:NSRightTextAlignment];
+}
+- (void)alignJustify:(id)sender {
+  PICA_UNUSED(sender);
+  [self applyAlignment:NSJustifiedTextAlignment];
+}
+
+- (void)fontFamilyChanged:(id)sender {
+  NSString *family = [(NSPopUpButton *)sender titleOfSelectedItem];
+  [self applyChange:^NSDictionary *(NSMutableAttributedString *storage, NSRange range,
+                                   NSDictionary *typing) {
+    return [PicaRichTextFormatter setFontFamily:family
+                                         inText:storage
+                                          range:range
+                               typingAttributes:typing];
+  }];
+}
+
+- (void)fontSizeChanged:(id)sender {
+  CGFloat size = (CGFloat)[[(NSControl *)sender stringValue] doubleValue];
+  if (size <= 0)
+    return;
+  [self applyChange:^NSDictionary *(NSMutableAttributedString *storage, NSRange range,
+                                   NSDictionary *typing) {
+    return [PicaRichTextFormatter setFontSize:size
+                                       inText:storage
+                                        range:range
+                             typingAttributes:typing];
+  }];
+}
+
+- (void)textColorChanged:(id)sender {
+  NSColor *color = [(NSColorWell *)sender color];
+  [self applyChange:^NSDictionary *(NSMutableAttributedString *storage, NSRange range,
+                                   NSDictionary *typing) {
+    return [PicaRichTextFormatter setColor:color
+                                    inText:storage
+                                     range:range
+                          typingAttributes:typing];
+  }];
+}
+
 #pragma mark - Modal panel
 
 - (void)accept:(id)sender {
   (void)sender;
   [NSApp stopModalWithCode:NSModalResponseOK];
-  [self.window close];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
   [NSApp stopModalWithCode:NSModalResponseCancel];
-  [self.window close];
 }
 
 + (BOOL)runForTextbox:(RDLTextbox *)item context:(PicaEditingContext *)context {
   if (item == nil || ![item isKindOfClass:[RDLTextbox class]])
     return NO;
   PicaRichTextEditor *ed = [[PicaRichTextEditor alloc] init];
-  // The panel -- window, hint, text view and buttons, and the releasedWhenClosed
-  // NO that keeps ARC from handing AppKit a freed window -- is all in the XIB.
+  // The panel -- window, formatting bar, text view and buttons -- is all in
+  // the XIB.
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"PicaRichTextEditor"
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
@@ -54,12 +234,29 @@
   [ed.window setTitle:[NSString stringWithFormat:@"Rich Text — %@", item.name]];
   NSTextView *tv = ed.textView;
   [[tv textContainer] setWidthTracksTextView:YES];
+  // The text view shows report content, which is printed on paper and carries
+  // its own colours -- so it is painted like paper rather than following the
+  // system appearance. Left to inherit, a dark-mode desktop gave a dark
+  // background under the report's own dark ink and the text vanished.
+  [tv setDrawsBackground:YES];
+  [tv setBackgroundColor:[item.style.backgroundColor length]
+                             ? PicaColorFromHex(item.style.backgroundColor)
+                             : [NSColor whiteColor]];
+  [tv setInsertionPointColor:PicaColorFromHex(item.style.color)];
+  [[tv enclosingScrollView] setDrawsBackground:YES];
+  [[tv enclosingScrollView] setBackgroundColor:[tv backgroundColor]];
   [[tv textStorage] setAttributedString:[self attributedStringForItem:item]];
   [tv setTypingAttributes:[RDLTextAttributes attributesForStyle:item.style
                                                  paragraphAlign:RDLTextAlignUnspecified
                                                           scale:1.0]];
+  [ed prepareToolbar];
+  [ed syncToolbar];
   [ed.window center];
-  if ([NSApp runModalForWindow:ed.window] != NSModalResponseOK)
+  NSInteger code = [NSApp runModalForWindow:ed.window];
+  // Ordered out rather than closed, once, on both paths: the text storage is
+  // read below, and the session has to end before the window goes away.
+  [ed.window orderOut:nil];
+  if (code != NSModalResponseOK)
     return NO;
   [context.editor setAttributedString:[ed.textView textStorage] ofItem:item];
   return YES;

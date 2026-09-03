@@ -368,6 +368,20 @@ static NSMutableArray *PicaContainerIn(NSMutableArray *items, RDLItem *target) {
 
 #pragma mark - Rich text
 
+- (void)setPlainValue:(NSString *)value ofItem:(RDLItem *)item {
+  if (item == nil)
+    return;
+  NSString *typed = value ?: @"";
+  NSString *current = [item valueForKeyPath:@"value"] ?: @"";
+  // Unchanged text is not an edit, so the runs stay.
+  if ([typed isEqualToString:current])
+    return;
+  [self beginGroup:@"Edit Text"];
+  [self setValue:typed forKeyPath:@"value" ofItem:item];
+  [self setValue:nil forKeyPath:@"paragraphs" ofItem:item];
+  [self endGroup];
+}
+
 - (void)setAttributedString:(NSAttributedString *)text ofItem:(RDLItem *)item {
   if (item == nil)
     return;

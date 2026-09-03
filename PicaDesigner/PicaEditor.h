@@ -84,6 +84,11 @@
 // Sets `value` and `paragraphs` together from an attributed string, as one
 // undo step. Plain text clears `paragraphs` rather than leaving stale runs.
 - (void)setAttributedString:(NSAttributedString *)text ofItem:(RDLItem *)item;
+// A plain-text edit of a textbox's value, which replaces any rich-text runs.
+// Does nothing at all when the text has not changed: the inspector's value
+// field reports "end editing" whenever it merely loses focus, and clearing the
+// runs on that threw away formatting as soon as the rich-text panel closed.
+- (void)setPlainValue:(NSString *)value ofItem:(RDLItem *)item;
 
 // --- Item transfer (clipboard, duplicate) ---------------------------------
 // An item round-trips as RDL XML by hosting it in an otherwise empty report, so

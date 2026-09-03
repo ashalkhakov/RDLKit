@@ -131,13 +131,11 @@
   (void)sender;
   [self commitTableEditing];
   [NSApp stopModalWithCode:NSModalResponseOK];
-  [self.window close];
 }
 
 - (void)cancel:(id)sender {
   (void)sender;
   [NSApp stopModalWithCode:NSModalResponseCancel];
-  [self.window close];
 }
 
 #pragma mark - Table data source
@@ -195,6 +193,9 @@
   [ed buildPanelForTablix:tablix];
   [ed.window center];
   NSInteger code = [NSApp runModalForWindow:ed.window];
+  // Ordered out once, on both paths, after the session has ended -- the
+  // columns are read back out of `ed` below.
+  [ed.window orderOut:nil];
   if (code != NSModalResponseOK)
     return NO;
 

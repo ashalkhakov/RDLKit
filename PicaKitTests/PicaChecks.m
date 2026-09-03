@@ -2963,6 +2963,69 @@ NSArray<NSString *> *PicaRunChartChecks(void) {
   return fails;
 }
 
+// Formatting that covers a whole textbox is one paragraph with one run, which
+// the reader used to flatten back into a plain value on the grounds that a
+// lone run carries nothing -- true only when that run has no style of its own.
+// Bolding every character therefore wrote correctly and came back unbolded.
+NSArray<NSString *> *PicaRunWholeTextboxStyleChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLReport *r = [RDLReport emptyReportNamed:@"Whole"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Greeting";
+  tb.value = @"Dear reader,";
+  tb.width = 4;
+  tb.height = 0.3;
+  tb.style.fontFamily = @"Georgia";
+  tb.style.fontSize = [RDLLength points:12];
+
+  // One paragraph, one run, and the run is bold where the textbox is not.
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *run = [[RDLTextRun alloc] init];
+  run.value = @"Dear reader,";
+  run.style = [[RDLStyle alloc] init];
+  run.style.fontWeight = RDLFontWeightBold;
+  [para.runs addObject:run];
+  tb.paragraphs = [NSMutableArray arrayWithObject:para];
+  [r.body.items addObject:tb];
+
+  NSError *err = nil;
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if (back == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"round trip refused: %@", err.localizedDescription]);
+    return fails;
+  }
+  RDLTextbox *b = (RDLTextbox *)back.body.items.firstObject;
+  if ([b.paragraphs count] != 1) {
+    PicaFail(fails, @"a single styled run must survive: it is what formatting a whole textbox makes");
+    return fails;
+  }
+  RDLTextRun *backRun = [[[b.paragraphs firstObject] runs] firstObject];
+  if (backRun.style.fontWeight != RDLFontWeightBold)
+    PicaFail(fails, @"the run's own weight should come back");
+
+  // The other half of the rule still has to hold: a plain textbox must not
+  // grow Paragraphs just by being written and read, even though the writer
+  // copies the textbox style onto the run it emits.
+  RDLReport *plainReport = [RDLReport emptyReportNamed:@"Plain"];
+  RDLTextbox *plain = [[RDLTextbox alloc] init];
+  plain.name = @"Plain";
+  plain.value = @"Nothing special";
+  plain.width = 4;
+  plain.height = 0.3;
+  plain.style.fontFamily = @"Georgia";
+  plain.style.fontSize = [RDLLength points:12];
+  [plainReport.body.items addObject:plain];
+  RDLReport *plainBack =
+      [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:plainReport] error:&err];
+  RDLTextbox *pb = (RDLTextbox *)plainBack.body.items.firstObject;
+  if ([pb.paragraphs count] != 0)
+    PicaFail(fails, @"plain text should stay plain rather than grow Paragraphs");
+  if (![pb.value isEqualToString:@"Nothing special"])
+    PicaFail(fails, [NSString stringWithFormat:@"plain value → %@", pb.value]);
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -2974,6 +3037,7 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixFitChecks()];
   [fails addObjectsFromArray:PicaRunUpgraderChecks()];
   [fails addObjectsFromArray:PicaRunChartChecks()];
+  [fails addObjectsFromArray:PicaRunWholeTextboxStyleChecks()];
   [fails addObjectsFromArray:PicaRunWriterWhitespaceChecks()];
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];

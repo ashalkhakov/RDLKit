@@ -377,11 +377,11 @@
   // The rest are composites: each writes more than one property and must undo
   // as a single step.
   if (sender == _valueField && it != nil) {
-    [editor beginGroup:@"Edit Text"];
-    [editor setValue:[_valueField stringValue] forKeyPath:@"value" ofItem:it];
-    // A plain edit replaces any rich-text runs.
-    [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it];
-    [editor endGroup];
+    // -controlTextDidEndEditing: fires whenever the field resigns first
+    // responder, not only when something was typed, and opening the rich-text
+    // panel is enough to do that. -setPlainValue:ofItem: is the one that knows
+    // an unchanged value is not an edit and must leave the runs alone.
+    [editor setPlainValue:[_valueField stringValue] ofItem:it];
     return;
   }
 

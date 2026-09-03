@@ -18,4 +18,5 @@ NSArray<NSString *> *PicaRunDialogLifecycleChecks(void);
 NSArray<NSString *> *PicaRunExportChecks(void);
 NSArray<NSString *> *PicaRunSharedPipelineChecks(void);
 NSArray<NSString *> *PicaRunSampleFitChecks(void);
+NSArray<NSString *> *PicaRunRichTextFormatterChecks(void);
 NSArray<NSString *> *PicaRunAllDesignerChecks(void);

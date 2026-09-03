@@ -209,6 +209,19 @@
   }
 }
 
+// The pointer has left the canvas, so nothing is hovered any more. Declared
+// in the header and called by PicaCanvasView all along, but never written --
+// which raised an unrecognized selector on every exit.
+- (void)mouseExited {
+  [[NSCursor arrowCursor] set];
+  if (_hoverTablix == nil && _hoverPart == nil)
+    return;
+  _hoverTablix = nil;
+  _hoverCol = 0;
+  _hoverPart = nil;
+  [_host interactionNeedsRedraw];
+}
+
 - (void)mouseMoved:(NSEvent *)event {
   NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
   CGFloat z = _ctx.zoom;

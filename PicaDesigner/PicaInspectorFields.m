@@ -58,10 +58,34 @@
 
 #pragma mark - Model -> UI
 
+// Bindings are declared for every kind of item and the inspector shows only
+// the sections that apply, so filling has to tolerate a key path the selected
+// item does not have -- `source` belongs to an image, not to a textbox.
+//
+// It cannot simply ask for the value: -valueForKey: raises for an undefined
+// key, and because the inspector fills itself from a change notification, that
+// exception unwound all the way out through whatever had posted the change.
+// -[PicaEditor setAttributedString:ofItem:] writes the value and then the
+// paragraphs, so the throw landed between the two and the rich-text runs were
+// silently never stored.
+static BOOL PicaCanReadKeyPath(id target, NSString *keyPath) {
+  id probe = target;
+  for (NSString *key in [keyPath componentsSeparatedByString:@"."]) {
+    if (probe == nil)
+      return NO;
+    if (![probe respondsToSelector:NSSelectorFromString(key)])
+      return NO;
+    probe = [probe valueForKey:key];
+  }
+  return YES;
+}
+
 - (void)fillFromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
   for (PicaFieldBinding *b in _bindings) {
     id target = [self targetForBinding:b item:item band:band report:report];
     if (target == nil)
+      continue;
+    if (!PicaCanReadKeyPath(target, b.keyPath))
       continue;
     id value = [target valueForKeyPath:b.keyPath];
     switch (b.kind) {
@@ -109,6 +133,10 @@
              bandKey:(NSString *)bandKey {
   for (PicaFieldBinding *b in _bindings) {
     if (b.control != control)
+      continue;
+    // Same reasoning as PicaCanReadKeyPath: a control belonging to a section
+    // that does not apply must not write into an item without that property.
+    if (b.scope == PicaFieldScopeItem && item != nil && !PicaCanReadKeyPath(item, b.keyPath))
       continue;
     id value = nil;
     switch (b.kind) {

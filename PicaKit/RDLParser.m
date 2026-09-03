@@ -560,10 +560,35 @@ static BOOL PicaSparseStyleIsEmpty(RDLStyle *s) {
          s.textDecoration == RDLTextDecorationUnspecified && ![s.format length];
 }
 
+// Does this run's style say anything the textbox's own style does not? The
+// plain writer copies the whole textbox style onto its single run, so a run
+// that merely repeats it carries no formatting of its own and the paragraph
+// can be flattened back into `value`.
+static BOOL PicaSparseStyleAddsNothing(RDLStyle *run, RDLStyle *item) {
+  if (run == nil)
+    return YES;
+  if (item == nil)
+    return PicaSparseStyleIsEmpty(run);
+  BOOL sameSize = (run.fontSize == nil) ||
+                  (item.fontSize != nil &&
+                   fabs([run.fontSize points] - [item.fontSize points]) < 0.01);
+  return ([run.fontFamily length] == 0 || [run.fontFamily isEqualToString:item.fontFamily]) &&
+         sameSize &&
+         (run.fontWeight == RDLFontWeightUnspecified || run.fontWeight == item.fontWeight) &&
+         (run.fontStyle == RDLFontStyleUnspecified || run.fontStyle == item.fontStyle) &&
+         ([run.color length] == 0 || [run.color isEqualToString:item.color]) &&
+         ([run.backgroundColor length] == 0 ||
+          [run.backgroundColor isEqualToString:item.backgroundColor]) &&
+         (run.textAlign == RDLTextAlignUnspecified || run.textAlign == item.textAlign) &&
+         (run.textDecoration == RDLTextDecorationUnspecified ||
+          run.textDecoration == item.textDecoration) &&
+         ([run.format length] == 0 || [run.format isEqualToString:item.format]);
+}
+
 // Rich text: keep the Paragraph/TextRun structure when any run or paragraph
 // carries its own style, or a paragraph holds more than one run. Otherwise the
 // flattened `value` string is a lossless representation and we return nil.
-static NSMutableArray *PicaParseParagraphs(NSXMLElement *el) {
+static NSMutableArray *PicaParseParagraphs(NSXMLElement *el, RDLStyle *itemStyle) {
   NSXMLElement *paragraphs = PicaChild(el, @"Paragraphs");
   if (paragraphs == nil)
     return nil;
@@ -595,9 +620,22 @@ static NSMutableArray *PicaParseParagraphs(NSXMLElement *el) {
     [paras addObject:para];
   }
   // A single paragraph with a single run flattens losslessly into `value`
-  // (our own plain writer duplicates the textbox style on that run).
-  if ([paras count] == 1 && [[(RDLParagraph *)paras.firstObject runs] count] <= 1)
-    return nil;
+  // *only when neither carries a style of its own* -- which is what the plain
+  // writer emits, duplicating the textbox's own style onto the run.
+  //
+  // Dropping it unconditionally lost formatting that covered the whole
+  // textbox: bolding every character produces exactly one paragraph with one
+  // styled run, so the bold went in, was written to the file correctly, and
+  // vanished on the way back.
+  if ([paras count] == 1) {
+    RDLParagraph *only = [paras firstObject];
+    RDLTextRun *run = [only.runs firstObject];
+    if ([only.runs count] == 0)
+      return nil;
+    if ([only.runs count] == 1 && PicaSparseStyleAddsNothing(only.style, itemStyle) &&
+        PicaSparseStyleAddsNothing(run.style, itemStyle))
+      return nil;
+  }
   return rich ? paras : nil;
 }
 
@@ -698,7 +736,7 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
   if ([item isKindOfClass:[RDLTextbox class]] && [el.localName isEqualToString:@"Textbox"]) {
     RDLTextbox *tb = (RDLTextbox *)item;
     tb.value = PicaTextboxValue(el);
-    tb.paragraphs = PicaParseParagraphs(el);
+    tb.paragraphs = PicaParseParagraphs(el, item.style);
     tb.hyperlink = PicaParseHyperlink(el);
     NSString *cg = PicaText(PicaChild(el, @"CanGrow"));
     tb.canGrow = ![cg isEqualToString:@"false"];
