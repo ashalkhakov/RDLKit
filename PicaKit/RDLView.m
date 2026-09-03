@@ -1,4 +1,5 @@
 #import "RDLView.h"
+#import "RDLChartRenderer.h"
 #import "RDLTextAttributes.h"
 #import "RDLReport.h"
 #import "RDLLayoutEngine.h"
@@ -189,75 +190,10 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
       continue;
     }
     if ([it isKindOfClass:[RDLLaidOutChart class]]) {
-      RDLLaidOutChart *chart = (RDLLaidOutChart *)it;
       PicaFillBackground(r, it.style);
-      [PicaColorFromHex(@"#1a1916") set];
-      RDLChartType type = chart.chartType;
-      NSUInteger n = [chart.values count];
-      double max = 1, total = 0;
-      for (NSNumber *v in chart.values) {
-        if ([v doubleValue] > max)
-          max = [v doubleValue];
-        total += fabs([v doubleValue]);
-      }
-      if (n && type == RDLChartTypePie) {
-        CGFloat cx = NSMidX(r), cy = NSMidY(r);
-        CGFloat rad = MIN(NSWidth(r), NSHeight(r)) * 0.42;
-        double startDeg = 90;
-        for (NSUInteger i = 0; i < n; i++) {
-          double frac = total > 0 ? fabs([chart.values[i] doubleValue]) / total : 1.0 / n;
-          double endDeg = startDeg - frac * 360;
-          NSBezierPath *wedge = [NSBezierPath bezierPath];
-          [wedge moveToPoint:NSMakePoint(cx, cy)];
-          [wedge appendBezierPathWithArcWithCenter:NSMakePoint(cx, cy)
-                                            radius:rad
-                                        startAngle:startDeg
-                                          endAngle:endDeg
-                                         clockwise:YES];
-          [wedge closePath];
-          double shade = 0.25 + 0.6 * ((double)i / MAX(n, 1));
-          [[NSColor colorWithCalibratedWhite:0.12 alpha:shade] set];
-          [wedge fill];
-          startDeg = endDeg;
-        }
-      } else if (n && type == RDLChartTypeLine) {
-        NSBezierPath *pl = [NSBezierPath bezierPath];
-        for (NSUInteger i = 0; i < n; i++) {
-          CGFloat x = n > 1 ? NSMinX(r) + 10 + (NSWidth(r) - 20) * i / (n - 1) : NSMidX(r);
-          CGFloat y = NSMaxY(r) - 10 - ([chart.values[i] doubleValue] / max) * (NSHeight(r) - 20);
-          if (i == 0)
-            [pl moveToPoint:NSMakePoint(x, y)];
-          else
-            [pl lineToPoint:NSMakePoint(x, y)];
-        }
-        [pl setLineWidth:2];
-        [PicaColorFromHex(@"#1a1916") set];
-        [pl stroke];
-      } else if (n && type == RDLChartTypeBar) {
-        CGFloat innerH = NSHeight(r) - 24;
-        CGFloat gap = innerH / n;
-        CGFloat bh = gap * 0.55;
-        for (NSUInteger i = 0; i < n; i++) {
-          CGFloat bw = ([chart.values[i] doubleValue] / max) * (NSWidth(r) - 24);
-          NSRect bar = NSMakeRect(NSMinX(r) + 12, NSMinY(r) + 12 + i * gap + (gap - bh) / 2, bw, bh);
-          NSRectFill(bar);
-        }
-      } else if (n) {
-        NSBezierPath *axis = [NSBezierPath bezierPath];
-        [axis moveToPoint:NSMakePoint(NSMinX(r) + 8, NSMinY(r) + 8)];
-        [axis lineToPoint:NSMakePoint(NSMinX(r) + 8, NSMaxY(r) - 8)];
-        [axis lineToPoint:NSMakePoint(NSMaxX(r) - 8, NSMaxY(r) - 8)];
-        [axis stroke];
-        CGFloat innerW = NSWidth(r) - 24;
-        CGFloat innerH = NSHeight(r) - 24;
-        CGFloat gap = innerW / n;
-        CGFloat bw = gap * 0.55;
-        for (NSUInteger i = 0; i < n; i++) {
-          CGFloat bh = ([chart.values[i] doubleValue] / max) * innerH;
-          NSRect bar = NSMakeRect(NSMinX(r) + 12 + i * gap + (gap - bw) / 2, NSMaxY(r) - 12 - bh, bw, bh);
-          NSRectFill(bar);
-        }
-      }
+      // The picture is worked out by RDLChartRenderer, the same geometry the
+      // HTML backend and the designer canvas draw, so all three agree.
+      [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r];
       PicaDrawBorders(r, it.style);
       continue;
     }

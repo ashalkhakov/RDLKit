@@ -17,6 +17,8 @@ PicaKit_HEADER_FILES = \
 PicaKit_OBJC_FILES = \
   RDLReport.m \
   RDLParser.m \
+  RDLUpgrader.m \
+  RDLChartRenderer.m \
   RDLExpression.m \
   RDLLayoutEngine.m \
   RDLView.m \

@@ -1,4 +1,5 @@
 #import "RDLParser.h"
+#import "RDLUpgrader.h"
 #import "RDLReport.h"
 #import "PicaCompatibility.h"
 
@@ -56,6 +57,14 @@ static NSMutableArray *PicaWarnings(void);
       else                                                                          \
         (dest) = _picaValue;                                                        \
     }                                                                               \
+  } while (0)
+
+// A page measurement: absent leaves whatever default RDLPage set.
+#define PICA_PAGE_INCHES(dest, parent, name)                                       \
+  do {                                                                             \
+    NSString *_picaRaw = PicaText(PicaChild((parent), (name)));                     \
+    if ([_picaRaw length])                                                          \
+      (dest) = PicaInchesFromString(_picaRaw);                                      \
   } while (0)
 
 // A measurement element that may instead be an `=` expression.
@@ -314,6 +323,132 @@ static RDLTablixCell *PicaParseCellContents(NSXMLElement *contents) {
   if ([rs integerValue] > 0)
     cell.rowSpan = [rs integerValue];
   return cell;
+}
+
+// One ChartMember: the grouping and the label to write under it.
+static RDLChartMember *PicaParseChartMember(NSXMLElement *el) {
+  RDLChartMember *m = [[RDLChartMember alloc] init];
+  NSXMLElement *group = PicaChild(el, @"Group");
+  m.groupName = [group attributeForName:@"Name"].stringValue;
+  for (NSXMLNode *n in [PicaChild(group, @"GroupExpressions") children]) {
+    if (n.kind == NSXMLElementKind)
+      [m.groupExpressions addObject:[RDLValue valueWithSource:PicaText((NSXMLElement *)n)]
+                                        ?: [RDLValue literal:@""]];
+  }
+  m.label = PicaValue(PicaChild(el, @"Label"));
+  return m;
+}
+
+static void PicaParseChartMembers(NSXMLElement *hierarchy,
+                                  NSMutableArray<RDLChartMember *> *into) {
+  for (NSXMLNode *n in [PicaChild(hierarchy, @"ChartMembers") children]) {
+    if (n.kind == NSXMLElementKind)
+      [into addObject:PicaParseChartMember((NSXMLElement *)n)];
+  }
+}
+
+static void PicaParseChartAxis(NSXMLElement *el, RDLChartAxis *axis) {
+  if (el == nil)
+    return;
+  axis.hidden = [PicaText(PicaChild(el, @"Hidden")) isEqualToString:@"true"];
+  NSXMLElement *title = PicaChild(el, @"ChartAxisTitle");
+  axis.title = PicaValue(PicaChild(title, @"Caption"));
+  NSXMLElement *grid = PicaChild(el, @"ChartMajorGridLines");
+  if (grid)
+    axis.showMajorGridLines = ![PicaText(PicaChild(grid, @"Hidden")) isEqualToString:@"true"];
+  PICA_PARSE_ENUM(axis.majorTickMarks, @"MajorTickMarks", RDLChartTickMarksFromString,
+                  PicaText(PicaChild(el, @"MajorTickMarks")));
+  axis.minimum = PicaValue(PicaChild(el, @"Minimum"));
+  axis.maximum = PicaValue(PicaChild(el, @"Maximum"));
+  axis.majorInterval = PicaValue(PicaChild(el, @"MajorInterval"));
+  axis.scalar = [PicaText(PicaChild(el, @"Scalar")) isEqualToString:@"true"];
+}
+
+// MS-RDL 2008/2010 Chart. Older documents reach this having been rewritten
+// into the same shape by RDLUpgrader, so there is only one reader.
+static void PicaParseChart(NSXMLElement *el, RDLChart *chart) {
+  chart.dataSetName = PicaText(PicaChild(el, @"DataSetName"));
+  PICA_PARSE_ENUM(chart.palette, @"Palette", RDLChartPaletteFromString,
+                  PicaText(PicaChild(el, @"Palette")));
+  NSXMLElement *titles = PicaChild(el, @"ChartTitles");
+  for (NSXMLNode *n in [titles children]) {
+    if (n.kind != NSXMLElementKind)
+      continue;
+    chart.chartTitle = PicaValue(PicaChild((NSXMLElement *)n, @"Caption"));
+    break;
+  }
+  PicaParseChartMembers(PicaChild(el, @"ChartCategoryHierarchy"), chart.categoryMembers);
+  PicaParseChartMembers(PicaChild(el, @"ChartSeriesHierarchy"), chart.seriesMembers);
+
+  NSXMLElement *collection = PicaChild(PicaChild(el, @"ChartData"), @"ChartSeriesCollection");
+  for (NSXMLNode *n in [collection children]) {
+    if (n.kind != NSXMLElementKind)
+      continue;
+    NSXMLElement *se = (NSXMLElement *)n;
+    RDLChartSeries *series = [[RDLChartSeries alloc] init];
+    series.name = [se attributeForName:@"Name"].stringValue;
+    PICA_PARSE_ENUM(series.type, @"Type", RDLChartTypeFromString, PicaText(PicaChild(se, @"Type")));
+    PICA_PARSE_ENUM(series.subtype, @"Subtype", RDLChartSubtypeFromString,
+                    PicaText(PicaChild(se, @"Subtype")));
+    // The first data point carries the expressions; the rest of the points are
+    // produced by the groupings, not written out.
+    NSXMLElement *point = nil;
+    for (NSXMLNode *pn in [PicaChild(se, @"ChartDataPoints") children]) {
+      if (pn.kind == NSXMLElementKind) {
+        point = (NSXMLElement *)pn;
+        break;
+      }
+    }
+    NSXMLElement *values = PicaChild(point, @"ChartDataPointValues");
+    series.value = PicaValue(PicaChild(values, @"Y"));
+    series.x = PicaValue(PicaChild(values, @"X"));
+    series.size = PicaValue(PicaChild(values, @"Size"));
+    NSXMLElement *label = PicaChild(point, @"ChartDataLabel");
+    if (label)
+      series.showDataLabels = ![PicaText(PicaChild(label, @"Hidden")) isEqualToString:@"true"];
+    NSXMLElement *marker = PicaChild(point, @"ChartMarker");
+    if (marker) {
+      NSString *type = PicaText(PicaChild(marker, @"Type"));
+      series.showMarker = [type length] && ![type isEqualToString:@"None"];
+    }
+    [chart.series addObject:series];
+  }
+
+  NSXMLElement *area = nil;
+  for (NSXMLNode *n in [PicaChild(el, @"ChartAreas") children]) {
+    if (n.kind == NSXMLElementKind) {
+      area = (NSXMLElement *)n;
+      break;
+    }
+  }
+  for (NSXMLNode *n in [PicaChild(area, @"ChartCategoryAxes") children])
+    if (n.kind == NSXMLElementKind) {
+      PicaParseChartAxis((NSXMLElement *)n, chart.categoryAxis);
+      break;
+    }
+  for (NSXMLNode *n in [PicaChild(area, @"ChartValueAxes") children])
+    if (n.kind == NSXMLElementKind) {
+      PicaParseChartAxis((NSXMLElement *)n, chart.valueAxis);
+      break;
+    }
+
+  chart.legendHidden = YES;
+  for (NSXMLNode *n in [PicaChild(el, @"ChartLegends") children]) {
+    if (n.kind != NSXMLElementKind)
+      continue;
+    NSXMLElement *legend = (NSXMLElement *)n;
+    chart.legendHidden = [PicaText(PicaChild(legend, @"Hidden")) isEqualToString:@"true"];
+    PICA_PARSE_ENUM(chart.legendPosition, @"Position", RDLChartLegendPositionFromString,
+                    PicaText(PicaChild(legend, @"Position")));
+    break;
+  }
+  // The chart's own type/subtype is whatever its first series says, which is
+  // where RDL 2008 moved it from the 2005 Chart/Type element.
+  RDLChartSeries *first = [chart.series firstObject];
+  chart.chartType = first.type;
+  chart.subtype = first.subtype;
+  [chart.filters addObjectsFromArray:PicaParseFilters(PicaChild(el, @"Filters"))];
+  [chart.sortExpressions addObjectsFromArray:PicaParseSorts(PicaChild(el, @"SortExpressions"))];
 }
 
 static RDLTablixMember *PicaParseMember(NSXMLElement *el) {
@@ -576,46 +711,7 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
                     PicaText(PicaChild(el, @"Sizing")));
     img.hyperlink = PicaParseHyperlink(el);
   } else if ([el.localName isEqualToString:@"Chart"]) {
-    // Minimal MS-RDL Chart subset: first series + first category grouping.
-    RDLChart *chart = (RDLChart *)item;
-    chart.dataSetName = PicaText(PicaChild(el, @"DataSetName"));
-    chart.title = PicaText(PicaChild(PicaChild(PicaChild(el, @"ChartTitles"), @"ChartTitle"),
-                                    @"Caption"));
-    NSXMLElement *data = PicaChild(el, @"ChartData");
-    NSXMLElement *series = nil;
-    for (NSXMLNode *n in [PicaChild(data, @"ChartSeriesCollection") children]) {
-      if (n.kind == NSXMLElementKind) {
-        series = (NSXMLElement *)n;
-        break;
-      }
-    }
-    chart.chartType = RDLChartTypeColumn;
-    PICA_PARSE_ENUM(chart.chartType, @"Type", RDLChartTypeFromString,
-                    PicaText(PicaChild(series, @"Type")));
-    NSXMLElement *point = nil;
-    for (NSXMLNode *n in [PicaChild(series, @"ChartDataPoints") children]) {
-      if (n.kind == NSXMLElementKind) {
-        point = (NSXMLElement *)n;
-        break;
-      }
-    }
-    NSXMLElement *values = PicaChild(point, @"ChartDataPointValues");
-    chart.valueField = PicaText(PicaChild(values, @"Y"));
-    NSXMLElement *catH = PicaChild(el, @"ChartCategoryHierarchy");
-    NSXMLElement *catMember = nil;
-    for (NSXMLNode *n in [PicaChild(catH, @"ChartMembers") children]) {
-      if (n.kind == NSXMLElementKind) {
-        catMember = (NSXMLElement *)n;
-        break;
-      }
-    }
-    NSXMLElement *grp = PicaChild(catMember, @"Group");
-    for (NSXMLNode *n in [PicaChild(grp, @"GroupExpressions") children]) {
-      if (n.kind == NSXMLElementKind) {
-        chart.categoryField = PicaText((NSXMLElement *)n);
-        break;
-      }
-    }
+    PicaParseChart(el, (RDLChart *)item);
   } else if ([el.localName isEqualToString:@"List"]) {
     RDLTablix *tablix = (RDLTablix *)item;
     // RDL 2005 List: single-column, single-details-row Tablix whose cell holds
@@ -757,7 +853,10 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     // a spec and -rebuildTablix has something authoritative to build from.
     [tablix inferColumnSpecsFromTablixBody];
   } else if ([item isKindOfClass:[RDLChart class]]) {
-    // A Rectangle carrying this app's chart custom properties.
+    // A Rectangle this designer promoted to a chart: PicaRectangleIsChart
+    // spotted its Pica.* custom properties. Real <Chart> elements are handled
+    // above; this is only for files the designer wrote before charts were
+    // stored as MS-RDL.
     RDLChart *chart = (RDLChart *)item;
     for (NSXMLNode *n in [PicaChild(el, @"CustomProperties") children]) {
       if (n.kind != NSXMLElementKind)
@@ -829,6 +928,9 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml options:0 error:error];
   if (doc == nil)
     return nil;
+  // Older schemas are rewritten into the current grammar first, so everything
+  // below only ever has to know one shape. See RDLUpgrader.
+  RDLSchemaVersion wasVersion = [RDLUpgrader upgradeDocument:doc];
   NSXMLElement *root = doc.rootElement;
   if (![[root localName] isEqualToString:@"Report"]) {
     if (error)
@@ -849,12 +951,15 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
   r.reportDescription = PicaText(PicaChild(root, @"Description"));
   r.width = PicaInchesFromString(PicaText(PicaChild(root, @"Width")));
   NSXMLElement *pageEl = PicaChild(root, @"Page");
-  r.page.pageWidth = PicaInchesFromString(PicaText(PicaChild(pageEl, @"PageWidth")));
-  r.page.pageHeight = PicaInchesFromString(PicaText(PicaChild(pageEl, @"PageHeight")));
-  r.page.leftMargin = PicaInchesFromString(PicaText(PicaChild(pageEl, @"LeftMargin")));
-  r.page.rightMargin = PicaInchesFromString(PicaText(PicaChild(pageEl, @"RightMargin")));
-  r.page.topMargin = PicaInchesFromString(PicaText(PicaChild(pageEl, @"TopMargin")));
-  r.page.bottomMargin = PicaInchesFromString(PicaText(PicaChild(pageEl, @"BottomMargin")));
+  // An element that is not there must leave RDLPage's default alone -- RDL
+  // says an absent PageWidth means Letter, and reading it as zero produces a
+  // report that lays out onto nothing.
+  PICA_PAGE_INCHES(r.page.pageWidth, pageEl, @"PageWidth");
+  PICA_PAGE_INCHES(r.page.pageHeight, pageEl, @"PageHeight");
+  PICA_PAGE_INCHES(r.page.leftMargin, pageEl, @"LeftMargin");
+  PICA_PAGE_INCHES(r.page.rightMargin, pageEl, @"RightMargin");
+  PICA_PAGE_INCHES(r.page.topMargin, pageEl, @"TopMargin");
+  PICA_PAGE_INCHES(r.page.bottomMargin, pageEl, @"BottomMargin");
   r.pageHeader = PicaParseBand(PicaChild(pageEl, @"PageHeader") ?: PicaChild(root, @"PageHeader"), 0.5);
   r.pageFooter = PicaParseBand(PicaChild(pageEl, @"PageFooter") ?: PicaChild(root, @"PageFooter"), 0.4);
   r.body = PicaParseBand(PicaChild(root, @"Body"), 4.0);
@@ -962,6 +1067,11 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
   }
   if ([r.name length] == 0)
     r.name = @"Report";
+  if (wasVersion != RDLSchemaVersion2010 && wasVersion != RDLSchemaVersion2016)
+    [gPicaParseWarnings insertObject:[NSString stringWithFormat:
+        @"upgraded from RDL %@ to the 2010 grammar",
+        wasVersion == RDLSchemaVersionUnknown ? @"(no namespace)"
+                                              : @((long)wasVersion).stringValue] atIndex:0];
   [r.warnings setArray:gPicaParseWarnings];
   gPicaParseWarnings = nil;
   if (gPicaParseError) {
@@ -1257,6 +1367,132 @@ static void PicaAddMember(NSXMLElement *parent, RDLTablixMember *m) {
   [parent addChild:me];
 }
 
+// MS-RDL 2008/2010 Chart. What is written is what the reader reads back, and
+// what RDLUpgrader turns an older chart into, so a 2005 report opened and
+// saved comes out as a current one.
+static void PicaAddChartMembers(NSXMLElement *parent, NSString *hierarchyName,
+                                NSArray<RDLChartMember *> *members) {
+  if ([members count] == 0)
+    return;
+  NSXMLElement *hierarchy = PicaEl(hierarchyName);
+  NSXMLElement *list = PicaEl(@"ChartMembers");
+  for (RDLChartMember *m in members) {
+    NSXMLElement *member = PicaEl(@"ChartMember");
+    if ([m.groupExpressions count]) {
+      NSXMLElement *group = PicaEl(@"Group");
+      PicaAddAttr(group, @"Name", m.groupName);
+      NSXMLElement *exprs = PicaEl(@"GroupExpressions");
+      for (RDLValue *e in m.groupExpressions)
+        PicaAddValue(exprs, @"GroupExpression", e);
+      [group addChild:exprs];
+      [member addChild:group];
+    }
+    PicaAddValue(member, @"Label", m.label);
+    [list addChild:member];
+  }
+  [hierarchy addChild:list];
+  [parent addChild:hierarchy];
+}
+
+static void PicaAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLChartAxis *axis) {
+  NSXMLElement *collection = PicaEl(collectionName);
+  NSXMLElement *el = PicaEl(@"ChartAxis");
+  if (axis.hidden)
+    PicaAdd(el, @"Hidden", @"true");
+  if (axis.title != nil) {
+    NSXMLElement *title = PicaEl(@"ChartAxisTitle");
+    PicaAddValue(title, @"Caption", axis.title);
+    [el addChild:title];
+  }
+  NSXMLElement *grid = PicaEl(@"ChartMajorGridLines");
+  if (!axis.showMajorGridLines)
+    PicaAdd(grid, @"Hidden", @"true");
+  [el addChild:grid];
+  if (axis.majorTickMarks != RDLChartTickMarksUnspecified)
+    PicaAdd(el, @"MajorTickMarks", RDLStringFromChartTickMarks(axis.majorTickMarks));
+  PicaAddValue(el, @"Minimum", axis.minimum);
+  PicaAddValue(el, @"Maximum", axis.maximum);
+  PicaAddValue(el, @"MajorInterval", axis.majorInterval);
+  if (axis.scalar)
+    PicaAdd(el, @"Scalar", @"true");
+  [collection addChild:el];
+  [parent addChild:collection];
+}
+
+static void PicaAddChart(NSXMLElement *parent, RDLChart *chart) {
+  NSXMLElement *el = PicaEl(@"Chart");
+  PicaAddAttr(el, @"Name", chart.name);
+  PicaAddBox(el, chart);
+  PicaAddVisibility(el, chart.hidden);
+  PicaAddItemPagination(el, chart);
+  PicaAddStyle(el, chart.style);
+  PicaAddIf(el, @"DataSetName", chart.dataSetName);
+  PicaAddFilters(el, chart.filters);
+  PicaAddSorts(el, chart.sortExpressions);
+  PicaAddChartMembers(el, @"ChartCategoryHierarchy", chart.categoryMembers);
+  PicaAddChartMembers(el, @"ChartSeriesHierarchy", chart.seriesMembers);
+
+  NSXMLElement *data = PicaEl(@"ChartData");
+  NSXMLElement *collection = PicaEl(@"ChartSeriesCollection");
+  for (RDLChartSeries *series in chart.series) {
+    NSXMLElement *se = PicaEl(@"ChartSeries");
+    PicaAddAttr(se, @"Name", series.name);
+    NSXMLElement *points = PicaEl(@"ChartDataPoints");
+    NSXMLElement *point = PicaEl(@"ChartDataPoint");
+    NSXMLElement *values = PicaEl(@"ChartDataPointValues");
+    PicaAddValue(values, @"X", series.x);
+    PicaAddValue(values, @"Y", series.value);
+    PicaAddValue(values, @"Size", series.size);
+    [point addChild:values];
+    if (series.showDataLabels)
+      [point addChild:PicaEl(@"ChartDataLabel")];
+    if (series.showMarker) {
+      NSXMLElement *marker = PicaEl(@"ChartMarker");
+      PicaAdd(marker, @"Type", @"Auto");
+      [point addChild:marker];
+    }
+    [points addChild:point];
+    [se addChild:points];
+    // The type lives on the series from 2008 onwards; fall back to the
+    // chart's own so a designer-made chart still says what it is.
+    RDLChartType type = series.type != RDLChartTypeUnspecified ? series.type : chart.chartType;
+    RDLChartSubtype sub = series.subtype != RDLChartSubtypeUnspecified ? series.subtype : chart.subtype;
+    PicaAdd(se, @"Type", RDLStringFromChartType(type) ?: @"Column");
+    if (sub != RDLChartSubtypeUnspecified)
+      PicaAdd(se, @"Subtype", RDLStringFromChartSubtype(sub));
+    [collection addChild:se];
+  }
+  [data addChild:collection];
+  [el addChild:data];
+
+  NSXMLElement *areas = PicaEl(@"ChartAreas");
+  NSXMLElement *area = PicaEl(@"ChartArea");
+  PicaAddChartAxis(area, @"ChartCategoryAxes", chart.categoryAxis);
+  PicaAddChartAxis(area, @"ChartValueAxes", chart.valueAxis);
+  [areas addChild:area];
+  [el addChild:areas];
+
+  NSXMLElement *legends = PicaEl(@"ChartLegends");
+  NSXMLElement *legend = PicaEl(@"ChartLegend");
+  if (chart.legendHidden)
+    PicaAdd(legend, @"Hidden", @"true");
+  if (chart.legendPosition != RDLChartLegendPositionUnspecified)
+    PicaAdd(legend, @"Position", RDLStringFromChartLegendPosition(chart.legendPosition));
+  [legends addChild:legend];
+  [el addChild:legends];
+
+  if (chart.chartTitle != nil) {
+    NSXMLElement *titles = PicaEl(@"ChartTitles");
+    NSXMLElement *title = PicaEl(@"ChartTitle");
+    PicaAddValue(title, @"Caption", chart.chartTitle);
+    [titles addChild:title];
+    [el addChild:titles];
+  }
+  if (chart.palette != RDLChartPaletteUnspecified)
+    PicaAdd(el, @"Palette", RDLStringFromChartPalette(chart.palette));
+  [parent addChild:el];
+}
+
 static void PicaAddTablix(NSXMLElement *parent, RDLTablix *it) {
   if (it.tablixBody == nil || [it.tablixBody.rows count] == 0)
     [it rebuildTablix];
@@ -1399,28 +1635,7 @@ static void PicaAddItem(NSXMLElement *parent, RDLItem *it) {
     return;
   }
   if ([it isKindOfClass:[RDLChart class]]) {
-    // A chart is a Rectangle plus Pica.* custom properties.
-    RDLChart *chart = (RDLChart *)it;
-    NSXMLElement *el = PicaEl(@"Rectangle");
-    PicaAddAttr(el, @"Name", it.name);
-    PicaAddBox(el, it);
-    PicaAddStyle(el, it.style);
-    NSXMLElement *props = PicaEl(@"CustomProperties");
-    NSArray *pairs = @[
-      @[ @"Pica.ChartType", RDLStringFromChartType(chart.chartType) ?: @"Column" ],
-      @[ @"Pica.DataSet", chart.dataSetName ?: @"" ],
-      @[ @"Pica.Category", chart.categoryField ?: @"" ],
-      @[ @"Pica.Value", chart.valueField ?: @"" ],
-      @[ @"Pica.Title", chart.title ?: @"" ],
-    ];
-    for (NSArray *pair in pairs) {
-      NSXMLElement *prop = PicaEl(@"CustomProperty");
-      PicaAdd(prop, @"Name", pair[0]);
-      PicaAdd(prop, @"Value", pair[1]);
-      [props addChild:prop];
-    }
-    [el addChild:props];
-    [parent addChild:el];
+    PicaAddChart(parent, (RDLChart *)it);
     return;
   }
   if ([it isKindOfClass:[RDLTablix class]]) {
@@ -1508,7 +1723,13 @@ static void PicaAddBand(NSXMLElement *parent, RDLBand *b) {
 
   NSXMLElement *sets = PicaEl(@"DataSets");
   for (RDLDataSet *ds in report.dataSets) {
-    NSData *json = [NSJSONSerialization dataWithJSONObject:(ds.rows ?: @[]) options:0 error:nil];
+    // Sorted, because NSDictionary hands its keys back in no particular order
+    // and an unsorted dump makes the same report write differently every time
+    // -- which shows up as spurious diffs in version control and breaks the
+    // write/read/write round trip.
+    NSData *json = [NSJSONSerialization dataWithJSONObject:(ds.rows ?: @[])
+                                                   options:NSJSONWritingSortedKeys
+                                                     error:nil];
     NSString *cmd = json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"[]";
     NSXMLElement *de = PicaEl(@"DataSet");
     PicaAddAttr(de, @"Name", ds.name);

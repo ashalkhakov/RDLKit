@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <PageHeight>11in</PageHeight>
+  <PageWidth>8.5in</PageWidth>
+  <TopMargin>.5in</TopMargin>
+  <LeftMargin>.5in</LeftMargin>
+  <RightMargin>.5in</RightMargin>
+  <BottomMargin>.5in</BottomMargin>
+  <Width>7.5in</Width>
+
+  <ReportParameters>
+    <ReportParameter Name="BarcodeType">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <Values>
+          <Value>QrCode</Value>
+        </Values>
+      </DefaultValue>
+      <Nullable>false</Nullable>
+      <AllowBlank>false</AllowBlank>
+      <Prompt>Barcode Type</Prompt>
+    </ReportParameter>
+    <ReportParameter Name="BarcodeValue">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <Values>
+          <Value>https://github.com/majorsilence/Reporting</Value>
+        </Values>
+      </DefaultValue>
+      <Nullable>false</Nullable>
+      <AllowBlank>false</AllowBlank>
+      <Prompt>Value to Encode</Prompt>
+    </ReportParameter>
+  </ReportParameters>
+
+  <PageHeader>
+    <Height>.8in</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="Title">
+        <Top>.05in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.3in</Height>
+        <Value>="Barcode Demo — " &amp; Parameters!BarcodeType.Value</Value>
+        <Style>
+          <FontSize>16pt</FontSize>
+          <FontWeight>Bold</FontWeight>
+        </Style>
+      </Textbox>
+      <Textbox Name="TypeLabel">
+        <Top>.4in</Top>
+        <Left>0in</Left>
+        <Width>1.2in</Width>
+        <Height>.15in</Height>
+        <Value>Format:</Value>
+        <Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight></Style>
+      </Textbox>
+      <Textbox Name="TypeValue">
+        <Top>.4in</Top>
+        <Left>1.2in</Left>
+        <Width>3in</Width>
+        <Height>.15in</Height>
+        <Value>=Parameters!BarcodeType.Value</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="ValueLabel">
+        <Top>.58in</Top>
+        <Left>0in</Left>
+        <Width>1.2in</Width>
+        <Height>.15in</Height>
+        <Value>Encodes:</Value>
+        <Style><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight></Style>
+      </Textbox>
+      <Textbox Name="ValueValue">
+        <Top>.58in</Top>
+        <Left>1.2in</Left>
+        <Width>6in</Width>
+        <Height>.15in</Height>
+        <Value>=Parameters!BarcodeValue.Value</Value>
+        <Style><FontSize>9pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+    </ReportItems>
+  </PageHeader>
+
+  <Body>
+    <Height>4in</Height>
+    <ReportItems>
+      <!-- The <Type> expression ={?BarcodeType} is resolved at render time,
+           allowing any registered CRI type to be selected without changing the RDL. -->
+      <CustomReportItem Name="DynamicBarcode">
+        <Type>={?BarcodeType}</Type>
+        <Top>.1in</Top>
+        <Left>.5in</Left>
+        <Width>3in</Width>
+        <Height>2in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>={?BarcodeValue}</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+      <Textbox Name="HintText">
+        <Top>2.3in</Top>
+        <Left>.5in</Left>
+        <Width>6in</Width>
+        <Height>.2in</Height>
+        <Value>Pass a different type and value as CLI arguments to change the output without editing the RDL.</Value>
+        <Style><FontSize>8pt</FontSize><Color>Gray</Color><FontStyle>Italic</FontStyle></Style>
+      </Textbox>
+    </ReportItems>
+  </Body>
+
+  <PageFooter>
+    <Height>18pt</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="PageNum">
+        <Top>2pt</Top>
+        <Left>0in</Left>
+        <Width>3in</Width>
+        <Height>14pt</Height>
+        <Value>=Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+    </ReportItems>
+  </PageFooter>
+</Report>

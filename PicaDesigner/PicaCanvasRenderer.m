@@ -171,47 +171,14 @@ static NSAttributedString *PicaAttributedText(NSString *text, RDLStyle *style, C
   } else if ([it isKindOfClass:[RDLTablix class]]) {
     [self drawTablix:(RDLTablix *)it inRect:r];
   } else if ([it isKindOfClass:[RDLChart class]]) {
-    RDLChart *chart = (RDLChart *)it;
-    [[NSColor colorWithCalibratedWhite:0.2 alpha:1] set];
-    NSBezierPath *axis = [NSBezierPath bezierPath];
-    [axis moveToPoint:NSMakePoint(NSMinX(r) + 6, NSMinY(r) + 6)];
-    [axis lineToPoint:NSMakePoint(NSMinX(r) + 6, NSMaxY(r) - 6)];
-    [axis lineToPoint:NSMakePoint(NSMaxX(r) - 6, NSMaxY(r) - 6)];
-    [axis stroke];
-    RDLDataSet *ds = nil;
-    for (RDLDataSet *d in _ctx.report.dataSets)
-      if ([d.name isEqualToString:chart.dataSetName])
-        ds = d;
-    NSUInteger n = [ds.rows count];
-    if (n == 0)
-      n = 4;
-    double max = 1;
-    NSMutableArray *vals = [NSMutableArray array];
-    for (NSDictionary *row in ds.rows) {
-      id v = row[chart.valueField];
-      double d = [v respondsToSelector:@selector(doubleValue)] ? [v doubleValue] : 1;
-      [vals addObject:@(d)];
-      if (d > max)
-        max = d;
-    }
-    while ([vals count] < n)
-      [vals addObject:@(0.4 + [vals count] * 0.15)];
-    CGFloat innerW = NSWidth(r) - 20;
-    CGFloat innerH = NSHeight(r) - 20;
-    CGFloat gap = innerW / n;
-    CGFloat bw = gap * 0.55;
-    for (NSUInteger i = 0; i < n; i++) {
-      CGFloat bh = ([vals[i] doubleValue] / max) * innerH;
-      NSRect bar =
-          NSMakeRect(NSMinX(r) + 10 + i * gap + (gap - bw) / 2, NSMaxY(r) - 10 - bh, bw, bh);
-      NSRectFill(bar);
-    }
-    NSString *title = chart.title.length ? chart.title : @"Chart";
-    [title drawAtPoint:NSMakePoint(NSMinX(r) + 10, NSMinY(r) + 4)
-        withAttributes:@{
-          NSFontAttributeName : [NSFont userFontOfSize:MAX(8, 9 * _ctx.zoom)],
-          NSForegroundColorAttributeName : PicaColorFromHex(@"#1a1916")
-        }];
+    // The canvas shows the real chart, not a stand-in: the model is laid out
+    // against whatever data is bound and drawn by the same RDLChartRenderer
+    // plan the PDF and HTML backends use, so what is on the canvas is what
+    // gets exported.
+    RDLLaidOutChart *preview = [RDLLayoutEngine laidOutChart:(RDLChart *)it
+                                                    inReport:_ctx.report
+                                                 paramValues:_ctx.document.paramValues];
+    [RDLChartRenderer drawChart:preview inRect:r];
   } else {
     // Textbox (and unknown kinds): full WYSIWYG preview — background, border,
     // padding and the attributed value.

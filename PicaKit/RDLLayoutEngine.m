@@ -55,6 +55,29 @@
 @implementation PicaColPlanEntry
 @end
 
+#pragma mark - Charts
+
+// Rows grouped by a chart hierarchy: the distinct keys in the order they were
+// first seen, plus the rows behind each. Order matters -- it is what the
+// category axis and the legend are drawn in.
+@interface PicaChartBuckets : NSObject
+@property (nonatomic, strong) NSMutableArray<NSString *> *keys;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *rows;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *labels;
+@end
+
+@implementation PicaChartBuckets
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _keys = [NSMutableArray array];
+    _rows = [NSMutableDictionary dictionary];
+    _labels = [NSMutableDictionary dictionary];
+  }
+  return self;
+}
+@end
+
 @implementation RDLLayoutEngine
 
 static RDLDataSet *PicaFindSet(RDLReport *report, NSString *name) {
@@ -997,6 +1020,199 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
   return extra;
 }
 
+// Group `rows` by one chart hierarchy. With no grouping there is a single
+// bucket holding everything, which is what an ungrouped series wants.
+static PicaChartBuckets *PicaGroupForChart(NSArray *rows, RDLChartMember *member,
+                                           RDLEvalScope *scope) {
+  PicaChartBuckets *out = [[PicaChartBuckets alloc] init];
+  if (member == nil || [member.groupExpressions count] == 0) {
+    [out.keys addObject:@""];
+    out.rows[@""] = [rows mutableCopy];
+    out.labels[@""] = @"";
+    return out;
+  }
+  for (NSDictionary *row in rows) {
+    NSMutableString *key = [NSMutableString string];
+    for (RDLValue *e in member.groupExpressions) {
+      [key appendString:PicaAsStr(PicaEvalRow(e, row, scope))];
+      [key appendString:@"\x1f"];
+    }
+    NSMutableArray *bucket = out.rows[key];
+    if (bucket == nil) {
+      bucket = [NSMutableArray array];
+      out.rows[key] = bucket;
+      [out.keys addObject:key];
+      // The label is whatever the report asked for, or the group value itself.
+      RDLValue *label = member.label ?: member.groupExpressions[0];
+      out.labels[key] = PicaAsStr(PicaEvalRow(label, row, scope));
+    }
+    [bucket addObject:row];
+  }
+  return out;
+}
+
+// Evaluate one series expression over the rows of a single bucket. The rows go
+// into the scope as a group so Sum/Avg/Count aggregate over exactly them.
+static id PicaChartAggregate(RDLValue *value, NSArray *rows, RDLEvalScope *scope) {
+  if (value == nil || [rows count] == 0)
+    return [NSNull null];
+  NSDictionary *savedRow = scope.row;
+  NSArray *savedGroup = scope.groupRows;
+  scope.row = [rows firstObject];
+  scope.groupRows = rows;
+  id v = [value evaluateInScope:scope];
+  scope.row = savedRow;
+  scope.groupRows = savedGroup;
+  if (v == nil || v == [NSNull null])
+    return [NSNull null];
+  if ([v isKindOfClass:[NSNumber class]])
+    return v;
+  NSString *text = PicaAsStr(v);
+  return [text length] ? @([text doubleValue]) : [NSNull null];
+}
+
+// A readable axis step: 1, 2 or 5 times a power of ten, whichever gives
+// roughly the number of gridlines asked for.
+static double PicaNiceInterval(double span, NSInteger want) {
+  if (span <= 0 || want <= 0)
+    return 1;
+  double raw = span / (double)want;
+  double mag = pow(10, floor(log10(raw)));
+  double norm = raw / mag;
+  double step = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return step * mag;
+}
+
+static void PicaLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *scope) {
+  lc.chartType = chart.chartType != RDLChartTypeUnspecified ? chart.chartType : RDLChartTypeColumn;
+  lc.subtype = chart.subtype != RDLChartSubtypeUnspecified ? chart.subtype : RDLChartSubtypePlain;
+  lc.title = [chart.chartTitle evaluateTextInScope:scope];
+  lc.categoryAxisTitle = [chart.categoryAxis.title evaluateTextInScope:scope];
+  lc.valueAxisTitle = [chart.valueAxis.title evaluateTextInScope:scope];
+  lc.categoryAxisHidden = chart.categoryAxis.hidden;
+  lc.valueAxisHidden = chart.valueAxis.hidden;
+  lc.showCategoryGridLines = chart.categoryAxis.showMajorGridLines;
+  lc.showValueGridLines = chart.valueAxis.showMajorGridLines;
+  lc.legendHidden = chart.legendHidden;
+  lc.legendPosition = chart.legendPosition != RDLChartLegendPositionUnspecified
+                          ? chart.legendPosition
+                          : RDLChartLegendPositionRightCenter;
+
+  RDLDataSet *ds = PicaFindSet(scope.report, chart.dataSetName);
+  NSArray *rows = ds.rows ?: @[];
+  rows = PicaApplyFilters(rows, chart.filters, scope);
+  rows = PicaApplySort(rows, chart.sortExpressions, scope);
+  RDLDataSet *savedSet = scope.dataSet;
+  if (ds)
+    scope.dataSet = ds;
+
+  PicaChartBuckets *cats = PicaGroupForChart(rows, [chart.categoryMembers firstObject], scope);
+  PicaChartBuckets *sers = PicaGroupForChart(rows, [chart.seriesMembers firstObject], scope);
+
+  NSMutableArray *categories = [NSMutableArray array];
+  for (NSString *key in cats.keys)
+    [categories addObject:cats.labels[key] ?: @""];
+  lc.categories = categories;
+
+  NSArray<NSString *> *palette = RDLColorsForChartPalette(chart.palette);
+  NSMutableArray<RDLLaidOutChartSeries *> *drawn = [NSMutableArray array];
+  // One drawn series per (series definition x series grouping key), which is
+  // how a single <ChartSeries> over a grouping becomes several lines.
+  for (RDLChartSeries *def in chart.series) {
+    for (NSString *sKey in sers.keys) {
+      NSSet *sRows = [NSSet setWithArray:sers.rows[sKey] ?: @[]];
+      RDLLaidOutChartSeries *out = [[RDLLaidOutChartSeries alloc] init];
+      NSString *seriesLabel = sers.labels[sKey];
+      out.label = [seriesLabel length] ? seriesLabel : (def.name ?: @"");
+      out.color = palette[[drawn count] % [palette count]];
+      out.type = def.type != RDLChartTypeUnspecified ? def.type : lc.chartType;
+      out.subtype = def.subtype != RDLChartSubtypeUnspecified ? def.subtype : lc.subtype;
+      out.showDataLabels = def.showDataLabels;
+      out.showMarker = def.showMarker;
+      NSMutableArray *values = [NSMutableArray array];
+      NSMutableArray *xValues = def.x ? [NSMutableArray array] : nil;
+      for (NSString *cKey in cats.keys) {
+        // The rows in this category that also belong to this series.
+        NSMutableArray *cell = [NSMutableArray array];
+        for (NSDictionary *row in cats.rows[cKey])
+          if ([sRows containsObject:row])
+            [cell addObject:row];
+        [values addObject:PicaChartAggregate(def.value, cell, scope)];
+        if (xValues)
+          [xValues addObject:PicaChartAggregate(def.x, cell, scope)];
+      }
+      out.values = values;
+      out.xValues = xValues;
+      [drawn addObject:out];
+    }
+  }
+  lc.chartSeries = drawn;
+
+  // The value axis. An explicit Minimum/Maximum wins; otherwise take it from
+  // the data, and from the stacked total rather than the tallest single series
+  // when the series are piled up.
+  BOOL stacked = lc.subtype == RDLChartSubtypeStacked || lc.subtype == RDLChartSubtypePercentStacked;
+  double lo = 0, hi = 0;
+  BOOL any = NO;
+  for (NSUInteger i = 0; i < [categories count]; i++) {
+    double stack = 0;
+    for (RDLLaidOutChartSeries *s in drawn) {
+      if (i >= [s.values count] || s.values[i] == [NSNull null])
+        continue;
+      double v = [s.values[i] doubleValue];
+      any = YES;
+      if (stacked) {
+        stack += v;
+      } else {
+        if (v > hi) hi = v;
+        if (v < lo) lo = v;
+      }
+    }
+    if (stacked && stack > hi)
+      hi = stack;
+    if (stacked && stack < lo)
+      lo = stack;
+  }
+  if (lc.subtype == RDLChartSubtypePercentStacked) {
+    lo = 0;
+    hi = 100;
+  } else if (!any) {
+    hi = 1;
+  }
+  id explicitMin = [chart.valueAxis.minimum evaluateInScope:scope];
+  id explicitMax = [chart.valueAxis.maximum evaluateInScope:scope];
+  if ([explicitMin respondsToSelector:@selector(doubleValue)] && [PicaAsStr(explicitMin) length])
+    lo = [explicitMin doubleValue];
+  if ([explicitMax respondsToSelector:@selector(doubleValue)] && [PicaAsStr(explicitMax) length])
+    hi = [explicitMax doubleValue];
+  if (hi <= lo)
+    hi = lo + 1;
+  double interval = PicaNiceInterval(hi - lo, 5);
+  id explicitStep = [chart.valueAxis.majorInterval evaluateInScope:scope];
+  if ([explicitStep respondsToSelector:@selector(doubleValue)] && [explicitStep doubleValue] > 0)
+    interval = [explicitStep doubleValue];
+  // Round the ends out to whole steps so the labels are readable numbers.
+  lc.axisMinimum = interval > 0 ? floor(lo / interval) * interval : lo;
+  lc.axisMaximum = interval > 0 ? ceil(hi / interval) * interval : hi;
+  lc.axisInterval = interval;
+  scope.dataSet = savedSet;
+}
+
++ (RDLLaidOutChart *)laidOutChart:(RDLChart *)chart
+                         inReport:(RDLReport *)report
+                      paramValues:(NSDictionary<NSString *, NSString *> *)params {
+  RDLLaidOutChart *out = [[RDLLaidOutChart alloc] init];
+  if (chart == nil)
+    return out;
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = report;
+  scope.paramValues = params;
+  PicaLayOutChart(chart, out, scope);
+  out.w = chart.width;
+  out.h = chart.height;
+  return out;
+}
+
 + (void)placeItem:(RDLItem *)item
           originX:(CGFloat)ox
           originY:(CGFloat)oy
@@ -1085,29 +1301,7 @@ static CGFloat PicaExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport 
       lm.imageSrc = val;
     }
   } else if ([item isKindOfClass:[RDLChart class]]) {
-    RDLChart *chart = (RDLChart *)item;
-    RDLLaidOutChart *lc = (RDLLaidOutChart *)li;
-    lc.chartType = chart.chartType;
-    lc.title = chart.title;
-    RDLDataSet *ds = PicaFindSet(scope.report, chart.dataSetName);
-    NSString *catField = PicaFieldOf(chart.categoryField) ?: chart.categoryField;
-    NSString *valField = PicaFieldOf(chart.valueField) ?: chart.valueField;
-    NSMutableArray *cats = [NSMutableArray array];
-    NSMutableArray *vals = [NSMutableArray array];
-    for (NSDictionary *row in ds.rows) {
-      id ck = nil;
-      id vk = nil;
-      for (NSString *k in row) {
-        if (catField && [k caseInsensitiveCompare:catField] == NSOrderedSame)
-          ck = row[k];
-        if (valField && [k caseInsensitiveCompare:valField] == NSOrderedSame)
-          vk = row[k];
-      }
-      [cats addObject:ck ? [ck description] : @""];
-      [vals addObject:@([vk respondsToSelector:@selector(doubleValue)] ? [vk doubleValue] : 0)];
-    }
-    lc.categories = cats;
-    lc.values = vals;
+    PicaLayOutChart((RDLChart *)item, (RDLLaidOutChart *)li, scope);
   } else if ([item isKindOfClass:[RDLRectangle class]]) {
     [page.items addObject:li];
     for (RDLItem *child in item.childItems)

@@ -37,6 +37,7 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaExpressionHelper` | Expression completion: typing `!` after `Fields`/`Parameters`/`Globals`/`User` pops the member list; function names complete elsewhere. Also the field editor, which carries its own typing undo so Cmd+Z in a field does not reach the document |
 | `PicaSamples` | Native sample factories |
 | `RDLView` (kit) | Paginated preview from laid-out pages + `PDFData` |
+| `RDLChartRenderer` (kit) | A chart worked out as plain shapes. The PDF backend, the HTML backend and the canvas all draw the same plan, so the canvas shows what gets exported |
 
 ## Interface files
 

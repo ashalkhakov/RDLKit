@@ -1,5 +1,6 @@
 #import "RDLBackend.h"
 #import "RDLReport.h"
+#import "RDLChartRenderer.h"
 #import "PicaCompatibility.h"
 #import <math.h>
 
@@ -88,57 +89,106 @@ static NSString *PicaCSSTextDecoration(RDLTextDecoration d) {
   return nil;
 }
 
+// The geometry comes from RDLChartRenderer, shared with the PDF backend and
+// the designer canvas, so all three draw the same chart. This only has to turn
+// shapes into SVG.
+static NSString *PicaSVGEsc(NSString *s) {
+  NSMutableString *o = [s mutableCopy] ?: [NSMutableString string];
+  [o replaceOccurrencesOfString:@"&" withString:@"&amp;" options:0 range:NSMakeRange(0, [o length])];
+  [o replaceOccurrencesOfString:@"<" withString:@"&lt;" options:0 range:NSMakeRange(0, [o length])];
+  [o replaceOccurrencesOfString:@">" withString:@"&gt;" options:0 range:NSMakeRange(0, [o length])];
+  return o;
+}
+
+// Degrees clockwise from twelve, to a point on the circle.
+static CGPoint PicaWedgePoint(CGRect r, CGFloat degrees, CGFloat radius) {
+  CGFloat a = degrees * (CGFloat)M_PI / 180.0f;
+  return CGPointMake(CGRectGetMidX(r) + sinf(a) * radius, CGRectGetMidY(r) - cosf(a) * radius);
+}
+
 static NSString *PicaChartSVG(RDLLaidOutChart *it) {
-  NSUInteger n = [it.values count];
+  CGFloat W = MAX(it.w, 0.01) * 96.0, H = MAX(it.h, 0.01) * 96.0;
+  NSArray<RDLChartShape *> *shapes =
+      [RDLChartRenderer shapesForChart:it inRect:CGRectMake(0, 0, W, H)];
   NSMutableString *svg = [NSMutableString string];
-  CGFloat W = 400, H = 300;
-  [svg appendFormat:@"<svg viewBox=\"0 0 %.0f %.0f\" width=\"100%%\" height=\"100%%\" "
-                    @"preserveAspectRatio=\"none\" xmlns=\"http://www.w3.org/2000/svg\">",
+  [svg appendFormat:@"<svg viewBox=\"0 0 %.2f %.2f\" width=\"100%%\" height=\"100%%\" "
+                    @"xmlns=\"http://www.w3.org/2000/svg\">",
                     W, H];
-  double max = 1, total = 0;
-  for (NSNumber *v in it.values) {
-    if ([v doubleValue] > max)
-      max = [v doubleValue];
-    total += fabs([v doubleValue]);
-  }
-  RDLChartType type = it.chartType;
-  NSString *ink = @"#1a1916";
-  if (n && type == RDLChartTypePie) {
-    double cx = W / 2, cy = H / 2, r = MIN(W, H) * 0.42;
-    double angle = -M_PI_2;
-    for (NSUInteger i = 0; i < n; i++) {
-      double frac = total > 0 ? fabs([it.values[i] doubleValue]) / total : 1.0 / n;
-      double a2 = angle + frac * 2 * M_PI;
-      double x1 = cx + r * cos(angle), y1 = cy + r * sin(angle);
-      double x2 = cx + r * cos(a2), y2 = cy + r * sin(a2);
-      int large = (a2 - angle) > M_PI ? 1 : 0;
-      double shade = 0.25 + 0.6 * ((double)i / MAX(n, 1));
-      [svg appendFormat:@"<path d=\"M%.1f %.1f L%.1f %.1f A%.1f %.1f 0 %d 1 %.1f %.1f Z\" "
-                        @"fill=\"rgba(26,25,22,%.2f)\" stroke=\"#f6f1e8\"/>",
-                        cx, cy, x1, y1, r, r, large, x2, y2, shade];
-      angle = a2;
+  for (RDLChartShape *sh in shapes) {
+    NSString *fill = sh.fill ?: @"none";
+    NSString *stroke = sh.stroke ?: @"none";
+    NSString *op = sh.opacity < 1 ? [NSString stringWithFormat:@" opacity=\"%.2f\"", sh.opacity] : @"";
+    switch (sh.kind) {
+    case RDLChartShapeRect:
+      [svg appendFormat:@"<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" "
+                        @"fill=\"%@\"%@/>",
+                        sh.rect.origin.x, sh.rect.origin.y, sh.rect.size.width, sh.rect.size.height,
+                        fill, op];
+      break;
+    case RDLChartShapeEllipse:
+      [svg appendFormat:@"<ellipse cx=\"%.2f\" cy=\"%.2f\" rx=\"%.2f\" ry=\"%.2f\" "
+                        @"fill=\"%@\"%@/>",
+                        CGRectGetMidX(sh.rect), CGRectGetMidY(sh.rect), sh.rect.size.width / 2,
+                        sh.rect.size.height / 2, fill, op];
+      break;
+    case RDLChartShapeLine: {
+      CGPoint a = RDLChartPointFromValue(sh.points[0]);
+      CGPoint b = RDLChartPointFromValue(sh.points[1]);
+      [svg appendFormat:@"<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" "
+                        @"stroke=\"%@\" stroke-width=\"%.2f\"/>",
+                        a.x, a.y, b.x, b.y, stroke, sh.lineWidth];
+      break;
     }
-  } else if (n && type == RDLChartTypeLine) {
-    [svg appendString:@"<polyline fill=\"none\" stroke=\"#1a1916\" stroke-width=\"3\" points=\""];
-    for (NSUInteger i = 0; i < n; i++) {
-      double x = n > 1 ? (W - 20) * i / (n - 1) + 10 : W / 2;
-      double y = H - 10 - ([it.values[i] doubleValue] / max) * (H - 20);
-      [svg appendFormat:@"%.1f,%.1f ", x, y];
+    case RDLChartShapePolyline:
+    case RDLChartShapePolygon: {
+      NSMutableString *pts = [NSMutableString string];
+      for (NSValue *v in sh.points) {
+        CGPoint p = RDLChartPointFromValue(v);
+        [pts appendFormat:@"%.2f,%.2f ", p.x, p.y];
+      }
+      [svg appendFormat:@"<%@ points=\"%@\" fill=\"%@\" stroke=\"%@\" stroke-width=\"%.2f\" "
+                        @"stroke-linejoin=\"round\"%@/>",
+                        sh.kind == RDLChartShapePolygon ? @"polygon" : @"polyline", pts,
+                        sh.kind == RDLChartShapePolygon ? fill : @"none",
+                        sh.kind == RDLChartShapePolygon ? @"none" : stroke, sh.lineWidth, op];
+      break;
     }
-    [svg appendString:@"\"/>"];
-  } else if (n && type == RDLChartTypeBar) {
-    CGFloat gap = (H - 20) / n;
-    for (NSUInteger i = 0; i < n; i++) {
-      double w = ([it.values[i] doubleValue] / max) * (W - 20);
-      [svg appendFormat:@"<rect x=\"10\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%@\"/>",
-                        10 + i * gap + gap * 0.15, w, gap * 0.7, ink];
+    case RDLChartShapeWedge: {
+      CGFloat outer = sh.rect.size.width / 2;
+      CGPoint p1 = PicaWedgePoint(sh.rect, sh.startAngle, outer);
+      CGPoint p2 = PicaWedgePoint(sh.rect, sh.endAngle, outer);
+      int large = (sh.endAngle - sh.startAngle) > 180 ? 1 : 0;
+      if (sh.innerRadius > 0) {
+        CGPoint q1 = PicaWedgePoint(sh.rect, sh.endAngle, sh.innerRadius);
+        CGPoint q2 = PicaWedgePoint(sh.rect, sh.startAngle, sh.innerRadius);
+        [svg appendFormat:@"<path d=\"M%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f L%.2f %.2f "
+                          @"A%.2f %.2f 0 %d 0 %.2f %.2f Z\" fill=\"%@\" stroke=\"%@\"/>",
+                          p1.x, p1.y, outer, outer, large, p2.x, p2.y, q1.x, q1.y, sh.innerRadius,
+                          sh.innerRadius, large, q2.x, q2.y, fill, stroke];
+      } else {
+        [svg appendFormat:@"<path d=\"M%.2f %.2f L%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f Z\" "
+                          @"fill=\"%@\" stroke=\"%@\"/>",
+                          CGRectGetMidX(sh.rect), CGRectGetMidY(sh.rect), p1.x, p1.y, outer, outer,
+                          large, p2.x, p2.y, fill, stroke];
+      }
+      break;
     }
-  } else if (n) {
-    CGFloat gap = (W - 20) / n;
-    for (NSUInteger i = 0; i < n; i++) {
-      double h = ([it.values[i] doubleValue] / max) * (H - 20);
-      [svg appendFormat:@"<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" fill=\"%@\"/>",
-                        10 + i * gap + gap * 0.2, H - 10 - h, gap * 0.6, h, ink];
+    case RDLChartShapeText: {
+      NSString *anchor = sh.anchor == RDLChartTextAnchorMiddle
+                             ? @"middle"
+                             : (sh.anchor == RDLChartTextAnchorEnd ? @"end" : @"start");
+      NSString *transform =
+          sh.rotation != 0
+              ? [NSString stringWithFormat:@" transform=\"rotate(%.1f %.2f %.2f)\"", -sh.rotation,
+                                           sh.rect.origin.x, sh.rect.origin.y]
+              : @"";
+      [svg appendFormat:@"<text x=\"%.2f\" y=\"%.2f\" text-anchor=\"%@\" font-size=\"%.2f\" "
+                        @"font-family=\"Helvetica,Arial,sans-serif\"%@ fill=\"%@\"%@>%@</text>",
+                        sh.rect.origin.x, sh.rect.origin.y, anchor, sh.fontSize,
+                        sh.bold ? @" font-weight=\"bold\"" : @"", fill, transform,
+                        PicaSVGEsc(sh.text)];
+      break;
+    }
     }
   }
   [svg appendString:@"</svg>"];

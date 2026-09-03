@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <PageHeight>11in</PageHeight>
+  <PageWidth>8.5in</PageWidth>
+  <TopMargin>.5in</TopMargin>
+  <LeftMargin>.5in</LeftMargin>
+  <RightMargin>.5in</RightMargin>
+  <BottomMargin>.5in</BottomMargin>
+  <Width>7.5in</Width>
+
+  <DataSources>
+    <DataSource Name="DS1">
+      <ConnectionProperties>
+        <DataProvider>Json</DataProvider>
+        <!-- Path is overridden at runtime via DataSource.UserConnection -->
+        <ConnectString>file=employees.json</ConnectString>
+      </ConnectionProperties>
+    </DataSource>
+  </DataSources>
+
+  <DataSets>
+    <DataSet Name="Data">
+      <Query>
+        <DataSourceName>DS1</DataSourceName>
+        <!-- List the fields to include; nested objects use underscore notation -->
+        <CommandText>columns=EmployeeID,FirstName,LastName,Department,Title,HireDate,Salary,Contact_Email,Contact_Phone</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="EmployeeID">
+          <DataField>EmployeeID</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="FirstName">
+          <DataField>FirstName</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="LastName">
+          <DataField>LastName</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="Department">
+          <DataField>Department</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="Title">
+          <DataField>Title</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="HireDate">
+          <DataField>HireDate</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="Salary">
+          <DataField>Salary</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="Contact_Email">
+          <DataField>Contact_Email</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+        <Field Name="Contact_Phone">
+          <DataField>Contact_Phone</DataField>
+          <rd:TypeName>System.Text.Json.JsonElement</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+
+  <PageHeader>
+    <Height>.6in</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="Title">
+        <Top>.1in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.3in</Height>
+        <Value>Employee Directory</Value>
+        <Style>
+          <FontSize>16pt</FontSize>
+          <FontWeight>Bold</FontWeight>
+        </Style>
+      </Textbox>
+      <Textbox Name="Generated">
+        <Top>.45in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.12in</Height>
+        <Value>=Format(Today(), "MMMM d, yyyy")</Value>
+        <Style>
+          <FontSize>8pt</FontSize>
+          <Color>Gray</Color>
+        </Style>
+      </Textbox>
+    </ReportItems>
+  </PageHeader>
+
+  <Body>
+    <Height>3in</Height>
+    <ReportItems>
+      <Table Name="EmployeeTable">
+        <DataSetName>Data</DataSetName>
+        <NoRows>No employees found.</NoRows>
+        <Top>0in</Top>
+        <Left>0in</Left>
+        <TableColumns>
+          <TableColumn><Width>.35in</Width></TableColumn>
+          <TableColumn><Width>1.5in</Width></TableColumn>
+          <TableColumn><Width>1in</Width></TableColumn>
+          <TableColumn><Width>1.75in</Width></TableColumn>
+          <TableColumn><Width>.85in</Width></TableColumn>
+          <TableColumn><Width>2.05in</Width></TableColumn>
+        </TableColumns>
+        <Header>
+          <TableRows>
+            <TableRow>
+              <Height>16pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_ID">
+                      <Value>ID</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Name">
+                      <Value>Name</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Dept">
+                      <Value>Department</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Title">
+                      <Value>Title</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Hire">
+                      <Value>Hire Date</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Email">
+                      <Value>Email</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#7030A0</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+          <RepeatOnNewPage>true</RepeatOnNewPage>
+        </Header>
+        <Details>
+          <TableRows>
+            <TableRow>
+              <Height>14pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="EmployeeID">
+                      <Value>=Fields!EmployeeID.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="FullName">
+                      <Value>=Fields!FirstName.Value &amp; " " &amp; Fields!LastName.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Department">
+                      <Value>=Fields!Department.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Title2">
+                      <Value>=Fields!Title.Value</Value>
+                      <CanGrow>true</CanGrow>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="HireDate">
+                      <Value>=Fields!HireDate.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Contact_Email">
+                      <Value>=Fields!Contact_Email.Value</Value>
+                      <CanGrow>true</CanGrow>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F3EEFA", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+        </Details>
+      </Table>
+    </ReportItems>
+  </Body>
+
+  <PageFooter>
+    <Height>18pt</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="PageNum">
+        <Top>2pt</Top>
+        <Left>0in</Left>
+        <Width>3in</Width>
+        <Height>14pt</Height>
+        <Value>=Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+    </ReportItems>
+  </PageFooter>
+</Report>

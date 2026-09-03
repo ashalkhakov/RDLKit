@@ -141,13 +141,85 @@ NSString *RDLStringFromParameterDataType(RDLParameterDataType v) {
   return PicaStringFromEnum(v, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
 }
 
-static const char *const kRDLChartTypeNames[] = {"", "Column", "Bar", "Line", "Pie"};
+static const char *const kRDLChartTypeNames[] = {"",     "Column",   "Bar",     "Line",  "Area",
+                                                 "Pie",  "Doughnut", "Scatter", "Bubble"};
 static const NSInteger kRDLChartTypeNamesCount = (NSInteger)(sizeof(kRDLChartTypeNames) / sizeof(*kRDLChartTypeNames));
 RDLChartType RDLChartTypeFromString(NSString *s) {
   return (RDLChartType)PicaEnumFromString(s, kRDLChartTypeNames, kRDLChartTypeNamesCount);
 }
 NSString *RDLStringFromChartType(RDLChartType v) {
   return PicaStringFromEnum(v, kRDLChartTypeNames, kRDLChartTypeNamesCount);
+}
+
+static const char *const kRDLChartSubtypeNames[] = {"",       "Plain",  "Stacked",
+                                                    "PercentStacked", "Smooth", "Exploded"};
+static const NSInteger kRDLChartSubtypeNamesCount =
+    (NSInteger)(sizeof(kRDLChartSubtypeNames) / sizeof(*kRDLChartSubtypeNames));
+RDLChartSubtype RDLChartSubtypeFromString(NSString *s) {
+  return (RDLChartSubtype)PicaEnumFromString(s, kRDLChartSubtypeNames, kRDLChartSubtypeNamesCount);
+}
+NSString *RDLStringFromChartSubtype(RDLChartSubtype v) {
+  return PicaStringFromEnum(v, kRDLChartSubtypeNames, kRDLChartSubtypeNamesCount);
+}
+
+static const char *const kRDLChartLegendPositionNames[] = {
+    "",         "TopLeft",    "TopCenter",   "TopRight",    "LeftTop",     "LeftCenter",
+    "LeftBottom", "RightTop", "RightCenter", "RightBottom", "BottomLeft",  "BottomCenter",
+    "BottomRight"};
+static const NSInteger kRDLChartLegendPositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartLegendPositionNames) / sizeof(*kRDLChartLegendPositionNames));
+RDLChartLegendPosition RDLChartLegendPositionFromString(NSString *s) {
+  return (RDLChartLegendPosition)PicaEnumFromString(s, kRDLChartLegendPositionNames,
+                                                    kRDLChartLegendPositionNamesCount);
+}
+NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v) {
+  return PicaStringFromEnum(v, kRDLChartLegendPositionNames, kRDLChartLegendPositionNamesCount);
+}
+
+static const char *const kRDLChartPaletteNames[] = {"",          "Default",   "EarthTones",
+                                                    "Excel",     "GrayScale", "Pastel",
+                                                    "Light",     "SemiTransparent"};
+static const NSInteger kRDLChartPaletteNamesCount =
+    (NSInteger)(sizeof(kRDLChartPaletteNames) / sizeof(*kRDLChartPaletteNames));
+RDLChartPalette RDLChartPaletteFromString(NSString *s) {
+  return (RDLChartPalette)PicaEnumFromString(s, kRDLChartPaletteNames, kRDLChartPaletteNamesCount);
+}
+NSString *RDLStringFromChartPalette(RDLChartPalette v) {
+  return PicaStringFromEnum(v, kRDLChartPaletteNames, kRDLChartPaletteNamesCount);
+}
+
+static const char *const kRDLChartTickMarksNames[] = {"", "None", "Inside", "Outside", "Cross"};
+static const NSInteger kRDLChartTickMarksNamesCount =
+    (NSInteger)(sizeof(kRDLChartTickMarksNames) / sizeof(*kRDLChartTickMarksNames));
+RDLChartTickMarks RDLChartTickMarksFromString(NSString *s) {
+  return (RDLChartTickMarks)PicaEnumFromString(s, kRDLChartTickMarksNames, kRDLChartTickMarksNamesCount);
+}
+NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v) {
+  return PicaStringFromEnum(v, kRDLChartTickMarksNames, kRDLChartTickMarksNamesCount);
+}
+
+// Series colours. Deliberately muted rather than saturated, to sit with the
+// rest of what this kit draws; the named palettes keep RDL's names so a report
+// asking for one gets something recognisably like it.
+NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette) {
+  switch (palette) {
+  case RDLChartPaletteEarthTones:
+    return @[ @"#7a5c3e", @"#a8814f", @"#5c6b4a", @"#8a6a4f", @"#3f4f3a", @"#c2a06a", @"#6b4f3a" ];
+  case RDLChartPaletteExcel:
+    return @[ @"#4572a7", @"#aa4643", @"#89a54e", @"#71588f", @"#4198af", @"#db843d", @"#93a9cf" ];
+  case RDLChartPaletteGrayScale:
+    return @[ @"#2b2b2b", @"#4f4f4f", @"#737373", @"#979797", @"#bbbbbb", @"#585858", @"#8c8c8c" ];
+  case RDLChartPalettePastel:
+    return @[ @"#a8c8e0", @"#e0b8b0", @"#c2d6a8", @"#d0c0dc", @"#a8d6d0", @"#e6cfa8", @"#c8bfae" ];
+  case RDLChartPaletteLight:
+    return @[ @"#cfe0ec", @"#f0d5cf", @"#dbe8c8", @"#e4dcec", @"#cfe6e2", @"#f2e3c8", @"#ded7c9" ];
+  case RDLChartPaletteSemiTransparent:
+    return @[ @"#6f8fae", @"#ae7f78", @"#93a878", @"#9a8caa", @"#78a49e", @"#c0a173", @"#9c9384" ];
+  case RDLChartPaletteDefault:
+  case RDLChartPaletteUnspecified:
+  default:
+    return @[ @"#4a6b8a", @"#a8603f", @"#6b7f4a", @"#7a5f8a", @"#3f7f78", @"#b08a4a", @"#5c574e" ];
+  }
 }
 
 
@@ -536,10 +608,131 @@ static const CGFloat kPicaGroupHeaderWidth = 1.2;
 
 @end
 
+@implementation RDLChartMember
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _groupExpressions = [NSMutableArray array];
+  return self;
+}
+@end
+
+@implementation RDLChartAxis
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _showMajorGridLines = YES;
+    _majorTickMarks = RDLChartTickMarksOutside;
+  }
+  return self;
+}
+@end
+
+@implementation RDLChartSeries
+@end
+
 @implementation RDLChart
+
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _categoryMembers = [NSMutableArray array];
+    _seriesMembers = [NSMutableArray array];
+    _series = [NSMutableArray array];
+    _categoryAxis = [[RDLChartAxis alloc] init];
+    _valueAxis = [[RDLChartAxis alloc] init];
+    _legendPosition = RDLChartLegendPositionRightCenter;
+  }
+  return self;
+}
+
 - (NSString *)rdlElementName {
   return @"Chart";
 }
+
+#pragma mark - Designer conveniences
+
+// The field a single grouping is over, so the inspector can offer a field
+// picker rather than make the user write "=Fields!X.Value" by hand. Reading
+// and writing both go through the real members, which stay the only truth.
+static NSString *PicaChartFieldOf(RDLValue *value) {
+  NSString *source = [value source];
+  NSRange bang = [source rangeOfString:@"Fields!"];
+  if (bang.location == NSNotFound)
+    return source;
+  NSString *rest = [source substringFromIndex:NSMaxRange(bang)];
+  NSRange dot = [rest rangeOfString:@"."];
+  return dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
+}
+
+static RDLValue *PicaChartFieldValue(NSString *field) {
+  if ([field length] == 0)
+    return nil;
+  return [RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
+}
+
+static void PicaSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString *field,
+                              NSString *chartName, NSString *suffix) {
+  if ([field length] == 0) {
+    [members removeAllObjects];
+    return;
+  }
+  RDLChartMember *m = [members firstObject];
+  if (m == nil) {
+    m = [[RDLChartMember alloc] init];
+    [members addObject:m];
+  }
+  m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
+  [m.groupExpressions removeAllObjects];
+  [m.groupExpressions addObject:PicaChartFieldValue(field)];
+  m.label = PicaChartFieldValue(field);
+}
+
+- (NSString *)categoryField {
+  RDLChartMember *m = [_categoryMembers firstObject];
+  return [m.groupExpressions count] ? PicaChartFieldOf(m.groupExpressions[0]) : nil;
+}
+
+- (void)setCategoryField:(NSString *)field {
+  PicaSetSoleMember(_categoryMembers, field, self.name, @"Category");
+}
+
+- (NSString *)seriesField {
+  RDLChartMember *m = [_seriesMembers firstObject];
+  return [m.groupExpressions count] ? PicaChartFieldOf(m.groupExpressions[0]) : nil;
+}
+
+- (void)setSeriesField:(NSString *)field {
+  PicaSetSoleMember(_seriesMembers, field, self.name, @"Series");
+}
+
+- (NSString *)valueField {
+  return [_series count] ? PicaChartFieldOf([_series[0] value]) : nil;
+}
+
+- (void)setValueField:(NSString *)field {
+  if ([field length] == 0) {
+    [_series removeAllObjects];
+    return;
+  }
+  RDLChartSeries *s = [_series firstObject];
+  if (s == nil) {
+    s = [[RDLChartSeries alloc] init];
+    s.name = [NSString stringWithFormat:@"%@_Series", self.name ?: @"Chart"];
+    [_series addObject:s];
+  }
+  // A chart plots an aggregate over each category, not one row each.
+  s.value = [RDLValue valueWithSource:[NSString stringWithFormat:@"=Sum(Fields!%@.Value)", field]];
+}
+
+- (NSString *)title {
+  return [_chartTitle source];
+}
+
+- (void)setTitle:(NSString *)title {
+  _chartTitle = [RDLValue valueWithSource:title];
+}
+
 @end
 
 // CellContents may hold any report item; everything this file builds and reads
@@ -1320,10 +1513,26 @@ static void PicaAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
 }
 @end
 
+@implementation RDLLaidOutChartSeries
+@end
+
 @implementation RDLLaidOutChart
+
+// Every series' values in one flat list, for a renderer that only wants to
+// know how big the numbers get.
+- (NSArray<NSNumber *> *)values {
+  NSMutableArray *out = [NSMutableArray array];
+  for (RDLLaidOutChartSeries *s in _chartSeries)
+    for (id v in s.values)
+      [out addObject:v == [NSNull null] ? @0 : v];
+  return out;
+}
+
+
 - (NSString *)rdlElementName {
   return @"Chart";
 }
+
 @end
 
 @implementation RDLLaidOutPage

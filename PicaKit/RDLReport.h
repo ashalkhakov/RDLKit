@@ -148,13 +148,65 @@ typedef NS_ENUM(NSInteger, RDLParameterDataType) {
   RDLParameterDataTypeString,
 };
 
-// Not MS-RDL: a chart is stored as a Rectangle plus Pica.* CustomProperties.
 typedef NS_ENUM(NSInteger, RDLChartType) {
   RDLChartTypeUnspecified = 0,
   RDLChartTypeColumn,
   RDLChartTypeBar,
   RDLChartTypeLine,
+  RDLChartTypeArea,
   RDLChartTypePie,
+  RDLChartTypeDoughnut,
+  RDLChartTypeScatter,
+  RDLChartTypeBubble,
+};
+
+// How the series of a chart are combined. Plain draws them side by side;
+// Stacked piles them up; PercentStacked piles them up and scales each category
+// to the full height so the shares are comparable.
+typedef NS_ENUM(NSInteger, RDLChartSubtype) {
+  RDLChartSubtypeUnspecified = 0,
+  RDLChartSubtypePlain,
+  RDLChartSubtypeStacked,
+  RDLChartSubtypePercentStacked,
+  RDLChartSubtypeSmooth,   // Line
+  RDLChartSubtypeExploded, // Pie / Doughnut
+};
+
+// Where the legend sits, named as RDL names it: the edge first, then where
+// along that edge.
+typedef NS_ENUM(NSInteger, RDLChartLegendPosition) {
+  RDLChartLegendPositionUnspecified = 0,
+  RDLChartLegendPositionTopLeft,
+  RDLChartLegendPositionTopCenter,
+  RDLChartLegendPositionTopRight,
+  RDLChartLegendPositionLeftTop,
+  RDLChartLegendPositionLeftCenter,
+  RDLChartLegendPositionLeftBottom,
+  RDLChartLegendPositionRightTop,
+  RDLChartLegendPositionRightCenter,
+  RDLChartLegendPositionRightBottom,
+  RDLChartLegendPositionBottomLeft,
+  RDLChartLegendPositionBottomCenter,
+  RDLChartLegendPositionBottomRight,
+};
+
+typedef NS_ENUM(NSInteger, RDLChartPalette) {
+  RDLChartPaletteUnspecified = 0,
+  RDLChartPaletteDefault,
+  RDLChartPaletteEarthTones,
+  RDLChartPaletteExcel,
+  RDLChartPaletteGrayScale,
+  RDLChartPalettePastel,
+  RDLChartPaletteLight,
+  RDLChartPaletteSemiTransparent,
+};
+
+typedef NS_ENUM(NSInteger, RDLChartTickMarks) {
+  RDLChartTickMarksUnspecified = 0,
+  RDLChartTickMarksNone,
+  RDLChartTickMarksInside,
+  RDLChartTickMarksOutside,
+  RDLChartTickMarksCross,
 };
 
 
@@ -186,6 +238,16 @@ FOUNDATION_EXPORT RDLParameterDataType RDLParameterDataTypeFromString(NSString *
 FOUNDATION_EXPORT NSString *RDLStringFromParameterDataType(RDLParameterDataType v);
 FOUNDATION_EXPORT RDLChartType RDLChartTypeFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromChartType(RDLChartType v);
+FOUNDATION_EXPORT RDLChartSubtype RDLChartSubtypeFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromChartSubtype(RDLChartSubtype v);
+FOUNDATION_EXPORT RDLChartLegendPosition RDLChartLegendPositionFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v);
+FOUNDATION_EXPORT RDLChartPalette RDLChartPaletteFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromChartPalette(RDLChartPalette v);
+FOUNDATION_EXPORT RDLChartTickMarks RDLChartTickMarksFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v);
+// The colours a palette cycles through, as "#rrggbb".
+FOUNDATION_EXPORT NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette);
 
 // An RDL measurement: a number and the unit it was written in. RDL writes
 // these as "10pt", "0.5in", "3mm"; keeping the unit rather than normalising to
@@ -363,11 +425,63 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 @end
 
-// Not an MS-RDL element: written as a Rectangle plus Pica.* CustomProperties.
+// One grouping along an axis of a chart: the categories across the bottom, or
+// the series in the legend. The same shape serves both, which is how MS-RDL
+// models it (ChartCategoryHierarchy / ChartSeriesHierarchy).
+@interface RDLChartMember : NSObject
+@property (nonatomic, copy) NSString *groupName;
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *groupExpressions;
+// What to write under the category, or beside the swatch in the legend.
+// Defaults to the group expression when absent.
+@property (nonatomic, strong) RDLValue *label;
+@end
+
+@interface RDLChartAxis : NSObject
+@property (nonatomic, assign) BOOL hidden;
+@property (nonatomic, strong) RDLValue *title;
+@property (nonatomic, assign) BOOL showMajorGridLines;
+@property (nonatomic, assign) RDLChartTickMarks majorTickMarks;
+@property (nonatomic, strong) RDLValue *minimum, *maximum, *majorInterval;
+// A scalar axis is numeric and spaced by value; otherwise categories are
+// evenly spaced in the order they appear.
+@property (nonatomic, assign) BOOL scalar;
+@end
+
+// One measure plotted across the categories. A chart with a series grouping
+// has one of these; the grouping is what multiplies it into several drawn
+// series at layout time.
+@interface RDLChartSeries : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, strong) RDLValue *value; // Y
+@property (nonatomic, strong) RDLValue *x;     // Scatter / Bubble
+@property (nonatomic, strong) RDLValue *size;  // Bubble
+// A series may override the chart's own type and subtype, which is how RDL
+// expresses a combination chart (bars with a line over them).
+@property (nonatomic, assign) RDLChartType type;
+@property (nonatomic, assign) RDLChartSubtype subtype;
+@property (nonatomic, assign) BOOL showDataLabels;
+@property (nonatomic, assign) BOOL showMarker;
+@end
+
 @interface RDLChart : RDLDataRegion
 @property (nonatomic, assign) RDLChartType chartType;
+@property (nonatomic, assign) RDLChartSubtype subtype;
+@property (nonatomic, assign) RDLChartPalette palette;
+@property (nonatomic, strong) RDLValue *chartTitle;
+@property (nonatomic, strong) NSMutableArray<RDLChartMember *> *categoryMembers;
+@property (nonatomic, strong) NSMutableArray<RDLChartMember *> *seriesMembers;
+@property (nonatomic, strong) NSMutableArray<RDLChartSeries *> *series;
+@property (nonatomic, strong) RDLChartAxis *categoryAxis;
+@property (nonatomic, strong) RDLChartAxis *valueAxis;
+@property (nonatomic, assign) BOOL legendHidden;
+@property (nonatomic, assign) RDLChartLegendPosition legendPosition;
+
+// Designer conveniences, projected onto the structures above the way
+// RDLTablix.columnSpecs is -- so the inspector can bind to one plain field
+// each and the MS-RDL shape stays the only stored truth.
 @property (nonatomic, copy) NSString *categoryField;
 @property (nonatomic, copy) NSString *valueField;
+@property (nonatomic, copy) NSString *seriesField;
 @property (nonatomic, copy) NSString *title;
 @end
 
@@ -590,11 +704,35 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) RDLImageSizing sizing;
 @end
 
+// One plotted series after the data has been grouped and aggregated: `values`
+// has one entry per category, NSNull where that category had no row.
+@interface RDLLaidOutChartSeries : NSObject
+@property (nonatomic, copy) NSString *label;
+@property (nonatomic, copy) NSString *color; // "#rrggbb", from the palette
+@property (nonatomic, copy) NSArray<id> *values;
+@property (nonatomic, copy) NSArray<id> *xValues; // Scatter / Bubble, else nil
+@property (nonatomic, assign) RDLChartType type;
+@property (nonatomic, assign) RDLChartSubtype subtype;
+@property (nonatomic, assign) BOOL showDataLabels;
+@property (nonatomic, assign) BOOL showMarker;
+@end
+
 @interface RDLLaidOutChart : RDLLaidOutItem
 @property (nonatomic, copy) NSArray<NSString *> *categories;
-@property (nonatomic, copy) NSArray<NSNumber *> *values;
+@property (nonatomic, copy) NSArray<RDLLaidOutChartSeries *> *chartSeries;
 @property (nonatomic, assign) RDLChartType chartType;
+@property (nonatomic, assign) RDLChartSubtype subtype;
 @property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSString *categoryAxisTitle;
+@property (nonatomic, copy) NSString *valueAxisTitle;
+@property (nonatomic, assign) BOOL categoryAxisHidden, valueAxisHidden;
+@property (nonatomic, assign) BOOL showCategoryGridLines, showValueGridLines;
+@property (nonatomic, assign) BOOL legendHidden;
+@property (nonatomic, assign) RDLChartLegendPosition legendPosition;
+// The value axis, already resolved to what should be drawn.
+@property (nonatomic, assign) double axisMinimum, axisMaximum, axisInterval;
+// Every series' values, flattened -- what a simple renderer wants.
+@property (nonatomic, readonly) NSArray<NSNumber *> *values;
 @end
 
 @interface RDLLaidOutPage : NSObject

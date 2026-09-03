@@ -4,6 +4,8 @@
 #import "PicaCompatibility.h"
 #import "RDLReport.h"
 #import "RDLParser.h"
+#import "RDLUpgrader.h"
+#import "RDLChartRenderer.h"
 #import "RDLExpression.h"
 #import "RDLLayoutEngine.h"
 #import "RDLView.h"

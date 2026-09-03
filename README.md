@@ -2,12 +2,14 @@
 
 Report Definition Language Kit for GNUstep and Cocoa.
 
-Pure Objective-C (ARC). No Swift, no UIKit, no nibs.
+Pure Objective-C (ARC). No Swift, no UIKit. The designer builds its UI in XIBs.
 
 1. **Generator** (`PicaKit` + `PicaDemo`) — takes an RDL file, data sources, and input parameters, lays out pages (tablix expansion included), then a **PDF** or **HTML** backend paints those elements.
 2. **Designer** (`PicaDesigner`) — creates and edits RDL files (report outline, canvas, inspector, datasets).
 
-The object model follows **MS-RDL 2010/01**: ReportItems, TablixBody / TablixRow / TablixCell, TablixMember (static vs Group with GroupExpressions and TablixHeader, RepeatOnNewPage), Filters, SortExpressions, TablixCorner, DataSources, PageHeader/Footer as PageSection.
+The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
+2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
+accepted as current: ReportItems, TablixBody / TablixRow / TablixCell, TablixMember (static vs Group with GroupExpressions and TablixHeader, RepeatOnNewPage), Filters, SortExpressions, TablixCorner, DataSources, PageHeader/Footer as PageSection.
 
 ## Pipeline
 
@@ -99,3 +101,42 @@ xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test
 There are two test schemes: `PicaKitTests` for the library and
 `PicaDesignerTests` for the app. Use those rather than `swift test` --
 SwiftPM is not part of the build story, which has to work under GNUstep too.
+
+## Charts
+
+`RDLChart` models the MS-RDL 2008/2010 chart — category and series
+hierarchies, a series collection, chart areas with axes, legends, titles and a
+palette. Column, Bar, Line, Area, Pie, Doughnut, Scatter and Bubble; Plain,
+Stacked, PercentStacked and Exploded.
+
+`RDLChartRenderer` turns a laid-out chart into a list of plain shapes, and the
+PDF backend, the HTML backend and the designer canvas all paint that one plan
+— so the canvas shows the chart that gets exported rather than a placeholder.
+
+## RDL coverage
+
+`RDL-COVERAGE.md` scores the parser against 86 real report definitions from the
+Majorsilence Reporting project, imported under `Examples/majorsilence/`. They
+are all RDL 2005 or older; `RDLUpgrader` rewrites them into the 2010 grammar on
+read, the way SSRS upgrades an older report, so the object model only ever has
+to know one shape. 79 of the 86 now parse and lay out; the 7 that do not are
+honest refusals naming a report item we have not implemented. Re-score with
+`.tools/rdl-coverage.sh`.
+
+## License
+
+RDLKit is licensed under the **GNU Lesser General Public License, version 2.1**
+— see `LICENSE`. The LGPL is deliberate: linking `PicaKit.framework` into a
+program does not impose the GPL on that program.
+
+`Examples/majorsilence/` is not ours. Those report definitions come from the
+Majorsilence Reporting project and stay under **Apache License 2.0**; the
+license and attribution sit beside them in `Examples/majorsilence/LICENSE` and
+`NOTICE`. They are distributed alongside RDLKit, not combined into it.
+
+One consequence worth knowing before it bites: Apache 2.0 and LGPL 2.1 are
+**not** compatible in the direction that matters here. Apache-licensed *code*
+cannot be copied into RDLKit's LGPL 2.1 sources. Reading their implementation
+to understand the format is fine, and so is shipping their `.rdl` files as
+separate data; porting their C# into `PicaKit/` is not, unless RDLKit moves to
+LGPL 3.0, which is the version the FSF considers Apache-compatible.

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <PageHeight>11in</PageHeight>
+  <PageWidth>8.5in</PageWidth>
+  <TopMargin>.5in</TopMargin>
+  <LeftMargin>.5in</LeftMargin>
+  <RightMargin>.5in</RightMargin>
+  <BottomMargin>.5in</BottomMargin>
+  <Width>7.5in</Width>
+
+  <DataSources>
+    <DataSource Name="DS1">
+      <ConnectionProperties>
+        <DataProvider>Microsoft.Data.Sqlite</DataProvider>
+        <!-- sqlitetestdb2.db is used only for parse-time schema validation.
+             At runtime, SetData() injects data and the query never executes. -->
+        <ConnectString>Data Source=sqlitetestdb2.db</ConnectString>
+      </ConnectionProperties>
+    </DataSource>
+  </DataSources>
+
+  <DataSets>
+    <DataSet Name="Data">
+      <Query>
+        <DataSourceName>DS1</DataSourceName>
+        <!-- Column aliases must match the SaleRecord property names used in Program.cs.
+             This query runs only at parse time; SetData() provides all runtime data. -->
+        <CommandText>SELECT ProductName AS Product, '' AS Region, UnitPrice AS Amount, UnitsInStock AS Quantity FROM Products LIMIT 0</CommandText>
+      </Query>
+      <!-- Field names must exactly match the public property names of SaleRecord -->
+      <Fields>
+        <Field Name="Product">
+          <DataField>Product</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Region">
+          <DataField>Region</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="Amount">
+          <DataField>Amount</DataField>
+          <rd:TypeName>System.Decimal</rd:TypeName>
+        </Field>
+        <Field Name="Quantity">
+          <DataField>Quantity</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+
+  <PageHeader>
+    <Height>.6in</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="Title">
+        <Top>.1in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.3in</Height>
+        <Value>Sales Report</Value>
+        <Style>
+          <FontSize>16pt</FontSize>
+          <FontWeight>Bold</FontWeight>
+        </Style>
+      </Textbox>
+      <Textbox Name="Generated">
+        <Top>.45in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.12in</Height>
+        <Value>=Format(Today(), "MMMM d, yyyy")</Value>
+        <Style>
+          <FontSize>8pt</FontSize>
+          <Color>Gray</Color>
+        </Style>
+      </Textbox>
+    </ReportItems>
+  </PageHeader>
+
+  <Body>
+    <Height>3in</Height>
+    <ReportItems>
+      <Table Name="SalesTable">
+        <DataSetName>Data</DataSetName>
+        <NoRows>No sales data provided.</NoRows>
+        <Top>0in</Top>
+        <Left>0in</Left>
+        <TableColumns>
+          <TableColumn><Width>2.75in</Width></TableColumn>
+          <TableColumn><Width>1.5in</Width></TableColumn>
+          <TableColumn><Width>1.5in</Width></TableColumn>
+          <TableColumn><Width>1.0in</Width></TableColumn>
+          <TableColumn><Width>.75in</Width></TableColumn>
+        </TableColumns>
+        <Header>
+          <TableRows>
+            <TableRow>
+              <Height>16pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Product">
+                      <Value>Product</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#C00000</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Region">
+                      <Value>Region</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#C00000</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Amount">
+                      <Value>Amount</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#C00000</BackgroundColor>
+                        <Color>White</Color>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Quantity">
+                      <Value>Qty</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#C00000</BackgroundColor>
+                        <Color>White</Color>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_AvgPrice">
+                      <Value>Avg Price</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#C00000</BackgroundColor>
+                        <Color>White</Color>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+          <RepeatOnNewPage>true</RepeatOnNewPage>
+        </Header>
+        <Details>
+          <TableRows>
+            <TableRow>
+              <Height>14pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Product">
+                      <Value>=Fields!Product.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#FCE4E4", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Region">
+                      <Value>=Fields!Region.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#FCE4E4", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Amount">
+                      <Value>=Fields!Amount.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#FCE4E4", "White")</BackgroundColor>
+                        <Format>$#,##0.00</Format>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="Quantity">
+                      <Value>=Fields!Quantity.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#FCE4E4", "White")</BackgroundColor>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="AvgPrice">
+                      <Value>=IIf(Fields!Quantity.Value = 0, 0, Fields!Amount.Value / Fields!Quantity.Value)</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#FCE4E4", "White")</BackgroundColor>
+                        <Format>$#,##0.00</Format>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+        </Details>
+      </Table>
+    </ReportItems>
+  </Body>
+
+  <PageFooter>
+    <Height>18pt</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="PageNum">
+        <Top>2pt</Top>
+        <Left>0in</Left>
+        <Width>3in</Width>
+        <Height>14pt</Height>
+        <Value>=Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+    </ReportItems>
+  </PageFooter>
+</Report>

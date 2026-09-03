@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <PageHeight>11in</PageHeight>
+  <PageWidth>8.5in</PageWidth>
+  <TopMargin>.5in</TopMargin>
+  <LeftMargin>.5in</LeftMargin>
+  <RightMargin>.5in</RightMargin>
+  <BottomMargin>.5in</BottomMargin>
+  <Width>7.5in</Width>
+
+  <PageHeader>
+    <Height>.6in</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="Title">
+        <Top>.1in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.3in</Height>
+        <Value>Barcode Format Showcase</Value>
+        <Style>
+          <FontSize>16pt</FontSize>
+          <FontWeight>Bold</FontWeight>
+        </Style>
+      </Textbox>
+      <Textbox Name="Subtitle">
+        <Top>.45in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.12in</Height>
+        <Value>Six formats rendered via Custom Report Items (CRI) using ZXing.Net — no database required</Value>
+        <Style>
+          <FontSize>8pt</FontSize>
+          <Color>Gray</Color>
+        </Style>
+      </Textbox>
+    </ReportItems>
+  </PageHeader>
+
+  <Body>
+    <Height>7.5in</Height>
+    <ReportItems>
+
+      <!-- ===== LEFT COLUMN ===== -->
+
+      <!-- Row 0: QR Code -->
+      <Textbox Name="L_QR_Label">
+        <Top>0in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>QR Code</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="L_QR_Value">
+        <Top>0.23in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>https://github.com/majorsilence/Reporting</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_QR">
+        <Type>QrCode</Type>
+        <Top>0.42in</Top><Left>0in</Left><Width>1.4in</Width><Height>1.4in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>https://github.com/majorsilence/Reporting</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- Row 1: Code 128 -->
+      <Textbox Name="L_128_Label">
+        <Top>2in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>Code 128</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="L_128_Value">
+        <Top>2.23in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>HELLO-WORLD-128</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_128">
+        <Type>BarCode128</Type>
+        <Top>2.42in</Top><Left>0in</Left><Width>3in</Width><Height>0.85in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>HELLO-WORLD-128</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- Row 2: Code 39 -->
+      <Textbox Name="L_39_Label">
+        <Top>4in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>Code 39</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="L_39_Value">
+        <Top>4.23in</Top><Left>0in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>CODE39HELLO</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_39">
+        <Type>BarCode39</Type>
+        <Top>4.42in</Top><Left>0in</Left><Width>3in</Width><Height>0.85in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>CODE39HELLO</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- ===== RIGHT COLUMN ===== -->
+
+      <!-- Row 0: Data Matrix -->
+      <Textbox Name="R_DM_Label">
+        <Top>0in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>Data Matrix</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="R_DM_Value">
+        <Top>0.23in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>DataMatrix-Demo-Text</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_DM">
+        <Type>DataMatrix</Type>
+        <Top>0.42in</Top><Left>4in</Left><Width>2.5in</Width><Height>1.2in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>DataMatrix-Demo-Text</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- Row 1: Aztec Code -->
+      <Textbox Name="R_AZ_Label">
+        <Top>2in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>Aztec Code</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="R_AZ_Value">
+        <Top>2.23in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>Aztec Demo Text</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_AZ">
+        <Type>AztecCode</Type>
+        <Top>2.42in</Top><Left>4in</Left><Width>1.4in</Width><Height>1.4in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>Aztec Demo Text</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- Row 2: PDF417 -->
+      <Textbox Name="R_P417_Label">
+        <Top>4in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.22in</Height>
+        <Value>PDF417</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="R_P417_Value">
+        <Top>4.23in</Top><Left>4in</Left><Width>3.4in</Width><Height>0.15in</Height>
+        <Value>PDF417 Multi-Row Barcode Demo</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_P417">
+        <Type>Pdf417</Type>
+        <Top>4.42in</Top><Left>4in</Left><Width>3in</Width><Height>0.85in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>Code</Name>
+            <Value>PDF417 Multi-Row Barcode Demo</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+      <!-- Row 3 (full width): ITF-14 — note property name is ITF14, not Code, and value must be 13 or 14 digits -->
+      <Textbox Name="ITF14_Label">
+        <Top>6in</Top><Left>0in</Left><Width>7.5in</Width><Height>0.22in</Height>
+        <Value>ITF-14 (Interleaved 2 of 5)</Value>
+        <Style><FontWeight>Bold</FontWeight><FontSize>9pt</FontSize></Style>
+      </Textbox>
+      <Textbox Name="ITF14_Value">
+        <Top>6.23in</Top><Left>0in</Left><Width>7.5in</Width><Height>0.15in</Height>
+        <Value>12345678901231  (14 digits required)</Value>
+        <Style><FontSize>7pt</FontSize><Color>Gray</Color></Style>
+      </Textbox>
+      <CustomReportItem Name="CRI_ITF14">
+        <Type>ITF-14</Type>
+        <Top>6.42in</Top><Left>0in</Left><Width>3in</Width><Height>1.4in</Height>
+        <CustomProperties>
+          <CustomProperty>
+            <Name>ITF14</Name>
+            <Value>12345678901231</Value>
+          </CustomProperty>
+        </CustomProperties>
+        <Source>Embedded</Source>
+      </CustomReportItem>
+
+    </ReportItems>
+  </Body>
+
+  <PageFooter>
+    <Height>18pt</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="PageNum">
+        <Top>2pt</Top>
+        <Left>0in</Left>
+        <Width>3in</Width>
+        <Height>14pt</Height>
+        <Value>=Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+    </ReportItems>
+  </PageFooter>
+</Report>

@@ -2606,6 +2606,363 @@ NSArray<NSString *> *PicaRunTablixFitChecks(void) {
   return fails;
 }
 
+#pragma mark - Schema upgrade
+
+// An RDL 2005 report: page setup on <Report>, a Table with a header, a group
+// and a footer, borders grouped by property, and a ColSpan the older schema
+// leaves the covered cells out of.
+static NSString *PicaLegacyTableRDL(void) {
+  return @"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+         @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition\""
+         @"        Name=\"Legacy\">\n"
+         @"  <Width>6in</Width>\n"
+         @"  <PageWidth>8.5in</PageWidth><PageHeight>11in</PageHeight>\n"
+         @"  <TopMargin>1in</TopMargin><LeftMargin>0.5in</LeftMargin>\n"
+         @"  <DataSets><DataSet Name=\"Only\"><Fields>"
+         @"    <Field Name=\"City\"><DataField>City</DataField></Field>"
+         @"    <Field Name=\"Pop\"><DataField>Pop</DataField></Field></Fields></DataSet></DataSets>\n"
+         @"  <Body><Height>3in</Height><ReportItems>\n"
+         @"    <Table Name=\"T1\">\n"
+         @"      <NoRows>Nothing here</NoRows>\n"
+         @"      <PageBreakAtEnd>true</PageBreakAtEnd>\n"
+         @"      <Style><BorderStyle><Default>Solid</Default><Left>None</Left></BorderStyle>\n"
+         @"             <BorderColor><Default>#112233</Default></BorderColor></Style>\n"
+         @"      <TableColumns><TableColumn><Width>2in</Width></TableColumn>\n"
+         @"                    <TableColumn><Width>1.5in</Width></TableColumn></TableColumns>\n"
+         @"      <Header><RepeatOnNewPage>true</RepeatOnNewPage><TableRows><TableRow><Height>0.3in</Height>\n"
+         @"        <TableCells>\n"
+         @"          <TableCell><ReportItems><Textbox Name=\"H1\"><Value>City</Value></Textbox></ReportItems></TableCell>\n"
+         @"          <TableCell><ReportItems><Textbox Name=\"H2\"><Value>Pop</Value></Textbox></ReportItems></TableCell>\n"
+         @"        </TableCells></TableRow></TableRows></Header>\n"
+         @"      <TableGroups><TableGroup>\n"
+         @"        <Header><TableRows><TableRow><Height>0.3in</Height><TableCells>\n"
+         @"          <TableCell><ColSpan>2</ColSpan><ReportItems>"
+         @"            <Textbox Name=\"G1\"><Value>=Fields!City.Value</Value></Textbox></ReportItems></TableCell>\n"
+         @"        </TableCells></TableRow></TableRows></Header>\n"
+         @"        <Grouping Name=\"ByCity\"><GroupExpressions>"
+         @"          <GroupExpression>=Fields!City.Value</GroupExpression></GroupExpressions></Grouping>\n"
+         @"        <Footer><TableRows><TableRow><Height>0.3in</Height><TableCells>\n"
+         @"          <TableCell><ReportItems><Textbox Name=\"F1\"><Value>Sub</Value></Textbox></ReportItems></TableCell>\n"
+         @"          <TableCell><ReportItems><Textbox Name=\"F2\"><Value>=Sum(Fields!Pop.Value)</Value></Textbox></ReportItems></TableCell>\n"
+         @"        </TableCells></TableRow></TableRows></Footer>\n"
+         @"      </TableGroup></TableGroups>\n"
+         @"      <Details><TableRows><TableRow><Height>0.25in</Height><TableCells>\n"
+         @"        <TableCell><ReportItems><Textbox Name=\"D1\"><Value>=Fields!City.Value</Value></Textbox></ReportItems></TableCell>\n"
+         @"        <TableCell><ReportItems><Textbox Name=\"D2\"><Value>=Fields!Pop.Value</Value></Textbox></ReportItems></TableCell>\n"
+         @"      </TableCells></TableRow></TableRows></Details>\n"
+         @"    </Table>\n"
+         @"  </ReportItems></Body>\n"
+         @"</Report>\n";
+}
+
+NSArray<NSString *> *PicaRunUpgraderChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  RDLReport *r = [RDLParser reportFromXMLString:PicaLegacyTableRDL() error:&err];
+  if (r == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"legacy report refused: %@", err.localizedDescription]);
+    return fails;
+  }
+
+  // The Name attribute 2005 put on <Report>.
+  if (![r.name isEqualToString:@"Legacy"])
+    PicaFail(fails, [NSString stringWithFormat:@"report name → %@", r.name]);
+  // Page setup that lived directly on <Report>.
+  if (fabs(r.page.pageWidth - 8.5) > 1e-6 || fabs(r.page.pageHeight - 11.0) > 1e-6 ||
+      fabs(r.page.topMargin - 1.0) > 1e-6 || fabs(r.page.leftMargin - 0.5) > 1e-6)
+    PicaFail(fails, [NSString stringWithFormat:@"page → %.2fx%.2f margins %.2f/%.2f",
+                                               r.page.pageWidth, r.page.pageHeight,
+                                               r.page.topMargin, r.page.leftMargin]);
+  // The upgrade is announced rather than done behind the caller's back.
+  BOOL saidSo = NO;
+  for (NSString *w in r.warnings)
+    if ([w rangeOfString:@"upgraded"].location != NSNotFound)
+      saidSo = YES;
+  if (!saidSo)
+    PicaFail(fails, @"an upgraded report should say so in its warnings");
+
+  RDLItem *item = r.body.items.firstObject;
+  if (![item isKindOfClass:[RDLTablix class]]) {
+    PicaFail(fails, [NSString stringWithFormat:@"Table became %@", [item class]]);
+    return fails;
+  }
+  RDLTablix *t = (RDLTablix *)item;
+
+  // 2005 leaves the size implicit; 2010 needs it or the item lays out as nothing.
+  if (fabs(t.width - 3.5) > 1e-4)
+    PicaFail(fails, [NSString stringWithFormat:@"width → %.4f, wanted 3.5 (2in + 1.5in)", t.width]);
+  if (t.height <= 0)
+    PicaFail(fails, @"a converted table should have a height");
+  // The sole dataset, which 2005 let a table leave out.
+  if (![t.dataSetName isEqualToString:@"Only"])
+    PicaFail(fails, [NSString stringWithFormat:@"dataSetName → %@", t.dataSetName]);
+  if (![t.noRowsMessage isEqualToString:@"Nothing here"])
+    PicaFail(fails, @"NoRows should become NoRowsMessage");
+  if (t.pageBreak != RDLPageBreakLocationEnd)
+    PicaFail(fails, @"PageBreakAtEnd should become a PageBreak at End");
+
+  // Borders: property-grouped in 2005, edge-grouped in 2010.
+  if (t.style.border.style != RDLBorderStyleSolid)
+    PicaFail(fails, @"BorderStyle/Default should become Border/Style");
+  if (![t.style.border.color isEqualToString:@"#112233"])
+    PicaFail(fails, [NSString stringWithFormat:@"border colour → %@", t.style.border.color]);
+  if (t.style.borderLeft.style != RDLBorderStyleNone)
+    PicaFail(fails, @"BorderStyle/Left should become LeftBorder/Style");
+
+  if ([t.tablixBody.columns count] != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"columns → %lu",
+                                               (unsigned long)[t.tablixBody.columns count]]);
+  // header, group header, detail, group footer -- in that order.
+  if ([t.tablixBody.rows count] != 4) {
+    PicaFail(fails, [NSString stringWithFormat:@"rows → %lu",
+                                               (unsigned long)[t.tablixBody.rows count]]);
+    return fails;
+  }
+  // 2005 omits the cells a ColSpan covers; the reader indexes cells by column,
+  // so the placeholder has to be back or the next row's cells shift left.
+  RDLTablixRow *groupHeader = t.tablixBody.rows[1];
+  if ([groupHeader.cells count] != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"ColSpan row has %lu cells, wanted 2",
+                                               (unsigned long)[groupHeader.cells count]]);
+  else if ([groupHeader.cells[0] colSpan] != 2 || [groupHeader.cells[1] item] != nil)
+    PicaFail(fails, @"a ColSpan cell should be followed by an empty placeholder");
+
+  // Leaves of the row hierarchy must line up with the body rows, in order:
+  // static header, then the group holding [header, detail, footer].
+  if ([t.rowHierarchy.members count] != 2) {
+    PicaFail(fails, [NSString stringWithFormat:@"top-level members → %lu",
+                                               (unsigned long)[t.rowHierarchy.members count]]);
+    return fails;
+  }
+  RDLTablixMember *head = t.rowHierarchy.members[0];
+  RDLTablixMember *group = t.rowHierarchy.members[1];
+  if (!head.repeatOnNewPage)
+    PicaFail(fails, @"RepeatOnNewPage should survive the upgrade");
+  if (![group.groupName isEqualToString:@"ByCity"])
+    PicaFail(fails, [NSString stringWithFormat:@"group name → %@", group.groupName]);
+  if ([group.groupExpressions count] != 1 ||
+      ![[group.groupExpressions[0] source] isEqualToString:@"=Fields!City.Value"])
+    PicaFail(fails, @"Grouping/GroupExpressions should become Group/GroupExpressions");
+  if ([group.members count] != 3)
+    PicaFail(fails, [NSString stringWithFormat:@"group should hold header+detail+footer, has %lu",
+                                               (unsigned long)[group.members count]]);
+  // The designer's own view of it: a grouped table.
+  if (![t.groupBy isEqualToString:@"City"])
+    PicaFail(fails, [NSString stringWithFormat:@"groupBy → %@", t.groupBy]);
+
+  // And it has to actually lay out, which is the whole point.
+  RDLDataSet *ds = r.dataSets.firstObject;
+  ds.rows = @[ @{@"City" : @"Rye", @"Pop" : @4500}, @{@"City" : @"Hove", @"Pop" : @9100} ];
+  NSUInteger laidOut = 0;
+  for (RDLLaidOutPage *pg in [RDLLayoutEngine pagesForReport:r paramValues:nil])
+    laidOut += [pg.items count];
+  if (laidOut == 0)
+    PicaFail(fails, @"an upgraded report should lay out onto something");
+
+  // A 2010 document is already current and must come through untouched.
+  RDLReport *modern = [RDLReport emptyReportNamed:@"Modern"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = @"hello";
+  [modern.body.items addObject:tb];
+  NSString *modernXML = [RDLWriter XMLStringFromReport:modern];
+  RDLReport *back = [RDLParser reportFromXMLString:modernXML error:&err];
+  for (NSString *w in back.warnings)
+    if ([w rangeOfString:@"upgraded"].location != NSNotFound)
+      PicaFail(fails, @"a 2010 document should not be upgraded");
+  if (![[RDLWriter XMLStringFromReport:back] isEqualToString:modernXML])
+    PicaFail(fails, @"a current document should round trip untouched");
+  return fails;
+}
+
+#pragma mark - Charts
+
+// A 2005 chart: type on the chart, one implicit series, groupings beside it.
+static NSString *PicaLegacyChartRDL(void) {
+  return @"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+         @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition\">\n"
+         @"  <Width>6in</Width><PageWidth>8.5in</PageWidth><PageHeight>11in</PageHeight>\n"
+         @"  <DataSets><DataSet Name=\"Sales\"><Fields>"
+         @"    <Field Name=\"Year\"><DataField>Year</DataField></Field>"
+         @"    <Field Name=\"Kind\"><DataField>Kind</DataField></Field>"
+         @"    <Field Name=\"Amount\"><DataField>Amount</DataField></Field></Fields></DataSet></DataSets>\n"
+         @"  <Body><Height>4in</Height><ReportItems>\n"
+         @"    <Chart Name=\"C1\">\n"
+         @"      <Width>5in</Width><Height>3in</Height>\n"
+         @"      <Type>Column</Type><Subtype>Stacked</Subtype><Palette>Excel</Palette>\n"
+         @"      <Title><Caption>Sales</Caption></Title>\n"
+         @"      <Legend><Visible>true</Visible><Position>BottomCenter</Position></Legend>\n"
+         @"      <ChartData><ChartSeries><DataPoints><DataPoint>\n"
+         @"        <DataValues><DataValue><Value>=Sum(Fields!Amount.Value)</Value></DataValue></DataValues>\n"
+         @"        <DataLabel/><Marker/>\n"
+         @"      </DataPoint></DataPoints></ChartSeries></ChartData>\n"
+         @"      <CategoryGroupings><CategoryGrouping><DynamicCategories>\n"
+         @"        <Grouping Name=\"ByYear\"><GroupExpressions>"
+         @"          <GroupExpression>=Fields!Year.Value</GroupExpression></GroupExpressions></Grouping>\n"
+         @"        <Label>=Fields!Year.Value</Label>\n"
+         @"      </DynamicCategories></CategoryGrouping></CategoryGroupings>\n"
+         @"      <SeriesGroupings><SeriesGrouping><DynamicSeries>\n"
+         @"        <Grouping Name=\"ByKind\"><GroupExpressions>"
+         @"          <GroupExpression>=Fields!Kind.Value</GroupExpression></GroupExpressions></Grouping>\n"
+         @"        <Label>=Fields!Kind.Value</Label>\n"
+         @"      </DynamicSeries></SeriesGrouping></SeriesGroupings>\n"
+         @"      <CategoryAxis><Axis><Title><Caption>Year</Caption></Title>\n"
+         @"        <MajorGridLines><ShowGridLines>false</ShowGridLines></MajorGridLines></Axis></CategoryAxis>\n"
+         @"      <ValueAxis><Axis><Title><Caption>Money</Caption></Title>\n"
+         @"        <MajorGridLines><ShowGridLines>true</ShowGridLines></MajorGridLines></Axis></ValueAxis>\n"
+         @"    </Chart>\n"
+         @"  </ReportItems></Body>\n"
+         @"</Report>\n";
+}
+
+NSArray<NSString *> *PicaRunChartChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:PicaLegacyChartRDL() error:&err];
+  if (r == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"legacy chart refused: %@", err.localizedDescription]);
+    return fails;
+  }
+  RDLChart *chart = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      chart = (RDLChart *)it;
+  if (chart == nil) {
+    PicaFail(fails, @"a 2005 Chart should upgrade into an RDLChart");
+    return fails;
+  }
+
+  // 2008 moved the type onto the series; the upgrade has to carry it there and
+  // the chart has to still be able to say what it is.
+  if (chart.chartType != RDLChartTypeColumn || chart.subtype != RDLChartSubtypeStacked)
+    PicaFail(fails, [NSString stringWithFormat:@"type/subtype → %@/%@",
+                                               RDLStringFromChartType(chart.chartType),
+                                               RDLStringFromChartSubtype(chart.subtype)]);
+  if (chart.palette != RDLChartPaletteExcel)
+    PicaFail(fails, @"Palette should survive the upgrade");
+  if (![[chart.chartTitle source] isEqualToString:@"Sales"])
+    PicaFail(fails, @"Title/Caption should become ChartTitles");
+  if (chart.legendHidden || chart.legendPosition != RDLChartLegendPositionBottomCenter)
+    PicaFail(fails, @"Legend visibility and position should survive");
+  if (![[chart.categoryAxis.title source] isEqualToString:@"Year"] ||
+      ![[chart.valueAxis.title source] isEqualToString:@"Money"])
+    PicaFail(fails, @"axis titles should survive");
+  // 2005 says "show these gridlines"; 2010 says "these are hidden". The sense
+  // inverts, so getting it wrong shows gridlines exactly where they were off.
+  if (chart.categoryAxis.showMajorGridLines)
+    PicaFail(fails, @"ShowGridLines false should mean no gridlines");
+  if (!chart.valueAxis.showMajorGridLines)
+    PicaFail(fails, @"ShowGridLines true should mean gridlines");
+  if ([chart.categoryMembers count] != 1 || [chart.seriesMembers count] != 1)
+    PicaFail(fails, @"category and series groupings should both come across");
+  if (![[[chart.series firstObject] value].source isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    PicaFail(fails, @"the series expression should come across");
+  if (![[chart.series firstObject] showDataLabels] || ![[chart.series firstObject] showMarker])
+    PicaFail(fails, @"DataLabel and Marker should come across");
+  // The sole dataset, which a 2005 chart may leave out.
+  if (![chart.dataSetName isEqualToString:@"Sales"])
+    PicaFail(fails, [NSString stringWithFormat:@"dataSetName → %@", chart.dataSetName]);
+
+  // Laying it out is where the grouping actually happens: two series across
+  // three categories, each cell aggregated.
+  RDLDataSet *ds = r.dataSets.firstObject;
+  ds.rows = @[
+    @{@"Year" : @"2019", @"Kind" : @"Books", @"Amount" : @10},
+    @{@"Year" : @"2019", @"Kind" : @"Music", @"Amount" : @4},
+    @{@"Year" : @"2020", @"Kind" : @"Books", @"Amount" : @20},
+    @{@"Year" : @"2020", @"Kind" : @"Music", @"Amount" : @6},
+    @{@"Year" : @"2021", @"Kind" : @"Books", @"Amount" : @30},
+    @{@"Year" : @"2021", @"Kind" : @"Music", @"Amount" : @2},
+    // A second row in one bucket, so the aggregate has something to add up.
+    @{@"Year" : @"2021", @"Kind" : @"Books", @"Amount" : @5},
+  ];
+  RDLLaidOutChart *laid = [RDLLayoutEngine laidOutChart:chart inReport:r paramValues:nil];
+  NSArray *wantCategories = @[ @"2019", @"2020", @"2021" ];
+  if (![laid.categories isEqualToArray:wantCategories])
+    PicaFail(fails, [NSString stringWithFormat:@"categories → %@", laid.categories]);
+  if ([laid.chartSeries count] != 2) {
+    PicaFail(fails, [NSString stringWithFormat:@"series → %lu, wanted 2",
+                                               (unsigned long)[laid.chartSeries count]]);
+    return fails;
+  }
+  RDLLaidOutChartSeries *books = laid.chartSeries[0];
+  RDLLaidOutChartSeries *music = laid.chartSeries[1];
+  if (![books.label isEqualToString:@"Books"] || ![music.label isEqualToString:@"Music"])
+    PicaFail(fails, [NSString stringWithFormat:@"series labels → %@ / %@", books.label, music.label]);
+  if ([books.values count] != 3 || [books.values[0] doubleValue] != 10 ||
+      [books.values[1] doubleValue] != 20 || [books.values[2] doubleValue] != 35)
+    PicaFail(fails, [NSString stringWithFormat:@"Books values → %@ (wanted 10, 20, 35)", books.values]);
+  if ([music.values[2] doubleValue] != 2)
+    PicaFail(fails, [NSString stringWithFormat:@"Music 2021 → %@", music.values[2]]);
+  if ([books.color isEqualToString:music.color])
+    PicaFail(fails, @"two series should not get the same colour");
+  // Stacked, so the axis has to reach the tallest stack, not the tallest bar.
+  if (laid.axisMaximum < 37)
+    PicaFail(fails, [NSString stringWithFormat:@"stacked axis max → %.1f, needs to reach 37",
+                                               laid.axisMaximum]);
+
+  // A category with no row for one series leaves a hole rather than a zero,
+  // so a line chart breaks there instead of diving to the axis.
+  ds.rows = @[ @{@"Year" : @"2019", @"Kind" : @"Books", @"Amount" : @10},
+               @{@"Year" : @"2020", @"Kind" : @"Music", @"Amount" : @4} ];
+  RDLLaidOutChart *sparse = [RDLLayoutEngine laidOutChart:chart inReport:r paramValues:nil];
+  BOOL sawHole = NO;
+  for (RDLLaidOutChartSeries *s in sparse.chartSeries)
+    for (id v in s.values)
+      if (v == [NSNull null])
+        sawHole = YES;
+  if (!sawHole)
+    PicaFail(fails, @"a category with no rows for a series should be a hole, not a zero");
+
+  // The drawing plan: something has to come out, and it has to stay inside
+  // the box it was given.
+  CGRect box = CGRectMake(0, 0, 320, 200);
+  NSArray<RDLChartShape *> *shapes = [RDLChartRenderer shapesForChart:laid inRect:box];
+  if ([shapes count] < 8)
+    PicaFail(fails, [NSString stringWithFormat:@"chart plan produced %lu shapes",
+                                               (unsigned long)[shapes count]]);
+  for (RDLChartShape *sh in shapes) {
+    if (sh.kind == RDLChartShapeText || sh.kind == RDLChartShapeWedge)
+      continue;
+    if (sh.kind == RDLChartShapeRect && !CGRectContainsRect(CGRectInset(box, -1, -1), sh.rect))
+      PicaFail(fails, [NSString stringWithFormat:@"shape escapes the chart box: %@",
+                                                 NSStringFromRect(NSRectFromCGRect(sh.rect))]);
+  }
+
+  // Written back out as MS-RDL 2008/2010, and read back the same -- which
+  // also means it is no longer something the upgrader has to touch.
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if (back == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"written chart refused: %@", err.localizedDescription]);
+    return fails;
+  }
+  for (NSString *w in back.warnings)
+    if ([w rangeOfString:@"upgraded"].location != NSNotFound)
+      PicaFail(fails, @"a written chart should already be current, not upgraded again");
+  RDLChart *rt = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      rt = (RDLChart *)it;
+  if (rt == nil || rt.chartType != RDLChartTypeColumn || rt.subtype != RDLChartSubtypeStacked ||
+      [rt.categoryMembers count] != 1 || [rt.seriesMembers count] != 1 ||
+      ![[rt.chartTitle source] isEqualToString:@"Sales"] ||
+      rt.palette != RDLChartPaletteExcel)
+    PicaFail(fails, @"the chart should survive being written and read back");
+  if (![[RDLWriter XMLStringFromReport:back] isEqualToString:xml])
+    PicaFail(fails, @"a chart should write identically on the second pass");
+
+  // Named colours: RDL allows them and real reports use them.
+  if (![PicaHexForColorName(@"LightGrey") isEqualToString:@"d3d3d3"] ||
+      ![PicaHexForColorName(@"coral") isEqualToString:@"ff7f50"] ||
+      PicaHexForColorName(@"#ff0000") != nil)
+    PicaFail(fails, @"named RDL colours should resolve, and hex should not");
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -2615,6 +2972,8 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunStyleExpressionChecks()];
   [fails addObjectsFromArray:PicaRunValueChecks()];
   [fails addObjectsFromArray:PicaRunTablixFitChecks()];
+  [fails addObjectsFromArray:PicaRunUpgraderChecks()];
+  [fails addObjectsFromArray:PicaRunChartChecks()];
   [fails addObjectsFromArray:PicaRunWriterWhitespaceChecks()];
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];

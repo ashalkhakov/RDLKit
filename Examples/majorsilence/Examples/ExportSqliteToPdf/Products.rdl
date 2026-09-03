@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <PageHeight>11in</PageHeight>
+  <PageWidth>8.5in</PageWidth>
+  <TopMargin>.5in</TopMargin>
+  <LeftMargin>.5in</LeftMargin>
+  <RightMargin>.5in</RightMargin>
+  <BottomMargin>.5in</BottomMargin>
+  <Width>7.5in</Width>
+
+  <DataSources>
+    <DataSource Name="DS1">
+      <ConnectionProperties>
+        <DataProvider>Microsoft.Data.Sqlite</DataProvider>
+        <!-- Connection string is overridden at runtime via DataSource.UserConnection -->
+        <ConnectString>Data Source=sqlitetestdb2.db</ConnectString>
+      </ConnectionProperties>
+    </DataSource>
+  </DataSources>
+
+  <DataSets>
+    <DataSet Name="Data">
+      <Query>
+        <DataSourceName>DS1</DataSourceName>
+        <CommandText>SELECT ProductID, ProductName, QuantityPerUnit, UnitPrice, UnitsInStock FROM Products ORDER BY ProductName</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="ProductID">
+          <DataField>ProductID</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="ProductName">
+          <DataField>ProductName</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="QuantityPerUnit">
+          <DataField>QuantityPerUnit</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="UnitPrice">
+          <DataField>UnitPrice</DataField>
+          <rd:TypeName>System.Decimal</rd:TypeName>
+        </Field>
+        <Field Name="UnitsInStock">
+          <DataField>UnitsInStock</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+
+  <PageHeader>
+    <Height>.6in</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="Title">
+        <Top>.1in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.3in</Height>
+        <Value>Product Catalog</Value>
+        <Style>
+          <FontSize>16pt</FontSize>
+          <FontWeight>Bold</FontWeight>
+        </Style>
+      </Textbox>
+      <Textbox Name="Generated">
+        <Top>.45in</Top>
+        <Left>0in</Left>
+        <Width>7.5in</Width>
+        <Height>.12in</Height>
+        <Value>=Format(Today(), "MMMM d, yyyy")</Value>
+        <Style>
+          <FontSize>8pt</FontSize>
+          <Color>Gray</Color>
+        </Style>
+      </Textbox>
+    </ReportItems>
+  </PageHeader>
+
+  <Body>
+    <Height>3in</Height>
+    <ReportItems>
+      <Table Name="ProductTable">
+        <DataSetName>Data</DataSetName>
+        <NoRows>No products found.</NoRows>
+        <Top>0in</Top>
+        <Left>0in</Left>
+        <TableColumns>
+          <TableColumn><Width>.5in</Width></TableColumn>
+          <TableColumn><Width>2.5in</Width></TableColumn>
+          <TableColumn><Width>1.75in</Width></TableColumn>
+          <TableColumn><Width>1in</Width></TableColumn>
+          <TableColumn><Width>1in</Width></TableColumn>
+        </TableColumns>
+        <Header>
+          <TableRows>
+            <TableRow>
+              <Height>16pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_ID">
+                      <Value>ID</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#4472C4</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Name">
+                      <Value>Product Name</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#4472C4</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Qty">
+                      <Value>Qty Per Unit</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#4472C4</BackgroundColor>
+                        <Color>White</Color>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Price">
+                      <Value>Unit Price</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#4472C4</BackgroundColor>
+                        <Color>White</Color>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="H_Stock">
+                      <Value>In Stock</Value>
+                      <Style>
+                        <FontWeight>Bold</FontWeight>
+                        <BackgroundColor>#4472C4</BackgroundColor>
+                        <Color>White</Color>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+          <RepeatOnNewPage>true</RepeatOnNewPage>
+        </Header>
+        <Details>
+          <TableRows>
+            <TableRow>
+              <Height>14pt</Height>
+              <TableCells>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="ProductID">
+                      <Value>=Fields!ProductID.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F2F2F2", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="ProductName">
+                      <Value>=Fields!ProductName.Value</Value>
+                      <CanGrow>true</CanGrow>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F2F2F2", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="QuantityPerUnit">
+                      <Value>=Fields!QuantityPerUnit.Value</Value>
+                      <CanGrow>true</CanGrow>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F2F2F2", "White")</BackgroundColor>
+                        <PaddingLeft>4pt</PaddingLeft>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="UnitPrice">
+                      <Value>=Fields!UnitPrice.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F2F2F2", "White")</BackgroundColor>
+                        <Format>$#,##0.00</Format>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+                <TableCell>
+                  <ReportItems>
+                    <Textbox Name="UnitsInStock">
+                      <Value>=Fields!UnitsInStock.Value</Value>
+                      <Style>
+                        <BackgroundColor>=IIf(RowNumber(Nothing) Mod 2 = 0, "#F2F2F2", "White")</BackgroundColor>
+                        <TextAlign>Right</TextAlign>
+                        <PaddingRight>4pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                  </ReportItems>
+                </TableCell>
+              </TableCells>
+            </TableRow>
+          </TableRows>
+        </Details>
+      </Table>
+    </ReportItems>
+  </Body>
+
+  <PageFooter>
+    <Height>18pt</Height>
+    <PrintOnFirstPage>true</PrintOnFirstPage>
+    <PrintOnLastPage>true</PrintOnLastPage>
+    <ReportItems>
+      <Textbox Name="PageNum">
+        <Top>2pt</Top>
+        <Left>0in</Left>
+        <Width>3in</Width>
+        <Height>14pt</Height>
+        <Value>=Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+        <Style><FontSize>9pt</FontSize></Style>
+      </Textbox>
+    </ReportItems>
+  </PageFooter>
+</Report>

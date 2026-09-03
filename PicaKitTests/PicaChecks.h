@@ -7,6 +7,8 @@ NSArray<NSString *> *PicaRunExpressionRoundTripChecks(void);
 NSArray<NSString *> *PicaRunStyleExpressionChecks(void);
 NSArray<NSString *> *PicaRunValueChecks(void);
 NSArray<NSString *> *PicaRunTablixFitChecks(void);
+NSArray<NSString *> *PicaRunUpgraderChecks(void);
+NSArray<NSString *> *PicaRunChartChecks(void);
 NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void);
 NSArray<NSString *> *PicaRunLayoutChecks(void);
 NSArray<NSString *> *PicaRunTablixChecks(void);

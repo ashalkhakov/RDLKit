@@ -205,8 +205,9 @@
              kind:PicaFieldKindText];
   [_bindings bind:_chartKindPop keyPath:@"chartType" scope:PicaFieldScopeItem
              kind:PicaFieldKindPopUpIndex
-           values:@[ @(RDLChartTypeColumn), @(RDLChartTypeBar),
-                     @(RDLChartTypeLine), @(RDLChartTypePie) ]
+           values:@[ @(RDLChartTypeColumn), @(RDLChartTypeBar), @(RDLChartTypeLine),
+                     @(RDLChartTypeArea), @(RDLChartTypePie), @(RDLChartTypeDoughnut),
+                     @(RDLChartTypeScatter) ]
       placeholder:nil];
   [_bindings bind:_catField keyPath:@"categoryField" scope:PicaFieldScopeItem
              kind:PicaFieldKindText];

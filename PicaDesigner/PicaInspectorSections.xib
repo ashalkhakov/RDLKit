@@ -757,7 +757,10 @@
                                 <menuItem title="Column" id="mi12"/>
                                 <menuItem title="Bar" id="mi13"/>
                                 <menuItem title="Line" id="mi14"/>
+                                <menuItem title="Area" id="mi16"/>
                                 <menuItem title="Pie" id="mi15"/>
+                                <menuItem title="Doughnut" id="mi17"/>
+                                <menuItem title="Scatter" id="mi18"/>
                             </items>
                         </menu>
                     </popUpButtonCell>
