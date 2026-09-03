@@ -1,18 +1,5 @@
 #import "RDLChartRenderer.h"
 
-// NSValue has no portable CGPoint box: +valueWithCGPoint: is UIKit and
-// +valueWithPoint: is AppKit, and neither is both. Encoding it by hand works
-// everywhere, GNUstep included.
-NSValue *RDLChartPointValue(CGPoint p) {
-  return [NSValue valueWithBytes:&p objCType:@encode(CGPoint)];
-}
-
-CGPoint RDLChartPointFromValue(NSValue *v) {
-  CGPoint p = CGPointZero;
-  [v getValue:&p];
-  return p;
-}
-
 @implementation RDLChartShape
 - (instancetype)init {
   self = [super init];
@@ -37,26 +24,26 @@ static RDLChartShape *PicaShape(RDLChartShapeKind kind) {
   return s;
 }
 
-static RDLChartShape *PicaRectShape(CGRect r, NSString *fill) {
+static RDLChartShape *PicaRectShape(NSRect r, NSString *fill) {
   RDLChartShape *s = PicaShape(RDLChartShapeRect);
   s.rect = r;
   s.fill = fill;
   return s;
 }
 
-static RDLChartShape *PicaLineShape(CGPoint a, CGPoint b, NSString *stroke, CGFloat width) {
+static RDLChartShape *PicaLineShape(NSPoint a, NSPoint b, NSString *stroke, CGFloat width) {
   RDLChartShape *s = PicaShape(RDLChartShapeLine);
-  s.points = @[ RDLChartPointValue(a), RDLChartPointValue(b) ];
+  s.points = @[ [NSValue valueWithPoint:a], [NSValue valueWithPoint:b] ];
   s.stroke = stroke;
   s.lineWidth = width;
   return s;
 }
 
-static RDLChartShape *PicaTextShape(NSString *text, CGPoint at, CGFloat size,
+static RDLChartShape *PicaTextShape(NSString *text, NSPoint at, CGFloat size,
                                     RDLChartTextAnchor anchor, NSString *fill, BOOL bold) {
   RDLChartShape *s = PicaShape(RDLChartShapeText);
   s.text = text ?: @"";
-  s.rect = CGRectMake(at.x, at.y, 0, 0);
+  s.rect = NSMakeRect(at.x, at.y, 0, 0);
   s.fontSize = size;
   s.anchor = anchor;
   s.fill = fill;
@@ -120,9 +107,9 @@ static BOOL PicaHasValue(NSArray *values, NSUInteger i) {
 
 // The legend is laid out first, because whatever it takes is not available to
 // the plot area.
-static CGRect PicaReserveLegend(RDLLaidOutChart *chart, CGRect frame, CGFloat fontSize,
-                                CGRect *outLegend) {
-  *outLegend = CGRectZero;
+static NSRect PicaReserveLegend(RDLLaidOutChart *chart, NSRect frame, CGFloat fontSize,
+                                NSRect *outLegend) {
+  *outLegend = NSZeroRect;
   if (chart.legendHidden || [chart.chartSeries count] == 0)
     return frame;
   // A single unnamed series is not worth a legend.
@@ -138,24 +125,24 @@ static CGRect PicaReserveLegend(RDLLaidOutChart *chart, CGRect frame, CGFloat fo
               pos == RDLChartLegendPositionLeftBottom;
   if (bottom || top) {
     CGFloat h = fontSize + 8;
-    *outLegend = CGRectMake(frame.origin.x, bottom ? CGRectGetMaxY(frame) - h : frame.origin.y,
+    *outLegend = NSMakeRect(frame.origin.x, bottom ? NSMaxY(frame) - h : frame.origin.y,
                             frame.size.width, h);
-    return CGRectMake(frame.origin.x, top ? frame.origin.y + h : frame.origin.y,
+    return NSMakeRect(frame.origin.x, top ? frame.origin.y + h : frame.origin.y,
                       frame.size.width, frame.size.height - h);
   }
   CGFloat w = 0;
   for (RDLLaidOutChartSeries *s in chart.chartSeries)
     w = MAX(w, [RDLChartRenderer approximateWidthOfText:s.label atSize:fontSize bold:NO]);
   w = MIN(w + fontSize + 14, frame.size.width * 0.34f);
-  *outLegend = CGRectMake(left ? frame.origin.x : CGRectGetMaxX(frame) - w, frame.origin.y, w,
+  *outLegend = NSMakeRect(left ? frame.origin.x : NSMaxX(frame) - w, frame.origin.y, w,
                           frame.size.height);
-  return CGRectMake(left ? frame.origin.x + w : frame.origin.x, frame.origin.y,
+  return NSMakeRect(left ? frame.origin.x + w : frame.origin.x, frame.origin.y,
                     frame.size.width - w, frame.size.height);
 }
 
-static void PicaDrawLegend(RDLLaidOutChart *chart, CGRect box, CGFloat fontSize,
+static void PicaDrawLegend(RDLLaidOutChart *chart, NSRect box, CGFloat fontSize,
                            NSMutableArray *out) {
-  if (CGRectIsEmpty(box))
+  if (NSIsEmptyRect(box))
     return;
   BOOL horizontal = box.size.width > box.size.height * 2;
   CGFloat swatch = fontSize * 0.9f;
@@ -167,9 +154,9 @@ static void PicaDrawLegend(RDLLaidOutChart *chart, CGRect box, CGFloat fontSize,
     CGFloat x = box.origin.x + MAX(0, (box.size.width - total) / 2);
     CGFloat y = box.origin.y + box.size.height / 2;
     for (RDLLaidOutChartSeries *s in chart.chartSeries) {
-      [out addObject:PicaRectShape(CGRectMake(x, y - swatch / 2, swatch, swatch), s.color)];
+      [out addObject:PicaRectShape(NSMakeRect(x, y - swatch / 2, swatch, swatch), s.color)];
       x += swatch + 4;
-      [out addObject:PicaTextShape(s.label, CGPointMake(x, y + fontSize * 0.35f), fontSize,
+      [out addObject:PicaTextShape(s.label, NSMakePoint(x, y + fontSize * 0.35f), fontSize,
                                    RDLChartTextAnchorStart, kPicaChartMuted, NO)];
       x += [RDLChartRenderer approximateWidthOfText:s.label atSize:fontSize bold:NO] + 12;
     }
@@ -178,9 +165,9 @@ static void PicaDrawLegend(RDLLaidOutChart *chart, CGRect box, CGFloat fontSize,
   CGFloat step = fontSize + 6;
   CGFloat y = box.origin.y + MAX(0, (box.size.height - step * (CGFloat)[chart.chartSeries count]) / 2);
   for (RDLLaidOutChartSeries *s in chart.chartSeries) {
-    [out addObject:PicaRectShape(CGRectMake(box.origin.x + 4, y + (step - swatch) / 2, swatch, swatch),
+    [out addObject:PicaRectShape(NSMakeRect(box.origin.x + 4, y + (step - swatch) / 2, swatch, swatch),
                                  s.color)];
-    [out addObject:PicaTextShape(s.label, CGPointMake(box.origin.x + 4 + swatch + 5,
+    [out addObject:PicaTextShape(s.label, NSMakePoint(box.origin.x + 4 + swatch + 5,
                                                       y + step / 2 + fontSize * 0.35f),
                                  fontSize, RDLChartTextAnchorStart, kPicaChartMuted, NO)];
     y += step;
@@ -189,7 +176,7 @@ static void PicaDrawLegend(RDLLaidOutChart *chart, CGRect box, CGFloat fontSize,
 
 #pragma mark - Pie and doughnut
 
-static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
+static void PicaDrawPie(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
                         NSMutableArray *out) {
   // A pie shows one series split across the categories, so the slices are the
   // categories -- the opposite of every other type here.
@@ -202,7 +189,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
   if (total <= 0)
     return;
   CGFloat side = MIN(plot.size.width, plot.size.height);
-  CGRect circle = CGRectMake(plot.origin.x + (plot.size.width - side) / 2,
+  NSRect circle = NSMakeRect(plot.origin.x + (plot.size.width - side) / 2,
                              plot.origin.y + (plot.size.height - side) / 2, side, side);
   BOOL doughnut = chart.chartType == RDLChartTypeDoughnut;
   BOOL exploded = chart.subtype == RDLChartSubtypeExploded;
@@ -214,12 +201,12 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       continue;
     CGFloat sweep = (CGFloat)(frac * 360.0);
     RDLChartShape *wedge = PicaShape(RDLChartShapeWedge);
-    CGRect r = circle;
+    NSRect r = circle;
     if (exploded) {
       // Nudge each slice out along its own bisector.
       CGFloat mid = (angle + sweep / 2) * (CGFloat)M_PI / 180.0f;
       CGFloat push = side * 0.03f;
-      r = CGRectOffset(circle, sinf(mid) * push, -cosf(mid) * push);
+      r = NSOffsetRect(circle, sinf(mid) * push, -cosf(mid) * push);
     }
     wedge.rect = r;
     wedge.startAngle = angle;
@@ -233,8 +220,8 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
     if (series.showDataLabels && frac > 0.03) {
       CGFloat mid = (angle + sweep / 2) * (CGFloat)M_PI / 180.0f;
       CGFloat rr = side * (doughnut ? 0.36f : 0.30f);
-      CGPoint c = CGPointMake(CGRectGetMidX(r) + sinf(mid) * rr,
-                              CGRectGetMidY(r) - cosf(mid) * rr + fontSize * 0.35f);
+      NSPoint c = NSMakePoint(NSMidX(r) + sinf(mid) * rr,
+                              NSMidY(r) - cosf(mid) * rr + fontSize * 0.35f);
       [out addObject:PicaTextShape([NSString stringWithFormat:@"%.0f%%", frac * 100], c, fontSize,
                                    RDLChartTextAnchorMiddle, @"#ffffff", YES)];
     }
@@ -248,48 +235,48 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
 
 #pragma mark - The plan
 
-+ (NSArray<RDLChartShape *> *)shapesForChart:(RDLLaidOutChart *)chart inRect:(CGRect)rect {
++ (NSArray<RDLChartShape *> *)shapesForChart:(RDLLaidOutChart *)chart inRect:(NSRect)rect {
   NSMutableArray *out = [NSMutableArray array];
   if (chart == nil || rect.size.width <= 2 || rect.size.height <= 2)
     return out;
   CGFloat fontSize = MAX(6, MIN(11, rect.size.height * 0.045f));
-  CGRect frame = CGRectInset(rect, 4, 4);
+  NSRect frame = NSInsetRect(rect, 4, 4);
 
   // Title across the top.
   if ([chart.title length]) {
     CGFloat h = fontSize * 1.6f;
     [out addObject:PicaTextShape(chart.title,
-                                 CGPointMake(CGRectGetMidX(frame), frame.origin.y + fontSize * 1.1f),
+                                 NSMakePoint(NSMidX(frame), frame.origin.y + fontSize * 1.1f),
                                  fontSize * 1.25f, RDLChartTextAnchorMiddle, kPicaChartInk, YES)];
-    frame = CGRectMake(frame.origin.x, frame.origin.y + h, frame.size.width, frame.size.height - h);
+    frame = NSMakeRect(frame.origin.x, frame.origin.y + h, frame.size.width, frame.size.height - h);
   }
 
   if (PicaIsPieLike(chart.chartType)) {
     // A pie's legend names categories, not series, so it is built here rather
     // than from chart.chartSeries.
-    CGRect legendBox = CGRectZero;
-    CGRect plot = frame;
+    NSRect legendBox = NSZeroRect;
+    NSRect plot = frame;
     if (!chart.legendHidden && [chart.categories count] > 1) {
       CGFloat w = 0;
       for (NSString *c in chart.categories)
         w = MAX(w, [self approximateWidthOfText:c atSize:fontSize bold:NO]);
       w = MIN(w + fontSize + 14, frame.size.width * 0.34f);
-      legendBox = CGRectMake(CGRectGetMaxX(frame) - w, frame.origin.y, w, frame.size.height);
-      plot = CGRectMake(frame.origin.x, frame.origin.y, frame.size.width - w, frame.size.height);
+      legendBox = NSMakeRect(NSMaxX(frame) - w, frame.origin.y, w, frame.size.height);
+      plot = NSMakeRect(frame.origin.x, frame.origin.y, frame.size.width - w, frame.size.height);
     }
     PicaDrawPie(chart, plot, fontSize, out);
-    if (!CGRectIsEmpty(legendBox)) {
+    if (!NSIsEmptyRect(legendBox)) {
       NSArray *palette = RDLColorsForChartPalette(RDLChartPaletteUnspecified);
       CGFloat step = fontSize + 6;
       CGFloat swatch = fontSize * 0.9f;
       CGFloat y = legendBox.origin.y +
                   MAX(0, (legendBox.size.height - step * (CGFloat)[chart.categories count]) / 2);
       for (NSUInteger i = 0; i < [chart.categories count]; i++) {
-        [out addObject:PicaRectShape(CGRectMake(legendBox.origin.x + 4, y + (step - swatch) / 2,
+        [out addObject:PicaRectShape(NSMakeRect(legendBox.origin.x + 4, y + (step - swatch) / 2,
                                                 swatch, swatch),
                                      palette[i % [palette count]])];
         [out addObject:PicaTextShape(chart.categories[i],
-                                     CGPointMake(legendBox.origin.x + 4 + swatch + 5,
+                                     NSMakePoint(legendBox.origin.x + 4 + swatch + 5,
                                                  y + step / 2 + fontSize * 0.35f),
                                      fontSize, RDLChartTextAnchorStart, kPicaChartMuted, NO)];
         y += step;
@@ -298,7 +285,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
     return out;
   }
 
-  CGRect legendBox = CGRectZero;
+  NSRect legendBox = NSZeroRect;
   frame = PicaReserveLegend(chart, frame, fontSize, &legendBox);
 
   BOOL horizontal = PicaIsHorizontal(chart.chartType);
@@ -321,7 +308,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
   CGFloat valueTitleGutter = [chart.valueAxisTitle length] ? fontSize * 1.4f : 0;
   CGFloat categoryTitleGutter = [chart.categoryAxisTitle length] ? fontSize * 1.4f : 0;
 
-  CGRect plot;
+  NSRect plot;
   if (horizontal) {
     // Bars run across, so the categories label the left edge and the values
     // the bottom -- the two gutters swap.
@@ -329,12 +316,12 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
     for (NSString *c in chart.categories)
       leftGutter = MAX(leftGutter, [self approximateWidthOfText:c atSize:fontSize bold:NO]);
     leftGutter = chart.categoryAxisHidden ? 0 : MIN(leftGutter + 6, frame.size.width * 0.3f);
-    plot = CGRectMake(frame.origin.x + leftGutter + categoryTitleGutter, frame.origin.y,
+    plot = NSMakeRect(frame.origin.x + leftGutter + categoryTitleGutter, frame.origin.y,
                       frame.size.width - leftGutter - categoryTitleGutter,
                       frame.size.height - (chart.valueAxisHidden ? 0 : fontSize + 6) -
                           valueTitleGutter);
   } else {
-    plot = CGRectMake(frame.origin.x + valueGutter + valueTitleGutter, frame.origin.y,
+    plot = NSMakeRect(frame.origin.x + valueGutter + valueTitleGutter, frame.origin.y,
                       frame.size.width - valueGutter - valueTitleGutter,
                       frame.size.height - categoryGutter - categoryTitleGutter);
   }
@@ -353,29 +340,29 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       if (horizontal) {
         CGFloat x = plot.origin.x + (CGFloat)f * plot.size.width;
         if (chart.showValueGridLines)
-          [out addObject:PicaLineShape(CGPointMake(x, plot.origin.y),
-                                       CGPointMake(x, CGRectGetMaxY(plot)), kPicaChartGrid, 0.5f)];
+          [out addObject:PicaLineShape(NSMakePoint(x, plot.origin.y),
+                                       NSMakePoint(x, NSMaxY(plot)), kPicaChartGrid, 0.5f)];
         if (!chart.valueAxisHidden)
-          [out addObject:PicaTextShape(label, CGPointMake(x, CGRectGetMaxY(plot) + fontSize + 2),
+          [out addObject:PicaTextShape(label, NSMakePoint(x, NSMaxY(plot) + fontSize + 2),
                                        fontSize, RDLChartTextAnchorMiddle, kPicaChartMuted, NO)];
       } else {
-        CGFloat y = CGRectGetMaxY(plot) - (CGFloat)f * plot.size.height;
+        CGFloat y = NSMaxY(plot) - (CGFloat)f * plot.size.height;
         if (chart.showValueGridLines)
-          [out addObject:PicaLineShape(CGPointMake(plot.origin.x, y),
-                                       CGPointMake(CGRectGetMaxX(plot), y), kPicaChartGrid, 0.5f)];
+          [out addObject:PicaLineShape(NSMakePoint(plot.origin.x, y),
+                                       NSMakePoint(NSMaxX(plot), y), kPicaChartGrid, 0.5f)];
         if (!chart.valueAxisHidden)
-          [out addObject:PicaTextShape(label, CGPointMake(plot.origin.x - 4, y + fontSize * 0.35f),
+          [out addObject:PicaTextShape(label, NSMakePoint(plot.origin.x - 4, y + fontSize * 0.35f),
                                        fontSize, RDLChartTextAnchorEnd, kPicaChartMuted, NO)];
       }
     }
   }
 
   // The axis lines themselves.
-  [out addObject:PicaLineShape(CGPointMake(plot.origin.x, CGRectGetMaxY(plot)),
-                               CGPointMake(CGRectGetMaxX(plot), CGRectGetMaxY(plot)),
+  [out addObject:PicaLineShape(NSMakePoint(plot.origin.x, NSMaxY(plot)),
+                               NSMakePoint(NSMaxX(plot), NSMaxY(plot)),
                                kPicaChartMuted, 0.75f)];
-  [out addObject:PicaLineShape(CGPointMake(plot.origin.x, plot.origin.y),
-                               CGPointMake(plot.origin.x, CGRectGetMaxY(plot)), kPicaChartMuted,
+  [out addObject:PicaLineShape(NSMakePoint(plot.origin.x, plot.origin.y),
+                               NSMakePoint(plot.origin.x, NSMaxY(plot)), kPicaChartMuted,
                                0.75f)];
 
   CGFloat band = (horizontal ? plot.size.height : plot.size.width) / (CGFloat)catCount;
@@ -393,12 +380,12 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       NSString *label = chart.categories[i];
       if (horizontal) {
         CGFloat y = plot.origin.y + band * ((CGFloat)i + 0.5f) + fontSize * 0.35f;
-        [out addObject:PicaTextShape(label, CGPointMake(plot.origin.x - 4, y), fontSize,
+        [out addObject:PicaTextShape(label, NSMakePoint(plot.origin.x - 4, y), fontSize,
                                      RDLChartTextAnchorEnd, kPicaChartMuted, NO)];
       } else {
         CGFloat x = plot.origin.x + band * ((CGFloat)i + 0.5f);
         [out addObject:PicaTextShape(label,
-                                     CGPointMake(x, CGRectGetMaxY(plot) + fontSize + 2), fontSize,
+                                     NSMakePoint(x, NSMaxY(plot) + fontSize + 2), fontSize,
                                      RDLChartTextAnchorMiddle, kPicaChartMuted, NO)];
       }
     }
@@ -408,24 +395,24 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
   if ([chart.categoryAxisTitle length]) {
     if (horizontal) {
       RDLChartShape *t = PicaTextShape(chart.categoryAxisTitle,
-                                       CGPointMake(frame.origin.x + fontSize, CGRectGetMidY(plot)),
+                                       NSMakePoint(frame.origin.x + fontSize, NSMidY(plot)),
                                        fontSize, RDLChartTextAnchorMiddle, kPicaChartMuted, NO);
       t.rotation = 90;
       [out addObject:t];
     } else {
       [out addObject:PicaTextShape(chart.categoryAxisTitle,
-                                   CGPointMake(CGRectGetMidX(plot), CGRectGetMaxY(frame) - 1),
+                                   NSMakePoint(NSMidX(plot), NSMaxY(frame) - 1),
                                    fontSize, RDLChartTextAnchorMiddle, kPicaChartMuted, NO)];
     }
   }
   if ([chart.valueAxisTitle length]) {
     if (horizontal) {
       [out addObject:PicaTextShape(chart.valueAxisTitle,
-                                   CGPointMake(CGRectGetMidX(plot), CGRectGetMaxY(frame) - 1),
+                                   NSMakePoint(NSMidX(plot), NSMaxY(frame) - 1),
                                    fontSize, RDLChartTextAnchorMiddle, kPicaChartMuted, NO)];
     } else {
       RDLChartShape *t = PicaTextShape(chart.valueAxisTitle,
-                                       CGPointMake(frame.origin.x + fontSize, CGRectGetMidY(plot)),
+                                       NSMakePoint(frame.origin.x + fontSize, NSMidY(plot)),
                                        fontSize, RDLChartTextAnchorMiddle, kPicaChartMuted, NO);
       t.rotation = 90;
       [out addObject:t];
@@ -447,7 +434,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
   }
 
   CGFloat zero = horizontal ? plot.origin.x + (CGFloat)PicaAxisFraction(chart, 0) * plot.size.width
-                            : CGRectGetMaxY(plot) - (CGFloat)PicaAxisFraction(chart, 0) * plot.size.height;
+                            : NSMaxY(plot) - (CGFloat)PicaAxisFraction(chart, 0) * plot.size.height;
 
   // Running tops for the stack, one per category.
   NSMutableArray<NSNumber *> *stackBase = [NSMutableArray array];
@@ -478,14 +465,14 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
           type == RDLChartTypeBubble) {
         CGFloat vpos = horizontal
                            ? plot.origin.x + (CGFloat)PicaAxisFraction(chart, top) * plot.size.width
-                           : CGRectGetMaxY(plot) -
+                           : NSMaxY(plot) -
                                  (CGFloat)PicaAxisFraction(chart, top) * plot.size.height;
-        CGPoint p = horizontal ? CGPointMake(vpos, centre) : CGPointMake(centre, vpos);
-        [linePoints addObject:RDLChartPointValue(p)];
+        NSPoint p = horizontal ? NSMakePoint(vpos, centre) : NSMakePoint(centre, vpos);
+        [linePoints addObject:[NSValue valueWithPoint:p]];
         if (type == RDLChartTypeScatter || type == RDLChartTypeBubble || s.showMarker) {
           CGFloat r = type == RDLChartTypeBubble ? MAX(3, band * 0.18f) : 2.5f;
           RDLChartShape *dot = PicaShape(RDLChartShapeEllipse);
-          dot.rect = CGRectMake(p.x - r, p.y - r, r * 2, r * 2);
+          dot.rect = NSMakeRect(p.x - r, p.y - r, r * 2, r * 2);
           dot.fill = s.color;
           [out addObject:dot];
         }
@@ -496,21 +483,21 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
         CGFloat offset = stacked ? band * 0.15f : band * 0.15f + slot * (CGFloat)si;
         CGFloat lo = horizontal
                          ? plot.origin.x + (CGFloat)PicaAxisFraction(chart, MIN(base, top)) * plot.size.width
-                         : CGRectGetMaxY(plot) -
+                         : NSMaxY(plot) -
                                (CGFloat)PicaAxisFraction(chart, MAX(base, top)) * plot.size.height;
         CGFloat hi = horizontal
                          ? plot.origin.x + (CGFloat)PicaAxisFraction(chart, MAX(base, top)) * plot.size.width
-                         : CGRectGetMaxY(plot) -
+                         : NSMaxY(plot) -
                                (CGFloat)PicaAxisFraction(chart, MIN(base, top)) * plot.size.height;
-        CGRect bar = horizontal ? CGRectMake(MIN(lo, hi), plot.origin.y + band * (CGFloat)i + offset,
+        NSRect bar = horizontal ? NSMakeRect(MIN(lo, hi), plot.origin.y + band * (CGFloat)i + offset,
                                              fabs(hi - lo), slot)
-                                : CGRectMake(plot.origin.x + band * (CGFloat)i + offset, MIN(lo, hi),
+                                : NSMakeRect(plot.origin.x + band * (CGFloat)i + offset, MIN(lo, hi),
                                              slot, fabs(hi - lo));
         [out addObject:PicaRectShape(bar, s.color)];
         if (s.showDataLabels) {
-          CGPoint at = horizontal
-                           ? CGPointMake(CGRectGetMaxX(bar) + 3, CGRectGetMidY(bar) + fontSize * 0.35f)
-                           : CGPointMake(CGRectGetMidX(bar), bar.origin.y - 3);
+          NSPoint at = horizontal
+                           ? NSMakePoint(NSMaxX(bar) + 3, NSMidY(bar) + fontSize * 0.35f)
+                           : NSMakePoint(NSMidX(bar), bar.origin.y - 3);
           [out addObject:PicaTextShape(PicaAxisNumber(raw, chart.axisInterval), at, fontSize,
                                        horizontal ? RDLChartTextAnchorStart : RDLChartTextAnchorMiddle,
                                        kPicaChartMuted, NO)];
@@ -521,13 +508,13 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
     if ([linePoints count]) {
       if (type == RDLChartTypeArea) {
         NSMutableArray *poly = [linePoints mutableCopy];
-        CGPoint last = RDLChartPointFromValue([linePoints lastObject]);
-        CGPoint first = RDLChartPointFromValue([linePoints firstObject]);
+        NSPoint last = [[linePoints lastObject] pointValue];
+        NSPoint first = [[linePoints firstObject] pointValue];
         // Close the ribbon down to the zero line.
-        [poly addObject:RDLChartPointValue(horizontal ? CGPointMake(zero, last.y)
-                                                             : CGPointMake(last.x, zero))];
-        [poly addObject:RDLChartPointValue(horizontal ? CGPointMake(zero, first.y)
-                                                             : CGPointMake(first.x, zero))];
+        [poly addObject:[NSValue valueWithPoint:horizontal ? NSMakePoint(zero, last.y)
+                                                           : NSMakePoint(last.x, zero)]];
+        [poly addObject:[NSValue valueWithPoint:horizontal ? NSMakePoint(zero, first.y)
+                                                           : NSMakePoint(first.x, zero)]];
         RDLChartShape *area = PicaShape(RDLChartShapePolygon);
         area.points = poly;
         area.fill = s.color;
@@ -557,9 +544,9 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
 + (void)drawChart:(RDLLaidOutChart *)chart inRect:(NSRect)frame {
   NSArray<RDLChartShape *> *shapes =
       [RDLChartRenderer shapesForChart:chart
-                                inRect:CGRectMake(0, 0, NSWidth(frame), NSHeight(frame))];
+                                inRect:NSMakeRect(0, 0, NSWidth(frame), NSHeight(frame))];
   CGFloat (^fy)(CGFloat) = ^CGFloat(CGFloat y) { return NSMinY(frame) + y; };
-  NSPoint (^fp)(CGPoint) = ^NSPoint(CGPoint p) {
+  NSPoint (^fp)(NSPoint) = ^NSPoint(NSPoint p) {
     return NSMakePoint(NSMinX(frame) + p.x, NSMinY(frame) + p.y);
   };
   for (RDLChartShape *sh in shapes) {
@@ -592,8 +579,8 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       if (!stroke || [sh.points count] < 2)
         break;
       NSBezierPath *path = [NSBezierPath bezierPath];
-      [path moveToPoint:fp(RDLChartPointFromValue(sh.points[0]))];
-      [path lineToPoint:fp(RDLChartPointFromValue(sh.points[1]))];
+      [path moveToPoint:fp([sh.points[0] pointValue])];
+      [path lineToPoint:fp([sh.points[1] pointValue])];
       [path setLineWidth:sh.lineWidth];
       [stroke set];
       [path stroke];
@@ -604,9 +591,9 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       if ([sh.points count] < 2)
         break;
       NSBezierPath *path = [NSBezierPath bezierPath];
-      [path moveToPoint:fp(RDLChartPointFromValue(sh.points[0]))];
+      [path moveToPoint:fp([sh.points[0] pointValue])];
       for (NSUInteger i = 1; i < [sh.points count]; i++)
-        [path lineToPoint:fp(RDLChartPointFromValue(sh.points[i]))];
+        [path lineToPoint:fp([sh.points[i] pointValue])];
       if (sh.kind == RDLChartShapePolygon) {
         [path closePath];
         if (fill) {
@@ -664,7 +651,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
         NSForegroundColorAttributeName : fill ?: [NSColor blackColor]
       };
       NSSize size = [sh.text sizeWithAttributes:attrs];
-      NSPoint at = fp(CGPointMake(sh.rect.origin.x, sh.rect.origin.y));
+      NSPoint at = fp(NSMakePoint(sh.rect.origin.x, sh.rect.origin.y));
       // The plan gives a baseline; in a flipped view -drawAtPoint: takes the
       // top of the line box, so climb by the ascender.
       at.y -= [font ascender];
@@ -675,7 +662,7 @@ static void PicaDrawPie(RDLLaidOutChart *chart, CGRect plot, CGFloat fontSize,
       if (sh.rotation != 0) {
         [NSGraphicsContext saveGraphicsState];
         NSAffineTransform *t = [NSAffineTransform transform];
-        NSPoint pivot = fp(CGPointMake(sh.rect.origin.x, sh.rect.origin.y));
+        NSPoint pivot = fp(NSMakePoint(sh.rect.origin.x, sh.rect.origin.y));
         [t translateXBy:pivot.x yBy:pivot.y];
         [t rotateByDegrees:-sh.rotation];
         [t translateXBy:-pivot.x yBy:-pivot.y];

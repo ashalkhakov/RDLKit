@@ -2919,7 +2919,7 @@ NSArray<NSString *> *PicaRunChartChecks(void) {
 
   // The drawing plan: something has to come out, and it has to stay inside
   // the box it was given.
-  CGRect box = CGRectMake(0, 0, 320, 200);
+  NSRect box = NSMakeRect(0, 0, 320, 200);
   NSArray<RDLChartShape *> *shapes = [RDLChartRenderer shapesForChart:laid inRect:box];
   if ([shapes count] < 8)
     PicaFail(fails, [NSString stringWithFormat:@"chart plan produced %lu shapes",
@@ -2927,7 +2927,7 @@ NSArray<NSString *> *PicaRunChartChecks(void) {
   for (RDLChartShape *sh in shapes) {
     if (sh.kind == RDLChartShapeText || sh.kind == RDLChartShapeWedge)
       continue;
-    if (sh.kind == RDLChartShapeRect && !CGRectContainsRect(CGRectInset(box, -1, -1), sh.rect))
+    if (sh.kind == RDLChartShapeRect && !NSContainsRect(NSInsetRect(box, -1, -1), sh.rect))
       PicaFail(fails, [NSString stringWithFormat:@"shape escapes the chart box: %@",
                                                  NSStringFromRect(NSRectFromCGRect(sh.rect))]);
   }

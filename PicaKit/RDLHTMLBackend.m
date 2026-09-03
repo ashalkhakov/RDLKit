@@ -101,15 +101,15 @@ static NSString *PicaSVGEsc(NSString *s) {
 }
 
 // Degrees clockwise from twelve, to a point on the circle.
-static CGPoint PicaWedgePoint(CGRect r, CGFloat degrees, CGFloat radius) {
+static NSPoint PicaWedgePoint(NSRect r, CGFloat degrees, CGFloat radius) {
   CGFloat a = degrees * (CGFloat)M_PI / 180.0f;
-  return CGPointMake(CGRectGetMidX(r) + sinf(a) * radius, CGRectGetMidY(r) - cosf(a) * radius);
+  return NSMakePoint(NSMidX(r) + sinf(a) * radius, NSMidY(r) - cosf(a) * radius);
 }
 
 static NSString *PicaChartSVG(RDLLaidOutChart *it) {
   CGFloat W = MAX(it.w, 0.01) * 96.0, H = MAX(it.h, 0.01) * 96.0;
   NSArray<RDLChartShape *> *shapes =
-      [RDLChartRenderer shapesForChart:it inRect:CGRectMake(0, 0, W, H)];
+      [RDLChartRenderer shapesForChart:it inRect:NSMakeRect(0, 0, W, H)];
   NSMutableString *svg = [NSMutableString string];
   [svg appendFormat:@"<svg viewBox=\"0 0 %.2f %.2f\" width=\"100%%\" height=\"100%%\" "
                     @"xmlns=\"http://www.w3.org/2000/svg\">",
@@ -128,12 +128,12 @@ static NSString *PicaChartSVG(RDLLaidOutChart *it) {
     case RDLChartShapeEllipse:
       [svg appendFormat:@"<ellipse cx=\"%.2f\" cy=\"%.2f\" rx=\"%.2f\" ry=\"%.2f\" "
                         @"fill=\"%@\"%@/>",
-                        CGRectGetMidX(sh.rect), CGRectGetMidY(sh.rect), sh.rect.size.width / 2,
+                        NSMidX(sh.rect), NSMidY(sh.rect), sh.rect.size.width / 2,
                         sh.rect.size.height / 2, fill, op];
       break;
     case RDLChartShapeLine: {
-      CGPoint a = RDLChartPointFromValue(sh.points[0]);
-      CGPoint b = RDLChartPointFromValue(sh.points[1]);
+      NSPoint a = [sh.points[0] pointValue];
+      NSPoint b = [sh.points[1] pointValue];
       [svg appendFormat:@"<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" "
                         @"stroke=\"%@\" stroke-width=\"%.2f\"/>",
                         a.x, a.y, b.x, b.y, stroke, sh.lineWidth];
@@ -143,7 +143,7 @@ static NSString *PicaChartSVG(RDLLaidOutChart *it) {
     case RDLChartShapePolygon: {
       NSMutableString *pts = [NSMutableString string];
       for (NSValue *v in sh.points) {
-        CGPoint p = RDLChartPointFromValue(v);
+        NSPoint p = [v pointValue];
         [pts appendFormat:@"%.2f,%.2f ", p.x, p.y];
       }
       [svg appendFormat:@"<%@ points=\"%@\" fill=\"%@\" stroke=\"%@\" stroke-width=\"%.2f\" "
@@ -155,12 +155,12 @@ static NSString *PicaChartSVG(RDLLaidOutChart *it) {
     }
     case RDLChartShapeWedge: {
       CGFloat outer = sh.rect.size.width / 2;
-      CGPoint p1 = PicaWedgePoint(sh.rect, sh.startAngle, outer);
-      CGPoint p2 = PicaWedgePoint(sh.rect, sh.endAngle, outer);
+      NSPoint p1 = PicaWedgePoint(sh.rect, sh.startAngle, outer);
+      NSPoint p2 = PicaWedgePoint(sh.rect, sh.endAngle, outer);
       int large = (sh.endAngle - sh.startAngle) > 180 ? 1 : 0;
       if (sh.innerRadius > 0) {
-        CGPoint q1 = PicaWedgePoint(sh.rect, sh.endAngle, sh.innerRadius);
-        CGPoint q2 = PicaWedgePoint(sh.rect, sh.startAngle, sh.innerRadius);
+        NSPoint q1 = PicaWedgePoint(sh.rect, sh.endAngle, sh.innerRadius);
+        NSPoint q2 = PicaWedgePoint(sh.rect, sh.startAngle, sh.innerRadius);
         [svg appendFormat:@"<path d=\"M%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f L%.2f %.2f "
                           @"A%.2f %.2f 0 %d 0 %.2f %.2f Z\" fill=\"%@\" stroke=\"%@\"/>",
                           p1.x, p1.y, outer, outer, large, p2.x, p2.y, q1.x, q1.y, sh.innerRadius,
@@ -168,7 +168,7 @@ static NSString *PicaChartSVG(RDLLaidOutChart *it) {
       } else {
         [svg appendFormat:@"<path d=\"M%.2f %.2f L%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f Z\" "
                           @"fill=\"%@\" stroke=\"%@\"/>",
-                          CGRectGetMidX(sh.rect), CGRectGetMidY(sh.rect), p1.x, p1.y, outer, outer,
+                          NSMidX(sh.rect), NSMidY(sh.rect), p1.x, p1.y, outer, outer,
                           large, p2.x, p2.y, fill, stroke];
       }
       break;

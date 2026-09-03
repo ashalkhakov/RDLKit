@@ -29,8 +29,8 @@ typedef NS_ENUM(NSInteger, RDLChartTextAnchor) {
 @interface RDLChartShape : NSObject
 @property (nonatomic, assign) RDLChartShapeKind kind;
 // In the same units as the rect the plan was made for, y increasing downwards.
-@property (nonatomic, assign) CGRect rect;
-// Polyline and polygon vertices, as NSValue-wrapped CGPoints.
+@property (nonatomic, assign) NSRect rect;
+// Polyline and polygon vertices, as +[NSValue valueWithPoint:] boxes.
 @property (nonatomic, copy) NSArray<NSValue *> *points;
 @property (nonatomic, copy) NSString *fill;   // "#rrggbb", nil for none
 @property (nonatomic, copy) NSString *stroke; // "#rrggbb", nil for none
@@ -49,15 +49,11 @@ typedef NS_ENUM(NSInteger, RDLChartTextAnchor) {
 @property (nonatomic, assign) CGFloat rotation;
 @end
 
-// Portable CGPoint boxing for `points` -- see the note in the implementation.
-FOUNDATION_EXPORT NSValue *RDLChartPointValue(CGPoint p);
-FOUNDATION_EXPORT CGPoint RDLChartPointFromValue(NSValue *v);
-
 @interface RDLChartRenderer : NSObject
 // The shapes that draw `chart` inside `rect`, back to front: paint them in
 // order and the result is the chart. An empty array means there was nothing
 // to draw.
-+ (NSArray<RDLChartShape *> *)shapesForChart:(RDLLaidOutChart *)chart inRect:(CGRect)rect;
++ (NSArray<RDLChartShape *> *)shapesForChart:(RDLLaidOutChart *)chart inRect:(NSRect)rect;
 // Rough text width, which is all the plan needs to reserve room for labels.
 // Deliberately independent of any font engine so the geometry is the same
 // everywhere the chart is drawn.
