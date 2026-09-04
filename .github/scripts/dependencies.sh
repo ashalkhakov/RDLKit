@@ -102,17 +102,9 @@ install_libs_base() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
-    # Deliberately *not* --with-default-config=standalone.conf, which the
-    # reference recipe passes. standalone.conf is a deployment layout: it sets
-    # GNUSTEP_SYSTEM_LIBRARY=./ and friends, relative to the config file, for
-    # the case where everything has been copied into one directory beside an
-    # application. Compiled in here it means gnustep-gui looks for the backend
-    # bundle next to etc/GNUstep.conf while gnustep-make installed it under
-    # System/Library/Bundles, so the build succeeds and then nothing that
-    # needs a font can run. We do not need it: AppRun writes an explicit
-    # GNUSTEP_CONFIG_FILE naming every root, which is what makes the AppImage
-    # relocatable.
-    ./configure --prefix="$INSTALL_PATH" || cat config.log
+    ./configure --prefix="$INSTALL_PATH" \
+                --with-config-file="$INSTALL_PATH/etc/GNUstep.conf" \
+                --with-default-config=standalone.conf || cat config.log
     make
     make install
     echo "::endgroup::"
@@ -140,6 +132,23 @@ install_libs_back() {
     cd libs-back
     ./configure --prefix="$INSTALL_PATH" --enable-graphics=cairo || cat config.log
     make install
+    # gnustep-gui asks for the backend by version -- libgnustep-back-032.bundle
+    # -- and master's gui and back do not always agree on it, which reports as
+    #
+    #   Did not find correct version of backend (libgnustep-back-032.bundle)
+    #   NSApplication.m:306 Assertion failed ... Unable to find backend back
+    #
+    # UDQuakeTools' prepare-appdir.sh handles this with fallback symlinks. The
+    # same links are made here rather than there, because the test suites run
+    # against this prefix directly and need them too; AppDir gets them with the
+    # wholesale copy, and prepare-appdir.sh still makes them itself.
+    bundle=$(find "$INSTALL_PATH" -name 'libgnustep-back-*.bundle' | head -n 1)
+    if [ -n "$bundle" ]; then
+        dir=$(dirname "$bundle")
+        name=$(basename "$bundle")
+        ln -sfv "$name" "$dir/libgnustep-back.bundle"
+        ln -sfv "$name" "$dir/back.bundle"
+    fi
     echo "::endgroup::"
 }
 

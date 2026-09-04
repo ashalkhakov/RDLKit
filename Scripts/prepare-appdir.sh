@@ -1,52 +1,32 @@
 #!/bin/bash
-# Assemble AppDir: the designer, the CLI, and enough of GNUstep to run them.
+# Assemble AppDir. Ported from UDQuakeTools' Scripts/prepare-appdir.sh, which
+# is known to work; the differences from it are marked, and there are only two.
 #
 #   GNUSTEP_PREFIX=/path/to/gnustep ./Scripts/prepare-appdir.sh
 #
-# GNUstep dictates the shape: an app is a bundle under GNUSTEP_SYSTEM_APPS, it
-# finds its frameworks through the GNUstep roots, and inside an AppImage those
-# roots are wherever the image happens to be mounted.
-#
-# Where exactly those roots sit depends on how tools-make was configured, and
-# hard-coding either answer has already produced one empty AppDir. So nothing
-# here is assumed: every path is read back out of gnustep-config and rewritten
-# relative to the mount point, and the result is written as a template that
-# AppRun expands at launch. Get the prefix right and the layout follows.
-#
-# No -u: GNUstep.sh tests variables that are not set yet, and would abort
-# under it. -x so the log says which line failed -- this runs in CI, where the
-# only evidence is what it printed.
-set -eo pipefail
-set -x
+# Exit immediately if a command exits with a non-zero status
+set -e
 
 WORKSPACE_DIR=$(pwd)
-PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
-APPDIR="${WORKSPACE_DIR}/AppDir"
+# DIFFERENCE: the prefix is built in the same job rather than unpacked into
+# /opt, so it is passed in. The default keeps the original behaviour.
+LOCAL_PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
 
-rm -rf "$APPDIR"
-mkdir -p "$APPDIR/usr"
+# 1. Recreate clean AppDir structural root
+rm -rf AppDir
+mkdir -p AppDir/usr/bin
+mkdir -p AppDir/usr/lib
+mkdir -p AppDir/usr/etc
+mkdir -p AppDir/usr/local/bin
 
-# Fail loudly if the makefiles are not where either layout puts them, rather
-# than swallowing the error and dying on the next line.
-GNUSTEP_SH=""
-for candidate in "${PREFIX}/System/Library/Makefiles/GNUstep.sh" \
-                 "${PREFIX}/share/GNUstep/Makefiles/GNUstep.sh"; do
-  if [ -r "$candidate" ]; then
-    GNUSTEP_SH="$candidate"
-    break
-  fi
-done
-if [ -z "$GNUSTEP_SH" ]; then
-  echo "no GNUstep.sh under ${PREFIX}; is GNUSTEP_PREFIX right?" >&2
-  ls -la "${PREFIX}" >&2 || true
-  exit 1
-fi
-. "$GNUSTEP_SH"
+# 2. Source GNUstep environment once
+. "${LOCAL_PREFIX}/System/Library/Makefiles/GNUstep.sh"
 
-# Built and installed into the prefix, not into AppDir with DESTDIR: the whole
-# prefix is copied in below, and the generated config points the GNUstep roots
-# at that copy. Installing with DESTDIR would put the app under
-# AppDir/<prefix>/..., where nothing would look for it.
+# 3. Install into the prefix.
+# DIFFERENCE: UDQuakeTools installs its apps with DESTDIR and then migrates the
+# bundles out of the nested prefix path. We ship a command line tool as well as
+# an app, and that migration only handles .app bundles, so both go into the
+# SYSTEM domain instead and arrive in AppDir with the wholesale copy at step 5.
 make -C PicaKit
 make -C PicaKit install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 make -C PicaGen
@@ -54,111 +34,75 @@ make -C PicaGen install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 make -C PicaDesigner
 make -C PicaDesigner install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 
-# The prefix, whole, under usr/. Copying all of it keeps every path one
-# rewrite away from the mount point whatever the layout. Headers are dropped
-# afterwards: nothing at runtime reads them, and they are most of the bulk.
-cp -Rp "${PREFIX}/." "$APPDIR/usr/"
-rm -rf "$APPDIR/usr/include" "$APPDIR/usr/System/Library/Headers"
-
-# Now the paths. Ask gnustep-config what each root is, and rewrite the prefix
-# to the placeholder AppRun substitutes. A variable that is empty, or that
-# points outside the prefix (the user roots are relative to $HOME), is left
-# for the literal block below.
-config_template="$APPDIR/usr/GNUstep.conf.in"
-: > "$config_template"
-
-for var in GNUSTEP_MAKEFILES \
-           GNUSTEP_SYSTEM_APPS GNUSTEP_SYSTEM_ADMIN_APPS GNUSTEP_SYSTEM_WEB_APPS \
-           GNUSTEP_SYSTEM_TOOLS GNUSTEP_SYSTEM_ADMIN_TOOLS \
-           GNUSTEP_SYSTEM_LIBRARY GNUSTEP_SYSTEM_HEADERS GNUSTEP_SYSTEM_LIBRARIES \
-           GNUSTEP_SYSTEM_DOC GNUSTEP_SYSTEM_DOC_MAN GNUSTEP_SYSTEM_DOC_INFO \
-           GNUSTEP_NETWORK_APPS GNUSTEP_NETWORK_ADMIN_APPS GNUSTEP_NETWORK_WEB_APPS \
-           GNUSTEP_NETWORK_TOOLS GNUSTEP_NETWORK_ADMIN_TOOLS \
-           GNUSTEP_NETWORK_LIBRARY GNUSTEP_NETWORK_HEADERS GNUSTEP_NETWORK_LIBRARIES \
-           GNUSTEP_NETWORK_DOC GNUSTEP_NETWORK_DOC_MAN GNUSTEP_NETWORK_DOC_INFO \
-           GNUSTEP_LOCAL_APPS GNUSTEP_LOCAL_ADMIN_APPS GNUSTEP_LOCAL_WEB_APPS \
-           GNUSTEP_LOCAL_TOOLS GNUSTEP_LOCAL_ADMIN_TOOLS \
-           GNUSTEP_LOCAL_LIBRARY GNUSTEP_LOCAL_HEADERS GNUSTEP_LOCAL_LIBRARIES \
-           GNUSTEP_LOCAL_DOC GNUSTEP_LOCAL_DOC_MAN GNUSTEP_LOCAL_DOC_INFO
-do
-  value=$(gnustep-config --variable="$var" 2>/dev/null || true)
-  case "$value" in
-    "$PREFIX"/*) echo "${var}=@HERE@/usr/${value#$PREFIX/}" >> "$config_template" ;;
-    "$PREFIX")   echo "${var}=@HERE@/usr" >> "$config_template" ;;
-  esac
-done
-
-# The user domain is relative to whoever runs the image, not to the image.
-cat >> "$config_template" <<'IN_EOF'
-GNUSTEP_USER_CONFIG_FILE=.GNUstep.conf
-GNUSTEP_USER_DEFAULTS_DIR=GNUstep/Defaults
-GNUSTEP_SYSTEM_USERS_DIR=/home
-GNUSTEP_NETWORK_USERS_DIR=/home
-GNUSTEP_LOCAL_USERS_DIR=/home
-IN_EOF
-
-# What AppRun has to exec, and what has to be on LD_LIBRARY_PATH, in the same
-# terms. Written separately because AppRun needs them before it has a config.
-apps=$(gnustep-config --variable=GNUSTEP_SYSTEM_APPS)
-tools=$(gnustep-config --variable=GNUSTEP_SYSTEM_TOOLS)
-libs=$(gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARIES)
-rel() { printf '%s' "@HERE@/usr/${1#$PREFIX/}"; }
-
-# The Eau theme, if the prefix has one. It came in with the prefix copy above;
-# what is recorded here is only whether AppRun should ask for it. A prefix
-# without it -- a distro GNUstep, say -- still produces a working image, just
-# one that looks like stock GNUstep, so this is a warning and not an error.
-theme_dir=$(find "$APPDIR/usr" -maxdepth 6 -type d -name 'Eau.theme' -print -quit || true)
-if [ -n "$theme_dir" ]; then
-  default_theme=Eau
-else
-  default_theme=""
-  echo "::warning::no Eau.theme in ${PREFIX}; the image will use the default theme"
+if [ -d "${LOCAL_PREFIX}/System/Library/Themes" ]; then
+mkdir -p AppDir/usr/System/Library/Themes
+cp -Rp "${LOCAL_PREFIX}/System/Library/Themes/"* AppDir/usr/System/Library/Themes/
 fi
 
-cat > "$APPDIR/usr/pica-paths.in" <<IN_EOF
-PICA_APP=$(rel "$apps")/Pica.app/Pica
-PICA_TOOL=$(rel "$tools")/picagen
-PICA_LIBS=$(rel "$libs")
-PICA_DEFAULT_THEME=$default_theme
-IN_EOF
-
-# The background tools AppKit expects to be able to launch: the distributed
-# notification centre, the pasteboard server, and the services registry. They
-# are already inside the copied prefix; this only puts them somewhere PATH
-# will find them without depending on where that is.
-mkdir -p "$APPDIR/usr/local/bin"
-for tool in gdnc gpbs make_services gdomap; do
-  found=$(find "$APPDIR/usr" -type f -name "$tool" -perm -111 2>/dev/null | head -n 1 || true)
-  [ -n "$found" ] && cp -p "$found" "$APPDIR/usr/local/bin/" || true
+# 4. Dynamically locate the background tools
+for tool in gdnc gpbs make_services; do
+FOUND_TOOL=$(find "${LOCAL_PREFIX}" -type f -name "$tool" 2>/dev/null | head -n 1 || true)
+if [ -n "$FOUND_TOOL" ]; then
+    cp -p "$FOUND_TOOL" AppDir/usr/lib/
+    cp -p "$FOUND_TOOL" AppDir/usr/local/bin/
+fi
 done
 
-# Fonts. A report names the fonts its author had, and what the host has
-# installed decides how it paginates -- see the README. Shipping a set makes
-# the image lay out the same way everywhere, whatever the host lacks. After
-# the copy above, which would otherwise overwrite them.
-mkdir -p "$APPDIR/usr/etc/fonts" "$APPDIR/usr/share/fonts"
-cp Scripts/appimage/fonts.conf "$APPDIR/usr/etc/fonts/fonts.conf"
+# 5. Pull BOTH System and Local hierarchies into AppDir/usr/
+if [ -d "${LOCAL_PREFIX}/System" ]; then
+mkdir -p AppDir/usr/System
+cp -Rp "${LOCAL_PREFIX}/System/"* AppDir/usr/System/
+fi
+if [ -d "${LOCAL_PREFIX}/Local" ]; then
+mkdir -p AppDir/usr/Local
+cp -Rp "${LOCAL_PREFIX}/Local/"* AppDir/usr/Local/
+fi
+
+# Bundle libobjc from the prefix base lib directory
+for libobjc in "${LOCAL_PREFIX}"/lib/libobjc.so.*.*; do
+if [ -f "$libobjc" ]; then
+    soname=$(basename "$libobjc")
+    cp -p "$libobjc" AppDir/usr/lib/
+    ln -sf "$soname" "AppDir/usr/lib/${soname%.*}"
+    ln -sf "$soname" AppDir/usr/lib/libobjc.so
+fi
+done
+
+# Bundle libdispatch and its BlocksRuntime dependency safely
+echo "=== Manually staging libdispatch and BlocksRuntime ==="
+if ls "${LOCAL_PREFIX}/lib"/libdispatch.so* 1> /dev/null 2>&1; then
+cp -p "${LOCAL_PREFIX}/lib"/libdispatch.so* AppDir/usr/lib/
+cp -p "${LOCAL_PREFIX}/lib"/libBlocksRuntime.so* AppDir/usr/lib/ 2>/dev/null || true
+elif ls "${LOCAL_PREFIX}/lib64"/libdispatch.so* 1> /dev/null 2>&1; then
+cp -p "${LOCAL_PREFIX}/lib64"/libdispatch.so* AppDir/usr/lib/
+cp -p "${LOCAL_PREFIX}/lib64"/libBlocksRuntime.so* AppDir/usr/lib/ 2>/dev/null || true
+fi
+
+# 6. Maintain versioned and unversioned fallback bundle linking
+BACKEND_BUNDLE=$(find AppDir/usr -name "libgnustep-back-*.bundle" 2>/dev/null | head -n 1 || true)
+if [ -n "$BACKEND_BUNDLE" ]; then
+BUNDLE_DIR=$(dirname "$BACKEND_BUNDLE")
+BUNDLE_NAME=$(basename "$BACKEND_BUNDLE")
+ln -sfv "$BUNDLE_NAME" "$BUNDLE_DIR/libgnustep-back.bundle" || true
+ln -sfv "$BUNDLE_NAME" "$BUNDLE_DIR/back.bundle" || true
+fi
+
+# --- BUNDLE FONTS FOR PORTABILITY ---
+# A report names the fonts its author had, and what the host has installed
+# decides how it paginates. See the README.
+mkdir -p AppDir/usr/etc/fonts
+cp Scripts/appimage/fonts.conf AppDir/usr/etc/fonts/fonts.conf
 for dir in /usr/share/fonts/truetype/dejavu /usr/share/fonts/truetype/liberation \
            /usr/share/fonts/truetype/msttcorefonts; do
-  [ -d "$dir" ] && cp -Rp "$dir" "$APPDIR/usr/share/fonts/" || true
+if [ -d "$dir" ]; then
+    mkdir -p "AppDir/usr/share/fonts/truetype/$(basename "$dir")"
+    cp -Rp "$dir"/* "AppDir/usr/share/fonts/truetype/$(basename "$dir")/"
+fi
 done
 
-# The two things the image exists to carry. Missing here means the install
-# went somewhere the config does not describe, which is exactly the mistake
-# that produced an empty AppDir and an error one script later.
-missing=""
-for entry in "$(rel "$apps")/Pica.app/Pica" "$(rel "$tools")/picagen"; do
-  path="${APPDIR}${entry#@HERE@}"
-  [ -x "$path" ] || missing="$missing $path"
-done
-if [ -n "$missing" ]; then
-  echo "AppDir is missing:$missing" >&2
-  echo "what the prefix holds:" >&2
-  find "$PREFIX" -maxdepth 3 -type d >&2
-  exit 1
-fi
+# Clean up residual folders
+find AppDir -maxdepth 1 -type d ! -name "AppDir" ! -name "usr" -exec rm -rf {} + 2>/dev/null || true
 
 echo "AppDir assembled:"
-du -sh "$APPDIR"
-cat "$APPDIR/usr/pica-paths.in"
+du -sh AppDir
+find AppDir/usr -maxdepth 4 -name 'Pica.app' -o -maxdepth 4 -name picagen

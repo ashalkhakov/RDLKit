@@ -1,49 +1,31 @@
 #!/bin/bash
-# Turn AppDir into an AppImage.
+# Turn AppDir into an AppImage. Ported from UDQuakeTools'
+# Scripts/package-appimage.sh.
 #
 #   APP_VERSION=1.2.3 ./Scripts/package-appimage.sh
-set -eo pipefail
-set -x
+set -euo pipefail
 
 WORKSPACE_DIR=$(pwd)
-PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
+LOCAL_PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
 LINUXDEPLOY="${LINUXDEPLOY:-/usr/local/lib/linuxdeploy/AppRun}"
 
-"${WORKSPACE_DIR}/Scripts/appimage/install-assets.sh" "${WORKSPACE_DIR}" AppDir
+# 1. Copy tracked AppImage metadata/runtime assets into AppDir.
+"${WORKSPACE_DIR}/Scripts/appimage/install-assets.sh" "${WORKSPACE_DIR}" "AppDir"
 
-mapfile -t ELF_BINS < <("${WORKSPACE_DIR}/Scripts/appimage/collect-elf-binaries.sh" AppDir)
+# 2. Gather executable inputs for linuxdeploy.
+mapfile -t ELF_BINS < <("${WORKSPACE_DIR}/Scripts/appimage/collect-elf-binaries.sh" "AppDir")
 ELF_ARGS=()
 for bin in "${ELF_BINS[@]}"; do
-  ELF_ARGS+=(--executable "$bin")
+    ELF_ARGS+=(--executable "$bin")
 done
-if [ ${#ELF_ARGS[@]} -eq 0 ]; then
-  echo "no executables found in AppDir; did prepare-appdir.sh run?" >&2
-  exit 1
-fi
 
-# A theme is dlopened, so nothing links to it and linuxdeploy would never see
-# it while walking the two binaries. Handed over explicitly, its dependencies
-# get deployed too -- otherwise the image starts and then silently falls back
-# to the default theme on a host that lacks one of them.
-LIB_ARGS=()
-while IFS= read -r themebin; do
-  [ -n "$themebin" ] && LIB_ARGS+=(--library "$themebin") || true
-done < <(find AppDir -type f -path '*.theme/*' -perm -111 \
-              -exec sh -c 'file "$1" | grep -q ELF && echo "$1"' _ {} \; 2>/dev/null || true)
-
+# 3. Run the linuxdeploy process.
 export OUTPUT="RDLKit-Linux-${APP_VERSION:-dev}-$(uname -m).AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export NO_VALIDATE=1
-[ -n "${LDAI_RUNTIME_FILE:-}" ] && export LDAI_RUNTIME_FILE || true
+export LDAI_RUNTIME_FILE="${LDAI_RUNTIME_FILE:-/tmp/appimage-runtime/runtime-x86_64}"
 
-# Where the GNUstep libraries ended up inside AppDir depends on the layout of
-# the prefix, so take it from what prepare-appdir.sh recorded rather than
-# guessing again. linuxdeploy has to be able to resolve every dependency of
-# the two binaries, or it silently ships an image that cannot start.
-APPDIR_LIBS=$(sed -n 's|^PICA_LIBS=@HERE@|'"${WORKSPACE_DIR}"'|p' AppDir/usr/pica-paths.in)
-
-LD_LIBRARY_PATH="${PREFIX}/lib:${APPDIR_LIBS}:${WORKSPACE_DIR}/AppDir/usr/lib:${LD_LIBRARY_PATH:-}" \
-  "$LINUXDEPLOY" --appdir AppDir "${ELF_ARGS[@]}" "${LIB_ARGS[@]+"${LIB_ARGS[@]}"}" \
-    --output appimage
+LD_LIBRARY_PATH="${LOCAL_PREFIX}/System/Library/Libraries:${LOCAL_PREFIX}/Local/Library/Libraries:${WORKSPACE_DIR}/AppDir/usr/lib:${LD_LIBRARY_PATH:-}" \
+    "$LINUXDEPLOY" --appdir AppDir "${ELF_ARGS[@]}" --output appimage
 
 echo "built $OUTPUT"

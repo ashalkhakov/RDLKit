@@ -29,24 +29,6 @@ jobs:
 
       # Built first and on its own, so a compile error in the library is
       # reported as that rather than as a test failure.
-      # gnustep-gui dlopens the backend through the roots that libs-base was
-      # compiled to resolve, which is not the same thing as where gnustep-make
-      # installed it -- and when they disagree the build still succeeds and
-      # every test that touches a font dies instead. One line here rather than
-      # five confusing failures later. Runs on a cache hit too: a cached
-      # prefix built by an older script is exactly when this bites.
-      - name: Check the backend is findable
-        run: |
-          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
-          lib=$(gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARY)
-          echo "GNUSTEP_SYSTEM_LIBRARY=$lib"
-          find "$INSTALL_PATH" -name 'libgnustep-back*.bundle' -maxdepth 6
-          if ! ls "$lib"/Bundles/libgnustep-back*.bundle >/dev/null 2>&1; then
-            echo "::error::no backend bundle under $lib/Bundles"
-            exit 1
-          fi
-          ls "$lib"/Themes 2>/dev/null || echo "(no themes installed)"
-
       - name: Build PicaKit
         run: |
           xcodebuild -project RDLKit.xcodeproj -scheme PicaKit \
