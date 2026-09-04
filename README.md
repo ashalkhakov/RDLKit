@@ -368,8 +368,16 @@ a tag triggers it from anywhere.
   `Scripts/package-appimage.sh` hands it to `linuxdeploy`. The layout follows
   GNUstep's: `AppRun` writes a config pointing `GNUSTEP_SYSTEM_ROOT` and its
   siblings at wherever the image is mounted, because that path is not known
-  until it runs. Run the designer by launching the image, and the CLI as
+  until it runs. Nothing in either script hard-codes where GNUstep put things:
+  the roots are read back out of `gnustep-config` at build time and written as
+  a template, so a prefix in either layout packages the same way. Run the
+  designer by launching the image, and the CLI as
   `./RDLKit-Linux-*.AppImage picagen report.rdl --check`.
+
+  The image carries the **Eau** theme and asks for it by default, so the
+  designer looks the way a GNUstep desktop is expected to look rather than
+  like stock GNUstep. `PICA_THEME=SomeOtherTheme` picks a different installed
+  theme, and `PICA_THEME=` gets GNUstep's own.
 * **macOS** — `Pica.app`, and `picagen` beside the `PicaKit.framework` it
   loads through `@rpath` (the tool alone will not start), signed with a
   Developer ID and notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),

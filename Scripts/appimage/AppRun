@@ -47,4 +47,13 @@ case "$(basename "${ARGV0:-$0}")" in
     ;;
 esac
 
+# Eau is shipped in the image and asked for by default: it is the look users
+# expect from a GNUstep desktop, and stock GNUstep is not it. Set PICA_THEME to
+# the name of another installed theme to change it, or to the empty string to
+# get GNUstep's own. A -GSTheme passed by the caller wins over this one, since
+# the argument domain takes the last occurrence.
+theme="${PICA_THEME-${PICA_DEFAULT_THEME:-}}"
+if [ -n "$theme" ]; then
+  exec "$PICA_APP" -GSTheme "$theme" "$@"
+fi
 exec "$PICA_APP" "$@"

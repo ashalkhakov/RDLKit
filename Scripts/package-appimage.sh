@@ -21,6 +21,16 @@ if [ ${#ELF_ARGS[@]} -eq 0 ]; then
   exit 1
 fi
 
+# A theme is dlopened, so nothing links to it and linuxdeploy would never see
+# it while walking the two binaries. Handed over explicitly, its dependencies
+# get deployed too -- otherwise the image starts and then silently falls back
+# to the default theme on a host that lacks one of them.
+LIB_ARGS=()
+while IFS= read -r themebin; do
+  [ -n "$themebin" ] && LIB_ARGS+=(--library "$themebin") || true
+done < <(find AppDir -type f -path '*.theme/*' -perm -111 \
+              -exec sh -c 'file "$1" | grep -q ELF && echo "$1"' _ {} \; 2>/dev/null || true)
+
 export OUTPUT="RDLKit-Linux-${APP_VERSION:-dev}-$(uname -m).AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export NO_VALIDATE=1
@@ -33,6 +43,7 @@ export NO_VALIDATE=1
 APPDIR_LIBS=$(sed -n 's|^PICA_LIBS=@HERE@|'"${WORKSPACE_DIR}"'|p' AppDir/usr/pica-paths.in)
 
 LD_LIBRARY_PATH="${PREFIX}/lib:${APPDIR_LIBS}:${WORKSPACE_DIR}/AppDir/usr/lib:${LD_LIBRARY_PATH:-}" \
-  "$LINUXDEPLOY" --appdir AppDir "${ELF_ARGS[@]}" --output appimage
+  "$LINUXDEPLOY" --appdir AppDir "${ELF_ARGS[@]}" "${LIB_ARGS[@]+"${LIB_ARGS[@]}"}" \
+    --output appimage
 
 echo "built $OUTPUT"

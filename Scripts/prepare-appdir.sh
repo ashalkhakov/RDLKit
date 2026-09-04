@@ -104,10 +104,23 @@ tools=$(gnustep-config --variable=GNUSTEP_SYSTEM_TOOLS)
 libs=$(gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARIES)
 rel() { printf '%s' "@HERE@/usr/${1#$PREFIX/}"; }
 
+# The Eau theme, if the prefix has one. It came in with the prefix copy above;
+# what is recorded here is only whether AppRun should ask for it. A prefix
+# without it -- a distro GNUstep, say -- still produces a working image, just
+# one that looks like stock GNUstep, so this is a warning and not an error.
+theme_dir=$(find "$APPDIR/usr" -maxdepth 6 -type d -name 'Eau.theme' -print -quit || true)
+if [ -n "$theme_dir" ]; then
+  default_theme=Eau
+else
+  default_theme=""
+  echo "::warning::no Eau.theme in ${PREFIX}; the image will use the default theme"
+fi
+
 cat > "$APPDIR/usr/pica-paths.in" <<IN_EOF
 PICA_APP=$(rel "$apps")/Pica.app/Pica
 PICA_TOOL=$(rel "$tools")/picagen
 PICA_LIBS=$(rel "$libs")
+PICA_DEFAULT_THEME=$default_theme
 IN_EOF
 
 # The background tools AppKit expects to be able to launch: the distributed
