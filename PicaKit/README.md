@@ -4,7 +4,7 @@
 
 Backends today: **PDF** (AppKit) and **HTML** (Foundation). Runs on **Cocoa** and **GNUstep**. No Swift, no UIKit.
 
-The designer lives in `../PicaDesigner`. CLI: `../PicaDemo`. Tests: `../PicaKitTests` (XCTest on Mac).
+The designer lives in `../PicaDesigner`. CLI: `../PicaGen`. Tests: `../PicaKitTests` (XCTest on Mac).
 
 ## Pipeline
 
@@ -21,7 +21,7 @@ NSArray<RDLLaidOutPage *>   Textbox, Line, Rectangle, Image, Chart only — no T
 id<RDLBackend>  -renderPages:title:     PDF or HTML
 ```
 
-Backends never re-run layout. They paint the elements they are given.
+Backends paint the elements they are given, they do not lay out elements.
 
 ```
 NSArray *pages = [RDLGenerator pagesForReport:report parameters:params];
@@ -44,7 +44,7 @@ Tablix follows the spec:
 - `NoRowsMessage`, `RepeatColumnHeaders` / `RepeatRowHeaders`, `TablixCorner`
 - group-scoped `Sum` / `Count` (current group rows, or a named dataset)
 
-Designer convenience: `columns` / `headerHeight` / `rowHeight` / `groupBy` rebuild those structures (header + optional group header + details + subtotal footer).
+Designer convenience: `columnSpecs` / `headerHeight` / `rowHeight` / `groupBy` describe a header + details table plainly, and `-rebuildTablix` projects them onto those structures (header + optional group header + details + subtotal footer). Assigning the spec has no side effect, so the order the properties are set in does not matter.
 
 Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Subreport, Gauge, Map, …) are collected into `report.warnings` by the parser.
 
@@ -72,17 +72,19 @@ Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`)
 | `RDLView` | Flipped `NSView`; stacked pages; PDF from pages |
 | `RDLPDFBackend` | PDF backend (`renderPages:`) |
 | `RDLHTMLBackend` | HTML backend (`renderPages:` / `HTMLStringForPages:`) |
+| `RDLUpgrader` | 2003 / 2005 / 2008 → the 2010 grammar, in place on read, the way SSRS upgrades an older report — so the model only knows one shape |
+| `RDLChecker` / `RDLDataContract` | Static checking with no data bound, and the data shape a report needs, described in Objective-C terms |
+| `RDLChartRenderer` | A chart as plain shapes, shared by both backends and the designer canvas |
+| `RDLZipArchive` | Minimal ZIP reader (central directory, raw inflate; refuses Zip64 and encryption) — the `.docx` container |
+| `RDLDocxReader` | `word/document.xml` → format-neutral blocks. The only file that knows WordprocessingML |
+| `RDLImporter` | Blocks → a positioned report: measured heights, tabs as positions, tables as data regions. See the root `README.md` |
 
-## Tests (macOS)
+## Tests
 
-```
-cd .. && xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
-```
-
-See `../PicaKitTests/README.md`. GNUstep harness later: call `PicaRunAllChecks()`.
+See `../PicaKitTests/README.md`.
 
 ## Build
 
-GNUstep: `make` in this directory, then `make` in `../PicaDemo` or `../PicaDesigner`.
+GNUstep: `make` in this directory, then `make` in `../PicaGen` or `../PicaDesigner`.
 
 Xcode: open `../RDLKit.xcodeproj` (scheme **PicaKit**).

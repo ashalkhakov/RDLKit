@@ -1,49 +1,38 @@
-# RDLKit
+# PicaKit
 
 Report Definition Language Kit for GNUstep and Cocoa.
 
-Pure Objective-C (ARC). No Swift, no UIKit. The designer builds its UI in XIBs.
-
-1. **Generator** (`PicaKit` + `PicaDemo`) — takes an RDL file, data sources, and input parameters, lays out pages (tablix expansion included), then a **PDF** or **HTML** backend paints those elements.
-2. **Designer** (`PicaDesigner`) — creates and edits RDL files (report outline, canvas, inspector, datasets).
+1. **Generator** (`PicaKit` + `PicaGen`) — takes an RDL file, data sources, and input parameters, and generates a **PDF** or **HTML** file.
+2. **Designer** (`PicaDesigner`) — creates and edits RDL definitions.
 
 The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
-accepted as current: ReportItems, TablixBody / TablixRow / TablixCell, TablixMember (static vs Group with GroupExpressions and TablixHeader, RepeatOnNewPage), Filters, SortExpressions, TablixCorner, DataSources, PageHeader/Footer as PageSection.
+accepted as current.
 
-## Pipeline
+Output format support:
 
-```
-parse / bind  →  layout (tablix → elements)  →  backends
-```
+* PDF
+* HTML
 
-Backends receive `RDLLaidOutPage` of primitives (Textbox, Line, Rectangle, Image, Chart). They never see Tablix.
+Report generation is best described as a pipeline:
 
-## Supported RDL subset
+1. parse
+2. bind and calculate expressions
+3. perform layout
+4. feed the results to a backend
+5. obtain the output file
 
-* **Report items** — Textbox (multi-Paragraph/TextRun, CanGrow, styles), Line (horizontal / vertical / sloped, dash styles), Rectangle, Image (`Source` Embedded/External, `Sizing` Fit/FitProportional/Clip/AutoSize, report-level `EmbeddedImages`), Chart (Column/Bar/Line/Pie: first series, category group, data point), Tablix, List (mapped onto Tablix).
-* **Styles** — fonts (weight/style/size/family), color, background, per-side borders, padding, TextAlign, VerticalAlign, TextDecoration; any style property may be an `=` expression (conditional formatting), resolved per instance.
-* **Behavior** — `Visibility/Hidden` (static or expression) on items and tablix members, `ActionInfo/Hyperlink` (HTML `<a>`), `ZIndex`, `PageBreak` (with `ResetPageNumber` and `PageName` → `Globals!PageName`), `KeepTogether` on body items, `RepeatOnNewPage`, `NoRowsMessage`, Body `Style` (page background), crosstab pivot via dynamic `TablixColumnHierarchy` groups (nested groups render tiered, spanning column headers), horizontal pagination of wide tablixes with `RepeatRowHeaders`.
-* **Data** — datasets from `CommandText` JSON or `bindJSONString:`, calculated fields (`Field/Value`), dataset-level `Filters`, group/sort/filter on tablix members.
-* **Parameters** — String/Integer/Float/Boolean/DateTime coercion, `Nullable`, `MultiValue` (arrays, `Parameters!P.Count`, `Join`), `ValidValues`, defaults incl. `=` expressions.
-* **Expressions** — VB-style operators, ~90 functions, aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes, `Lookup`/`LookupSet`/`MultiLookup`, `Globals!` (incl. sectioned `PageNumber`/`TotalPages`, `OverallPageNumber`/`OverallTotalPages`, `PageName`), `User!`, `Parameters!`.
-
-Not (yet) supported: recursive group hierarchies (`Group/Parent`), `FixedHeaders`, Subreport, Gauge/Map, Toggle/InteractiveSort/DocumentMap, Drillthrough/BookmarkLink actions. Skipped elements are reported in `report.warnings` instead of dropped silently.
-
-```
-[RDLGenerator bindJSONString:json toDataSet:@"Items" inReport:report error:&err];
-NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{ @"InvoiceNo": @"A-1042" }];
-NSData *out = [backend renderPages:pages title:report.name];
-```
-
-## Layout
+## File Layout
 
 | Path | Component | Role |
 | --- | --- | --- |
-| `PicaKit` | Generator library | Parse RDL 2010, bind JSON, evaluate VB-style `=` expressions (tokenize → AST → execute), paginate, PDF + HTML backends |
-| `PicaDemo` | Generator CLI | `PicaDemo report.rdl [-f pdf\|html] [-o out] [-p Name=Value] [-d DataSet=file.json]` |
-| `PicaDesigner` | Designer app | Report outline · paper · inspector · data; modal Add Element palette; modal tablix editor (columns, nested row groups, column group crosstab, subtotals, grand total); WYSIWYG canvas with attributed-text preview, double-click in-place editing of textboxes and tablix cells (Tab moves across cells), and `Fields!`/`Parameters!` expression completion. Generator window exports PDF/HTML. |
-| `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends. Portable `PicaChecks` for a later GNUstep runner. |
+| `PicaKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
+| `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. Portable `PicaChecks` for GNUstep. |
+| `PicaGen` | Generator CLI | command-line tool to generate reports |
+| `PicaDesigner` | Designer app | WYSIWYG report designer |
+| `PicaDesignerTests` | Designer app | Tests for the report designer |
+
+Written in Objective-C with ARC. UI is built via XIBs.
 
 ## Generator API
 
@@ -56,42 +45,100 @@ id<RDLBackend> b = [RDLGenerator backendNamed:@"HTML"];
 NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 ```
 
-## Tests (macOS)
+## Supported RDL subset
 
-```
-xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test
-xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests -destination 'platform=macOS' test
-```
+* **Report items**
+  * Textbox (multi-Paragraph/TextRun, CanGrow, styles)
+  * Line (horizontal / vertical / sloped, dash styles)
+  * Rectangle
+  * Image (`Source` Embedded/External, `Sizing` Fit/FitProportional/Clip/AutoSize, report-level `EmbeddedImages`)
+  * Chart (Column/Bar/Line/Pie: first series, category group, data point)
+  * Tablix
+  * List (mapped onto Tablix)
+* **Styles**
+  * fonts (weight/style/size/family)
+  * color
+  * background,
+  * per-side borders, padding
+  * TextAlign
+  * VerticalAlign
+  * TextDecoration
+  * conditional formatting: any style property may be an `=` expression
+* **Behavior**
+  * `Visibility/Hidden` (static or expression) on items and tablix members
+  * `ActionInfo/Hyperlink` (HTML `<a>`)
+  * `ZIndex`
+  * `PageBreak` (with `ResetPageNumber` and `PageName` → `Globals!PageName`)
+  * `KeepTogether` on body items
+  * `RepeatOnNewPage`
+  * `NoRowsMessage`
+  * Body `Style` (page background)
+  * crosstab pivot via dynamic `TablixColumnHierarchy` groups (nested groups render tiered, spanning column headers)
+  * horizontal pagination of wide tablixes with `RepeatRowHeaders`
+* **Data**
+  * datasets from `CommandText` JSON or `bindJSONString:`
+  * calculated fields (`Field/Value`)
+  * dataset-level `Filters`
+  * group/sort/filter on tablix members
+* **Parameters**
+  * String/Integer/Float/Boolean/DateTime coercion
+  * `Nullable`
+  * `MultiValue` (arrays, `Parameters!P.Count`, `Join`)
+  * `ValidValues`
+  * defaults incl. `=` expressions
+* **Expressions**: a subset of Visual Basic needed for report calculations
+  * basic arithmetic and logical operators
+  * ~90 builtin functions
+  * aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes
+  * `Lookup`/`LookupSet`/`MultiLookup`
+  * `Globals!` (incl. sectioned `PageNumber`/`TotalPages`, `OverallPageNumber`/`OverallTotalPages`, `PageName`)
+  * `User!`
+  * `Parameters!`
 
-Or in Xcode: open `RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
+Not supported yet:
+* recursive group hierarchies (`Group/Parent`)
+* `FixedHeaders`
+* Subreport
+* Gauge/Map
+* Toggle/InteractiveSort/DocumentMap
+* Drillthrough/BookmarkLink actions
 
-## GNUstep
+Skipped elements are reported in `report.warnings` instead of dropped silently.
 
-```
-. /usr/share/GNUstep/Makefiles/GNUstep.sh
-cd PicaKit && make
-cd ../PicaDesigner && make
-openapp ./Pica.app
-cd ../PicaDemo && make
-./PicaDemo ../samples/invoice.rdl -f html -o invoice.html
-```
+## Testing
+
+* On MacOS:
+  * `xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test`
+  * `xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests -destination 'platform=macOS' test`
+  * Or in Xcode: open `RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
+* on GNUstep:
+
+  ```
+  . /usr/share/GNUstep/Makefiles/GNUstep.sh
+  cd PicaKit && make
+  cd ../PicaDesigner && make
+  openapp ./Pica.app
+  cd ../PicaGen && make
+  ./picagen ../samples/invoice.rdl -f html -o invoice.html
+  ```
 
 Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
 
 ## Cocoa (Xcode)
 
-Open `RDLKit.xcodeproj` (this folder). Four targets, all Objective-C ARC, macOS 12+:
+Open `RDLKit.xcodeproj` (this folder). Five targets, all Objective-C ARC, macOS 12+:
 
 | Scheme | Product | Role |
 | --- | --- | --- |
 | **Pica** | `Pica.app` | Designer (welcome screen also opens the generator window) |
-| **PicaDemo** | `PicaDemo` | Command-line generator |
+| **PicaGen** | `picagen` | Command-line generator |
 | **PicaKit** | `PicaKit.framework` | Generator library |
-| **PicaKitTests** | `PicaKitTests.xctest` | XCTest (parser, expressions, layout, backends) |
+| **PicaKitTests** | `PicaKitTests.xctest` | XCTest for the library (parser, expressions, layout, backends, checker, `.docx` import) |
+| **PicaDesignerTests** | `PicaDesignerTests.xctest` | XCTest for the app (editing core, canvas, panels) |
 
-Pica and PicaDemo link and embed `PicaKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
+Pica and PicaGen link and embed `PicaKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
 
-Xcode 26: every scheme’s Run action expands macros from a real product (`Pica.app`, `PicaDemo`, or `PicaKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
+Xcode 26: every scheme’s Run action expands macros from a real product (`Pica.app`, `picagen`, or `PicaKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
 
 ```
 xcodebuild -project RDLKit.xcodeproj -scheme Pica -configuration Debug build
@@ -101,6 +148,8 @@ xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test
 There are two test schemes: `PicaKitTests` for the library and
 `PicaDesignerTests` for the app. Use those rather than `swift test` --
 SwiftPM is not part of the build story, which has to work under GNUstep too.
+Both are ordinary XCTest; under GNUstep they build as bundles through their
+own GNUmakefiles and need `gnustep/tools-xctest`.
 
 ## Charts
 
@@ -140,8 +189,8 @@ data bound, nothing laid out. `RDLDataContract` describes the data the report
 needs, so a caller can validate what it is about to supply.
 
 ```
-PicaDemo report.rdl --check      # diagnostics; non-zero exit on errors
-PicaDemo report.rdl --contract   # JSON: datasets, field types, parameters
+picagen report.rdl --check      # diagnostics; non-zero exit on errors
+picagen report.rdl --contract   # JSON: datasets, field types, parameters
 ```
 
 It works over a small type language rather than a flat set of scalars: a
@@ -165,6 +214,52 @@ kit has not implemented reads as a warning rather than as a typo.
 The contract speaks Objective-C — `objcClass`, and the `objcType` a number
 wraps — so a caller sees what to put in the dictionary rather than a .NET type
 name. The report's own declaration comes along as `rdlType` for reference.
+
+## Importing a Word document
+
+`RDLImporter` scaffolds a report from a `.docx`, so the starting point can be a
+document somebody already has. `RDLZipArchive` reads the container and
+`RDLDocxReader` turns `word/document.xml` into format-neutral blocks; only that
+reader knows any WordprocessingML.
+
+The result is a scaffold, not a conversion. A document is a *flow* and a report
+is *absolute boxes*, so the importer measures and places rather than reflowing —
+and every rule below exists because a real template broke the obvious
+alternative:
+
+* **Heights are measured, never grown.** Textboxes are emitted `CanGrow=NO` at
+  the height their text needs, measured at the body width *less the style's
+  padding*. A wrong height is then visible and draggable instead of quietly
+  reflowing the page.
+* **Styles resolve Word's whole cascade** — `docDefaults`, the paragraph style
+  and its `basedOn` chain, the character style, then inline `w:rPr` — because
+  RDL has no stylesheet to inherit from, so the effective style has to be
+  settled while the document is still a document. Without it most text arrives
+  with no font at all.
+* **Tabs become positions.** Text after a tab is its own textbox at the stop the
+  tab reaches; padding tabs produce nothing; a right or decimal stop becomes a
+  right-aligned box ending there.
+* **Multi-column sections** divide the body width and fill left to right, which
+  is all a report can express anyway.
+* **A one-row table is layout** — an address block, a totals box — and keeps its
+  literal cells. A table with more rows becomes a data region: the first row is
+  the heading, the rest make way for one bound row.
+* **Every tablix names a dataset of its own**, empty when there is nothing to
+  declare, so no data region silently borrows another table's fields.
+* **Field names** come from Latin headings (`Price (EUR)` → `PriceEur`) and are
+  `Column1..N` otherwise, never transliterated: the name is what has to be typed
+  when data is bound, so a wrong guess costs more than an honest `ColumnN`. All
+  are typed `String`, since the import cannot tell a quantity from a part number.
+* **`{placeholder}`** becomes `=First(Fields!name.Value, "Data")` — outside a
+  data region a bare `Fields!` reference has no scope. `«…»` and `<<…>>` stay
+  literal: punctuation and prompts, not fields.
+* **Pictures** embed into the report rather than referencing a path on the
+  machine that imported them. A wide, thin shape becomes a line — that is how
+  Word draws a rule — and any other shape is left out and named in the notes.
+
+Import returns those notes alongside the report, and the designer's New Report
+wizard shows them before anything is committed to. `PicaKitTests/Fixtures/`
+holds three synthetic Word documents that exercise all of the above.
 
 ## RDL coverage
 

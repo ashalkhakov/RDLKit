@@ -197,7 +197,7 @@ page boundary), `CanShrinkTest`, `ImageSizingTests`, `HtmlTextboxTest`
 problems — the `Fields.Name.Value` dot dialect (fyiReporting's, not RDL's),
 `{PLACEHOLDER}` templating that is not RDL syntax at all, and calls to
 functions this kit has not implemented. Re-run with
-`PicaDemo <file> --check`.
+`picagen <file> --check`.
 
 Writing the checker turned up three bugs in our own expression parser, each of
 the same shape: it stopped at the first thing it did not understand and

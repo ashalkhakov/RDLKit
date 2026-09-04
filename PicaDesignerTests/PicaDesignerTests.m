@@ -1,82 +1,124 @@
-#import "PicaTestMacros.h"
+#import <XCTest/XCTest.h>
 #import "PicaDesignerChecks.h"
 
 // One case per area, plus an aggregate, mirroring PicaKitTests.
 
-@interface PicaEditingCoreTests : PICA_TEST_CASE
+@interface PicaEditingCoreTests : XCTestCase
 @end
 @implementation PicaEditingCoreTests
 - (void)testDocument {
-  PICA_ASSERT_NO_FAILURES(PicaRunDocumentChecks());
+  NSArray<NSString *> *fails = PicaRunDocumentChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testGranularUndo {
-  PICA_ASSERT_NO_FAILURES(PicaRunUndoChecks());
+  NSArray<NSString *> *fails = PicaRunUndoChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testEditorTablixOps {
-  PICA_ASSERT_NO_FAILURES(PicaRunEditorTablixChecks());
+  NSArray<NSString *> *fails = PicaRunEditorTablixChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testSelection {
-  PICA_ASSERT_NO_FAILURES(PicaRunSelectionChecks());
+  NSArray<NSString *> *fails = PicaRunSelectionChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testInsertionPolicy {
-  PICA_ASSERT_NO_FAILURES(PicaRunInsertionChecks());
+  NSArray<NSString *> *fails = PicaRunInsertionChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testItemTransfer {
-  PICA_ASSERT_NO_FAILURES(PicaRunItemTransferChecks());
+  NSArray<NSString *> *fails = PicaRunItemTransferChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testEditingContext {
-  PICA_ASSERT_NO_FAILURES(PicaRunEditingContextChecks());
+  NSArray<NSString *> *fails = PicaRunEditingContextChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testExport {
-  PICA_ASSERT_NO_FAILURES(PicaRunExportChecks());
+  NSArray<NSString *> *fails = PicaRunExportChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testSharedPipeline {
-  PICA_ASSERT_NO_FAILURES(PicaRunSharedPipelineChecks());
+  NSArray<NSString *> *fails = PicaRunSharedPipelineChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 @end
 
-@interface PicaCanvasTests : PICA_TEST_CASE
+@interface PicaCanvasTests : XCTestCase
 @end
 @implementation PicaCanvasTests
 - (void)testPageGeometry {
-  PICA_ASSERT_NO_FAILURES(PicaRunPageGeometryChecks());
+  NSArray<NSString *> *fails = PicaRunPageGeometryChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testTablixGeometry {
-  PICA_ASSERT_NO_FAILURES(PicaRunTablixGeometryChecks());
+  NSArray<NSString *> *fails = PicaRunTablixGeometryChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 @end
 
-@interface PicaUITests : PICA_TEST_CASE
+@interface PicaUITests : XCTestCase
 @end
 @implementation PicaUITests
 - (void)testInspectorFieldBindings {
-  PICA_ASSERT_NO_FAILURES(PicaRunFieldBindingChecks());
+  NSArray<NSString *> *fails = PicaRunFieldBindingChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testRichTextCodec {
-  PICA_ASSERT_NO_FAILURES(PicaRunRichTextCodecChecks());
+  NSArray<NSString *> *fails = PicaRunRichTextCodecChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testExpressionCompletion {
-  PICA_ASSERT_NO_FAILURES(PicaRunCompletionChecks());
+  NSArray<NSString *> *fails = PicaRunCompletionChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testTextInput {
-  PICA_ASSERT_NO_FAILURES(PicaRunTextInputChecks());
+  NSArray<NSString *> *fails = PicaRunTextInputChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testDialogLifecycle {
-  PICA_ASSERT_NO_FAILURES(PicaRunDialogLifecycleChecks());
+  NSArray<NSString *> *fails = PicaRunDialogLifecycleChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testNewReportWizard {
-  PICA_ASSERT_NO_FAILURES(PicaRunNewReportChecks());
+  NSArray<NSString *> *fails = PicaRunNewReportChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testNewReportPanel {
-  PICA_ASSERT_NO_FAILURES(PicaRunNewReportPanelChecks());
+  NSArray<NSString *> *fails = PicaRunNewReportPanelChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testMenuWiring {
-  PICA_ASSERT_NO_FAILURES(PicaRunMenuWiringChecks());
+  NSArray<NSString *> *fails = PicaRunMenuWiringChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testScaffoldedTablixEditor {
-  PICA_ASSERT_NO_FAILURES(PicaRunScaffoldedTablixEditorChecks());
+  NSArray<NSString *> *fails = PicaRunScaffoldedTablixEditorChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 - (void)testAllDesignerChecks {
-  PICA_ASSERT_NO_FAILURES(PicaRunAllDesignerChecks());
+  NSArray<NSString *> *fails = PicaRunAllDesignerChecks();
+  XCTAssertTrue([fails count] == 0, @"%@",
+                [fails componentsJoinedByString:@"\n"]);
 }
 @end

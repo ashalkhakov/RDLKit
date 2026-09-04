@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D125E61DED1C7934C31DB9B9"
-               BuildableName = "PicaDemo"
-               BlueprintName = "PicaDemo"
+               BuildableName = "picagen"
+               BlueprintName = "PicaGen"
                ReferencedContainer = "container:RDLKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,8 +31,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D125E61DED1C7934C31DB9B9"
-            BuildableName = "PicaDemo"
-            BlueprintName = "PicaDemo"
+            BuildableName = "picagen"
+            BlueprintName = "PicaGen"
             ReferencedContainer = "container:RDLKit.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -54,8 +54,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D125E61DED1C7934C31DB9B9"
-            BuildableName = "PicaDemo"
-            BlueprintName = "PicaDemo"
+            BuildableName = "picagen"
+            BlueprintName = "PicaGen"
             ReferencedContainer = "container:RDLKit.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -71,8 +71,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D125E61DED1C7934C31DB9B9"
-            BuildableName = "PicaDemo"
-            BlueprintName = "PicaDemo"
+            BuildableName = "picagen"
+            BlueprintName = "PicaGen"
             ReferencedContainer = "container:RDLKit.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

@@ -4,10 +4,10 @@
 static void PicaUsage(void) {
   fprintf(stderr,
           "Pica generator — RDL + data + parameters → PDF or HTML\n"
-          "usage: PicaDemo report.rdl [-o out.pdf|out.html] [-f pdf|html]\n"
-          "                 [-p Name=Value] [-d DataSet=file.json]\n"
-          "       PicaDemo report.rdl --check      static check, no data needed\n"
-          "       PicaDemo report.rdl --contract   the data shape the report needs\n");
+          "usage: picagen report.rdl [-o out.pdf|out.html] [-f pdf|html]\n"
+          "                [-p Name=Value] [-d DataSet=file.json]\n"
+          "       picagen report.rdl --check      static check, no data needed\n"
+          "       picagen report.rdl --contract   the data shape the report needs\n");
 }
 
 int main(int argc, const char *argv[]) {

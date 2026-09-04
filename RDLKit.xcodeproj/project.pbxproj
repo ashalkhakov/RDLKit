@@ -176,7 +176,6 @@
 		3988A14CD9E1B0BA1FAC689B /* GNUmakefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = GNUmakefile; sourceTree = "<group>"; };
 		3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PicaKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3FF932DD49FE9CA2225FCE16 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		4670AACF804D5A7D49B095FE /* PicaTestMacros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaTestMacros.h; sourceTree = "<group>"; };
 		4A7EC759B31E5CE35348B9B5 /* PicaChecks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaChecks.h; sourceTree = "<group>"; };
 		4BBD021D6129910A18C54E70 /* PicaAppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaAppDelegate.h; sourceTree = "<group>"; };
 		5287B31A4A81269C168B694D /* RDLView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLView.h; sourceTree = "<group>"; };
@@ -198,7 +197,7 @@
 		901AB0AC0C53219CCE9B02C9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		9AB735B023E47621763374DB /* PicaGeneratorWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaGeneratorWindow.m; sourceTree = "<group>"; };
 		9C93A8A6979B659C019D9C82 /* PicaCanvasView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaCanvasView.h; sourceTree = "<group>"; };
-		9FDB08F274A9264C500CEE4F /* PicaDemo */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PicaDemo; sourceTree = BUILT_PRODUCTS_DIR; };
+		9FDB08F274A9264C500CEE4F /* picagen */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = picagen; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF7A0C2EA618F5BE947043F1 /* PicaCanvasView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaCanvasView.m; sourceTree = "<group>"; };
 		B1200B16459F67D6DF909C0E /* PicaChecks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaChecks.m; sourceTree = "<group>"; };
 		B621BC81F65752457F397A3D /* PicaDesignerWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaDesignerWindow.h; sourceTree = "<group>"; };
@@ -255,7 +254,6 @@
 		D8E68112F539B7F4DFB7ADF0 /* PicaDesignerChecks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaDesignerChecks.h; sourceTree = "<group>"; };
 		C6544B3E1E83863172F46FE3 /* PicaDesignerChecks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaDesignerChecks.m; sourceTree = "<group>"; };
 		66EAB9A3CDBB900DB820A917 /* PicaDesignerTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaDesignerTests.m; sourceTree = "<group>"; };
-		088B76E18C0921BFF78E229C /* PicaTestMacros.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaTestMacros.h; sourceTree = "<group>"; };
 		A896A40DCA2AB0F57532ECFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		18F13C0ED4E70F80B9FCF4C0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		6790076B2E553AE0FAFF4A94 /* PicaDesignerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PicaDesignerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -339,13 +337,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		2E717BE81530C7484312DD81 /* PicaDemo */ = {
+		2E717BE81530C7484312DD81 /* PicaGen */ = {
 			isa = PBXGroup;
 			children = (
 				52D939EF9898701ED8C0484C /* main.m */,
 				30C70FC212DFDBB423681D78 /* README.md */,
 			);
-			path = PicaDemo;
+			path = PicaGen;
 			sourceTree = "<group>";
 		};
 		367BDD79C0EB7824B717F2C6 /* PicaDesigner */ = {
@@ -467,7 +465,7 @@
 			children = (
 				36F476BBE541DC85EE2D7647 /* PicaKit.framework */,
 				595C479D7AC91F29089D5228 /* Pica.app */,
-				9FDB08F274A9264C500CEE4F /* PicaDemo */,
+				9FDB08F274A9264C500CEE4F /* PicaGen */,
 				3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */,
 				6790076B2E553AE0FAFF4A94 /* PicaDesignerTests.xctest */,
 			);
@@ -489,7 +487,7 @@
 			children = (
 				45316B45CB436116EC434408 /* PicaKit */,
 				367BDD79C0EB7824B717F2C6 /* PicaDesigner */,
-				2E717BE81530C7484312DD81 /* PicaDemo */,
+				2E717BE81530C7484312DD81 /* PicaGen */,
 				E1F97BA8A1EBCC74BB0E0AFC /* PicaKitTests */,
 				9D4444B8635515926096826D /* PicaDesignerTests */,
 				14A697408350C1E512848621 /* Package.swift */,
@@ -503,7 +501,6 @@
 			isa = PBXGroup;
 			children = (
 				4A7EC759B31E5CE35348B9B5 /* PicaChecks.h */,
-				4670AACF804D5A7D49B095FE /* PicaTestMacros.h */,
 				B1200B16459F67D6DF909C0E /* PicaChecks.m */,
 				2EF02D16E9FF2F88CA6B2C23 /* PicaKitTests.m */,
 				3FF932DD49FE9CA2225FCE16 /* Info.plist */,
@@ -518,7 +515,6 @@
 				D8E68112F539B7F4DFB7ADF0 /* PicaDesignerChecks.h */,
 				C6544B3E1E83863172F46FE3 /* PicaDesignerChecks.m */,
 				66EAB9A3CDBB900DB820A917 /* PicaDesignerTests.m */,
-				088B76E18C0921BFF78E229C /* PicaTestMacros.h */,
 				A896A40DCA2AB0F57532ECFA /* Info.plist */,
 				18F13C0ED4E70F80B9FCF4C0 /* README.md */,
 			);
@@ -590,9 +586,9 @@
 			productReference = 3ACD4FCE2926083C83034463 /* PicaKitTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		D125E61DED1C7934C31DB9B9 /* PicaDemo */ = {
+		D125E61DED1C7934C31DB9B9 /* PicaGen */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaDemo" */;
+			buildConfigurationList = ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaGen" */;
 			buildPhases = (
 				6D7BCA08514DA73CAB700FD2 /* Sources */,
 				2B396DA3F7C5571D3F7FCD3D /* Frameworks */,
@@ -603,9 +599,9 @@
 			dependencies = (
 				B2F3F811EAE5F5276803D36F /* PBXTargetDependency */,
 			);
-			name = PicaDemo;
-			productName = PicaDemo;
-			productReference = 9FDB08F274A9264C500CEE4F /* PicaDemo */;
+			name = PicaGen;
+			productName = PicaGen;
+			productReference = 9FDB08F274A9264C500CEE4F /* PicaGen */;
 			productType = "com.apple.product-type.tool";
 		};
 		F14379BD3391DC97D94E4AC2 /* PicaKit */ = {
@@ -682,7 +678,7 @@
 				DD1BD88978FB5AC6C4DA2266 /* PicaDesignerTests */,
 				F14379BD3391DC97D94E4AC2 /* PicaKit */,
 				2FE3FBD7A51C361D063370C7 /* Pica */,
-				D125E61DED1C7934C31DB9B9 /* PicaDemo */,
+				D125E61DED1C7934C31DB9B9 /* PicaGen */,
 				45C98D5FCE3016A4889B25F4 /* PicaKitTests */,
 			);
 		};
@@ -879,7 +875,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.pica.demo;
-				PRODUCT_NAME = PicaDemo;
+				PRODUCT_NAME = picagen;
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
 			};
@@ -1013,7 +1009,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.pica.demo;
-				PRODUCT_NAME = PicaDemo;
+				PRODUCT_NAME = picagen;
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = "$(SRCROOT)/PicaKit";
 			};
@@ -1209,7 +1205,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaDemo" */ = {
+		ACD9B0E6AD6D91B1ED390CC2 /* Build configuration list for PBXNativeTarget "PicaGen" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6C24AE4171CCECDC2D082869 /* Debug */,

@@ -5,6 +5,10 @@
 `../PicaKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columnSpecs` + `-rebuildTablix`, with `groupBy` / `groupBy2` / `pivotBy` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. Setting `pivotBy` alongside `groupBy` builds a crosstab (matrix): a dynamic `TablixColumnHierarchy` group with the first column as the aggregated measure. The spec is stored plainly and projected onto the MS-RDL structures on demand, so the order in which the properties are set no longer matters. Grouping prepends a 1.2in row-header column that no column spec budgeted for, so `-rebuildTablix` takes that width back out of the columns in proportion rather than growing the tablix past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. The "Edit Tablix…" inspector button opens the modal editor.
 
 Pica.app’s welcome screen opens either this designer or the generator window.
+Choosing the designer asks first where the report comes from — a blank page, or
+a Word document scaffolded by the kit's `RDLImporter` — and shows what the
+import made of the file before anything is committed to. File > New Report is
+the same wizard.
 
 ## Windows
 
@@ -25,6 +29,8 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaInPlaceEditor` | Double-click editing of a textbox value or a tablix header/value cell, Tab/Backtab across cells, and the Cocoa workarounds it needs (edit begins on mouse-up, never `selectText:`) |
 | **Windows and panels** | |
 | `PicaWelcomeWindow` | Chooser: Generator or Designer |
+| `PicaNewReport` | What a new report is made of — blank, or scaffolded from a `.docx` — plus the import's notes and the checker's verdict. No window, so checks drive all of it |
+| `PicaNewReportPanel` | The wizard itself: the choice, the file, and what the import found. Wiring only |
 | `PicaDesignerWindow` | Split: report outline (+/− bar, Add Element palette) · canvas · inspector · data. Vends the expression field editor and the document's undo manager |
 | `PicaGeneratorWindow` | Open RDL, bind parameters/JSON, read the pages, export. Shares the designer's document |
 | `PicaOutlineDataSource` | The report outline: node tree, data source, delegate, and selection mirroring both ways |
@@ -53,6 +59,7 @@ Pica.app’s welcome screen opens either this designer or the generator window.
 | `PicaRichTextEditor.xib` | The window, the formatting bar and its controls, the text view and the buttons | The installed font families, and the text being edited |
 | `PicaAddElementPanel.xib` | The panel, its caption and Cancel | One button per allowed element kind, and the height to hold them |
 | `PicaPreviewWindow.xib` | Everything | — |
+| `PicaNewReportPanel.xib` | The window, the two choices, the file row, the summary and notes, the buttons | Nothing but the outcome being shown |
 
 Layout is springs and struts throughout — no Auto Layout — so the same files
 suit GNUstep, which reads the XIB directly while Xcode compiles it to a `.nib`.
@@ -127,9 +134,9 @@ Open `../RDLKit.xcodeproj`, scheme **Pica**. The designer app links `PicaKit.fra
 
 ## Headless generator
 
-`../PicaDemo` prints a `.rdl` to PDF or HTML without the designer UI:
+`../PicaGen` prints a `.rdl` to PDF or HTML without the designer UI:
 
 ```
-PicaDemo report.rdl -o out.pdf -p InvoiceNo=A-1042 -d Items=items.json
-PicaDemo report.rdl -f html -o out.html -p InvoiceNo=A-1042
+picagen report.rdl -o out.pdf -p InvoiceNo=A-1042 -d Items=items.json
+picagen report.rdl -f html -o out.html -p InvoiceNo=A-1042
 ```
