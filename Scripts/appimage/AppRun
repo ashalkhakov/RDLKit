@@ -3,43 +3,27 @@
 #
 # GNUstep finds everything through a config file and a set of root variables,
 # and inside an AppImage those roots are wherever the image happens to be
-# mounted. So both are written out at launch, pointing at $HERE.
+# mounted. prepare-appdir.sh recorded them at build time, as they came out of
+# gnustep-config, with @HERE@ where the mount point goes; all that is left to
+# do here is substitute it. Nothing about the layout is assumed on this side,
+# which is the point -- the two previous versions of this file each hard-coded
+# a different one, and each was wrong for the other prefix.
 set -eu
 
 HERE="$(dirname "$(readlink -f "$0")")"
 
+expand() { sed "s|@HERE@|$HERE|g" "$1"; }
+
 export GNUSTEP_CONFIG_FILE="/tmp/GNUstep-Pica-$$.conf"
-cat <<IN_EOF > "$GNUSTEP_CONFIG_FILE"
-GNUSTEP_USER_CONFIG_FILE=.GNUstep.conf
-GNUSTEP_USER_DEFAULTS_DIR=GNUstep/Defaults
-GNUSTEP_SYSTEM_USERS_DIR=/home
-GNUSTEP_NETWORK_USERS_DIR=/home
-GNUSTEP_LOCAL_USERS_DIR=/home
-GNUSTEP_MAKEFILES=$HERE/usr/share/GNUstep/Makefiles
-GNUSTEP_SYSTEM_APPS=$HERE/usr/lib/GNUstep/Applications
-GNUSTEP_SYSTEM_ADMIN_APPS=$HERE/usr/lib/GNUstep/Applications
-GNUSTEP_SYSTEM_WEB_APPS=$HERE/usr/lib/GNUstep/WebApplications
-GNUSTEP_SYSTEM_TOOLS=$HERE/usr/bin
-GNUSTEP_SYSTEM_ADMIN_TOOLS=$HERE/usr/sbin
-GNUSTEP_SYSTEM_LIBRARY=$HERE/usr/lib/GNUstep
-GNUSTEP_SYSTEM_HEADERS=$HERE/usr/include
-GNUSTEP_SYSTEM_LIBRARIES=$HERE/usr/lib
-GNUSTEP_SYSTEM_RESOURCES=$HERE/usr/share
-GNUSTEP_NETWORK_APPS=$HERE/usr/lib/GNUstep/Applications
-GNUSTEP_NETWORK_TOOLS=$HERE/usr/bin
-GNUSTEP_NETWORK_LIBRARY=$HERE/usr/lib/GNUstep
-GNUSTEP_NETWORK_LIBRARIES=$HERE/usr/lib
-GNUSTEP_NETWORK_RESOURCES=$HERE/usr/share
-GNUSTEP_LOCAL_APPS=$HERE/usr/lib/GNUstep/Applications
-GNUSTEP_LOCAL_TOOLS=$HERE/usr/bin
-GNUSTEP_LOCAL_LIBRARY=$HERE/usr/lib/GNUstep
-GNUSTEP_LOCAL_LIBRARIES=$HERE/usr/lib
-GNUSTEP_LOCAL_RESOURCES=$HERE/usr/share
-IN_EOF
+expand "$HERE/usr/GNUstep.conf.in" > "$GNUSTEP_CONFIG_FILE"
 chmod 600 "$GNUSTEP_CONFIG_FILE"
 
-export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
-export PATH="$HERE/usr/local/bin:$HERE/usr/bin:$PATH"
+paths="/tmp/pica-paths-$$.sh"
+expand "$HERE/usr/pica-paths.in" > "$paths"
+. "$paths"
+
+export LD_LIBRARY_PATH="$PICA_LIBS:$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
+export PATH="$HERE/usr/local/bin:$(dirname "$PICA_TOOL"):$PATH"
 
 # The bundled fonts are the point of shipping any: a report names Arial or
 # Times New Roman, and what the host has installed decides how it paginates.
@@ -47,20 +31,20 @@ export PATH="$HERE/usr/local/bin:$HERE/usr/bin:$PATH"
 export FONTCONFIG_FILE="$HERE/usr/etc/fonts/fonts.conf"
 export XDG_CACHE_HOME="/tmp/pica-fc-cache-$$"
 mkdir -p "$XDG_CACHE_HOME"
-trap 'rm -rf "$XDG_CACHE_HOME" "$GNUSTEP_CONFIG_FILE"' EXIT
+trap 'rm -rf "$XDG_CACHE_HOME" "$GNUSTEP_CONFIG_FILE" "$paths"' EXIT
 
 # The image carries two programs. Invoked as picagen, or with picagen as the
 # first argument, it is the command line tool; otherwise it is the designer.
 case "${1:-}" in
   picagen)
     shift
-    exec "$HERE/usr/bin/picagen" "$@"
+    exec "$PICA_TOOL" "$@"
     ;;
 esac
 case "$(basename "${ARGV0:-$0}")" in
   picagen)
-    exec "$HERE/usr/bin/picagen" "$@"
+    exec "$PICA_TOOL" "$@"
     ;;
 esac
 
-exec "$HERE/usr/lib/GNUstep/Applications/Pica.app/Pica" "$@"
+exec "$PICA_APP" "$@"

@@ -24,4 +24,4 @@ MSG
 fi
 
 exec docker run --rm -t -v "$root":/src -w /src "$image" \
-  sh -c '. /gnustep/share/GNUstep/Makefiles/GNUstep.sh; xvfb-run -a "$@"' -- "$@"
+  sh -c '. /gnustep/System/Library/Makefiles/GNUstep.sh; xvfb-run -a "$@"' -- "$@"

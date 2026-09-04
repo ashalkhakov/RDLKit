@@ -24,6 +24,9 @@ jobs:
       CXX: clang++
       LIBRARY_COMBO: ng-gnu-gnu
       RUNTIME_VERSION: gnustep-2.0
+      # See the note in ci.yml: the gnustep layout does not treat the prefix's
+      # plain lib/ as a library root, but libobjc2 and libdispatch live there.
+      LD_LIBRARY_PATH: ${{ github.workspace }}/build/lib
     defaults:
       run:
         working-directory: ${{ env.SRC_PATH }}

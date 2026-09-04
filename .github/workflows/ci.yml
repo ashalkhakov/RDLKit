@@ -125,6 +125,10 @@ jobs:
       CXX: clang++
       LIBRARY_COMBO: ng-gnu-gnu
       RUNTIME_VERSION: gnustep-2.0
+      # libobjc2 and libdispatch land in the prefix's plain lib/, which the
+      # gnustep layout does not treat as a library root. GNUstep.sh prepends
+      # the roots it does know about to this.
+      LD_LIBRARY_PATH: ${{ github.workspace }}/build/lib
     defaults:
       run:
         working-directory: ${{ env.SRC_PATH }}
@@ -185,12 +189,12 @@ jobs:
 
       - name: Build PicaKit
         run: |
-          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           make -C PicaKit
 
       - name: Build the CLI and the designer
         run: |
-          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           make -C PicaGen
           make -C PicaDesigner
 
@@ -201,17 +205,17 @@ jobs:
       # rather than as one line saying the process died.
       - name: Test PicaKit
         run: |
-          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           xvfb-run -a make -C PicaKitTests run-tests SANITIZE=1
 
       - name: Test PicaDesigner
         run: |
-          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           xvfb-run -a make -C PicaDesignerTests run-tests SANITIZE=1
 
       - name: Smoke-test picagen
         run: |
-          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           # Find what was actually built rather than assuming gnustep-make's
           # object directory is called "obj": it varies with the library combo.
           lib=$(find PicaKit -name 'libPicaKit*' -print -quit)

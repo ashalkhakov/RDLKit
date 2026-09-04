@@ -24,9 +24,15 @@ fi
 export OUTPUT="RDLKit-Linux-${APP_VERSION:-dev}-$(uname -m).AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export NO_VALIDATE=1
-[ -n "${LDAI_RUNTIME_FILE:-}" ] && export LDAI_RUNTIME_FILE
+[ -n "${LDAI_RUNTIME_FILE:-}" ] && export LDAI_RUNTIME_FILE || true
 
-LD_LIBRARY_PATH="${PREFIX}/lib:${WORKSPACE_DIR}/AppDir/usr/lib:${LD_LIBRARY_PATH:-}" \
+# Where the GNUstep libraries ended up inside AppDir depends on the layout of
+# the prefix, so take it from what prepare-appdir.sh recorded rather than
+# guessing again. linuxdeploy has to be able to resolve every dependency of
+# the two binaries, or it silently ships an image that cannot start.
+APPDIR_LIBS=$(sed -n 's|^PICA_LIBS=@HERE@|'"${WORKSPACE_DIR}"'|p' AppDir/usr/pica-paths.in)
+
+LD_LIBRARY_PATH="${PREFIX}/lib:${APPDIR_LIBS}:${WORKSPACE_DIR}/AppDir/usr/lib:${LD_LIBRARY_PATH:-}" \
   "$LINUXDEPLOY" --appdir AppDir "${ELF_ARGS[@]}" --output appimage
 
 echo "built $OUTPUT"
