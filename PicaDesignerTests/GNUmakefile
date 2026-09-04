@@ -39,6 +39,18 @@ PicaDesignerTests_RESOURCE_FILES = \
   ../PicaDesigner/PicaTablixEditor.xib \
   ../PicaDesigner/PicaNewReportPanel.xib
 
+# Heap corruption does not name itself: "malloc_consolidate(): unaligned
+# fastbin chunk" is reported by whichever allocation happens to notice, long
+# after the overflow. Build with SANITIZE=1 to have AddressSanitizer name the
+# write and the allocation it ran past instead:
+#
+#   make run-tests SANITIZE=1
+#
+ifeq ($(SANITIZE),1)
+ADDITIONAL_OBJCFLAGS += -fsanitize=address -fno-omit-frame-pointer -g
+ADDITIONAL_LDFLAGS += -fsanitize=address
+endif
+
 include $(GNUSTEP_MAKEFILES)/bundle.make
 
 XCTEST ?= xctest

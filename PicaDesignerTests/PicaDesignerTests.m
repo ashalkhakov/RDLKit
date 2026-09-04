@@ -276,8 +276,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 // GNUstep asserts that the shared application exists before anything touches a
 // font -- "The shared NSApplication instance must be created before methods
 // that need the backend may be called" -- and measuring text does. Cocoa is
-// laxer about it and does not mind this being here.
-+ (void)setUp {
+// laxer and does not mind.
+//
+// Per test rather than per class: +setUp is a later addition to XCTest and
+// GNUstep's implementation does not call it, which the font assertion proved
+// by surviving one. -setUp every implementation has, and -sharedApplication
+// is idempotent.
+- (void)setUp {
+  [super setUp];
   [NSApplication sharedApplication];
 }
 
@@ -1106,8 +1112,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 // GNUstep asserts that the shared application exists before anything touches a
 // font -- "The shared NSApplication instance must be created before methods
 // that need the backend may be called" -- and measuring text does. Cocoa is
-// laxer about it and does not mind this being here.
-+ (void)setUp {
+// laxer and does not mind.
+//
+// Per test rather than per class: +setUp is a later addition to XCTest and
+// GNUstep's implementation does not call it, which the font assertion proved
+// by surviving one. -setUp every implementation has, and -sharedApplication
+// is idempotent.
+- (void)setUp {
+  [super setUp];
   [NSApplication sharedApplication];
 }
 
@@ -1366,8 +1378,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 // GNUstep asserts that the shared application exists before anything touches a
 // font -- "The shared NSApplication instance must be created before methods
 // that need the backend may be called" -- and measuring text does. Cocoa is
-// laxer about it and does not mind this being here.
-+ (void)setUp {
+// laxer and does not mind.
+//
+// Per test rather than per class: +setUp is a later addition to XCTest and
+// GNUstep's implementation does not call it, which the font assertion proved
+// by surviving one. -setUp every implementation has, and -sharedApplication
+// is idempotent.
+- (void)setUp {
+  [super setUp];
   [NSApplication sharedApplication];
 }
 

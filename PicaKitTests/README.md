@@ -55,7 +55,10 @@ cd ../PicaKit && make
 cd ../PicaKitTests && make run-tests
 ```
 
-`make` builds `PicaKitTests.bundle`; `make run-tests` runs it through `xctest`. The
+`make` builds `PicaKitTests.bundle`; `make run-tests` runs it through `xctest`.
+`make run-tests SANITIZE=1` does the same under AddressSanitizer, which is the
+only practical way to place heap corruption: the allocator reports it wherever
+it happens to notice, not where the overflow was. The
 `.docx` fixtures are found relative to `__FILE__` rather than through the
 bundle, so they need no `RESOURCE_FILES` entry — but the checks do have to run
 from a source tree.
