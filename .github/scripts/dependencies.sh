@@ -102,8 +102,19 @@ install_libs_base() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
+    # The reference recipe names $PREFIX/etc/GNUstep.conf here. This
+    # gnustep-make writes it to $PREFIX/etc/GNUstep/GNUstep.conf instead, and
+    # when the named file does not exist libs-base falls back to the built-in
+    # standalone.conf defaults, which put every root at ./ relative to it --
+    # so gnustep-gui looks for the backend in $PREFIX/etc and reports
+    #
+    #   Did not find correct version of backend (libgnustep-back-032.bundle)
+    #   NSApplication.m:306 Assertion failed ... Unable to find backend back
+    #
+    # while the bundle sits in Local/Library/Bundles. Ask gnustep-make where
+    # it actually put the file rather than naming a path.
     ./configure --prefix="$INSTALL_PATH" \
-                --with-config-file="$INSTALL_PATH/etc/GNUstep.conf" \
+                --with-config-file="$(gnustep-config --variable=GNUSTEP_CONFIG_FILE)" \
                 --with-default-config=standalone.conf || cat config.log
     make
     make install
