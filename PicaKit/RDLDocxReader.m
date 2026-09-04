@@ -955,7 +955,16 @@ static NSArray<RDLImportBlock *> *PicaBlocksOfBody(NSXMLElement *body,
   return blocks;
 }
 
-static NSXMLElement *PicaPartBody(RDLZipArchive *zip, NSString *part, NSString *rootName) {
+// The element asked for, with its document kept alive in `keepAlive`.
+//
+// That last part is not optional. Cocoa's NSXMLNode retains its parent, so a
+// child handed out keeps the whole document alive; GNUstep's does not, and
+// -[NSXMLNode dealloc] calls xmlFreeDoc, which frees the entire libxml tree
+// underneath every node still being read. It shows up as a use-after-free the
+// moment anything touches the element again -- reading a run's text, for one.
+// So the caller holds the documents until it has finished with the elements.
+static NSXMLElement *PicaPartBody(RDLZipArchive *zip, NSString *part, NSString *rootName,
+                                  NSMutableArray *keepAlive) {
   NSData *data = [zip dataForEntryNamed:part];
   if (data == nil)
     return nil;
@@ -963,6 +972,9 @@ static NSXMLElement *PicaPartBody(RDLZipArchive *zip, NSString *part, NSString *
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithData:data
                                                    options:NSXMLNodePreserveWhitespace
                                                      error:NULL];
+  if (doc == nil)
+    return nil;
+  [keepAlive addObject:doc];
   NSXMLElement *root = [doc rootElement];
   if (root == nil)
     return nil;
@@ -1003,7 +1015,9 @@ static NSString *PicaReferenceId(NSXMLElement *sectPr, NSString *kind) {
   RDLZipArchive *zip = [RDLZipArchive archiveWithData:data error:error];
   if (zip == nil)
     return nil;
-  NSXMLElement *body = PicaPartBody(zip, @"word/document.xml", @"body");
+    // Held for the whole read: see PicaPartBody.
+  NSMutableArray *openDocuments = [NSMutableArray array];
+  NSXMLElement *body = PicaPartBody(zip, @"word/document.xml", @"body", openDocuments);
   if (body == nil) {
     if (error)
       *error = [NSError errorWithDomain:@"PicaKit"
@@ -1016,14 +1030,14 @@ static NSString *PicaReferenceId(NSXMLElement *sectPr, NSString *kind) {
   }
 
   NSMutableArray<NSString *> *collected = [NSMutableArray array];
-  NSXMLElement *settings = PicaPartBody(zip, @"word/settings.xml", nil);
+  NSXMLElement *settings = PicaPartBody(zip, @"word/settings.xml", nil, openDocuments);
   NSString *interval = PicaVal(PicaKid(settings, @"defaultTabStop"));
   NSMutableArray<RDLImportSection *> *sections = [NSMutableArray array];
   RDLImportDocument *out = [[RDLImportDocument alloc] init];
   out.defaultTabStop = [interval length] ? PicaTwipsToInches(interval) : 0.5;
   PicaDocxContext *ctx = [[PicaDocxContext alloc] init];
   ctx.zip = zip;
-  ctx.sheet = PicaReadStyleSheet(PicaPartBody(zip, @"word/styles.xml", nil));
+  ctx.sheet = PicaReadStyleSheet(PicaPartBody(zip, @"word/styles.xml", nil, openDocuments));
   ctx.unsupported = [NSMutableArray array];
   out.blocks = PicaBlocksOfBody(body, collected, sections, ctx);
   out.sections = sections;
@@ -1040,10 +1054,10 @@ static NSString *PicaReferenceId(NSXMLElement *sectPr, NSString *kind) {
       continue;
     if (out.headerBlocks == nil) {
       NSString *target = PicaRelationshipTarget(zip, PicaReferenceId(sectPr, @"headerReference"), nil);
-      NSXMLElement *hdr = target ? PicaPartBody(zip, [@"word/" stringByAppendingString:target], @"hdr")
+      NSXMLElement *hdr = target ? PicaPartBody(zip, [@"word/" stringByAppendingString:target], @"hdr", openDocuments)
                                  : nil;
       if (hdr == nil && target)
-        hdr = PicaPartBody(zip, [@"word/" stringByAppendingString:target], nil);
+        hdr = PicaPartBody(zip, [@"word/" stringByAppendingString:target], nil, openDocuments);
       if (hdr) {
         ctx.relationshipsPart =
             [NSString stringWithFormat:@"word/_rels/%@.rels", [target lastPathComponent]];
@@ -1053,10 +1067,10 @@ static NSString *PicaReferenceId(NSXMLElement *sectPr, NSString *kind) {
     }
     if (out.footerBlocks == nil) {
       NSString *target = PicaRelationshipTarget(zip, PicaReferenceId(sectPr, @"footerReference"), nil);
-      NSXMLElement *ftr = target ? PicaPartBody(zip, [@"word/" stringByAppendingString:target], @"ftr")
+      NSXMLElement *ftr = target ? PicaPartBody(zip, [@"word/" stringByAppendingString:target], @"ftr", openDocuments)
                                  : nil;
       if (ftr == nil && target)
-        ftr = PicaPartBody(zip, [@"word/" stringByAppendingString:target], nil);
+        ftr = PicaPartBody(zip, [@"word/" stringByAppendingString:target], nil, openDocuments);
       if (ftr) {
         ctx.relationshipsPart =
             [NSString stringWithFormat:@"word/_rels/%@.rels", [target lastPathComponent]];
