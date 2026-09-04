@@ -206,6 +206,13 @@ jobs:
       - name: Test PicaKit
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
+          # Where gnustep-make installed the backend, and where libs-base
+          # looks for it at runtime, are two different questions, and
+          # "Unable to find backend back" is printed when either is wrong.
+          echo "config file:  $(gnustep-config --variable=GNUSTEP_CONFIG_FILE)"
+          echo "system lib:   $(gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARY)"
+          ls -la "$INSTALL_PATH/etc" 2>&1 | head
+          find "$INSTALL_PATH" -maxdepth 6 -name 'libgnustep-back*' -o -maxdepth 6 -name 'GNUstep.conf'
           xvfb-run -a make -C PicaKitTests run-tests SANITIZE=1
 
       - name: Test PicaDesigner
