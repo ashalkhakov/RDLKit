@@ -4,6 +4,12 @@
 #import <math.h>
 
 @implementation RDLEvalScope
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _recursionLevel = -1; // 0 is a real depth, so "not recursive" needs its own
+  return self;
+}
 @end
 
 // Work out how this row spells the field named `key`, and return that spelling
@@ -974,9 +980,25 @@ static NSString *PicaDsName(RDLExprNode *arg, RDLEvalScope *scope) {
   return [s length] ? s : nil;
 }
 
+// Sum(expr, "Scope", Recursive): RDL spells the flag as a bare word, not a
+// string, so it arrives as an identifier node rather than as a value.
+static BOOL PicaIsRecursiveFlag(RDLExprNode *arg) {
+  return arg != nil && arg.kind == RDLExprNodeKindIdentifier &&
+         [arg.name caseInsensitiveCompare:@"Recursive"] == NSOrderedSame;
+}
+
 static id PicaExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
-  NSString *ds = [args count] > 1 ? PicaDsName(args[1], scope) : nil;
+  NSString *ds = ([args count] > 1 && !PicaIsRecursiveFlag(args[1]))
+                     ? PicaDsName(args[1], scope)
+                     : nil;
   NSArray *rows = PicaRows(scope, ds);
+  // Recursive widens the aggregate from this node's own rows to its whole
+  // subtree, which is what makes a recursive hierarchy worth having: the
+  // manager's total is the manager's team, not the manager's own row.
+  BOOL recursive = ([args count] > 1 && PicaIsRecursiveFlag(args[1])) ||
+                   ([args count] > 2 && PicaIsRecursiveFlag(args[2]));
+  if (recursive && [scope.recursiveRows count])
+    rows = scope.recursiveRows;
   RDLExprNode *expr = [args count] ? args[0] : nil;
   if ([n isEqualToString:@"countrows"] || [n isEqualToString:@"rowcount"])
     return @((double)[rows count]);
@@ -1634,8 +1656,18 @@ static id PicaExec(RDLExprNode *ast, RDLEvalScope *scope) {
     // which is what RDL returns.
     if ([n isEqualToString:@"level"]) {
       NSArray *scopes = scope.activeScopes ?: @[];
+      // Inside a recursive hierarchy Level() is the depth in the tree, not the
+      // nesting of the scopes -- which is the whole point of the feature, since
+      // it is what a report indents by.
       if ([ast.args count] == 0)
-        return @((double)MAX((NSInteger)[scopes count] - 1, 0));
+        return scope.recursionLevel >= 0 ? @((double)scope.recursionLevel)
+                                         : @((double)MAX((NSInteger)[scopes count] - 1, 0));
+      if (scope.recursionLevel >= 0 && [scopes count]) {
+        NSString *innermost = [scopes lastObject];
+        NSString *asked = PicaStr(PicaExec(ast.args[0], scope));
+        if ([innermost caseInsensitiveCompare:asked] == NSOrderedSame)
+          return @((double)scope.recursionLevel);
+      }
       NSString *want = PicaStr(PicaExec(ast.args[0], scope));
       for (NSUInteger i = 0; i < [scopes count]; i++)
         if ([scopes[i] caseInsensitiveCompare:want] == NSOrderedSame)

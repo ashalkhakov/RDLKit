@@ -39,6 +39,8 @@ Tablix follows the spec:
 - `TablixBody` → `TablixColumn` / `TablixRow` / `TablixCell` / CellContents (`ColSpan` / `RowSpan`)
 - `TablixColumnHierarchy` / `TablixRowHierarchy` → `TablixMember`
 - static member vs `Group` (`GroupExpressions`, nested members, `TablixHeader`)
+- `Group/Parent` — a recursive hierarchy: rows nested by matching a row's parent key to another row's group key, emitted depth first, with `Level()` as the depth and aggregates accepting the `Recursive` flag over a node's subtree. Orphans become roots and a looping parent chain is broken rather than hung on
+- `FixedColumnHeaders` / `FixedRowHeaders` / `FixedData` — carried through the model and the writer; interactive-viewer properties that neither paginated backend can act on
 - one dynamic column-group member pivots columns (crosstab): each group instance repeats the body column, `TablixHeader` becomes the column caption, and cell aggregates evaluate over the row-rows ∩ column-rows intersection
 - `Filters`, `SortExpressions`, `PageBreak` (Between / Start, plus `ResetPageNumber` / `PageName`), `KeepTogether`
 - `NoRowsMessage`, `RepeatColumnHeaders` / `RepeatRowHeaders`, `TablixCorner`

@@ -14,9 +14,9 @@ Output format support:
 * PDF
 * HTML
 
-Report generation is best described as a pipeline:
+Report generation is a pipeline:
 
-1. parse
+1. upgrade to the current format and parse
 2. bind and calculate expressions
 3. perform layout
 4. feed the results to a backend
@@ -89,15 +89,13 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 * **Expressions**: a subset of Visual Basic needed for report calculations
   * basic arithmetic and logical operators
   * ~90 builtin functions
-  * aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes
+  * aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes, and the `Recursive` flag over a recursive group's subtree
   * `Lookup`/`LookupSet`/`MultiLookup`
   * `Globals!` (incl. sectioned `PageNumber`/`TotalPages`, `OverallPageNumber`/`OverallTotalPages`, `PageName`)
   * `User!`
   * `Parameters!`
 
 Not supported yet:
-* recursive group hierarchies (`Group/Parent`)
-* `FixedHeaders`
 * Subreport
 * Gauge/Map
 * Toggle/InteractiveSort/DocumentMap
@@ -150,6 +148,34 @@ There are two test schemes: `PicaKitTests` for the library and
 SwiftPM is not part of the build story, which has to work under GNUstep too.
 Both are ordinary XCTest; under GNUstep they build as bundles through their
 own GNUmakefiles and need `gnustep/tools-xctest`.
+
+## Recursive hierarchies
+
+A group with a `Group/Parent` expression nests the dataset by matching a row's
+parent key to another row's group key — an org chart, a bill of materials, a
+threaded discussion, all from one flat table. Rows come out depth first, parents
+before children.
+
+`Level()` inside such a group is the depth in the tree rather than the nesting
+of the scopes, which is what a report indents by; and an aggregate marked
+`Recursive` covers the node's whole subtree, so a manager's total is the
+manager's team rather than the manager's own row:
+
+```
+=Sum(Fields!Pay.Value, "Emp", Recursive)
+```
+
+Two things a real dataset always contains are kept rather than dropped: a row
+whose parent matches nothing (an orphan, usually a filtered-out parent) becomes
+a root, and a parent chain that loops is broken instead of hanging. Losing rows
+silently would be the worse failure.
+
+`FixedColumnHeaders`, `FixedRowHeaders` and `TablixMember/FixedData` are parsed,
+modelled and written back, so a report round-trips without losing them. Neither
+paginated backend acts on one: they freeze headers while a region is *scrolled*,
+which the PDF backend has no notion of and the HTML backend — absolutely
+positioned inside a fixed page — cannot express. `RepeatOnNewPage` is the
+paginated equivalent, and that does apply.
 
 ## Charts
 

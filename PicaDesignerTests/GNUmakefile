@@ -11,7 +11,6 @@ BUNDLE_NAME = PicaDesignerTests
 # editing logic, not the window shell, which is why PicaAppDelegate and the
 # window controllers are absent.
 PicaDesignerTests_OBJC_FILES = \
-  PicaDesignerChecks.m \
   PicaDesignerTests.m \
   ../PicaDesigner/PicaChange.m \
   ../PicaDesigner/PicaDocument.m \

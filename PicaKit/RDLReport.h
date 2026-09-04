@@ -507,6 +507,12 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *noRowsMessage;
 @property (nonatomic, assign) BOOL repeatColumnHeaders;
 @property (nonatomic, assign) BOOL repeatRowHeaders;
+// FixedColumnHeaders / FixedRowHeaders: freeze the headers while the region is
+// scrolled. Carried through the model and the writer so a report round-trips
+// without losing them; both are interactive-viewer properties and neither
+// paginated backend can act on one. See `fixedData` on RDLTablixMember.
+@property (nonatomic, assign) BOOL fixedColumnHeaders;
+@property (nonatomic, assign) BOOL fixedRowHeaders;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
 // Designer convenience for a header + details table.
 //
@@ -574,6 +580,12 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *groupName; // nil / empty = static member
 @property (nonatomic, strong) RDLValue *hidden;  // Visibility/Hidden
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *groupExpressions;
+// Group/Parent: the expression giving *this* row's parent key, which makes the
+// group a recursive hierarchy — an org chart, a bill of materials, a threaded
+// discussion. Rows are then nested by matching a row's Parent to another row's
+// group expression, and `Level()` inside the group is the depth rather than the
+// nesting of the scopes. nil for an ordinary group.
+@property (nonatomic, strong) RDLValue *parentExpression;
 @property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
 @property (nonatomic, strong) RDLTablixHeader *header;
@@ -582,6 +594,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLValue *pageName;   // PageBreak/PageName → Globals!PageName
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) BOOL repeatOnNewPage;
+// FixedData: keep this member's cells in view while the region is scrolled.
+// Interactive rendering only — like SSRS, the paginated backends ignore it,
+// where RepeatOnNewPage is the equivalent that does apply.
+@property (nonatomic, assign) BOOL fixedData;
 @property (nonatomic, assign) RDLKeepWithGroup keepWithGroup;
 @property (nonatomic, strong) NSMutableArray<RDLTablixMember *> *members;
 @end

@@ -25,6 +25,12 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 // dataset name, then each group's name. InScope() asks whether a name is in
 // here, and Level() is a position within it.
 @property (nonatomic, copy) NSArray<NSString *> *activeScopes;
+// Depth within a recursive hierarchy (Group/Parent), 0 at the top. -1 when not
+// in one, which is what Level() distinguishes on.
+@property (nonatomic, assign) NSInteger recursionLevel;
+// The rows of this node and all of its descendants, which is what a Recursive
+// aggregate sums over. nil outside a recursive hierarchy.
+@property (nonatomic, copy) NSArray *recursiveRows;
 @property (nonatomic, assign) NSInteger pageNumber;
 @property (nonatomic, assign) NSInteger totalPages;
 @property (nonatomic, assign) NSInteger overallPageNumber; // 0 = same as pageNumber

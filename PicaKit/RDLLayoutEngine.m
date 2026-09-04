@@ -34,8 +34,19 @@
 @property (nonatomic, assign) NSInteger rowNumber;
 // The scopes enclosing this row, outermost first, for InScope() and Level().
 @property (nonatomic, copy) NSArray<NSString *> *activeScopes;
+// Depth within a recursive hierarchy, 0 at the top; -1 when not in one. What
+// Level() reports there, and what a report indents by.
+@property (nonatomic, assign) NSInteger recursionLevel;
+// This node's own rows plus every descendant's, for a Recursive aggregate.
+@property (nonatomic, copy) NSArray *recursiveRows;
 @end
 @implementation PicaTablixInst
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _recursionLevel = -1; // see RDLEvalScope
+  return self;
+}
 @end
 
 // One rendered column of the tablix body. For dynamic (crosstab) column
@@ -80,6 +91,27 @@
   }
   return self;
 }
+@end
+
+// A recursive group's partitions, depth first.
+//
+// Group/Parent turns a flat set of rows into a hierarchy: a row's Parent
+// expression names the group key of the row above it. So the partitions are
+// linked by key, walked from the roots, and each one is reported with its
+// depth -- what Level() answers inside the group.
+//
+// Two cases a real dataset always contains, both handled by treating the node
+// as a root rather than by dropping it: a row whose parent key is empty (the
+// top of the tree), and one whose parent key matches nothing (an orphan,
+// usually a filtered-out parent). Losing rows silently would be the worse
+// failure. A parent chain that loops is broken by visiting each partition once.
+@interface PicaRecursiveNode : NSObject
+@property (nonatomic, copy) NSArray *rows;
+@property (nonatomic, assign) NSInteger level;
+// The node's own rows and all of its descendants', in tree order.
+@property (nonatomic, copy) NSArray *subtreeRows;
+@end
+@implementation PicaRecursiveNode
 @end
 
 @implementation RDLLayoutEngine
@@ -628,6 +660,80 @@ static NSArray *PicaEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray 
   return local;
 }
 
+static void PicaCollectSubtree(NSString *key, NSDictionary<NSString *, NSArray *> *rowsByKey,
+                               NSDictionary<NSString *, NSArray<NSString *> *> *childKeys,
+                               NSMutableSet<NSString *> *seen, NSMutableArray *into) {
+  if (key == nil || [seen containsObject:key])
+    return;
+  [seen addObject:key];
+  [into addObjectsFromArray:rowsByKey[key] ?: @[]];
+  for (NSString *child in childKeys[key] ?: @[])
+    PicaCollectSubtree(child, rowsByKey, childKeys, seen, into);
+}
+
+static void PicaAppendRecursive(NSString *key, NSInteger level,
+                                NSDictionary<NSString *, NSArray *> *rowsByKey,
+                                NSDictionary<NSString *, NSArray<NSString *> *> *childKeys,
+                                NSMutableSet<NSString *> *placed,
+                                NSMutableArray<PicaRecursiveNode *> *into) {
+  if (key == nil || [placed containsObject:key])
+    return;
+  [placed addObject:key];
+  PicaRecursiveNode *node = [[PicaRecursiveNode alloc] init];
+  node.rows = rowsByKey[key] ?: @[];
+  node.level = level;
+  NSMutableArray *subtree = [NSMutableArray array];
+  PicaCollectSubtree(key, rowsByKey, childKeys, [NSMutableSet set], subtree);
+  node.subtreeRows = subtree;
+  [into addObject:node];
+  for (NSString *child in childKeys[key] ?: @[])
+    PicaAppendRecursive(child, level + 1, rowsByKey, childKeys, placed, into);
+}
+
+static NSArray<PicaRecursiveNode *> *PicaRecursiveOrder(NSArray<NSArray *> *parts,
+                                                        RDLTablixMember *m,
+                                                        RDLEvalScope *scope) {
+  RDLValue *keyExpr = [m.groupExpressions firstObject];
+  NSMutableArray<NSString *> *keys = [NSMutableArray array];
+  NSMutableDictionary<NSString *, NSArray *> *rowsByKey = [NSMutableDictionary dictionary];
+  NSMutableDictionary<NSString *, NSMutableArray<NSString *> *> *childKeys =
+      [NSMutableDictionary dictionary];
+  NSMutableArray<NSString *> *parentOf = [NSMutableArray array];
+
+  for (NSArray *part in parts) {
+    id row = [part firstObject];
+    NSString *key = PicaAsStr(PicaEvalRow(keyExpr, row, scope)) ?: @"";
+    if (rowsByKey[key] == nil) {
+      rowsByKey[key] = part;
+      [keys addObject:key];
+      [parentOf addObject:PicaAsStr(PicaEvalRow(m.parentExpression, row, scope)) ?: @""];
+    }
+  }
+  for (NSUInteger i = 0; i < [keys count]; i++) {
+    NSString *parent = parentOf[i];
+    if ([parent length] == 0 || rowsByKey[parent] == nil || [parent isEqualToString:keys[i]])
+      continue; // a root, an orphan, or its own parent
+    NSMutableArray *kids = childKeys[parent];
+    if (kids == nil)
+      childKeys[parent] = kids = [NSMutableArray array];
+    [kids addObject:keys[i]];
+  }
+
+  NSMutableArray<PicaRecursiveNode *> *out = [NSMutableArray array];
+  NSMutableSet<NSString *> *placed = [NSMutableSet set];
+  for (NSUInteger i = 0; i < [keys count]; i++) {
+    NSString *parent = parentOf[i];
+    BOOL isRoot = [parent length] == 0 || rowsByKey[parent] == nil ||
+                  [parent isEqualToString:keys[i]];
+    if (isRoot)
+      PicaAppendRecursive(keys[i], 0, rowsByKey, childKeys, placed, out);
+  }
+  // Anything still unplaced sits in a cycle; emit it rather than lose it.
+  for (NSUInteger i = 0; i < [keys count]; i++)
+    PicaAppendRecursive(keys[i], 0, rowsByKey, childKeys, placed, out);
+  return out;
+}
+
 static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
                                 NSArray<PicaColPlanEntry *> *plan, NSArray<NSString *> *scopeNames);
@@ -680,14 +786,31 @@ static NSArray *PicaWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curre
           return NSOrderedSame;
         }];
       }
+      // Group/Parent: the same partitions, ordered as a tree and each carrying
+      // its depth.
+      NSArray<PicaRecursiveNode *> *nodes =
+          m.parentExpression ? PicaRecursiveOrder(parts, m, scope) : nil;
+      if (nodes) {
+        NSMutableArray *ordered = [NSMutableArray array];
+        for (PicaRecursiveNode *n in nodes)
+          [ordered addObject:n.rows];
+        parts = ordered;
+      }
       NSInteger partIndex = 0;
       for (NSArray *part in parts) {
+        PicaRecursiveNode *node = nodes ? nodes[(NSUInteger)partIndex] : nil;
         NSArray *childInsts =
             nested ? PicaWalkMembers(m.members, part, childX, leaf, tab, scope, headerW, plan,
                                      innerScopes)
                    : PicaEmitRuns(m, leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : nil,
                                   part, NO, [part firstObject], part, tab, innerScopes, headerW,
                                   plan);
+        for (PicaTablixInst *ci in childInsts) {
+          if (node == nil)
+            continue;
+          ci.recursionLevel = node.level;
+          ci.recursiveRows = node.subtreeRows;
+        }
         if ([childInsts count] == 0) {
           partIndex += 1;
           continue;
@@ -952,6 +1075,8 @@ static NSArray<PicaTablixInst *> *PicaExpandTablix(RDLTablix *tab, RDLReport *re
         scope.row = inst.row;
         scope.rowNumber = inst.rowNumber;
         scope.activeScopes = inst.activeScopes;
+        scope.recursionLevel = inst.recursionLevel;
+        scope.recursiveRows = inst.recursiveRows;
       if (inst.groupRows)
         scope.groupRows = inst.groupRows;
       CGFloat grown = inst.height;
@@ -1355,6 +1480,8 @@ static void PicaLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *
   // but is still inside the scopes that RowNumber, InScope and Level report.
   scope.rowNumber = inst.rowNumber;
   scope.activeScopes = inst.activeScopes;
+  scope.recursionLevel = inst.recursionLevel;
+  scope.recursiveRows = inst.recursiveRows;
   scope.dataSet = PicaFindSet(scope.report, tab.dataSetName) ?: savedSet;
   if (inst.groupRows)
     scope.groupRows = inst.groupRows;

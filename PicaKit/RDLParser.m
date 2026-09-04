@@ -486,6 +486,9 @@ static RDLTablixMember *PicaParseMember(NSXMLElement *el) {
       if (n.kind == NSXMLElementKind)
         [m.groupExpressions addObject:[RDLValue valueWithSource:PicaText((NSXMLElement *)n)] ?: [RDLValue literal:@""]];
     }
+    // Group/Parent makes this a recursive hierarchy: the expression yields the
+    // row's parent key, matched against the group expression of another row.
+    m.parentExpression = PicaValue(PicaChild(group, @"Parent"));
     RDLPageBreakLocation pb = PicaParsePageBreak(PicaChild(group, @"PageBreak"));
     if (pb != RDLPageBreakLocationUnspecified)
       m.pageBreak = pb;
@@ -499,6 +502,8 @@ static RDLTablixMember *PicaParseMember(NSXMLElement *el) {
   }
   NSString *rep = PicaText(PicaChild(el, @"RepeatOnNewPage"));
   m.repeatOnNewPage = [rep isEqualToString:@"true"] || [rep isEqualToString:@"True"];
+  NSString *fd = PicaText(PicaChild(el, @"FixedData"));
+  m.fixedData = [fd isEqualToString:@"true"] || [fd isEqualToString:@"True"];
   PICA_PARSE_ENUM(m.keepWithGroup, @"KeepWithGroup", RDLKeepWithGroupFromString,
                   PicaText(PicaChild(el, @"KeepWithGroup")));
   NSString *kt = PicaText(PicaChild(el, @"KeepTogether"));
@@ -854,6 +859,10 @@ static RDLItem *PicaParseItem(NSXMLElement *el) {
     tablix.repeatColumnHeaders = [rch isEqualToString:@"true"] || [rch isEqualToString:@"True"];
     NSString *rrh = PicaText(PicaChild(el, @"RepeatRowHeaders"));
     tablix.repeatRowHeaders = [rrh isEqualToString:@"true"] || [rrh isEqualToString:@"True"];
+    NSString *fch = PicaText(PicaChild(el, @"FixedColumnHeaders"));
+    tablix.fixedColumnHeaders = [fch isEqualToString:@"true"] || [fch isEqualToString:@"True"];
+    NSString *frh = PicaText(PicaChild(el, @"FixedRowHeaders"));
+    tablix.fixedRowHeaders = [frh isEqualToString:@"true"] || [frh isEqualToString:@"True"];
     NSString *kt = PicaText(PicaChild(el, @"KeepTogether"));
     item.keepTogether = [kt isEqualToString:@"true"] || [kt isEqualToString:@"True"];
     RDLPageBreakLocation pb = PicaParsePageBreak(PicaChild(el, @"PageBreak"));
@@ -1404,6 +1413,8 @@ static void PicaAddMember(NSXMLElement *parent, RDLTablixMember *m) {
         PicaAddValue(ges, @"GroupExpression", e);
       [group addChild:ges];
     }
+    if (m.parentExpression)
+      PicaAddValue(group, @"Parent", m.parentExpression);
     PicaAddPageBreak(group, m.pageBreak, m.resetPageNumber, m.pageName);
     PicaAddFilters(group, m.filters);
     [me addChild:group];
@@ -1420,6 +1431,8 @@ static void PicaAddMember(NSXMLElement *parent, RDLTablixMember *m) {
   }
   if (m.repeatOnNewPage)
     PicaAdd(me, @"RepeatOnNewPage", @"true");
+  if (m.fixedData)
+    PicaAdd(me, @"FixedData", @"true");
   if (m.keepWithGroup != RDLKeepWithGroupUnspecified && m.keepWithGroup != RDLKeepWithGroupNone)
     PicaAdd(me, @"KeepWithGroup", RDLStringFromKeepWithGroup(m.keepWithGroup));
   if (m.keepTogether)
@@ -1572,6 +1585,10 @@ static void PicaAddTablix(NSXMLElement *parent, RDLTablix *it) {
     PicaAdd(tx, @"RepeatColumnHeaders", @"true");
   if (it.repeatRowHeaders)
     PicaAdd(tx, @"RepeatRowHeaders", @"true");
+  if (it.fixedColumnHeaders)
+    PicaAdd(tx, @"FixedColumnHeaders", @"true");
+  if (it.fixedRowHeaders)
+    PicaAdd(tx, @"FixedRowHeaders", @"true");
   if (it.keepTogether)
     PicaAdd(tx, @"KeepTogether", @"true");
   PicaAddPageBreak(tx, it.pageBreak, it.resetPageNumber, it.pageName);

@@ -8,7 +8,6 @@ include $(GNUSTEP_MAKEFILES)/common.make
 BUNDLE_NAME = PicaKitTests
 
 PicaKitTests_OBJC_FILES = \
-  PicaChecks.m \
   PicaKitTests.m
 PicaKitTests_OBJCFLAGS += -fobjc-arc -Wall
 PicaKitTests_INCLUDE_DIRS = -I../PicaKit

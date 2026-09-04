@@ -11,9 +11,14 @@ sends `-newDocument:` in `MainMenu.xib`, and that the tablix editor opens on a
 scaffolded report — the path where it once raised, having assumed a dataset's
 fields were strings.
 
-Same shape as `../PicaKitTests`: `PicaDesignerChecks.m` holds plain functions
-returning arrays of failure strings and `PicaDesignerTests.m` wraps them in
-ordinary `XCTestCase` cases. Under GNUstep these require
+One `XCTestCase` method per area — 22 of them — with the fixtures and helpers
+file-static beside them. There is no separate check layer: `XCTFail` records a
+failure and lets the method carry on, so a case still reports everything it
+found instead of stopping at the first, which is the only thing collecting
+strings into an array ever bought. What it costs is the line number, and now
+each failure names the assertion that produced it.
+
+Under GNUstep these require
 `gnustep/tools-xctest`:
 
 ```
