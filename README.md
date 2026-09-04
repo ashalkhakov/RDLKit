@@ -310,6 +310,27 @@ to know one shape. 79 of the 86 now parse and lay out; the 7 that do not are
 honest refusals naming a report item we have not implemented. Re-score with
 `.tools/rdl-coverage.sh`.
 
+## Fonts and layout across platforms
+
+Layout is measured with the fonts installed on the machine doing the measuring.
+A report names whatever its author had — Arial, Times New Roman, Calibri — and
+where that font is absent RDLKit falls back through the user font, the system
+font and Helvetica rather than carrying nothing.
+
+So a report does **not** paginate identically everywhere. The same file laid out
+on macOS, on Windows and on a bare Linux box will break lines and fill boxes
+slightly differently, because DejaVu Sans is not Arial. Every cross-platform
+report tool faces this and there are only two honest answers: install the named
+fonts on every machine that renders (on Debian and Ubuntu the `ttf-mscorefonts-installer`
+package does it), or accept that sizing differs and design with a little slack.
+
+One case deserves particular care. The `.docx` importer *measures* text and
+emits fixed heights with `CanGrow = NO`, so a scaffold made on one machine
+carries that machine's font metrics. Importing on a Mac and rendering on a Linux
+server with different fonts can clip a box that fitted when it was made. Either
+render where you import, install the same fonts on both, or turn `CanGrow` back
+on for the boxes that matter.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` builds and tests both platforms on every push.

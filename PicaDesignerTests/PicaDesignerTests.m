@@ -1693,9 +1693,16 @@ static NSString *PicaDesignerFixture(NSString *name) {
                                               typingAttributes:@{}];
   if (state.bold != PicaTriStateOff || state.italic != PicaTriStateOff)
     XCTFail(@"%@", @"plain text should read as unbold and unitalic");
-  if (![state.fontFamily isEqualToString:@"Helvetica"] || fabs(state.fontSize - 12) > 0.01)
-    XCTFail(@"%@", [NSString stringWithFormat:@"family/size read as %@/%g", state.fontFamily,
-                                               (double)state.fontSize]);
+  // The family the fixture actually got, not a name: Helvetica is not installed
+  // everywhere, and on a bare Linux box this falls back to DejaVu Sans. What is
+  // being checked is that a uniform selection reports its font rather than
+  // reading as mixed, which is true whatever that font turns out to be.
+  NSFont *expected = [text attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL];
+  if (![state.fontFamily isEqualToString:[expected familyName]] ||
+      fabs(state.fontSize - 12) > 0.01)
+    XCTFail(@"%@", [NSString stringWithFormat:@"family/size read as %@/%g, expected %@/12",
+                                               state.fontFamily, (double)state.fontSize,
+                                               [expected familyName]]);
 
   // Bold the first word, then a selection spanning both must read as mixed --
   // a button showing plain "on" or "off" there would be lying.

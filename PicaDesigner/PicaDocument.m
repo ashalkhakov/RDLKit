@@ -172,7 +172,21 @@
       }];
     return NO;
   }
-  return [data writeToURL:url options:NSDataWritingAtomic error:error];
+  NSError *writeError = nil;
+  if ([data writeToURL:url options:NSDataWritingAtomic error:&writeError])
+    return YES;
+  // A failure has to carry a reason. -writeToURL:options:error: fills one in on
+  // macOS and does not always on GNUstep, and "it failed, no idea why" is not
+  // something to hand a person looking at a save dialog.
+  if (error)
+    *error = writeError
+                 ?: [NSError errorWithDomain:@"PicaDocument"
+                                        code:3
+                                    userInfo:@{
+                                      NSLocalizedDescriptionKey : [NSString
+                                          stringWithFormat:@"Could not write %@", [url path]]
+                                    }];
+  return NO;
 }
 
 #pragma mark - Change publication
