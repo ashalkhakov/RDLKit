@@ -102,9 +102,17 @@ install_libs_base() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
-    ./configure --prefix="$INSTALL_PATH" \
-                --with-config-file="$INSTALL_PATH/etc/GNUstep.conf" \
-                --with-default-config=standalone.conf || cat config.log
+    # Deliberately *not* --with-default-config=standalone.conf, which the
+    # reference recipe passes. standalone.conf is a deployment layout: it sets
+    # GNUSTEP_SYSTEM_LIBRARY=./ and friends, relative to the config file, for
+    # the case where everything has been copied into one directory beside an
+    # application. Compiled in here it means gnustep-gui looks for the backend
+    # bundle next to etc/GNUstep.conf while gnustep-make installed it under
+    # System/Library/Bundles, so the build succeeds and then nothing that
+    # needs a font can run. We do not need it: AppRun writes an explicit
+    # GNUSTEP_CONFIG_FILE naming every root, which is what makes the AppImage
+    # relocatable.
+    ./configure --prefix="$INSTALL_PATH" || cat config.log
     make
     make install
     echo "::endgroup::"
