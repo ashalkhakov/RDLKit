@@ -1471,8 +1471,8 @@ static NSString *PicaDesignerFixture(NSString *name) {
   [weightPop selectItemAtIndex:0];
   [bindings applyControl:weightPop editor:editor item:item bandKey:@"body"];
   if (item.style.fontWeight != RDLFontWeightNormal)
-    XCTFail(@"%@", [NSString stringWithFormat:@"popup-index apply gave %@",
-                                               item.style.fontWeight]);
+    XCTFail(@"%@", [NSString stringWithFormat:@"popup-index apply gave %ld",
+                                               (long)item.style.fontWeight]);
   [alignPop selectItemWithTitle:@"Center"];
   [bindings applyControl:alignPop editor:editor item:item bandKey:@"body"];
   if (item.style.textAlign != RDLTextAlignCenter)
@@ -1613,8 +1613,8 @@ static NSString *PicaDesignerFixture(NSString *name) {
       if (first.style != nil)
         XCTFail(@"%@", @"the run matching the item style should stay unstyled");
       if (second.style.fontWeight != RDLFontWeightBold)
-        XCTFail(@"%@", [NSString stringWithFormat:@"bold run weight %@",
-                                                   second.style.fontWeight]);
+        XCTFail(@"%@", [NSString stringWithFormat:@"bold run weight %ld",
+                                                   (long)second.style.fontWeight]);
       if ([second.style.fontFamily length])
         XCTFail(@"%@", @"a run style should be sparse, not restate the family");
     }
@@ -2029,7 +2029,13 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 
   // Typing must actually land. This is the check that would have caught it.
   @try {
-    [editor insertText:@"Hello" replacementRange:NSMakeRange(0, 0)];
+    // -insertText: is the spelling both platforms have. macOS deprecated it in
+    // favour of insertText:replacementRange:, which GNUstep does not declare at
+    // all; deprecated is not gone, and this is a test driving the typing path.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [editor insertText:@"Hello"];
+#pragma clang diagnostic pop
   } @catch (NSException *e) {
     XCTFail(@"%@", [NSString stringWithFormat:@"typing raised %@: %@",
                                                [e name], [e reason]]);
