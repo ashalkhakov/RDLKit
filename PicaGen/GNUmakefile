@@ -10,7 +10,7 @@ picagen_OBJC_FILES = main.m
 # per-instance variable: it is the documented form and applies whatever the
 # instance type is.
 ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
-picagen_TOOL_LIBS += -lPicaKit
+picagen_TOOL_LIBS += -lPicaKit -ldispatch
 picagen_NEEDS_GUI = yes
 
 include $(GNUSTEP_MAKEFILES)/tool.make

@@ -37,7 +37,7 @@ Pica_OBJC_FILES = \
 # per-instance variable: it is the documented form and applies whatever the
 # instance type is.
 ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
-Pica_OBJC_LIBS += -lPicaKit
+Pica_OBJC_LIBS += -lPicaKit -ldispatch
 Pica_APPLICATION_ICON =
 
 # The windows and the menu bar are XIBs. Xcode compiles them to .nib; here they

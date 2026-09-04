@@ -2,7 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 LIBRARY_NAME = PicaKit
 PicaKit_NEEDS_GUI = yes
-PicaKit_LIBRARIES_DEPEND_UPON += -lz
+PicaKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
 PicaKit_OBJCFLAGS += -fobjc-arc -Wall
 PicaKit_HEADER_FILES = \
   PicaKit.h \

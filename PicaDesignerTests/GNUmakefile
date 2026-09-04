@@ -30,7 +30,7 @@ PicaDesignerTests_OBJC_FILES = \
 PicaDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
 PicaDesignerTests_INCLUDE_DIRS = -I../PicaKit -I../PicaDesigner
 ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
-PicaDesignerTests_BUNDLE_LIBS += -lPicaKit -lXCTest
+PicaDesignerTests_BUNDLE_LIBS += -lPicaKit -lXCTest -ldispatch
 PicaDesignerTests_NEEDS_GUI = yes
 
 # The two modal panels the checks open are looked up with -bundleForClass:,
