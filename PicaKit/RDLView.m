@@ -251,7 +251,24 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
     [self reloadLayout];
   else
     [self sizeToPages];
-  return [self dataWithPDFInsideRect:self.bounds];
+
+  // Hosted in an unflipped container rather than printed directly. A view
+  // with neither a window nor a superview never builds a coordinate matrix at
+  // all -- GNUstep's -_rebuildCoordinates takes the identity branch, and
+  // applies its flip only where a view's flippedness differs from its
+  // superview's -- so the flip the print machinery applies for a flipped view
+  // is left to compound with the one the backend applies from
+  // GSWSetViewIsFlipped, and the page comes out upside down. A flipped
+  // document view inside an unflipped parent is what NSScrollView does, and
+  // it gives exactly one flip on both platforms.
+  NSView *container = [[NSView alloc] initWithFrame:self.bounds];
+  NSRect frame = self.frame;
+  frame.origin = NSZeroPoint;
+  self.frame = frame;
+  [container addSubview:self];
+  NSData *data = [container dataWithPDFInsideRect:container.bounds];
+  [self removeFromSuperview];
+  return data;
 }
 
 @end
