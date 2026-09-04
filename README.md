@@ -9,6 +9,13 @@ The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
 accepted as current.
 
+**Platform status.** macOS builds and passes its tests on every change. The
+GNUstep build is being brought up in CI now. The sources were *written* for
+GNUstep but had never been compiled there, and doing so is turning up real
+breakage — a CoreGraphics import, Cocoa-only attributed-string enumerators,
+libraries that were never linked. Until that job is green, treat GNUstep as
+work in progress rather than as supported.
+
 Output format support:
 
 * PDF
@@ -27,7 +34,7 @@ Report generation is a pipeline:
 | Path | Component | Role |
 | --- | --- | --- |
 | `PicaKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
-| `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. Portable `PicaChecks` for GNUstep. |
+| `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. One XCTest per area; the GNUstep bundle build is not green yet. |
 | `PicaGen` | Generator CLI | command-line tool to generate reports |
 | `PicaDesigner` | Designer app | WYSIWYG report designer |
 | `PicaDesignerTests` | Designer app | Tests for the report designer |

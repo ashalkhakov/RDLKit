@@ -2,7 +2,9 @@
 
 **Component 1.** Native Objective-C (ARC) library: RDL files + data sources + input parameters → laid-out pages, then a **backend**.
 
-Backends today: **PDF** (AppKit) and **HTML** (Foundation). Runs on **Cocoa** and **GNUstep**. No Swift, no UIKit.
+Backends today: **PDF** (AppKit, which GNUstep implements too) and **HTML**
+(Foundation). Builds on **Cocoa**; the **GNUstep** build is being brought up in
+CI and is not green yet. No Swift, no UIKit.
 
 The designer lives in `../PicaDesigner`. CLI: `../PicaGen`. Tests: `../PicaKitTests` (XCTest on Mac).
 
