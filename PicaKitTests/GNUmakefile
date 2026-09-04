@@ -11,7 +11,7 @@ PicaKitTests_OBJC_FILES = \
   PicaKitTests.m
 PicaKitTests_OBJCFLAGS += -fobjc-arc -Wall
 PicaKitTests_INCLUDE_DIRS = -I../PicaKit
-PicaKitTests_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
+ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
 PicaKitTests_BUNDLE_LIBS += -lPicaKit -lXCTest
 # The PDF backend and text measurement are AppKit.
 PicaKitTests_NEEDS_GUI = yes

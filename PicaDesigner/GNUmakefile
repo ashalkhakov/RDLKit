@@ -32,6 +32,11 @@ Pica_OBJC_FILES = \
   PicaRichTextEditor.m \
   PicaDataView.m \
   PicaWelcomeWindow.m
+# PicaKit is built in the tree beside this one and not installed, so the
+# linker has to be told where it is. ADDITIONAL_LIB_DIRS rather than a
+# per-instance variable: it is the documented form and applies whatever the
+# instance type is.
+ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
 Pica_OBJC_LIBS += -lPicaKit
 Pica_APPLICATION_ICON =
 

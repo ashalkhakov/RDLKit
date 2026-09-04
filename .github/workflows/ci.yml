@@ -169,9 +169,16 @@ jobs:
       - name: Smoke-test picagen
         run: |
           . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          # Find what was actually built rather than assuming gnustep-make's
+          # object directory is called "obj": it varies with the library combo.
+          lib=$(find PicaKit -name 'libPicaKit*' -print -quit)
+          tool=$(find PicaGen -name picagen -type f -print -quit)
+          echo "library: $lib"
+          echo "tool:    $tool"
+          export LD_LIBRARY_PATH="$(dirname "$lib"):$LD_LIBRARY_PATH"
           sample=Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl
-          xvfb-run -a ./PicaGen/obj/picagen "$sample" --check
-          xvfb-run -a ./PicaGen/obj/picagen "$sample" -f html -o /tmp/out.html
+          xvfb-run -a "$tool" "$sample" --check
+          xvfb-run -a "$tool" "$sample" -f html -o /tmp/out.html
           # The PDF backend is AppKit's, and GNUstep implements it too.
-          xvfb-run -a ./PicaGen/obj/picagen "$sample" -o /tmp/out.pdf
+          xvfb-run -a "$tool" "$sample" -o /tmp/out.pdf
           test -s /tmp/out.html && test -s /tmp/out.pdf

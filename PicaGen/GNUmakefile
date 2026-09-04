@@ -5,6 +5,11 @@ include $(GNUSTEP_MAKEFILES)/common.make
 TOOL_NAME = picagen
 picagen_OBJCFLAGS += -fobjc-arc -I../PicaKit
 picagen_OBJC_FILES = main.m
+# PicaKit is built in the tree beside this one and not installed, so the
+# linker has to be told where it is. ADDITIONAL_LIB_DIRS rather than a
+# per-instance variable: it is the documented form and applies whatever the
+# instance type is.
+ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
 picagen_TOOL_LIBS += -lPicaKit
 picagen_NEEDS_GUI = yes
 

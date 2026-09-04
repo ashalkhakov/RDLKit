@@ -29,7 +29,7 @@ PicaDesignerTests_OBJC_FILES = \
   ../PicaDesigner/PicaTablixEditor.m
 PicaDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
 PicaDesignerTests_INCLUDE_DIRS = -I../PicaKit -I../PicaDesigner
-PicaDesignerTests_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
+ADDITIONAL_LIB_DIRS += -L../PicaKit/$(GNUSTEP_OBJ_DIR)
 PicaDesignerTests_BUNDLE_LIBS += -lPicaKit -lXCTest
 PicaDesignerTests_NEEDS_GUI = yes
 

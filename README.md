@@ -117,9 +117,14 @@ Skipped elements are reported in `report.warnings` instead of dropped silently.
   cd ../PicaDesigner && make
   openapp ./Pica.app
   cd ../PicaGen && make
-  ./picagen ../Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl \
-  -f html -o out.html
+  LD_LIBRARY_PATH=../PicaKit/obj ./obj/picagen \
+    ../Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl -f html -o out.html
   ```
+
+  `PicaKit` is linked out of the tree rather than installed, so the dependent
+  makefiles add `-L../PicaKit/$(GNUSTEP_OBJ_DIR)` and running anything built
+  against it needs that directory on `LD_LIBRARY_PATH`. `make install` in
+  `PicaKit` avoids both.
 
 Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
 
@@ -313,8 +318,10 @@ honest refusals naming a report item we have not implemented. Re-score with
   the same three products, both XCTest bundles through `make check`, and the
   same smoke test — all under `xvfb`, because AppKit drawing needs a display.
 
-GitHub Actions is free for public repositories on the standard runners, macOS
-included.
+Actions is free for public repositories on the standard runners. On a private
+one the minutes count against the account's allowance and **macOS bills at
+10×**, so the macOS job runs on pull requests and on `master` rather than on
+every push; the Linux job, at 1×, runs on everything.
 
 ## License
 
