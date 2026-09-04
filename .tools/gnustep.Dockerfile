@@ -16,8 +16,21 @@
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+# "Hash Sum mismatch" from a caching proxy is the usual way this build dies, so
+# retry, and stop apt pipelining requests -- which is what proxies mangle. Split
+# in two so a failure does not re-download the lot.
+RUN printf '%s\n' \
+      'Acquire::Retries "5";' \
+      'Acquire::http::Pipeline-Depth "0";' \
+      'Acquire::http::No-Cache "true";' \
+      'Acquire::BrokenProxy "true";' \
+    > /etc/apt/apt.conf.d/99-retries
+
 RUN apt-get -q -y update && apt-get -q -y install \
-      clang lld cmake make git pkg-config xvfb \
+      clang lld cmake make git pkg-config xvfb
+
+RUN apt-get -q -y install \
       libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev libssl-dev \
       libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev libgmp-dev \
       libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \

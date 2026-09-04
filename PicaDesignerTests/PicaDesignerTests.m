@@ -1045,8 +1045,12 @@ static NSString *PicaDesignerFixture(NSString *name) {
     XCTFail(@"%@", @"the exported file is not on disk");
   [[NSFileManager defaultManager] removeItemAtPath:out error:NULL];
   err = nil;
+  // The path is named for what it is because the frameworks log the failed
+  // write themselves -- GNUstep prints the failing mkstemp -- and a passing
+  // test should not leave a log line that reads like a fault.
   if ([doc exportUsingBackend:html
-                        toURL:[NSURL fileURLWithPath:@"/nonexistent-dir/x.html"]
+                        toURL:[NSURL fileURLWithPath:
+                                         @"/pica-this-write-is-meant-to-fail/x.html"]
                         error:&err])
     XCTFail(@"%@", @"exporting to an unwritable path should fail");
   if (err == nil)

@@ -20,6 +20,7 @@ jobs:
     name: macOS (Xcode)
     if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -91,6 +92,8 @@ jobs:
   gnustep:
     name: Ubuntu (GNUstep, clang, gnustep-2.0)
     runs-on: ubuntu-latest
+    # The dependency build is the long pole; everything after it is minutes.
+    timeout-minutes: 90
     env:
       SRC_PATH: ${{ github.workspace }}/source
       DEPS_PATH: ${{ github.workspace }}/dependencies
@@ -194,8 +197,18 @@ jobs:
           echo "tool:    $tool"
           export LD_LIBRARY_PATH="$(dirname "$lib"):$LD_LIBRARY_PATH"
           sample=Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl
-          xvfb-run -a "$tool" "$sample" --check
-          xvfb-run -a "$tool" "$sample" -f html -o /tmp/out.html
+          run() {
+            # A stall here should report as one, not sit until the job's
+            # timeout: GNUstep renders PDF through its print machinery, which
+            # invents a default printer when none is configured.
+            timeout 120 "$@" || {
+              status=$?
+              [ $status -eq 124 ] && echo "::error::timed out after 120s: $*"
+              exit $status
+            }
+          }
+          run xvfb-run -a "$tool" "$sample" --check
+          run xvfb-run -a "$tool" "$sample" -f html -o /tmp/out.html
           # The PDF backend is AppKit's, and GNUstep implements it too.
-          xvfb-run -a "$tool" "$sample" -o /tmp/out.pdf
+          run xvfb-run -a "$tool" "$sample" -o /tmp/out.pdf
           test -s /tmp/out.html && test -s /tmp/out.pdf
