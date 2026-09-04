@@ -1,8 +1,15 @@
 # A GNUstep box to reproduce the Linux build locally, so a portability bug can
 # be found in a minute here instead of a round trip through CI.
 #
+# Build it once -- this compiles libobjc2, libdispatch, gnustep-make, base, gui,
+# back and tools-xctest from source, so it takes the better part of an hour:
+#
 #   docker build -f .tools/gnustep.Dockerfile -t rdlkit-gnustep .
+#
+# After that the image is cached and running the suites is quick:
+#
 #   .tools/gnustep.sh make -C PicaKitTests run-tests
+#   .tools/gnustep.sh make -C PicaDesignerTests run-tests
 #
 # The stack is the same one the workflow builds, from the same script, so what
 # fails here fails there.
