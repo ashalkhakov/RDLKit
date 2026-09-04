@@ -322,7 +322,7 @@ honest refusals naming a report item we have not implemented. Re-score with
   `.github/scripts/dependencies.sh` (tools-make, libobjc2, libs-base, libs-gui,
   libs-back with the cairo graphics backend, and tools-xctest) and cached
   against that script, since it changes far less often than RDLKit does. Then
-  the same three products, both XCTest bundles through `make check`, and the
+  the same three products, both XCTest bundles through `make run-tests`, and the
   same smoke test — all under `xvfb`, because AppKit drawing needs a display.
 
 Actions is free for public repositories on the standard runners. On a private

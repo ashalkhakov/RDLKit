@@ -2,7 +2,7 @@
 # tools-xctest (https://github.com/gnustep/tools-xctest).
 #
 #   make          build the bundle
-#   make check    build and run it
+#   make run-tests  build and run it
 include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = PicaDesignerTests
@@ -43,7 +43,7 @@ include $(GNUSTEP_MAKEFILES)/bundle.make
 
 XCTEST ?= xctest
 
-.PHONY: check
-check: all
+.PHONY: run-tests
+run-tests: all
 	LD_LIBRARY_PATH="$(CURDIR)/../PicaKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  $(XCTEST) $(BUNDLE_NAME).bundle

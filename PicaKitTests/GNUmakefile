@@ -2,7 +2,7 @@
 # (https://github.com/gnustep/tools-xctest)
 #
 #   make          build the bundle
-#   make check    build and run it
+#   make run-tests  build and run it
 include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = PicaKitTests
@@ -23,7 +23,7 @@ XCTEST ?= xctest
 # The .docx fixtures are found relative to __FILE__ rather than through the
 # bundle, so they need no RESOURCE_FILES entry -- but they do mean the checks
 # have to run from a source tree, not from an installed bundle.
-.PHONY: check
-check: all
+.PHONY: run-tests
+run-tests: all
 	LD_LIBRARY_PATH="$(CURDIR)/../PicaKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  $(XCTEST) $(BUNDLE_NAME).bundle

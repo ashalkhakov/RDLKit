@@ -23,7 +23,7 @@ Under GNUstep these require
 
 ```
 cd ../PicaKit && make
-cd ../PicaDesignerTests && make check
+cd ../PicaDesignerTests && make run-tests
 ```
 
 The bundle compiles the app's plain objects directly and carries the two modal

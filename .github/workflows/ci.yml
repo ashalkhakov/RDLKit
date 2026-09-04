@@ -173,12 +173,12 @@ jobs:
       - name: Test PicaKit
         run: |
           . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
-          xvfb-run -a make -C PicaKitTests check
+          xvfb-run -a make -C PicaKitTests run-tests
 
       - name: Test PicaDesigner
         run: |
           . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
-          xvfb-run -a make -C PicaDesignerTests check
+          xvfb-run -a make -C PicaDesignerTests run-tests
 
       - name: Smoke-test picagen
         run: |

@@ -52,10 +52,10 @@ build. It supplies both `-lXCTest` and the `xctest` runner.
 ```
 . /usr/share/GNUstep/Makefiles/GNUstep.sh
 cd ../PicaKit && make
-cd ../PicaKitTests && make check
+cd ../PicaKitTests && make run-tests
 ```
 
-`make` builds `PicaKitTests.bundle`; `make check` runs it through `xctest`. The
+`make` builds `PicaKitTests.bundle`; `make run-tests` runs it through `xctest`. The
 `.docx` fixtures are found relative to `__FILE__` rather than through the
 bundle, so they need no `RESOURCE_FILES` entry — but the checks do have to run
 from a source tree.
