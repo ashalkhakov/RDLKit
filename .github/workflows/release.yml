@@ -73,18 +73,7 @@ jobs:
         run: ./.github/scripts/dependencies.sh
 
       - name: Fetch linuxdeploy and the AppImage runtime
-        run: |
-          mkdir -p /tmp/appimage-runtime /usr/local/lib/linuxdeploy 2>/dev/null || true
-          sudo mkdir -p /usr/local/lib/linuxdeploy
-          curl -fsSL -o /tmp/linuxdeploy.AppImage \
-            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x /tmp/linuxdeploy.AppImage
-          # Extracted rather than run: an AppImage inside a container needs FUSE,
-          # and extracting sidesteps the question.
-          cd /tmp && ./linuxdeploy.AppImage --appimage-extract > /dev/null
-          sudo cp -r /tmp/squashfs-root/. /usr/local/lib/linuxdeploy/
-          curl -fsSL -o /tmp/appimage-runtime/runtime-x86_64 \
-            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
+        run: ./Scripts/install-linuxdeploy.sh
 
       - name: Assemble AppDir
         run: GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
@@ -201,9 +190,15 @@ jobs:
                   | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')}
           suffix=""
           [ "${{ steps.sign.outputs.signed }}" = "true" ] || suffix="-unsigned"
+          # picagen links @rpath/PicaKit.framework, so the executable on its
+          # own will not start. Ship it beside the framework it needs.
+          rm -rf "$RUNNER_TEMP/picagen" && mkdir -p "$RUNNER_TEMP/picagen"
+          cp "$built/picagen" "$RUNNER_TEMP/picagen/"
+          cp -R "$built/PicaKit.framework" "$RUNNER_TEMP/picagen/"
           ditto -c -k --keepParent "$built/Pica.app" \
             "RDLKit-macOS-${APP_VERSION}${suffix}.zip"
-          ditto -c -k "$built/picagen" "picagen-macOS-${APP_VERSION}${suffix}.zip"
+          ditto -c -k --keepParent "$RUNNER_TEMP/picagen" \
+            "picagen-macOS-${APP_VERSION}${suffix}.zip"
 
       - uses: actions/upload-artifact@v4
         with:

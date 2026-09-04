@@ -351,10 +351,17 @@ one the minutes count against the account's allowance and **macOS bills at
 10×**, so the macOS job runs on pull requests and on `master` rather than on
 every push; the Linux job, at 1×, runs on everything.
 
-## Releases
+## Builds and releases
 
-`.github/workflows/release.yml` runs on a `v*` tag, or by hand for the
-artifacts without a release.
+Every push produces downloadable artifacts, from the run's own page in the
+Actions tab: an `RDLKit-Linux-<sha>` AppImage and an `RDLKit-macOS-<sha>` with
+an unsigned `Pica.app` and `picagen`. They are unsigned, named for the commit,
+and kept for 14 days — for trying a build, not for shipping.
+
+`.github/workflows/release.yml` is the shipping one. It runs on a `v*` tag, or
+by hand for the artifacts without publishing a release. Note that the "Run
+workflow" button only appears once the workflow is on the default branch;
+a tag triggers it from anywhere.
 
 * **Linux** — one AppImage carrying both programs. `Scripts/prepare-appdir.sh`
   assembles an AppDir with the designer, the CLI and the GNUstep runtime, and
@@ -363,8 +370,9 @@ artifacts without a release.
   siblings at wherever the image is mounted, because that path is not known
   until it runs. Run the designer by launching the image, and the CLI as
   `./RDLKit-Linux-*.AppImage picagen report.rdl --check`.
-* **macOS** — `Pica.app` and `picagen`, signed with a Developer ID and
-  notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),
+* **macOS** — `Pica.app`, and `picagen` beside the `PicaKit.framework` it
+  loads through `@rpath` (the tool alone will not start), signed with a
+  Developer ID and notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),
   `MACOS_CERTIFICATE_PASSWORD` and `MACOS_SIGN_IDENTITY`; notarization
   additionally needs `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and
   `NOTARY_PASSWORD`. Without them the build still produces artifacts, marked
