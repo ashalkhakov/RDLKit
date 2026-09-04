@@ -13,8 +13,12 @@ concurrency:
 
 jobs:
   ########################### macOS / Cocoa ###########################
+  # macOS minutes bill at 10x on a private repository, so this runs on pull
+  # requests and on the default branch rather than on every push to every
+  # branch. Trigger it by hand from the Actions tab when needed.
   macos:
     name: macOS (Xcode)
+    if: github.event_name != 'push' || github.ref == 'refs/heads/master'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -114,8 +118,16 @@ jobs:
             libpthread-workqueue-dev \
             libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
             xvfb
-          # The gnustep-2.0 runtime needs ld.gold or lld.
-          sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
+          # The gnustep-2.0 runtime needs ld.gold or lld. ld.gold is gone from
+          # binutils on newer Ubuntu, so fall back to lld rather than failing
+          # on a missing alternative.
+          if [ -x /usr/bin/ld.gold ]; then
+            sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
+          else
+            sudo apt-get -q -y install lld
+            sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 10
+          fi
+          ld --version | head -1
 
       # The whole GNUstep stack is built from source, which takes far longer
       # than RDLKit does. It only changes when the pinned dependency script

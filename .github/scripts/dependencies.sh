@@ -43,6 +43,25 @@ install_libobjc2() {
     echo "::endgroup::"
 }
 
+install_libdispatch() {
+    echo "::group::libdispatch"
+    cd "$DEPS_PATH"
+    git clone -q https://github.com/swiftlang/swift-corelibs-libdispatch.git libdispatch
+    mkdir -p libdispatch/build && cd libdispatch/build
+    # -Wno-error=void-pointer-to-int-cast works around a -Werror build failure
+    # in queue.c; taken from libs-gui's script.
+    cmake -DBUILD_TESTING=off \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_PATH" \
+          -DCMAKE_C_FLAGS="-Wno-error=void-pointer-to-int-cast" \
+          -DINSTALL_PRIVATE_HEADERS=1 \
+          -DBlocksRuntime_INCLUDE_DIR="$INSTALL_PATH/include" \
+          -DBlocksRuntime_LIBRARIES="$INSTALL_PATH/lib/libobjc.so" \
+          ../
+    make install
+    echo "::endgroup::"
+}
+
 install_libs_base() {
     echo "::group::GNUstep Base"
     cd "$DEPS_PATH"
@@ -50,6 +69,7 @@ install_libs_base() {
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
     ./configure || cat config.log
+    make
     make install
     echo "::endgroup::"
 }
@@ -88,8 +108,12 @@ install_tools_xctest() {
     echo "::endgroup::"
 }
 
-install_tools_make
+# Order matters, and it is libs-gui's: the runtime is built before tools-make,
+# because configuring tools-make with --with-runtime-abi=gnustep-2.0 probes for
+# it. Everything after that needs GNUstep.sh, which tools-make installs.
 install_libobjc2
+install_libdispatch
+install_tools_make
 install_libs_base
 install_libs_gui
 install_libs_back
