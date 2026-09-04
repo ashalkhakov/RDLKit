@@ -653,12 +653,26 @@ static NSArray<NSString *> *PicaTextsOf(RDLReport *r) {
 // things that actually broke. Each one imports to the same page size, body
 // height and item count as the document it was derived from.
 //
-// Located from __FILE__ rather than from a bundle, because the test target has
-// no resources phase; a missing fixture is a loud failure rather than a
-// quietly skipped check.
+// The directory this source file lives in.
+//
+// __FILE__ is absolute under Xcode and relative under gnustep-make, which
+// compiles as "PicaKitTests.m" with no directory to walk up from. Both make
+// runs start in the source directory, so anchoring a relative path to the
+// working directory gives the same answer either way. The checks therefore run
+// from a source tree, not from an installed bundle.
+static NSString *PicaSourceDirectory(void) {
+  NSString *file = @(__FILE__);
+  if (![file isAbsolutePath])
+    file = [[[NSFileManager defaultManager] currentDirectoryPath]
+        stringByAppendingPathComponent:file];
+  return [file stringByDeletingLastPathComponent];
+}
+
+// Located from the source directory rather than from a bundle, because the test
+// target has no resources phase; a missing fixture is a loud failure rather
+// than a quietly skipped check.
 static NSString *PicaFixturesDirectory(void) {
-  return [[@(__FILE__) stringByDeletingLastPathComponent]
-      stringByAppendingPathComponent:@"Fixtures"];
+  return [PicaSourceDirectory() stringByAppendingPathComponent:@"Fixtures"];
 }
 
 

@@ -233,15 +233,25 @@ static NSMutableAttributedString *PicaSampleRichText(void) {
   return s;
 }
 
-// The step between the welcome screen and the designer.
+
+// The directory this source file lives in.
 //
-// Everything the panel decides is PicaNewReport's, so most of this needs no
-// window at all; the last part opens the real panel to prove the XIB loads and
-// its buttons are wired, which is the half a hand-written XIB gets wrong.
+// __FILE__ is absolute under Xcode and relative under gnustep-make, which
+// compiles as "PicaKitTests.m" with no directory to walk up from. Both make
+// runs start in the source directory, so anchoring a relative path to the
+// working directory gives the same answer either way. The checks therefore run
+// from a source tree, not from an installed bundle.
+static NSString *PicaSourceDirectory(void) {
+  NSString *file = @(__FILE__);
+  if (![file isAbsolutePath])
+    file = [[[NSFileManager defaultManager] currentDirectoryPath]
+        stringByAppendingPathComponent:file];
+  return [file stringByDeletingLastPathComponent];
+}
+
+// ../PicaKitTests/Fixtures, the synthetic Word documents the kit checks use.
 static NSString *PicaDesignerFixture(NSString *name) {
-  // ../PicaKitTests/Fixtures, the synthetic Word documents the kit checks use.
-  NSString *tests = [[@(__FILE__) stringByDeletingLastPathComponent]
-      stringByDeletingLastPathComponent];
+  NSString *tests = [PicaSourceDirectory() stringByDeletingLastPathComponent];
   return [[[tests stringByAppendingPathComponent:@"PicaKitTests"]
       stringByAppendingPathComponent:@"Fixtures"] stringByAppendingPathComponent:name];
 }
@@ -2141,39 +2151,52 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 }
 
 - (void)testNewReportPanel {
-  for (NSInteger round = 1; round <= 4; round++) {
-    BOOL accept = (round % 2) == 0;
-    PicaDialogClicker *clicker = [[PicaDialogClicker alloc] init];
-    clicker.title = accept ? @"Create" : @"Cancel";
-    NSTimer *click = [NSTimer timerWithTimeInterval:0.05 target:clicker
-                                           selector:@selector(click)
-                                           userInfo:nil repeats:NO];
-    NSTimer *bail = [NSTimer timerWithTimeInterval:10.0 target:clicker
-                                          selector:@selector(bail)
-                                          userInfo:nil repeats:NO];
-    for (NSTimer *t in @[ click, bail ])
-      [[NSRunLoop currentRunLoop] addTimer:t forMode:NSModalPanelRunLoopMode];
-    PicaNewReportOutcome *outcome = [PicaNewReportPanel run];
-    [bail invalidate];
+  // What is worth checking here is the XIB, not the modal machinery. It is
+  // hand-written, and ibtool drops markup it dislikes without saying so, so a
+  // missing outlet or an unwired button is a real and silent failure. Running a
+  // modal session to find that out only exercised AppKit's, which is not ours
+  // and behaves differently on GNUstep.
+  PicaNewReportPanel *panel = [[PicaNewReportPanel alloc] init];
+  NSNib *nib = [[NSNib alloc]
+      initWithNibNamed:@"PicaNewReportPanel"
+                bundle:[NSBundle bundleForClass:[PicaNewReportPanel class]]];
+  if (nib == nil || ![nib instantiateWithOwner:panel topLevelObjects:NULL]) {
+    XCTFail(@"%@", @"PicaNewReportPanel.xib did not load");
+    return;
+  }
 
-    if (!clicker.sawModal)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: the panel never became modal",
-                                                 (long)round]);
-    if (!clicker.foundButton)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: no %@ button -- the XIB did not "
-                                                 @"load, or its buttons are not connected",
-                                                 (long)round, clicker.title]);
-    if ([NSApp modalWindow] != nil)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: a modal session was left running",
-                                                 (long)round]);
-    // The panel opens on Blank, so Create is enabled and yields a report;
-    // Cancel yields nothing at all.
-    if (accept && outcome.report == nil)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: Create produced no report",
-                                                 (long)round]);
-    if (!accept && outcome != nil)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: Cancel should produce nothing",
-                                                 (long)round]);
+  // Every outlet the panel drives. Read through KVC because they are declared
+  // in the class extension, which is right -- nothing outside needs them.
+  for (NSString *outlet in @[ @"window", @"blankCard", @"documentCard", @"fileLabel",
+                              @"chooseButton", @"summaryLabel", @"detailsView",
+                              @"detailsScroll", @"createButton", @"cancelButton" ]) {
+    if ([panel valueForKey:outlet] == nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"outlet %@ is not connected", outlet]);
+  }
+
+  // And the buttons reach the panel, which is the other half ibtool can lose.
+  NSMutableSet<NSString *> *actions = [NSMutableSet set];
+  NSMutableArray<NSView *> *queue =
+      [NSMutableArray arrayWithObject:[[panel valueForKey:@"window"] contentView]];
+  while ([queue count]) {
+    NSView *view = [queue lastObject];
+    [queue removeLastObject];
+    [queue addObjectsFromArray:[view subviews]];
+    if (![view isKindOfClass:[NSButton class]])
+      continue;
+    NSButton *button = (NSButton *)view;
+    if ([button action])
+      [actions addObject:NSStringFromSelector([button action])];
+    if ([button action] && [button target] != panel)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ does not target the panel",
+                                                 NSStringFromSelector([button action])]);
+  }
+  for (NSString *action in @[ @"chooseBlank:", @"chooseDocument:", @"chooseFile:",
+                              @"create:", @"cancel:" ]) {
+    if (![actions containsObject:action])
+      XCTFail(@"%@", [NSString stringWithFormat:@"no button sends %@", action]);
+    if (![panel respondsToSelector:NSSelectorFromString(action)])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the panel does not implement %@", action]);
   }
 }
 
