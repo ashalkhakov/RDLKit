@@ -18,7 +18,7 @@ PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
 APPDIR="${WORKSPACE_DIR}/AppDir"
 
 rm -rf "$APPDIR"
-mkdir -p "$APPDIR"/usr/{bin,lib,etc,local/bin,share/fonts}
+mkdir -p "$APPDIR"/usr/{bin,lib,etc,local/bin}
 
 # The makefiles live in one of two places depending on how the prefix was
 # laid out. Say which, and fail loudly if neither is there, rather than
@@ -49,15 +49,16 @@ make -C PicaGen install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 make -C PicaDesigner
 make -C PicaDesigner install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 
-# The GNUstep hierarchies themselves. Both, because a package installed into
-# Local is as necessary as one in System.
-for domain in System Local; do
-  for root in "${PREFIX}/${domain}" "${PREFIX}/share/GNUstep/${domain}"; do
-    if [ -d "$root" ]; then
-      mkdir -p "$APPDIR/usr/${domain}"
-      cp -Rp "$root/." "$APPDIR/usr/${domain}/"
-    fi
-  done
+# The prefix itself. Ours is a *flattened* GNUstep layout -- apps in
+# lib/GNUstep/Applications, tools in bin, libraries in lib, resources in share
+# -- not the System/Local hierarchy an unflattened prefix has. Copying it whole
+# into usr/ keeps every path one rewrite away from $HERE, which is what AppRun
+# does at launch. Headers are left behind: nothing at runtime reads them.
+for part in bin sbin lib share etc; do
+  if [ -d "${PREFIX}/${part}" ]; then
+    mkdir -p "$APPDIR/usr/${part}"
+    cp -Rp "${PREFIX}/${part}/." "$APPDIR/usr/${part}/"
+  fi
 done
 
 # The background tools AppKit expects to be able to launch: the distributed
@@ -79,12 +80,27 @@ done
 # Fonts. A report names the fonts its author had, and what the host has
 # installed decides how it paginates -- see the README. Shipping a set makes
 # the image lay out the same way everywhere, whatever the host lacks.
-mkdir -p "$APPDIR/usr/etc/fonts"
+mkdir -p "$APPDIR/usr/etc/fonts" "$APPDIR/usr/share/fonts"
 cp Scripts/appimage/fonts.conf "$APPDIR/usr/etc/fonts/fonts.conf"
 for dir in /usr/share/fonts/truetype/dejavu /usr/share/fonts/truetype/liberation \
            /usr/share/fonts/truetype/msttcorefonts; do
   [ -d "$dir" ] && cp -Rp "$dir" "$APPDIR/usr/share/fonts/" || true
 done
 
+# The two things the image exists to carry. Missing here means the copy above
+# looked in the wrong place, which is exactly the mistake that produced an
+# empty AppDir and an error one script later.
+missing=""
+[ -x "$APPDIR/usr/bin/picagen" ] || missing="$missing usr/bin/picagen"
+[ -x "$APPDIR/usr/lib/GNUstep/Applications/Pica.app/Pica" ] \
+  || missing="$missing usr/lib/GNUstep/Applications/Pica.app/Pica"
+if [ -n "$missing" ]; then
+  echo "AppDir is missing:$missing" >&2
+  echo "what the prefix holds:" >&2
+  find "$PREFIX" -maxdepth 2 -type d >&2
+  exit 1
+fi
+
 echo "AppDir assembled:"
-find "$APPDIR" -maxdepth 3 -type d | head -20
+du -sh "$APPDIR"
+find "$APPDIR" -maxdepth 4 -name picagen -o -maxdepth 4 -name 'Pica.app'

@@ -15,26 +15,28 @@ GNUSTEP_USER_DEFAULTS_DIR=GNUstep/Defaults
 GNUSTEP_SYSTEM_USERS_DIR=/home
 GNUSTEP_NETWORK_USERS_DIR=/home
 GNUSTEP_LOCAL_USERS_DIR=/home
-GNUSTEP_SYSTEM_ROOT=$HERE/usr/System
-GNUSTEP_SYSTEM_LIBRARIES=$HERE/usr/System/Library
-GNUSTEP_SYSTEM_LIBRARY=$HERE/usr/System/Library
-GNUSTEP_SYSTEM_TOOLS=$HERE/usr/System/Tools
-GNUSTEP_SYSTEM_APPS=$HERE/usr/System/Applications
-GNUSTEP_LOCAL_ROOT=$HERE/usr/Local
-GNUSTEP_LOCAL_LIBRARY=$HERE/usr/Local/Library
-GNUSTEP_LOCAL_TOOLS=$HERE/usr/Local/Tools
-GNUSTEP_LOCAL_APPS=$HERE/usr/Local/Applications
+GNUSTEP_MAKEFILES=$HERE/usr/share/GNUstep/Makefiles
+GNUSTEP_SYSTEM_APPS=$HERE/usr/lib/GNUstep/Applications
+GNUSTEP_SYSTEM_ADMIN_APPS=$HERE/usr/lib/GNUstep/Applications
+GNUSTEP_SYSTEM_WEB_APPS=$HERE/usr/lib/GNUstep/WebApplications
+GNUSTEP_SYSTEM_TOOLS=$HERE/usr/bin
+GNUSTEP_SYSTEM_ADMIN_TOOLS=$HERE/usr/sbin
+GNUSTEP_SYSTEM_LIBRARY=$HERE/usr/lib/GNUstep
+GNUSTEP_SYSTEM_HEADERS=$HERE/usr/include
+GNUSTEP_SYSTEM_LIBRARIES=$HERE/usr/lib
+GNUSTEP_SYSTEM_RESOURCES=$HERE/usr/share
+GNUSTEP_NETWORK_APPS=$HERE/usr/lib/GNUstep/Applications
+GNUSTEP_NETWORK_TOOLS=$HERE/usr/bin
+GNUSTEP_NETWORK_LIBRARY=$HERE/usr/lib/GNUstep
+GNUSTEP_NETWORK_LIBRARIES=$HERE/usr/lib
+GNUSTEP_NETWORK_RESOURCES=$HERE/usr/share
+GNUSTEP_LOCAL_APPS=$HERE/usr/lib/GNUstep/Applications
+GNUSTEP_LOCAL_TOOLS=$HERE/usr/bin
+GNUSTEP_LOCAL_LIBRARY=$HERE/usr/lib/GNUstep
+GNUSTEP_LOCAL_LIBRARIES=$HERE/usr/lib
+GNUSTEP_LOCAL_RESOURCES=$HERE/usr/share
 IN_EOF
 chmod 600 "$GNUSTEP_CONFIG_FILE"
-
-export GNUSTEP_SYSTEM_ROOT="$HERE/usr/System"
-export GNUSTEP_SYSTEM_LIBRARY="$HERE/usr/System/Library"
-export GNUSTEP_SYSTEM_TOOLS="$HERE/usr/System/Tools"
-export GNUSTEP_SYSTEM_APPS="$HERE/usr/System/Applications"
-export GNUSTEP_LOCAL_ROOT="$HERE/usr/Local"
-export GNUSTEP_LOCAL_LIBRARY="$HERE/usr/Local/Library"
-export GNUSTEP_LOCAL_TOOLS="$HERE/usr/Local/Tools"
-export GNUSTEP_LOCAL_APPS="$HERE/usr/Local/Applications"
 
 export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
 export PATH="$HERE/usr/local/bin:$HERE/usr/bin:$PATH"
@@ -61,4 +63,4 @@ case "$(basename "${ARGV0:-$0}")" in
     ;;
 esac
 
-exec "$HERE/usr/System/Applications/Pica.app/Pica" "$@"
+exec "$HERE/usr/lib/GNUstep/Applications/Pica.app/Pica" "$@"
