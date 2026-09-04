@@ -2201,8 +2201,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 }
 
 - (void)testMenuWiring {
-  NSString *path = [[[@(__FILE__) stringByDeletingLastPathComponent]
-      stringByDeletingLastPathComponent]
+  NSString *path = [[PicaSourceDirectory() stringByDeletingLastPathComponent]
       stringByAppendingPathComponent:@"PicaDesigner/MainMenu.xib"];
   NSError *err = nil;
   NSString *xib = [NSString stringWithContentsOfFile:path
