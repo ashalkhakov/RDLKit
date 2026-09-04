@@ -1,4 +1,5 @@
 #import <XCTest/XCTest.h>
+#import <AppKit/AppKit.h>
 
 // Checks for PicaKit, one XCTest per area.
 //
@@ -667,6 +668,14 @@ static NSString *PicaFixturesDirectory(void) {
 @end
 @implementation PicaParserTests
 
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
+
 - (void)testParser {
   NSError *err = nil;
   RDLReport *src = PicaMiniInvoice();
@@ -1317,6 +1326,14 @@ static NSString *PicaFixturesDirectory(void) {
 @end
 @implementation PicaExpressionTests
 
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
+
 - (void)testExpression {
   RDLReport *r = PicaMiniInvoice();
   RDLEvalScope *s = [[RDLEvalScope alloc] init];
@@ -1840,6 +1857,14 @@ static NSString *PicaFixturesDirectory(void) {
 @interface PicaLayoutTests : XCTestCase
 @end
 @implementation PicaLayoutTests
+
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
 
 - (void)testLayout {
   RDLReport *r = PicaMiniInvoice();
@@ -3155,6 +3180,14 @@ static NSString *PicaFixturesDirectory(void) {
 @end
 @implementation PicaBackendTests
 
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
+
 - (void)testBackendRegistry {
   NSArray *named = [[RDLGenerator backends] valueForKey:@"name"];
   if (![named containsObject:@"HTML"] || ![named containsObject:@"PDF"])
@@ -3220,11 +3253,6 @@ static NSString *PicaFixturesDirectory(void) {
 }
 
 - (void)testPDFBackend {
-  // AppKit wants an application object before anything draws, on either
-  // platform: GNUstep implements -dataWithPDFInsideRect: too (libs-gui,
-  // NSView.m, alongside GSPDFPrintOperation), so the PDF backend is not
-  // macOS-only and this check is not either.
-  [NSApplication sharedApplication];
   id<RDLBackend> pdf = [RDLGenerator backendNamed:@"PDF"];
   if (![[pdf pathExtension] isEqualToString:@"pdf"])
     XCTFail(@"%@", @"PDF pathExtension");
@@ -3812,6 +3840,14 @@ static NSString *PicaFixturesDirectory(void) {
 @interface PicaImportTests : XCTestCase
 @end
 @implementation PicaImportTests
+
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
 
 - (void)testZip {
   NSError *err = nil;

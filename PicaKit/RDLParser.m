@@ -316,11 +316,28 @@ static NSMutableArray *PicaWarnings(void) {
 // threading an NSError through every helper.
 static NSError *gPicaParseError = nil;
 
+// Where an element sits, named the way a person reads a report: /Report/Body/
+// ReportItems/Subreport. -XPath would do it on macOS but GNUstep answers with
+// positional wildcards -- /*/*[3]/*[3]/*[2] -- which tells nobody anything, and
+// the whole point of this message is to be actionable.
+static NSString *PicaElementPath(NSXMLElement *el) {
+  NSMutableArray<NSString *> *parts = [NSMutableArray array];
+  for (NSXMLNode *n = el; n != nil; n = [n parent]) {
+    if (n.kind != NSXMLElementKind)
+      continue;
+    NSString *name = [(NSXMLElement *)n localName];
+    if ([name length])
+      [parts insertObject:name atIndex:0];
+  }
+  return [parts count] ? [@"/" stringByAppendingString:[parts componentsJoinedByString:@"/"]]
+                       : ([el localName] ?: @"");
+}
+
 static void PicaFailUnsupported(NSXMLElement *el) {
   if (gPicaParseError != nil)
     return;
   NSString *name = [el attributeForName:@"Name"].stringValue;
-  NSString *where = [el XPath] ?: [el localName];
+  NSString *where = PicaElementPath(el);
   NSString *msg =
       [name length] ? [NSString stringWithFormat:@"unsupported element %@ '%@' at %@",
                                                  [el localName], name, where]
@@ -1779,12 +1796,15 @@ static void PicaAddBand(NSXMLElement *parent, RDLBand *b) {
 
 + (NSString *)XMLStringFromReport:(RDLReport *)report {
   NSXMLElement *root = PicaEl(@"Report");
-  [root addNamespace:[NSXMLNode namespaceWithName:@""
-                                      stringValue:@"http://schemas.microsoft.com/sqlserver/"
-                                                  @"reporting/2010/01/reportdefinition"]];
-  [root addNamespace:[NSXMLNode namespaceWithName:@"rd"
-                                      stringValue:@"http://schemas.microsoft.com/SQLServer/"
-                                                  @"reporting/reportdesigner"]];
+  // Written as plain attributes rather than through -addNamespace:. Cocoa reads
+  // +namespaceWithName:@"" as the default namespace; GNUstep copies the prefix
+  // as given, and the document it then writes does not read back -- the root
+  // arrives unrecognisable and every round trip fails at "Root element must be
+  // Report". An xmlns attribute means the same thing to both.
+  PicaAddAttr(root, @"xmlns",
+              @"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition");
+  PicaAddAttr(root, @"xmlns:rd",
+              @"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner");
   PicaAdd(root, @"rd:ReportUnitType", @"Inch");
   PicaAdd(root, @"Name", report.name);
   PicaAdd(root, @"Description", report.reportDescription);

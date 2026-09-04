@@ -1,4 +1,5 @@
 #import <XCTest/XCTest.h>
+#import <AppKit/AppKit.h>
 
 // Checks for the PicaDesigner app, one XCTest per area.
 //
@@ -271,6 +272,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 @interface PicaEditingCoreTests : XCTestCase
 @end
 @implementation PicaEditingCoreTests
+
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
 
 - (void)testDocument {
   PicaDocument *doc = [[PicaDocument alloc] initWithReport:PicaEditableReport()];
@@ -1094,6 +1103,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 @end
 @implementation PicaCanvasTests
 
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
+
 - (void)testPageGeometry {
   RDLReport *r = [RDLReport emptyReportNamed:@"Geometry"];
   // Letter, 1in margins all round, so the arithmetic is easy to read.
@@ -1345,6 +1362,14 @@ static NSString *PicaDesignerFixture(NSString *name) {
 @interface PicaUITests : XCTestCase
 @end
 @implementation PicaUITests
+
+// GNUstep asserts that the shared application exists before anything touches a
+// font -- "The shared NSApplication instance must be created before methods
+// that need the backend may be called" -- and measuring text does. Cocoa is
+// laxer about it and does not mind this being here.
++ (void)setUp {
+  [NSApplication sharedApplication];
+}
 
 - (void)testFieldBinding {
   PicaDocument *doc = [[PicaDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Fields"]];
