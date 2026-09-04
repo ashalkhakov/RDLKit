@@ -11,7 +11,7 @@ sends `-newDocument:` in `MainMenu.xib`, and that the tablix editor opens on a
 scaffolded report — the path where it once raised, having assumed a dataset's
 fields were strings.
 
-One `XCTestCase` method per area — 22 of them — with the fixtures and helpers
+One `XCTestCase` method per area — 21 of them — with the fixtures and helpers
 file-static beside them. There is no separate check layer: `XCTFail` records a
 failure and lets the method carry on, so a case still reports everything it
 found instead of stopping at the first, which is the only thing collecting

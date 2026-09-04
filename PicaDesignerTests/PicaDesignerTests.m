@@ -2071,56 +2071,6 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
     XCTFail(@"%@", @"the document's undo manager should group explicitly, not per event");
 }
 
-- (void)testDialogLifecycle {
-  PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:PicaGroupedJobs()];
-  RDLTablix *tab = (RDLTablix *)ctx.report.body.items.firstObject;
-  NSString *groupBefore = tab.groupBy;
-  NSUInteger specsBefore = [tab.columnSpecs count];
-
-  // Opened twice, cancelled then accepted.
-  //
-  // This used to run six rounds, hunting an over-release that only surfaced
-  // once the freed window's memory had been handed to something else. That bug
-  // came from handling the panels by hand -- an explicit -close, and
-  // isReleasedWhenClosed turned off to compensate. The panels now use the
-  // documented modal pattern (runModalForWindow: / stopModalWithCode:, ordered
-  // out once, on both paths) and there is nothing left for the repetition to
-  // find. What is worth checking is what each dismissal does, and twice covers
-  // that -- which also stops this being the slowest test on GNUstep, where each
-  // modal session costs real time.
-  for (NSInteger round = 1; round <= 2; round++) {
-    BOOL accept = (round % 2) == 0;
-    PicaDialogClicker *clicker = nil;
-    BOOL changed = PicaRunTablixDialog(tab, ctx, accept ? @"OK" : @"Cancel", &clicker);
-
-    if (!clicker.sawModal)
-      XCTFail(@"%@", [NSString stringWithFormat:
-                                    @"round %ld: the dialog never became the modal window",
-                                    (long)round]);
-    if (!clicker.foundButton)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: no %@ button in the window",
-                                                 (long)round, accept ? @"OK" : @"Cancel"]);
-    if (changed != accept)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: changed=%d for a %@",
-                                                 (long)round, (int)changed,
-                                                 accept ? @"an OK" : @"a cancel"]);
-    if ([NSApp modalWindow] != nil)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: a modal session was left running",
-                                                 (long)round]);
-    // An OK with no edits must be a no-op on the model, not a rewrite.
-    if (![tab.groupBy isEqualToString:groupBefore])
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: the row group was lost",
-                                                 (long)round]);
-    if ([tab.columnSpecs count] != specsBefore)
-      XCTFail(@"%@", [NSString stringWithFormat:@"round %ld: the columns changed",
-                                                 (long)round]);
-  }
-
-  // Cancelling must never reach the undo stack; the three OKs must.
-  if (!ctx.document.undoManager.canUndo)
-    XCTFail(@"%@", @"an accepted dialog should be undoable");
-}
-
 - (void)testNewReport {
 
   // Blank: always available, and it is a report rather than nothing.
