@@ -63,13 +63,15 @@ jobs:
           fi
 
       # The same stack, the same script and the same cache key as CI, so a
-      # release does not rebuild what a push already built.
-      - name: Cache GNUstep
+      # release does not rebuild what a push already built. Restore only: this
+      # job installs into the prefix to package it, so it must never write the
+      # result back. See the note in ci.yml.
+      - name: Restore GNUstep
         id: gnustep-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.INSTALL_PATH }}
-          key: gnustep-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
 
       - name: Build GNUstep
         if: steps.gnustep-cache.outputs.cache-hit != 'true'

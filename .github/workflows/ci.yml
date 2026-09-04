@@ -176,16 +176,32 @@ jobs:
       # The whole GNUstep stack is built from source, which takes far longer
       # than RDLKit does. It only changes when the pinned dependency script
       # changes, so it is cached against that.
-      - name: Cache GNUstep
+      #
+      # Restored and saved as two separate steps rather than with the combined
+      # action, because the combined one saves at the end of the job -- by
+      # which time packaging has run "make install
+      # GNUSTEP_INSTALLATION_DOMAIN=SYSTEM" and put PicaKit's own headers into
+      # the prefix. The next run then restores a prefix containing them, and
+      # every declaration is seen twice: once from
+      # System/Library/Headers/PicaKit and once from ../PicaKit. Saving here
+      # captures the stack before anything of ours is installed into it.
+      - name: Restore GNUstep
         id: gnustep-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.INSTALL_PATH }}
-          key: gnustep-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
 
       - name: Build GNUstep
         if: steps.gnustep-cache.outputs.cache-hit != 'true'
         run: ./.github/scripts/dependencies.sh
+
+      - name: Save GNUstep
+        if: steps.gnustep-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.INSTALL_PATH }}
+          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
 
       - name: Build PicaKit
         run: |
