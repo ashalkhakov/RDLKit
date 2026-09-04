@@ -20,6 +20,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # "Hash Sum mismatch" from a caching proxy is the usual way this build dies, so
 # retry, and stop apt pipelining requests -- which is what proxies mangle. Split
 # in two so a failure does not re-download the lot.
+# Retry, and stop apt pipelining requests, which is what proxies mangle.
+#
+# Not built successfully on this machine: its network path corrupts plain HTTP
+# from ports.ubuntu.com -- a 178 kB package arriving as 42 MB, reported as
+# "File has unexpected size" -- and drops HTTPS to the same host entirely, so
+# apt sees "Ign:" for every InRelease and ends up with no package lists. On a
+# network that does neither, this builds as written. If yours does, point apt
+# at a mirror you trust by editing /etc/apt/sources.list.d/ubuntu.sources here.
 RUN printf '%s\n' \
       'Acquire::Retries "5";' \
       'Acquire::http::Pipeline-Depth "0";' \
