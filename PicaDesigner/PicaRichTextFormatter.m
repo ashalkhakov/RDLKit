@@ -1,6 +1,39 @@
 #import "PicaRichTextFormatter.h"
 #import "PicaCompatibility.h"
 
+// Walking the runs of an attributed string, portably.
+//
+// -enumerateAttributesInRange:options:usingBlock: and its single-attribute
+// sibling are Cocoa additions that GNUstep's NSAttributedString does not
+// declare. -attributesAtIndex:longestEffectiveRange:inRange: and
+// -attribute:atIndex:longestEffectiveRange:inRange: do exist on both, and are
+// what the block forms are built on, so these do the same walk by hand.
+static void PicaEnumerateAttributes(NSAttributedString *text, NSRange range,
+                                    void (^block)(NSDictionary *attrs, NSRange r, BOOL *stop)) {
+  NSUInteger at = range.location;
+  BOOL stop = NO;
+  while (at < NSMaxRange(range) && !stop) {
+    NSRange effective = NSMakeRange(at, 0);
+    NSDictionary *attrs =
+        [text attributesAtIndex:at longestEffectiveRange:&effective inRange:range];
+    block(attrs ?: @{}, effective, &stop);
+    // A zero-length run would not advance, and the loop would not end.
+    at = effective.length ? NSMaxRange(effective) : at + 1;
+  }
+}
+
+static void PicaEnumerateAttribute(NSAttributedString *text, NSString *name, NSRange range,
+                                   void (^block)(id value, NSRange r, BOOL *stop)) {
+  NSUInteger at = range.location;
+  BOOL stop = NO;
+  while (at < NSMaxRange(range) && !stop) {
+    NSRange effective = NSMakeRange(at, 0);
+    id value = [text attribute:name atIndex:at longestEffectiveRange:&effective inRange:range];
+    block(value, effective, &stop);
+    at = effective.length ? NSMaxRange(effective) : at + 1;
+  }
+}
+
 @implementation PicaRichTextState
 - (instancetype)init {
   self = [super init];
@@ -78,9 +111,7 @@ static PicaTriState PicaFold(PicaTriState soFar, BOOL on, BOOL first) {
   __block CGFloat size = 0;
   __block NSColor *color = nil;
   __block BOOL familyMixed = NO, sizeMixed = NO, colorMixed = NO;
-  [text enumerateAttributesInRange:clipped
-                           options:0
-                        usingBlock:^(NSDictionary *attrs, NSRange r, BOOL *stop) {
+  PicaEnumerateAttributes(text, clipped, ^(NSDictionary *attrs, NSRange r, BOOL *stop) {
                           (void)r;
                           (void)stop;
                           bold = PicaFold(bold, PicaTraitIsOn(PicaRichTextTraitBold, attrs), first);
@@ -105,7 +136,7 @@ static PicaTriState PicaFold(PicaTriState soFar, BOOL on, BOOL first) {
                               colorMixed = YES;
                           }
                           first = NO;
-                        }];
+                        });
   state.bold = bold;
   state.italic = italic;
   state.underline = under;
@@ -119,10 +150,7 @@ static PicaTriState PicaFold(PicaTriState soFar, BOOL on, BOOL first) {
   __block BOOL alignFirst = YES;
   __block NSTextAlignment align = NSLeftTextAlignment;
   __block BOOL alignMixed = NO;
-  [text enumerateAttribute:NSParagraphStyleAttributeName
-                   inRange:paraRange
-                   options:0
-                usingBlock:^(id value, NSRange r, BOOL *stop) {
+  PicaEnumerateAttribute(text, NSParagraphStyleAttributeName, paraRange, ^(id value, NSRange r, BOOL *stop) {
                   (void)r;
                   (void)stop;
                   NSTextAlignment a = value ? [(NSParagraphStyle *)value alignment] : NSLeftTextAlignment;
@@ -131,7 +159,7 @@ static PicaTriState PicaFold(PicaTriState soFar, BOOL on, BOOL first) {
                   else if (a != align)
                     alignMixed = YES;
                   alignFirst = NO;
-                }];
+                });
   state.alignment = align;
   state.alignmentMixed = alignMixed;
   return state;
@@ -157,16 +185,13 @@ static void PicaMapFonts(NSMutableAttributedString *text, NSRange range,
     return;
   NSRange clipped = NSIntersectionRange(range, NSMakeRange(0, [text length]));
   [text beginEditing];
-  [text enumerateAttribute:NSFontAttributeName
-                   inRange:clipped
-                   options:0
-                usingBlock:^(id value, NSRange r, BOOL *stop) {
+  PicaEnumerateAttribute(text, NSFontAttributeName, clipped, ^(id value, NSRange r, BOOL *stop) {
                   (void)stop;
                   NSFont *font = value ?: [NSFont systemFontOfSize:[NSFont systemFontSize]];
                   NSFont *replacement = transform(font);
                   if (replacement)
                     [text addAttribute:NSFontAttributeName value:replacement range:r];
-                }];
+                });
   [text endEditing];
 }
 
@@ -276,16 +301,13 @@ static void PicaMapFonts(NSMutableAttributedString *text, NSRange range,
   if (paraRange.length == 0)
     return nextTyping;
   [text beginEditing];
-  [text enumerateAttribute:NSParagraphStyleAttributeName
-                   inRange:paraRange
-                   options:0
-                usingBlock:^(id value, NSRange r, BOOL *stop) {
+  PicaEnumerateAttribute(text, NSParagraphStyleAttributeName, paraRange, ^(id value, NSRange r, BOOL *stop) {
                   (void)stop;
                   NSMutableParagraphStyle *style =
                       [(value ?: [NSParagraphStyle defaultParagraphStyle]) mutableCopy];
                   [style setAlignment:alignment];
                   [text addAttribute:NSParagraphStyleAttributeName value:style range:r];
-                }];
+                });
   [text endEditing];
   return nextTyping;
 }
