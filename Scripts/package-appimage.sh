@@ -2,7 +2,8 @@
 # Turn AppDir into an AppImage.
 #
 #   APP_VERSION=1.2.3 ./Scripts/package-appimage.sh
-set -euo pipefail
+set -eo pipefail
+set -x
 
 WORKSPACE_DIR=$(pwd)
 PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"

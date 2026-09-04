@@ -249,8 +249,10 @@ jobs:
           LDAI_RUNTIME_FILE: /tmp/appimage-runtime/runtime-x86_64
           APP_VERSION: 0.0.0-${{ github.run_number }}-${{ github.sha }}
         run: |
-          sudo apt-get -q -y install -qq desktop-file-utils fonts-dejavu fonts-liberation
+          sudo apt-get -q -y install desktop-file-utils fonts-dejavu fonts-liberation
+          echo "packages installed"
           GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
+          echo "AppDir assembled"
           GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/package-appimage.sh
 
       # It has to start. --check needs no display, so a bundle that cannot find

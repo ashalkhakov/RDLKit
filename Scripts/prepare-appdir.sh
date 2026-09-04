@@ -7,7 +7,11 @@
 # GNUstep: an app is a bundle under GNUSTEP_SYSTEM_APPS, it finds its
 # frameworks through the GNUstep roots, and those roots have to be inside the
 # image because an AppImage is mounted wherever the user runs it.
-set -euo pipefail
+# No -u: GNUstep.sh tests variables that are not set yet, and would abort
+# under it. -x so the log says which line failed -- this runs in CI, where the
+# only evidence is what it printed.
+set -eo pipefail
+set -x
 
 WORKSPACE_DIR=$(pwd)
 PREFIX="${GNUSTEP_PREFIX:-/opt/gnustep-prefix}"
@@ -16,8 +20,23 @@ APPDIR="${WORKSPACE_DIR}/AppDir"
 rm -rf "$APPDIR"
 mkdir -p "$APPDIR"/usr/{bin,lib,etc,local/bin,share/fonts}
 
-. "${PREFIX}/share/GNUstep/Makefiles/GNUstep.sh" 2>/dev/null \
-  || . "${PREFIX}/System/Library/Makefiles/GNUstep.sh"
+# The makefiles live in one of two places depending on how the prefix was
+# laid out. Say which, and fail loudly if neither is there, rather than
+# swallowing the error and dying on the next line.
+GNUSTEP_SH=""
+for candidate in "${PREFIX}/share/GNUstep/Makefiles/GNUstep.sh" \
+                 "${PREFIX}/System/Library/Makefiles/GNUstep.sh"; do
+  if [ -r "$candidate" ]; then
+    GNUSTEP_SH="$candidate"
+    break
+  fi
+done
+if [ -z "$GNUSTEP_SH" ]; then
+  echo "no GNUstep.sh under ${PREFIX}; is GNUSTEP_PREFIX right?" >&2
+  ls -la "${PREFIX}" >&2 || true
+  exit 1
+fi
+. "$GNUSTEP_SH"
 
 # Built and installed into the prefix, not into AppDir with DESTDIR: the whole
 # prefix is copied in below, and AppRun points GNUSTEP_SYSTEM_ROOT at that copy.
