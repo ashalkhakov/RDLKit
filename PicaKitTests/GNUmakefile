@@ -26,6 +26,11 @@ PicaKitTests_NEEDS_GUI = yes
 ifeq ($(SANITIZE),1)
 ADDITIONAL_OBJCFLAGS += -fsanitize=address -fno-omit-frame-pointer -g
 ADDITIONAL_LDFLAGS += -fsanitize=address
+# The bundle is dlopened by an xctest binary that is not instrumented, so the
+# ASan runtime has to be loaded first or its interceptors are never installed.
+ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-x86_64.so)
+# Leaks are not what is being looked for here, and a test bundle reports plenty.
+SANITIZE_ENV := LD_PRELOAD="$(ASAN_LIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1
 endif
 
 include $(GNUSTEP_MAKEFILES)/bundle.make
@@ -37,5 +42,6 @@ XCTEST ?= xctest
 # have to run from a source tree, not from an installed bundle.
 .PHONY: run-tests
 run-tests: all
+	$(SANITIZE_ENV) \
 	LD_LIBRARY_PATH="$(CURDIR)/../PicaKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  $(XCTEST) $(BUNDLE_NAME).bundle

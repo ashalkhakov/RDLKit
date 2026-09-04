@@ -12,8 +12,18 @@
   NSFont *font = [style.fontFamily length] ? [NSFont fontWithName:style.fontFamily
                                                              size:pt * s]
                                            : nil;
+  // A report names whatever font its author had. On another machine that font
+  // is usually absent, so fall back rather than carry nil: a nil font in the
+  // attributes is not "no font", it is a text system with nothing to measure
+  // with, and GNUstep's does not survive it.
   if (font == nil)
     font = [NSFont userFontOfSize:pt * s];
+  if (font == nil)
+    font = [NSFont systemFontOfSize:pt * s];
+  if (font == nil)
+    font = [NSFont fontWithName:@"Helvetica" size:pt * s];
+  if (font == nil)
+    return nil; // a machine with no fonts at all; the caller omits the attribute
   NSFontManager *fm = [NSFontManager sharedFontManager];
   // RDL allows a range of weight names, not just "Bold"; anything at or above
   // semibold reads as bold on screen.
@@ -60,7 +70,11 @@
                       paragraphAlign:(RDLTextAlign)paragraphAlign
                                scale:(CGFloat)scale {
   NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
-  attrs[NSFontAttributeName] = [self fontForStyle:style scale:scale];
+  // Assigning nil through the subscript removes the key, which is right: an
+  // absent font attribute is handled, a nil one is not.
+  NSFont *font = [self fontForStyle:style scale:scale];
+  if (font)
+    attrs[NSFontAttributeName] = font;
   attrs[NSForegroundColorAttributeName] = PicaColorFromHex(style.color);
   if (style.textDecoration == RDLTextDecorationUnderline)
     attrs[NSUnderlineStyleAttributeName] = @(NSUnderlineStyleSingle);

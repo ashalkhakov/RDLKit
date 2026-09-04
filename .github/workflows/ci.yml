@@ -169,16 +169,19 @@ jobs:
           make -C PicaDesigner
 
       # Both suites are ordinary XCTest, which GNUstep supplies through
-      # tools-xctest. `make check` builds the bundle and runs it under xctest.
+      # tools-xctest. `make run-tests` builds the bundle and runs it under
+      # xctest. SANITIZE=1 while the port is being brought up: a segfault or a
+      # heap overflow then arrives as a symbolized backtrace naming the write,
+      # rather than as one line saying the process died.
       - name: Test PicaKit
         run: |
           . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
-          xvfb-run -a make -C PicaKitTests run-tests
+          xvfb-run -a make -C PicaKitTests run-tests SANITIZE=1
 
       - name: Test PicaDesigner
         run: |
           . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
-          xvfb-run -a make -C PicaDesignerTests run-tests
+          xvfb-run -a make -C PicaDesignerTests run-tests SANITIZE=1
 
       - name: Smoke-test picagen
         run: |
