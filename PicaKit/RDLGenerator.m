@@ -50,7 +50,7 @@
   // over an existing schema would silently reorder the report's columns.
   NSDictionary *first = [obj firstObject];
   if ([ds.fields count] == 0 && [first isKindOfClass:[NSDictionary class]])
-    ds.fields = [first allKeys];
+    [ds setFieldNames:[first allKeys]];
   return YES;
 }
 

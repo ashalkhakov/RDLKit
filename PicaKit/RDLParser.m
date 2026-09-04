@@ -13,6 +13,32 @@ static NSXMLElement *PicaChild(NSXMLElement *el, NSString *name) {
   return nil;
 }
 
+// The text of a leaf element, including text that is only whitespace.
+//
+// NSXML exposes such an element as empty: childCount 0 and an empty
+// -stringValue, even though -XMLString round-trips it. A TextRun holding a
+// single space -- which is exactly what sits between two differently styled
+// words -- therefore read back as nothing, and "Foo Baz" came back "FooBaz".
+// Recovering it from the element's own XML is safe because anything that is
+// not whitespace would have come back from -stringValue.
+static NSString *PicaElementText(NSXMLElement *el) {
+  if (el == nil)
+    return @"";
+  NSString *direct = [el stringValue];
+  if ([direct length] || [el childCount] > 0)
+    return direct ?: @"";
+  NSString *xml = [el XMLString];
+  NSRange open = [xml rangeOfString:@">"];
+  NSRange close = [xml rangeOfString:@"</" options:NSBackwardsSearch];
+  if (open.location == NSNotFound || close.location == NSNotFound ||
+      close.location <= NSMaxRange(open))
+    return @"";
+  NSString *inner = [xml substringWithRange:NSMakeRange(NSMaxRange(open),
+                                                        close.location - NSMaxRange(open))];
+  NSCharacterSet *space = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+  return [[inner stringByTrimmingCharactersInSet:space] length] == 0 ? inner : @"";
+}
+
 static NSString *PicaText(NSXMLElement *el) {
   return [[el stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
              ?: @"";
@@ -523,7 +549,7 @@ static NSString *PicaTextboxValue(NSXMLElement *el) {
       if (tn.kind != NSXMLElementKind || ![tn.localName isEqualToString:@"TextRun"])
         continue;
       NSXMLElement *rv = PicaChild((NSXMLElement *)tn, @"Value");
-      [para appendString:[rv stringValue] ?: @""]; // preserve run whitespace
+      [para appendString:PicaElementText(rv)]; // preserve run whitespace
     }
     [paraTexts addObject:para];
   }
@@ -607,7 +633,7 @@ static NSMutableArray *PicaParseParagraphs(NSXMLElement *el, RDLStyle *itemStyle
       if (tn.kind != NSXMLElementKind || ![tn.localName isEqualToString:@"TextRun"])
         continue;
       RDLTextRun *run = [[RDLTextRun alloc] init];
-      run.value = [PicaChild((NSXMLElement *)tn, @"Value") stringValue] ?: @"";
+      run.value = PicaElementText(PicaChild((NSXMLElement *)tn, @"Value"));
       RDLStyle *rs = PicaParseSparseStyle(PicaChild((NSXMLElement *)tn, @"Style"));
       if (rs && !PicaSparseStyleIsEmpty(rs)) {
         run.style = rs;
@@ -963,7 +989,11 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
 }
 
 + (RDLReport *)picaParseReportFromXMLString:(NSString *)xml error:(NSError **)error {
-  NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml options:0 error:error];
+  // PreserveWhitespace, or a TextRun holding a single space arrives empty --
+  // see PicaElementText.
+  NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml
+                                                       options:NSXMLNodePreserveWhitespace
+                                                         error:error];
   if (doc == nil)
     return nil;
   // Older schemas are rewritten into the current grammar first, so everything
@@ -1046,20 +1076,14 @@ static RDLBand *PicaParseBand(NSXMLElement *el, CGFloat fallback) {
       NSString *fn = [fe attributeForName:@"Name"].stringValue;
       if (fn == nil)
         continue;
-      NSString *calc = PicaText(PicaChild(fe, @"Value"));
-      RDLFieldDataType type = RDLFieldDataTypeFromString(PicaText(PicaChild(fe, @"TypeName")));
-      // A bare name stays a bare name; anything the report actually said about
-      // the field needs an RDLField to hold it.
-      if ([calc length] || type != RDLFieldDataTypeUnknown) {
-        RDLField *fld = [[RDLField alloc] init];
-        fld.name = fn;
-        fld.dataField = PicaText(PicaChild(fe, @"DataField"));
-        fld.value = [RDLValue valueWithSource:calc];
-        fld.dataType = type;
-        [fields addObject:fld];
-      } else {
-        [fields addObject:fn];
-      }
+      RDLField *fld = [[RDLField alloc] init];
+      fld.name = fn;
+      fld.dataField = PicaText(PicaChild(fe, @"DataField"));
+      // nil unless the field really is calculated: -valueWithSource: answers
+      // nil for empty, which is what keeps a plain field plain.
+      fld.value = [RDLValue valueWithSource:PicaText(PicaChild(fe, @"Value"))];
+      fld.dataType = RDLFieldDataTypeFromString(PicaText(PicaChild(fe, @"TypeName")));
+      [fields addObject:fld];
     }
     ds.fields = fields;
     [ds.filters addObjectsFromArray:PicaParseFilters(PicaChild(dsEl, @"Filters"))];
@@ -1781,22 +1805,16 @@ static void PicaAddBand(NSXMLElement *parent, RDLBand *b) {
     PicaAdd(query, @"CommandText", cmd);
     [de addChild:query];
     NSXMLElement *fields = PicaEl(@"Fields");
-    for (id f in ds.fields) {
-      RDLField *fld = [f isKindOfClass:[RDLField class]] ? (RDLField *)f : nil;
+    for (RDLField *fld in ds.fields) {
       NSXMLElement *fe = PicaEl(@"Field");
-      if (fld && fld.value != nil) {
-        PicaAddAttr(fe, @"Name", fld.name);
+      PicaAddAttr(fe, @"Name", fld.name);
+      // A calculated field carries an expression instead of a source column.
+      if (fld.value != nil)
         PicaAddValue(fe, @"Value", fld.value);
-        if (fld.dataType != RDLFieldDataTypeUnknown)
-          PicaAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
-      } else {
-        NSString *name = fld ? fld.name : [f description];
-        NSString *df = fld ? fld.dataField : name;
-        PicaAddAttr(fe, @"Name", name);
-        PicaAdd(fe, @"DataField", [df length] ? df : name);
-        if (fld.dataType != RDLFieldDataTypeUnknown)
-          PicaAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
-      }
+      else
+        PicaAdd(fe, @"DataField", [fld.dataField length] ? fld.dataField : fld.name);
+      if (fld.dataType != RDLFieldDataTypeUnknown)
+        PicaAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
       [fields addChild:fe];
     }
     [de addChild:fields];

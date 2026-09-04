@@ -25,7 +25,7 @@
 - (void)rebuildFieldPop:(NSPopUpButton *)pop selecting:(NSString *)selecting {
   [pop removeAllItems];
   [pop addItemWithTitle:@"(none)"];
-  for (NSString *f in [self selectedDataset].fields)
+  for (NSString *f in [[self selectedDataset] fieldNames])
     [pop addItemWithTitle:f];
   if ([selecting length] && [pop itemWithTitle:selecting])
     [pop selectItemWithTitle:selecting];
@@ -86,7 +86,7 @@
   (void)sender;
   [self commitTableEditing];
   RDLDataSet *ds = [self selectedDataset];
-  NSString *field = ds.fields.firstObject ?: @"Field";
+  NSString *field = [[ds fieldNames] firstObject] ?: @"Field";
   [_cols addObject:[@{
     @"width" : @1.6,
     @"header" : field,

@@ -19,4 +19,8 @@ NSArray<NSString *> *PicaRunExportChecks(void);
 NSArray<NSString *> *PicaRunSharedPipelineChecks(void);
 NSArray<NSString *> *PicaRunSampleFitChecks(void);
 NSArray<NSString *> *PicaRunRichTextFormatterChecks(void);
+NSArray<NSString *> *PicaRunNewReportChecks(void);
+NSArray<NSString *> *PicaRunNewReportPanelChecks(void);
+NSArray<NSString *> *PicaRunMenuWiringChecks(void);
+NSArray<NSString *> *PicaRunScaffoldedTablixEditorChecks(void);
 NSArray<NSString *> *PicaRunAllDesignerChecks(void);

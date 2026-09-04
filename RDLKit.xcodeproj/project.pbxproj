@@ -99,6 +99,18 @@
 		0EF8A1B103C3BAC6DA99890B /* PicaRichTextFormatter.m in Sources */ = {isa = PBXBuildFile; fileRef = 701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */; };
 		A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */ = {isa = PBXBuildFile; fileRef = A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		D698F948027CE30144A0F09A /* RDLChecker.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E46887EEBE88948C77788A7 /* RDLChecker.m */; };
+		6933ADC28B3E7AE06AB2DE3B /* RDLZipArchive.h in Headers */ = {isa = PBXBuildFile; fileRef = D7C42B02B9723B65DDFAD0E0 /* RDLZipArchive.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C8A9185493F7171DA48DFF44 /* RDLZipArchive.m in Sources */ = {isa = PBXBuildFile; fileRef = ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */; };
+		F4AD7C00306AE84C038A4131 /* RDLDocxReader.h in Headers */ = {isa = PBXBuildFile; fileRef = 56D1A1CB0C8D9E6BADBF8A27 /* RDLDocxReader.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		30D1ADC2BBA917E2AC326515 /* RDLDocxReader.m in Sources */ = {isa = PBXBuildFile; fileRef = 77DD5A25CE0B19552E044D29 /* RDLDocxReader.m */; };
+		0C89ABD04BA653D7357D3688 /* RDLImporter.h in Headers */ = {isa = PBXBuildFile; fileRef = D0E2612F70B1AC04570C5BC5 /* RDLImporter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DB1D9F53F0A81F287AB8D9FC /* RDLImporter.m in Sources */ = {isa = PBXBuildFile; fileRef = F2530ACA702894971A26320C /* RDLImporter.m */; };
+		85E4D28A97D8150EB37E381B /* PicaNewReport.m in Sources */ = {isa = PBXBuildFile; fileRef = E7EE2913922B76161C121E0A /* PicaNewReport.m */; };
+		D2C4D4627A54694089CA5C42 /* PicaNewReportPanel.m in Sources */ = {isa = PBXBuildFile; fileRef = BE41C653CA556AECA4C3DDC7 /* PicaNewReportPanel.m */; };
+		93DDFA3148BCE38AF05CC8AA /* PicaNewReportPanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8399CC90B6584EEB8751BAD3 /* PicaNewReportPanel.xib */; };
+		0177C034AE8CBD8251E87809 /* PicaNewReportPanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8399CC90B6584EEB8751BAD3 /* PicaNewReportPanel.xib */; };
+		9A0DF837B69B19F10D27BD5E /* PicaNewReport.m in Sources */ = {isa = PBXBuildFile; fileRef = E7EE2913922B76161C121E0A /* PicaNewReport.m */; };
+		C00014D4136BD4D999A82A59 /* PicaNewReportPanel.m in Sources */ = {isa = PBXBuildFile; fileRef = BE41C653CA556AECA4C3DDC7 /* PicaNewReportPanel.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -264,6 +276,17 @@
 		701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaRichTextFormatter.m; sourceTree = "<group>"; };
 		A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChecker.h; sourceTree = "<group>"; };
 		5E46887EEBE88948C77788A7 /* RDLChecker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChecker.m; sourceTree = "<group>"; };
+		D7C42B02B9723B65DDFAD0E0 /* RDLZipArchive.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLZipArchive.h; sourceTree = "<group>"; };
+		ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLZipArchive.m; sourceTree = "<group>"; };
+		56D1A1CB0C8D9E6BADBF8A27 /* RDLDocxReader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDocxReader.h; sourceTree = "<group>"; };
+		77DD5A25CE0B19552E044D29 /* RDLDocxReader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDocxReader.m; sourceTree = "<group>"; };
+		D0E2612F70B1AC04570C5BC5 /* RDLImporter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLImporter.h; sourceTree = "<group>"; };
+		F2530ACA702894971A26320C /* RDLImporter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLImporter.m; sourceTree = "<group>"; };
+		0DA4E4FF4FAE775A4047CEB3 /* PicaNewReport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaNewReport.h; sourceTree = "<group>"; };
+		E7EE2913922B76161C121E0A /* PicaNewReport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaNewReport.m; sourceTree = "<group>"; };
+		3F5A5B18A1D85BFC4675D077 /* PicaNewReportPanel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PicaNewReportPanel.h; sourceTree = "<group>"; };
+		BE41C653CA556AECA4C3DDC7 /* PicaNewReportPanel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PicaNewReportPanel.m; sourceTree = "<group>"; };
+		8399CC90B6584EEB8751BAD3 /* PicaNewReportPanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = PicaNewReportPanel.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -390,6 +413,11 @@
 				FD2BA757C61D0F567D92D2C8 /* PicaInspectorSections.xib */,
 				59052354FED2A23FCBB86CE3 /* PicaRichTextFormatter.h */,
 				701CC6AEAF76424D92FDAD30 /* PicaRichTextFormatter.m */,
+				0DA4E4FF4FAE775A4047CEB3 /* PicaNewReport.h */,
+				E7EE2913922B76161C121E0A /* PicaNewReport.m */,
+				3F5A5B18A1D85BFC4675D077 /* PicaNewReportPanel.h */,
+				BE41C653CA556AECA4C3DDC7 /* PicaNewReportPanel.m */,
+				8399CC90B6584EEB8751BAD3 /* PicaNewReportPanel.xib */,
 			);
 			path = PicaDesigner;
 			sourceTree = "<group>";
@@ -424,6 +452,12 @@
 				C8C4A40041B77E07028495EC /* RDLChartRenderer.m */,
 				A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */,
 				5E46887EEBE88948C77788A7 /* RDLChecker.m */,
+				D7C42B02B9723B65DDFAD0E0 /* RDLZipArchive.h */,
+				ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */,
+				56D1A1CB0C8D9E6BADBF8A27 /* RDLDocxReader.h */,
+				77DD5A25CE0B19552E044D29 /* RDLDocxReader.m */,
+				D0E2612F70B1AC04570C5BC5 /* RDLImporter.h */,
+				F2530ACA702894971A26320C /* RDLImporter.m */,
 			);
 			path = PicaKit;
 			sourceTree = "<group>";
@@ -511,6 +545,9 @@
 				E1455B7A4E59E9EC65FE8340 /* RDLUpgrader.h in Headers */,
 				F02041FC1136A1CBE9435FF9 /* RDLChartRenderer.h in Headers */,
 				A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */,
+				6933ADC28B3E7AE06AB2DE3B /* RDLZipArchive.h in Headers */,
+				F4AD7C00306AE84C038A4131 /* RDLDocxReader.h in Headers */,
+				0C89ABD04BA653D7357D3688 /* RDLImporter.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -657,6 +694,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B31B2D52BA44A3FCD9E15506 /* PicaTablixEditor.xib in Resources */,
+				0177C034AE8CBD8251E87809 /* PicaNewReportPanel.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -673,6 +711,7 @@
 				D94080269225683213760055 /* PicaAddElementPanel.xib in Resources */,
 				EBF7165C1B6689C83EFFE827 /* PicaGeneratorWindow.xib in Resources */,
 				E57B48BECBA27CF5473E355C /* PicaInspectorSections.xib in Resources */,
+				93DDFA3148BCE38AF05CC8AA /* PicaNewReportPanel.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -726,6 +765,8 @@
 				CE1FE97227D9FE5C9ED36D5E /* PicaPageGeometry.m in Sources */,
 				17354ADEBD0361ECCDD84BF6 /* PicaRichTextCodec.m in Sources */,
 				6A42D0D007C753EA81406391 /* PicaRichTextFormatter.m in Sources */,
+				85E4D28A97D8150EB37E381B /* PicaNewReport.m in Sources */,
+				D2C4D4627A54694089CA5C42 /* PicaNewReportPanel.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -745,6 +786,9 @@
 				7F76015BA9F94F61D881BA25 /* RDLUpgrader.m in Sources */,
 				591545F14DDDF7A8CDCA8180 /* RDLChartRenderer.m in Sources */,
 				D698F948027CE30144A0F09A /* RDLChecker.m in Sources */,
+				C8A9185493F7171DA48DFF44 /* RDLZipArchive.m in Sources */,
+				30D1ADC2BBA917E2AC326515 /* RDLDocxReader.m in Sources */,
+				DB1D9F53F0A81F287AB8D9FC /* RDLImporter.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -767,6 +811,8 @@
 				F8EA04B9F8175CF7FCE6FEAD /* PicaInspectorFields.m in Sources */,
 				C76E850AF8CE40F9D17DF932 /* PicaTablixEditor.m in Sources */,
 				0EF8A1B103C3BAC6DA99890B /* PicaRichTextFormatter.m in Sources */,
+				9A0DF837B69B19F10D27BD5E /* PicaNewReport.m in Sources */,
+				C00014D4136BD4D999A82A59 /* PicaNewReportPanel.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

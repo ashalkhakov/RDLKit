@@ -27,6 +27,8 @@ Pica_OBJC_FILES = \
   PicaInspectorFields.m \
   PicaExpressionHelper.m \
   PicaTablixEditor.m \
+  PicaNewReport.m \
+  PicaNewReportPanel.m \
   PicaRichTextEditor.m \
   PicaDataView.m \
   PicaWelcomeWindow.m
@@ -46,7 +48,8 @@ Pica_RESOURCE_FILES = \
   PicaAddElementPanel.xib \
   PicaPreviewWindow.xib \
   PicaTablixEditor.xib \
-  PicaRichTextEditor.xib
+  PicaRichTextEditor.xib \
+  PicaNewReportPanel.xib
 
 # Left empty on purpose: the menu bar is loaded explicitly in
 # -[PicaAppDelegate loadMenuBar], so that the Samples submenu can be filled in

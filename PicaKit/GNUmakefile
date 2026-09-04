@@ -2,6 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 LIBRARY_NAME = PicaKit
 PicaKit_NEEDS_GUI = yes
+PicaKit_LIBRARIES_DEPEND_UPON += -lz
 PicaKit_OBJCFLAGS += -fobjc-arc -Wall
 PicaKit_HEADER_FILES = \
   PicaKit.h \
@@ -20,6 +21,9 @@ PicaKit_OBJC_FILES = \
   RDLUpgrader.m \
   RDLChartRenderer.m \
   RDLChecker.m \
+  RDLZipArchive.m \
+  RDLDocxReader.m \
+  RDLImporter.m \
   RDLExpression.m \
   RDLLayoutEngine.m \
   RDLView.m \

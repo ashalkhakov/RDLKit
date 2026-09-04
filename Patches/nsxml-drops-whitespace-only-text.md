@@ -1,4 +1,4 @@
-# NSXML discards a text node that is only whitespace
+# NSXML discards a text node that is only whitespace (worked around)
 
 **Framework.** Foundation's `NSXMLDocument` on macOS 15 (Darwin 24.6.0),
 Xcode 26.0 toolchain.
@@ -38,12 +38,35 @@ safe to use for report files.
 clang -fobjc-arc -framework Foundation -o /tmp/repro Patches/repro-nsxml-whitespace.m && /tmp/repro
 ```
 
-**Impact here.** A Textbox whose value is only spaces loses that value on save.
-This is an edge case — the text is invisible either way — so it is recorded and
-pinned by a check (`PicaRunWriterWhitespaceChecks`) rather than worked around.
-That check also fails if the behaviour ever *improves*, so this note does not
-quietly go stale.
+**Impact here, and the fix.** A run whose value is only whitespace read back
+empty, which is not the edge case it first looks like: Word and our own rich
+text both store the space *between* two differently formatted words as its own
+run, so "Foo Baz" came back "FooBaz". A textbox value round-trips through a
+TextRun, so a value of `"   "` was lost the same way.
 
-Note that `PicaText` in `RDLParser.m` trims its result as well, which is
-deliberate for element values like `<Width>` and `<Operator>`; run values go
-through `[node stringValue]` directly so their spacing is kept.
+`RDLParser` now parses with `NSXMLNodePreserveWhitespace` and reads leaf text
+through `PicaElementText`, which falls back to `-XMLString` when an element
+claims to be empty. That is sound because only whitespace can have been lost:
+anything else would have come back from `-stringValue`. `PicaRunWriterWhitespaceChecks`
+pins both cases.
+
+Note that `PicaText` still trims, which is deliberate for element values like
+`<Width>` and `<Operator>` where surrounding whitespace is formatting.
+
+## It also hides whitespace-only text inside a leaf element
+
+Found again while reading `.docx`, in a worse form. Given
+`<t xml:space="preserve"> </t>`, NSXML reports `childCount` 0 and an empty
+`-stringValue`, so the space is invisible to both accessors — yet `-XMLString`
+round-trips it correctly when the document was parsed with
+`NSXMLNodePreserveWhitespace` (without that option it is genuinely gone).
+
+This matters because Word stores the space between two differently formatted
+runs as its own `<w:t xml:space="preserve"> </w:t>`. Reading it the obvious way
+turns "Address: 01000 Sylvania" into "Address:01000Sylvania".
+
+The workaround, in `PicaElementText` (there is a copy in `RDLDocxReader` and
+one in `RDLParser`, since the two read different vocabularies): parse with
+`NSXMLNodePreserveWhitespace`, and when an element reports itself empty,
+recover its content from `-XMLString`. Only whitespace can have been lost that
+way, since anything else would have come back from `-stringValue`.

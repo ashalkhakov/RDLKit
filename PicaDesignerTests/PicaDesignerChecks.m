@@ -27,6 +27,7 @@
 #import "PicaExpressionHelper.h"
 #import "PicaInspectorFields.h"
 #import "PicaTablixEditor.h"
+#import "PicaNewReportPanel.h"
 
 static void PicaFail(NSMutableArray *fails, NSString *msg) {
   [fails addObject:msg];
@@ -41,7 +42,7 @@ static RDLReport *PicaEditableReport(void) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Rows";
   ds.dataSourceName = @"Demo";
-  ds.fields = @[ @"Sku", @"Amount" ];
+  [ds setFieldNames:@[ @"Sku", @"Amount" ]];
   ds.rows = @[ @{@"Sku" : @"A", @"Amount" : @10} ];
   [r.dataSets addObject:ds];
 
@@ -73,7 +74,7 @@ static RDLReport *PicaGroupedJobs(void) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Jobs";
   ds.dataSourceName = @"Demo";
-  ds.fields = @[ @"Job", @"Finish", @"Amount" ];
+  [ds setFieldNames:@[ @"Job", @"Finish", @"Amount" ]];
   ds.rows = @[
     @{@"Job" : @"Desk", @"Finish" : @"Oil", @"Amount" : @1840},
     @{@"Job" : @"Chair", @"Finish" : @"Oil", @"Amount" : @420},
@@ -775,7 +776,7 @@ NSArray<NSString *> *PicaRunCompletionChecks(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Completion"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Items";
-  ds.fields = @[ @"Sku", @"Amount", @"Note" ];
+  [ds setFieldNames:@[ @"Sku", @"Amount", @"Note" ]];
   [r.dataSets addObject:ds];
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = @"InvoiceNo";
@@ -2051,6 +2052,239 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   return fails;
 }
 
+// The step between the welcome screen and the designer.
+//
+// Everything the panel decides is PicaNewReport's, so most of this needs no
+// window at all; the last part opens the real panel to prove the XIB loads and
+// its buttons are wired, which is the half a hand-written XIB gets wrong.
+static NSString *PicaDesignerFixture(NSString *name) {
+  // ../PicaKitTests/Fixtures, the synthetic Word documents the kit checks use.
+  NSString *tests = [[@(__FILE__) stringByDeletingLastPathComponent]
+      stringByDeletingLastPathComponent];
+  return [[[tests stringByAppendingPathComponent:@"PicaKitTests"]
+      stringByAppendingPathComponent:@"Fixtures"] stringByAppendingPathComponent:name];
+}
+
+NSArray<NSString *> *PicaRunNewReportChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+
+  // Blank: always available, and it is a report rather than nothing.
+  {
+    PicaNewReportOutcome *outcome = [PicaNewReport blankReport];
+    if (outcome.report == nil || outcome.error)
+      PicaFail(fails, @"a blank report should always be makeable");
+    if (outcome.source != PicaNewReportSourceBlank)
+      PicaFail(fails, @"a blank outcome should say so");
+    if ([[outcome details] length])
+      PicaFail(fails, @"a blank report has nothing to report");
+    if ([[outcome summary] length] == 0)
+      PicaFail(fails, @"every outcome needs a summary line");
+  }
+
+  // From a Word document: the report arrives named after the file, carrying
+  // the import's notes and the checker's verdict.
+  {
+    NSURL *url = [NSURL fileURLWithPath:PicaDesignerFixture(@"invoice-two-column.docx")];
+    PicaNewReportOutcome *outcome = [PicaNewReport reportFromWordDocumentAtURL:url];
+    if (outcome.report == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"the fixture should import: %@",
+                                                 [outcome.error localizedDescription]]);
+    } else {
+      if (![outcome.report.name isEqualToString:@"invoice-two-column"])
+        PicaFail(fails, [NSString stringWithFormat:@"the report takes the file's name: %@",
+                                                   outcome.report.name]);
+      if ([outcome.notes count] == 0)
+        PicaFail(fails, @"an import has something to say about what it did");
+      for (RDLDiagnostic *d in outcome.problems)
+        if (d.severity == RDLDiagnosticSeverityError)
+          PicaFail(fails, [NSString stringWithFormat:@"the scaffold should check clean: %@",
+                                                     [d oneLineDescription]]);
+      if ([[outcome summary] rangeOfString:@"field"].location == NSNotFound)
+        PicaFail(fails, [NSString stringWithFormat:@"the summary should mention the fields "
+                                                   @"to supply: '%@'",
+                                                   [outcome summary]]);
+      if ([[outcome details] length] == 0)
+        PicaFail(fails, @"the notes should reach the details text");
+    }
+  }
+
+  // A file that is not a Word document comes back as an outcome carrying the
+  // error, not as a raise and not as an empty report: the panel has to be able
+  // to say what went wrong and stay open.
+  {
+    NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"pica-not-a-docx.docx"];
+    [@"this is not a zip" writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    PicaNewReportOutcome *outcome =
+        [PicaNewReport reportFromWordDocumentAtURL:[NSURL fileURLWithPath:path]];
+    if (outcome.report != nil)
+      PicaFail(fails, @"a file that is not a .docx must not produce a report");
+    if (outcome.error == nil)
+      PicaFail(fails, @"a refused import must say why");
+    if ([[outcome summary] rangeOfString:@"Could not read"].location == NSNotFound)
+      PicaFail(fails, [NSString stringWithFormat:@"the failure summary reads oddly: '%@'",
+                                                 [outcome summary]]);
+    [[NSFileManager defaultManager] removeItemAtPath:path error:NULL];
+  }
+
+  // A missing file, which is the other way the panel can be handed nothing.
+  {
+    PicaNewReportOutcome *outcome = [PicaNewReport
+        reportFromWordDocumentAtURL:[NSURL fileURLWithPath:@"/nowhere/absent.docx"]];
+    if (outcome.report != nil || outcome.error == nil)
+      PicaFail(fails, @"a missing file should come back as an error");
+  }
+  return fails;
+}
+
+// Opening the tablix editor on a scaffolded report.
+//
+// The path that crashed: import a Word document, right-click the last tablix --
+// a layout table -- and edit it. Its dataset has no fields, so the editor's
+// popups were filled from another table's, whose entries are RDLField objects
+// rather than names; -addItemWithTitle: was handed an RDLField and the menu
+// action raised. Every scaffolded tablix now names a dataset of its own, which
+// removes the fallback, and the popups read names through -fieldNames, which
+// removes the crash. This checks both by opening the editor on the tablix whose
+// dataset is the empty one.
+NSArray<NSString *> *PicaRunScaffoldedTablixEditorChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSString *fixture = PicaDesignerFixture(@"invoice-header-image.docx");
+  NSData *docx = [NSData dataWithContentsOfFile:fixture];
+  if (docx == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"missing fixture %@", fixture]);
+    return fails;
+  }
+  NSError *err = nil;
+  RDLReport *report = [RDLImporter reportFromDocxData:docx error:&err];
+  if (report == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"the fixture should import: %@",
+                                               [err localizedDescription]]);
+    return fails;
+  }
+  // The scaffold has to be the shape that broke: a dataset of RDLField objects,
+  // and a tablix that does not name one.
+  BOOL sawRealField = NO;
+  for (RDLDataSet *ds in report.dataSets)
+    for (id f in ds.fields)
+      if ([f isKindOfClass:[RDLField class]])
+        sawRealField = YES;
+  if (!sawRealField)
+    PicaFail(fails, @"this check is pointless unless the import declares RDLField objects");
+
+  // Every tablix must name a dataset -- a data region pointing at nothing is
+  // what let the editor reach for another table's fields in the first place.
+  RDLTablix *layout = nil;
+  for (RDLItem *it in report.body.items) {
+    if (![it isKindOfClass:[RDLTablix class]])
+      continue;
+    RDLTablix *tablix = (RDLTablix *)it;
+    if ([tablix.dataSetName length] == 0) {
+      PicaFail(fails, [NSString stringWithFormat:@"%@ names no dataset", tablix.name]);
+      continue;
+    }
+    for (RDLDataSet *ds in report.dataSets)
+      if ([ds.name isEqualToString:tablix.dataSetName] && [ds.fields count] == 0)
+        layout = tablix;
+  }
+  if (layout == nil) {
+    PicaFail(fails, @"expected a layout tablix bound to an empty dataset");
+    return fails;
+  }
+
+  PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:report];
+  PicaDialogClicker *clicker = nil;
+  // Cancel, because the point is opening it at all.
+  PicaRunTablixDialog(layout, ctx, @"Cancel", &clicker);
+  if (!clicker.sawModal)
+    PicaFail(fails, @"the tablix editor never opened on a scaffolded report");
+  if (!clicker.foundButton)
+    PicaFail(fails, @"no Cancel button -- the editor did not build its panel");
+  if ([NSApp modalWindow] != nil)
+    PicaFail(fails, @"a modal session was left running");
+  return fails;
+}
+
+// File > New Report has to keep reaching the wizard.
+//
+// The app delegate and the menu bar are not in this bundle -- the test target
+// compiles the plain objects, not the window shell -- so the wiring is checked
+// where it actually lives, in the XIB. The failure this guards against is
+// silent: rename the action and the menu item still draws, still enables, and
+// does nothing.
+NSArray<NSString *> *PicaRunMenuWiringChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSString *path = [[[@(__FILE__) stringByDeletingLastPathComponent]
+      stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"PicaDesigner/MainMenu.xib"];
+  NSError *err = nil;
+  NSString *xib = [NSString stringWithContentsOfFile:path
+                                            encoding:NSUTF8StringEncoding
+                                               error:&err];
+  if (xib == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"cannot read %@: %@", path,
+                                               [err localizedDescription]]);
+    return fails;
+  }
+  if ([xib rangeOfString:@"title=\"New Report…\""].location == NSNotFound)
+    PicaFail(fails, @"the File menu should offer New Report…, which opens the wizard");
+  // The item and its action, in that order and close together, so this does
+  // not pass on an unrelated newDocument: elsewhere in the menu bar.
+  NSRange item = [xib rangeOfString:@"id=\"newItem\""];
+  if (item.location == NSNotFound) {
+    PicaFail(fails, @"the New Report menu item is gone");
+  } else {
+    NSString *rest = [xib substringFromIndex:NSMaxRange(item)];
+    NSRange action = [rest rangeOfString:@"newDocument:"];
+    NSRange nextItem = [rest rangeOfString:@"<menuItem"];
+    if (action.location == NSNotFound ||
+        (nextItem.location != NSNotFound && action.location > nextItem.location))
+      PicaFail(fails, @"New Report… no longer sends -newDocument:, so it does nothing");
+  }
+  return fails;
+}
+
+// The panel itself: does the XIB load, are the outlets connected, do the
+// buttons end the modal session. Cancel and Create are run separately because
+// the failures in this app's other dialogs have all been on the second opening.
+NSArray<NSString *> *PicaRunNewReportPanelChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  for (NSInteger round = 1; round <= 4; round++) {
+    BOOL accept = (round % 2) == 0;
+    PicaDialogClicker *clicker = [[PicaDialogClicker alloc] init];
+    clicker.title = accept ? @"Create" : @"Cancel";
+    NSTimer *click = [NSTimer timerWithTimeInterval:0.05 target:clicker
+                                           selector:@selector(click)
+                                           userInfo:nil repeats:NO];
+    NSTimer *bail = [NSTimer timerWithTimeInterval:10.0 target:clicker
+                                          selector:@selector(bail)
+                                          userInfo:nil repeats:NO];
+    for (NSTimer *t in @[ click, bail ])
+      [[NSRunLoop currentRunLoop] addTimer:t forMode:NSModalPanelRunLoopMode];
+    PicaNewReportOutcome *outcome = [PicaNewReportPanel run];
+    [bail invalidate];
+
+    if (!clicker.sawModal)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: the panel never became modal",
+                                                 (long)round]);
+    if (!clicker.foundButton)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: no %@ button -- the XIB did not "
+                                                 @"load, or its buttons are not connected",
+                                                 (long)round, clicker.title]);
+    if ([NSApp modalWindow] != nil)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: a modal session was left running",
+                                                 (long)round]);
+    // The panel opens on Blank, so Create is enabled and yields a report;
+    // Cancel yields nothing at all.
+    if (accept && outcome.report == nil)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: Create produced no report",
+                                                 (long)round]);
+    if (!accept && outcome != nil)
+      PicaFail(fails, [NSString stringWithFormat:@"round %ld: Cancel should produce nothing",
+                                                 (long)round]);
+  }
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunDocumentChecks()];
@@ -2067,6 +2301,10 @@ NSArray<NSString *> *PicaRunAllDesignerChecks(void) {
   [fails addObjectsFromArray:PicaRunTablixGeometryChecks()];
   [fails addObjectsFromArray:PicaRunFieldBindingChecks()];
   [fails addObjectsFromArray:PicaRunDialogLifecycleChecks()];
+  [fails addObjectsFromArray:PicaRunNewReportChecks()];
+  [fails addObjectsFromArray:PicaRunNewReportPanelChecks()];
+  [fails addObjectsFromArray:PicaRunMenuWiringChecks()];
+  [fails addObjectsFromArray:PicaRunScaffoldedTablixEditorChecks()];
   [fails addObjectsFromArray:PicaRunExportChecks()];
   [fails addObjectsFromArray:PicaRunSharedPipelineChecks()];
   [fails addObjectsFromArray:PicaRunSampleFitChecks()];

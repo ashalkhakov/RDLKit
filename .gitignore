@@ -55,3 +55,8 @@ obj/
 
 # OS
 .DS_Store
+
+# Real documents used to develop the .docx importer. They contain names,
+# addresses and account numbers; the committed fixtures in
+# PicaKitTests/Fixtures are scrubbed copies of them.
+/*.docx

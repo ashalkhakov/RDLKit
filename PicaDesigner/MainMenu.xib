@@ -51,7 +51,7 @@
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="fileSep1"/>
-                            <menuItem title="New Letter" keyEquivalent="n" id="newItem">
+                            <menuItem title="New Report…" keyEquivalent="n" id="newItem">
                                 <connections>
                                     <action selector="newDocument:" target="-2" id="newAction"/>
                                 </connections>

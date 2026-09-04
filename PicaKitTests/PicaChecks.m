@@ -24,7 +24,7 @@ static RDLReport *PicaMiniInvoice(void) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Items";
   ds.dataSourceName = @"Demo";
-  ds.fields = @[ @"Sku", @"Amount" ];
+  [ds setFieldNames:@[ @"Sku", @"Amount" ]];
   ds.rows = @[
     @{@"Sku" : @"W1", @"Amount" : @10},
     @{@"Sku" : @"W2", @"Amount" : @5},
@@ -365,7 +365,7 @@ NSArray<NSString *> *PicaRunExpressionLangChecks(void) {
   RDLDataSet *cat = [[RDLDataSet alloc] init];
   cat.name = @"Catalog";
   cat.dataSourceName = @"Demo";
-  cat.fields = @[ @"Sku", @"Kind" ];
+  [cat setFieldNames:@[ @"Sku", @"Kind" ]];
   cat.rows = @[
     @{@"Sku" : @"W1", @"Kind" : @"Desk"},
     @{@"Sku" : @"W2", @"Kind" : @"Chair"},
@@ -575,10 +575,12 @@ NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void) {
                                                  v, tb2.value]);
   }
 
-  // Known limitation, pinned so a change in behaviour is noticed: NSXML's
-  // reader drops a text node that is only whitespace, so a value of "   "
-  // cannot survive a save. xml:space="preserve" and NSXMLNodePreserveWhitespace
-  // both fail to bring it back -- see ../Patches.
+  // A value that is *only* whitespace used to be lost: NSXML's reader hides a
+  // text node with nothing but spaces in it, reporting the element empty. It
+  // survives now because the parser recovers such text from -XMLString (see
+  // PicaElementText in RDLParser.m), and because a textbox value round-trips
+  // through a TextRun rather than a bare element. Pinned, since the recovery is
+  // subtle enough to be refactored away by accident.
   RDLReport *r = [RDLReport emptyReportNamed:@"WS"];
   RDLTextbox *tb = [[RDLTextbox alloc] init];
   tb.name = @"T";
@@ -589,11 +591,39 @@ NSArray<NSString *> *PicaRunWriterWhitespaceChecks(void) {
   NSError *err = nil;
   RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
   RDLTextbox *tb2 = (RDLTextbox *)back.body.items.firstObject;
-  if ([tb2.value length] != 0)
+  if (![tb2.value isEqualToString:@"   "])
     PicaFail(fails, [NSString stringWithFormat:
-                                  @"whitespace-only value now survives ('%@') -- good news, but "
-                                  @"the Patches note and this check need updating",
-                                  tb2.value]);
+                                  @"whitespace-only value lost: came back as '%@'", tb2.value]);
+
+  // The case that made this worth fixing: a single space between two
+  // differently styled runs, which is how "Foo Baz" is stored.
+  RDLReport *r2 = [RDLReport emptyReportNamed:@"WS2"];
+  RDLTextbox *sp = [[RDLTextbox alloc] init];
+  sp.name = @"S";
+  sp.width = 2;
+  sp.height = 0.3;
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  NSArray *texts = @[ @"Foo", @" ", @"Baz" ];
+  for (NSString *t in texts) {
+    RDLTextRun *run = [[RDLTextRun alloc] init];
+    run.value = t;
+    [para.runs addObject:run];
+  }
+  sp.paragraphs = [NSMutableArray arrayWithObject:para];
+  [r2.body.items addObject:sp];
+  RDLReport *back2 = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r2] error:&err];
+  RDLTextbox *sp2 = (RDLTextbox *)back2.body.items.firstObject;
+  // Unstyled runs are not kept as runs -- the parser collapses a paragraph that
+  // needs no formatting back into a plain value -- so check whichever form
+  // came back.
+  NSMutableString *joined = [NSMutableString string];
+  for (RDLTextRun *run in [[sp2.paragraphs firstObject] runs])
+    [joined appendString:run.value ?: @""];
+  if ([joined length] == 0)
+    [joined appendString:sp2.value ?: @""];
+  if (![joined isEqualToString:@"Foo Baz"])
+    PicaFail(fails, [NSString stringWithFormat:
+                                  @"space between styled runs lost: '%@'", joined]);
   return fails;
 }
 
@@ -704,7 +734,7 @@ static RDLReport *PicaGroupedJobs(void) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Jobs";
   ds.dataSourceName = @"Demo";
-  ds.fields = @[ @"Job", @"Finish", @"Amount" ];
+  [ds setFieldNames:@[ @"Job", @"Finish", @"Amount" ]];
   ds.rows = @[
     @{@"Job" : @"Desk", @"Finish" : @"Oil", @"Amount" : @1840},
     @{@"Job" : @"Chair", @"Finish" : @"Oil", @"Amount" : @420},
@@ -1629,7 +1659,7 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Items";
   ds.dataSourceName = @"Demo";
-  ds.fields = @[ @"Sku", @"Amount" ];
+  [ds setFieldNames:@[ @"Sku", @"Amount" ]];
   ds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
   [sr.dataSets addObject:ds];
   RDLTextbox *tb = [[RDLTextbox alloc] init];
@@ -1727,7 +1757,7 @@ NSArray<NSString *> *PicaRunRDLSubsetChecks(void) {
   RDLDataSet *fds = [[RDLDataSet alloc] init];
   fds.name = @"Items";
   fds.dataSourceName = @"Demo";
-  fds.fields = @[ @"Sku", @"Amount" ];
+  [fds setFieldNames:@[ @"Sku", @"Amount" ]];
   fds.rows = @[ @{@"Sku" : @"W1", @"Amount" : @10}, @{@"Sku" : @"W2", @"Amount" : @5} ];
   RDLFilter *ff = [[RDLFilter alloc] init];
   ff.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
@@ -2427,7 +2457,7 @@ NSArray<NSString *> *PicaRunValueChecks(void) {
 
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"D";
-  ds.fields = @[ @"Amount" ];
+  [ds setFieldNames:@[ @"Amount" ]];
   RDLField *calc = [[RDLField alloc] init];
   calc.name = @"Double";
   calc.value = [RDLValue valueWithSource:@"=Fields!Amount.Value * 2"];
@@ -2581,7 +2611,7 @@ NSArray<NSString *> *PicaRunTablixFitChecks(void) {
   // The point of all of it: one page, not a horizontal spill.
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"D";
-  ds.fields = @[ @"A", @"B", @"C", @"D", @"G" ];
+  [ds setFieldNames:@[ @"A", @"B", @"C", @"D", @"G" ]];
   ds.rows = @[ @{@"A" : @"one", @"B" : @1, @"C" : @2, @"D" : @3, @"G" : @"x"} ];
   [r.dataSets addObject:ds];
   RDLReport *single = [RDLReport emptyReportNamed:@"Fit1"];
@@ -3179,7 +3209,7 @@ NSArray<NSString *> *PicaRunCheckerChecks(void) {
     // Union: both sets, in order, without repeats.
     RDLDataSet *ds = [[RDLDataSet alloc] init];
     ds.name = @"Cities";
-    ds.fields = @[ @"City" ];
+    [ds setFieldNames:@[ @"City" ]];
     ds.rows = @[ @{@"City" : @"Leeds"}, @{@"City" : @"York"} ];
     [sc.report.dataSets addObject:ds];
     sc.dataSet = ds;
@@ -3200,7 +3230,7 @@ NSArray<NSString *> *PicaRunCheckerChecks(void) {
     RDLReport *r = [RDLReport emptyReportNamed:@"Scopes"];
     RDLDataSet *ds = [[RDLDataSet alloc] init];
     ds.name = @"Sales";
-    ds.fields = @[ @"Region", @"City", @"Amount" ];
+    [ds setFieldNames:@[ @"Region", @"City", @"Amount" ]];
     ds.rows = @[ @{@"Region" : @"North", @"City" : @"Leeds", @"Amount" : @10},
                  @{@"Region" : @"North", @"City" : @"York", @"Amount" : @20} ];
     [r.dataSets addObject:ds];
@@ -3239,7 +3269,7 @@ NSArray<NSString *> *PicaRunCheckerChecks(void) {
     RDLReport *r = PicaCheckableReport();
     RDLDataSet *ds = r.dataSets.firstObject;
     // NSDate answers to KVC, and has the properties to prove the path works.
-    ds.fields = @[ @"timeIntervalSince1970" ];
+    [ds setFieldNames:@[ @"timeIntervalSince1970" ]];
     ds.rows = @[ [NSDate dateWithTimeIntervalSince1970:1000] ];
     RDLEvalScope *sc = [[RDLEvalScope alloc] init];
     sc.report = r;
@@ -3261,7 +3291,7 @@ NSArray<NSString *> *PicaRunCheckerChecks(void) {
   {
     RDLReport *r = PicaCheckableReport();
     RDLDataSet *ds = r.dataSets.firstObject;
-    ds.fields = @[ @"Amount" ];
+    [ds setFieldNames:@[ @"Amount" ]];
     RDLEvalScope *sc = [[RDLEvalScope alloc] init];
     sc.report = r;
     sc.dataSet = ds;
@@ -3374,6 +3404,1355 @@ NSArray<NSString *> *PicaRunCheckerChecks(void) {
   return fails;
 }
 
+#pragma mark - Reading a .docx container
+
+// A real .docx, small but complete: a heading, merge fields written both the
+// simple and the complex way, a table whose first row is marked to repeat, and
+// a two-column section. Embedded rather than kept beside the tests, so the
+// check needs no bundle resources and runs the same everywhere.
+static NSData *PicaSampleDocx(void) {
+  NSString *base64 = [@[
+    @"UEsDBBQAAAAIACixI10CxKfs2AAAAEsBAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbH2QzU4DMQyEXyXKFe1m4YAQ2mwP/ByB"
+    @"Q3kAK/FuoyZOlLilfXu8FPXAgaP9zYxHHjenFNURawuZrL7tB62QXPaBFqs/t6/dg1aNgTzETGj1GZveTOP2XLAp8VKzesdc"
+    @"Ho1pbocJWp8LkpA51wQsY11MAbeHBc3dMNwbl4mRuOM1Q0/jM85wiKxeTrK+9BC7Vk8X3XrKaiglBgcs2KzUTOO71K7Bo/qA"
+    @"ym+QRGW+cvXGZ3dI4uz/jzmS/9O1y/McHF79a1qp2WFr8o8U+ytJEOjmt4f5ecb0DVBLAwQUAAAACAAosSNdm/036q0AAAAp"
+    @"AQAACwAAAF9yZWxzLy5yZWxzjc87DsIwDAbgq0TeaVoGhFDTLgipKyoHsBI3rWgeSsKjtycDA0UMjLZ/f5br9mlmdqcQJ2cF"
+    @"VEUJjKx0arJawKU/bfbAYkKrcHaWBCwUoW3qM82Y8kocJx9ZNmwUMKbkD5xHOZLBWDhPNk8GFwymXAbNPcorauLbstzx8GnA"
+    @"2mSdEhA6VQHrF0//2G4YJklHJ2+GbPpx4iuRZQyakoCHC4qrd7vILPCm5qsXmxdQSwMEFAAAAAgAKLEjXUX+BU84AwAApgwA"
+    @"ABEAAAB3b3JkL2RvY3VtZW50LnhtbMVX23LaMBD9FY07k4dOG4NLgYGQTEKundB2Etq89EW2F6xiSx5JhpCv71q+QKkBp5NM"
+    @"eLAuK509uyutlqOTxygkc5CKCT6wmocNiwD3hM/4dGD9GF9+7FpEacp9GgoOA2sJyjo5Plr0fOElEXBNEICr3mJgBVrHPdtW"
+    @"XgARVYciBo6yiZAR1TiUU3shpB9L4YFSiB+FttNotO2IMm7lMLIOjJhMmAfnOYEMREJINdqgAhYrKyXoCn+ZtrH5fJemudfL"
+    @"EMiiN6fhwLoGmtrZtOxUJhIdMg6387CQNzKBiqmHy3CWTjQgQ6dlJHYJm32yvpvteSpAWt0MRV4KrlUKojzGBtYVoCmM5kD5"
+    @"ZuNNoxBdHUtQIOdgHY9ASubNyAGN4j75SUNI9+hsZ0Zk09KapLcovOFzgS4m6HXyl6pFbxL69yyKjRcZVxqhyeji7uri8ubi"
+    @"9pwME6VFBPIrjYD8ep+Lvt2NTsfE2qf24F2z0+yvQ+BMt9PftLbksA/wA/GpBn/ThsKQYUAlKXvjZYybXZjicbQ3FhtLx/C4"
+    @"Rc+6B3LfnaPiTQekmCVSPToKYioR6h9GO124xqHCg7s1AvfrKjt8/jFsOs84hmOQkepVRi+/MKzO9eGgyadGFcq2cB686zpN"
+    @"p79Lc1Jc8DSVhZBdck+EQhaCYSP91brgAjOwn8AOdXho2AzqYBHjaaIDqivDo90wb64k89PuFNuhSNMeZvFWznljGuNWOd0u"
+    @"LVwD1Bm/gqcbppkWZL6umPaybzF6WNOPXW0Oo/9YZMhiYVyVcPc65YtwK5xhr1hUcjFGvziXa5FI9T9s2q/B5jQSCa86KTkd"
+    @"exXOF4naFhoPNOSJJgvJdJovfFCzVw3YFhpN51UDs01rt9V4+wgEDF8sQWdEMR+IF1Am3yIE7beIQMvZHwC7zJ3rL9xvr8j3"
+    @"HhajIDdrRhewiIKy/sJ9dApnEujszEjqP4YB5TOyFImpyrCVxDOVUvUrrMDTufHT+6ciNikL7AfY/9wtGU1HpgzQIsb5VrZE"
+    @"smmgV0NXaFS1GocwWZMGJr8PrI5jhhMhdDEs3sW09OUJIjjpity6TlkNFHTtonC3V38xjv8AUEsBAhQDFAAAAAgAKLEjXQLE"
+    @"p+zYAAAASwEAABMAAAAAAAAAAAAAAIABAAAAAFtDb250ZW50X1R5cGVzXS54bWxQSwECFAMUAAAACAAosSNdm/036q0AAAAp"
+    @"AQAACwAAAAAAAAAAAAAAgAEJAQAAX3JlbHMvLnJlbHNQSwECFAMUAAAACAAosSNdRf4FTzgDAACmDAAAEQAAAAAAAAAAAAAA"
+    @"gAHfAQAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAMAAwC5AAAARgUAAAAA"
+  ] componentsJoinedByString:@""];
+  return [[NSData alloc] initWithBase64EncodedString:base64 options:0];
+}
+
+NSArray<NSString *> *PicaRunZipChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // Something that is not a ZIP is refused rather than half-read.
+  if ([RDLZipArchive archiveWithData:[@"not a zip at all" dataUsingEncoding:NSUTF8StringEncoding]
+                               error:&err] != nil)
+    PicaFail(fails, @"a file with no end-of-central-directory record should be refused");
+  if ([RDLZipArchive archiveWithData:[NSData data] error:&err] != nil)
+    PicaFail(fails, @"an empty file should be refused");
+
+  NSData *docx = PicaSampleDocx();
+  RDLZipArchive *zip = [RDLZipArchive archiveWithData:docx error:&err];
+  if (zip == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"the sample .docx was refused: %@",
+                                               err.localizedDescription]);
+    return fails;
+  }
+  if (![zip.entryNames containsObject:@"word/document.xml"])
+    PicaFail(fails, [NSString stringWithFormat:@"entries were %@", zip.entryNames]);
+  if ([zip dataForEntryNamed:@"word/nothing-here.xml"] != nil)
+    PicaFail(fails, @"asking for an entry that is not there should give nil");
+
+  NSData *document = [zip dataForEntryNamed:@"word/document.xml"];
+  if ([document length] == 0) {
+    PicaFail(fails, @"word/document.xml should inflate to something");
+    return fails;
+  }
+  // Inflated correctly means it parses, not merely that bytes came back.
+  NSXMLDocument *xml = [[NSXMLDocument alloc] initWithData:document options:0 error:&err];
+  if (xml == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"inflated document.xml did not parse: %@",
+                                               err.localizedDescription]);
+    return fails;
+  }
+  // The constructs the importer will have to find.
+  struct { NSString *name; NSUInteger least; } wanted[] = {
+    {@"p", 4}, {@"tbl", 1}, {@"tblHeader", 1}, {@"gridCol", 3}, {@"cols", 1},
+  };
+  for (NSUInteger i = 0; i < sizeof(wanted) / sizeof(*wanted); i++) {
+    NSString *path = [NSString stringWithFormat:@"//*[local-name()='%@']", wanted[i].name];
+    NSUInteger found = [[xml nodesForXPath:path error:NULL] count];
+    if (found < wanted[i].least)
+      PicaFail(fails, [NSString stringWithFormat:@"expected at least %lu <w:%@>, found %lu",
+                                                 (unsigned long)wanted[i].least, wanted[i].name,
+                                                 (unsigned long)found]);
+  }
+  NSString *text = [[NSString alloc] initWithData:document encoding:NSUTF8StringEncoding];
+  if ([text rangeOfString:@"MERGEFIELD CustomerName"].location == NSNotFound ||
+      [text rangeOfString:@"MERGEFIELD InvoiceDate"].location == NSNotFound)
+    PicaFail(fails, @"both merge fields should survive the round trip through zlib");
+  return fails;
+}
+
+#pragma mark - Reading a Word document
+
+// Build a .docx in memory. The entries are *stored* rather than deflated,
+// which needs no compressor and which RDLZipArchive reads just as happily --
+// so a check can state the WordprocessingML it is about rather than hiding it
+// in a base64 blob.
+static void PicaAppendU16(NSMutableData *d, uint16_t v) {
+  uint8_t b[2] = {(uint8_t)(v & 0xFF), (uint8_t)(v >> 8)};
+  [d appendBytes:b length:2];
+}
+static void PicaAppendU32(NSMutableData *d, uint32_t v) {
+  uint8_t b[4] = {(uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF), (uint8_t)((v >> 16) & 0xFF),
+                  (uint8_t)((v >> 24) & 0xFF)};
+  [d appendBytes:b length:4];
+}
+
+static NSData *PicaStoredZip(NSDictionary<NSString *, NSString *> *parts) {
+  NSMutableData *out = [NSMutableData data];
+  NSMutableArray *offsets = [NSMutableArray array];
+  NSArray *names = [[parts allKeys] sortedArrayUsingSelector:@selector(compare:)];
+  for (NSString *name in names) {
+    NSData *nameBytes = [name dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *body = [parts[name] dataUsingEncoding:NSUTF8StringEncoding];
+    [offsets addObject:@([out length])];
+    PicaAppendU32(out, 0x04034b50);           // local file header
+    PicaAppendU16(out, 10);                   // version needed
+    PicaAppendU16(out, 0);                    // flags
+    PicaAppendU16(out, 0);                    // stored
+    PicaAppendU16(out, 0);                    // time
+    PicaAppendU16(out, 0);                    // date
+    PicaAppendU32(out, 0);                    // crc, which the reader does not check
+    PicaAppendU32(out, (uint32_t)[body length]);
+    PicaAppendU32(out, (uint32_t)[body length]);
+    PicaAppendU16(out, (uint16_t)[nameBytes length]);
+    PicaAppendU16(out, 0);                    // extra length
+    [out appendData:nameBytes];
+    [out appendData:body];
+  }
+  NSUInteger directoryStart = [out length];
+  for (NSUInteger i = 0; i < [names count]; i++) {
+    NSData *nameBytes = [names[i] dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *body = [parts[names[i]] dataUsingEncoding:NSUTF8StringEncoding];
+    PicaAppendU32(out, 0x02014b50);           // central file header
+    PicaAppendU16(out, 20);                   // version made by
+    PicaAppendU16(out, 10);                   // version needed
+    PicaAppendU16(out, 0);                    // flags
+    PicaAppendU16(out, 0);                    // stored
+    PicaAppendU16(out, 0);
+    PicaAppendU16(out, 0);
+    PicaAppendU32(out, 0);
+    PicaAppendU32(out, (uint32_t)[body length]);
+    PicaAppendU32(out, (uint32_t)[body length]);
+    PicaAppendU16(out, (uint16_t)[nameBytes length]);
+    PicaAppendU16(out, 0);                    // extra
+    PicaAppendU16(out, 0);                    // comment
+    PicaAppendU16(out, 0);                    // disk
+    PicaAppendU16(out, 0);                    // internal attrs
+    PicaAppendU32(out, 0);                    // external attrs
+    PicaAppendU32(out, (uint32_t)[offsets[i] unsignedIntegerValue]);
+    [out appendData:nameBytes];
+  }
+  NSUInteger directoryLength = [out length] - directoryStart;
+  PicaAppendU32(out, 0x06054b50);             // end of central directory
+  PicaAppendU16(out, 0);
+  PicaAppendU16(out, 0);
+  PicaAppendU16(out, (uint16_t)[names count]);
+  PicaAppendU16(out, (uint16_t)[names count]);
+  PicaAppendU32(out, (uint32_t)directoryLength);
+  PicaAppendU32(out, (uint32_t)directoryStart);
+  PicaAppendU16(out, 0);                      // comment length
+  return out;
+}
+
+static NSData *PicaDocxWithParts(NSString *bodyXML, NSDictionary<NSString *, NSString *> *extra) {
+  NSString *ns = @"xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" "
+                  "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" "
+                  "xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" "
+                  "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+                  "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"";
+  NSMutableDictionary *parts = [extra mutableCopy] ?: [NSMutableDictionary dictionary];
+  parts[@"word/document.xml"] =
+      [NSString stringWithFormat:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                                 @"<w:document %@><w:body>%@</w:body></w:document>",
+                                 ns, bodyXML];
+  return PicaStoredZip(parts);
+}
+
+static NSData *PicaDocxWithBodyAndStyles(NSString *bodyXML, NSString *stylesXML) {
+  NSString *ns = @"xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" "
+                  "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"";
+  NSString *document =
+      [NSString stringWithFormat:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                                 @"<w:document %@><w:body>%@</w:body></w:document>",
+                                 ns, bodyXML];
+  if (stylesXML == nil)
+    return PicaStoredZip(@{@"word/document.xml" : document});
+  NSString *styles = [NSString stringWithFormat:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                                                @"<w:styles %@>%@</w:styles>",
+                                                ns, stylesXML];
+  return PicaStoredZip(@{@"word/document.xml" : document, @"word/styles.xml" : styles});
+}
+
+static NSData *PicaDocxWithBody(NSString *bodyXML) {
+  return PicaDocxWithBodyAndStyles(bodyXML, nil);
+}
+
+NSArray<NSString *> *PicaRunDocxChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  if ([RDLDocxReader documentFromData:PicaStoredZip(@{@"hello.txt" : @"not a word file"})
+                                error:&err] != nil)
+    PicaFail(fails, @"a zip without word/document.xml is not a Word document");
+
+  // Spaces between differently formatted runs live in their own
+  // `<w:t xml:space="preserve"> </w:t>`, which NSXML exposes as empty. Reading
+  // it naively ran words together: "Address:03124Ukraine".
+  {
+    NSString *body = @"<w:p>"
+                      "<w:r><w:t>Address:</w:t></w:r>"
+                      "<w:r><w:t xml:space=\"preserve\"> </w:t></w:r>"
+                      "<w:r><w:t>03124</w:t></w:r>"
+                      "<w:r><w:t xml:space=\"preserve\"> </w:t></w:r>"
+                      "<w:r><w:t>Ukraine</w:t></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    NSMutableString *text = [NSMutableString string];
+    for (RDLImportRun *r in [[doc.blocks firstObject] runs])
+      [text appendString:r.text ?: @""];
+    if (![text isEqualToString:@"Address: 03124 Ukraine"])
+      PicaFail(fails, [NSString stringWithFormat:@"whitespace-only runs were lost: '%@'", text]);
+  }
+
+  // Placeholders. Word splits them across runs wherever it likes, so the
+  // search has to run over the paragraph's joined text.
+  {
+    NSString *body = @"<w:p><w:r><w:t>No: {inv</w:t></w:r>"
+                      "<w:r><w:t>oice_number} for </w:t></w:r>"
+                      "<w:r><w:rPr><w:b/></w:rPr><w:t>{customer}</w:t></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    if (![doc.fieldNames isEqualToArray:(@[ @"invoice_number", @"customer" ])])
+      PicaFail(fails, [NSString stringWithFormat:@"fields → %@", doc.fieldNames]);
+    NSArray<RDLImportRun *> *runs = [[doc.blocks firstObject] runs];
+    NSMutableArray *shape = [NSMutableArray array];
+    for (RDLImportRun *r in runs)
+      [shape addObject:r.fieldName ? [@"<" stringByAppendingString:r.fieldName] : r.text];
+    if (![shape isEqualToArray:(@[ @"No: ", @"<invoice_number", @" for ", @"<customer" ])])
+      PicaFail(fails, [NSString stringWithFormat:@"a split placeholder was not rejoined: %@", shape]);
+  }
+
+  // «…» is punctuation in several languages and must not be read as a field.
+  {
+    NSString *body = @"<w:p><w:r><w:t>JSC «NORTHERN BANK»</w:t></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    if ([doc.fieldNames count] != 0)
+      PicaFail(fails, [NSString stringWithFormat:@"guillemets are not a placeholder: %@",
+                                                 doc.fieldNames]);
+  }
+
+  // MERGEFIELD, written the short way and the long way Word actually uses.
+  {
+    NSString *body =
+        @"<w:p><w:fldSimple w:instr=\" MERGEFIELD Simple \\* MERGEFORMAT \">"
+         "<w:r><w:t>«Simple»</w:t></w:r></w:fldSimple></w:p>"
+         "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>"
+         "<w:r><w:instrText xml:space=\"preserve\"> MERGEFIELD Complex </w:instrText></w:r>"
+         "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>"
+         "<w:r><w:t>«Complex»</w:t></w:r>"
+         "<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    if (![doc.fieldNames isEqualToArray:(@[ @"Simple", @"Complex" ])])
+      PicaFail(fails, [NSString stringWithFormat:@"merge fields → %@", doc.fieldNames]);
+    // The display text Word caches is not kept: the name is what matters.
+    for (RDLImportBlock *b in doc.blocks)
+      for (RDLImportRun *r in b.runs)
+        if (r.fieldName == nil && [r.text rangeOfString:@"«"].location != NSNotFound)
+          PicaFail(fails, @"a merge field's cached display text should not survive as literal text");
+  }
+
+  // A table: grid widths, the repeating header row, and merged cells.
+  {
+    NSString *body =
+        @"<w:tbl><w:tblGrid><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"2880\"/>"
+         "<w:gridCol w:w=\"1440\"/></w:tblGrid>"
+         "<w:tr><w:trPr><w:tblHeader/></w:trPr>"
+         "<w:tc><w:p><w:r><w:t>A</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>B</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>C</w:t></w:r></w:p></w:tc></w:tr>"
+         "<w:tr><w:tc><w:tcPr><w:gridSpan w:val=\"2\"/></w:tcPr>"
+         "<w:p><w:r><w:t>Total</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>{amount}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    RDLImportBlock *table = [doc.blocks firstObject];
+    if (table.kind != RDLImportBlockTable) {
+      PicaFail(fails, @"a w:tbl should read as a table block");
+    } else {
+      NSArray *widths = @[ @1.0, @2.0, @1.0 ]; // twips / 1440
+      for (NSUInteger i = 0; i < [widths count]; i++)
+        if (fabs([table.columnWidths[i] doubleValue] - [widths[i] doubleValue]) > 0.001)
+          PicaFail(fails, [NSString stringWithFormat:@"column %lu width → %@", (unsigned long)i,
+                                                     table.columnWidths[i]]);
+      if (![[table.rows firstObject] isHeader])
+        PicaFail(fails, @"w:tblHeader marks a row that repeats on every page");
+      if ([[table.rows lastObject] isHeader])
+        PicaFail(fails, @"an ordinary row is not a header");
+      RDLImportCell *merged = [[[table.rows lastObject] cells] firstObject];
+      if (merged.columnSpan != 2)
+        PicaFail(fails, [NSString stringWithFormat:@"w:gridSpan → %ld", (long)merged.columnSpan]);
+      if (![doc.fieldNames containsObject:@"amount"])
+        PicaFail(fails, @"a placeholder inside a table cell should be found");
+    }
+  }
+
+  // Sections: page setup, and the column count that a multi-column section
+  // declares. A sectPr on a paragraph ends a section; the one under the body
+  // is the last.
+  {
+    NSString *body =
+        @"<w:p><w:pPr><w:sectPr><w:pgSz w:w=\"11910\" w:h=\"16840\"/>"
+         "<w:pgMar w:left=\"900\" w:right=\"1220\" w:top=\"1280\" w:bottom=\"280\"/>"
+         "<w:cols w:num=\"2\" w:space=\"720\"/></w:sectPr></w:pPr>"
+         "<w:r><w:t>first</w:t></w:r></w:p>"
+         "<w:p><w:r><w:t>second</w:t></w:r></w:p>"
+         "<w:sectPr><w:pgSz w:w=\"11910\" w:h=\"16840\"/><w:cols/></w:sectPr>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    if ([doc.sections count] != 2) {
+      PicaFail(fails, [NSString stringWithFormat:@"sections → %lu",
+                                                 (unsigned long)[doc.sections count]]);
+    } else {
+      RDLImportSection *first = doc.sections[0];
+      if (fabs(first.pageWidth - 8.2708) > 0.01 || fabs(first.pageHeight - 11.694) > 0.01)
+        PicaFail(fails, [NSString stringWithFormat:@"A4 page → %.3f x %.3f", first.pageWidth,
+                                                   first.pageHeight]);
+      if (fabs(first.marginLeft - 0.625) > 0.01)
+        PicaFail(fails, [NSString stringWithFormat:@"left margin → %.3f", first.marginLeft]);
+      if (first.columnCount != 2)
+        PicaFail(fails, @"a two-column section should say so");
+      if (doc.sections[1].columnCount != 1)
+        PicaFail(fails, @"a section with no w:num is one column");
+    }
+    // Blocks know which section they are in, since that decides their width.
+    if ([[doc.blocks firstObject] sectionIndex] != 0 ||
+        [[doc.blocks lastObject] sectionIndex] != 1)
+      PicaFail(fails, @"blocks should be attributed to the section they fall in");
+  }
+
+  // Run formatting, and the coalescing of runs Word split for its own reasons.
+  {
+    NSString *body = @"<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr>"
+                      "<w:r><w:rPr><w:b/><w:sz w:val=\"48\"/></w:rPr><w:t>Bo</w:t></w:r>"
+                      "<w:r><w:rPr><w:b/><w:sz w:val=\"48\"/></w:rPr><w:t>ld</w:t></w:r>"
+                      "<w:r><w:rPr><w:i/></w:rPr><w:t> then italic</w:t></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    RDLImportBlock *block = [doc.blocks firstObject];
+    if (block.alignment != RDLTextAlignCenter)
+      PicaFail(fails, @"w:jc should become the paragraph alignment");
+    if ([block.runs count] != 2) {
+      PicaFail(fails, [NSString stringWithFormat:@"runs formatted alike should merge: %lu runs",
+                                                 (unsigned long)[block.runs count]]);
+    } else {
+      RDLImportRun *bold = block.runs[0];
+      if (![bold.text isEqualToString:@"Bold"])
+        PicaFail(fails, [NSString stringWithFormat:@"merged text → '%@'", bold.text]);
+      if (bold.style.fontWeight != RDLFontWeightBold ||
+          fabs([bold.style.fontSize points] - 24) > 0.01)
+        PicaFail(fails, @"bold and half-point size should come across");
+      if ([[block.runs[1] style] fontStyle] != RDLFontStyleItalic)
+        PicaFail(fails, @"italic should come across");
+    }
+  }
+  return fails;
+}
+
+// Scaffolding a report from a Word document: the flow-to-boxes half.
+//
+// Everything here is asserted on the geometry the importer produces, because
+// that is the part with no obviously right answer -- a document has a flow and
+// a report does not -- and then the result is round-tripped through the writer
+// and parser and handed to the checker, since a scaffold that will not reopen
+// or that reports problems is not a scaffold anyone can start from.
+// styles.xml: the formatting a document does not state.
+//
+// Worth checking carefully because it is nearly invisible when wrong -- text
+// still arrives, just in the wrong font, and the importer then measures it at
+// the wrong size and lays the page out slightly askew.
+NSArray<NSString *> *PicaRunStyleSheetChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+  NSString *(^fontOf)(RDLImportDocument *, NSUInteger) = ^(RDLImportDocument *d, NSUInteger i) {
+    RDLImportRun *run = [[d.blocks[i] runs] firstObject];
+    return run.style.fontFamily ?: @"(none)";
+  };
+
+  // docDefaults reach a run that says nothing about itself, which is most of
+  // the text in a real template.
+  {
+    NSString *styles = @"<w:docDefaults><w:rPrDefault><w:rPr>"
+                        "<w:rFonts w:ascii=\"Arial MT\"/><w:sz w:val=\"22\"/>"
+                        "</w:rPr></w:rPrDefault></w:docDefaults>"
+                        "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\">"
+                        "<w:name w:val=\"Normal\"/></w:style>";
+    RDLImportDocument *doc = [RDLDocxReader
+        documentFromData:PicaDocxWithBodyAndStyles(
+                             @"<w:p><w:r><w:t>Plain</w:t></w:r></w:p>", styles)
+                   error:&err];
+    RDLImportRun *run = [[[doc.blocks firstObject] runs] firstObject];
+    if (![run.style.fontFamily isEqualToString:@"Arial MT"])
+      PicaFail(fails, [NSString stringWithFormat:@"docDefaults font not applied: %@",
+                                                 fontOf(doc, 0)]);
+    if (fabs([run.style.fontSize points] - 11.0) > 0.01)
+      PicaFail(fails, [NSString stringWithFormat:@"docDefaults size not applied: %@",
+                                                 run.style.fontSize]);
+  }
+
+  // basedOn: a style contributes what it states and inherits the rest, and
+  // what the run itself says wins over both.
+  {
+    NSString *styles = @"<w:docDefaults><w:rPrDefault><w:rPr>"
+                        "<w:rFonts w:ascii=\"Base\"/><w:sz w:val=\"20\"/><w:b/>"
+                        "</w:rPr></w:rPrDefault></w:docDefaults>"
+                        "<w:style w:type=\"paragraph\" w:styleId=\"A\">"
+                        "<w:rPr><w:rFonts w:ascii=\"FromA\"/></w:rPr></w:style>"
+                        "<w:style w:type=\"paragraph\" w:styleId=\"B\">"
+                        "<w:basedOn w:val=\"A\"/><w:rPr><w:sz w:val=\"28\"/></w:rPr></w:style>";
+    NSString *body = @"<w:p><w:pPr><w:pStyle w:val=\"B\"/></w:pPr>"
+                      "<w:r><w:t>Inherited</w:t></w:r></w:p>"
+                      "<w:p><w:pPr><w:pStyle w:val=\"B\"/></w:pPr>"
+                      "<w:r><w:rPr><w:rFonts w:ascii=\"Inline\"/><w:b w:val=\"0\"/></w:rPr>"
+                      "<w:t>Stated</w:t></w:r></w:p>";
+    RDLImportDocument *doc =
+        [RDLDocxReader documentFromData:PicaDocxWithBodyAndStyles(body, styles) error:&err];
+    RDLImportRun *inherited = [[doc.blocks[0] runs] firstObject];
+    if (![inherited.style.fontFamily isEqualToString:@"FromA"])
+      PicaFail(fails, [NSString stringWithFormat:@"basedOn chain not walked: %@", fontOf(doc, 0)]);
+    if (fabs([inherited.style.fontSize points] - 14.0) > 0.01)
+      PicaFail(fails, @"the derived style's own size should win over the one it is based on");
+    if (inherited.style.fontWeight != RDLFontWeightBold)
+      PicaFail(fails, @"bold from docDefaults should reach a run that does not mention it");
+    RDLImportRun *stated = [[doc.blocks[1] runs] firstObject];
+    if (![stated.style.fontFamily isEqualToString:@"Inline"])
+      PicaFail(fails, [NSString stringWithFormat:@"inline rPr must win: %@", fontOf(doc, 1)]);
+    // "Absent" and "explicitly off" are different answers: without the
+    // distinction a run could never turn off what its style switched on.
+    if (stated.style.fontWeight != RDLFontWeightNormal)
+      PicaFail(fails, @"<w:b w:val=\"0\"/> must switch off bold inherited from a style");
+  }
+
+  // A character style sits between the paragraph style and the inline
+  // properties.
+  {
+    NSString *styles = @"<w:style w:type=\"paragraph\" w:styleId=\"P\">"
+                        "<w:rPr><w:rFonts w:ascii=\"Para\"/><w:i/></w:rPr></w:style>"
+                        "<w:style w:type=\"character\" w:styleId=\"C\">"
+                        "<w:rPr><w:rFonts w:ascii=\"Char\"/></w:rPr></w:style>";
+    NSString *body = @"<w:p><w:pPr><w:pStyle w:val=\"P\"/></w:pPr>"
+                      "<w:r><w:rPr><w:rStyle w:val=\"C\"/></w:rPr><w:t>Run</w:t></w:r></w:p>";
+    RDLImportDocument *doc =
+        [RDLDocxReader documentFromData:PicaDocxWithBodyAndStyles(body, styles) error:&err];
+    RDLImportRun *run = [[[doc.blocks firstObject] runs] firstObject];
+    if (![run.style.fontFamily isEqualToString:@"Char"])
+      PicaFail(fails, [NSString stringWithFormat:@"w:rStyle must beat the paragraph style: %@",
+                                                 fontOf(doc, 0)]);
+    if (run.style.fontStyle != RDLFontStyleItalic)
+      PicaFail(fails, @"italic from the paragraph style should survive a character style");
+  }
+
+  // Paragraph properties come through the same cascade: this is how a heading
+  // gets its spacing and alignment without stating either.
+  {
+    NSString *styles = @"<w:style w:type=\"paragraph\" w:styleId=\"H\">"
+                        "<w:pPr><w:jc w:val=\"center\"/><w:spacing w:before=\"240\"/>"
+                        "<w:outlineLvl w:val=\"0\"/></w:pPr></w:style>";
+    NSString *body = @"<w:p><w:pPr><w:pStyle w:val=\"H\"/></w:pPr>"
+                      "<w:r><w:t>Heading</w:t></w:r></w:p>";
+    RDLImportDocument *doc =
+        [RDLDocxReader documentFromData:PicaDocxWithBodyAndStyles(body, styles) error:&err];
+    RDLImportBlock *block = [doc.blocks firstObject];
+    if (block.alignment != RDLTextAlignCenter)
+      PicaFail(fails, @"alignment from a paragraph style not applied");
+    if (fabs(block.spaceBefore - 12.0) > 0.01)
+      PicaFail(fails, [NSString stringWithFormat:@"spacing from a paragraph style: %.2fpt",
+                                                 block.spaceBefore]);
+    if (block.outlineLevel != 0)
+      PicaFail(fails, @"outline level from a paragraph style not applied");
+  }
+
+  // A hand-edited document can contain a cycle; it must not hang.
+  {
+    NSString *styles = @"<w:style w:type=\"paragraph\" w:styleId=\"X\">"
+                        "<w:basedOn w:val=\"Y\"/><w:rPr><w:rFonts w:ascii=\"X\"/></w:rPr></w:style>"
+                        "<w:style w:type=\"paragraph\" w:styleId=\"Y\">"
+                        "<w:basedOn w:val=\"X\"/></w:style>";
+    NSString *body = @"<w:p><w:pPr><w:pStyle w:val=\"X\"/></w:pPr>"
+                      "<w:r><w:t>Cyclic</w:t></w:r></w:p>";
+    RDLImportDocument *doc =
+        [RDLDocxReader documentFromData:PicaDocxWithBodyAndStyles(body, styles) error:&err];
+    if (doc == nil || [doc.blocks count] != 1)
+      PicaFail(fails, @"a cyclic basedOn chain should be survivable");
+  }
+
+  // No styles.xml at all: the reader keeps working on inline properties, and
+  // a run with no formatting anywhere stays unstyled rather than being frozen
+  // to a guessed default.
+  {
+    RDLImportDocument *doc =
+        [RDLDocxReader documentFromData:PicaDocxWithBody(@"<w:p><w:r><w:t>Bare</w:t></w:r></w:p>")
+                                  error:&err];
+    RDLImportRun *run = [[[doc.blocks firstObject] runs] firstObject];
+    if (run.style != nil)
+      PicaFail(fails, @"with no stylesheet and no inline rPr a run must stay unstyled");
+  }
+  return fails;
+}
+
+// Tabs.
+//
+// Both sample templates turned out to use tabs only as padding -- five
+// paragraphs of trailing tabs and one of nothing else, and not a single tab
+// between two pieces of text -- so the case that positions text is checked
+// here rather than against a document.
+// Drawings: pictures, and the shapes Word draws a line with.
+//
+// The image bytes are opaque to the reader -- it resolves a relationship and
+// carries the data across -- so the fixtures below use stand-in content rather
+// than real PNGs, and check the plumbing rather than any decoding.
+NSArray<NSString *> *PicaRunDrawingChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+  NSString *rels =
+      @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+       "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+       "<Relationship Id=\"rId7\" Target=\"media/image1.png\" "
+       "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\"/>"
+       "</Relationships>";
+  NSString *(^drawingWith)(NSString *, NSString *) = ^(NSString *extent, NSString *inner) {
+    return [NSString
+        stringWithFormat:@"<w:p><w:r><w:drawing><wp:inline><wp:extent %@/>"
+                          "<a:graphic><a:graphicData>%@</a:graphicData></a:graphic>"
+                          "</wp:inline></w:drawing></w:r></w:p>",
+                         extent, inner];
+  };
+
+  // A picture: the relationship is resolved, the bytes are carried into the
+  // report, and Word's own size is kept.
+  {
+    NSString *body = drawingWith(@"cx=\"1828800\" cy=\"914400\"",
+                                 @"<pic:pic xmlns:pic=\"http://schemas.openxmlformats.org/"
+                                  "drawingml/2006/picture\"><pic:blipFill>"
+                                  "<a:blip r:embed=\"rId7\"/></pic:blipFill></pic:pic>");
+    NSData *docx = PicaDocxWithParts(body, @{
+      @"word/_rels/document.xml.rels" : rels,
+      @"word/media/image1.png" : @"PNG-BYTES-STAND-IN"
+    });
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:docx error:&err];
+    RDLImportBlock *block = [doc.blocks firstObject];
+    if (block.kind != RDLImportBlockImage) {
+      PicaFail(fails, @"a w:drawing with a blip should become an image block");
+    } else {
+      if (fabs(block.imageWidth - 2.0) > 0.001 || fabs(block.imageHeight - 1.0) > 0.001)
+        PicaFail(fails, [NSString stringWithFormat:@"wp:extent is EMU: got %.2fx%.2f",
+                                                   block.imageWidth, block.imageHeight]);
+      if (![block.imageMIME isEqualToString:@"image/png"])
+        PicaFail(fails, [NSString stringWithFormat:@"MIME from the target: %@", block.imageMIME]);
+      if ([block.imageData length] != 18)
+        PicaFail(fails, @"the image bytes should come from word/media");
+    }
+    RDLReport *r = [RDLImporter reportFromDocxData:docx error:&err];
+    RDLImage *image = nil;
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLImage class]])
+        image = (RDLImage *)it;
+    if (image == nil) {
+      PicaFail(fails, @"an image block should become an RDLImage");
+    } else {
+      if (image.source != RDLImageSourceEmbedded)
+        PicaFail(fails, @"an imported picture must be embedded, not a path on this machine");
+      RDLEmbeddedImage *embedded = [r embeddedImageNamed:image.value];
+      if (embedded == nil || [embedded.imageData length] != 18)
+        PicaFail(fails, @"the image should be in the report's embedded images");
+      if (fabs(image.width - 2.0) > 0.001 || fabs(image.height - 1.0) > 0.001)
+        PicaFail(fails, [NSString stringWithFormat:@"image size not kept: %.2fx%.2f", image.width,
+                                                   image.height]);
+    }
+  }
+
+  // A shape with no picture in it, thin and wide: the rule under a signature
+  // line, which is how the sample invoice draws one.
+  {
+    NSString *body = drawingWith(@"cx=\"2041525\" cy=\"22225\"", @"<a:noPicture/>");
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithParts(body, nil) error:&err];
+    RDLLine *line = nil;
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLLine class]])
+        line = (RDLLine *)it;
+    if (line == nil)
+      PicaFail(fails, @"a wide, thin shape should become a rule");
+    else if (fabs(line.width - 2.23) > 0.01)
+      PicaFail(fails, [NSString stringWithFormat:@"rule width: %.2f", line.width]);
+  }
+
+  // A shape that is not a rule is reported rather than approximated.
+  {
+    NSString *body = [NSString
+        stringWithFormat:@"<w:p><w:r><w:drawing><wp:inline><wp:extent cx=\"914400\" cy=\"914400\"/>"
+                          "<wp:docPr id=\"3\" name=\"Star 3\"/><a:graphic><a:graphicData/>"
+                          "</a:graphic></wp:inline></w:drawing></w:r></w:p>"];
+    NSArray<NSString *> *notes = nil;
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithParts(body, nil)
+                                             notes:&notes
+                                             error:&err];
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLLine class]] || [it isKindOfClass:[RDLImage class]])
+        PicaFail(fails, @"a shape that is not a rule should not be approximated by one");
+    BOOL mentioned = NO;
+    for (NSString *note in notes)
+      if ([note rangeOfString:@"Star 3"].location != NSNotFound)
+        mentioned = YES;
+    if (!mentioned)
+      PicaFail(fails, [NSString stringWithFormat:@"a dropped shape should be reported: %@", notes]);
+  }
+
+  // Word writes a shape twice, as DrawingML in mc:Choice and legacy VML in
+  // mc:Fallback. Reading both draws it twice.
+  {
+    NSString *body =
+        @"<w:p><w:r><mc:AlternateContent>"
+         "<mc:Choice Requires=\"wps\"><w:drawing><wp:inline>"
+         "<wp:extent cx=\"2041525\" cy=\"22225\"/><a:graphic><a:graphicData/></a:graphic>"
+         "</wp:inline></w:drawing></mc:Choice>"
+         "<mc:Fallback><w:drawing><wp:inline><wp:extent cx=\"2041525\" cy=\"22225\"/>"
+         "<a:graphic><a:graphicData/></a:graphic></wp:inline></w:drawing></mc:Fallback>"
+         "</mc:AlternateContent></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithParts(body, nil) error:&err];
+    NSUInteger lines = 0;
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLLine class]])
+        lines++;
+    if (lines != 1)
+      PicaFail(fails, [NSString stringWithFormat:
+                                    @"mc:Fallback repeats the shape: got %lu rules, expected 1",
+                                    (unsigned long)lines]);
+  }
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunTabChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // The reader keeps a tab as a run of its own, not as "\t" in the text: a tab
+  // is a position, and only the importer knows where anything is.
+  {
+    NSString *body = @"<w:p><w:r><w:t>A</w:t><w:tab/><w:t>B</w:t></w:r></w:p>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(body) error:&err];
+    NSArray<RDLImportRun *> *runs = [[doc.blocks firstObject] runs];
+    if ([runs count] != 3 || !runs[1].isTab)
+      PicaFail(fails, [NSString stringWithFormat:@"a tab should be its own run, got %lu runs",
+                                                 (unsigned long)[runs count]]);
+    for (RDLImportRun *run in runs)
+      if ([run.text rangeOfString:@"\t"].location != NSNotFound)
+        PicaFail(fails, @"no run should still carry a tab character");
+    if (fabs(doc.defaultTabStop - 0.5) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"default tab stop without settings.xml: %.3f",
+                                                 doc.defaultTabStop]);
+  }
+
+  // Text after a tab becomes a second box, at the stop the tab reached.
+  {
+    NSString *body = @"<w:p><w:r><w:t>A</w:t><w:tab/><w:t>B</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+    if ([r.body.items count] != 2) {
+      PicaFail(fails, [NSString stringWithFormat:@"a tabbed line should be %lu boxes, not 1",
+                                                 (unsigned long)[r.body.items count]]);
+    } else {
+      RDLTextbox *left = (RDLTextbox *)r.body.items[0], *right = (RDLTextbox *)r.body.items[1];
+      if (![left.value isEqualToString:@"A"] || ![right.value isEqualToString:@"B"])
+        PicaFail(fails, [NSString stringWithFormat:@"tab split the text wrongly: '%@' / '%@'",
+                                                   left.value, right.value]);
+      if (fabs(right.left - 0.5) > 0.001)
+        PicaFail(fails, [NSString stringWithFormat:@"tabbed text should start at the stop: %.3f",
+                                                   right.left]);
+      if (left.top != right.top)
+        PicaFail(fails, @"a tab moves across, not down");
+      // The first box has to stop where the second starts, or they overlap.
+      if (left.left + left.width > right.left + 0.001)
+        PicaFail(fails, @"boxes either side of a tab overlap");
+    }
+  }
+
+  // The paragraph's own stops win over the regular interval, and a right stop
+  // puts the end of the text at the stop rather than its start.
+  {
+    NSString *body = @"<w:p><w:pPr><w:tabs><w:tab w:val=\"right\" w:pos=\"2880\"/></w:tabs></w:pPr>"
+                      "<w:r><w:t>A</w:t><w:tab/><w:t>B</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+    RDLTextbox *right = (RDLTextbox *)[r.body.items lastObject];
+    if (fabs(right.left - 2.0) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"explicit tab stop ignored: %.3f", right.left]);
+    if (right.style.textAlign != RDLTextAlignRight)
+      PicaFail(fails, @"a right tab stop should right-align the text that follows it");
+  }
+
+  // Padding: trailing tabs, and a paragraph of nothing but tabs, are what the
+  // real templates are full of. Neither should produce a box.
+  {
+    NSString *body = @"<w:p><w:r><w:t>Only</w:t><w:tab/><w:tab/></w:r></w:p>"
+                      "<w:p><w:r><w:tab/><w:tab/><w:tab/></w:r></w:p>"
+                      "<w:p><w:r><w:t>After</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+    if ([r.body.items count] != 2)
+      PicaFail(fails, [NSString stringWithFormat:
+                                    @"trailing and tab-only padding should make no boxes: got %lu",
+                                    (unsigned long)[r.body.items count]]);
+    RDLTextbox *only = (RDLTextbox *)[r.body.items firstObject];
+    if (![only.value isEqualToString:@"Only"])
+      PicaFail(fails, [NSString stringWithFormat:@"trailing tabs changed the text: '%@'",
+                                                 only.value]);
+    // The tab-only paragraph is still vertical space the document asked for.
+    RDLTextbox *after = (RDLTextbox *)[r.body.items lastObject];
+    if (after.top <= only.top + only.height)
+      PicaFail(fails, @"an empty paragraph should still take vertical space");
+  }
+
+  // A blank segment between two tabs is dropped, but the tabs around it still
+  // advance -- removing it outright moved the next segment a stop to the left.
+  {
+    NSString *body = @"<w:p><w:r><w:t>A</w:t><w:tab/><w:t xml:space=\"preserve\">  </w:t>"
+                      "<w:tab/><w:t>C</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+    if ([r.body.items count] != 2) {
+      PicaFail(fails, [NSString stringWithFormat:@"a blank segment should not become a box: %lu",
+                                                 (unsigned long)[r.body.items count]]);
+    } else {
+      RDLTextbox *last = (RDLTextbox *)r.body.items[1];
+      if (fabs(last.left - 1.0) > 0.001)
+        PicaFail(fails, [NSString stringWithFormat:
+                                      @"the second tab should still have advanced a stop: %.3f",
+                                      last.left]);
+    }
+  }
+
+  // An indent moves where the line starts, and therefore which stop a tab
+  // reaches.
+  {
+    NSString *body = @"<w:p><w:pPr><w:ind w:left=\"1440\"/></w:pPr>"
+                      "<w:r><w:t>A</w:t><w:tab/><w:t>B</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+    RDLTextbox *first = (RDLTextbox *)[r.body.items firstObject];
+    RDLTextbox *second = (RDLTextbox *)[r.body.items lastObject];
+    if (fabs(first.left - 1.0) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"indent not applied: %.3f", first.left]);
+    if (fabs(second.left - 1.5) > 0.001)
+      PicaFail(fails, [NSString stringWithFormat:@"tab after an indent: %.3f", second.left]);
+  }
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunImporterChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // A4 with 1cm margins, so the page setup has to come from the document
+  // rather than from the Letter default.
+  NSString *sectPr = @"<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/>"
+                      "<w:pgMar w:top=\"567\" w:right=\"567\" w:bottom=\"567\" w:left=\"567\"/>"
+                      "</w:sectPr>";
+  NSString *body = [NSString
+      stringWithFormat:@"<w:p><w:r><w:t>First paragraph.</w:t></w:r></w:p>"
+                        "<w:p><w:r><w:t>Second paragraph.</w:t></w:r></w:p>%@",
+                       sectPr];
+  RDLReport *report = [RDLImporter reportFromDocxData:PicaDocxWithBody(body) error:&err];
+  if (report == nil) {
+    PicaFail(fails, [NSString stringWithFormat:@"import refused a valid document: %@",
+                                               [err localizedDescription]]);
+    return fails;
+  }
+  if (fabs(report.page.pageWidth - 8.27) > 0.02 || fabs(report.page.pageHeight - 11.69) > 0.02)
+    PicaFail(fails, [NSString stringWithFormat:@"A4 page not carried over: %.2fx%.2f",
+                                               report.page.pageWidth, report.page.pageHeight]);
+  if (fabs(report.width - (8.27 - 0.79)) > 0.03)
+    PicaFail(fails, [NSString stringWithFormat:@"body width is not the page less its margins: %.2f",
+                                               report.width]);
+
+  NSArray<RDLItem *> *items = report.body.items;
+  if ([items count] != 2) {
+    PicaFail(fails, [NSString stringWithFormat:@"two paragraphs became %lu items",
+                                               (unsigned long)[items count]]);
+    return fails;
+  }
+  RDLTextbox *first = (RDLTextbox *)items[0], *second = (RDLTextbox *)items[1];
+  if (![first.value isEqualToString:@"First paragraph."] ||
+      ![second.value isEqualToString:@"Second paragraph."])
+    PicaFail(fails, [NSString stringWithFormat:@"paragraph text lost: '%@' / '%@'", first.value,
+                                               second.value]);
+  // The flow: boxes stack, none of them overlaps the next, and each is as wide
+  // as the body.
+  if (first.top != 0)
+    PicaFail(fails, [NSString stringWithFormat:@"first box does not start at the top: %.2f",
+                                               first.top]);
+  if (second.top < first.top + first.height - 0.001)
+    PicaFail(fails, [NSString stringWithFormat:@"boxes overlap: %.2f+%.2f then %.2f", first.top,
+                                               first.height, second.top]);
+  if (first.height <= 0 || first.height > 0.6)
+    PicaFail(fails, [NSString stringWithFormat:@"a one-line box measured %.2fin", first.height]);
+  if (fabs(first.width - report.width) > 0.001)
+    PicaFail(fails, [NSString stringWithFormat:@"box is not the body width: %.2f vs %.2f",
+                                               first.width, report.width]);
+  // Measured, not grown -- a height that is wrong should be visible rather
+  // than silently reflowed at render time.
+  if (first.canGrow || second.canGrow)
+    PicaFail(fails, @"imported textboxes must have CanGrow off");
+  if (report.body.height < second.top + second.height - 0.001)
+    PicaFail(fails, @"body is shorter than the content placed in it");
+
+  // A placeholder becomes an expression over the dataset the import declares,
+  // and the fallback value stays readable.
+  {
+    NSString *ph = @"<w:p><w:r><w:t>Invoice {invoice_number} for {name}</w:t></w:r></w:p>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(ph) error:&err];
+    RDLDataSet *ds = [r.dataSets firstObject];
+    NSMutableArray *names = [NSMutableArray array];
+    for (RDLField *f in ds.fields)
+      [names addObject:f.name];
+    if (![[names componentsJoinedByString:@","] isEqualToString:@"invoice_number,name"])
+      PicaFail(fails, [NSString stringWithFormat:@"placeholders did not become fields: %@", names]);
+    RDLTextbox *box = (RDLTextbox *)[r.body.items firstObject];
+    NSMutableArray *sources = [NSMutableArray array];
+    for (RDLTextRun *run in [[box.paragraphs firstObject] runs])
+      [sources addObject:run.value ?: @""];
+    NSString *expected = @"Invoice ,=First(Fields!invoice_number.Value, \"Data\"), for ,"
+                         @"=First(Fields!name.Value, \"Data\")";
+    if (![[sources componentsJoinedByString:@","] isEqualToString:expected])
+      PicaFail(fails, [NSString stringWithFormat:@"placeholder runs wrong: %@",
+                                                 [sources componentsJoinedByString:@"|"]]);
+    // Outside a data region a bare Fields! reference has no scope, so First()
+    // is not decoration -- the checker rejects it without.
+    if ([[RDLChecker checkReport:r] count] != 0)
+      PicaFail(fails, [NSString stringWithFormat:@"scaffold does not check clean: %@",
+                                                 [[[RDLChecker checkReport:r] firstObject]
+                                                     oneLineDescription]]);
+    if (![box.value isEqualToString:@"Invoice {invoice_number} for {name}"])
+      PicaFail(fails, [NSString stringWithFormat:@"flattened value is not readable text: '%@'",
+                                                 box.value]);
+  }
+
+  // A cell holding several paragraphs becomes one value with real line breaks.
+  // This read "BILL TO\nKaldi Financial" on a real invoice, with the backslash
+  // and the n visible on the page, because the separator was written as a
+  // literal "\\n" in the source.
+  {
+    NSString *table = @"<w:tbl><w:tr><w:tc>"
+                       "<w:p><w:r><w:t>BILL TO</w:t></w:r></w:p>"
+                       "<w:p><w:r><w:t>Kaldi Financial</w:t></w:r></w:p>"
+                       "</w:tc></w:tr></w:tbl>";
+    RDLImportDocument *doc = [RDLDocxReader documentFromData:PicaDocxWithBody(table) error:&err];
+    RDLImportRow *row = [[[doc.blocks firstObject] rows] firstObject];
+    RDLImportCell *cell = [row.cells firstObject];
+    NSMutableString *text = [NSMutableString string];
+    for (RDLImportRun *run in cell.runs)
+      [text appendString:run.text ?: @""];
+    if (![text isEqualToString:@"BILL TO\nKaldi Financial"])
+      PicaFail(fails, [NSString stringWithFormat:@"paragraphs in a cell joined wrongly: %@",
+                                                 [text stringByReplacingOccurrencesOfString:@"\n"
+                                                                                 withString:@"<LF>"]]);
+  }
+
+  // The grid, and the header row Word marked to repeat. A table with rows in it
+  // is turned into a data region -- see PicaRunTableBindingChecks -- so what is
+  // asserted here is what survives that: the columns, and a header that still
+  // repeats on every page.
+  {
+    NSString *table =
+        @"<w:tbl>"
+         "<w:tblGrid><w:gridCol w:w=\"2880\"/><w:gridCol w:w=\"2880\"/></w:tblGrid>"
+         "<w:tr><w:trPr><w:tblHeader/></w:trPr>"
+         "<w:tc><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>Amount</w:t></w:r></w:p></w:tc></w:tr>"
+         "<w:tr><w:tc><w:p><w:r><w:t>Bolt</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>2.00</w:t></w:r></w:p></w:tc></w:tr>"
+         "</w:tbl>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(table) error:&err];
+    RDLTablix *tablix = nil;
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLTablix class]])
+        tablix = (RDLTablix *)it;
+    if (tablix == nil) {
+      PicaFail(fails, @"a w:tbl did not become a tablix");
+    } else {
+      if ([tablix.tablixBody.columns count] != 2)
+        PicaFail(fails, [NSString stringWithFormat:@"table grid became %lu columns",
+                                                   (unsigned long)[tablix.tablixBody.columns count]]);
+      RDLTablixMember *header = [tablix.rowHierarchy.members firstObject];
+      if (!header.repeatOnNewPage)
+        PicaFail(fails, @"the heading row must repeat on new pages");
+      RDLTablixMember *plain = [tablix.rowHierarchy.members count] > 1
+                                   ? tablix.rowHierarchy.members[1]
+                                   : nil;
+      if (plain.repeatOnNewPage)
+        PicaFail(fails, @"the detail row must not repeat");
+    }
+  }
+
+  // A merged cell keeps its span in a table that stays static -- a one-row
+  // layout table, which is where merges actually survive into the report.
+  {
+    NSString *table =
+        @"<w:tbl>"
+         "<w:tblGrid><w:gridCol w:w=\"2880\"/><w:gridCol w:w=\"2880\"/></w:tblGrid>"
+         "<w:tr><w:tc><w:tcPr><w:gridSpan w:val=\"2\"/></w:tcPr>"
+         "<w:p><w:r><w:t>Total</w:t></w:r></w:p></w:tc></w:tr>"
+         "</w:tbl>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(table) error:&err];
+    RDLTablix *tablix = nil;
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLTablix class]])
+        tablix = (RDLTablix *)it;
+    RDLTablixRow *only = [tablix.tablixBody.rows firstObject];
+    RDLTablixCell *merged = [only.cells firstObject];
+    if (merged.colSpan != 2)
+      PicaFail(fails, [NSString stringWithFormat:@"w:gridSpan 2 became colSpan %ld",
+                                                 (long)merged.colSpan]);
+    if ([only.cells count] != 2)
+      PicaFail(fails, @"a merged cell still needs a placeholder for each column it covers");
+  }
+
+  // Two columns: a report has no flow, so the body width divides and blocks
+  // are placed left to right.
+  {
+    NSString *twoCol = @"";
+    for (int i = 0; i < 8; i++)
+      twoCol = [twoCol stringByAppendingFormat:@"<w:p><w:r><w:t>Line %d</w:t></w:r></w:p>", i];
+    twoCol = [twoCol stringByAppendingString:
+                         @"<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/>"
+                          "<w:cols w:num=\"2\" w:space=\"720\"/></w:sectPr>"];
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(twoCol) error:&err];
+    CGFloat leftmost = CGFLOAT_MAX, rightmost = 0, columnWidth = 0;
+    for (RDLItem *it in r.body.items) {
+      leftmost = MIN(leftmost, it.left);
+      rightmost = MAX(rightmost, it.left);
+      columnWidth = MAX(columnWidth, it.width);
+    }
+    if (rightmost <= leftmost)
+      PicaFail(fails, @"a two-column section placed everything in one column");
+    if (columnWidth > r.width / 2)
+      PicaFail(fails, [NSString stringWithFormat:@"column boxes are %.2f wide in a %.2f body",
+                                                 columnWidth, r.width]);
+  }
+
+  // The whole point: it has to reopen. Write it, read it back, and check that
+  // the geometry and the expressions survived.
+  {
+    NSString *xml = [RDLWriter XMLStringFromReport:report];
+    RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+    if (back == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"scaffold did not reopen: %@",
+                                                 [err localizedDescription]]);
+    } else {
+      if ([back.body.items count] != [report.body.items count])
+        PicaFail(fails, @"items lost in the round trip");
+      RDLTextbox *b0 = (RDLTextbox *)[back.body.items firstObject];
+      if (fabs(b0.height - first.height) > 0.001 || fabs(b0.top - first.top) > 0.001)
+        PicaFail(fails, @"box geometry changed in the round trip");
+      if (b0.canGrow)
+        PicaFail(fails, @"CanGrow came back on after a round trip");
+      for (RDLDiagnostic *d in [RDLChecker checkReport:back])
+        if (d.severity == RDLDiagnosticSeverityError)
+          PicaFail(fails, [NSString stringWithFormat:@"reopened scaffold has an error: %@",
+                                                     [d oneLineDescription]]);
+    }
+  }
+  return fails;
+}
+
+// A Word table becoming a data region.
+//
+// The point is the columns: a tablix scaffolded as static rows opens in the
+// designer with none, because the designer edits `columnSpecs`. Giving it
+// columns means giving it a dataset, and the dataset's field names have to come
+// from somewhere -- the headings when they are Latin, ColumnN when they are not.
+// RDLDataSet.fields holds RDLField objects and nothing else.
+//
+// It used to accept bare names too, and that cost a crash the compiler could
+// not have caught: an RDLField reached -isEqualToString: inside the tablix
+// editor's field popup, once the importer started declaring real fields. The
+// invariant is worth pinning, because nothing about `NSArray *` enforces it.
+NSArray<NSString *> *PicaRunFieldNameChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+
+  // Declaring by name is the convenience, and it is a method rather than a
+  // property assignment, so that `fields` means one thing.
+  [ds setFieldNames:@[ @"Alpha", @"Beta" ]];
+  if (![[[ds fieldNames] componentsJoinedByString:@","] isEqualToString:@"Alpha,Beta"])
+    PicaFail(fails, [NSString stringWithFormat:@"names read back wrong: %@", [ds fieldNames]]);
+  for (id entry in ds.fields)
+    if (![entry isKindOfClass:[RDLField class]])
+      PicaFail(fails, [NSString stringWithFormat:@"a name became a %@, not an RDLField",
+                                                 [entry class]]);
+  if ([[ds.fields firstObject] dataType] != RDLFieldDataTypeUnknown)
+    PicaFail(fails, @"a field declared by name alone has no type yet");
+
+  // Assigning real fields keeps everything they carry.
+  RDLField *field = [[RDLField alloc] init];
+  field.name = @"Gamma";
+  field.dataType = RDLFieldDataTypeString;
+  ds.fields = @[ field ];
+  if (![[[ds fieldNames] firstObject] isEqualToString:@"Gamma"])
+    PicaFail(fails, [NSString stringWithFormat:@"an RDLField's name: %@", [ds fieldNames]]);
+  if ([[ds.fields firstObject] dataType] != RDLFieldDataTypeString)
+    PicaFail(fails, @"assigning fields must not lose their types");
+
+  // Declaring by name replaces what was there rather than adding to it.
+  [ds setFieldNames:@[ @"Delta" ]];
+  if ([ds.fields count] != 1 || ![[[ds fieldNames] firstObject] isEqualToString:@"Delta"])
+    PicaFail(fails, [NSString stringWithFormat:@"-setFieldNames: replaces: %@", [ds fieldNames]]);
+
+  ds.fields = nil;
+  if ([[ds fieldNames] count] != 0)
+    PicaFail(fails, @"a dataset with no fields has no names");
+  return fails;
+}
+
+NSArray<NSString *> *PicaRunTableBindingChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+  NSString *(^table)(NSString *, NSString *) = ^(NSString *headings, NSString *body) {
+    NSMutableString *header = [NSMutableString stringWithString:@"<w:tr>"];
+    for (NSString *h in [headings componentsSeparatedByString:@"|"])
+      [header appendFormat:@"<w:tc><w:p><w:r><w:t>%@</w:t></w:r></w:p></w:tc>", h];
+    [header appendString:@"</w:tr>"];
+    return [NSString stringWithFormat:@"<w:tbl>%@%@</w:tbl>", header, body];
+  };
+  NSString *plainRow = @"<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc>"
+                        "<w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr>";
+  RDLTablix *(^tablixOf)(RDLReport *) = ^(RDLReport *r) {
+    for (RDLItem *it in r.body.items)
+      if ([it isKindOfClass:[RDLTablix class]])
+        return (RDLTablix *)it;
+    return (RDLTablix *)nil;
+  };
+  NSArray<NSString *> *(^fieldsOf)(RDLReport *, NSString *) = ^(RDLReport *r, NSString *name) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (RDLDataSet *ds in r.dataSets)
+      if ([ds.name isEqualToString:name])
+        for (RDLField *f in ds.fields)
+          [out addObject:f.name];
+    return (NSArray<NSString *> *)out;
+  };
+
+  // Latin headings become field names; the punctuation and spacing go.
+  {
+    RDLReport *r = [RDLImporter
+        reportFromDocxData:PicaDocxWithBody(table(@"Item name|Price (EUR)", plainRow))
+                     error:&err];
+    RDLTablix *tablix = tablixOf(r);
+    if (![tablix.dataSetName isEqualToString:@"Table1Data"])
+      PicaFail(fails, [NSString stringWithFormat:@"a table should declare its dataset: %@",
+                                                 tablix.dataSetName]);
+    NSArray *names = fieldsOf(r, @"Table1Data");
+    if (![[names componentsJoinedByString:@","] isEqualToString:@"ItemName,PriceEur"])
+      PicaFail(fails, [NSString stringWithFormat:@"field names from headings: %@", names]);
+    for (RDLDataSet *ds in r.dataSets)
+      if ([ds.name isEqualToString:@"Table1Data"])
+        for (RDLField *f in ds.fields)
+          if (f.dataType != RDLFieldDataTypeString)
+            PicaFail(fails, @"every scaffolded field is String -- the import cannot tell types");
+    // The columns are what the designer edits, and what was missing before.
+    if ([tablix.columnSpecs count] != 2)
+      PicaFail(fails, [NSString stringWithFormat:@"expected 2 column specs, got %lu",
+                                                 (unsigned long)[tablix.columnSpecs count]]);
+    NSDictionary *first = [tablix.columnSpecs firstObject];
+    if (![first[@"header"] isEqualToString:@"Item name"])
+      PicaFail(fails, [NSString stringWithFormat:@"the heading keeps the document's words: %@",
+                                                 first[@"header"]]);
+    if (![first[@"value"] isEqualToString:@"=Fields!ItemName.Value"])
+      PicaFail(fails, [NSString stringWithFormat:@"the column binds to its field: %@",
+                                                 first[@"value"]]);
+    if ([first[@"width"] doubleValue] <= 0)
+      PicaFail(fails, @"a column spec needs the width the document gave it");
+    for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+      if (d.severity == RDLDiagnosticSeverityError)
+        PicaFail(fails, [NSString stringWithFormat:@"bound table does not check clean: %@",
+                                                   [d oneLineDescription]]);
+  }
+
+  // A heading that is not Latin is not transliterated: a wrong guess at a name
+  // is worse than an honest ColumnN, since the name is what has to be typed
+  // when data is bound. Greek rather than any particular document's language --
+  // what is being checked is the script, not the words.
+  {
+    RDLReport *r = [RDLImporter
+        reportFromDocxData:PicaDocxWithBody(table(@"№|Περιγραφή", plainRow)) error:&err];
+    NSArray *names = fieldsOf(r, @"Table1Data");
+    if (![[names componentsJoinedByString:@","] isEqualToString:@"Column1,Column2"])
+      PicaFail(fails, [NSString stringWithFormat:@"non-Latin headings should fall back: %@",
+                                                 names]);
+  }
+
+  // Two columns headed the same thing is ordinary in a real document, and two
+  // fields with one name is not.
+  {
+    RDLReport *r = [RDLImporter
+        reportFromDocxData:PicaDocxWithBody(table(@"Amount|Amount", plainRow)) error:&err];
+    NSArray *names = fieldsOf(r, @"Table1Data");
+    if ([[NSSet setWithArray:names] count] != [names count])
+      PicaFail(fails, [NSString stringWithFormat:@"field names must be unique: %@", names]);
+  }
+
+  // A single-row table is layout, not data -- an address block, a totals box --
+  // so its cells keep their text. It is still bound, to a dataset of its own
+  // with no fields in it: a data region naming no dataset is a trap, because
+  // the designer then falls back to whichever dataset happens to be first,
+  // which belongs to some other table.
+  {
+    NSString *layout = @"<w:tbl><w:tr>"
+                        "<w:tc><w:p><w:r><w:t>BILL TO</w:t></w:r></w:p></w:tc>"
+                        "<w:tc><w:p><w:r><w:t>TOTAL</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(layout) error:&err];
+    RDLTablix *tablix = tablixOf(r);
+    if (![tablix.dataSetName isEqualToString:@"Table1Data"])
+      PicaFail(fails, [NSString stringWithFormat:@"every scaffolded tablix names a dataset: %@",
+                                                 tablix.dataSetName]);
+    if ([r.dataSets count] != 1 || [[[r.dataSets firstObject] fields] count] != 0)
+      PicaFail(fails, @"a layout table's dataset is created, and is empty");
+    if ([tablix.columnSpecs count] != 0)
+      PicaFail(fails, @"a layout table has no columns to bind");
+    RDLTablixCell *cell = [[[tablix.tablixBody.rows firstObject] cells] firstObject];
+    if (![[(RDLTextbox *)cell.item value] isEqualToString:@"BILL TO"])
+      PicaFail(fails, @"a layout table keeps the text the document had");
+    // Binding must not make it vanish: a region with no rows still lays its
+    // body out once.
+    NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+    BOOL sawText = NO;
+    for (RDLLaidOutPage *page in pages)
+      for (RDLLaidOutItem *item in page.items)
+        if ([item isKindOfClass:[RDLLaidOutTextbox class]] &&
+            [[(RDLLaidOutTextbox *)item text] rangeOfString:@"BILL TO"].location != NSNotFound)
+          sawText = YES;
+    if (!sawText)
+      PicaFail(fails, @"a bound layout table must still render its own text");
+  }
+
+  // A merged heading names only the first column it covers: it says nothing
+  // about the others.
+  {
+    NSString *merged =
+        @"<w:tbl>"
+         "<w:tblGrid><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"1440\"/><w:gridCol w:w=\"1440\"/>"
+         "</w:tblGrid>"
+         "<w:tr><w:tc><w:tcPr><w:gridSpan w:val=\"2\"/></w:tcPr>"
+         "<w:p><w:r><w:t>Goods</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>Total</w:t></w:r></w:p></w:tc></w:tr>"
+         "<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc>"
+         "<w:tc><w:p><w:r><w:t>c</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    RDLReport *r = [RDLImporter reportFromDocxData:PicaDocxWithBody(merged) error:&err];
+    NSArray *names = fieldsOf(r, @"Table1Data");
+    if (![[names componentsJoinedByString:@","] isEqualToString:@"Goods,Column2,Total"])
+      PicaFail(fails, [NSString stringWithFormat:@"a merged heading names one column: %@", names]);
+  }
+
+  // The whole thing has to reopen, since a scaffold nobody can open is no
+  // scaffold.
+  {
+    RDLReport *r = [RDLImporter
+        reportFromDocxData:PicaDocxWithBody(table(@"Item name|Price (EUR)", plainRow))
+                     error:&err];
+    RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
+    RDLTablix *tablix = tablixOf(back);
+    if (![tablix.dataSetName isEqualToString:@"Table1Data"])
+      PicaFail(fails, @"the dataset binding must survive a round trip");
+    if ([fieldsOf(back, @"Table1Data") count] != 2)
+      PicaFail(fails, @"the declared fields must survive a round trip");
+  }
+  return fails;
+}
+
+// The three synthetic templates in PicaKitTests/Fixtures.
+//
+// They are real Word documents -- every byte of markup kept from templates
+// that were written in Word and used for real work -- with the names,
+// addresses and account numbers replaced and the logo swapped for a plain
+// placeholder. That matters: a hand-built .docx does not fragment its runs,
+// does not carry a 35 KB styles.xml, and does not exercise a single one of the
+// things that actually broke. Each one imports to the same page size, body
+// height and item count as the document it was derived from.
+//
+// Located from __FILE__ rather than from a bundle, because the test target has
+// no resources phase; a missing fixture is a loud failure rather than a
+// quietly skipped check.
+static NSString *PicaFixturesDirectory(void) {
+  return [[@(__FILE__) stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"Fixtures"];
+}
+
+static NSData *PicaFixtureNamed(NSString *name, NSMutableArray *fails) {
+  NSString *path = [PicaFixturesDirectory() stringByAppendingPathComponent:name];
+  NSData *data = [NSData dataWithContentsOfFile:path];
+  if (data == nil)
+    PicaFail(fails, [NSString stringWithFormat:@"missing fixture %@", path]);
+  return data;
+}
+
+static RDLTextbox *PicaFirstTextboxContaining(NSArray<RDLItem *> *items, NSString *needle) {
+  for (RDLItem *it in items)
+    if ([it isKindOfClass:[RDLTextbox class]] &&
+        [[(RDLTextbox *)it value] rangeOfString:needle].location != NSNotFound)
+      return (RDLTextbox *)it;
+  return nil;
+}
+
+NSArray<NSString *> *PicaRunFixtureChecks(void) {
+  NSMutableArray *fails = [NSMutableArray array];
+  NSError *err = nil;
+
+  // A two-column A4 invoice: placeholders, a table with a repeating header row
+  // and merged cells, and the rectangle Word draws a signature rule with.
+  {
+    NSData *docx = PicaFixtureNamed(@"invoice-two-column.docx", fails);
+    NSArray<NSString *> *notes = nil;
+    RDLReport *r = docx ? [RDLImporter reportFromDocxData:docx notes:&notes error:&err] : nil;
+    if (r == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"two-column invoice did not import: %@",
+                                                 [err localizedDescription]]);
+    } else {
+      if (fabs(r.page.pageWidth - 8.27) > 0.02 || fabs(r.page.pageHeight - 11.69) > 0.02)
+        PicaFail(fails, @"the invoice is A4");
+      RDLDataSet *ds = [r.dataSets firstObject];
+      if ([ds.fields count] != 7)
+        PicaFail(fails, [NSString stringWithFormat:@"expected 7 placeholders, got %lu",
+                                                   (unsigned long)[ds.fields count]]);
+      // The two-column section: items in both columns, none full width.
+      CGFloat leftmost = CGFLOAT_MAX, rightmost = 0;
+      for (RDLItem *it in r.body.items) {
+        leftmost = MIN(leftmost, it.left);
+        rightmost = MAX(rightmost, it.left);
+      }
+      if (rightmost < 3.0)
+        PicaFail(fails, @"the two-column section was not split across columns");
+      BOOL rule = NO, tablix = NO;
+      for (RDLItem *it in r.body.items) {
+        rule = rule || [it isKindOfClass:[RDLLine class]];
+        tablix = tablix || [it isKindOfClass:[RDLTablix class]];
+      }
+      if (!rule)
+        PicaFail(fails, @"the signature rule (a thin rectangle) should become a line");
+      if (!tablix)
+        PicaFail(fails, @"the services table should become a tablix");
+      if ([r.pageHeader.items count] != 1 || [r.pageFooter.items count] != 1)
+        PicaFail(fails, @"the invoice has a page header and a page footer");
+      BOOL warned = NO;
+      for (NSString *note in notes)
+        if ([note rangeOfString:@"data region"].location != NSNotFound)
+          warned = YES;
+      if (!warned)
+        PicaFail(fails, @"a table holding a placeholder should be flagged as a likely data region");
+      for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+        if (d.severity == RDLDiagnosticSeverityError)
+          PicaFail(fails, [NSString stringWithFormat:@"invoice scaffold has an error: %@",
+                                                     [d oneLineDescription]]);
+    }
+  }
+
+  // A letter whose layout is done with tabs: 38 of them, all but a handful
+  // padding, and a right-hand addressee block that only tab stops put there.
+  {
+    NSData *docx = PicaFixtureNamed(@"letter-with-tabs.docx", fails);
+    RDLReport *r = docx ? [RDLImporter reportFromDocxData:docx error:&err] : nil;
+    if (r == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"tabbed letter did not import: %@",
+                                                 [err localizedDescription]]);
+    } else {
+      // Nothing should still carry a tab: a tab is a position, and by this
+      // point every one has become a box or been dropped.
+      for (RDLItem *it in r.body.items)
+        if ([it isKindOfClass:[RDLTextbox class]] &&
+            [[(RDLTextbox *)it value] rangeOfString:@"\t"].location != NSNotFound)
+          PicaFail(fails, [NSString stringWithFormat:@"a tab survived into %@", it.name]);
+      // The addressee block sits in the right half because tabs put it there.
+      NSUInteger placed = 0;
+      for (RDLItem *it in r.body.items)
+        if (it.left > 3.0)
+          placed++;
+      if (placed < 3)
+        PicaFail(fails, [NSString stringWithFormat:
+                                      @"tabs should place the addressee block right: %lu items",
+                                      (unsigned long)placed]);
+      if ([[r.dataSets firstObject] fields].count != 5)
+        PicaFail(fails, @"the letter has five placeholders");
+      for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+        if (d.severity == RDLDiagnosticSeverityError)
+          PicaFail(fails, [NSString stringWithFormat:@"letter scaffold has an error: %@",
+                                                     [d oneLineDescription]]);
+    }
+  }
+
+  // An invoice with a logo in its page header, and table cells holding several
+  // paragraphs each.
+  {
+    NSData *docx = PicaFixtureNamed(@"invoice-header-image.docx", fails);
+    NSArray<NSString *> *notes = nil;
+    RDLReport *r = docx ? [RDLImporter reportFromDocxData:docx notes:&notes error:&err] : nil;
+    if (r == nil) {
+      PicaFail(fails, [NSString stringWithFormat:@"header-image invoice did not import: %@",
+                                                 [err localizedDescription]]);
+    } else {
+      RDLImage *logo = nil;
+      for (RDLItem *it in r.pageHeader.items)
+        if ([it isKindOfClass:[RDLImage class]])
+          logo = (RDLImage *)it;
+      if (logo == nil) {
+        PicaFail(fails, @"the header logo should become an image in the page header");
+      } else {
+        // The relationship is resolved against header1.xml.rels, not the
+        // document's own, which is the whole point of this fixture.
+        RDLEmbeddedImage *embedded = [r embeddedImageNamed:logo.value];
+        if (embedded == nil)
+          PicaFail(fails, @"the logo should be embedded in the report");
+        else if (![embedded.mimeType isEqualToString:@"image/jpeg"])
+          PicaFail(fails, [NSString stringWithFormat:@"logo MIME: %@", embedded.mimeType]);
+        else if ([embedded.imageData length] < 500)
+          PicaFail(fails, @"the logo bytes look truncated");
+      }
+      // A full-page rectangle is a page border, not a rule, and is left out.
+      BOOL dropped = NO;
+      for (NSString *note in notes)
+        if ([note rangeOfString:@"was left out"].location != NSNotFound)
+          dropped = YES;
+      if (!dropped)
+        PicaFail(fails, @"the full-page rectangle should be reported as left out");
+      for (RDLItem *it in r.body.items)
+        if ([it isKindOfClass:[RDLLine class]])
+          PicaFail(fails, @"a full-page rectangle must not be approximated by a rule");
+      // Multi-paragraph cells: the separator has to be a newline, not the two
+      // characters a backslash and an n, which is how it read on a real page.
+      BOOL sawBreak = NO;
+      for (RDLItem *it in r.body.items) {
+        if (![it isKindOfClass:[RDLTablix class]])
+          continue;
+        for (RDLTablixRow *row in [(RDLTablix *)it tablixBody].rows)
+          for (RDLTablixCell *cell in row.cells) {
+            NSString *value = [cell.item isKindOfClass:[RDLTextbox class]]
+                                  ? [(RDLTextbox *)cell.item value]
+                                  : @"";
+            if ([value rangeOfString:@"\\n"].location != NSNotFound)
+              PicaFail(fails, [NSString stringWithFormat:@"a literal \\n reached a cell: '%@'",
+                                                         value]);
+            if ([value rangeOfString:@"\n"].location != NSNotFound)
+              sawBreak = YES;
+          }
+      }
+      if (!sawBreak)
+        PicaFail(fails, @"a cell with several paragraphs should hold a line break");
+      for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+        if (d.severity == RDLDiagnosticSeverityError)
+          PicaFail(fails, [NSString stringWithFormat:@"header-image scaffold has an error: %@",
+                                                     [d oneLineDescription]]);
+    }
+  }
+  return fails;
+}
+
 NSArray<NSString *> *PicaRunAllChecks(void) {
   NSMutableArray *fails = [NSMutableArray array];
   [fails addObjectsFromArray:PicaRunParserChecks()];
@@ -3387,6 +4766,15 @@ NSArray<NSString *> *PicaRunAllChecks(void) {
   [fails addObjectsFromArray:PicaRunChartChecks()];
   [fails addObjectsFromArray:PicaRunWholeTextboxStyleChecks()];
   [fails addObjectsFromArray:PicaRunCheckerChecks()];
+  [fails addObjectsFromArray:PicaRunZipChecks()];
+  [fails addObjectsFromArray:PicaRunDocxChecks()];
+  [fails addObjectsFromArray:PicaRunStyleSheetChecks()];
+  [fails addObjectsFromArray:PicaRunTabChecks()];
+  [fails addObjectsFromArray:PicaRunDrawingChecks()];
+  [fails addObjectsFromArray:PicaRunImporterChecks()];
+  [fails addObjectsFromArray:PicaRunFieldNameChecks()];
+  [fails addObjectsFromArray:PicaRunTableBindingChecks()];
+  [fails addObjectsFromArray:PicaRunFixtureChecks()];
   [fails addObjectsFromArray:PicaRunWriterWhitespaceChecks()];
   [fails addObjectsFromArray:PicaRunLayoutChecks()];
   [fails addObjectsFromArray:PicaRunTablixChecks()];

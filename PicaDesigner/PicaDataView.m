@@ -125,7 +125,7 @@
     [b setTag:dsi];
     [_stack addSubview:b];
     y += 24;
-    NSTextField *fields = [self label:[ds.fields componentsJoinedByString:@"  "]
+    NSTextField *fields = [self label:[[ds fieldNames] componentsJoinedByString:@"  "]
                                 frame:NSMakeRect(10, y, 220, 16)];
     [fields setFont:[NSFont userFontOfSize:9]];
     [_stack addSubview:fields];

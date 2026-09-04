@@ -3,6 +3,7 @@
 #import "PicaGeneratorWindow.h"
 #import "PicaWelcomeWindow.h"
 #import "PicaEditingContext.h"
+#import "PicaNewReportPanel.h"
 #import "PicaSamples.h"
 
 @implementation PicaAppDelegate
@@ -12,7 +13,7 @@
   _context = [[PicaEditingContext alloc] init];
   [self loadMenuBar];
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(showDesigner:)
+                                           selector:@selector(newReportThenDesigner:)
                                                name:PicaOpenDesignerNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
@@ -60,6 +61,26 @@
     _generator = [[PicaGeneratorWindow alloc] initWithDocument:_context.document];
 }
 
+// Making a new report, from the welcome screen's Designer card and from File >
+// New Report. Both ask the same question and land in the same place, because a
+// report has to come from somewhere and "from a Word document I already have"
+// is as reasonable a starting point as an empty page.
+//
+// Cancelling leaves the user exactly where they were: no report is loaded and
+// no window is brought forward.
+//
+// Only these two entry points go through the wizard. Opening a file, or
+// anything else that already has a report in hand, calls -showDesigner:
+// directly.
+- (void)newReportThenDesigner:(id)sender {
+  (void)sender;
+  PicaNewReportOutcome *outcome = [PicaNewReportPanel run];
+  if (outcome == nil)
+    return;
+  [_context loadReport:outcome.report];
+  [self showDesigner:nil];
+}
+
 - (void)showDesigner:(id)sender {
   (void)sender;
   [self ensureDesigner];
@@ -92,10 +113,12 @@
     [self showGenerator:nil];
 }
 
+// File > New Report. It used to make a blank Letter report and open the
+// generator; it now asks the same question the welcome screen does, and opens
+// the designer, since a report that has just been made has nothing to run yet
+// and a scaffolded one needs its boxes moved.
 - (void)newDocument:(id)sender {
-  (void)sender;
-  [_context loadBlankReport];
-  [self showGenerator:nil];
+  [self newReportThenDesigner:sender];
 }
 
 // Only reached when no window handled it -- each window controller implements

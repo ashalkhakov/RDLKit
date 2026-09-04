@@ -64,6 +64,18 @@
 - (void)testDialogLifecycle {
   PICA_ASSERT_NO_FAILURES(PicaRunDialogLifecycleChecks());
 }
+- (void)testNewReportWizard {
+  PICA_ASSERT_NO_FAILURES(PicaRunNewReportChecks());
+}
+- (void)testNewReportPanel {
+  PICA_ASSERT_NO_FAILURES(PicaRunNewReportPanelChecks());
+}
+- (void)testMenuWiring {
+  PICA_ASSERT_NO_FAILURES(PicaRunMenuWiringChecks());
+}
+- (void)testScaffoldedTablixEditor {
+  PICA_ASSERT_NO_FAILURES(PicaRunScaffoldedTablixEditorChecks());
+}
 - (void)testAllDesignerChecks {
   PICA_ASSERT_NO_FAILURES(PicaRunAllDesignerChecks());
 }

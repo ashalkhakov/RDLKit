@@ -1339,6 +1339,23 @@ static NSString *PicaAggregateOfValue(NSString *value) {
   }
   return self;
 }
+
+- (void)setFieldNames:(NSArray<NSString *> *)names {
+  NSMutableArray<RDLField *> *out = [NSMutableArray arrayWithCapacity:[names count]];
+  for (NSString *name in names) {
+    RDLField *field = [[RDLField alloc] init];
+    field.name = name;
+    [out addObject:field];
+  }
+  self.fields = out;
+}
+
+- (NSArray<NSString *> *)fieldNames {
+  NSMutableArray<NSString *> *names = [NSMutableArray arrayWithCapacity:[_fields count]];
+  for (RDLField *field in _fields)
+    [names addObject:field.name ?: @""];
+  return names;
+}
 @end
 
 @implementation RDLDataSource

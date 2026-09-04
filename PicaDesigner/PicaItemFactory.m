@@ -246,14 +246,9 @@ static RDLItem *PicaFindInItems(NSArray *items, RDLItem *target, RDLItem *parent
   }
 }
 
-// RDLDataSet.fields holds either NSString names or RDLField objects.
 + (NSString *)fieldNameAtIndex:(NSUInteger)index ofDataSet:(RDLDataSet *)ds {
-  if (index >= [ds.fields count])
-    return nil;
-  id f = ds.fields[index];
-  if ([f isKindOfClass:[RDLField class]])
-    return ((RDLField *)f).name;
-  return [f description];
+  NSArray<NSString *> *names = [ds fieldNames];
+  return index < [names count] ? names[index] : nil;
 }
 
 @end

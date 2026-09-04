@@ -64,11 +64,12 @@ static NSDictionary *PicaCol(NSString *header, NSString *value, CGFloat width, N
   };
 }
 
-static RDLDataSet *PicaSet(NSString *name, NSArray *fields, NSArray *rows) {
+static RDLDataSet *PicaSet(NSString *name, NSArray<NSString *> *fields, NSArray *rows) {
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = name;
   ds.dataSourceName = @"Demo";
-  ds.fields = fields;
+  // The samples declare fields by name; the types are whatever the rows hold.
+  [ds setFieldNames:fields];
   ds.rows = rows;
   return ds;
 }

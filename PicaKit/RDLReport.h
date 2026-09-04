@@ -617,7 +617,22 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *dataSourceName;
 @property (nonatomic, copy) NSString *commandText;
-@property (nonatomic, strong) NSArray *fields; // NSString or RDLField
+// Always RDLField objects, never bare names.
+//
+// MS-RDL has no bare-name form: a <Field> is an element with a required Name
+// attribute and optional DataField, Value and TypeName children, so every field
+// a report declares carries enough to make an object of. The bare NSString this
+// used to also accept was a shortcut of ours, and it cost a crash -- an
+// RDLField reached -isEqualToString: in the designer's field popup, which the
+// compiler could not have caught.
+@property (nonatomic, copy) NSArray<RDLField *> *fields;
+
+// The names, for the common case of wanting only those.
+- (NSArray<NSString *> *)fieldNames;
+// Declare fields by name alone: each name becomes an RDLField of unknown type,
+// replacing whatever `fields` held. For a dataset built by hand, or one whose
+// shape was inferred from the data rather than declared by the report.
+- (void)setFieldNames:(NSArray<NSString *> *)names;
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
 // One entry per row: an NSDictionary keyed by field name, or any object that
 // answers to key-value coding. See RDLRowValue.
