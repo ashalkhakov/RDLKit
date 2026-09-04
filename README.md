@@ -117,7 +117,8 @@ Skipped elements are reported in `report.warnings` instead of dropped silently.
   cd ../PicaDesigner && make
   openapp ./Pica.app
   cd ../PicaGen && make
-  ./picagen ../samples/invoice.rdl -f html -o invoice.html
+  ./picagen ../Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl \
+  -f html -o out.html
   ```
 
 Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
@@ -296,6 +297,24 @@ read, the way SSRS upgrades an older report, so the object model only ever has
 to know one shape. 79 of the 86 now parse and lay out; the 7 that do not are
 honest refusals naming a report item we have not implemented. Re-score with
 `.tools/rdl-coverage.sh`.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` builds and tests both platforms on every push.
+
+* **macOS** — `xcodebuild` for `PicaKit`, `Pica` and `PicaGen`, both test
+  suites, the RDL corpus score (which fails the build if any file parses to
+  nothing, or if fewer than 79 of the 86 still lay out), and a `picagen` smoke
+  test that checks a report and renders it to HTML and PDF.
+* **GNUstep** — the stack is built from source by
+  `.github/scripts/dependencies.sh` (tools-make, libobjc2, libs-base, libs-gui,
+  libs-back with the cairo graphics backend, and tools-xctest) and cached
+  against that script, since it changes far less often than RDLKit does. Then
+  the same three products, both XCTest bundles through `make check`, and the
+  same smoke test — all under `xvfb`, because AppKit drawing needs a display.
+
+GitHub Actions is free for public repositories on the standard runners, macOS
+included.
 
 ## License
 

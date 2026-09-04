@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A push that lands while an earlier one is still running supersedes it; there
+# is no value in finishing CI for a commit nobody will look at again.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ########################### macOS / Cocoa ###########################
+  macos:
+    name: macOS (Xcode)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      # Built first and on its own, so a compile error in the library is
+      # reported as that rather than as a test failure.
+      - name: Build PicaKit
+        run: |
+          xcodebuild -project RDLKit.xcodeproj -scheme PicaKit \
+            -destination 'platform=macOS' -configuration Debug build
+
+      - name: Build the designer and the CLI
+        run: |
+          for scheme in Pica PicaGen; do
+            xcodebuild -project RDLKit.xcodeproj -scheme "$scheme" \
+              -destination 'platform=macOS' -configuration Debug build
+          done
+
+      - name: Test PicaKit
+        run: |
+          xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests \
+            -destination 'platform=macOS' \
+            -resultBundlePath "$RUNNER_TEMP/PicaKitTests.xcresult" test
+
+      # The designer's cases open real modal panels, so they need a session
+      # that can make windows. A GitHub macOS runner has one.
+      - name: Test PicaDesigner
+        run: |
+          xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests \
+            -destination 'platform=macOS' \
+            -resultBundlePath "$RUNNER_TEMP/PicaDesignerTests.xcresult" test
+
+      # 86 report definitions written by somebody else. The count is asserted
+      # rather than merely printed, so a regression that quietly starts
+      # refusing files fails the build.
+      - name: RDL corpus coverage
+        run: |
+          .tools/rdl-coverage.sh > /tmp/coverage.txt 2> /tmp/coverage-tally.txt || true
+          cat /tmp/coverage-tally.txt
+          grep -q "0 silently empty" /tmp/coverage-tally.txt \
+            || { echo "::error::a report parsed to nothing without complaining"; exit 1; }
+          ok=$(sed -n 's/.*: \([0-9]*\) ok.*/\1/p' /tmp/coverage-tally.txt)
+          [ "${ok:-0}" -ge 79 ] \
+            || { echo "::error::corpus coverage fell to ${ok} of 86 (was 79)"; exit 1; }
+
+      - name: Smoke-test picagen
+        run: |
+          built=$(xcodebuild -project RDLKit.xcodeproj -scheme PicaGen \
+                    -destination 'platform=macOS' -showBuildSettings 2>/dev/null \
+                  | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
+          sample=Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl
+          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" --check
+          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" --contract > /dev/null
+          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" -f html -o /tmp/out.html
+          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" -o /tmp/out.pdf
+          test -s /tmp/out.html && test -s /tmp/out.pdf
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: macos-test-results
+          path: ${{ runner.temp }}/*.xcresult
+          retention-days: 7
+
+  ########################### GNUstep / Linux ###########################
+  gnustep:
+    name: Ubuntu (GNUstep, clang, gnustep-2.0)
+    runs-on: ubuntu-latest
+    env:
+      SRC_PATH: ${{ github.workspace }}/source
+      DEPS_PATH: ${{ github.workspace }}/dependencies
+      INSTALL_PATH: ${{ github.workspace }}/build
+      CC: clang
+      CXX: clang++
+      LIBRARY_COMBO: ng-gnu-gnu
+      RUNTIME_VERSION: gnustep-2.0
+    defaults:
+      run:
+        working-directory: ${{ env.SRC_PATH }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.SRC_PATH }}
+
+      - name: Install packages
+        run: |
+          sudo apt-get -q -y update
+          sudo apt-get -q -y install \
+            pkg-config libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
+            libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
+            libgmp-dev libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
+            libpthread-workqueue-dev \
+            libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
+            xvfb
+          # The gnustep-2.0 runtime needs ld.gold or lld.
+          sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
+
+      # The whole GNUstep stack is built from source, which takes far longer
+      # than RDLKit does. It only changes when the pinned dependency script
+      # changes, so it is cached against that.
+      - name: Cache GNUstep
+        id: gnustep-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.INSTALL_PATH }}
+          key: gnustep-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+
+      - name: Build GNUstep
+        if: steps.gnustep-cache.outputs.cache-hit != 'true'
+        run: ./.github/scripts/dependencies.sh
+
+      - name: Build PicaKit
+        run: |
+          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          make -C PicaKit
+
+      - name: Build the CLI and the designer
+        run: |
+          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          make -C PicaGen
+          make -C PicaDesigner
+
+      # Both suites are ordinary XCTest, which GNUstep supplies through
+      # tools-xctest. `make check` builds the bundle and runs it under xctest.
+      - name: Test PicaKit
+        run: |
+          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          xvfb-run -a make -C PicaKitTests check
+
+      - name: Test PicaDesigner
+        run: |
+          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          xvfb-run -a make -C PicaDesignerTests check
+
+      - name: Smoke-test picagen
+        run: |
+          . $INSTALL_PATH/share/GNUstep/Makefiles/GNUstep.sh
+          sample=Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl
+          xvfb-run -a ./PicaGen/obj/picagen "$sample" --check
+          xvfb-run -a ./PicaGen/obj/picagen "$sample" -f html -o /tmp/out.html
+          # The PDF backend is AppKit's, and GNUstep implements it too.
+          xvfb-run -a ./PicaGen/obj/picagen "$sample" -o /tmp/out.pdf
+          test -s /tmp/out.html && test -s /tmp/out.pdf
