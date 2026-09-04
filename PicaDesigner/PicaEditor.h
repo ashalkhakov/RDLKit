@@ -11,7 +11,6 @@
 // with the previous value, so NSUndoManager derives redo for free.
 #import <Foundation/Foundation.h>
 #import "PicaKit.h"
-#import <CoreGraphics/CoreGraphics.h>
 
 @class PicaDocument;
 @class RDLItem;

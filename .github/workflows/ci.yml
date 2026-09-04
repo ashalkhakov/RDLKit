@@ -108,6 +108,20 @@ jobs:
         with:
           path: ${{ env.SRC_PATH }}
 
+      # Seconds, and before the half-hour dependency build. CoreGraphics is a
+      # macOS framework: importing it compiles fine on a Mac and breaks the
+      # GNUstep build, which is a slow way to find out. CGFloat and the NS
+      # geometry types come from Foundation on both platforms.
+      - name: No macOS-only imports
+        run: |
+          if grep -rn "CoreGraphics\|<Cocoa/Cocoa.h>\|QuartzCore" \
+               --include="*.h" --include="*.m" PicaKit PicaDesigner PicaGen \
+               PicaKitTests PicaDesignerTests; then
+            echo "::error::a macOS-only framework is imported; GNUstep has no such header"
+            exit 1
+          fi
+          echo "none found"
+
       - name: Install packages
         run: |
           sudo apt-get -q -y update
