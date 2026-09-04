@@ -2077,11 +2077,18 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   NSString *groupBefore = tab.groupBy;
   NSUInteger specsBefore = [tab.columnSpecs count];
 
-  // Opened repeatedly, alternating dismissal, because the failures here have
-  // all been about the second and later openings rather than the first. Six
-  // rounds: an over-released window only shows up once its memory has been
-  // handed to something else, which took two rounds of three to surface.
-  for (NSInteger round = 1; round <= 6; round++) {
+  // Opened twice, cancelled then accepted.
+  //
+  // This used to run six rounds, hunting an over-release that only surfaced
+  // once the freed window's memory had been handed to something else. That bug
+  // came from handling the panels by hand -- an explicit -close, and
+  // isReleasedWhenClosed turned off to compensate. The panels now use the
+  // documented modal pattern (runModalForWindow: / stopModalWithCode:, ordered
+  // out once, on both paths) and there is nothing left for the repetition to
+  // find. What is worth checking is what each dismissal does, and twice covers
+  // that -- which also stops this being the slowest test on GNUstep, where each
+  // modal session costs real time.
+  for (NSInteger round = 1; round <= 2; round++) {
     BOOL accept = (round % 2) == 0;
     PicaDialogClicker *clicker = nil;
     BOOL changed = PicaRunTablixDialog(tab, ctx, accept ? @"OK" : @"Cancel", &clicker);
