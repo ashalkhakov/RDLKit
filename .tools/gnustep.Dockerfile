@@ -17,10 +17,8 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# "Hash Sum mismatch" from a caching proxy is the usual way this build dies, so
-# retry, and stop apt pipelining requests -- which is what proxies mangle. Split
-# in two so a failure does not re-download the lot.
-# Retry, and stop apt pipelining requests, which is what proxies mangle.
+# Retry, and stop apt pipelining requests, which is what proxies mangle. The
+# install is split in two so a failure does not re-download the lot.
 #
 # Not built successfully on this machine: its network path corrupts plain HTTP
 # from ports.ubuntu.com -- a 178 kB package arriving as 42 MB, reported as
