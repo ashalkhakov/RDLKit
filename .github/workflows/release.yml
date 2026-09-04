@@ -1,0 +1,221 @@
+name: Release
+
+# Tag a version to publish, or run it by hand to get the artifacts without
+# creating a release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ############################ Linux AppImage ############################
+  appimage:
+    name: Linux AppImage
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SRC_PATH: ${{ github.workspace }}/source
+      DEPS_PATH: ${{ github.workspace }}/dependencies
+      INSTALL_PATH: ${{ github.workspace }}/build
+      CC: clang
+      CXX: clang++
+      LIBRARY_COMBO: ng-gnu-gnu
+      RUNTIME_VERSION: gnustep-2.0
+    defaults:
+      run:
+        working-directory: ${{ env.SRC_PATH }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ${{ env.SRC_PATH }}
+
+      - name: Version
+        run: |
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          else
+            echo "APP_VERSION=0.0.0-build${{ github.run_number }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install packages
+        run: |
+          sudo apt-get -q -y update
+          sudo apt-get -q -y install \
+            pkg-config libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
+            libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
+            libgmp-dev libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
+            libpthread-workqueue-dev \
+            libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
+            fuse libfuse2 desktop-file-utils \
+            fonts-dejavu fonts-liberation
+          if [ -x /usr/bin/ld.gold ]; then
+            sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
+          else
+            sudo apt-get -q -y install lld
+            sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 10
+          fi
+
+      # The same stack, the same script and the same cache key as CI, so a
+      # release does not rebuild what a push already built.
+      - name: Cache GNUstep
+        id: gnustep-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.INSTALL_PATH }}
+          key: gnustep-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+
+      - name: Build GNUstep
+        if: steps.gnustep-cache.outputs.cache-hit != 'true'
+        run: ./.github/scripts/dependencies.sh
+
+      - name: Fetch linuxdeploy and the AppImage runtime
+        run: |
+          mkdir -p /tmp/appimage-runtime /usr/local/lib/linuxdeploy 2>/dev/null || true
+          sudo mkdir -p /usr/local/lib/linuxdeploy
+          curl -fsSL -o /tmp/linuxdeploy.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x /tmp/linuxdeploy.AppImage
+          # Extracted rather than run: an AppImage inside a container needs FUSE,
+          # and extracting sidesteps the question.
+          cd /tmp && ./linuxdeploy.AppImage --appimage-extract > /dev/null
+          sudo cp -r /tmp/squashfs-root/. /usr/local/lib/linuxdeploy/
+          curl -fsSL -o /tmp/appimage-runtime/runtime-x86_64 \
+            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
+
+      - name: Assemble AppDir
+        run: GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
+
+      - name: Package the AppImage
+        env:
+          LDAI_RUNTIME_FILE: /tmp/appimage-runtime/runtime-x86_64
+        run: GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/package-appimage.sh
+
+      # Proof it starts: --check needs no display, so a broken bundle fails
+      # here rather than for whoever downloads it.
+      - name: Smoke-test the AppImage
+        run: |
+          image=$(ls RDLKit-Linux-*.AppImage)
+          chmod +x "$image"
+          ./"$image" picagen \
+            Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl --check
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RDLKit-Linux-${{ env.APP_VERSION }}
+          path: ${{ env.SRC_PATH }}/RDLKit-Linux-*.AppImage
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.SRC_PATH }}/RDLKit-Linux-*.AppImage
+
+  ############################ macOS ############################
+  macos:
+    name: macOS (signed)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        run: |
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          else
+            echo "APP_VERSION=0.0.0-build${{ github.run_number }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build
+        run: |
+          for scheme in PicaKit Pica PicaGen; do
+            xcodebuild -project RDLKit.xcodeproj -scheme "$scheme" \
+              -destination 'platform=macOS' -configuration Release build
+          done
+
+      # Signing is skipped, loudly, when the certificate secrets are absent, so
+      # a fork or a dry run still produces artifacts -- unsigned, and named so.
+      - name: Sign
+        id: sign
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$CERTIFICATE" ] || [ -z "$IDENTITY" ]; then
+            echo "::warning::MACOS_CERTIFICATE or MACOS_SIGN_IDENTITY not set; shipping unsigned"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain" > /dev/null
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          built=$(xcodebuild -project RDLKit.xcodeproj -scheme Pica \
+                    -destination 'platform=macOS' -configuration Release \
+                    -showBuildSettings 2>/dev/null \
+                  | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
+          echo "BUILT=$built" >> "$GITHUB_ENV"
+          # --options runtime is what notarization requires; sign the framework
+          # before the app that embeds it, or the outer signature is stale.
+          codesign --force --timestamp --options runtime \
+                   --sign "$IDENTITY" "$built/PicaKit.framework"
+          codesign --force --timestamp --options runtime \
+                   --sign "$IDENTITY" "$built/picagen"
+          codesign --force --timestamp --options runtime --deep \
+                   --sign "$IDENTITY" "$built/Pica.app"
+          codesign --verify --strict --verbose=2 "$built/Pica.app"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize
+        if: steps.sign.outputs.signed == 'true' && env.NOTARY_APPLE_ID != ''
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          ditto -c -k --keepParent "$BUILT/Pica.app" "$RUNNER_TEMP/Pica-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Pica-notarize.zip" \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" \
+            --password "$NOTARY_PASSWORD" --wait
+          xcrun stapler staple "$BUILT/Pica.app"
+
+      - name: Package
+        run: |
+          built=${BUILT:-$(xcodebuild -project RDLKit.xcodeproj -scheme Pica \
+                    -destination 'platform=macOS' -configuration Release \
+                    -showBuildSettings 2>/dev/null \
+                  | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')}
+          suffix=""
+          [ "${{ steps.sign.outputs.signed }}" = "true" ] || suffix="-unsigned"
+          ditto -c -k --keepParent "$built/Pica.app" \
+            "RDLKit-macOS-${APP_VERSION}${suffix}.zip"
+          ditto -c -k "$built/picagen" "picagen-macOS-${APP_VERSION}${suffix}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RDLKit-macOS-${{ env.APP_VERSION }}
+          path: |
+            RDLKit-macOS-*.zip
+            picagen-macOS-*.zip
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            RDLKit-macOS-*.zip
+            picagen-macOS-*.zip

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Pica
+GenericName=Report Designer
+Comment=Create and edit Microsoft RDL report definitions
+Exec=AppRun %f
+Icon=pica
+Terminal=false
+Categories=Office;Development;
+MimeType=application/x-rdl;

@@ -351,6 +351,30 @@ one the minutes count against the account's allowance and **macOS bills at
 10×**, so the macOS job runs on pull requests and on `master` rather than on
 every push; the Linux job, at 1×, runs on everything.
 
+## Releases
+
+`.github/workflows/release.yml` runs on a `v*` tag, or by hand for the
+artifacts without a release.
+
+* **Linux** — one AppImage carrying both programs. `Scripts/prepare-appdir.sh`
+  assembles an AppDir with the designer, the CLI and the GNUstep runtime, and
+  `Scripts/package-appimage.sh` hands it to `linuxdeploy`. The layout follows
+  GNUstep's: `AppRun` writes a config pointing `GNUSTEP_SYSTEM_ROOT` and its
+  siblings at wherever the image is mounted, because that path is not known
+  until it runs. Run the designer by launching the image, and the CLI as
+  `./RDLKit-Linux-*.AppImage picagen report.rdl --check`.
+* **macOS** — `Pica.app` and `picagen`, signed with a Developer ID and
+  notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),
+  `MACOS_CERTIFICATE_PASSWORD` and `MACOS_SIGN_IDENTITY`; notarization
+  additionally needs `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and
+  `NOTARY_PASSWORD`. Without them the build still produces artifacts, marked
+  `-unsigned`, rather than failing.
+
+The AppImage bundles DejaVu and Liberation, and the Microsoft core fonts if
+they are installed on the builder. That is the point of bundling any: it is
+what stops a report laying out differently on a machine that has none of the
+fonts it names. See **Fonts and layout across platforms** above.
+
 ## License
 
 RDLKit is licensed under the **GNU Lesser General Public License, version 2.1**

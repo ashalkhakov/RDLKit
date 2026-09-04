@@ -1,0 +1,64 @@
+#!/bin/sh
+# Launcher for the RDLKit AppImage.
+#
+# GNUstep finds everything through a config file and a set of root variables,
+# and inside an AppImage those roots are wherever the image happens to be
+# mounted. So both are written out at launch, pointing at $HERE.
+set -eu
+
+HERE="$(dirname "$(readlink -f "$0")")"
+
+export GNUSTEP_CONFIG_FILE="/tmp/GNUstep-Pica-$$.conf"
+cat <<IN_EOF > "$GNUSTEP_CONFIG_FILE"
+GNUSTEP_USER_CONFIG_FILE=.GNUstep.conf
+GNUSTEP_USER_DEFAULTS_DIR=GNUstep/Defaults
+GNUSTEP_SYSTEM_USERS_DIR=/home
+GNUSTEP_NETWORK_USERS_DIR=/home
+GNUSTEP_LOCAL_USERS_DIR=/home
+GNUSTEP_SYSTEM_ROOT=$HERE/usr/System
+GNUSTEP_SYSTEM_LIBRARIES=$HERE/usr/System/Library
+GNUSTEP_SYSTEM_LIBRARY=$HERE/usr/System/Library
+GNUSTEP_SYSTEM_TOOLS=$HERE/usr/System/Tools
+GNUSTEP_SYSTEM_APPS=$HERE/usr/System/Applications
+GNUSTEP_LOCAL_ROOT=$HERE/usr/Local
+GNUSTEP_LOCAL_LIBRARY=$HERE/usr/Local/Library
+GNUSTEP_LOCAL_TOOLS=$HERE/usr/Local/Tools
+GNUSTEP_LOCAL_APPS=$HERE/usr/Local/Applications
+IN_EOF
+chmod 600 "$GNUSTEP_CONFIG_FILE"
+
+export GNUSTEP_SYSTEM_ROOT="$HERE/usr/System"
+export GNUSTEP_SYSTEM_LIBRARY="$HERE/usr/System/Library"
+export GNUSTEP_SYSTEM_TOOLS="$HERE/usr/System/Tools"
+export GNUSTEP_SYSTEM_APPS="$HERE/usr/System/Applications"
+export GNUSTEP_LOCAL_ROOT="$HERE/usr/Local"
+export GNUSTEP_LOCAL_LIBRARY="$HERE/usr/Local/Library"
+export GNUSTEP_LOCAL_TOOLS="$HERE/usr/Local/Tools"
+export GNUSTEP_LOCAL_APPS="$HERE/usr/Local/Applications"
+
+export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
+export PATH="$HERE/usr/local/bin:$HERE/usr/bin:$PATH"
+
+# The bundled fonts are the point of shipping any: a report names Arial or
+# Times New Roman, and what the host has installed decides how it paginates.
+# See "Fonts and layout across platforms" in the README.
+export FONTCONFIG_FILE="$HERE/usr/etc/fonts/fonts.conf"
+export XDG_CACHE_HOME="/tmp/pica-fc-cache-$$"
+mkdir -p "$XDG_CACHE_HOME"
+trap 'rm -rf "$XDG_CACHE_HOME" "$GNUSTEP_CONFIG_FILE"' EXIT
+
+# The image carries two programs. Invoked as picagen, or with picagen as the
+# first argument, it is the command line tool; otherwise it is the designer.
+case "${1:-}" in
+  picagen)
+    shift
+    exec "$HERE/usr/bin/picagen" "$@"
+    ;;
+esac
+case "$(basename "${ARGV0:-$0}")" in
+  picagen)
+    exec "$HERE/usr/bin/picagen" "$@"
+    ;;
+esac
+
+exec "$HERE/usr/System/Applications/Pica.app/Pica" "$@"

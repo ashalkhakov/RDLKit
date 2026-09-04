@@ -209,6 +209,8 @@ jobs:
           }
           run xvfb-run -a "$tool" "$sample" --check
           run xvfb-run -a "$tool" "$sample" -f html -o /tmp/out.html
-          # The PDF backend is AppKit's, and GNUstep implements it too.
-          run xvfb-run -a "$tool" "$sample" -o /tmp/out.pdf
-          test -s /tmp/out.html && test -s /tmp/out.pdf
+          test -s /tmp/out.html
+          # PDF is not exercised here: -dataWithPDFInsideRect: goes through
+          # GNUstep's print machinery, which invents a default printer when
+          # none is configured and then never returns. See
+          # Patches/gnustep-pdf-hangs-headless.md. The macOS job covers PDF.
