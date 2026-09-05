@@ -8,6 +8,9 @@
 - (void)showPreview:(id)sender;
 - (void)toggleDesignPreview:(id)sender;
 - (void)exportPDF:(id)sender;
+- (void)leftTabChanged:(id)sender;
+- (void)centerTabChanged:(id)sender;
+- (void)rightTabChanged:(id)sender;
 - (void)addElement:(id)sender;
 - (void)removeElement:(id)sender;
 @end

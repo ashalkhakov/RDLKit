@@ -20,6 +20,14 @@
 @property (nonatomic, strong) IBOutlet RDLInspectorView *inspector;
 @property (nonatomic, strong) IBOutlet NSScrollView *inspectorScroll;
 @property (nonatomic, strong) IBOutlet RDLDataView *dataView;
+// Each pane is a segmented control over a tabless tab view: the control is the
+// visible chrome, the tab view holds the panes. Hosts are empty views the
+// later stages fill; they carry a label so an empty pane says what belongs
+// there rather than looking broken.
+@property (nonatomic, strong) IBOutlet NSSegmentedControl *leftTabs, *centerTabs, *rightTabs;
+@property (nonatomic, strong) IBOutlet NSTabView *leftTabView, *centerTabView, *rightTabView;
+@property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
+@property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
 // RDLPreviewWindow.xib
 @property (nonatomic, strong) IBOutlet NSWindow *previewWindow;
@@ -201,6 +209,29 @@
   _previewView.paramValues = _context.document.paramValues;
   [_previewView reloadLayout];
   [_previewWindow makeKeyAndOrderFront:nil];
+}
+
+// Selecting a segment selects the tab of the same index. Nothing else: which
+// pane is showing is not state worth keeping anywhere but in the tab view.
+static void RDLSelectTab(NSSegmentedControl *tabs, NSTabView *tabView) {
+  NSInteger i = [tabs selectedSegment];
+  if (i >= 0 && i < [tabView numberOfTabViewItems])
+    [tabView selectTabViewItemAtIndex:i];
+}
+
+- (void)leftTabChanged:(id)sender {
+  (void)sender;
+  RDLSelectTab(_leftTabs, _leftTabView);
+}
+
+- (void)centerTabChanged:(id)sender {
+  (void)sender;
+  RDLSelectTab(_centerTabs, _centerTabView);
+}
+
+- (void)rightTabChanged:(id)sender {
+  (void)sender;
+  RDLSelectTab(_rightTabs, _rightTabView);
 }
 
 - (void)toggleDesignPreview:(id)sender {

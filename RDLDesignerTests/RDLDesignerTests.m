@@ -2223,6 +2223,70 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // the report's own dark ink on a dark ground and the text disappears. Checked
 // here rather than by eye, because the desktop that matters is the one CI runs
 // on and not this one.
+// The designer window is hand-written XIB, and the mistakes that markup admits
+// are silent: an outlet whose name does not match the property stays nil, and
+// a pane whose segmented control and tab view disagree on how many panes there
+// are selects the wrong one or nothing. Both are read out of the file here.
+//
+// This is not a load test. It cannot see markup that ibtool drops on macOS --
+// what it checks is that the file says what the controller expects, which is
+// where hand-editing goes wrong. A load test would need the canvas, inspector,
+// data view and outline source in this bundle; they belong here eventually,
+// with the panes that use them.
+- (void)testDesignerWindowShell {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *xibPath = [dir stringByAppendingPathComponent:@"RDLDesigner/RDLDesignerWindow.xib"];
+  NSString *xib = [NSString stringWithContentsOfFile:xibPath
+                                            encoding:NSUTF8StringEncoding
+                                               error:NULL];
+  NSString *source = [NSString stringWithContentsOfFile:
+                                   [dir stringByAppendingPathComponent:
+                                            @"RDLDesigner/RDLDesignerWindow.m"]
+                                               encoding:NSUTF8StringEncoding
+                                                  error:NULL];
+  if (xib == nil || source == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"cannot read %@", xibPath]);
+    return;
+  }
+
+  // Every outlet the XIB connects has to be a property the controller declares,
+  // or it silently connects nothing.
+  NSError *err = nil;
+  NSRegularExpression *outlets =
+      [NSRegularExpression regularExpressionWithPattern:@"outlet property=\"([A-Za-z]+)\""
+                                                options:0
+                                                  error:&err];
+  NSUInteger found = 0;
+  for (NSTextCheckingResult *m in
+       [outlets matchesInString:xib options:0 range:NSMakeRange(0, [xib length])]) {
+    NSString *name = [xib substringWithRange:[m rangeAtIndex:1]];
+    found++;
+    if ([name isEqualToString:@"delegate"] || [name isEqualToString:@"window"])
+      continue;
+    if ([source rangeOfString:[NSString stringWithFormat:@"*%@;", name]].location == NSNotFound &&
+        [source rangeOfString:[NSString stringWithFormat:@"*%@,", name]].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:
+                                   @"the XIB connects %@, which the controller does not declare",
+                                   name]);
+  }
+  if (found < 10)
+    XCTFail(@"%@", @"the XIB connects almost nothing; it is not the designer window");
+
+  // Each pane is a segmented control over a tab view, and they have to agree.
+  NSUInteger segments = [[xib componentsSeparatedByString:@"<segment "] count] - 1;
+  NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
+  if (segments != items)
+    XCTFail(@"%@", [NSString stringWithFormat:
+                                 @"%lu segments over %lu panes -- a tab with no segment "
+                                 @"cannot be reached, and a segment with no tab selects nothing",
+                                 (unsigned long)segments, (unsigned long)items]);
+  // Left: outline and datasets. Centre: preview, source, dataset. Right:
+  // element, report, dataset field.
+  if (items != 8)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 8 panes across the three tab views, got %lu",
+                                              (unsigned long)items]);
+}
+
 - (void)testRichTextEditorPaper {
   RDLReport *report = [RDLSamples blankLetter];
   RDLTextbox *box = nil;
