@@ -1,4 +1,5 @@
 #import "RDLRichTextEditor.h"
+#import "RDLExpressionEditor.h"
 #import "RDLRichTextCodec.h"
 #import "RDLRichTextFormatter.h"
 #import "RDLEditingContext.h"
@@ -11,6 +12,10 @@
 @interface RDLRichTextEditor () <NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
 @property (nonatomic, strong) IBOutlet NSTextView *textView;
+@property (nonatomic, strong) IBOutlet NSButton *exprButton;
+// Kept so the expression editor can offer this report's own fields and
+// parameters, which is most of what makes the picker useful.
+@property (nonatomic, strong) RDLReport *report;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
 // The formatting bar.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *fontPopup;
@@ -216,6 +221,29 @@
   [NSApp stopModalWithCode:NSModalResponseCancel];
 }
 
+// Expressions nest inside rich text and not the other way round: a run's text
+// may be an expression, so it is inserted here, at the insertion point, taking
+// the formatting of the text around it. The field beside a plain attribute
+// cannot offer this, which is why the editor has its own way in.
+- (void)insertExpression:(id)sender {
+  (void)sender;
+  NSString *source = [RDLExpressionEditor runForSource:@""
+                                               context:RDLExpressionContextText
+                                                report:_report];
+  if ([source length] == 0)
+    return;
+  NSRange at = [_textView selectedRange];
+  if (at.location == NSNotFound)
+    at = NSMakeRange([[_textView textStorage] length], 0);
+  NSDictionary *attrs = [_textView typingAttributes];
+  [[_textView textStorage]
+      replaceCharactersInRange:at
+          withAttributedString:[[NSAttributedString alloc] initWithString:source
+                                                              attributes:attrs]];
+  [_textView setSelectedRange:NSMakeRange(at.location + [source length], 0)];
+  [self syncToolbar];
+}
+
 + (NSColor *)paperColorForItem:(RDLTextbox *)item {
   // Paper, not ink: a textbox with no fill of its own is edited on white,
   // whatever the desktop appearance is.
@@ -268,6 +296,7 @@
   [tv setTypingAttributes:[RDLTextAttributes attributesForStyle:item.style
                                                  paragraphAlign:RDLTextAlignUnspecified
                                                           scale:1.0]];
+  ed.report = context.report;
   [ed prepareToolbar];
   [ed syncToolbar];
   return ed;

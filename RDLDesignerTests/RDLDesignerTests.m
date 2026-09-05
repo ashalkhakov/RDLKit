@@ -2262,6 +2262,76 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The expression editor, built and driven without a modal session: what it
 // offers to insert, that inserting lands at the caret, and that the source it
 // hands back is what was typed.
+// A font size that is computed. The literal side is an RDLLength, so this is a
+// separate kind from the text one: writing the string "10pt" into fontSize
+// would put the wrong type in the model.
+- (void)testLengthExpressionBinding {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  box.style.fontSize = [RDLLength points:11];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLExpressionField *field =
+      [[RDLExpressionField alloc] initWithFrame:NSMakeRect(0, 0, 90, 22)];
+  field.expressionContext = RDLExpressionContextLength;
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:field keyPath:@"style.fontSize" scope:RDLFieldScopeItem
+            kind:RDLFieldKindLengthOrExpression];
+
+  [bindings fillFromItem:box band:nil report:report];
+  if (![[field stringValue] isEqualToString:@"11pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the field shows %@", [field stringValue]]);
+
+  [field setStringValue:@"=IIf(Fields!Big.Value, \"14pt\", \"9pt\")"];
+  [bindings applyControl:field editor:ctx.editor item:box bandKey:nil];
+  if (box.style.expressions.fontSize == nil)
+    XCTFail(@"%@", @"the expression was not written to style.expressions.fontSize");
+  if (box.style.fontSize != nil)
+    XCTFail(@"%@", @"the measurement survived the expression");
+
+  // And back to a measurement, which has to arrive as an RDLLength and not as
+  // the string that was typed.
+  [field setStringValue:@"12pt"];
+  [bindings applyControl:field editor:ctx.editor item:box bandKey:nil];
+  if (box.style.expressions.fontSize != nil)
+    XCTFail(@"%@", @"the expression survived a measurement");
+  if (![box.style.fontSize isKindOfClass:[RDLLength class]])
+    XCTFail(@"%@", @"a string was written where an RDLLength belongs");
+  if (![[box.style.fontSize stringValue] isEqualToString:@"12pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the size reads %@",
+                                              [box.style.fontSize stringValue]]);
+}
+
+// The rich-text editor has its own way into the expression editor, because an
+// expression nests inside a run and the run is what is being edited.
+- (void)testRichTextEditorTakesExpressions {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRichTextEditor *ed = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (ed == nil) {
+    XCTFail(@"%@", @"RDLRichTextEditor.xib did not load");
+    return;
+  }
+  NSWindow *panel = [ed valueForKey:@"window"];
+  if (RDLFindButtonTitled([panel contentView], @"Insert Expression…") == nil)
+    XCTFail(@"%@", @"the rich-text editor offers no way to insert an expression");
+  // It needs the report to offer that report's fields; without it the picker
+  // would list functions and nothing else.
+  if ([ed valueForKey:@"report"] != report)
+    XCTFail(@"%@", @"the editor was not given the report the picker draws on");
+}
+
 - (void)testExpressionEditor {
   RDLReport *report = [RDLSamples atelierInvoice];
   RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@"#336699"

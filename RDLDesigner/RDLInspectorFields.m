@@ -141,6 +141,17 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         }
         break;
       }
+      case RDLFieldKindLengthOrExpression: {
+        RDLExpr *expr = [target valueForKeyPath:RDLExpressionKeyPath(b.keyPath)];
+        if (expr != nil) {
+          [(NSTextField *)b.control setStringValue:[expr source] ?: @""];
+        } else {
+          RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
+          [(NSTextField *)b.control
+              setStringValue:len ? [len stringValue] : (b.placeholder ?: @"")];
+        }
+        break;
+      }
       case RDLFieldKindColor: {
         NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
         // A transparent background is not a colour the well can show, so it
@@ -222,6 +233,34 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
             [editor setReportValue:expr forKeyPath:exprPath];
             [editor setReportValue:isExpression ? nil : ([text length] ? text : nil)
                         forKeyPath:b.keyPath];
+            break;
+        }
+        return YES;
+      }
+      case RDLFieldKindLengthOrExpression: {
+        NSString *text = [(NSTextField *)b.control stringValue];
+        NSString *exprPath = RDLExpressionKeyPath(b.keyPath);
+        BOOL isExpression = [RDLExpr isExpressionSource:text];
+        id expr = isExpression ? [RDLExpr expressionWithSource:text] : nil;
+        // Clearing the field removes the measurement rather than storing zero,
+        // as the plain length kind does.
+        id length = isExpression ? nil : [RDLLength lengthFromString:text];
+        switch (b.scope) {
+          case RDLFieldScopeItem:
+            if (item) {
+              [editor setValue:expr forKeyPath:exprPath ofItem:item];
+              [editor setValue:length forKeyPath:b.keyPath ofItem:item];
+            }
+            break;
+          case RDLFieldScopeBand:
+            if ([bandKey length]) {
+              [editor setValue:expr forKeyPath:exprPath ofBandWithKey:bandKey];
+              [editor setValue:length forKeyPath:b.keyPath ofBandWithKey:bandKey];
+            }
+            break;
+          case RDLFieldScopeReport:
+            [editor setReportValue:expr forKeyPath:exprPath];
+            [editor setReportValue:length forKeyPath:b.keyPath];
             break;
         }
         return YES;

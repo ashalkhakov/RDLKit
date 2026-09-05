@@ -23,6 +23,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -38,10 +39,7 @@
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *valueField, *fontField, *colorField, *formatField;
-// A measurement, so still a plain field: its literal is an RDLLength and the
-// text-or-expression binding writes strings. Expressions on lengths need a
-// kind of their own.
-@property (nonatomic, strong) IBOutlet NSTextField *sizeField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
 @property (nonatomic, strong) IBOutlet NSView *lineBox;
@@ -175,7 +173,7 @@
   [_bindings bind:_fontField keyPath:@"style.fontFamily" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression values:nil placeholder:@"Georgia"];
   [_bindings bind:_sizeField keyPath:@"style.fontSize" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLength values:nil placeholder:@"10pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"10pt"];
   // Vocabulary popups map menu index to the enum case, so the model value and
   // the menu title no longer have to be the same word ("Roman" shows Normal).
   [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:RDLFieldScopeItem
@@ -454,6 +452,7 @@
   _colorField.expressionContext = RDLExpressionContextColor;
   _rectBGField.expressionContext = RDLExpressionContextColor;
   _formatField.expressionContext = RDLExpressionContextText;
+  _sizeField.expressionContext = RDLExpressionContextLength;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -465,6 +464,7 @@
   if (sender == _colorExprButton) return _colorField;
   if (sender == _formatExprButton) return _formatField;
   if (sender == _rectBGExprButton) return _rectBGField;
+  if (sender == _sizeExprButton) return _sizeField;
   return nil;
 }
 

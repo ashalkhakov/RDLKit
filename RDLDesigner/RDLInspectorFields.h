@@ -39,6 +39,11 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   // of the two is set. Text beginning with "=" writes the expression and clears
   // the literal; anything else does the reverse.
   RDLFieldKindTextOrExpression,
+  // A measurement that may instead be an expression. The same pair as
+  // RDLFieldKindTextOrExpression, except the literal side is an RDLLength: a
+  // font size is "10pt", not the string "10pt", so the two kinds cannot share
+  // an implementation without writing the wrong type into the model.
+  RDLFieldKindLengthOrExpression,
   // NSColorWell over an RDL colour string. The well opens NSColorPanel, which
   // is the standard way to pick one; the hex field beside it stays, because a
   // report's colours are often given rather than chosen.

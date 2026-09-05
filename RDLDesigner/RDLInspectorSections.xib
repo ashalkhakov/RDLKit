@@ -24,6 +24,7 @@
                 <outlet property="colorExprButton" destination="colorExprButton" id="colorExprButtonOutlet"/>
                 <outlet property="formatExprButton" destination="formatExprButton" id="formatExprButtonOutlet"/>
                 <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
+                <outlet property="sizeExprButton" destination="sizeExprButton" id="sizeExprButtonOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
@@ -509,8 +510,8 @@
                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="sizeField">
-                    <rect key="frame" x="10" y="154.0" width="114" height="22"/>
+                <textField id="sizeField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="154.0" width="86.0" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="sizeFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -522,6 +523,15 @@
                         <outlet property="delegate" destination="-2" id="sizeFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Edit this as an expression" id="sizeExprButton">
+                    <rect key="frame" x="100.0" y="154.0" width="24" height="22.0"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="sizeExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections><action selector="editExpression:" target="-2" id="sizeExprButtonAction"/></connections>
+                </button>
                 <popUpButton id="weightPop">
                     <rect key="frame" x="136" y="154.0" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
