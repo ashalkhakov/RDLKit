@@ -150,63 +150,20 @@ static RDLReport *PicaGroupedJobs(void) {
 // path is exercised: the panel's action reaches the editor, which ends the
 // session, which unwinds the loop.
 
-@interface PicaDialogClicker : NSObject
-@property (nonatomic, copy) NSString *title;
-@property (nonatomic, assign) BOOL foundButton;
-@property (nonatomic, assign) BOOL sawModal;
-@end
-@implementation PicaDialogClicker
-- (NSButton *)findIn:(NSView *)view {
+// Finds a button by title anywhere under a view. Used instead of running a
+// modal session: what these panels owe us is that they are built and wired,
+// and a session only exercises AppKit's modal machinery, which is not ours and
+// does not behave the same on GNUstep.
+static NSButton *PicaFindButtonTitled(NSView *view, NSString *title) {
   for (NSView *v in [view subviews]) {
     if ([v isKindOfClass:[NSButton class]] &&
-        [[(NSButton *)v title] isEqualToString:_title])
+        [[(NSButton *)v title] isEqualToString:title])
       return (NSButton *)v;
-    NSButton *b = [self findIn:v];
+    NSButton *b = PicaFindButtonTitled(v, title);
     if (b)
       return b;
   }
   return nil;
-}
-- (void)click {
-  NSWindow *modal = [NSApp modalWindow];
-  _sawModal = modal != nil;
-  if (modal == nil)
-    return;
-  // Deliberately not asserting -isKeyWindow: a test bundle is not an active
-  // app, so no window becomes key here regardless of its class. Whether the
-  // dialog takes key focus has to be checked in the running app.
-  NSButton *b = [self findIn:[modal contentView]];
-  _foundButton = b != nil;
-  if (b)
-    [b performClick:nil];
-  else
-    [NSApp abortModal]; // do not hang the suite
-}
-- (void)bail {
-  if ([NSApp modalWindow])
-    [NSApp abortModal];
-}
-@end
-
-// Opens the dialog, clicks `button`, and reports whether the dialog was
-// actually up and the click landed.
-static BOOL PicaRunTablixDialog(RDLTablix *tablix, PicaEditingContext *ctx,
-                                 NSString *button, PicaDialogClicker **outClicker) {
-  PicaDialogClicker *clicker = [[PicaDialogClicker alloc] init];
-  clicker.title = button;
-  NSTimer *click = [NSTimer timerWithTimeInterval:0.05 target:clicker
-                                         selector:@selector(click)
-                                         userInfo:nil repeats:NO];
-  NSTimer *bail = [NSTimer timerWithTimeInterval:10.0 target:clicker
-                                        selector:@selector(bail)
-                                        userInfo:nil repeats:NO];
-  for (NSTimer *t in @[ click, bail ])
-    [[NSRunLoop currentRunLoop] addTimer:t forMode:NSModalPanelRunLoopMode];
-  BOOL changed = [PicaTablixEditor runForTablix:tablix context:ctx];
-  [bail invalidate];
-  if (outClicker)
-    *outClicker = clicker;
-  return changed;
 }
 
 // --- Stage 6: one document pipeline ----------------------------------------
@@ -2277,16 +2234,31 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
     return;
   }
 
+  // The point is that the editor can be built at all against a scaffold: a
+  // dataset of RDLField objects and a tablix bound to an empty one. That used
+  // to reach for another table's fields and send -isEqualToString: to an
+  // RDLField. Built, not run: see PicaFindButtonTitled above.
   PicaEditingContext *ctx = [[PicaEditingContext alloc] initWithReport:report];
-  PicaDialogClicker *clicker = nil;
-  // Cancel, because the point is opening it at all.
-  PicaRunTablixDialog(layout, ctx, @"Cancel", &clicker);
-  if (!clicker.sawModal)
-    XCTFail(@"%@", @"the tablix editor never opened on a scaffolded report");
-  if (!clicker.foundButton)
+  PicaTablixEditor *editor = [PicaTablixEditor editorForTablix:layout context:ctx];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the tablix editor was not built for a scaffolded report");
+    return;
+  }
+  NSWindow *panel = [editor valueForKey:@"window"];
+  if (panel == nil) {
+    XCTFail(@"%@", @"PicaTablixEditor.xib did not load");
+    return;
+  }
+  if (PicaFindButtonTitled([panel contentView], @"Cancel") == nil)
     XCTFail(@"%@", @"no Cancel button -- the editor did not build its panel");
-  if ([NSApp modalWindow] != nil)
-    XCTFail(@"%@", @"a modal session was left running");
+
+  // And it is filled in from the tablix it was given, not from whatever
+  // dataset happened to be first.
+  NSPopUpButton *datasets = [editor valueForKey:@"datasetPop"];
+  if (![[datasets titleOfSelectedItem] isEqualToString:layout.dataSetName])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the dataset popup shows %@, not %@",
+                                              [datasets titleOfSelectedItem],
+                                              layout.dataSetName]);
 }
 
 @end

@@ -179,9 +179,9 @@
 
 #pragma mark - Entry point
 
-+ (BOOL)runForTablix:(RDLTablix *)tablix context:(PicaEditingContext *)context {
++ (instancetype)editorForTablix:(RDLTablix *)tablix context:(PicaEditingContext *)context {
   if (tablix == nil || ![tablix isKindOfClass:[RDLTablix class]])
-    return NO;
+    return nil;
   PicaTablixEditor *ed = [[PicaTablixEditor alloc] init];
   ed.report = context.report;
   NSMutableArray *cols = [NSMutableArray array];
@@ -191,6 +191,13 @@
     [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
   ed.cols = cols;
   [ed buildPanelForTablix:tablix];
+  return ed;
+}
+
++ (BOOL)runForTablix:(RDLTablix *)tablix context:(PicaEditingContext *)context {
+  PicaTablixEditor *ed = [self editorForTablix:tablix context:context];
+  if (ed == nil)
+    return NO;
   [ed.window center];
   NSInteger code = [NSApp runModalForWindow:ed.window];
   // Ordered out once, on both paths, after the session has ended -- the
