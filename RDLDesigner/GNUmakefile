@@ -1,9 +1,9 @@
 include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = RDLDesigner
-RDL_NEEDS_GUI = yes
-RDL_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit
-RDL_OBJC_FILES = \
+RDLDesigner_NEEDS_GUI = yes
+RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit
+RDLDesigner_OBJC_FILES = \
   main.m \
   RDLEditingContext.m \
   RDLChange.m \
@@ -37,14 +37,14 @@ RDL_OBJC_FILES = \
 # per-instance variable: it is the documented form and applies whatever the
 # instance type is.
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
-RDL_OBJC_LIBS += -lRDLKit -ldispatch
-RDL_APPLICATION_ICON =
+RDLDesigner_OBJC_LIBS += -lRDLKit -ldispatch
+RDLDesigner_APPLICATION_ICON =
 
 # The windows and the menu bar are XIBs. Xcode compiles them to .nib; here they
 # are copied in as they are, and gnustep-gui reads the XIB directly (GSXib5).
 # Both are found by the same -initWithNibNamed:, which is why no path or
 # extension appears anywhere in the source.
-RDL_RESOURCE_FILES = \
+RDLDesigner_RESOURCE_FILES = \
   MainMenu.xib \
   RDLWelcomeWindow.xib \
   RDLDesignerWindow.xib \
@@ -59,6 +59,6 @@ RDL_RESOURCE_FILES = \
 # Left empty on purpose: the menu bar is loaded explicitly in
 # -[RDLAppDelegate loadMenuBar], so that the Samples submenu can be filled in
 # from the sample catalogue through a real outlet.
-RDL_MAIN_MODEL_FILE =
+RDLDesigner_MAIN_MODEL_FILE =
 
 include $(GNUSTEP_MAKEFILES)/application.make
