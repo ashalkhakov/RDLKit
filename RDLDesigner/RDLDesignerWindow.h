@@ -1,8 +1,12 @@
 #import <AppKit/AppKit.h>
 
+#import "RDLDatasetNavigator.h"
+
 @class RDLEditingContext;
 
-@interface RDLDesignerWindow : NSWindowController
+// The dataset navigator's delegate: choosing a dataset is what puts its
+// fields in the right pane and the dataset itself in the centre.
+@interface RDLDesignerWindow : NSWindowController <RDLDatasetNavigatorDelegate>
 @property (nonatomic, readonly, strong) RDLEditingContext *context;
 - (instancetype)initWithContext:(RDLEditingContext *)context;
 - (void)showPreview:(id)sender;

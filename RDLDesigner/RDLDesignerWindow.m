@@ -15,7 +15,7 @@
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow () <RDLDatasetNavigatorDelegate>
+@interface RDLDesignerWindow ()
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -145,6 +145,10 @@
 - (void)selectionDidChange:(NSNotification *)note {
   RDL_UNUSED(note);
   [_outlineSource syncSelection];
+  // Selecting something on the canvas or in the outline ends the dataset's
+  // turn in the Attributes tab.
+  if ([_context selectedItem] != nil)
+    _datasetFields.dataSet = nil;
   [self syncInspectorToSelection];
 }
 
@@ -261,8 +265,15 @@ static void RDLFillTabBar(NSView *host, id target, SEL action, NSUInteger select
 
 // Selecting a bar item selects the tab of the same index. Nothing else: which
 // pane is showing is not state worth keeping anywhere but in the tab view.
+//
+// The sender is the BAR, not the item: DMTabBar sends
+// -performSelector:withObject:self, and its own comment says so. Reading a tag
+// off it instead gives NSView's -1, which fails the bounds check below and
+// silently selects nothing -- which is what both bars did.
 static void RDLSelectTab(id sender, NSTabView *tabView) {
-  NSInteger i = (NSInteger)[(DMTabBarItem *)sender tag];
+  if (![sender isKindOfClass:[DMTabBar class]])
+    return;
+  NSInteger i = (NSInteger)[(DMTabBar *)sender selectedIndex];
   if (i >= 0 && i < [tabView numberOfTabViewItems])
     [tabView selectTabViewItemAtIndex:i];
 }
@@ -324,8 +335,14 @@ static void RDLFillHost(NSView *host, NSView *view) {
   RDL_UNUSED(navigator);
   _datasetFields.dataSet = dataSet;
   if (dataSet != nil) {
+    // One selection at a time. Choosing a dataset is choosing to edit it, so
+    // whatever was selected on the canvas is no longer what the inspector is
+    // about -- and leaving it selected would keep the element inspector in
+    // front of the fields the user just asked for.
+    [_context.selection selectReport];
     [_centerTabView selectTabViewItemAtIndex:2];
     [_rightTabView selectTabViewItemAtIndex:1];
+    [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
   } else if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2) {
     [self centerModeChanged:nil];
   }

@@ -28,6 +28,17 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLSelection.m \
   ../RDLDesigner/RDLRichTextEditor.m \
   ../RDLDesigner/RDLDatasetNavigator.m \
+  ../RDLDesigner/RDLDesignerWindow.m \
+  ../RDLDesigner/RDLCanvasView.m \
+  ../RDLDesigner/RDLCanvasRenderer.m \
+  ../RDLDesigner/RDLCanvasInteraction.m \
+  ../RDLDesigner/RDLInPlaceEditor.m \
+  ../RDLDesigner/RDLInspectorView.m \
+  ../RDLDesigner/RDLDataView.m \
+  ../RDLDesigner/RDLOutlineDataSource.m \
+  ../RDLDesigner/RDLTabBadge.m \
+  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m \
+  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
@@ -39,6 +50,8 @@ RDLDesignerTests_NEEDS_GUI = yes
 # The panels the checks open are looked up with -bundleForClass:,
 # which resolves to this bundle rather than to RDLDesigner.app.
 RDLDesignerTests_RESOURCE_FILES = \
+  ../RDLDesigner/RDLDesignerWindow.xib \
+  ../RDLDesigner/RDLInspectorSections.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLTablixEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib

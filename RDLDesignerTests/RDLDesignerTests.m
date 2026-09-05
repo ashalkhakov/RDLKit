@@ -38,6 +38,8 @@
 #import "RDLInspectorFields.h"
 #import "RDLTablixEditor.h"
 #import "RDLDatasetNavigator.h"
+#import "RDLDesignerWindow.h"
+#import "DMTabBar.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLRichTextEditor.h"
 #import "RDLNewReportPanel.h"
@@ -2241,6 +2243,78 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The panes the shell left empty. What is checked is that each one has
 // something in it and that the something reflects the report -- a pane that
 // loads but shows nothing is the state this replaced.
+// The window as it is actually built, driven through the controls the user
+// drives. Two silent failures got past the structural check that reads the
+// XIB: a header that was not a project file reference, so this file's test was
+// never in the bundle; and DMTabBar sending the BAR as the action's sender,
+// where the controller read a tag off it and got NSView's -1, so no tab ever
+// switched. Both are only visible by loading the thing and clicking it.
+- (void)testDesignerWindowPanesRespond {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"RDLDesignerWindow.xib did not load");
+    return;
+  }
+
+  DMTabBar *leftBar = [wc valueForKey:@"leftTabBar"];
+  NSTabView *leftTabs = [wc valueForKey:@"leftTabView"];
+  DMTabBar *rightBar = [wc valueForKey:@"rightTabBar"];
+  NSTabView *rightTabs = [wc valueForKey:@"rightTabView"];
+  NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
+  if (![leftBar isKindOfClass:[DMTabBar class]] || ![rightBar isKindOfClass:[DMTabBar class]]) {
+    XCTFail(@"%@", @"the tab bars did not come out of the XIB as DMTabBars");
+    return;
+  }
+  if ([[leftBar tabBarItems] count] != 2 || [[rightBar tabBarItems] count] != 2)
+    XCTFail(@"%@", @"the bars were not given their items");
+
+  // Datasets, then back to Outline. The bar is the sender, as DMTabBar sends it.
+  leftBar.selectedIndex = 1;
+  [wc leftTabChanged:leftBar];
+  if ([leftTabs indexOfTabViewItem:[leftTabs selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"the Datasets navigator is not reachable from its tab");
+  leftBar.selectedIndex = 0;
+  [wc leftTabChanged:leftBar];
+  if ([leftTabs indexOfTabViewItem:[leftTabs selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"the Outline navigator is not reachable from its tab");
+
+  rightBar.selectedIndex = 1;
+  [wc rightTabChanged:rightBar];
+  if ([rightTabs indexOfTabViewItem:[rightTabs selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"the Attributes tab is not reachable from its tab");
+
+  // Every host got a view: a pane that loads and shows nothing is the state
+  // these were in before.
+  for (NSString *host in @[ @"reportInspectorHost", @"datasetNavigatorHost",
+                            @"datasetInspectorHost", @"sourceHost" ]) {
+    NSView *view = [wc valueForKey:host];
+    if ([[view subviews] count] < 2)  // the XIB's label, plus what belongs here
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is still empty", host]);
+  }
+
+  // Selecting an element shows the element inspector; selecting a dataset
+  // shows that dataset's fields instead, and takes the canvas selection with it.
+  RDLItem *item = [report.body.items firstObject];
+  [ctx.selection selectItem:item inBandWithKey:@"body"];
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"an element is selected but the element inspector is not showing");
+
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  [ctx.editor addDataSet:ds];
+  RDLDatasetNavigator *nav = [wc valueForKey:@"datasetNavigator"];
+  [wc datasetNavigator:nav didSelectDataSet:ds];
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"a dataset is selected but its fields are not showing");
+  if ([ctx selectedItem] != nil)
+    XCTFail(@"%@", @"the canvas selection survived choosing a dataset");
+  RDLDatasetFieldsView *fields = [wc valueForKey:@"datasetFields"];
+  if (fields.dataSet != ds)
+    XCTFail(@"%@", @"the field inspector is showing a different dataset");
+}
+
 - (void)testDatasetPanes {
   RDLReport *report = [RDLSamples blankLetter];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
