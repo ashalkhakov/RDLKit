@@ -48,7 +48,7 @@ static NSString *RDLLegacyTableRDL(void) {
          @"</Report>\n";
 }
 
-@interface RDLParserTests : XCTestCase
+@interface RDLParserTests : RDLKitTestCase
 @end
 @implementation RDLParserTests
 
@@ -61,11 +61,6 @@ static NSString *RDLLegacyTableRDL(void) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testParser {
   NSError *err = nil;
   RDLReport *src = RDLMiniInvoice();

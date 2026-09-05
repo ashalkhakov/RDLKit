@@ -48,3 +48,16 @@ NSString *RDLDesignerFixture(NSString *name) {
   return [[[tests stringByAppendingPathComponent:@"RDLKitTests"]
       stringByAppendingPathComponent:@"Fixtures"] stringByAppendingPathComponent:name];
 }
+
+@implementation RDLDesignerTestCase
+
+// Per test rather than per class: +setUp is a later addition to XCTest and
+// GNUstep's implementation does not call it, which the font assertion proved by
+// surviving one. -setUp every implementation has, and -sharedApplication is
+// idempotent.
+- (void)setUp {
+  [super setUp];
+  [NSApplication sharedApplication];
+}
+
+@end

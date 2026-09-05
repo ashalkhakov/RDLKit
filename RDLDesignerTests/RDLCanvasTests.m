@@ -3,7 +3,7 @@
 
 
 
-@interface RDLCanvasTests : XCTestCase
+@interface RDLCanvasTests : RDLDesignerTestCase
 @end
 @implementation RDLCanvasTests
 
@@ -16,11 +16,6 @@
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testPageGeometry {
   RDLReport *r = [RDLReport emptyReportNamed:@"Geometry"];
   // Letter, 1in margins all round, so the arithmetic is easy to read.

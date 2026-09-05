@@ -143,7 +143,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   return out;
 }
 
-@interface RDLLayoutTests : XCTestCase
+@interface RDLLayoutTests : RDLKitTestCase
 @end
 @implementation RDLLayoutTests
 
@@ -156,11 +156,6 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testLayout {
   RDLReport *r = RDLMiniInvoice();
   NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{@"InvoiceNo" : @"B-2"}];

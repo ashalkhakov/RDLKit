@@ -138,7 +138,7 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   return RDLDocxWithBodyAndStyles(bodyXML, nil);
 }
 
-@interface RDLImportTests : XCTestCase
+@interface RDLImportTests : RDLKitTestCase
 @end
 @implementation RDLImportTests
 
@@ -151,11 +151,6 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testZip {
   NSError *err = nil;
 

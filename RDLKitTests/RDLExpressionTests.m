@@ -55,7 +55,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
   return [RDLChecker checkReport:r];
 }
 
-@interface RDLExpressionTests : XCTestCase
+@interface RDLExpressionTests : RDLKitTestCase
 @end
 @implementation RDLExpressionTests
 
@@ -68,11 +68,6 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testExpression {
   RDLReport *r = RDLMiniInvoice();
   RDLEvalScope *s = [[RDLEvalScope alloc] init];

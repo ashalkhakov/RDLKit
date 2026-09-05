@@ -19,7 +19,7 @@
 
 
 
-@interface RDLExpressionUITests : XCTestCase
+@interface RDLExpressionUITests : RDLDesignerTestCase
 @end
 @implementation RDLExpressionUITests
 

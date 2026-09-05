@@ -6,7 +6,7 @@
 
 
 
-@interface RDLInspectorTests : XCTestCase
+@interface RDLInspectorTests : RDLDesignerTestCase
 @end
 @implementation RDLInspectorTests
 

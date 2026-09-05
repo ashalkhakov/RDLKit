@@ -71,7 +71,7 @@ static RDLReport *RDLGroupedJobs(void) {
   return r;
 }
 
-@interface RDLEditingCoreTests : XCTestCase
+@interface RDLEditingCoreTests : RDLDesignerTestCase
 @end
 @implementation RDLEditingCoreTests
 
@@ -84,11 +84,6 @@ static RDLReport *RDLGroupedJobs(void) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testDocument {
   RDLDocument *doc = [[RDLDocument alloc] initWithReport:RDLEditableReport()];
 

@@ -5,7 +5,7 @@ static NSString *RDLEnt(NSString *name) {
   return [@"&" stringByAppendingString:[name stringByAppendingString:@";"]];
 }
 
-@interface RDLBackendTests : XCTestCase
+@interface RDLBackendTests : RDLKitTestCase
 @end
 @implementation RDLBackendTests
 
@@ -18,11 +18,6 @@ static NSString *RDLEnt(NSString *name) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-- (void)setUp {
-  [super setUp];
-  [NSApplication sharedApplication];
-}
-
 - (void)testBackendRegistry {
   NSArray *named = [[RDLGenerator backends] valueForKey:@"name"];
   if (![named containsObject:@"HTML"] || ![named containsObject:@"PDF"])

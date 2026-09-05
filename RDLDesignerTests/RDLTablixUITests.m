@@ -6,7 +6,7 @@
 
 
 
-@interface RDLTablixUITests : XCTestCase
+@interface RDLTablixUITests : RDLDesignerTestCase
 @end
 @implementation RDLTablixUITests
 

@@ -35,3 +35,10 @@ NSString *RDLColorMismatch(NSColor *actual, NSColor *expected, NSString *what);
 NSButton *RDLFindButtonTitled(NSView *view, NSString *title);
 NSString *RDLSourceDirectory(void);
 NSString *RDLDesignerFixture(NSString *name);
+
+// The base every suite here inherits. It exists for one line, and that line is
+// load-bearing on GNUstep: nothing that touches a font may run before the
+// shared application exists. Inherited rather than copied into each suite --
+// there were five copies of it, and splitting the files lost six more.
+@interface RDLDesignerTestCase : XCTestCase
+@end

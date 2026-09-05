@@ -5,7 +5,7 @@
 
 
 
-@interface RDLNewReportTests : XCTestCase
+@interface RDLNewReportTests : RDLDesignerTestCase
 @end
 @implementation RDLNewReportTests
 

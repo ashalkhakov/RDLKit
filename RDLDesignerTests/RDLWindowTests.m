@@ -10,7 +10,7 @@
 
 
 
-@interface RDLWindowTests : XCTestCase
+@interface RDLWindowTests : RDLDesignerTestCase
 @end
 @implementation RDLWindowTests
 

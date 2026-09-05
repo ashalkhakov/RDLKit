@@ -33,7 +33,7 @@ static NSMutableAttributedString *RDLSampleRichText(void) {
   return s;
 }
 
-@interface RDLRichTextTests : XCTestCase
+@interface RDLRichTextTests : RDLDesignerTestCase
 @end
 @implementation RDLRichTextTests
 
