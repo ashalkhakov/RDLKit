@@ -27,6 +27,8 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
   ../RDLDesigner/RDLRichTextEditor.m \
+  ../RDLDesigner/RDLDatasetNavigator.m \
+  ../RDLDesigner/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
 RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner

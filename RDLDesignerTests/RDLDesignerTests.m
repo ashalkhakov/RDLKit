@@ -37,6 +37,8 @@
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
 #import "RDLTablixEditor.h"
+#import "RDLDatasetNavigator.h"
+#import "RDLDatasetFieldsView.h"
 #import "RDLRichTextEditor.h"
 #import "RDLNewReportPanel.h"
 
@@ -2236,6 +2238,51 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // A colour well is bound to an RDL colour string, which means a conversion in
 // each direction. Both are checked here; the panel the well opens is AppKit's
 // and is not.
+// The panes the shell left empty. What is checked is that each one has
+// something in it and that the something reflects the report -- a pane that
+// loads but shows nothing is the state this replaced.
+- (void)testDatasetPanes {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSUInteger before = [report.dataSets count];
+
+  RDLDatasetNavigator *nav =
+      [[RDLDatasetNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 400) context:ctx];
+  [nav reload];
+  [nav addDataSet:nil];
+  if ([report.dataSets count] != before + 1) {
+    XCTFail(@"%@", @"the navigator did not add a dataset");
+    return;
+  }
+  RDLDataSet *added = [nav selectedDataSet];
+  if (added == nil) {
+    XCTFail(@"%@", @"the dataset it added is not selected");
+    return;
+  }
+
+  // Adding is undoable, like every other edit.
+  [ctx.document.undoManager undo];
+  if ([report.dataSets count] != before)
+    XCTFail(@"%@", @"undo did not remove the dataset");
+  [ctx.document.undoManager redo];
+
+  RDLDatasetFieldsView *fields =
+      [[RDLDatasetFieldsView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+  fields.dataSet = [nav selectedDataSet];
+  [fields addField:nil];
+  NSArray<RDLField *> *added2 = [[nav selectedDataSet] fields];
+  if ([added2 count] != 1) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected one field, got %lu",
+                                              (unsigned long)[added2 count]]);
+    return;
+  }
+  // Fields are RDLField objects and a new one is a String, not an unknown.
+  if (![added2[0] isKindOfClass:[RDLField class]])
+    XCTFail(@"%@", @"the field list holds something that is not an RDLField");
+  if ([added2[0] dataType] != RDLFieldDataTypeString)
+    XCTFail(@"%@", @"a new field should start as String");
+}
+
 - (void)testInspectorColorBinding {
   RDLReport *report = [RDLSamples blankLetter];
   RDLTextbox *box = nil;

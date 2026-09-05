@@ -10,10 +10,12 @@
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 #import "RDLTabBadge.h"
+#import "RDLDatasetNavigator.h"
+#import "RDLDatasetFieldsView.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow ()
+@interface RDLDesignerWindow () <RDLDatasetNavigatorDelegate>
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -33,6 +35,12 @@
 // Inside the right pane's Attributes tab: the element inspector or the dataset
 // field inspector, whichever the selection calls for.
 @property (nonatomic, strong) IBOutlet NSTabView *attributeTabView;
+// Built into the XIB's empty hosts: a host is a place in the layout, and what
+// goes in it is decided here.
+@property (nonatomic, strong) RDLInspectorView *reportInspector;
+@property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
+@property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
+@property (nonatomic, strong) NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
@@ -114,6 +122,7 @@
   // The tab bars come out of the XIB as empty DMTabBar views: it takes its
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
+  [self buildPanes];
   [self syncInspectorToSelection];
 }
 
@@ -129,6 +138,8 @@
     [self reloadUI];
   else
     [self updateWindowTitle];
+  // The panes read the report itself, so they follow any change to it.
+  [self reloadPanes];
 }
 
 - (void)selectionDidChange:(NSNotification *)note {
@@ -256,6 +267,71 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
     [tabView selectTabViewItemAtIndex:i];
 }
 
+// Each empty host in the XIB gets its view here. They fill their hosts, so
+// nothing has to be laid out twice when the window resizes.
+static void RDLFillHost(NSView *host, NSView *view) {
+  [view setFrame:[host bounds]];
+  [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+  [host addSubview:view];
+}
+
+- (void)buildPanes {
+  // The report's own inspector: the same view the Attributes tab uses, told to
+  // stay on the report rather than follow the selection.
+  _reportInspector = [[RDLInspectorView alloc] initWithFrame:[_reportInspectorHost bounds]
+                                                     context:_context];
+  _reportInspector.showsReportOnly = YES;
+  RDLFillHost(_reportInspectorHost, _reportInspector);
+
+  _datasetNavigator = [[RDLDatasetNavigator alloc] initWithFrame:[_datasetNavigatorHost bounds]
+                                                         context:_context];
+  _datasetNavigator.delegate = self;
+  RDLFillHost(_datasetNavigatorHost, _datasetNavigator);
+
+  _datasetFields = [[RDLDatasetFieldsView alloc] initWithFrame:[_datasetInspectorHost bounds]
+                                                       context:_context];
+  RDLFillHost(_datasetInspectorHost, _datasetFields);
+
+  // The source pane shows what the report would be written as. Read-only for
+  // now: editing it means parsing the result and deciding what to do when it
+  // does not parse, which is its own piece of work.
+  NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:[_sourceHost bounds]];
+  [scroll setHasVerticalScroller:YES];
+  [scroll setHasHorizontalScroller:YES];
+  _sourceText = [[NSTextView alloc] initWithFrame:[[scroll contentView] bounds]];
+  [_sourceText setEditable:NO];
+  [_sourceText setRichText:NO];
+  [_sourceText setFont:[NSFont userFixedPitchFontOfSize:11] ?: [NSFont systemFontOfSize:11]];
+  [[_sourceText textContainer] setWidthTracksTextView:NO];
+  [[_sourceText textContainer] setContainerSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
+  [_sourceText setHorizontallyResizable:YES];
+  [scroll setDocumentView:_sourceText];
+  RDLFillHost(_sourceHost, scroll);
+  [self reloadPanes];
+}
+
+- (void)reloadPanes {
+  [_reportInspector reload];
+  [_datasetNavigator reload];
+  [_datasetFields reload];
+  [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
+}
+
+// A dataset selected shows it in the centre and puts its fields in the right
+// pane; deselecting hands both back to the report and the selected element.
+- (void)datasetNavigator:(RDLDatasetNavigator *)navigator
+        didSelectDataSet:(RDLDataSet *)dataSet {
+  RDL_UNUSED(navigator);
+  _datasetFields.dataSet = dataSet;
+  if (dataSet != nil) {
+    [_centerTabView selectTabViewItemAtIndex:2];
+    [_rightTabView selectTabViewItemAtIndex:1];
+  } else if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2) {
+    [self centerModeChanged:nil];
+  }
+  [self syncInspectorToSelection];
+}
+
 - (void)buildTabBars {
   // Both side panes are choosers. The centre is not: Preview or Source is a
   // segmented control, and the dataset pane arrives because a dataset was
@@ -294,8 +370,10 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
 // selected means the element inspector, a dataset field means the field
 // inspector. The tab itself stays where the user left it.
 - (void)syncInspectorToSelection {
-  BOOL editingItem = [_context selectedItem] != nil;
-  [_attributeTabView selectTabViewItemAtIndex:editingItem ? 0 : 1];
+  // An element beats a dataset: selecting something on the canvas is the more
+  // recent intent, and the navigator's selection stays where it is.
+  BOOL showFields = [_context selectedItem] == nil && _datasetFields.dataSet != nil;
+  [_attributeTabView selectTabViewItemAtIndex:showFields ? 1 : 0];
 }
 
 - (void)leftTabChanged:(id)sender {

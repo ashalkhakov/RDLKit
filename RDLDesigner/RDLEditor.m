@@ -151,6 +151,57 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[RDLChange reportChange:@[ keyPath ]]];
 }
 
+#pragma mark - Datasets
+
+- (void)addDataSet:(RDLDataSet *)dataSet {
+  RDLReport *report = _document.report;
+  if (report == nil || dataSet == nil)
+    return;
+  if (report.dataSets == nil)
+    report.dataSets = [NSMutableArray array];
+  [self beginGroup:@"Add Dataset"];
+  [[self undoProxy] removeDataSet:dataSet];
+  [report.dataSets addObject:dataSet];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)removeDataSet:(RDLDataSet *)dataSet {
+  RDLReport *report = _document.report;
+  NSUInteger index = dataSet ? [report.dataSets indexOfObject:dataSet] : NSNotFound;
+  if (index == NSNotFound)
+    return;
+  [self beginGroup:@"Remove Dataset"];
+  // Restored where it was, not appended: the order is what the dataset popups
+  // and the navigator show.
+  [[self undoProxy] insertDataSet:dataSet atIndex:index];
+  [report.dataSets removeObjectAtIndex:index];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)insertDataSet:(RDLDataSet *)dataSet atIndex:(NSUInteger)index {
+  RDLReport *report = _document.report;
+  if (report == nil || dataSet == nil || index > [report.dataSets count])
+    return;
+  [self beginGroup:@"Add Dataset"];
+  [[self undoProxy] removeDataSet:dataSet];
+  [report.dataSets insertObject:dataSet atIndex:index];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)setFields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil)
+    return;
+  NSArray *old = [dataSet.fields copy];
+  [self beginGroup:@"Edit Fields"];
+  [[self undoProxy] setFields:old ofDataSet:dataSet];
+  dataSet.fields = [fields copy];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
 #pragma mark - Geometry
 
 - (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top {

@@ -282,6 +282,12 @@
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
   RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
+  // The Report tab shows the document's own fields whatever is selected, which
+  // is the same branch the shared inspector falls to when nothing is.
+  if (_showsReportOnly) {
+    it = nil;
+    band = nil;
+  }
 
   if (it != nil) {
       [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@",

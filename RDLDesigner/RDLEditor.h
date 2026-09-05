@@ -14,6 +14,7 @@
 
 @class RDLDocument;
 @class RDLItem;
+@class RDLDataSet;
 @class NSAttributedString;
 
 @interface RDLEditor : NSObject
@@ -62,6 +63,17 @@
 - (BOOL)removeItem:(RDLItem *)item;
 // The array that holds `item` — a band's items or a Rectangle's children.
 - (NSMutableArray *)containerOfItem:(RDLItem *)item bandKey:(NSString **)outBandKey;
+
+// --- Datasets -------------------------------------------------------------
+// Each is the other's inverse, so a dataset added and undone leaves the report
+// as it was, in the position it held.
+- (void)addDataSet:(RDLDataSet *)dataSet;
+- (void)removeDataSet:(RDLDataSet *)dataSet;
+// Undo of a removal; the navigator calls -addDataSet: instead.
+- (void)insertDataSet:(RDLDataSet *)dataSet atIndex:(NSUInteger)index;
+// The whole field list at once, and its inverse is the previous list: fields
+// are edited as a set, and a rename plus a retype is one step.
+- (void)setFields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet;
 
 // --- Tablix ---------------------------------------------------------------
 // All of these go through columnSpecs + -rebuildTablix, so the inverse is

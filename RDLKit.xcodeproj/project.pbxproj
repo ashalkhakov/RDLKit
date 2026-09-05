@@ -80,6 +80,8 @@
 		C6A2B39DFB62F224DEAF1976 /* RDLSelection.m in Sources */ = {isa = PBXBuildFile; fileRef = 34F661B42A6228C31982DF99 /* RDLSelection.m */; };
 		C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */ = {isa = PBXBuildFile; fileRef = F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */; };
 		C76E850AF8CE40F9D17DF932 /* RDLTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */; };
+		AA03DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */; };
+		AA03DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSNAV000000000001 /* RDLDatasetNavigator.m */; };
 		C76E850BF8CE40F9D17DF933 /* RDLRichTextEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52E30473A9E00D62319 /* RDLRichTextEditor.m */; };
 		C81B37A201B3B486F2605ABE /* RDLInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* RDLInspectorFields.m */; };
 		C8A9185493F7171DA48DFF44 /* RDLZipArchive.m in Sources */ = {isa = PBXBuildFile; fileRef = ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */; };
@@ -88,6 +90,8 @@
 		CE65B5EED5EC5A3A470E38EE /* RDLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; };
 		CEBAF52B30470D1500D62319 /* RDLExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* RDLExpressionHelper.m */; };
 		CEBAF52C30470D1500D62319 /* RDLTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */; };
+		AA02DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */; };
+		AA02DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSNAV000000000001 /* RDLDatasetNavigator.m */; };
 		AA02DMTABITEM00000001 /* DMTabBarItem.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABITEM00000001 /* DMTabBarItem.m */; };
 		AA02DMTABBAR000000001 /* DMTabBar.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABBAR000000001 /* DMTabBar.m */; };
 		AA02TABBADGE0000000001 /* RDLTabBadge.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01TABBADGE0000000001 /* RDLTabBadge.m */; };
@@ -257,6 +261,11 @@
 		CEBAF52830470D1500D62319 /* RDLExpressionHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionHelper.m; sourceTree = "<group>"; };
 		CEBAF52930470D1500D62319 /* RDLTablixEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTablixEditor.h; sourceTree = "<group>"; };
 		CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTablixEditor.m; sourceTree = "<group>"; };
+		AA04TABBADGE000000001 /* RDLTabBadge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTabBadge.h; sourceTree = "<group>"; };
+		AA04DSFIELDS000000001 /* RDLDatasetFieldsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDatasetFieldsView.h; sourceTree = "<group>"; };
+		AA04DSNAV000000000001 /* RDLDatasetNavigator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDatasetNavigator.h; sourceTree = "<group>"; };
+		AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDatasetFieldsView.m; sourceTree = "<group>"; };
+		AA01DSNAV000000000001 /* RDLDatasetNavigator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDatasetNavigator.m; sourceTree = "<group>"; };
 		AA01DMTABITEM00000001 /* DMTabBarItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DMTabBarItem.m; path = RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m; sourceTree = SOURCE_ROOT; };
 		AA01DMTABBAR000000001 /* DMTabBar.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DMTabBar.m; path = RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m; sourceTree = SOURCE_ROOT; };
 		AA01TABBADGE0000000001 /* RDLTabBadge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RDLTabBadge.m; path = RDLDesigner/RDLTabBadge.m; sourceTree = SOURCE_ROOT; };
@@ -356,6 +365,11 @@
 				CEBAF52830470D1500D62319 /* RDLExpressionHelper.m */,
 				CEBAF52930470D1500D62319 /* RDLTablixEditor.h */,
 				CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */,
+				AA04TABBADGE000000001 /* RDLTabBadge.h */,
+				AA04DSFIELDS000000001 /* RDLDatasetFieldsView.h */,
+				AA04DSNAV000000000001 /* RDLDatasetNavigator.h */,
+				AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */,
+				AA01DSNAV000000000001 /* RDLDatasetNavigator.m */,
 				AA01DMTABITEM00000001 /* DMTabBarItem.m */,
 				AA01DMTABBAR000000001 /* DMTabBar.m */,
 				AA01TABBADGE0000000001 /* RDLTabBadge.m */,
@@ -746,6 +760,8 @@
 				C64526DBC3B8898C885ECA7F /* RDLWelcomeWindow.m in Sources */,
 				CEBAF52B30470D1500D62319 /* RDLExpressionHelper.m in Sources */,
 				CEBAF52C30470D1500D62319 /* RDLTablixEditor.m in Sources */,
+				AA02DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */,
+				AA02DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */,
 				AA02DMTABITEM00000001 /* DMTabBarItem.m in Sources */,
 				AA02DMTABBAR000000001 /* DMTabBar.m in Sources */,
 				AA02TABBADGE0000000001 /* RDLTabBadge.m in Sources */,
@@ -785,6 +801,8 @@
 				020F2C1DAA62304129E64EC4 /* RDLExpressionHelper.m in Sources */,
 				F8EA04B9F8175CF7FCE6FEAD /* RDLInspectorFields.m in Sources */,
 				C76E850AF8CE40F9D17DF932 /* RDLTablixEditor.m in Sources */,
+				AA03DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */,
+				AA03DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */,
 				C76E850BF8CE40F9D17DF933 /* RDLRichTextEditor.m in Sources */,
 				0EF8A1B103C3BAC6DA99890B /* RDLRichTextFormatter.m in Sources */,
 				9A0DF837B69B19F10D27BD5E /* RDLNewReport.m in Sources */,

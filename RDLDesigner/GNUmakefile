@@ -33,6 +33,8 @@ RDLDesigner_OBJC_FILES = \
   RDLDataView.m \
   RDLWelcomeWindow.m \
   RDLTabBadge.m \
+  RDLDatasetNavigator.m \
+  RDLDatasetFieldsView.m \
   ThirdParty/DMTabBar/DMTabBar.m \
   ThirdParty/DMTabBar/DMTabBarItem.m
 # RDLKit is built in the tree beside this one and not installed, so the
