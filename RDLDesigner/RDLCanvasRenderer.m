@@ -68,9 +68,9 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
     NSDictionary *edit = (_overlay.editingItem == it) ? _overlay.editingCell : nil;
     BOOL editingThisColumn = edit && [edit[@"col"] unsignedIntegerValue] == i;
     BOOL editingHeader = editingThisColumn &&
-                         [edit[@"part"] isEqualToString:RDLTablixPartHeader];
+                         [edit[@"part"] integerValue] == RDLTablixPartHeader;
     BOOL editingValue = editingThisColumn &&
-                        [edit[@"part"] isEqualToString:RDLTablixPartValue];
+                        [edit[@"part"] integerValue] == RDLTablixPartValue;
     if (!editingHeader) {
       NSRect cell = NSMakeRect(x, NSMinY(r), w, hh);
       [RDLAttributedText(col[@"header"] ?: @"", headerStyle, z)

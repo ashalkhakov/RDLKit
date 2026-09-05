@@ -40,6 +40,8 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"
+#import "RDLInspectorView.h"
+#import "RDLPageGeometry.h"
 #import "RDLDesignerWindow.h"
 #import "DMTabBar.h"
 #import "RDLDatasetFieldsView.h"
@@ -1329,18 +1331,18 @@ static NSString *RDLDesignerFixture(NSString *name) {
 
   // Cell hit testing.
   NSUInteger col = 99;
-  NSString *part = nil;
+  RDLTablixPart part = RDLTablixPartNone;
   if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 210)
                           column:&col part:&part zoom:1.0])
     XCTFail(@"%@", @"a point in the header row should hit a cell");
-  else if (col != 0 || ![part isEqualToString:RDLTablixPartHeader])
+  else if (col != 0 || part != RDLTablixPartHeader)
     XCTFail(@"%@", @"expected column 0, header");
   if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(250, 245)
                           column:&col part:&part zoom:1.0])
     XCTFail(@"%@", @"a point in the value row should hit a cell");
-  else if (col != 1 || ![part isEqualToString:RDLTablixPartValue])
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected column 1, value; got %lu %@",
-                                               (unsigned long)col, part]);
+  else if (col != 1 || part != RDLTablixPartValue)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected column 1, value; got %lu %ld",
+                                               (unsigned long)col, (long)part]);
   // Below the two preview rows is not an editable cell.
   if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 258)
                          column:NULL part:NULL zoom:1.0])
@@ -2268,6 +2270,57 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The zoom control and the rulers. Both read the context rather than keeping
 // their own copy of the zoom, so zooming from the menu has to move the popup
 // and re-measure the rulers -- which is the part that silently would not.
+// Clicking a cell of a scaffolded tablix selects the column as well as the
+// region, and the inspector edits that column's spec. A cell is not an item of
+// its own -- it is an entry in columnSpecs -- so the cell travels with the item
+// selection rather than replacing it.
+- (void)testTablixCellSelection {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  if ([tablix.columnSpecs count] < 2) {
+    XCTFail(@"%@", @"the invoice sample should scaffold a tablix with columns");
+    return;
+  }
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:tablix inBandWithKey:@"body" column:1 part:RDLTablixPartValue];
+  if ([ctx selectedItem] != tablix)
+    XCTFail(@"%@", @"selecting a cell should still select the region");
+  if (ctx.selection.tablixColumn != 1 || ctx.selection.tablixPart != RDLTablixPartValue)
+    XCTFail(@"%@", @"the cell did not travel with the selection");
+
+  // Selecting the item plainly clears the cell, so the inspector stops showing
+  // a column that is no longer what the user pointed at.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  if (ctx.selection.tablixColumn != -1)
+    XCTFail(@"%@", @"a plain item selection left a column behind");
+
+  // The inspector shows the column and writes it back.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body" column:1 part:RDLTablixPartValue];
+  RDLInspectorView *inspector =
+      [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 700) context:ctx];
+  [inspector reload];
+  NSTextField *header = [inspector valueForKey:@"cellHeaderField"];
+  NSString *was = tablix.columnSpecs[1][@"header"];
+  if (![[header stringValue] isEqualToString:was ?: @""])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the cell section shows %@, the column is %@",
+                                              [header stringValue], was]);
+
+  [header setStringValue:@"Amount due"];
+  [inspector changed:header];
+  if (![tablix.columnSpecs[1][@"header"] isEqualToString:@"Amount due"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the column header is %@",
+                                              tablix.columnSpecs[1][@"header"]]);
+  // ... and the other columns are untouched, since the whole array is rewritten.
+  if ([tablix.columnSpecs count] < 2 || tablix.columnSpecs[0][@"header"] == nil)
+    XCTFail(@"%@", @"rewriting one column disturbed the others");
+}
+
 - (void)testPreviewZoomAndRulers {
   RDLReport *report = [RDLSamples blankLetter];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];

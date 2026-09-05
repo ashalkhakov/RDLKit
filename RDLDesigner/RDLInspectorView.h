@@ -12,4 +12,7 @@
 // the Attributes tab is the one that follows the selection.
 @property (nonatomic, assign) BOOL showsReportOnly;
 - (void)reload;
+// A control finished editing: read it back into the model. Declared because
+// the sections are driven through it, in the app and in checks alike.
+- (void)changed:(id)sender;
 @end

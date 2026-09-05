@@ -8,8 +8,6 @@ NSString * const RDLHandleSouthEast = @"se";
 NSString * const RDLHandleEast = @"e";
 NSString * const RDLHandleSouth = @"s";
 
-NSString * const RDLTablixPartHeader = @"header";
-NSString * const RDLTablixPartValue = @"value";
 
 // The canvas leaves this much room around the paper, and the drag handles are
 // this big. Both are geometry, so they live with the rest of it rather than
@@ -249,7 +247,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
 + (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
               column:(NSUInteger)column
-                part:(NSString *)part
+                part:(RDLTablixPart)part
                 zoom:(CGFloat)zoom {
   NSArray *specs = tablix.columnSpecs ?: @[];
   CGFloat x = NSMinX(itemRect);
@@ -257,7 +255,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
     x += [self widthOfColumn:i in:specs zoom:zoom];
   CGFloat w = [self widthOfColumn:column in:specs zoom:zoom];
   CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
-  BOOL header = [part isEqualToString:RDLTablixPartHeader];
+  BOOL header = part == RDLTablixPartHeader;
   return NSMakeRect(x, header ? NSMinY(itemRect) : NSMinY(itemRect) + hh, w,
                     header ? hh : [self rowHeightOf:tablix zoom:zoom]);
 }
@@ -266,14 +264,14 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
         column:(NSUInteger *)outColumn
-          part:(NSString **)outPart
+          part:(RDLTablixPart *)outPart
           zoom:(CGFloat)zoom {
   NSArray *specs = tablix.columnSpecs ?: @[];
   if ([specs count] == 0 || !NSPointInRect(point, itemRect))
     return NO;
   CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
   CGFloat rh = [self rowHeightOf:tablix zoom:zoom];
-  NSString *part;
+  RDLTablixPart part;
   if (point.y < NSMinY(itemRect) + hh)
     part = RDLTablixPartHeader;
   else if (point.y < NSMinY(itemRect) + hh + rh)

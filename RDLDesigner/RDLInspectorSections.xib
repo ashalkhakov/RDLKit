@@ -25,6 +25,13 @@
                 <outlet property="formatExprButton" destination="formatExprButton" id="formatExprButtonOutlet"/>
                 <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
                 <outlet property="sizeExprButton" destination="sizeExprButton" id="sizeExprButtonOutlet"/>
+                <outlet property="cellHeaderField" destination="cellHeaderField" id="cellHeaderFieldOutlet"/>
+                <outlet property="cellValueField" destination="cellValueField" id="cellValueFieldOutlet"/>
+                <outlet property="cellWidthField" destination="cellWidthField" id="cellWidthFieldOutlet"/>
+                <outlet property="cellAlignPop" destination="cellAlignPop" id="cellAlignPopOutlet"/>
+                <outlet property="cellAggPop" destination="cellAggPop" id="cellAggPopOutlet"/>
+                <outlet property="cellExprButton" destination="cellExprButton" id="cellExprButtonOutlet"/>
+                <outlet property="cellBox" destination="cellBox" id="cellBoxOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
@@ -406,6 +413,141 @@
                         <outlet property="delegate" destination="-2" id="heightFieldDelegate"/>
                     </connections>
                 </textField>
+            </subviews>
+        </customView>
+        <customView id="cellBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="176"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lblCell0">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Column" id="lblCell0Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="cellHeaderField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellHeaderFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellHeaderFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellHeaderFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lblCell1">
+                    <rect key="frame" x="10" y="46" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Value" id="lblCell1Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="cellValueField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="62" width="214" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellValueFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellValueFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellValueFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="cellExprButton">
+                    <rect key="frame" x="226" y="62" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cellExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections><action selector="editExpression:" target="-2" id="cellExprButtonAction"/></connections>
+                </button>
+                <textField verticalHuggingPriority="750" id="lblCell2">
+                    <rect key="frame" x="10" y="88" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Width in" id="lblCell2Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lblCell3">
+                    <rect key="frame" x="136" y="88" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Align" id="lblCell3Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="cellWidthField">
+                    <rect key="frame" x="10" y="104" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellWidthFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellWidthFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellWidthFieldDelegate"/>
+                    </connections>
+                </textField>
+                <popUpButton id="cellAlignPop">
+                    <rect key="frame" x="136" y="104" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" title="Default" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" pullsDown="NO" selectedItem="cellAlignPopItem0" id="cellAlignPopCell">
+                        <behavior key="behavior" lightByContents="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                        <menu key="menu" title="OtherViews" id="cellAlignPopMenu">
+                            <items>
+                                    <menuItem title="Default" id="cellAlignPopItem0"/>
+                                    <menuItem title="Left" id="cellAlignPopItem1"/>
+                                    <menuItem title="Center" id="cellAlignPopItem2"/>
+                                    <menuItem title="Right" id="cellAlignPopItem3"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections><action selector="changed:" target="-2" id="cellAlignPopAction"/></connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lblCell4">
+                    <rect key="frame" x="10" y="130" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Total" id="lblCell4Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="cellAggPop">
+                    <rect key="frame" x="10" y="146" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" title="None" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" pullsDown="NO" selectedItem="cellAggPopItem0" id="cellAggPopCell">
+                        <behavior key="behavior" lightByContents="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                        <menu key="menu" title="OtherViews" id="cellAggPopMenu">
+                            <items>
+                                    <menuItem title="None" id="cellAggPopItem0"/>
+                                    <menuItem title="Sum" id="cellAggPopItem1"/>
+                                    <menuItem title="Avg" id="cellAggPopItem2"/>
+                                    <menuItem title="Count" id="cellAggPopItem3"/>
+                                    <menuItem title="Min" id="cellAggPopItem4"/>
+                                    <menuItem title="Max" id="cellAggPopItem5"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections><action selector="changed:" target="-2" id="cellAggPopAction"/></connections>
+                </popUpButton>
             </subviews>
         </customView>
         <customView id="textBox">

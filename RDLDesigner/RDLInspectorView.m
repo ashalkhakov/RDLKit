@@ -24,6 +24,13 @@
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
+// The selected tablix column. A cell is an entry in columnSpecs rather than an
+// item, so these are applied by hand rather than through a key path binding.
+@property (nonatomic, strong) IBOutlet NSView *cellBox;
+@property (nonatomic, strong) IBOutlet NSTextField *cellHeaderField, *cellWidthField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *cellValueField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *cellAlignPop, *cellAggPop;
+@property (nonatomic, strong) IBOutlet NSButton *cellExprButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -111,7 +118,7 @@
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
   for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
-                         _imageBox, _chartBox, _tablixBox ])
+                         _imageBox, _chartBox, _tablixBox, _cellBox ])
     [self addSubview:box];
   [self declareBindings];
 }
@@ -257,7 +264,8 @@
 
 - (void)stackBoxes:(NSArray *)boxes {
   NSArray *all = @[
-    _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox, _chartBox, _tablixBox
+    _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox, _chartBox, _tablixBox,
+    _cellBox
   ];
   for (NSView *v in all)
     [v setHidden:YES];
@@ -323,6 +331,8 @@
         [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
+      if ([self fillCellFromTablix:(RDLTablix *)it column:sel.tablixColumn])
+        [boxes addObject:_cellBox];
         [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
     }
     [self stackBoxes:boxes];
@@ -348,6 +358,59 @@
 
   [_bindings fillFromItem:it band:band report:report];
   _reloading = NO;
+}
+
+// The selected column's spec, or NO when the selection names no column -- in
+// which case the section is not shown at all rather than shown empty.
+- (BOOL)fillCellFromTablix:(RDLTablix *)tablix column:(NSInteger)column {
+  NSArray *specs = tablix.columnSpecs ?: @[];
+  if (column < 0 || column >= (NSInteger)[specs count])
+    return NO;
+  NSDictionary *spec = specs[(NSUInteger)column];
+  [_cellHeaderField setStringValue:spec[@"header"] ?: @""];
+  [_cellValueField setStringValue:spec[@"value"] ?: @""];
+  [_cellWidthField setStringValue:[NSString stringWithFormat:@"%.3f",
+                                                            [spec[@"width"] doubleValue]]];
+  NSString *align = spec[@"align"] ?: @"Default";
+  [_cellAlignPop selectItemWithTitle:[_cellAlignPop itemWithTitle:align] ? align : @"Default"];
+  NSString *agg = spec[@"aggregate"] ?: @"None";
+  [_cellAggPop selectItemWithTitle:[_cellAggPop itemWithTitle:agg] ? agg : @"None"];
+  return YES;
+}
+
+// One column changed: the whole spec array goes back, because that is the unit
+// -rebuildTablix reads and the unit the inverse restores.
+- (BOOL)applyCellControl:(id)sender {
+  RDLSelection *sel = _context.selection;
+  RDLItem *it = [_context selectedItem];
+  if (![it isKindOfClass:[RDLTablix class]] || sel.tablixColumn < 0)
+    return NO;
+  if (sender != _cellHeaderField && sender != _cellValueField && sender != _cellWidthField &&
+      sender != _cellAlignPop && sender != _cellAggPop)
+    return NO;
+  RDLTablix *tablix = (RDLTablix *)it;
+  NSMutableArray *specs = [(tablix.columnSpecs ?: @[]) mutableCopy];
+  if (sel.tablixColumn >= (NSInteger)[specs count])
+    return NO;
+  NSMutableDictionary *spec = [specs[(NSUInteger)sel.tablixColumn] mutableCopy];
+  spec[@"header"] = [_cellHeaderField stringValue];
+  spec[@"value"] = [_cellValueField stringValue];
+  CGFloat width = [[_cellWidthField stringValue] doubleValue];
+  if (width > 0)
+    spec[@"width"] = @(width);
+  NSString *align = [_cellAlignPop titleOfSelectedItem];
+  if ([align isEqualToString:@"Default"])
+    [spec removeObjectForKey:@"align"];
+  else
+    spec[@"align"] = align;
+  NSString *agg = [_cellAggPop titleOfSelectedItem];
+  if ([agg isEqualToString:@"None"])
+    [spec removeObjectForKey:@"aggregate"];
+  else
+    spec[@"aggregate"] = agg;
+  specs[(NSUInteger)sel.tablixColumn] = spec;
+  [_context.editor setColumnSpecs:specs ofTablix:tablix];
+  return YES;
 }
 
 #pragma mark - Apply (UI → model)
@@ -427,6 +490,8 @@
 
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
+  if ([self applyCellControl:sender])
+    return;
   if (sender == _marginField) {
     [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
     return;
@@ -453,6 +518,7 @@
   _rectBGField.expressionContext = RDLExpressionContextColor;
   _formatField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
+  _cellValueField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -465,6 +531,7 @@
   if (sender == _formatExprButton) return _formatField;
   if (sender == _rectBGExprButton) return _rectBGField;
   if (sender == _sizeExprButton) return _sizeField;
+  if (sender == _cellExprButton) return _cellValueField;
   return nil;
 }
 

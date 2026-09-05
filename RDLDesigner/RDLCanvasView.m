@@ -252,7 +252,7 @@
   if ([hit isKindOfClass:[RDLTablix class]]) {
     RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger col = 0;
-    NSString *part = nil;
+    RDLTablixPart part = RDLTablixPartNone;
     BOOL onCell = [RDLTablixGeometry tablix:tablixHit
                                    itemRect:itemRect
                                       point:p
