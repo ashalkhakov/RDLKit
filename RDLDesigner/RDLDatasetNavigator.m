@@ -34,6 +34,11 @@
   [_table setDataSource:self];
   [_table setDelegate:self];
   [_table setAllowsEmptySelection:YES];
+  // -tableViewSelectionDidChange: only fires when the selection CHANGES, so
+  // clicking the row that is already selected says nothing. It is still the
+  // user asking for that dataset, so the click itself is an action too.
+  [_table setTarget:self];
+  [_table setAction:@selector(rowClicked:)];
   [_scroll setDocumentView:_table];
   [self addSubview:_scroll];
 
@@ -119,6 +124,11 @@
   return [NSString stringWithFormat:@"%@  (%lu %@)", ds.name ?: @"",
                                     (unsigned long)fields,
                                     fields == 1 ? @"field" : @"fields"];
+}
+
+- (void)rowClicked:(id)sender {
+  (void)sender;
+  [_delegate datasetNavigator:self didSelectDataSet:[self selectedDataSet]];
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)note {

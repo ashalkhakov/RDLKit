@@ -146,9 +146,13 @@
   RDL_UNUSED(note);
   [_outlineSource syncSelection];
   // Selecting something on the canvas or in the outline ends the dataset's
-  // turn in the Attributes tab.
-  if ([_context selectedItem] != nil)
+  // turn -- in the Attributes tab, and in the centre, which was showing the
+  // dataset and has nothing to do with the element now selected.
+  if ([_context selectedItem] != nil) {
     _datasetFields.dataSet = nil;
+    if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2)
+      [self centerModeChanged:nil];
+  }
   [self syncInspectorToSelection];
 }
 

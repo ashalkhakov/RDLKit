@@ -2249,6 +2249,67 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // never in the bundle; and DMTabBar sending the BAR as the action's sender,
 // where the controller read a tag off it and got NSView's -1, so no tab ever
 // switched. Both are only visible by loading the thing and clicking it.
+// Controls that overlap are the failure hand-written inspector markup invites:
+// the one on top takes the clicks and the one under it looks fine and does
+// nothing, which is what the rich-text button did under the Typeface label.
+// Read out of the file, per container, because that is where the mistake is.
+- (void)testInspectorControlsDoNotOverlap {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *xib = [NSString
+      stringWithContentsOfFile:[dir stringByAppendingPathComponent:
+                                        @"RDLDesigner/RDLInspectorSections.xib"]
+                      encoding:NSUTF8StringEncoding
+                         error:NULL];
+  if (xib == nil) {
+    XCTFail(@"%@", @"cannot read RDLInspectorSections.xib");
+    return;
+  }
+
+  NSError *err = nil;
+  NSRegularExpression *control = [NSRegularExpression
+      regularExpressionWithPattern:
+          @"<(textField|button|popUpButton|colorWell|comboBox|matrix)[^>]*id=\"([^\"]+)\"[^>]*>"
+           "\\s*<rect key=\"frame\" x=\"([-0-9.]+)\" y=\"([-0-9.]+)\" "
+           "width=\"([0-9.]+)\" height=\"([0-9.]+)\""
+                           options:0
+                             error:&err];
+  NSRegularExpression *container =
+      [NSRegularExpression regularExpressionWithPattern:@"<customView id=\"([a-zA-Z]+Box)\">"
+                                               options:0
+                                                 error:&err];
+  NSArray *boxes = [container matchesInString:xib
+                                      options:0
+                                        range:NSMakeRange(0, [xib length])];
+  if ([boxes count] < 3) {
+    XCTFail(@"%@", @"no inspector boxes found; the check is reading the wrong thing");
+    return;
+  }
+
+  for (NSUInteger b = 0; b < [boxes count]; b++) {
+    NSUInteger from = [(NSTextCheckingResult *)boxes[b] range].location;
+    NSUInteger to = b + 1 < [boxes count]
+                        ? [(NSTextCheckingResult *)boxes[b + 1] range].location
+                        : [xib length];
+    NSString *box = [xib substringWithRange:[(NSTextCheckingResult *)boxes[b] rangeAtIndex:1]];
+    NSMutableArray *names = [NSMutableArray array];
+    NSMutableArray *rects = [NSMutableArray array];
+    for (NSTextCheckingResult *m in [control matchesInString:xib
+                                                     options:0
+                                                       range:NSMakeRange(from, to - from)]) {
+      [names addObject:[xib substringWithRange:[m rangeAtIndex:2]]];
+      [rects addObject:[NSValue valueWithRect:NSMakeRect(
+                                                  [[xib substringWithRange:[m rangeAtIndex:3]] doubleValue],
+                                                  [[xib substringWithRange:[m rangeAtIndex:4]] doubleValue],
+                                                  [[xib substringWithRange:[m rangeAtIndex:5]] doubleValue],
+                                                  [[xib substringWithRange:[m rangeAtIndex:6]] doubleValue])]];
+    }
+    for (NSUInteger i = 0; i < [rects count]; i++)
+      for (NSUInteger j = i + 1; j < [rects count]; j++)
+        if (NSIntersectsRect([rects[i] rectValue], [rects[j] rectValue]))
+          XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@ overlaps %@", box, names[i], names[j]]);
+  }
+}
+
 - (void)testDesignerWindowPanesRespond {
   RDLReport *report = [RDLSamples blankLetter];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];

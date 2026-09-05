@@ -403,7 +403,7 @@
             </subviews>
         </customView>
         <customView id="textBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="246"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="270"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField verticalHuggingPriority="750" id="lbl16">
@@ -428,7 +428,7 @@
                     </connections>
                 </textField>
                 <button toolTip="Edit this textbox as rich text" id="richTextButton">
-                    <rect key="frame" x="188" y="66" width="62" height="22"/>
+                    <rect key="frame" x="188" y="66" width="62" height="20"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="Rich…" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="richTextButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -439,7 +439,7 @@
                     </connections>
                 </button>
                 <textField verticalHuggingPriority="750" id="lbl17">
-                    <rect key="frame" x="10" y="70" width="240" height="14"/>
+                    <rect key="frame" x="10" y="94.0" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Typeface" id="lbl17Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -447,7 +447,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="fontField">
-                    <rect key="frame" x="10" y="86" width="172" height="22"/>
+                    <rect key="frame" x="10" y="110.0" width="172" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="fontFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -460,7 +460,7 @@
                     </connections>
                 </textField>
                 <button toolTip="Choose the font, size and weight in the font panel" id="fontPanelButton">
-                    <rect key="frame" x="188" y="86" width="62" height="22"/>
+                    <rect key="frame" x="188" y="110.0" width="62" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="Font…" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="fontPanelButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -471,7 +471,7 @@
                     </connections>
                 </button>
                 <textField verticalHuggingPriority="750" id="lbl18">
-                    <rect key="frame" x="10" y="114" width="114" height="14"/>
+                    <rect key="frame" x="10" y="138.0" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Size" id="lbl18Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -479,7 +479,7 @@
                     </textFieldCell>
                 </textField>
                 <textField verticalHuggingPriority="750" id="lbl19">
-                    <rect key="frame" x="136" y="114" width="114" height="14"/>
+                    <rect key="frame" x="136" y="138.0" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Weight" id="lbl19Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -487,7 +487,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="sizeField">
-                    <rect key="frame" x="10" y="130" width="114" height="22"/>
+                    <rect key="frame" x="10" y="154.0" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="sizeFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -500,7 +500,7 @@
                     </connections>
                 </textField>
                 <popUpButton id="weightPop">
-                    <rect key="frame" x="136" y="130" width="114" height="22"/>
+                    <rect key="frame" x="136" y="154.0" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="weightPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -517,7 +517,7 @@
                     </connections>
                 </popUpButton>
                 <textField verticalHuggingPriority="750" id="lbl20">
-                    <rect key="frame" x="10" y="158" width="240" height="14"/>
+                    <rect key="frame" x="10" y="182.0" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Align" id="lbl20Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -525,7 +525,7 @@
                     </textFieldCell>
                 </textField>
                 <popUpButton id="alignPop">
-                    <rect key="frame" x="10" y="174" width="240" height="22"/>
+                    <rect key="frame" x="10" y="198.0" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="alignPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -543,7 +543,7 @@
                     </connections>
                 </popUpButton>
                 <textField verticalHuggingPriority="750" id="lbl21">
-                    <rect key="frame" x="10" y="202" width="114" height="14"/>
+                    <rect key="frame" x="10" y="226.0" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Ink" id="lbl21Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -551,7 +551,7 @@
                     </textFieldCell>
                 </textField>
                 <textField verticalHuggingPriority="750" id="lbl22">
-                    <rect key="frame" x="136" y="202" width="114" height="14"/>
+                    <rect key="frame" x="136" y="226.0" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Format" id="lbl22Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -559,7 +559,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="colorField">
-                    <rect key="frame" x="10" y="218" width="114" height="22"/>
+                    <rect key="frame" x="10" y="242.0" width="86" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="colorFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -572,7 +572,7 @@
                     </connections>
                 </textField>
                 <colorWell toolTip="Text colour" id="colorWell">
-                    <rect key="frame" x="130" y="218" width="44" height="22"/>
+                    <rect key="frame" x="100" y="242.0" width="24" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <color key="color" red="0.1" green="0.098" blue="0.086" alpha="1" colorSpace="calibratedRGB"/>
                     <connections>
@@ -580,7 +580,7 @@
                     </connections>
                 </colorWell>
                 <textField id="formatField">
-                    <rect key="frame" x="136" y="218" width="114" height="22"/>
+                    <rect key="frame" x="136" y="242.0" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="formatFieldCell">
                         <font key="font" metaFont="user" size="11"/>
