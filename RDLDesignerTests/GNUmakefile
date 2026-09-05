@@ -13,7 +13,13 @@ BUNDLE_NAME = RDLDesignerTests
 RDLDesignerTests_OBJC_FILES = \
   RDLEditingCoreTests.m \
   RDLCanvasTests.m \
-  RDLUITests.m \
+  RDLDesignerTestSupport.m \
+  RDLWindowTests.m \
+  RDLInspectorTests.m \
+  RDLExpressionUITests.m \
+  RDLRichTextTests.m \
+  RDLTablixUITests.m \
+  RDLNewReportTests.m \
   ../RDLDesigner/RDLChange.m \
   ../RDLDesigner/RDLDocument.m \
   ../RDLDesigner/RDLEditingContext.m \
