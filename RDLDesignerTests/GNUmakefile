@@ -11,7 +11,9 @@ BUNDLE_NAME = RDLDesignerTests
 # editing logic, not the window shell, which is why RDLAppDelegate and the
 # window controllers are absent.
 RDLDesignerTests_OBJC_FILES = \
-  RDLDesignerTests.m \
+  RDLEditingCoreTests.m \
+  RDLCanvasTests.m \
+  RDLUITests.m \
   ../RDLDesigner/RDLChange.m \
   ../RDLDesigner/RDLDocument.m \
   ../RDLDesigner/RDLEditingContext.m \

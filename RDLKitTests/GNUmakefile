@@ -8,7 +8,12 @@ include $(GNUSTEP_MAKEFILES)/common.make
 BUNDLE_NAME = RDLKitTests
 
 RDLKitTests_OBJC_FILES = \
-  RDLKitTests.m
+  RDLTestSupport.m \
+  RDLParserTests.m \
+  RDLExpressionTests.m \
+  RDLLayoutTests.m \
+  RDLBackendTests.m \
+  RDLImportTests.m
 RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall
 RDLKitTests_INCLUDE_DIRS = -I../RDLKit
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
