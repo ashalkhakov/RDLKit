@@ -329,15 +329,36 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+  PICA_UNUSED(dirtyRect);
+  [NSGraphicsContext saveGraphicsState];
+#ifdef GNUSTEP
+  // GSPDFPrintOperation -_print hands the view straight to
+  // -displayRectIgnoringOpacity:inContext: with no transform of its own; its
+  // own last line is "FIXME: Output comes out up-side-down". Locking focus
+  // still calls GSWSetViewIsFlipped(ctxt, YES) for a flipped view, so the
+  // backend compensates for a flip that is not in the CTM -- and because this
+  // view has no window, nothing else put one there either. Both the glyphs and
+  // the order of the page come out mirrored, which is exactly what the export
+  // showed. Supplying the matrix a window would have supplied leaves the
+  // context in the state this same view is in when it draws on screen, where
+  // it is correct. Not needed on macOS, whose printing applies it itself.
+  if ([self isFlipped] && [self window] == nil) {
+    NSAffineTransformStruct ats = {1, 0, 0, -1, 0, NSHeight([self bounds])};
+    NSAffineTransform *flip = [NSAffineTransform transform];
+    [flip setTransformStruct:ats];
+    [flip concat];
+  }
+#endif
+  // Every page, not just the dirty one: this view exists to be rendered whole,
+  // and under the transform above the dirty rect is not in these coordinates.
   [[NSColor whiteColor] set];
-  NSRectFill(dirtyRect);
+  NSRectFill([self bounds]);
   CGFloat y = 0;
   for (RDLLaidOutPage *page in self.pages) {
-    NSRect r = NSMakeRect(0, y, page.width * kPicaDPI, page.height * kPicaDPI);
-    if (NSIntersectsRect(r, dirtyRect))
-      [self drawItemsOfPage:page atY:y];
+    [self drawItemsOfPage:page atY:y];
     y += page.height * kPicaDPI;
   }
+  [NSGraphicsContext restoreGraphicsState];
 }
 
 @end
