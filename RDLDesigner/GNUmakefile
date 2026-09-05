@@ -37,6 +37,7 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionField.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \
+  RDLFieldInspectorView.m \
   RDLDatasetFieldsView.m \
   ThirdParty/DMTabBar/DMTabBar.m \
   ThirdParty/DMTabBar/DMTabBarItem.m

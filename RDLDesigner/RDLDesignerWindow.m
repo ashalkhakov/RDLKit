@@ -13,11 +13,12 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLInsertPalette.h"
+#import "RDLFieldInspectorView.h"
 #import "RDLPageGeometry.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow ()
+@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate>
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -44,6 +45,7 @@
 @property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
 @property (nonatomic, strong) RDLInsertPalette *palette;
+@property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
 @property (nonatomic, strong) NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
@@ -380,9 +382,21 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _datasetNavigator.delegate = self;
   RDLFillHost(_datasetNavigatorHost, _datasetNavigator);
 
-  _datasetFields = [[RDLDatasetFieldsView alloc] initWithFrame:[_datasetInspectorHost bounds]
+  // The dataset's attributes table sits in the centre, over the data view: it
+  // is what is being edited when a dataset is chosen, the way the Core Data
+  // builder shows an entity's attributes. The data view stays underneath as
+  // what the pane shows when no dataset is selected.
+  _datasetFields = [[RDLDatasetFieldsView alloc] initWithFrame:[_dataView bounds]
                                                        context:_context];
-  RDLFillHost(_datasetInspectorHost, _datasetFields);
+  _datasetFields.delegate = self;
+  [_datasetFields setHidden:YES];
+  RDLFillHost([_dataView superview], _datasetFields);
+
+  // ... and the settings of whichever attribute is selected go where every
+  // other selection's settings go.
+  _fieldInspector = [[RDLFieldInspectorView alloc] initWithFrame:[_datasetInspectorHost bounds]
+                                                         context:_context];
+  RDLFillHost(_datasetInspectorHost, _fieldInspector);
 
   _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
   RDLFillHost(_paletteHost, _palette);
@@ -419,6 +433,8 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
         didSelectDataSet:(RDLDataSet *)dataSet {
   RDL_UNUSED(navigator);
   _datasetFields.dataSet = dataSet;
+  [_datasetFields setHidden:dataSet == nil];
+  [_fieldInspector showField:nil ofDataSet:dataSet];
   if (dataSet != nil) {
     // One selection at a time. Choosing a dataset is choosing to edit it, so
     // whatever was selected on the canvas is no longer what the inspector is
@@ -431,6 +447,15 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   } else if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2) {
     [self centerModeChanged:nil];
   }
+  [self syncInspectorToSelection];
+}
+
+// An attribute selected in the centre puts its settings in the inspector,
+// which is the same swap an element makes.
+- (void)datasetFieldsView:(RDLDatasetFieldsView *)view didSelectField:(RDLField *)field {
+  [_fieldInspector showField:field ofDataSet:view.dataSet];
+  if (field != nil)
+    [_context.selection selectReport];  // one selection at a time
   [self syncInspectorToSelection];
 }
 
@@ -473,10 +498,10 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // selected means the element inspector, a dataset field means the field
 // inspector. The tab itself stays where the user left it.
 - (void)syncInspectorToSelection {
-  // An element beats a dataset: selecting something on the canvas is the more
-  // recent intent, and the navigator's selection stays where it is.
-  BOOL showFields = [_context selectedItem] == nil && _datasetFields.dataSet != nil;
-  [_attributeTabView selectTabViewItemAtIndex:showFields ? 1 : 0];
+  // An element beats an attribute: selecting something on the canvas is the
+  // more recent intent, and the navigator's selection stays where it is.
+  BOOL showField = [_context selectedItem] == nil && _fieldInspector.field != nil;
+  [_attributeTabView selectTabViewItemAtIndex:showField ? 1 : 0];
 }
 
 - (void)leftTabChanged:(id)sender {

@@ -4,6 +4,9 @@
 // holds, the preview's rulers and zoom, the menu, and what a drag from the
 // palette lands as.
 #import "RDLDesignerTestSupport.h"
+#import "RDLDatasetFieldsView.h"
+#import "RDLFieldInspectorView.h"
+#import "RDLDesignerWindow.h"
 
 
 
@@ -79,6 +82,10 @@
                                               (unsigned long)items]);
 }
 
+static NSTabView *_centerTabViewOf(id wc) {
+  return [wc valueForKey:@"centerTabView"];
+}
+
 - (void)testDesignerWindowPanesRespond {
   RDLReport *report = [RDLSamples blankLetter];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
@@ -139,13 +146,16 @@
   [ctx.editor addDataSet:ds];
   RDLDatasetNavigator *nav = [wc valueForKey:@"datasetNavigator"];
   [wc datasetNavigator:nav didSelectDataSet:ds];
-  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
-    XCTFail(@"%@", @"a dataset is selected but its fields are not showing");
   if ([ctx selectedItem] != nil)
     XCTFail(@"%@", @"the canvas selection survived choosing a dataset");
+  // A dataset fills the centre with its attributes; the inspector waits for one
+  // of them to be chosen, since a dataset is not an attribute. That swap is
+  // testDatasetAttributesAndInspector's.
   RDLDatasetFieldsView *fields = [wc valueForKey:@"datasetFields"];
-  if (fields.dataSet != ds)
-    XCTFail(@"%@", @"the field inspector is showing a different dataset");
+  if (fields.dataSet != ds || [fields isHidden])
+    XCTFail(@"%@", @"the centre is not showing the chosen dataset's attributes");
+  if ([_centerTabViewOf(wc) indexOfTabViewItem:[_centerTabViewOf(wc) selectedTabViewItem]] != 2)
+    XCTFail(@"%@", @"the centre did not switch to the dataset");
 }
 
 - (void)testDatasetPanes {
@@ -388,6 +398,74 @@
   if ([canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
                   atPoint:NSMakePoint(2, 2)])
     XCTFail(@"%@", @"a drop outside the bands should be refused");
+}
+
+// The dataset arrangement, as the Core Data builder has it: the attributes in
+// the centre, where what is being edited goes, and the selected attribute's
+// settings in the inspector, where the settings of whatever is selected always
+// go.
+- (void)testDatasetAttributesAndInspector {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  if ([[ds fields] count] == 0) {
+    XCTFail(@"%@", @"the invoice sample should declare fields");
+    return;
+  }
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+
+  RDLDatasetFieldsView *table = [wc valueForKey:@"datasetFields"];
+  RDLFieldInspectorView *inspector = [wc valueForKey:@"fieldInspector"];
+  RDLDatasetNavigator *nav = [wc valueForKey:@"datasetNavigator"];
+  NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
+
+  // Choosing a dataset shows its attributes in the centre and nothing yet in
+  // the inspector: a dataset is not an attribute.
+  [wc datasetNavigator:nav didSelectDataSet:ds];
+  if (table.dataSet != ds || [table isHidden])
+    XCTFail(@"%@", @"the attributes table is not showing the chosen dataset");
+  if (inspector.field != nil)
+    XCTFail(@"%@", @"nothing is selected in the table, so nothing should be inspected");
+
+  // Choosing an attribute puts it in the inspector, on the tab the element
+  // inspector uses.
+  RDLField *field = [[ds fields] firstObject];
+  [wc datasetFieldsView:table didSelectField:field];
+  if (inspector.field != field)
+    XCTFail(@"%@", @"the inspector is not showing the selected attribute");
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"the Attributes tab should have swapped to the attribute");
+
+  // Editing it there writes through to the dataset.
+  NSTextField *nameField = [inspector valueForKey:@"_nameField"];
+  [nameField setStringValue:@"Renamed"];
+  [inspector changed:nameField];
+  if (![[[ds fields] firstObject].name isEqualToString:@"Renamed"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the field is called %@",
+                                              [[ds fields] firstObject].name]);
+
+  // The dataset's own name is editable too, and renaming carries the regions
+  // that referred to it.
+  NSString *was = ds.name;
+  RDLTablix *bound = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]] &&
+        [[(RDLTablix *)it dataSetName] isEqualToString:was])
+      bound = (RDLTablix *)it;
+  [ctx.editor renameDataSet:ds to:@"Ledger"];
+  if (![ds.name isEqualToString:@"Ledger"])
+    XCTFail(@"%@", @"the dataset was not renamed");
+  if (bound && ![bound.dataSetName isEqualToString:@"Ledger"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the tablix still names %@", bound.dataSetName]);
+  [ctx.document.undoManager undo];
+  if (![ds.name isEqualToString:was])
+    XCTFail(@"%@", @"undo did not put the name back");
+  if (bound && ![bound.dataSetName isEqualToString:was])
+    XCTFail(@"%@", @"undo left the tablix pointing at the new name");
 }
 
 @end

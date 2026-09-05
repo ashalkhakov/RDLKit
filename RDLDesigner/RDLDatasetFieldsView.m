@@ -19,14 +19,15 @@
     return nil;
   _context = context;
 
-  CGFloat bar = 26, head = 22;
+  CGFloat bar = 26, head = 30;
+  // The dataset's own settings. Only its name so far, which is what a report
+  // refers to it by and the one thing that was not editable anywhere.
   _title = [[NSTextField alloc]
-      initWithFrame:NSMakeRect(8, NSHeight(frame) - head, NSWidth(frame) - 16, 17)];
-  [_title setBezeled:NO];
-  [_title setDrawsBackground:NO];
-  [_title setEditable:NO];
-  [_title setSelectable:NO];
-  [_title setFont:[NSFont boldSystemFontOfSize:[NSFont smallSystemFontSize]]];
+      initWithFrame:NSMakeRect(8, NSHeight(frame) - head + 4, NSWidth(frame) - 16, 22)];
+  [_title setEditable:YES];
+  [_title setBezeled:YES];
+  [_title setTarget:self];
+  [_title setAction:@selector(renameDataSet:)];
   [_title setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
   [self addSubview:_title];
 
@@ -73,8 +74,34 @@
 }
 
 - (void)reload {
-  [_title setStringValue:_dataSet.name ?: @"No dataset selected"];
+  [_title setStringValue:_dataSet.name ?: @""];
+  [_title setEnabled:_dataSet != nil];
   [_table reloadData];
+}
+
+- (RDLField *)selectedField {
+  NSInteger row = [_table selectedRow];
+  NSArray<RDLField *> *fields = [_dataSet fields];
+  return (row >= 0 && row < (NSInteger)[fields count]) ? fields[(NSUInteger)row] : nil;
+}
+
+// Renaming a dataset is not only a label: every tablix and chart that names it
+// would otherwise be pointing at nothing.
+- (void)renameDataSet:(id)sender {
+  (void)sender;
+  NSString *name = [[_title stringValue] stringByTrimmingCharactersInSet:
+                                             [NSCharacterSet whitespaceCharacterSet]];
+  if (_dataSet == nil || [name length] == 0 || [name isEqualToString:_dataSet.name]) {
+    [self reload];
+    return;
+  }
+  [_context.editor renameDataSet:_dataSet to:name];
+  [self reload];
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification *)note {
+  (void)note;
+  [_delegate datasetFieldsView:self didSelectField:[self selectedField]];
 }
 
 #pragma mark - Editing

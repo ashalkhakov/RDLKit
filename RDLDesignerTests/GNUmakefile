@@ -50,6 +50,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLTabBadge.m \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
+  ../RDLDesigner/RDLFieldInspectorView.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall

@@ -74,6 +74,10 @@
 // The whole field list at once, and its inverse is the previous list: fields
 // are edited as a set, and a rename plus a retype is one step.
 - (void)setFields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet;
+// Renaming carries the references with it: every tablix and chart that names
+// this dataset is pointed at the new name in the same step, because a region
+// naming a dataset that is not there is not a state to pass through.
+- (void)renameDataSet:(RDLDataSet *)dataSet to:(NSString *)name;
 
 // --- Tablix ---------------------------------------------------------------
 // All of these go through columnSpecs + -rebuildTablix, so the inverse is
