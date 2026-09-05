@@ -116,8 +116,8 @@ xcodebuild -project ../RDLKit.xcodeproj -scheme RDLDesignerTests -destination 'p
 xcodebuild -project ../RDLKit.xcodeproj -scheme RDLKitTests      -destination 'platform=macOS' test
 ```
 
-Do not use `swift test`: SwiftPM is not part of this project's build story, which
-has to work under GNUstep too.
+There is no `Package.swift`, and `swift test` is not a way to build this:
+SwiftPM is not part of the build story, which has to work under GNUstep too.
 
 ## GNUstep
 

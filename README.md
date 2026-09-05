@@ -157,8 +157,8 @@ xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests test
 ```
 
 There are two test schemes: `RDLKitTests` for the library and
-`RDLDesignerTests` for the app. Use those rather than `swift test` --
-SwiftPM is not part of the build story, which has to work under GNUstep too.
+`RDLDesignerTests` for the app. There is no `Package.swift`: SwiftPM is not
+part of the build story, which has to work under GNUstep too.
 Both are ordinary XCTest; under GNUstep they build as bundles through their
 own GNUmakefiles and need `gnustep/tools-xctest`.
 
