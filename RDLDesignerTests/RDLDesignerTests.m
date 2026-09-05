@@ -2275,11 +2275,16 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   // Each pane is a DMTabBar over a tab view. The bar takes its items in code,
   // so the XIB only has to supply the three hosts; what it must not do is
   // leave one out, since an absent host means a pane nothing can reach.
-  for (NSString *host in @[ @"leftTabBar", @"centerTabBar", @"rightTabBar" ]) {
-    NSString *decl = [NSString stringWithFormat:@"id=\"%@\" customClass=\"DMTabBar\"", host];
-    if ([xib rangeOfString:decl].location == NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing or is not a DMTabBar", host]);
-  }
+  // Only the left pane is a chooser. The right one follows the selection and
+  // the centre offers Preview or Source, so a tab bar over either would be
+  // offering a choice that is not the user's to make.
+  if ([xib rangeOfString:@"id=\"leftTabBar\" customClass=\"DMTabBar\""].location == NSNotFound)
+    XCTFail(@"%@", @"leftTabBar is missing or is not a DMTabBar");
+  if ([xib rangeOfString:@"customClass=\"DMTabBar\""].location !=
+      [xib rangeOfString:@"customClass=\"DMTabBar\"" options:NSBackwardsSearch].location)
+    XCTFail(@"%@", @"more than one DMTabBar: only the navigators are chosen by the user");
+  if ([xib rangeOfString:@"id=\"centerMode\""].location == NSNotFound)
+    XCTFail(@"%@", @"the centre pane has no Preview/Source control");
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
   // Left: outline and datasets. Centre: preview, source, dataset. Right:
   // element, report, dataset field.

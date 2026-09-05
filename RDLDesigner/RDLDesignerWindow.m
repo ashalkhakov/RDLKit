@@ -27,7 +27,8 @@
 // visible chrome, the tab view holds the panes. Hosts are empty views the
 // later stages fill; they carry a label so an empty pane says what belongs
 // there rather than looking broken.
-@property (nonatomic, strong) IBOutlet NSView *leftTabBar, *centerTabBar, *rightTabBar;
+@property (nonatomic, strong) IBOutlet NSView *leftTabBar;
+@property (nonatomic, strong) IBOutlet NSSegmentedControl *centerMode;
 @property (nonatomic, strong) IBOutlet NSTabView *leftTabView, *centerTabView, *rightTabView;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
@@ -110,6 +111,7 @@
   // The tab bars come out of the XIB as empty DMTabBar views: it takes its
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
+  [self syncInspectorToSelection];
 }
 
 // The outline mirrors the report tree, so it only needs rebuilding when the
@@ -129,6 +131,7 @@
 - (void)selectionDidChange:(NSNotification *)note {
   RDL_UNUSED(note);
   [_outlineSource syncSelection];
+  [self syncInspectorToSelection];
 }
 
 - (void)dealloc {
@@ -251,33 +254,44 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
 }
 
 - (void)buildTabBars {
+  // Only the left pane is a chooser: the navigators are two things the user
+  // picks between. The right pane is not -- the inspector follows the
+  // selection, the way the Core Data builder's does -- and the centre offers
+  // Preview or Source, with the dataset view arriving because a dataset was
+  // selected rather than because a tab was clicked.
   RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, @[
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
   ]);
-  RDLFillTabBar(_centerTabBar, self, @selector(centerTabChanged:), 0, @[
-    @[ @"P", @"Preview", @0.36, @0.49, @0.72 ],
-    @[ @"S", @"RDL source", @0.32, @0.60, @0.53 ],
-    @[ @"D", @"Dataset", @0.70, @0.48, @0.32 ],
-  ]);
-  RDLFillTabBar(_rightTabBar, self, @selector(rightTabChanged:), 0, @[
-    @[ @"E", @"Element inspector", @0.36, @0.49, @0.72 ],
-    @[ @"R", @"Report inspector", @0.47, @0.53, @0.64 ],
-    @[ @"F", @"Dataset field inspector", @0.70, @0.48, @0.32 ],
-  ]);
+}
+
+// The centre shows the report -- as a preview or as its source -- or a
+// dataset. The first two are the user's choice; the third is a consequence of
+// what is selected, so choosing Preview or Source also means "show the report
+// again" when a dataset was showing.
+- (void)centerModeChanged:(id)sender {
+  RDL_UNUSED(sender);
+  [_centerTabView selectTabViewItemAtIndex:[_centerMode selectedSegment] == 1 ? 1 : 0];
+}
+
+- (void)showDatasetPane {
+  [_centerTabView selectTabViewItemAtIndex:2];
+}
+
+// Which inspector is showing is a function of what is selected, not a tab.
+// An element selected means the element inspector; nothing selected means the
+// report itself, which is what the user is editing when they are not editing
+// anything smaller. The dataset field inspector arrives with the dataset
+// navigator that selects one.
+- (void)syncInspectorToSelection {
+  BOOL hasItem = [_context selectedItem] != nil;
+  [_rightTabView selectTabViewItemAtIndex:hasItem ? 0 : 1];
 }
 
 - (void)leftTabChanged:(id)sender {
   RDLSelectTab(sender, _leftTabView);
 }
 
-- (void)centerTabChanged:(id)sender {
-  RDLSelectTab(sender, _centerTabView);
-}
-
-- (void)rightTabChanged:(id)sender {
-  RDLSelectTab(sender, _rightTabView);
-}
 
 - (void)toggleDesignPreview:(id)sender {
   [self showPreview:sender];
