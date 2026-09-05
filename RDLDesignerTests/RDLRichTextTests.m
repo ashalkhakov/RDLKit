@@ -642,4 +642,41 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
     XCTFail(@"%@", @"a literal should not be marked as an expression");
 }
 
+// An expression run is kept apart from the text beside it even when the two
+// are styled identically. The mark is an attribute, so it breaks the attribute
+// run, which is what makes the paragraph hold more than one run and so what
+// makes the codec keep paragraphs at all. Without that, an expression
+// surrounded by text in the same face would flatten into one literal string.
+- (void)testExpressionRunSurvivesIdenticalStyling {
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.style.fontFamily = @"Georgia";
+  box.style.fontSize = [RDLLength points:11];
+
+  // Everything in the textbox's own face: nothing distinguishes the pieces but
+  // the mark.
+  NSDictionary *base = [RDLTextAttributes attributesForStyle:box.style
+                                              paragraphAlign:RDLTextAlignUnspecified
+                                                       scale:1.0];
+  NSMutableAttributedString *text =
+      [[NSMutableAttributedString alloc] initWithString:@"Due " attributes:base];
+  [text appendAttributedString:[RDLRichTextCodec expressionRun:@"=Fields!Total.Value"
+                                                     baseStyle:box.style]];
+  [text appendAttributedString:[[NSAttributedString alloc] initWithString:@" today"
+                                                              attributes:base]];
+
+  [RDLRichTextCodec applyAttributedString:text toItem:box];
+  RDLParagraph *para = [box.paragraphs firstObject];
+  if ([para.runs count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu runs; the expression should be one of three",
+                                              (unsigned long)[para.runs count]]);
+    return;
+  }
+  if (![[para.runs[1] value] isEqualToString:@"=Fields!Total.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the middle run reads %@",
+                                              [para.runs[1] value]]);
+  if (![[para.runs[0] value] isEqualToString:@"Due "] ||
+      ![[para.runs[2] value] isEqualToString:@" today"])
+    XCTFail(@"%@", @"the literals around it should come back unchanged");
+}
+
 @end
