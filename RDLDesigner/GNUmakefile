@@ -32,6 +32,7 @@ RDLDesigner_OBJC_FILES = \
   RDLRichTextEditor.m \
   RDLDataView.m \
   RDLWelcomeWindow.m \
+  RDLExpressionEditor.m \
   RDLExpressionField.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \
@@ -51,6 +52,7 @@ RDLDesigner_APPLICATION_ICON =
 # Both are found by the same -initWithNibNamed:, which is why no path or
 # extension appears anywhere in the source.
 RDLDesigner_RESOURCE_FILES = \
+  RDLExpressionEditor.xib \
   MainMenu.xib \
   RDLWelcomeWindow.xib \
   RDLDesignerWindow.xib \

@@ -1,4 +1,5 @@
 #import "RDLExpression.h"
+#import "RDLExpressionCatalog.h"
 #import "RDLReport.h"
 #import "RDLCompatibility.h"
 #import <math.h>
@@ -215,6 +216,43 @@ static NSDate *RDLAsDate(id v, NSDate *fallback) {
 @end
 @implementation RDLTok
 @end
+
+@implementation RDLExprHighlight
+@end
+
+// The lexer's own kinds, mapped once, here, where they are defined. Nothing
+// outside sees them.
+static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
+  NSString *k = t.kind;
+  if ([k isEqualToString:@"num"])
+    return RDLExprTokenKindNumber;
+  if ([k isEqualToString:@"str"])
+    return RDLExprTokenKindString;
+  if ([k isEqualToString:@"op"])
+    return RDLExprTokenKindOperator;
+  if ([k isEqualToString:@"p"])
+    return RDLExprTokenKindPunctuation;
+  if ([k isEqualToString:@"bad"])
+    return RDLExprTokenKindInvalid;
+  if ([k isEqualToString:@"id"]) {
+    // Fields!Amount reads as three tokens; the collection name is what marks
+    // the reference, and the "!" after it is what distinguishes it from a bare
+    // name that happens to be spelled Fields.
+    static NSSet *collections;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      collections = [NSSet setWithArray:@[ @"fields", @"parameters", @"globals",
+                                           @"reportitems", @"recursive" ]];
+    });
+    if ([collections containsObject:[t.s lowercaseString]] &&
+        [next.kind isEqualToString:@"p"] && [next.s isEqualToString:@"!"])
+      return RDLExprTokenKindReference;
+    if ([RDLExpressionCatalog functionNamed:t.s] != nil)
+      return RDLExprTokenKindFunction;
+    return RDLExprTokenKindIdentifier;
+  }
+  return RDLExprTokenKindUnspecified;
+}
 
 @implementation RDLExprNode {
   // How the last row's class spelled this node's field name. Rows in a
@@ -1928,6 +1966,44 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
 
 - (BOOL)parsedCompletely {
   return _complete;
+}
+
++ (NSArray<RDLExprHighlight *> *)highlightsForSource:(NSString *)source {
+  NSMutableArray *out = [NSMutableArray array];
+  if ([source length] == 0)
+    return out;
+
+  void (^add)(NSRange, RDLExprTokenKind) = ^(NSRange r, RDLExprTokenKind kind) {
+    if (r.length == 0)
+      return;
+    RDLExprHighlight *h = [[RDLExprHighlight alloc] init];
+    h.range = r;
+    h.kind = kind;
+    [out addObject:h];
+  };
+
+  // Text that is not an expression has nothing to colour, and the leading "="
+  // is punctuation the lexer never sees, because parsing starts after it.
+  if (![self isExpressionSource:source]) {
+    add(NSMakeRange(0, [source length]), RDLExprTokenKindTrivia);
+    return out;
+  }
+  add(NSMakeRange(0, 1), RDLExprTokenKindPunctuation);
+
+  NSString *body = [source substringFromIndex:1];
+  NSString *trailing = nil;
+  NSArray *toks = RDLLexKeepingTrivia(body, &trailing);
+  NSUInteger at = 1;  // past the "="
+  for (NSUInteger i = 0; i < [toks count]; i++) {
+    RDLTok *t = toks[i];
+    RDLTok *next = i + 1 < [toks count] ? toks[i + 1] : nil;
+    add(NSMakeRange(at, [t.leading length]), RDLExprTokenKindTrivia);
+    at += [t.leading length];
+    add(NSMakeRange(at, [t.text length]), RDLKindOfToken(t, next));
+    at += [t.text length];
+  }
+  add(NSMakeRange(at, [trailing length]), RDLExprTokenKindTrivia);
+  return out;
 }
 
 - (id)evaluateInScope:(RDLEvalScope *)scope {

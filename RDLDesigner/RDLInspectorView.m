@@ -9,6 +9,7 @@
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionEditor.h"
 #import "RDLRichTextEditor.h"
 #import "RDLTextAttributes.h"
 
@@ -20,6 +21,8 @@
 @property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
 @property (nonatomic, strong) IBOutlet NSColorWell *colorWell, *bgColorWell;
 @property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
+@property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -451,6 +454,32 @@
   _colorField.expressionContext = RDLExpressionContextColor;
   _rectBGField.expressionContext = RDLExpressionContextColor;
   _formatField.expressionContext = RDLExpressionContextText;
+}
+
+// Which field each f(x) button belongs to. One action for all of them: the
+// button says which attribute is being edited, and the field is where the
+// answer goes back.
+- (RDLExpressionField *)expressionFieldForButton:(id)sender {
+  if (sender == _valueExprButton) return _valueField;
+  if (sender == _fontExprButton) return _fontField;
+  if (sender == _colorExprButton) return _colorField;
+  if (sender == _formatExprButton) return _formatField;
+  if (sender == _rectBGExprButton) return _rectBGField;
+  return nil;
+}
+
+- (void)editExpression:(id)sender {
+  RDLExpressionField *field = [self expressionFieldForButton:sender];
+  if (field == nil)
+    return;
+  NSString *edited = [RDLExpressionEditor runForSource:[field stringValue]
+                                               context:field.expressionContext
+                                                report:_context.report];
+  if (edited == nil)
+    return;  // cancelled: the field keeps what it had
+  [field setStringValue:edited];
+  // Through the same path as typing, so it is one edit and it undoes.
+  [self changed:field];
 }
 
 #pragma mark - Font and rich text panels

@@ -39,6 +39,7 @@
 #import "RDLTablixEditor.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionEditor.h"
 #import "RDLDesignerWindow.h"
 #import "DMTabBar.h"
 #import "RDLDatasetFieldsView.h"
@@ -2258,6 +2259,59 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // the expression first, so a literal left behind one would come back the moment
 // the expression was cleared. Both directions are checked, because the field
 // shows whichever is set.
+// The expression editor, built and driven without a modal session: what it
+// offers to insert, that inserting lands at the caret, and that the source it
+// hands back is what was typed.
+- (void)testExpressionEditor {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@"#336699"
+                                                         context:RDLExpressionContextColor
+                                                          report:report];
+  if (ed == nil) {
+    XCTFail(@"%@", @"RDLExpressionEditor.xib did not load");
+    return;
+  }
+
+  // What there is to pick: the report's own names first, then the catalogue's
+  // categories.
+  NSArray<NSString *> *categories = [ed categoryNames];
+  for (NSString *expected in @[ @"Fields", @"Parameters", @"Globals", @"Aggregate", @"Text" ])
+    if (![categories containsObject:expected])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the picker has no %@ category", expected]);
+
+  // Inserting into a literal turns it into an expression: that is what the
+  // editor is for, and the leading = is not something the user should have to
+  // remember.
+  RDLExpressionEditor *fresh = [RDLExpressionEditor editorForSource:@""
+                                                            context:RDLExpressionContextText
+                                                             report:report];
+  [fresh selectCategoryNamed:@"Aggregate"];
+  NSTableView *items = [fresh valueForKey:@"itemTable"];
+  [items selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+  [fresh insert:nil];
+  if (![[fresh source] hasPrefix:@"="])
+    XCTFail(@"%@", [NSString stringWithFormat:@"inserting into an empty editor gave %@",
+                                              [fresh source]]);
+  if ([[fresh source] length] < 2)
+    XCTFail(@"%@", @"nothing was inserted");
+
+  // The report's fields are offered as references, spelled the way the
+  // evaluator reads them.
+  [fresh selectCategoryNamed:@"Fields"];
+  NSInteger rows = [items numberOfRows];
+  if (rows == 0) {
+    XCTFail(@"%@", @"the invoice sample has datasets with fields; none were offered");
+    return;
+  }
+  NSString *first = [[fresh valueForKey:@"itemTable"] dataSource]
+      ? [[items dataSource] tableView:items
+             objectValueForTableColumn:[[items tableColumns] firstObject]
+                                   row:0]
+      : nil;
+  if (![first hasPrefix:@"Fields!"] || ![first hasSuffix:@".Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a field reads as %@", first]);
+}
+
 - (void)testStyleExpressionBinding {
   RDLReport *report = [RDLSamples blankLetter];
   RDLTextbox *box = nil;

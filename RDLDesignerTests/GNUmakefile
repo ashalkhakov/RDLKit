@@ -27,6 +27,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
   ../RDLDesigner/RDLRichTextEditor.m \
+  ../RDLDesigner/RDLExpressionEditor.m \
   ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLDatasetNavigator.m \
   ../RDLDesigner/RDLDesignerWindow.m \
@@ -53,6 +54,7 @@ RDLDesignerTests_NEEDS_GUI = yes
 RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLDesignerWindow.xib \
   ../RDLDesigner/RDLInspectorSections.xib \
+  ../RDLDesigner/RDLExpressionEditor.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLTablixEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib

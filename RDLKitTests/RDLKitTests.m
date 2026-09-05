@@ -5019,4 +5019,56 @@ static NSString *RDLFixturesDirectory(void) {
     XCTFail(@"%@", @"lookup is case sensitive; the evaluator's is not");
 }
 
+// Highlighting comes from the lexer that parses, not a second one written for
+// the editor: the runs have to cover the source end to end, so an editor can
+// attribute the whole string in one pass and nothing is left uncoloured.
+- (void)testExpressionHighlighting {
+  NSString *source = @"=IIf(Fields!Due.Value < 0, \"late\", Sum(Fields!Paid.Value))";
+  NSArray<RDLExprHighlight *> *runs = [RDLExpr highlightsForSource:source];
+  if ([runs count] == 0) {
+    XCTFail(@"%@", @"nothing to colour");
+    return;
+  }
+
+  // End to end, in order, no gaps and no overlaps.
+  NSUInteger at = 0;
+  for (RDLExprHighlight *h in runs) {
+    if (h.range.location != at)
+      XCTFail(@"%@", [NSString stringWithFormat:@"a gap or an overlap at %lu: run starts at %lu",
+                                                (unsigned long)at, (unsigned long)h.range.location]);
+    at = NSMaxRange(h.range);
+  }
+  if (at != [source length])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the runs cover %lu of %lu characters",
+                                              (unsigned long)at, (unsigned long)[source length]]);
+
+  // The kinds an editor colours differently.
+  NSMutableDictionary *byKind = [NSMutableDictionary dictionary];
+  for (RDLExprHighlight *h in runs) {
+    NSString *text = [source substringWithRange:h.range];
+    byKind[@(h.kind)] = ([byKind[@(h.kind)] ?: @[] arrayByAddingObject:text]);
+  }
+  if (![byKind[@(RDLExprTokenKindFunction)] containsObject:@"IIf"] ||
+      ![byKind[@(RDLExprTokenKindFunction)] containsObject:@"Sum"])
+    XCTFail(@"%@", @"IIf and Sum are functions the evaluator has; they should read as functions");
+  if (![byKind[@(RDLExprTokenKindReference)] containsObject:@"Fields"])
+    XCTFail(@"%@", @"Fields! should read as a reference");
+  if (![byKind[@(RDLExprTokenKindString)] containsObject:@"\"late\""])
+    XCTFail(@"%@", @"a quoted string should read as a string");
+  if (![byKind[@(RDLExprTokenKindNumber)] containsObject:@"0"])
+    XCTFail(@"%@", @"0 should read as a number");
+
+  // A name that is not a function is not coloured as one, however it is spelled.
+  NSArray<RDLExprHighlight *> *plain = [RDLExpr highlightsForSource:@"=Frobnicate(1)"];
+  for (RDLExprHighlight *h in plain)
+    if (h.kind == RDLExprTokenKindFunction)
+      XCTFail(@"%@", @"Frobnicate is not a function this evaluator has");
+
+  // Text that is not an expression is one run, so an editor can show a literal
+  // through the same path.
+  NSArray<RDLExprHighlight *> *literal = [RDLExpr highlightsForSource:@"#336699"];
+  if ([literal count] != 1 || [literal[0] kind] != RDLExprTokenKindTrivia)
+    XCTFail(@"%@", @"a literal should be one uncoloured run");
+}
+
 @end
