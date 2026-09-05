@@ -37,6 +37,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLRichTextEditor.m \
   ../RDLDesigner/RDLExpressionEditor.m \
   ../RDLDesigner/RDLInsertPalette.m \
+  ../RDLDesigner/RDLExpressionCell.m \
   ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLDatasetNavigator.m \
   ../RDLDesigner/RDLDesignerWindow.m \

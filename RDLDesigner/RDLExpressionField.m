@@ -14,6 +14,45 @@ static NSColor *RDLBrokenExpressionInk(void) {
 
 @implementation RDLExpressionField
 
++ (NSColor *)inkForSource:(NSString *)source {
+  if (![RDLExpr isExpressionSource:source])
+    return [NSColor controlTextColor];
+  RDLExpr *expr = [RDLExpr expressionWithSource:source];
+  return (expr != nil && expr.parsedCompletely) ? RDLExpressionInk() : RDLBrokenExpressionInk();
+}
+
++ (void)highlight:(NSMutableAttributedString *)text {
+  NSString *source = [text string];
+  for (RDLExprHighlight *run in [RDLExpr highlightsForSource:source]) {
+    NSColor *ink = nil;
+    switch (run.kind) {
+      case RDLExprTokenKindFunction:
+        ink = [NSColor colorWithCalibratedRed:0.45 green:0.35 blue:0.75 alpha:1];
+        break;
+      case RDLExprTokenKindReference:
+        ink = [NSColor colorWithCalibratedRed:0.20 green:0.55 blue:0.45 alpha:1];
+        break;
+      case RDLExprTokenKindString:
+        ink = [NSColor colorWithCalibratedRed:0.75 green:0.40 blue:0.20 alpha:1];
+        break;
+      case RDLExprTokenKindNumber:
+        ink = [NSColor colorWithCalibratedRed:0.30 green:0.55 blue:0.85 alpha:1];
+        break;
+      case RDLExprTokenKindOperator:
+      case RDLExprTokenKindPunctuation:
+        ink = [NSColor colorWithCalibratedWhite:0.55 alpha:1];
+        break;
+      case RDLExprTokenKindInvalid:
+        ink = RDLBrokenExpressionInk();
+        break;
+      default:
+        break;
+    }
+    if (ink && NSMaxRange(run.range) <= [text length])
+      [text addAttribute:NSForegroundColorAttributeName value:ink range:run.range];
+  }
+}
+
 - (BOOL)holdsExpression {
   return [RDLExpr isExpressionSource:[self stringValue]];
 }
@@ -38,7 +77,7 @@ static NSColor *RDLBrokenExpressionInk(void) {
   }
   RDLExpr *expr = [RDLExpr expressionWithSource:[self stringValue]];
   BOOL whole = expr != nil && expr.parsedCompletely;
-  [self setTextColor:whole ? RDLExpressionInk() : RDLBrokenExpressionInk()];
+  [self setTextColor:[RDLExpressionField inkForSource:[self stringValue]]];
   [self setToolTip:whole ? [NSString stringWithFormat:@"An expression producing %@",
                                                       RDLExpressionContextDescription(
                                                           _expressionContext)]

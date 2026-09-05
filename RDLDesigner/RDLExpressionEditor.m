@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLExpressionEditor.h"
+#import "RDLExpressionField.h"
 
 @interface RDLExpressionEditor () <NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
@@ -85,34 +86,7 @@
     NSForegroundColorAttributeName : [NSColor controlTextColor],
   }
                    range:NSMakeRange(0, [text length])];
-  for (RDLExprHighlight *run in [RDLExpr highlightsForSource:text]) {
-    NSColor *ink = nil;
-    switch (run.kind) {
-      case RDLExprTokenKindFunction:
-        ink = [NSColor colorWithCalibratedRed:0.45 green:0.35 blue:0.75 alpha:1];
-        break;
-      case RDLExprTokenKindReference:
-        ink = [NSColor colorWithCalibratedRed:0.20 green:0.55 blue:0.45 alpha:1];
-        break;
-      case RDLExprTokenKindString:
-        ink = [NSColor colorWithCalibratedRed:0.75 green:0.40 blue:0.20 alpha:1];
-        break;
-      case RDLExprTokenKindNumber:
-        ink = [NSColor colorWithCalibratedRed:0.30 green:0.55 blue:0.85 alpha:1];
-        break;
-      case RDLExprTokenKindOperator:
-      case RDLExprTokenKindPunctuation:
-        ink = [NSColor colorWithCalibratedWhite:0.55 alpha:1];
-        break;
-      case RDLExprTokenKindInvalid:
-        ink = [NSColor colorWithCalibratedRed:0.85 green:0.32 blue:0.26 alpha:1];
-        break;
-      default:
-        break;
-    }
-    if (ink)
-      [storage addAttribute:NSForegroundColorAttributeName value:ink range:run.range];
-  }
+  [RDLExpressionField highlight:storage];
   [storage endEditing];
   [self showStatus];
 }

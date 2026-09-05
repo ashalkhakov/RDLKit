@@ -18,4 +18,13 @@
 @property (nonatomic, readonly) BOOL holdsExpression;
 // nil unless it holds an expression that parsed completely.
 @property (nonatomic, readonly, strong) RDLExpr *expression;
+
+// Colours a source string in place, from +[RDLExpr highlightsForSource:]. One
+// implementation for every place an expression is shown -- the editor panel,
+// this field and the table cell -- so they cannot come to disagree about what
+// a run of text is or what colour it takes.
++ (void)highlight:(NSMutableAttributedString *)text;
+// The three states a field shows by its ink: literal, expression, and an
+// expression the parser could not consume to the end.
++ (NSColor *)inkForSource:(NSString *)source;
 @end

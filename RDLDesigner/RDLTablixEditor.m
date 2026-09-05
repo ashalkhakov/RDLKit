@@ -1,5 +1,7 @@
 #import "RDLTablixEditor.h"
 #import "RDLEditingContext.h"
+#import "RDLExpressionCell.h"
+#import "RDLExpressionEditor.h"
 
 // Dragging between the three lists carries the field's name and which list it
 // came from, so a drop knows what to remove as well as what to add.
@@ -88,6 +90,17 @@ static NSString *RDLFieldOfValue(NSString *value) {
     [_datasetPop addItemWithTitle:ds.name];
   if (tab.dataSetName && [_datasetPop itemWithTitle:tab.dataSetName])
     [_datasetPop selectItemWithTitle:tab.dataSetName];
+  // The Value column takes an expression, so it gets the cell that shows one:
+  // coloured, and with f(x) to open the editor for that row. The other columns
+  // are plain text, a measurement and two popups, and stay as they are.
+  NSTableColumn *valueColumn = [_table tableColumnWithIdentifier:@"value"];
+  RDLExpressionCell *cell = [[RDLExpressionCell alloc] init];
+  [cell setEditable:YES];
+  [cell setFont:[[valueColumn dataCell] font] ?: [NSFont systemFontOfSize:11]];
+  cell.buttonTarget = self;
+  cell.buttonAction = @selector(editColumnExpression:);
+  [valueColumn setDataCell:cell];
+
   _rowGroups = [(tab.rowGroups ?: @[]) mutableCopy];
   _colGroups = [(tab.columnGroups ?: @[]) mutableCopy];
   for (NSTableView *t in @[ _rowGroupTable, _colGroupTable, _table ]) {
@@ -101,6 +114,23 @@ static NSString *RDLFieldOfValue(NSString *value) {
   [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
   [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.headerHeight]];
   [_rowHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.rowHeight]];
+  [_table reloadData];
+}
+
+// f(x) in a Value cell: the editor for that row's expression, written back
+// into the spec the table is showing.
+- (void)editColumnExpression:(id)sender {
+  (void)sender;
+  NSInteger row = [_table clickedRow];
+  if (row < 0 || row >= (NSInteger)[_cols count])
+    return;
+  NSMutableDictionary *spec = _cols[(NSUInteger)row];
+  NSString *edited = [RDLExpressionEditor runForSource:spec[@"value"] ?: @""
+                                               context:RDLExpressionContextText
+                                                report:_report];
+  if (edited == nil)
+    return;
+  spec[@"value"] = edited;
   [_table reloadData];
 }
 

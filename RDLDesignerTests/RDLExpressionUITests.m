@@ -3,6 +3,19 @@
 // Editing expressions: the editor panel, completion, and the field editor that
 // must not take the document's undo manager with it.
 #import "RDLDesignerTestSupport.h"
+#import "RDLExpressionCell.h"
+
+// Records what a cell's button action was sent, since the action is the only
+// thing a cell can report and the sender is what carries the row.
+@interface RDLCellClickRecorder : NSObject
+@property (nonatomic, weak) id sender;
+- (void)clicked:(id)sender;
+@end
+@implementation RDLCellClickRecorder
+- (void)clicked:(id)sender {
+  _sender = sender;
+}
+@end
 
 
 
@@ -195,6 +208,64 @@
   // made sharing it unsafe in the first place.
   if ([doc.undoManager groupsByEvent])
     XCTFail(@"%@", @"the document's undo manager should group explicitly, not per event");
+}
+
+// The expression cell, which is how expressions are edited in a table: the
+// text area and the f(x) area divide the cell between them, and a click in
+// each does its own thing. Checked as geometry and dispatch rather than by
+// clicking, since the tracking is AppKit's.
+- (void)testExpressionCell {
+  RDLExpressionCell *cell = [[RDLExpressionCell alloc] init];
+  NSRect frame = NSMakeRect(0, 0, 200, 20);
+  NSRect button = [RDLExpressionCell buttonRectInFrame:frame];
+
+  // The button is at the trailing edge, inside the cell, and leaves most of it
+  // for the text.
+  if (!NSContainsRect(frame, button))
+    XCTFail(@"%@", @"the button is not inside the cell");
+  if (fabs(NSMaxX(button) - NSMaxX(frame)) > 0.01)
+    XCTFail(@"%@", @"the button should sit at the trailing edge");
+  if (NSWidth(button) > NSWidth(frame) / 3)
+    XCTFail(@"%@", @"the button is taking too much of the cell from the text");
+
+  // A click on the button reaches the target; the cell is the sender, which is
+  // what lets the table say which row it was.
+  __block id sender = nil;
+  RDLCellClickRecorder *recorder = [[RDLCellClickRecorder alloc] init];
+  cell.buttonTarget = recorder;
+  cell.buttonAction = @selector(clicked:);
+  NSView *view = [[NSView alloc] initWithFrame:frame];
+  NSEvent *hit = [NSEvent mouseEventWithType:NSEventTypeLeftMouseDown
+                                    location:NSMakePoint(NSMidX(button), NSMidY(button))
+                               modifierFlags:0
+                                   timestamp:0
+                                windowNumber:0
+                                     context:nil
+                                 eventNumber:0
+                                  clickCount:1
+                                    pressure:1];
+  if (![cell trackMouse:hit inRect:frame ofView:view untilMouseUp:YES])
+    XCTFail(@"%@", @"a click on the button was not taken by the cell");
+  sender = recorder.sender;
+  if (sender != cell)
+    XCTFail(@"%@", @"the cell should send itself, so the table can say which row");
+
+  // The three inks, shared with the fields and the editor so nothing drifts.
+  if ([RDLExpressionField inkForSource:@"plain"] !=
+      [NSColor controlTextColor])
+    XCTFail(@"%@", @"a literal should be drawn in the ordinary ink");
+  if ([RDLExpressionField inkForSource:@"=Sum(Fields!A.Value)"] ==
+      [RDLExpressionField inkForSource:@"=Sum(Fields!A.Value) leftovers"])
+    XCTFail(@"%@", @"an expression with tokens left over should not look like a whole one");
+
+  // And highlighting is the shared one: a function is coloured as a function.
+  NSMutableAttributedString *text = [[NSMutableAttributedString alloc]
+      initWithString:@"=Sum(Fields!A.Value)"];
+  [RDLExpressionField highlight:text];
+  NSRange effective = NSMakeRange(NSNotFound, 0);
+  id ink = [text attribute:NSForegroundColorAttributeName atIndex:1 effectiveRange:&effective];
+  if (ink == nil || effective.length != 3)
+    XCTFail(@"%@", @"Sum should be coloured as a function, on its own");
 }
 
 @end
