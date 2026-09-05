@@ -38,6 +38,7 @@
 #import "RDLInspectorFields.h"
 #import "RDLTablixEditor.h"
 #import "RDLDatasetNavigator.h"
+#import "RDLExpressionField.h"
 #import "RDLDesignerWindow.h"
 #import "DMTabBar.h"
 #import "RDLDatasetFieldsView.h"
@@ -2253,6 +2254,71 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // the one on top takes the clicks and the one under it looks fine and does
 // nothing, which is what the rich-text button did under the Typeface label.
 // Read out of the file, per container, because that is where the mistake is.
+// A style property is a literal or an expression, never both: the writer picks
+// the expression first, so a literal left behind one would come back the moment
+// the expression was cleared. Both directions are checked, because the field
+// shows whichever is set.
+- (void)testStyleExpressionBinding {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  box.style.color = @"#336699";
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLExpressionField *field =
+      [[RDLExpressionField alloc] initWithFrame:NSMakeRect(0, 0, 120, 22)];
+  field.expressionContext = RDLExpressionContextColor;
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:field keyPath:@"style.color" scope:RDLFieldScopeItem
+            kind:RDLFieldKindTextOrExpression];
+
+  // A literal shows as itself, and the field says it is not an expression.
+  [bindings fillFromItem:box band:nil report:report];
+  if (![[field stringValue] isEqualToString:@"#336699"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the field shows %@", [field stringValue]]);
+  if ([field holdsExpression])
+    XCTFail(@"%@", @"a literal is being read as an expression");
+
+  // Typing an expression writes the expression and clears the literal.
+  [field setStringValue:@"=IIf(Fields!Due.Value < 0, \"#b00020\", \"#1a1916\")"];
+  if (![field holdsExpression] || field.expression == nil)
+    XCTFail(@"%@", @"the field does not recognise a complete expression");
+  [bindings applyControl:field editor:ctx.editor item:box bandKey:nil];
+  if (box.style.expressions.color == nil)
+    XCTFail(@"%@", @"the expression was not written to style.expressions.color");
+  if (box.style.color != nil)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the literal survived as %@", box.style.color]);
+
+  // And it comes back as what was typed, byte for byte.
+  [bindings fillFromItem:box band:nil report:report];
+  if (![[field stringValue] hasPrefix:@"=IIf("])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the expression reads back as %@",
+                                              [field stringValue]]);
+
+  // Typing a literal over it clears the expression again.
+  [field setStringValue:@"#0a0a0a"];
+  [bindings applyControl:field editor:ctx.editor item:box bandKey:nil];
+  if (box.style.expressions.color != nil)
+    XCTFail(@"%@", @"the expression survived a literal");
+  if (![box.style.color isEqualToString:@"#0a0a0a"])
+    XCTFail(@"%@", @"the literal was not written");
+
+  // Text the parser could not consume to the end: everything after the first
+  // expression is silently ignored when the report runs, so the field marks it.
+  // This is what -parsedCompletely detects -- trailing tokens, not a missing
+  // operand, which parses to a tree with a hole in it and is RDLChecker's to
+  // find.
+  [field setStringValue:@"=Sum(Fields!Amount.Value) and then some"];
+  if (![field holdsExpression])
+    XCTFail(@"%@", @"text beginning with = is an expression whatever follows");
+  if (field.expression != nil)
+    XCTFail(@"%@", @"an expression with tokens left over is being reported as whole");
+}
+
 - (void)testInspectorControlsDoNotOverlap {
   NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
   NSString *xib = [NSString

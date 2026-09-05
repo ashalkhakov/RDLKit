@@ -390,6 +390,18 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 @end
 
 @implementation RDLStyle
+
+// Created on demand rather than left nil. Every reader already pairs its nil
+// check with -isEmpty -- an empty holder and no holder mean the same thing --
+// and an editor setting style.expressions.color through a key path cannot
+// create the intermediate object itself: the write would go nowhere, silently,
+// which is exactly what it did.
+- (RDLStyleExpressions *)expressions {
+  if (_expressions == nil)
+    _expressions = [[RDLStyleExpressions alloc] init];
+  return _expressions;
+}
+
 + (instancetype)defaultStyle {
   RDLStyle *s = [[RDLStyle alloc] init];
   s.fontFamily = @"Georgia";

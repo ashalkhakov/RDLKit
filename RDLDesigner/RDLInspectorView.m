@@ -8,6 +8,7 @@
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
+#import "RDLExpressionField.h"
 #import "RDLRichTextEditor.h"
 #import "RDLTextAttributes.h"
 
@@ -33,14 +34,18 @@
 @property (nonatomic, strong) IBOutlet NSTextField *leftField, *topField, *widthField, *heightField;
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
-@property (nonatomic, strong) IBOutlet NSTextField *valueField, *fontField, *sizeField, *colorField, *formatField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *valueField, *fontField, *colorField, *formatField;
+// A measurement, so still a plain field: its literal is an RDLLength and the
+// text-or-expression binding writes strings. Expressions on lengths need a
+// kind of their own.
+@property (nonatomic, strong) IBOutlet NSTextField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
 @property (nonatomic, strong) IBOutlet NSView *lineBox;
 @property (nonatomic, strong) IBOutlet NSTextField *lineColorField;
 // Rectangle section
 @property (nonatomic, strong) IBOutlet NSView *rectBox;
-@property (nonatomic, strong) IBOutlet NSTextField *rectBGField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *rectBGField;
 // Image section
 @property (nonatomic, strong) IBOutlet NSView *imageBox;
 @property (nonatomic, strong) IBOutlet NSTextField *imageValueField;
@@ -165,7 +170,7 @@
 
   // Textbox.
   [_bindings bind:_fontField keyPath:@"style.fontFamily" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText values:nil placeholder:@"Georgia"];
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:@"Georgia"];
   [_bindings bind:_sizeField keyPath:@"style.fontSize" scope:RDLFieldScopeItem
              kind:RDLFieldKindLength values:nil placeholder:@"10pt"];
   // Vocabulary popups map menu index to the enum case, so the model value and
@@ -179,17 +184,17 @@
            values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
       placeholder:nil];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
   [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindColor];
   [_bindings bind:_formatField keyPath:@"style.format" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText];
+             kind:RDLFieldKindTextOrExpression];
 
   // Line and Rectangle each expose one style property.
   [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
   [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText];
+             kind:RDLFieldKindTextOrExpression];
   [_bindings bind:_bgColorWell keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindColor];
 
@@ -272,6 +277,12 @@
     [pop addItemWithTitle:ds.name];
   if (name && [pop itemWithTitle:name])
     [pop selectItemWithTitle:name];
+}
+
+// Applied once the XIB's objects exist.
+- (void)awakeFromNib {
+  [super awakeFromNib];
+  [self applyExpressionContexts];
 }
 
 - (void)reload {
@@ -430,6 +441,16 @@
     }
     return;
   }
+}
+
+// What each expression-capable field has to produce. Set once: it is a
+// property of the attribute, not of what is selected.
+- (void)applyExpressionContexts {
+  _valueField.expressionContext = RDLExpressionContextText;
+  _fontField.expressionContext = RDLExpressionContextText;
+  _colorField.expressionContext = RDLExpressionContextColor;
+  _rectBGField.expressionContext = RDLExpressionContextColor;
+  _formatField.expressionContext = RDLExpressionContextText;
 }
 
 #pragma mark - Font and rich text panels

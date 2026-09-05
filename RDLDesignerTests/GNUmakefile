@@ -27,6 +27,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
   ../RDLDesigner/RDLRichTextEditor.m \
+  ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLDatasetNavigator.m \
   ../RDLDesigner/RDLDesignerWindow.m \
   ../RDLDesigner/RDLCanvasView.m \

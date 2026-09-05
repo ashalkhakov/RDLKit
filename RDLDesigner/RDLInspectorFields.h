@@ -33,6 +33,12 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   RDLFieldKindPopUpTitle,
   // NSPopUpButton whose selected index maps into `values`.
   RDLFieldKindPopUpIndex,
+  // A string style property that may instead be an expression. The literal
+  // lives at the bound key path and the expression beside it, under
+  // `expressions` -- style.color and style.expressions.color -- and exactly one
+  // of the two is set. Text beginning with "=" writes the expression and clears
+  // the literal; anything else does the reverse.
+  RDLFieldKindTextOrExpression,
   // NSColorWell over an RDL colour string. The well opens NSColorPanel, which
   // is the standard way to pick one; the hex field beside it stays, because a
   // report's colours are often given rather than chosen.

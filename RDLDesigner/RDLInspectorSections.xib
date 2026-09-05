@@ -414,7 +414,7 @@
                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="valueField">
+                <textField id="valueField" customClass="RDLExpressionField">
                     <rect key="frame" x="10" y="20" width="240" height="44"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valueFieldCell">
@@ -446,7 +446,7 @@
                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="fontField">
+                <textField id="fontField" customClass="RDLExpressionField">
                     <rect key="frame" x="10" y="110.0" width="172" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="fontFieldCell">
@@ -558,7 +558,7 @@
                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="colorField">
+                <textField id="colorField" customClass="RDLExpressionField">
                     <rect key="frame" x="10" y="242.0" width="86" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="colorFieldCell">
@@ -579,7 +579,7 @@
                         <action selector="changed:" target="-2" id="colorWellAction"/>
                     </connections>
                 </colorWell>
-                <textField id="formatField">
+                <textField id="formatField" customClass="RDLExpressionField">
                     <rect key="frame" x="136" y="242.0" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="formatFieldCell">
@@ -633,7 +633,7 @@
                         <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="rectBGField">
+                <textField id="rectBGField" customClass="RDLExpressionField">
                     <rect key="frame" x="10" y="20" width="180" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rectBGFieldCell">

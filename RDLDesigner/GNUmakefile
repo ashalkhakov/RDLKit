@@ -32,6 +32,7 @@ RDLDesigner_OBJC_FILES = \
   RDLRichTextEditor.m \
   RDLDataView.m \
   RDLWelcomeWindow.m \
+  RDLExpressionField.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \
   RDLDatasetFieldsView.m \
