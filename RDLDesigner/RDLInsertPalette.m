@@ -102,18 +102,42 @@ static NSString * const kRDLPaletteHeader = @"header";
   return row >= 0 && row < (NSInteger)[_rows count] && _rows[(NSUInteger)row][kRDLPaletteHeader] == nil;
 }
 
-- (id<NSPasteboardWriting>)tableView:(NSTableView *)tableView
-              pasteboardWriterForRow:(NSInteger)row {
+// Two ways of saying the same thing. -pasteboardWriterForRow: is the modern
+// one and is what macOS calls; GNUstep's NSTableView declares only
+// -writeRowsWithIndexes:toPasteboard:, and an optional delegate method it does
+// not have is not an error -- the drag simply never starts. So both are here,
+// and each platform uses the one it has.
+- (BOOL)tableView:(NSTableView *)tableView
+    writeRowsWithIndexes:(NSIndexSet *)rows
+            toPasteboard:(NSPasteboard *)pasteboard {
   (void)tableView;
+  NSDictionary *binding = [self bindingForRow:(NSInteger)[rows firstIndex]];
+  if (binding == nil)
+    return NO;
+  [pasteboard declareTypes:@[ RDLPaletteDragType ] owner:nil];
+  [pasteboard setPropertyList:binding forType:RDLPaletteDragType];
+  return YES;
+}
+
+// The row's binding, or nil for a header and for anything out of range.
+- (NSDictionary *)bindingForRow:(NSInteger)row {
   if (row < 0 || row >= (NSInteger)[_rows count])
     return nil;
   NSDictionary *r = _rows[(NSUInteger)row];
   if (r[kRDLPaletteHeader] || [r[RDLPaletteExpressionKey] length] == 0)
     return nil;
+  return @{ RDLPaletteExpressionKey : r[RDLPaletteExpressionKey],
+            RDLPaletteLabelKey : r[RDLPaletteLabelKey] };
+}
+
+- (id<NSPasteboardWriting>)tableView:(NSTableView *)tableView
+              pasteboardWriterForRow:(NSInteger)row {
+  (void)tableView;
+  NSDictionary *binding = [self bindingForRow:row];
+  if (binding == nil)
+    return nil;
   NSPasteboardItem *item = [[NSPasteboardItem alloc] init];
-  [item setPropertyList:@{ RDLPaletteExpressionKey : r[RDLPaletteExpressionKey],
-                           RDLPaletteLabelKey : r[RDLPaletteLabelKey] }
-                forType:RDLPaletteDragType];
+  [item setPropertyList:binding forType:RDLPaletteDragType];
   return item;
 }
 

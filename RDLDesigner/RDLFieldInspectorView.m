@@ -78,8 +78,8 @@
   [self addSubview:_valueField];
   _valueExprButton = [[NSButton alloc] initWithFrame:NSMakeRect(NSWidth(frame) - 34, y, 24, 22)];
   [_valueExprButton setTitle:@"f(x)"];
-  [_valueExprButton setBezelStyle:NSBezelStyleRounded];
-  [[_valueExprButton cell] setControlSize:NSControlSizeSmall];
+  [_valueExprButton setBezelStyle:NSRoundedBezelStyle];
+  [[_valueExprButton cell] setControlSize:NSSmallControlSize];
   [_valueExprButton setFont:[NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
   [_valueExprButton setTarget:self];
   [_valueExprButton setAction:@selector(editValueExpression:)];

@@ -555,6 +555,12 @@
 // and it is one panel rather than three controls that have to agree. The
 // inspector keeps its own font and size fields: a report often specifies a
 // face by name that is not installed here, and typing it has to stay possible.
+// The font panel's action arrives through the responder chain, so this view
+// has to be able to hold first responder.
+- (BOOL)acceptsFirstResponder {
+  return YES;
+}
+
 - (void)openFontPanel:(id)sender {
   RDLItem *item = [_context selectedItem];
   if (item == nil)
@@ -566,8 +572,13 @@
   NSFont *font = attrs[NSFontAttributeName];
   if (font)
     [manager setSelectedFont:font isMultiple:NO];
-  [manager setTarget:self];
   [manager setAction:@selector(changeFont:)];
+  // Not -setTarget:. That is a macOS convenience; the documented behaviour, and
+  // GNUstep's, is that the font manager sends its action to nil -- down the
+  // responder chain. So the inspector has to be IN that chain rather than name
+  // itself as a target, which also ends any field edit in progress, committing
+  // it before the font changes underneath it.
+  [[self window] makeFirstResponder:self];
   [[manager fontPanel:YES] orderFront:sender];
 }
 

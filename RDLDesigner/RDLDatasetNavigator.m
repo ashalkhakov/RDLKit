@@ -46,7 +46,7 @@
       ^NSButton *(NSString *title, CGFloat x, SEL action, NSString *tip) {
     NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(x, 1, 32, 24)];
     [b setTitle:title];
-    [b setBezelStyle:NSBezelStyleShadowlessSquare];
+    [b setBezelStyle:NSShadowlessSquareBezelStyle];
     [b setTarget:self];
     [b setAction:action];
     [b setToolTip:tip];

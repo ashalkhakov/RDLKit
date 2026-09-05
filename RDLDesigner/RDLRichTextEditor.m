@@ -1,5 +1,6 @@
 #import "RDLRichTextEditor.h"
 #import "RDLExpressionEditor.h"
+#import "RDLRichTextFormatter.h"
 #import "RDLRichTextCodec.h"
 #import "RDLRichTextFormatter.h"
 #import "RDLEditingContext.h"
@@ -294,16 +295,14 @@
   [storage beginEditing];
   [storage removeAttribute:NSBackgroundColorAttributeName range:all];
   NSColor *tint = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.18];
-  [storage enumerateAttribute:RDLExpressionRunAttributeName
-                      inRange:all
-                      options:0
-                   usingBlock:^(id value, NSRange range, BOOL *stop) {
-                     (void)stop;
-                     if (value)
-                       [storage addAttribute:NSBackgroundColorAttributeName
-                                       value:tint
-                                       range:range];
-                   }];
+  RDLEnumerateAttribute(storage, RDLExpressionRunAttributeName, all,
+                        ^(id value, NSRange range, BOOL *stop) {
+                          (void)stop;
+                          if (value)
+                            [storage addAttribute:NSBackgroundColorAttributeName
+                                            value:tint
+                                            range:range];
+                        });
   [storage endEditing];
 }
 
@@ -319,18 +318,17 @@
     return to;
   __block NSUInteger start = to.location;
   __block NSUInteger end = NSMaxRange(to);
-  [storage enumerateAttribute:RDLExpressionRunAttributeName
-                      inRange:NSMakeRange(0, [storage length])
-                      options:0
-                   usingBlock:^(id value, NSRange range, BOOL *stop) {
-                     (void)stop;
-                     if (value == nil)
-                       return;
-                     if (start > range.location && start < NSMaxRange(range))
-                       start = range.location;
-                     if (end > range.location && end < NSMaxRange(range))
-                       end = NSMaxRange(range);
-                   }];
+  RDLEnumerateAttribute(storage, RDLExpressionRunAttributeName,
+                        NSMakeRange(0, [storage length]),
+                        ^(id value, NSRange range, BOOL *stop) {
+                          (void)stop;
+                          if (value == nil)
+                            return;
+                          if (start > range.location && start < NSMaxRange(range))
+                            start = range.location;
+                          if (end > range.location && end < NSMaxRange(range))
+                            end = NSMaxRange(range);
+                        });
   return NSMakeRange(start, end - start);
 }
 

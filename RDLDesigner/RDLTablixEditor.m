@@ -140,6 +140,20 @@ static NSString *RDLFieldOfValue(NSString *value) {
 // Dragging moves it, so the three lists always partition what the tablix uses
 // rather than letting the same field be a group and a column at once.
 
+// As in the palette: the modern writer for macOS, the older one for GNUstep,
+// which declares only that. A missing optional delegate method is not an error
+// -- the drag just never starts -- so both are here.
+- (BOOL)tableView:(NSTableView *)tv
+    writeRowsWithIndexes:(NSIndexSet *)rows
+            toPasteboard:(NSPasteboard *)pasteboard {
+  NSString *field = [self fieldInTable:tv atRow:(NSInteger)[rows firstIndex]];
+  if ([field length] == 0)
+    return NO;
+  [pasteboard declareTypes:@[ RDLTablixFieldDragType ] owner:nil];
+  [pasteboard setString:field forType:RDLTablixFieldDragType];
+  return YES;
+}
+
 - (id<NSPasteboardWriting>)tableView:(NSTableView *)tv pasteboardWriterForRow:(NSInteger)row {
   NSString *field = [self fieldInTable:tv atRow:row];
   if ([field length] == 0)
