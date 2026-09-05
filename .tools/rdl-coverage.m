@@ -6,24 +6,24 @@
 //           data region, a zero-sized page, or a page with no items. Silent
 //           loss, which is worse than a refusal
 //   FAIL    refused, naming the element it does not support
-#import "PicaKit.h"
+#import "RDLKit.h"
 
-static BOOL PicaRegionIsEmpty(RDLItem *item) {
+static BOOL RDLRegionIsEmpty(RDLItem *item) {
   if (![item isKindOfClass:[RDLTablix class]])
     return NO;
   RDLTablix *t = (RDLTablix *)item;
   return [t.tablixBody.rows count] == 0 || [t.tablixBody.columns count] == 0;
 }
 
-static BOOL PicaAnyRegionEmpty(NSArray<RDLItem *> *items) {
+static BOOL RDLAnyRegionEmpty(NSArray<RDLItem *> *items) {
   for (RDLItem *it in items) {
-    if (PicaRegionIsEmpty(it) || PicaAnyRegionEmpty([it childItems]))
+    if (RDLRegionIsEmpty(it) || RDLAnyRegionEmpty([it childItems]))
       return YES;
   }
   return NO;
 }
 
-static void PicaCollect(NSString *dir, NSMutableArray *out) {
+static void RDLCollect(NSString *dir, NSMutableArray *out) {
   NSFileManager *fm = [NSFileManager defaultManager];
   for (NSString *rel in [[fm subpathsAtPath:dir] sortedArrayUsingSelector:@selector(compare:)]) {
     NSString *ext = [[rel pathExtension] lowercaseString];
@@ -38,7 +38,7 @@ int main(int argc, const char **argv) { @autoreleasepool {
     return 2;
   }
   NSMutableArray *files = [NSMutableArray array];
-  PicaCollect([NSString stringWithUTF8String:argv[1]], files);
+  RDLCollect([NSString stringWithUTF8String:argv[1]], files);
   NSUInteger ok = 0, empty = 0, fail = 0;
   NSCountedSet *reasons = [[NSCountedSet alloc] init];
   for (NSString *path in files) {
@@ -63,8 +63,8 @@ int main(int argc, const char **argv) { @autoreleasepool {
       continue;
     }
     NSString *blank = nil;
-    if (PicaAnyRegionEmpty(r.body.items) || PicaAnyRegionEmpty(r.pageHeader.items) ||
-        PicaAnyRegionEmpty(r.pageFooter.items))
+    if (RDLAnyRegionEmpty(r.body.items) || RDLAnyRegionEmpty(r.pageHeader.items) ||
+        RDLAnyRegionEmpty(r.pageFooter.items))
       blank = @"data region parsed with no rows or columns";
     else if (r.page.pageWidth <= 0 || r.page.pageHeight <= 0)
       blank = @"no page size";

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="RDLRichTextEditor">
+            <connections>
+                <outlet property="alignCenterButton" destination="alignCenterButton" id="alignCenterOutlet"/>
+                <outlet property="alignJustifyButton" destination="alignJustifyButton" id="alignJustifyOutlet"/>
+                <outlet property="alignLeftButton" destination="alignLeftButton" id="alignLeftOutlet"/>
+                <outlet property="alignRightButton" destination="alignRightButton" id="alignRightOutlet"/>
+                <outlet property="boldButton" destination="boldButton" id="boldButtonOutlet"/>
+                <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
+                <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
+                <outlet property="fontPopup" destination="fontPopup" id="fontPopupOutlet"/>
+                <outlet property="italicButton" destination="italicButton" id="italicButtonOutlet"/>
+                <outlet property="sizeCombo" destination="sizeCombo" id="sizeComboOutlet"/>
+                <outlet property="strikeButton" destination="strikeButton" id="strikeButtonOutlet"/>
+                <outlet property="textView" destination="textView" id="textViewOutlet"/>
+                <outlet property="underlineButton" destination="underlineButton" id="underlineButtonOutlet"/>
+                <outlet property="window" destination="panel" id="panelOutlet"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <window title="Rich Text" allowsToolTipsWhenApplicationIsInactive="NO" visibleAtLaunch="NO" animationBehavior="default" id="panel">
+            <windowStyleMask key="styleMask" titled="YES" resizable="YES"/>
+            <rect key="contentRect" x="0.0" y="0.0" width="620" height="380"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
+            <view key="contentView" id="panelContent">
+                <rect key="frame" x="0.0" y="0.0" width="620" height="380"/>
+                <autoresizingMask key="autoresizingMask" flexibleMinY="YES" flexibleMaxY="YES"/>
+                <subviews>
+                    <popUpButton toolTip="Font" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="fontPopup">
+                        <rect key="frame" x="12" y="338" width="170" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" id="fontPopupCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="menu" size="12"/>
+                            <menu key="menu" id="fontPopupMenu"/>
+                        </popUpButtonCell>
+                        <connections>
+                            <action selector="fontFamilyChanged:" target="-2" id="fontPopupAction"/>
+                        </connections>
+                    </popUpButton>
+                    <comboBox toolTip="Size" focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="sizeCombo">
+                        <rect key="frame" x="188" y="338" width="62" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <comboBoxCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" borderStyle="bezel" alignment="right" drawsBackground="YES" completes="NO" numberOfVisibleItems="12" id="sizeComboCell">
+                            <font key="font" metaFont="cellTitle"/>
+                            <color key="textColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </comboBoxCell>
+                        <connections>
+                            <action selector="fontSizeChanged:" target="-2" id="sizeComboAction"/>
+                        </connections>
+                    </comboBox>
+                    <colorWell toolTip="Text colour" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="colorWell">
+                        <rect key="frame" x="256" y="338" width="44" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.10000000000000001" blue="0.089999999999999997" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="textColorChanged:" target="-2" id="colorWellAction"/>
+                        </connections>
+                    </colorWell>
+                    <button toolTip="Bold" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="boldButton">
+                        <rect key="frame" x="312" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="B" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="boldButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="toggleBold:" target="-2" id="boldButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Italic" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="italicButton">
+                        <rect key="frame" x="344" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="I" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="italicButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="toggleItalic:" target="-2" id="italicButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Underline" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="underlineButton">
+                        <rect key="frame" x="376" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="U" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="underlineButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="toggleUnderline:" target="-2" id="underlineButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Strikethrough" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="strikeButton">
+                        <rect key="frame" x="408" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="S" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="strikeButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="toggleStrikethrough:" target="-2" id="strikeButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Align left" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="alignLeftButton">
+                        <rect key="frame" x="450" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="L" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="alignLeftButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="alignLeft:" target="-2" id="alignLeftButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Centre" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="alignCenterButton">
+                        <rect key="frame" x="482" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="C" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="alignCenterButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="alignCenter:" target="-2" id="alignCenterButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Align right" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="alignRightButton">
+                        <rect key="frame" x="514" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="R" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="alignRightButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="alignRight:" target="-2" id="alignRightButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Justify" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="alignJustifyButton">
+                        <rect key="frame" x="546" y="338" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="J" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="alignJustifyButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="alignJustify:" target="-2" id="alignJustifyButtonAction"/>
+                        </connections>
+                    </button>
+                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" translatesAutoresizingMaskIntoConstraints="NO" id="textScroll">
+                        <rect key="frame" x="12" y="44" width="596" height="286"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <clipView key="contentView" id="textClip">
+                            <rect key="frame" x="1" y="1" width="579" height="269"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                            <subviews>
+                                <textView importsGraphics="NO" verticallyResizable="YES" usesFontPanel="YES" allowsUndo="YES" id="textView">
+                                    <rect key="frame" x="0.0" y="0.0" width="594" height="269"/>
+                                    <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                                    <size key="minSize" width="579" height="269"/>
+                                    <size key="maxSize" width="611" height="10000000"/>
+                                    <color key="insertionPointColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                                </textView>
+                            </subviews>
+                        </clipView>
+                        <scroller key="horizontalScroller" verticalHuggingPriority="750" horizontal="YES" id="textHScroller">
+                            <rect key="frame" x="1" y="270" width="579" height="15"/>
+                            <autoresizingMask key="autoresizingMask"/>
+                        </scroller>
+                        <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="textVScroller">
+                            <rect key="frame" x="580" y="1" width="15" height="269"/>
+                            <autoresizingMask key="autoresizingMask"/>
+                        </scroller>
+                    </scrollView>
+                    <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="cancelButton">
+                        <rect key="frame" x="440" y="10" width="80" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="cancel:" target="-2" id="cancelAction"/>
+                        </connections>
+                    </button>
+                    <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="okButton">
+                        <rect key="frame" x="528" y="10" width="80" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="OK" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="okButtonCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+DQ
+</string>
+                        </buttonCell>
+                        <connections>
+                            <action selector="accept:" target="-2" id="acceptAction"/>
+                        </connections>
+                    </button>
+                </subviews>
+            </view>
+            <connections>
+                <outlet property="initialFirstResponder" destination="textView" id="initialFirstResponderOutlet"/>
+            </connections>
+            <point key="canvasLocation" x="140" y="144"/>
+        </window>
+    </objects>
+</document>

@@ -45,12 +45,12 @@ run, so "Foo Baz" came back "FooBaz". A textbox value round-trips through a
 TextRun, so a value of `"   "` was lost the same way.
 
 `RDLParser` now parses with `NSXMLNodePreserveWhitespace` and reads leaf text
-through `PicaElementText`, which falls back to `-XMLString` when an element
+through `RDLElementText`, which falls back to `-XMLString` when an element
 claims to be empty. That is sound because only whitespace can have been lost:
-anything else would have come back from `-stringValue`. `PicaRunWriterWhitespaceChecks`
+anything else would have come back from `-stringValue`. `RDLRunWriterWhitespaceChecks`
 pins both cases.
 
-Note that `PicaText` still trims, which is deliberate for element values like
+Note that `RDLText` still trims, which is deliberate for element values like
 `<Width>` and `<Operator>` where surrounding whitespace is formatting.
 
 ## It also hides whitespace-only text inside a leaf element
@@ -65,7 +65,7 @@ This matters because Word stores the space between two differently formatted
 runs as its own `<w:t xml:space="preserve"> </w:t>`. Reading it the obvious way
 turns "Address: 01000 Sylvania" into "Address:01000Sylvania".
 
-The workaround, in `PicaElementText` (there is a copy in `RDLDocxReader` and
+The workaround, in `RDLElementText` (there is a copy in `RDLDocxReader` and
 one in `RDLParser`, since the two read different vocabularies): parse with
 `NSXMLNodePreserveWhitespace`, and when an element reports itself empty,
 recover its content from `-XMLString`. Only whitespace can have been lost that

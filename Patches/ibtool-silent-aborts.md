@@ -100,11 +100,11 @@ Found while writing these XIBs by hand. In each case ibtool exits 0 and reports
 nothing, and the property is simply absent at runtime:
 
 - `<attributedString key="attributedTitle">` on an `NSButtonCell`. Every
-  spelling tried was ignored, so `PicaWelcomeWindow.xib` lays the card text out
+  spelling tried was ignored, so `RDLWelcomeWindow.xib` lays the card text out
   as labels over the button instead.
 - `<tableHeaderView key="headerView">` on an `NSTableView`, in any position
   tried and under the element names `tableHeaderView`, `customView` and `view`.
-  `PicaTablixEditor` sets the header view in code.
+  `RDLTablixEditor` sets the header view in code.
 - `<subviews>` nested inside a `<button>`, which is not a container view.
 
 ## Related: characters XML cannot carry

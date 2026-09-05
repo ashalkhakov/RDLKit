@@ -1,13 +1,20 @@
-# PicaKit
+# RDLKit
 
 Report Definition Language Kit for GNUstep and Cocoa.
 
-1. **Generator** (`PicaKit` + `PicaGen`) — takes an RDL file, data sources, and input parameters, and generates a **PDF** or **HTML** file.
-2. **Designer** (`PicaDesigner`) — creates and edits RDL definitions.
+1. **Generator** (`RDLKit` + `RDLGen`) — takes an RDL file, data sources, and input parameters, and generates a **PDF** or **HTML** file.
+2. **Designer** (`RDLDesigner`) — creates and edits RDL definitions.
 
 The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
 accepted as current.
+
+**Platform status.** macOS builds and passes its tests on every change. The
+GNUstep build is being brought up in CI now. The sources were *written* for
+GNUstep but had never been compiled there, and doing so is turning up real
+breakage — a CoreGraphics import, Cocoa-only attributed-string enumerators,
+libraries that were never linked. Until that job is green, treat GNUstep as
+work in progress rather than as supported.
 
 Output format support:
 
@@ -26,11 +33,11 @@ Report generation is a pipeline:
 
 | Path | Component | Role |
 | --- | --- | --- |
-| `PicaKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
-| `PicaKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. Portable `PicaChecks` for GNUstep. |
-| `PicaGen` | Generator CLI | command-line tool to generate reports |
-| `PicaDesigner` | Designer app | WYSIWYG report designer |
-| `PicaDesignerTests` | Designer app | Tests for the report designer |
+| `RDLKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
+| `RDLKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. One XCTest per area; the GNUstep bundle build is not green yet. |
+| `RDLGen` | Generator CLI | command-line tool to generate reports |
+| `RDLDesigner` | Designer app | WYSIWYG report designer |
+| `RDLDesignerTests` | Designer app | Tests for the report designer |
 
 Written in Objective-C with ARC. UI is built via XIBs.
 
@@ -106,19 +113,25 @@ Skipped elements are reported in `report.warnings` instead of dropped silently.
 ## Testing
 
 * On MacOS:
-  * `xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests -destination 'platform=macOS' test`
-  * `xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests -destination 'platform=macOS' test`
-  * Or in Xcode: open `RDLKit.xcodeproj`, scheme **PicaKitTests**, Product → Test.
+  * `xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests -destination 'platform=macOS' test`
+  * `xcodebuild -project RDLKit.xcodeproj -scheme RDLDesignerTests -destination 'platform=macOS' test`
+  * Or in Xcode: open `RDLKit.xcodeproj`, scheme **RDLKitTests**, Product → Test.
 * on GNUstep:
 
   ```
   . /usr/share/GNUstep/Makefiles/GNUstep.sh
-  cd PicaKit && make
-  cd ../PicaDesigner && make
-  openapp ./Pica.app
-  cd ../PicaGen && make
-  ./picagen ../samples/invoice.rdl -f html -o invoice.html
+  cd RDLKit && make
+  cd ../RDLDesigner && make
+  openapp ./RDLDesigner.app
+  cd ../RDLGen && make
+  LD_LIBRARY_PATH=../RDLKit/obj ./obj/rdlgen \
+    ../Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl -f html -o out.html
   ```
+
+  `RDLKit` is linked out of the tree rather than installed, so the dependent
+  makefiles add `-L../RDLKit/$(GNUSTEP_OBJ_DIR)` and running anything built
+  against it needs that directory on `LD_LIBRARY_PATH`. `make install` in
+  `RDLKit` avoids both.
 
 Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
 
@@ -128,24 +141,24 @@ Open `RDLKit.xcodeproj` (this folder). Five targets, all Objective-C ARC, macOS 
 
 | Scheme | Product | Role |
 | --- | --- | --- |
-| **Pica** | `Pica.app` | Designer (welcome screen also opens the generator window) |
-| **PicaGen** | `picagen` | Command-line generator |
-| **PicaKit** | `PicaKit.framework` | Generator library |
-| **PicaKitTests** | `PicaKitTests.xctest` | XCTest for the library (parser, expressions, layout, backends, checker, `.docx` import) |
-| **PicaDesignerTests** | `PicaDesignerTests.xctest` | XCTest for the app (editing core, canvas, panels) |
+| **RDLDesigner** | `RDLDesigner.app` | Designer (welcome screen also opens the generator window) |
+| **RDLGen** | `rdlgen` | Command-line generator |
+| **RDLKit** | `RDLKit.framework` | Generator library |
+| **RDLKitTests** | `RDLKitTests.xctest` | XCTest for the library (parser, expressions, layout, backends, checker, `.docx` import) |
+| **RDLDesignerTests** | `RDLDesignerTests.xctest` | XCTest for the app (editing core, canvas, panels) |
 
-Pica and PicaGen link and embed `PicaKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
+RDLDesigner and RDLGen link and embed `RDLKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
 
-Xcode 26: every scheme’s Run action expands macros from a real product (`Pica.app`, `picagen`, or `PicaKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
+Xcode 26: every scheme’s Run action expands macros from a real product (`RDLDesigner.app`, `rdlgen`, or `RDLKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
 
 ```
-xcodebuild -project RDLKit.xcodeproj -scheme Pica -configuration Debug build
-xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests test
+xcodebuild -project RDLKit.xcodeproj -scheme RDLDesigner -configuration Debug build
+xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests test
 ```
 
-There are two test schemes: `PicaKitTests` for the library and
-`PicaDesignerTests` for the app. Use those rather than `swift test` --
-SwiftPM is not part of the build story, which has to work under GNUstep too.
+There are two test schemes: `RDLKitTests` for the library and
+`RDLDesignerTests` for the app. There is no `Package.swift`: SwiftPM is not
+part of the build story, which has to work under GNUstep too.
 Both are ordinary XCTest; under GNUstep they build as bundles through their
 own GNUmakefiles and need `gnustep/tools-xctest`.
 
@@ -215,8 +228,8 @@ data bound, nothing laid out. `RDLDataContract` describes the data the report
 needs, so a caller can validate what it is about to supply.
 
 ```
-picagen report.rdl --check      # diagnostics; non-zero exit on errors
-picagen report.rdl --contract   # JSON: datasets, field types, parameters
+rdlgen report.rdl --check      # diagnostics; non-zero exit on errors
+rdlgen report.rdl --contract   # JSON: datasets, field types, parameters
 ```
 
 It works over a small type language rather than a flat set of scalars: a
@@ -284,7 +297,7 @@ alternative:
   Word draws a rule — and any other shape is left out and named in the notes.
 
 Import returns those notes alongside the report, and the designer's New Report
-wizard shows them before anything is committed to. `PicaKitTests/Fixtures/`
+wizard shows them before anything is committed to. `RDLKitTests/Fixtures/`
 holds three synthetic Word documents that exercise all of the above.
 
 ## RDL coverage
@@ -297,10 +310,90 @@ to know one shape. 79 of the 86 now parse and lay out; the 7 that do not are
 honest refusals naming a report item we have not implemented. Re-score with
 `.tools/rdl-coverage.sh`.
 
+## Fonts and layout across platforms
+
+Layout is measured with the fonts installed on the machine doing the measuring.
+A report names whatever its author had — Arial, Times New Roman, Calibri — and
+where that font is absent RDLKit falls back through the user font, the system
+font and Helvetica rather than carrying nothing.
+
+So a report does **not** paginate identically everywhere. The same file laid out
+on macOS, on Windows and on a bare Linux box will break lines and fill boxes
+slightly differently, because DejaVu Sans is not Arial. Every cross-platform
+report tool faces this and there are only two honest answers: install the named
+fonts on every machine that renders (on Debian and Ubuntu the `ttf-mscorefonts-installer`
+package does it), or accept that sizing differs and design with a little slack.
+
+One case deserves particular care. The `.docx` importer *measures* text and
+emits fixed heights with `CanGrow = NO`, so a scaffold made on one machine
+carries that machine's font metrics. Importing on a Mac and rendering on a Linux
+server with different fonts can clip a box that fitted when it was made. Either
+render where you import, install the same fonts on both, or turn `CanGrow` back
+on for the boxes that matter.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` builds and tests both platforms on every push.
+
+* **macOS** — `xcodebuild` for `RDLKit`, `RDLDesigner` and `RDLGen`, both test
+  suites, the RDL corpus score (which fails the build if any file parses to
+  nothing, or if fewer than 79 of the 86 still lay out), and a `rdlgen` smoke
+  test that checks a report and renders it to HTML and PDF.
+* **GNUstep** — the stack is built from source by
+  `.github/scripts/dependencies.sh` (tools-make, libobjc2, libs-base, libs-gui,
+  libs-back with the cairo graphics backend, and tools-xctest) and cached
+  against that script, since it changes far less often than RDLKit does. Then
+  the same three products, both XCTest bundles through `make run-tests`, and the
+  same smoke test — all under `xvfb`, because AppKit drawing needs a display.
+
+Actions is free for public repositories on the standard runners. On a private
+one the minutes count against the account's allowance and **macOS bills at
+10×**, so the macOS job runs on pull requests and on `master` rather than on
+every push; the Linux job, at 1×, runs on everything.
+
+## Builds and releases
+
+Every push produces downloadable artifacts, from the run's own page in the
+Actions tab: an `RDLKit-Linux-<sha>` AppImage and an `RDLKit-macOS-<sha>` with
+an unsigned `RDLDesigner.app` and `rdlgen`. They are unsigned, named for the commit,
+and kept for 14 days — for trying a build, not for shipping.
+
+`.github/workflows/release.yml` is the shipping one. It runs on a `v*` tag, or
+by hand for the artifacts without publishing a release. Note that the "Run
+workflow" button only appears once the workflow is on the default branch;
+a tag triggers it from anywhere.
+
+* **Linux** — one AppImage carrying both programs. `Scripts/prepare-appdir.sh`
+  assembles an AppDir with the designer, the CLI and the GNUstep runtime, and
+  `Scripts/package-appimage.sh` hands it to `linuxdeploy`. The layout follows
+  GNUstep's: `AppRun` writes a config pointing `GNUSTEP_SYSTEM_ROOT` and its
+  siblings at wherever the image is mounted, because that path is not known
+  until it runs. Both scripts are ports of the ones in `UDQuakeTools`, which
+  package a GNUstep app the same way; the places they differ are marked in the
+  files. Run the designer by launching the image, and the CLI as
+  `./RDLKit-Linux-*.AppImage rdlgen report.rdl --check`.
+
+  The image carries the **Eau** theme, and `AppRun` selects it — along with the
+  bundled Liberation fonts — by writing them into the designer's own defaults
+  domain at launch, so it looks the way a GNUstep desktop is expected to look
+  rather than like stock GNUstep.
+* **macOS** — `RDLDesigner.app`, and `rdlgen` beside the `RDLKit.framework` it
+  loads through `@rpath` (the tool alone will not start), signed with a
+  Developer ID and notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),
+  `MACOS_CERTIFICATE_PASSWORD` and `MACOS_SIGN_IDENTITY`; notarization
+  additionally needs `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and
+  `NOTARY_PASSWORD`. Without them the build still produces artifacts, marked
+  `-unsigned`, rather than failing.
+
+The AppImage bundles DejaVu and Liberation, and the Microsoft core fonts if
+they are installed on the builder. That is the point of bundling any: it is
+what stops a report laying out differently on a machine that has none of the
+fonts it names. See **Fonts and layout across platforms** above.
+
 ## License
 
 RDLKit is licensed under the **GNU Lesser General Public License, version 2.1**
-— see `LICENSE`. The LGPL is deliberate: linking `PicaKit.framework` into a
+— see `LICENSE`. The LGPL is deliberate: linking `RDLKit.framework` into a
 program does not impose the GPL on that program.
 
 `Examples/majorsilence/` is not ours. Those report definitions come from the
@@ -312,5 +405,5 @@ One consequence worth knowing before it bites: Apache 2.0 and LGPL 2.1 are
 **not** compatible in the direction that matters here. Apache-licensed *code*
 cannot be copied into RDLKit's LGPL 2.1 sources. Reading their implementation
 to understand the format is fine, and so is shipping their `.rdl` files as
-separate data; porting their C# into `PicaKit/` is not, unless RDLKit moves to
+separate data; porting their C# into `RDLKit/` is not, unless RDLKit moves to
 LGPL 3.0, which is the version the FSF considers Apache-compatible.

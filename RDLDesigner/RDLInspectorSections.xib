@@ -1,0 +1,895 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="RDLInspectorView">
+            <connections>
+                <outlet property="alignPop" destination="alignPop" id="alignPopOutlet"/>
+                <outlet property="authorField" destination="authorField" id="authorFieldOutlet"/>
+                <outlet property="bandBGField" destination="bandBGField" id="bandBGFieldOutlet"/>
+                <outlet property="bandBox" destination="bandBox" id="bandBoxOutlet"/>
+                <outlet property="bandHField" destination="bandHField" id="bandHFieldOutlet"/>
+                <outlet property="bodyHField" destination="bodyHField" id="bodyHFieldOutlet"/>
+                <outlet property="catField" destination="catField" id="catFieldOutlet"/>
+                <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
+                <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
+                <outlet property="chartKindPop" destination="chartKindPop" id="chartKindPopOutlet"/>
+                <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
+                <outlet property="descField" destination="descField" id="descFieldOutlet"/>
+                <outlet property="docBox" destination="docBox" id="docBoxOutlet"/>
+                <outlet property="docNameField" destination="docNameField" id="docNameFieldOutlet"/>
+                <outlet property="fontField" destination="fontField" id="fontFieldOutlet"/>
+                <outlet property="footerHField" destination="footerHField" id="footerHFieldOutlet"/>
+                <outlet property="formatField" destination="formatField" id="formatFieldOutlet"/>
+                <outlet property="geoBox" destination="geoBox" id="geoBoxOutlet"/>
+                <outlet property="headerHField" destination="headerHField" id="headerHFieldOutlet"/>
+                <outlet property="heightField" destination="heightField" id="heightFieldOutlet"/>
+                <outlet property="imageBox" destination="imageBox" id="imageBoxOutlet"/>
+                <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
+                <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
+                <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
+                <outlet property="kindLabel" destination="kindLabel" id="kindLabelOutlet"/>
+                <outlet property="leftField" destination="leftField" id="leftFieldOutlet"/>
+                <outlet property="lineBox" destination="lineBox" id="lineBoxOutlet"/>
+                <outlet property="lineColorField" destination="lineColorField" id="lineColorFieldOutlet"/>
+                <outlet property="marginField" destination="marginField" id="marginFieldOutlet"/>
+                <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
+                <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
+                <outlet property="rectBGField" destination="rectBGField" id="rectBGFieldOutlet"/>
+                <outlet property="rectBox" destination="rectBox" id="rectBoxOutlet"/>
+                <outlet property="sizeField" destination="sizeField" id="sizeFieldOutlet"/>
+                <outlet property="tablixBox" destination="tablixBox" id="tablixBoxOutlet"/>
+                <outlet property="tablixDatasetPop" destination="tablixDatasetPop" id="tablixDatasetPopOutlet"/>
+                <outlet property="tablixHeaderHField" destination="tablixHeaderHField" id="tablixHeaderHFieldOutlet"/>
+                <outlet property="tablixRowHField" destination="tablixRowHField" id="tablixRowHFieldOutlet"/>
+                <outlet property="textBox" destination="textBox" id="textBoxOutlet"/>
+                <outlet property="titleField" destination="titleField" id="titleFieldOutlet"/>
+                <outlet property="topField" destination="topField" id="topFieldOutlet"/>
+                <outlet property="valField" destination="valField" id="valFieldOutlet"/>
+                <outlet property="valueField" destination="valueField" id="valueFieldOutlet"/>
+                <outlet property="weightPop" destination="weightPop" id="weightPopOutlet"/>
+                <outlet property="widthField" destination="widthField" id="widthFieldOutlet"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <textField verticalHuggingPriority="750" id="kindLabel">
+            <rect key="frame" x="0.0" y="0.0" width="240" height="16"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <textFieldCell key="cell" title="Report" id="kindLabelCell">
+                <font key="font" metaFont="smallSystemBold"/>
+                <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+            </textFieldCell>
+            <point key="canvasLocation" x="140" y="154"/>
+        </textField>
+        <customView id="docBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="290"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl1">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Name" id="lbl1Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="docNameField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="docNameFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="docNameFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="docNameFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl2">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Author" id="lbl2Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="authorField">
+                    <rect key="frame" x="10" y="64" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="authorFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="authorFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="authorFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl3">
+                    <rect key="frame" x="10" y="92" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Description" id="lbl3Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="descField">
+                    <rect key="frame" x="10" y="108" width="240" height="44"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="descFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="descFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="descFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl4">
+                    <rect key="frame" x="10" y="158" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Page" id="lbl4Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="pagePop">
+                    <rect key="frame" x="10" y="174" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="pagePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="pagePopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pagePopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl5">
+                    <rect key="frame" x="10" y="202" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Header in" id="lbl5Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl6">
+                    <rect key="frame" x="136" y="202" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Body in" id="lbl6Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="headerHField">
+                    <rect key="frame" x="10" y="218" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="headerHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="headerHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="headerHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField id="bodyHField">
+                    <rect key="frame" x="136" y="218" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bodyHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bodyHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="bodyHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl7">
+                    <rect key="frame" x="10" y="246" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Footer in" id="lbl7Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl8">
+                    <rect key="frame" x="136" y="246" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Margin in" id="lbl8Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="footerHField">
+                    <rect key="frame" x="10" y="262" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="footerHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="footerHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="footerHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField id="marginField">
+                    <rect key="frame" x="136" y="262" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="marginFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="marginFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="marginFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="bandBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl9">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Height in" id="lbl9Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="bandHField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bandHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bandHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="bandHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl10">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Background" id="lbl10Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="bandBGField">
+                    <rect key="frame" x="10" y="64" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bandBGFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bandBGFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="bandBGFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="geoBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="140"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl11">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Name" id="lbl11Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="nameField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nameFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="nameFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="nameFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl12">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Left" id="lbl12Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="leftField">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="leftFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="leftFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="leftFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl13">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Top" id="lbl13Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="topField">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="topFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="topFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="topFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl14">
+                    <rect key="frame" x="10" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Width" id="lbl14Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="widthField">
+                    <rect key="frame" x="10" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="widthFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="widthFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="widthFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl15">
+                    <rect key="frame" x="136" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Height" id="lbl15Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="heightField">
+                    <rect key="frame" x="136" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="heightFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="heightFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="heightFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="textBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="246"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl16">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Value" id="lbl16Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="valueField">
+                    <rect key="frame" x="10" y="20" width="240" height="44"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valueFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="valueFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="valueFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl17">
+                    <rect key="frame" x="10" y="70" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Typeface" id="lbl17Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="fontField">
+                    <rect key="frame" x="10" y="86" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="fontFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="fontFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="fontFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl18">
+                    <rect key="frame" x="10" y="114" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Size" id="lbl18Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl19">
+                    <rect key="frame" x="136" y="114" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Weight" id="lbl19Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="sizeField">
+                    <rect key="frame" x="10" y="130" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="sizeFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="sizeFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="sizeFieldDelegate"/>
+                    </connections>
+                </textField>
+                <popUpButton id="weightPop">
+                    <rect key="frame" x="136" y="130" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="weightPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="weightPopMenu">
+                            <items>
+                                <menuItem title="Roman" id="mi1"/>
+                                <menuItem title="Bold" id="mi2"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="weightPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl20">
+                    <rect key="frame" x="10" y="158" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Align" id="lbl20Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="alignPop">
+                    <rect key="frame" x="10" y="174" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="alignPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="alignPopMenu">
+                            <items>
+                                <menuItem title="Left" id="mi3"/>
+                                <menuItem title="Center" id="mi4"/>
+                                <menuItem title="Right" id="mi5"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="alignPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl21">
+                    <rect key="frame" x="10" y="202" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Ink" id="lbl21Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl22">
+                    <rect key="frame" x="136" y="202" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Format" id="lbl22Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="colorField">
+                    <rect key="frame" x="10" y="218" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="colorFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="colorFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="colorFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField id="formatField">
+                    <rect key="frame" x="136" y="218" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="formatFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="formatFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="formatFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="lineBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="48"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl23">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Ink" id="lbl23Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="lineColorField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="lineColorFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="lineColorFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="lineColorFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="rectBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="48"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl24">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Background" id="lbl24Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="rectBGField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rectBGFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="rectBGFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="rectBGFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="imageBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl25">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Image (name or =expr)" id="lbl25Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="imageValueField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="imageValueFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="imageValueFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="imageValueFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl26">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Source" id="lbl26Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl27">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Sizing" id="lbl27Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="imageSourcePop">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSourcePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="imageSourcePopMenu">
+                            <items>
+                                <menuItem title="Embedded" id="mi6"/>
+                                <menuItem title="External" id="mi7"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="imageSourcePopAction"/>
+                    </connections>
+                </popUpButton>
+                <popUpButton id="imageSizingPop">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSizingPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="imageSizingPopMenu">
+                            <items>
+                                <menuItem title="Fit" id="mi8"/>
+                                <menuItem title="FitProportional" id="mi9"/>
+                                <menuItem title="Clip" id="mi10"/>
+                                <menuItem title="AutoSize" id="mi11"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="imageSizingPopAction"/>
+                    </connections>
+                </popUpButton>
+            </subviews>
+        </customView>
+        <customView id="chartBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="180"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl28">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Dataset" id="lbl28Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="chartDatasetPop">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="chartDatasetPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="chartDatasetPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="chartDatasetPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl29">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Title" id="lbl29Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="titleField">
+                    <rect key="frame" x="10" y="64" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="titleFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="titleFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="titleFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl30">
+                    <rect key="frame" x="10" y="92" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Kind" id="lbl30Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="chartKindPop">
+                    <rect key="frame" x="10" y="108" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="chartKindPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="chartKindPopMenu">
+                            <items>
+                                <menuItem title="Column" id="mi12"/>
+                                <menuItem title="Bar" id="mi13"/>
+                                <menuItem title="Line" id="mi14"/>
+                                <menuItem title="Area" id="mi16"/>
+                                <menuItem title="Pie" id="mi15"/>
+                                <menuItem title="Doughnut" id="mi17"/>
+                                <menuItem title="Scatter" id="mi18"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="chartKindPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl31">
+                    <rect key="frame" x="10" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Category field" id="lbl31Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl32">
+                    <rect key="frame" x="136" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Value field" id="lbl32Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="catField">
+                    <rect key="frame" x="10" y="152" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="catFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="catFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="catFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField id="valField">
+                    <rect key="frame" x="136" y="152" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="valFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="valFieldDelegate"/>
+                    </connections>
+                </textField>
+            </subviews>
+        </customView>
+        <customView id="tablixBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="122"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" id="lbl33">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Dataset" id="lbl33Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="tablixDatasetPop">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="tablixDatasetPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="tablixDatasetPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="tablixDatasetPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField verticalHuggingPriority="750" id="lbl34">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Header in" id="lbl34Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField verticalHuggingPriority="750" id="lbl35">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Row in" id="lbl35Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField id="tablixHeaderHField">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="tablixHeaderHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="tablixHeaderHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="tablixHeaderHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField id="tablixRowHField">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="tablixRowHFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="tablixRowHFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="tablixRowHFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button id="editTablixButton">
+                    <rect key="frame" x="10" y="92" width="240" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="square" title="Edit Tablix…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="editTablixButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editTablix:" target="-2" id="editTablixAction"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+    </objects>
+</document>
