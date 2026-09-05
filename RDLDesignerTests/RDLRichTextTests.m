@@ -594,4 +594,52 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
                                 inkLuma, paperLuma, box.style.backgroundColor]);
 }
 
+// A textbox whose whole value is an expression has no paragraphs yet -- it is
+// one plain value. Opening it in the rich-text editor still has to show that
+// expression as a run, not as text beginning with "=": otherwise the first
+// thing the editor does is turn it into a literal.
+- (void)testPlainExpressionOpensAsARun {
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Total";
+  box.value = @"=Sum(Fields!Amount.Value)";
+
+  NSAttributedString *text = [RDLRichTextCodec attributedStringForItem:box];
+  NSRange marked = NSMakeRange(NSNotFound, 0);
+  id value = [text attribute:RDLExpressionRunAttributeName atIndex:0 effectiveRange:&marked];
+  if (![value isEqualToString:box.value]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the value is marked %@", value]);
+    return;
+  }
+  if (marked.length != [text length])
+    XCTFail(@"%@", @"the whole value is the expression, so the whole of it is the run");
+
+  // And it survives the round trip. A textbox that is nothing but one
+  // expression goes back as a plain value, not as paragraphs: there is no
+  // formatting to keep, and RDL writes the simpler shape.
+  RDLTextbox *out = [[RDLTextbox alloc] init];
+  out.style = box.style;
+  [RDLRichTextCodec applyAttributedString:text toItem:out];
+  if (![out.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"it came back as %@", out.value]);
+
+  // Give it a literal beside the expression and it becomes paragraphs, with
+  // the expression as a run of its own.
+  NSMutableAttributedString *mixed = [text mutableCopy];
+  [mixed appendAttributedString:[[NSAttributedString alloc] initWithString:@" due"]];
+  RDLTextbox *rich = [[RDLTextbox alloc] init];
+  rich.style = box.style;
+  [RDLRichTextCodec applyAttributedString:mixed toItem:rich];
+  RDLTextRun *first = [[[rich.paragraphs firstObject] runs] firstObject];
+  if (![first.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the expression run reads %@", first.value]);
+
+  // A plain value is not marked, which is what keeps the mark meaning
+  // "deliberately an expression".
+  RDLTextbox *literal = [[RDLTextbox alloc] init];
+  literal.value = @"Total";
+  NSAttributedString *plain = [RDLRichTextCodec attributedStringForItem:literal];
+  if ([plain attribute:RDLExpressionRunAttributeName atIndex:0 effectiveRange:NULL] != nil)
+    XCTFail(@"%@", @"a literal should not be marked as an expression");
+}
+
 @end

@@ -80,10 +80,21 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
 }
 
 + (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item {
-  if ([item.paragraphs count] == 0)
-    return [RDLTextAttributes attributedStringForText:item.value ?: @""
-                                                style:item.style
-                                                scale:1.0];
+  if ([item.paragraphs count] == 0) {
+    // A textbox that is one plain value, not paragraphs yet. If that value is
+    // an expression it is still an expression run -- the whole of it -- and has
+    // to arrive in the editor as one, or the first thing the editor does is
+    // turn it into literal text that happens to begin with "=".
+    NSMutableAttributedString *plain =
+        [[RDLTextAttributes attributedStringForText:item.value ?: @""
+                                              style:item.style
+                                              scale:1.0] mutableCopy];
+    if ([RDLExpr isExpressionSource:item.value] && [plain length])
+      [plain addAttribute:RDLExpressionRunAttributeName
+                    value:item.value
+                    range:NSMakeRange(0, [plain length])];
+    return plain;
+  }
   NSMutableAttributedString *out =
       [[RDLTextAttributes attributedStringForParagraphs:item.paragraphs
                                              baseStyle:item.style
