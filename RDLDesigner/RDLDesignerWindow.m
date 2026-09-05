@@ -9,6 +9,9 @@
 #import "RDLOutlineDataSource.h"
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
+#import "RDLTabBadge.h"
+#import "ThirdParty/DMTabBar/DMTabBar.h"
+#import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
 @interface RDLDesignerWindow ()
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
@@ -24,7 +27,7 @@
 // visible chrome, the tab view holds the panes. Hosts are empty views the
 // later stages fill; they carry a label so an empty pane says what belongs
 // there rather than looking broken.
-@property (nonatomic, strong) IBOutlet NSSegmentedControl *leftTabs, *centerTabs, *rightTabs;
+@property (nonatomic, strong) IBOutlet NSView *leftTabBar, *centerTabBar, *rightTabBar;
 @property (nonatomic, strong) IBOutlet NSTabView *leftTabView, *centerTabView, *rightTabView;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
@@ -104,6 +107,9 @@
   _dataView.document = _context.document;
   _outlineSource = [[RDLOutlineDataSource alloc] initWithOutlineView:_outline
                                                              context:_context];
+  // The tab bars come out of the XIB as empty DMTabBar views: it takes its
+  // items in code, and its icons are drawn rather than loaded.
+  [self buildTabBars];
 }
 
 // The outline mirrors the report tree, so it only needs rebuilding when the
@@ -211,27 +217,66 @@
   [_previewWindow makeKeyAndOrderFront:nil];
 }
 
-// Selecting a segment selects the tab of the same index. Nothing else: which
+// The bar draws icons rather than labels, so each pane gets a lettered badge
+// and the pane name as its tool tip. Colours are the XForms Designer's, which
+// group by role: blue-grey for what a thing is, blue for its contents, green
+// for layout, orange for data.
+static void RDLFillTabBar(NSView *host, id target, SEL action, NSUInteger selected,
+                          NSArray<NSArray *> *pages) {
+  DMTabBar *bar = (DMTabBar *)host;
+  if (![bar isKindOfClass:[DMTabBar class]])
+    return;
+  NSMutableArray *items = [NSMutableArray array];
+  NSUInteger tag = 0;
+  for (NSArray *page in pages) {
+    DMTabBarItem *item =
+        [DMTabBarItem tabBarItemWithIcon:RDLTabBadge(page[0], [page[2] doubleValue],
+                                                     [page[3] doubleValue],
+                                                     [page[4] doubleValue])
+                                     tag:tag++];
+    item.toolTip = page[1];
+    [items addObject:item];
+  }
+  bar.tabBarItems = items;
+  [bar setTarget:target action:action];
+  bar.selectedIndex = selected;
+}
+
+// Selecting a bar item selects the tab of the same index. Nothing else: which
 // pane is showing is not state worth keeping anywhere but in the tab view.
-static void RDLSelectTab(NSSegmentedControl *tabs, NSTabView *tabView) {
-  NSInteger i = [tabs selectedSegment];
+static void RDLSelectTab(id sender, NSTabView *tabView) {
+  NSInteger i = (NSInteger)[(DMTabBarItem *)sender tag];
   if (i >= 0 && i < [tabView numberOfTabViewItems])
     [tabView selectTabViewItemAtIndex:i];
 }
 
+- (void)buildTabBars {
+  RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, @[
+    @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
+    @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
+  ]);
+  RDLFillTabBar(_centerTabBar, self, @selector(centerTabChanged:), 0, @[
+    @[ @"P", @"Preview", @0.36, @0.49, @0.72 ],
+    @[ @"S", @"RDL source", @0.32, @0.60, @0.53 ],
+    @[ @"D", @"Dataset", @0.70, @0.48, @0.32 ],
+  ]);
+  RDLFillTabBar(_rightTabBar, self, @selector(rightTabChanged:), 0, @[
+    @[ @"E", @"Element inspector", @0.36, @0.49, @0.72 ],
+    @[ @"R", @"Report inspector", @0.47, @0.53, @0.64 ],
+    @[ @"F", @"Dataset field inspector", @0.70, @0.48, @0.32 ],
+  ]);
+}
+
 - (void)leftTabChanged:(id)sender {
-  (void)sender;
-  RDLSelectTab(_leftTabs, _leftTabView);
+  RDLSelectTab(sender, _leftTabView);
 }
 
 - (void)centerTabChanged:(id)sender {
-  (void)sender;
-  RDLSelectTab(_centerTabs, _centerTabView);
+  RDLSelectTab(sender, _centerTabView);
 }
 
 - (void)rightTabChanged:(id)sender {
-  (void)sender;
-  RDLSelectTab(_rightTabs, _rightTabView);
+  RDLSelectTab(sender, _rightTabView);
 }
 
 - (void)toggleDesignPreview:(id)sender {

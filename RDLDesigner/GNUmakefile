@@ -31,7 +31,10 @@ RDLDesigner_OBJC_FILES = \
   RDLNewReportPanel.m \
   RDLRichTextEditor.m \
   RDLDataView.m \
-  RDLWelcomeWindow.m
+  RDLWelcomeWindow.m \
+  RDLTabBadge.m \
+  ThirdParty/DMTabBar/DMTabBar.m \
+  ThirdParty/DMTabBar/DMTabBarItem.m
 # RDLKit is built in the tree beside this one and not installed, so the
 # linker has to be told where it is. ADDITIONAL_LIB_DIRS rather than a
 # per-instance variable: it is the documented form and applies whatever the

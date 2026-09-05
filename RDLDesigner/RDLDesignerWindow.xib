@@ -11,18 +11,18 @@
                 <outlet property="canvas" destination="canvas" id="canvasOutlet"/>
                 <outlet property="canvasScroll" destination="canvasScroll" id="canvasScrollOutlet"/>
                 <outlet property="centerTabView" destination="centerTabView" id="centerTabViewOutlet"/>
-                <outlet property="centerTabs" destination="centerTabs" id="centerTabsOutlet"/>
+                <outlet property="centerTabBar" destination="centerTabBar" id="centerTabBarOutlet"/>
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
                 <outlet property="inspector" destination="inspector" id="inspectorOutlet"/>
                 <outlet property="inspectorScroll" destination="inspectorScroll" id="inspectorScrollOutlet"/>
                 <outlet property="leftTabView" destination="leftTabView" id="leftTabViewOutlet"/>
-                <outlet property="leftTabs" destination="leftTabs" id="leftTabsOutlet"/>
+                <outlet property="leftTabBar" destination="leftTabBar" id="leftTabBarOutlet"/>
                 <outlet property="outline" destination="outline" id="outlineOutlet"/>
                 <outlet property="reportInspectorHost" destination="reportInspectorHost" id="reportInspectorHostOutlet"/>
                 <outlet property="rightTabView" destination="rightTabView" id="rightTabViewOutlet"/>
-                <outlet property="rightTabs" destination="rightTabs" id="rightTabsOutlet"/>
+                <outlet property="rightTabBar" destination="rightTabBar" id="rightTabBarOutlet"/>
                 <outlet property="sourceHost" destination="sourceHost" id="sourceHostOutlet"/>
                 <outlet property="split" destination="split" id="splitOutlet"/>
                 <outlet property="window" destination="designerWindow" id="designerWindowOutlet"/>
@@ -68,18 +68,10 @@
                                 <rect key="frame" x="0.0" y="0.0" width="220" height="736"/>
                                 <autoresizingMask key="autoresizingMask" heightSizable="YES"/>
                                 <subviews>
-                                    <segmentedControl verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="leftTabs">
-                                        <rect key="frame" x="6" y="712" width="208" height="20"/>
+                                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="leftTabBar" customClass="DMTabBar">
+                                        <rect key="frame" x="0" y="708" width="220" height="24"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                                        <segmentedCell key="cell" controlSize="small" borderStyle="border" alignment="left" style="rounded" trackingMode="selectOne" id="leftTabsCell">
-                                            <font key="font" metaFont="smallSystem"/>
-                                            <segments>
-                                                <segment label="Outline" width="100" selected="YES"/>
-                                                <segment label="Datasets" width="100" tag="1"/>
-                                            </segments>
-                                        </segmentedCell>
-                                        <connections><action selector="leftTabChanged:" target="-2" id="leftTabsAction"/></connections>
-                                    </segmentedControl>
+                                    </customView>
                                     <tabView fixedFrame="YES" type="noTabsNoBorder" translatesAutoresizingMaskIntoConstraints="NO" id="leftTabView">
                                         <rect key="frame" x="0.0" y="0.0" width="220" height="708"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -184,19 +176,10 @@
                                 <rect key="frame" x="221" y="0.0" width="778" height="736"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <subviews>
-                                    <segmentedControl verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="centerTabs">
-                                        <rect key="frame" x="6" y="712" width="240" height="20"/>
-                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                        <segmentedCell key="cell" controlSize="small" borderStyle="border" alignment="left" style="rounded" trackingMode="selectOne" id="centerTabsCell">
-                                            <font key="font" metaFont="smallSystem"/>
-                                            <segments>
-                                                <segment label="Preview" width="80" selected="YES"/>
-                                                <segment label="Source" width="80" tag="1"/>
-                                                <segment label="Dataset" width="80" tag="2"/>
-                                            </segments>
-                                        </segmentedCell>
-                                        <connections><action selector="centerTabChanged:" target="-2" id="centerTabsAction"/></connections>
-                                    </segmentedControl>
+                                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="centerTabBar" customClass="DMTabBar">
+                                        <rect key="frame" x="0" y="708" width="778" height="24"/>
+                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                                    </customView>
                                     <tabView fixedFrame="YES" type="noTabsNoBorder" translatesAutoresizingMaskIntoConstraints="NO" id="centerTabView">
                                         <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -293,19 +276,10 @@
                                 <rect key="frame" x="1000" y="0.0" width="280" height="736"/>
                                 <autoresizingMask key="autoresizingMask" heightSizable="YES"/>
                                 <subviews>
-                                    <segmentedControl verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rightTabs">
-                                        <rect key="frame" x="6" y="712" width="268" height="20"/>
+                                    <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rightTabBar" customClass="DMTabBar">
+                                        <rect key="frame" x="0" y="708" width="280" height="24"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                                        <segmentedCell key="cell" controlSize="small" borderStyle="border" alignment="left" style="rounded" trackingMode="selectOne" id="rightTabsCell">
-                                            <font key="font" metaFont="smallSystem"/>
-                                            <segments>
-                                                <segment label="Element" width="88" selected="YES"/>
-                                                <segment label="Report" width="88" tag="1"/>
-                                                <segment label="Dataset" width="88" tag="2"/>
-                                            </segments>
-                                        </segmentedCell>
-                                        <connections><action selector="rightTabChanged:" target="-2" id="rightTabsAction"/></connections>
-                                    </segmentedControl>
+                                    </customView>
                                     <tabView fixedFrame="YES" type="noTabsNoBorder" translatesAutoresizingMaskIntoConstraints="NO" id="rightTabView">
                                         <rect key="frame" x="0.0" y="0.0" width="280" height="708"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
