@@ -138,18 +138,25 @@
   if (target == nil)
     return NO;
 
+  // Into inches, which is what an item's position is in: the band frame is in
+  // view points, so the distance has to be divided by the points in an inch as
+  // well as by the zoom. Dividing by the zoom alone stored points as inches and
+  // put the item a hundred inches off the page, where it drew nowhere and could
+  // not be clicked.
   CGFloat zoom = geometry.zoom > 0 ? geometry.zoom : 1.0;
-  CGFloat left = (p.x - NSMinX(target.frame)) / zoom;
-  CGFloat top = (p.y - NSMinY(target.frame)) / zoom;
+  CGFloat perInch = RDLPointsPerInch * zoom;
+  CGFloat left = (p.x - NSMinX(target.frame)) / perInch;
+  CGFloat top = (p.y - NSMinY(target.frame)) / perInch;
 
   RDLTextbox *box = [[RDLTextbox alloc] init];
   box.name = [RDLItemFactory uniqueNameWithPrefix:binding[RDLPaletteLabelKey] ?: @"Field"
                                          inReport:_context.report];
+  // The same size and style an inserted textbox gets, so a dropped one is not
+  // a differently shaped kind of textbox.
+  [RDLItemFactory applyDefaultsTo:box report:_context.report];
   box.value = expression;
   box.left = MAX(0, [RDLEditor snap:left]);
   box.top = MAX(0, [RDLEditor snap:top]);
-  box.width = 1.6;
-  box.height = 0.22;
   [_context.editor addItem:box into:target.band.items bandKey:target.bandKey];
   [_context.selection selectItem:box inBandWithKey:target.bandKey];
   return YES;

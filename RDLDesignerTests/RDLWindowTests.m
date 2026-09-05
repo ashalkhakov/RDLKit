@@ -468,4 +468,45 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"undo left the tablix pointing at the new name");
 }
 
+// A dropped binding has to be findable where it was dropped: the canvas hit
+// tests through the geometry, so if the placement and the geometry disagree the
+// item draws but cannot be clicked, and never shows the selection frame.
+- (void)testDroppedItemIsWhereItWasDropped {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas =
+      [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  RDLBandFrame *body = nil;
+  for (RDLBandFrame *f in [canvas geometry].bandFrames)
+    if ([f.bandKey isEqualToString:@"body"])
+      body = f;
+
+  NSPoint drop = NSMakePoint(NSMinX(body.frame) + 108, NSMinY(body.frame) + 54);
+  [canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
+              atPoint:drop];
+  RDLItem *made = [ctx selectedItem];
+  if (made == nil) {
+    XCTFail(@"%@", @"nothing was dropped");
+    return;
+  }
+
+  // The geometry has to place it where the pointer was.
+  NSRect rect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:made rect:&rect]) {
+    XCTFail(@"%@", @"the geometry cannot place the item that was just added");
+    return;
+  }
+  if (!NSPointInRect(drop, rect))
+    XCTFail(@"%@", [NSString stringWithFormat:@"dropped at %@ but the item is at %@",
+                                              NSStringFromPoint(drop), NSStringFromRect(rect)]);
+
+  // ... and clicking there has to find it, which is what selecting it again
+  // depends on.
+  NSString *bandKey = nil;
+  RDLItem *hit = [[canvas geometry] itemAtPoint:drop kind:NULL bandKey:&bandKey rect:NULL];
+  if (hit != made)
+    XCTFail(@"%@", [NSString stringWithFormat:@"clicking where it was dropped finds %@",
+                                              hit ? hit.name : @"nothing"]);
+}
+
 @end
