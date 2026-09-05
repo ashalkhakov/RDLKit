@@ -5071,4 +5071,76 @@ static NSString *RDLFixturesDirectory(void) {
     XCTFail(@"%@", @"a literal should be one uncoloured run");
 }
 
+// Row groups nest as deep as they are given. Two was the limit the scaffolding
+// had; the shape is the same at three, which is what this checks -- the
+// hierarchy nested innermost-last, a subtotal per group, and the body rows in
+// the order the hierarchy's leaves come out depth-first, because a tablix whose
+// rows and leaves disagree renders its totals against the wrong groups.
+- (void)testTablixNestsManyRowGroups {
+  RDLTablix *t = [[RDLTablix alloc] init];
+  t.name = @"Sales";
+  t.headerHeight = 0.25;
+  t.rowHeight = 0.22;
+  t.width = 7.5;
+  t.columnSpecs = @[
+    @{ @"width" : @2.0, @"header" : @"Item", @"value" : @"=Fields!Item.Value" },
+    @{ @"width" : @1.2, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value",
+       @"aggregate" : @"Sum" },
+  ];
+  t.rowGroups = @[ @"Region", @"Country", @"City" ];
+  [t rebuildTablix];
+
+  // The three names are readable through the old windows as well, which is
+  // what keeps a report written against them working.
+  if (![t.groupBy isEqualToString:@"Region"] || ![t.groupBy2 isEqualToString:@"Country"])
+    XCTFail(@"%@", @"groupBy and groupBy2 should read the first two row groups");
+
+  // Nested innermost-last: Region > Country > City > details.
+  RDLTablixMember *outer = [t.rowHierarchy.members lastObject];
+  NSUInteger depth = 0;
+  RDLTablixMember *at = outer;
+  NSMutableArray *names = [NSMutableArray array];
+  while ([at.groupExpressions count]) {
+    [names addObject:at.groupName ?: @""];
+    depth++;
+    RDLTablixMember *next = nil;
+    for (RDLTablixMember *child in at.members)
+      if ([child.groupExpressions count] || [child.groupName length]) {
+        next = child;
+        break;
+      }
+    if (next == nil || ![next.groupExpressions count])
+      break;
+    at = next;
+  }
+  if (depth != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the hierarchy nests %lu deep, not 3: %@",
+                                              (unsigned long)depth,
+                                              [names componentsJoinedByString:@", "]]);
+    return;
+  }
+  if (![names[0] hasSuffix:@"Region"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the outermost group is %@", names[0]]);
+
+  // The header and details rows, then one subtotal per group -- five for three
+  // groups, where an ungrouped table has two.
+  if ([t.tablixBody.rows count] != 5)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu body rows; expected header, details and "
+                                              @"three subtotals",
+                                              (unsigned long)[t.tablixBody.rows count]]);
+
+  // The corner names every group, and the region is wide enough for a header
+  // column each.
+  RDLTablixCell *corner = [[t.cornerRows firstObject] firstObject];
+  RDLTextbox *cornerBox = (RDLTextbox *)corner.item;
+  if (![cornerBox.value isEqualToString:@"Region / Country / City"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the corner reads %@", cornerBox.value]);
+
+  // And clearing the outermost group clears them all: an inner group with
+  // nothing around it is not a shape RDL has.
+  t.groupBy = nil;
+  if ([t.rowGroups count] != 0)
+    XCTFail(@"%@", @"clearing groupBy left inner groups behind");
+}
+
 @end
