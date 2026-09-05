@@ -53,7 +53,9 @@ ADDITIONAL_LDFLAGS += -fsanitize=address
 # ASan runtime has to be loaded first or its interceptors are never installed.
 ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-x86_64.so)
 # Leaks are not what is being looked for here, and a test bundle reports plenty.
-SANITIZE_ENV := LD_PRELOAD="$(ASAN_LIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1
+# handle_abort=1 so the SIGABRT the timeout below sends is reported by ASan
+# with a symbolized backtrace, instead of the process simply disappearing.
+SANITIZE_ENV := LD_PRELOAD="$(ASAN_LIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:handle_abort=1
 endif
 
 include $(GNUSTEP_MAKEFILES)/bundle.make
@@ -61,7 +63,14 @@ include $(GNUSTEP_MAKEFILES)/bundle.make
 XCTEST ?= xctest
 
 .PHONY: run-tests
+# Bounded. A test that opens a modal panel can wait for an event that never
+# arrives on a machine with no window manager, and an unbounded hang costs the
+# whole job's timeout and says nothing about where it stopped. TEST_TIMEOUT
+# seconds later the run is aborted, and with SANITIZE=1 that abort comes back
+# as a backtrace naming the call that was waiting.
+TEST_TIMEOUT ?= 600
+
 run-tests: all
 	$(SANITIZE_ENV) \
 	LD_LIBRARY_PATH="$(CURDIR)/../PicaKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
-	  $(XCTEST) $(BUNDLE_NAME).bundle
+	  timeout -s ABRT $(TEST_TIMEOUT) $(XCTEST) $(BUNDLE_NAME).bundle
