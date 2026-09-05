@@ -27,9 +27,12 @@
 // visible chrome, the tab view holds the panes. Hosts are empty views the
 // later stages fill; they carry a label so an empty pane says what belongs
 // there rather than looking broken.
-@property (nonatomic, strong) IBOutlet NSView *leftTabBar;
+@property (nonatomic, strong) IBOutlet NSView *leftTabBar, *rightTabBar;
 @property (nonatomic, strong) IBOutlet NSSegmentedControl *centerMode;
 @property (nonatomic, strong) IBOutlet NSTabView *leftTabView, *centerTabView, *rightTabView;
+// Inside the right pane's Attributes tab: the element inspector or the dataset
+// field inspector, whichever the selection calls for.
+@property (nonatomic, strong) IBOutlet NSTabView *attributeTabView;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
@@ -254,14 +257,18 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
 }
 
 - (void)buildTabBars {
-  // Only the left pane is a chooser: the navigators are two things the user
-  // picks between. The right pane is not -- the inspector follows the
-  // selection, the way the Core Data builder's does -- and the centre offers
-  // Preview or Source, with the dataset view arriving because a dataset was
+  // Both side panes are choosers. The centre is not: Preview or Source is a
+  // segmented control, and the dataset pane arrives because a dataset was
   // selected rather than because a tab was clicked.
   RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, @[
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
+  ]);
+  // Report first -- page size and margins, which belong to the document rather
+  // than to anything in it -- then the attributes of whatever is selected.
+  RDLFillTabBar(_rightTabBar, self, @selector(rightTabChanged:), 1, @[
+    @[ @"R", @"Report", @0.47, @0.53, @0.64 ],
+    @[ @"A", @"Attributes", @0.36, @0.49, @0.72 ],
   ]);
 }
 
@@ -278,14 +285,17 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
   [_centerTabView selectTabViewItemAtIndex:2];
 }
 
-// Which inspector is showing is a function of what is selected, not a tab.
-// An element selected means the element inspector; nothing selected means the
-// report itself, which is what the user is editing when they are not editing
-// anything smaller. The dataset field inspector arrives with the dataset
-// navigator that selects one.
+- (void)rightTabChanged:(id)sender {
+  RDLSelectTab(sender, _rightTabView);
+}
+
+// The Attributes tab is the one that swaps. Which inspector it holds is a
+// function of what is selected, not something the user picks: an element
+// selected means the element inspector, a dataset field means the field
+// inspector. The tab itself stays where the user left it.
 - (void)syncInspectorToSelection {
-  BOOL hasItem = [_context selectedItem] != nil;
-  [_rightTabView selectTabViewItemAtIndex:hasItem ? 0 : 1];
+  BOOL editingItem = [_context selectedItem] != nil;
+  [_attributeTabView selectTabViewItemAtIndex:editingItem ? 0 : 1];
 }
 
 - (void)leftTabChanged:(id)sender {

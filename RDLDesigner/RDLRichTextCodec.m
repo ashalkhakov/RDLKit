@@ -2,15 +2,6 @@
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 
-static NSString *RDLHexFromColor(NSColor *color) {
-  NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
-  if (rgb == nil)
-    return nil;
-  return [NSString stringWithFormat:@"#%02x%02x%02x", (int)round([rgb redComponent] * 255),
-                                    (int)round([rgb greenComponent] * 255),
-                                    (int)round([rgb blueComponent] * 255)];
-}
-
 static BOOL RDLStyleIsEmpty(RDLStyle *s) {
   return ![s.fontFamily length] && s.fontSize == nil && s.fontWeight == RDLFontWeightUnspecified &&
          s.fontStyle == RDLFontStyleUnspecified && ![s.color length] && s.textDecoration == RDLTextDecorationUnspecified &&

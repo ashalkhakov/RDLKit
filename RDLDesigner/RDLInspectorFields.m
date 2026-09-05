@@ -1,6 +1,7 @@
 #import "RDLInspectorFields.h"
 #import "RDLEditor.h"
 #import "RDLKit.h"
+#import "RDLCompatibility.h"
 
 @implementation RDLFieldBinding
 @end
@@ -113,6 +114,15 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
           [pop selectItemAtIndex:0];
         break;
       }
+      case RDLFieldKindColor: {
+        NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
+        // A transparent background is not a colour the well can show, so it
+        // shows the paper it would let through.
+        [(NSColorWell *)b.control setColor:RDLColorIsTransparent(hex)
+                                               ? [NSColor whiteColor]
+                                               : RDLColorFromHex(hex)];
+        break;
+      }
       case RDLFieldKindPopUpIndex: {
         NSPopUpButton *pop = (NSPopUpButton *)b.control;
         NSUInteger index = [b.values indexOfObject:(value ?: [NSNull null])];
@@ -155,6 +165,9 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       case RDLFieldKindPopUpTitle:
         value = [(NSPopUpButton *)b.control titleOfSelectedItem];
+        break;
+      case RDLFieldKindColor:
+        value = RDLHexFromColor([(NSColorWell *)b.control color]);
         break;
       case RDLFieldKindPopUpIndex: {
         NSInteger i = [(NSPopUpButton *)b.control indexOfSelectedItem];

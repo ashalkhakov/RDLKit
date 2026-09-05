@@ -2233,6 +2233,51 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // where hand-editing goes wrong. A load test would need the canvas, inspector,
 // data view and outline source in this bundle; they belong here eventually,
 // with the panes that use them.
+// A colour well is bound to an RDL colour string, which means a conversion in
+// each direction. Both are checked here; the panel the well opens is AppKit's
+// and is not.
+- (void)testInspectorColorBinding {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  box.style.color = @"#336699";
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSColorWell *well = [[NSColorWell alloc] initWithFrame:NSMakeRect(0, 0, 44, 22)];
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:well keyPath:@"style.color" scope:RDLFieldScopeItem kind:RDLFieldKindColor];
+
+  // Model -> well.
+  [bindings fillFromItem:box band:nil report:report];
+  NSString *bad = RDLColorMismatch([well color], RDLColorFromHex(@"#336699"), @"the colour well");
+  if (bad)
+    XCTFail(@"%@", bad);
+
+  // Well -> model, through the editor, so it is undoable like any other edit.
+  [well setColor:[NSColor colorWithCalibratedRed:1.0 green:0.5 blue:0.0 alpha:1.0]];
+  if (![bindings applyControl:well editor:ctx.editor item:box bandKey:nil])
+    XCTFail(@"%@", @"the well is bound but the binding did not claim it");
+  if (![box.style.color isEqualToString:@"#ff8000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the style reads %@, expected #ff8000",
+                                              box.style.color]);
+
+  // A transparent background has no colour to show, so the well shows the
+  // paper it would let through rather than black -- which is what scanning
+  // "Transparent" as hex would give.
+  box.style.backgroundColor = @"Transparent";
+  NSColorWell *bg = [[NSColorWell alloc] initWithFrame:NSMakeRect(0, 0, 44, 22)];
+  [bindings bind:bg keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
+            kind:RDLFieldKindColor];
+  [bindings fillFromItem:box band:nil report:report];
+  bad = RDLColorMismatch([bg color], [NSColor whiteColor], @"the background well");
+  if (bad)
+    XCTFail(@"%@", bad);
+}
+
 - (void)testDesignerWindowShell {
   NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
   NSString *xibPath = [dir stringByAppendingPathComponent:@"RDLDesigner/RDLDesignerWindow.xib"];
@@ -2275,21 +2320,29 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   // Each pane is a DMTabBar over a tab view. The bar takes its items in code,
   // so the XIB only has to supply the three hosts; what it must not do is
   // leave one out, since an absent host means a pane nothing can reach.
-  // Only the left pane is a chooser. The right one follows the selection and
-  // the centre offers Preview or Source, so a tab bar over either would be
-  // offering a choice that is not the user's to make.
-  if ([xib rangeOfString:@"id=\"leftTabBar\" customClass=\"DMTabBar\""].location == NSNotFound)
-    XCTFail(@"%@", @"leftTabBar is missing or is not a DMTabBar");
-  if ([xib rangeOfString:@"customClass=\"DMTabBar\""].location !=
-      [xib rangeOfString:@"customClass=\"DMTabBar\"" options:NSBackwardsSearch].location)
-    XCTFail(@"%@", @"more than one DMTabBar: only the navigators are chosen by the user");
+  // Both side panes are choosers, so both have a bar; the centre is not, so it
+  // has a Preview/Source control instead. The Attributes tab holds a second,
+  // tabless tab view -- the one that swaps with the selection -- and that must
+  // not acquire a bar of its own.
+  for (NSString *bar in @[ @"leftTabBar", @"rightTabBar" ]) {
+    NSString *decl = [NSString stringWithFormat:@"id=\"%@\" customClass=\"DMTabBar\"", bar];
+    if ([xib rangeOfString:decl].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing or is not a DMTabBar", bar]);
+  }
+  NSUInteger bars = [[xib componentsSeparatedByString:@"customClass=\"DMTabBar\""] count] - 1;
+  if (bars != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu tab bars; the centre pane and the "
+                                              @"attribute swap are not the user's to choose",
+                                              (unsigned long)bars]);
   if ([xib rangeOfString:@"id=\"centerMode\""].location == NSNotFound)
     XCTFail(@"%@", @"the centre pane has no Preview/Source control");
+  if ([xib rangeOfString:@"id=\"attributeTabView\""].location == NSNotFound)
+    XCTFail(@"%@", @"the Attributes tab has nothing to swap between");
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
-  // Left: outline and datasets. Centre: preview, source, dataset. Right:
-  // element, report, dataset field.
-  if (items != 8)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 8 panes across the three tab views, got %lu",
+  // Left: outline, datasets. Centre: preview, source, dataset. Right: report,
+  // attributes -- and inside attributes, element and dataset field.
+  if (items != 9)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 9 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
 }
 

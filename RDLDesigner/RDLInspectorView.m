@@ -8,6 +8,8 @@
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
+#import "RDLRichTextEditor.h"
+#import "RDLTextAttributes.h"
 
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
@@ -15,6 +17,8 @@
 // One declaration per field drives both directions; see RDLInspectorFields.
 @property (nonatomic, strong) RDLFieldBindings *bindings;
 @property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
+@property (nonatomic, strong) IBOutlet NSColorWell *colorWell, *bgColorWell;
+@property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -176,6 +180,8 @@
       placeholder:nil];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
+             kind:RDLFieldKindColor];
   [_bindings bind:_formatField keyPath:@"style.format" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
 
@@ -184,6 +190,8 @@
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
   [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
+  [_bindings bind:_bgColorWell keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindColor];
 
   // Image.
   [_bindings bind:_imageValueField keyPath:@"value" scope:RDLFieldScopeItem
@@ -416,6 +424,72 @@
     }
     return;
   }
+}
+
+#pragma mark - Font and rich text panels
+
+// The font panel is the standard way to choose a family, a size and a weight,
+// and it is one panel rather than three controls that have to agree. The
+// inspector keeps its own font and size fields: a report often specifies a
+// face by name that is not installed here, and typing it has to stay possible.
+- (void)openFontPanel:(id)sender {
+  RDLItem *item = [_context selectedItem];
+  if (item == nil)
+    return;
+  NSFontManager *manager = [NSFontManager sharedFontManager];
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:item.style
+                                              paragraphAlign:RDLTextAlignUnspecified
+                                                       scale:1.0];
+  NSFont *font = attrs[NSFontAttributeName];
+  if (font)
+    [manager setSelectedFont:font isMultiple:NO];
+  [manager setTarget:self];
+  [manager setAction:@selector(changeFont:)];
+  [[manager fontPanel:YES] orderFront:sender];
+}
+
+// Family, size, weight and slant arrive together and are written together, as
+// one undo step: undoing a font choice one property at a time would leave the
+// style in a state the user never chose.
+- (void)changeFont:(id)sender {
+  RDLItem *item = [_context selectedItem];
+  if (item == nil)
+    return;
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:item.style
+                                              paragraphAlign:RDLTextAlignUnspecified
+                                                       scale:1.0];
+  NSFont *current = attrs[NSFontAttributeName];
+  NSFont *chosen = current ? [sender convertFont:current] : [sender selectedFont];
+  if (chosen == nil)
+    return;
+
+  NSFontManager *manager = [NSFontManager sharedFontManager];
+  NSFontTraitMask traits = [manager traitsOfFont:chosen];
+  RDLEditor *editor = _context.editor;
+  [editor beginGroup:@"Font"];
+  [editor setValue:[chosen familyName] forKeyPath:@"style.fontFamily" ofItem:item];
+  [editor setValue:[RDLLength points:[chosen pointSize]]
+        forKeyPath:@"style.fontSize"
+            ofItem:item];
+  [editor setValue:@((traits & NSBoldFontMask) ? RDLFontWeightBold : RDLFontWeightNormal)
+        forKeyPath:@"style.fontWeight"
+            ofItem:item];
+  [editor setValue:@((traits & NSItalicFontMask) ? RDLFontStyleItalic : RDLFontStyleNormal)
+        forKeyPath:@"style.fontStyle"
+            ofItem:item];
+  [editor endGroup];
+  [self reload];
+}
+
+// The value field holds one line; a textbox that carries paragraphs and runs
+// needs the rich-text editor, which is a panel rather than a field.
+- (void)editRichText:(id)sender {
+  RDL_UNUSED(sender);
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTextbox class]])
+    return;
+  if ([RDLRichTextEditor runForTextbox:(RDLTextbox *)item context:_context])
+    [self reload];
 }
 
 @end

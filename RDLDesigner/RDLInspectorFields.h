@@ -32,7 +32,11 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   // NSPopUpButton whose selected title IS the value.
   RDLFieldKindPopUpTitle,
   // NSPopUpButton whose selected index maps into `values`.
-  RDLFieldKindPopUpIndex
+  RDLFieldKindPopUpIndex,
+  // NSColorWell over an RDL colour string. The well opens NSColorPanel, which
+  // is the standard way to pick one; the hex field beside it stays, because a
+  // report's colours are often given rather than chosen.
+  RDLFieldKindColor
 };
 
 @interface RDLFieldBinding : NSObject

@@ -109,6 +109,22 @@ static inline NSColor *RDLColorFromHex(NSString *hex) {
   return RDL_COLOR(r, g, b, 1);
 }
 
+// The inverse of RDLColorFromHex, for controls that hand back a colour. RDL
+// writes colours as #rrggbb, so the colour has to be resolved to RGB first: a
+// well can return one in any space, and a catalog colour has no components at
+// all until it is.
+static inline NSString *RDLHexFromColor(NSColor *color) {
+  NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (rgb == nil)
+    return nil;
+  CGFloat r = 0, g = 0, b = 0, a = 0;
+  [rgb getRed:&r green:&g blue:&b alpha:&a];
+  // Lower case, which is what the rich-text codec wrote when this lived there
+  // as a file-static; RDL does not care, but the fixtures do.
+  return [NSString stringWithFormat:@"#%02x%02x%02x", (unsigned)round(r * 255),
+                                    (unsigned)round(g * 255), (unsigned)round(b * 255)];
+}
+
 static inline CGFloat RDLInchesFromString(NSString *raw) {
   if (raw == nil || [raw length] == 0) {
     return 0;

@@ -18,7 +18,11 @@
                 <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
                 <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
                 <outlet property="chartKindPop" destination="chartKindPop" id="chartKindPopOutlet"/>
+                <outlet property="bgColorWell" destination="bgColorWell" id="bgColorWellOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
+                <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
+                <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
+                <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
                 <outlet property="descField" destination="descField" id="descFieldOutlet"/>
                 <outlet property="docBox" destination="docBox" id="docBoxOutlet"/>
                 <outlet property="docNameField" destination="docNameField" id="docNameFieldOutlet"/>
@@ -423,6 +427,17 @@
                         <outlet property="delegate" destination="-2" id="valueFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Edit this textbox as rich text" id="richTextButton">
+                    <rect key="frame" x="188" y="66" width="62" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Rich…" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="richTextButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editRichText:" target="-2" id="richTextButtonAction"/>
+                    </connections>
+                </button>
                 <textField verticalHuggingPriority="750" id="lbl17">
                     <rect key="frame" x="10" y="70" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -432,7 +447,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="fontField">
-                    <rect key="frame" x="10" y="86" width="240" height="22"/>
+                    <rect key="frame" x="10" y="86" width="172" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="fontFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -444,6 +459,17 @@
                         <outlet property="delegate" destination="-2" id="fontFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Choose the font, size and weight in the font panel" id="fontPanelButton">
+                    <rect key="frame" x="188" y="86" width="62" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Font…" bezelStyle="rounded" controlSize="small" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="fontPanelButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="openFontPanel:" target="-2" id="fontPanelButtonAction"/>
+                    </connections>
+                </button>
                 <textField verticalHuggingPriority="750" id="lbl18">
                     <rect key="frame" x="10" y="114" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -545,6 +571,14 @@
                         <outlet property="delegate" destination="-2" id="colorFieldDelegate"/>
                     </connections>
                 </textField>
+                <colorWell toolTip="Text colour" id="colorWell">
+                    <rect key="frame" x="130" y="218" width="44" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <color key="color" red="0.1" green="0.098" blue="0.086" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="colorWellAction"/>
+                    </connections>
+                </colorWell>
                 <textField id="formatField">
                     <rect key="frame" x="136" y="218" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
@@ -600,7 +634,7 @@
                     </textFieldCell>
                 </textField>
                 <textField id="rectBGField">
-                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <rect key="frame" x="10" y="20" width="180" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rectBGFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -612,6 +646,14 @@
                         <outlet property="delegate" destination="-2" id="rectBGFieldDelegate"/>
                     </connections>
                 </textField>
+                <colorWell toolTip="Background colour" id="bgColorWell">
+                    <rect key="frame" x="196" y="20" width="44" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <color key="color" red="0.1" green="0.098" blue="0.086" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bgColorWellAction"/>
+                    </connections>
+                </colorWell>
             </subviews>
         </customView>
         <customView id="imageBox">
