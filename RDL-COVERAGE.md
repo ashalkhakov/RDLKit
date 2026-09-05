@@ -45,7 +45,7 @@ one of those reports was in fact laying out onto a zero-sized page.
 ## How: upgrade on read
 
 Not one file in the corpus uses the 2010 `Tablix` grammar RDLKit is built
-around, so rather than teach the model a second grammar, [RDLUpgrader](PicaKit/RDLUpgrader.h)
+around, so rather than teach the model a second grammar, [RDLUpgrader](RDLKit/RDLUpgrader.h)
 rewrites the XML tree into the current shape before `RDLParser` reads a model
 out of it — which is what SSRS does when it opens an older report. A report
 that was upgraded says so in `RDLReport.warnings`.
@@ -91,8 +91,8 @@ against.
 | `.../reporting/2005/01/reportdefinition` | 37 |
 | `.../reporting/2003/10/reportdefinition` | 1 |
 
-`PicaItemForElementName` maps `Table` and `List` onto `RDLTablix`, and then
-[RDLParser.m:663](PicaKit/RDLParser.m#L663) reads the 2010 body out of it —
+`RDLItemForElementName` maps `Table` and `List` onto `RDLTablix`, and then
+[RDLParser.m:663](RDLKit/RDLParser.m#L663) reads the 2010 body out of it —
 `TablixBody` → `TablixColumns` → `TablixRows` → `TablixCells` → `CellContents`.
 An RDL 2005 `<Table>` has none of those. It has `TableColumns` / `TableRows` /
 `TableCells` / `ReportItems`, wrapped in `Header` / `Details` / `Footer`. Every
@@ -197,7 +197,7 @@ page boundary), `CanShrinkTest`, `ImageSizingTests`, `HtmlTextboxTest`
 problems — the `Fields.Name.Value` dot dialect (fyiReporting's, not RDL's),
 `{PLACEHOLDER}` templating that is not RDL syntax at all, and calls to
 functions this kit has not implemented. Re-run with
-`picagen <file> --check`.
+`rdlgen <file> --check`.
 
 Writing the checker turned up three bugs in our own expression parser, each of
 the same shape: it stopped at the first thing it did not understand and

@@ -53,7 +53,7 @@ right. `gnustep-patch-repros/pdf-print-operation-test.m` demonstrates it and
 decides PASS/FAIL on the page count.
 
 **Applied where.** `.github/scripts/dependencies.sh`, in the libs-gui step, the
-way `gnustep-build/Scripts/build-gnustep.sh` applies its own patches. PicaKit
+way `gnustep-build/Scripts/build-gnustep.sh` applies its own patches. RDLKit
 briefly carried a `#ifdef GNUSTEP` workaround that supplied the missing matrix
 in `RDLPrintView -drawRect:`; it has been removed, because the patch and the
 workaround together would correct the orientation twice.

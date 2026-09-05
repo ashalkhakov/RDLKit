@@ -19,7 +19,7 @@
 #                            so the tree can be moved -- which is precisely
 #                            what mounting an AppImage does.
 #
-# RDLKit needs more of the stack than a Foundation-only project would: PicaKit
+# RDLKit needs more of the stack than a Foundation-only project would: RDLKit
 # draws through AppKit, so libs-gui and a graphics backend are required, and
 # both test bundles are XCTest, so tools-xctest is too. The theme and
 # libs-corebase from that recipe are not built here; nothing in RDLKit uses
@@ -134,7 +134,7 @@ install_libs_gui() {
     # GSPDFPrintOperation overrides -_print with a single-sheet copy of
     # GSEPSPrintOperation's, so PDF output ignores -knowsPageRange: and comes
     # out upside down -- see Patches/gnustep-gui-pdf-print-operation.patch and
-    # the repro beside it. Applied here, not worked around in PicaKit: a
+    # the repro beside it. Applied here, not worked around in RDLKit: a
     # workaround and the patch together would correct it twice.
     git apply "$WORKSPACE_DIR/Patches/gnustep-gui-pdf-print-operation.patch"
     ./configure --prefix="$INSTALL_PATH" || cat config.log

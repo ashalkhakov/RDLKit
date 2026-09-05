@@ -27,12 +27,12 @@ mkdir -p AppDir/usr/local/bin
 # bundles out of the nested prefix path. We ship a command line tool as well as
 # an app, and that migration only handles .app bundles, so both go into the
 # SYSTEM domain instead and arrive in AppDir with the wholesale copy at step 5.
-make -C PicaKit
-make -C PicaKit install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
-make -C PicaGen
-make -C PicaGen install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
-make -C PicaDesigner
-make -C PicaDesigner install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
+make -C RDLKit
+make -C RDLKit install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
+make -C RDLGen
+make -C RDLGen install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
+make -C RDLDesigner
+make -C RDLDesigner install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM
 
 if [ -d "${LOCAL_PREFIX}/System/Library/Themes" ]; then
 mkdir -p AppDir/usr/System/Library/Themes
@@ -105,4 +105,4 @@ find AppDir -maxdepth 1 -type d ! -name "AppDir" ! -name "usr" -exec rm -rf {} +
 
 echo "AppDir assembled:"
 du -sh AppDir
-find AppDir/usr -maxdepth 4 -name 'Pica.app' -o -maxdepth 4 -name picagen
+find AppDir/usr -maxdepth 4 -name 'RDLDesigner.app' -o -maxdepth 4 -name rdlgen

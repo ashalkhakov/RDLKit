@@ -7,10 +7,10 @@ PBXFileReference, a PBXBuildFile, a group `children` entry and a build-phase
 `files` entry. Doing that by hand for a multi-file refactor is error-prone;
 this does it idempotently.
 
-    python3 .tools/pbxadd.py PicaKit RDLDocument.h RDLDocument.m ...
-    python3 .tools/pbxadd.py Pica PicaCanvasRenderer.h PicaCanvasRenderer.m
-    python3 .tools/pbxadd.py Pica --resource PicaWelcomeWindow.xib
-    python3 .tools/pbxadd.py PicaDesignerTests --shared-ref PicaTablixEditor.xib
+    python3 .tools/pbxadd.py RDLKit RDLDocument.h RDLDocument.m ...
+    python3 .tools/pbxadd.py RDLDesigner RDLCanvasRenderer.h RDLCanvasRenderer.m
+    python3 .tools/pbxadd.py RDLDesigner --resource RDLWelcomeWindow.xib
+    python3 .tools/pbxadd.py RDLDesignerTests --shared-ref RDLTablixEditor.xib
 
 --shared-ref reuses the PBXFileReference another target already has for that
 basename, instead of adding one to this target's group. Use it when a file that
@@ -24,13 +24,13 @@ PROJ = 'RDLKit.xcodeproj/project.pbxproj'
 
 TARGETS = {
     # name: (group, sources phase, headers phase or None, resources phase or None)
-    'PicaKit': ('45316B45CB436116EC434408', 'BBD96B25C463E4F2194995B6',
+    'RDLKit': ('45316B45CB436116EC434408', 'BBD96B25C463E4F2194995B6',
                 '7904DBFDD0ABC4FECE1D6E19', None),
-    'Pica':    ('367BDD79C0EB7824B717F2C6', '9A62AC01A2B00BE761FA3E90',
+    'RDLDesigner':    ('367BDD79C0EB7824B717F2C6', '9A62AC01A2B00BE761FA3E90',
                 None, 'F0BE7C60351F60A2424990B8'),
     # The checks drive the tablix panel, so its XIB has to be in the test
-    # bundle as well: -bundleForClass: resolves there, not to Pica.app.
-    'PicaDesignerTests': ('9D4444B8635515926096826D', 'A38464B071A1A354E92781FB',
+    # bundle as well: -bundleForClass: resolves there, not to RDLDesigner.app.
+    'RDLDesignerTests': ('9D4444B8635515926096826D', 'A38464B071A1A354E92781FB',
                           None, '0C7A1FD3B4E5A6C7D8E9F001'),
 }
 

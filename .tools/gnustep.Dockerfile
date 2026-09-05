@@ -8,8 +8,8 @@
 #
 # After that the image is cached and running the suites is quick:
 #
-#   .tools/gnustep.sh make -C PicaKitTests run-tests
-#   .tools/gnustep.sh make -C PicaDesignerTests run-tests
+#   .tools/gnustep.sh make -C RDLKitTests run-tests
+#   .tools/gnustep.sh make -C RDLDesignerTests run-tests
 #
 # The stack is the same one the workflow builds, from the same script, so what
 # fails here fails there.

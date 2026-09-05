@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-  name: "PicaKit",
+  name: "RDLKit",
   platforms: [.macOS(.v12)],
   products: [
-    .library(name: "PicaKit", targets: ["PicaKit"]),
+    .library(name: "RDLKit", targets: ["RDLKit"]),
   ],
   targets: [
     .target(
-      name: "PicaKit",
-      path: "PicaKit",
+      name: "RDLKit",
+      path: "RDLKit",
       exclude: ["GNUmakefile", "README.md"],
       publicHeadersPath: ".",
       linkerSettings: [
@@ -19,9 +19,9 @@ let package = Package(
       ]
     ),
     .testTarget(
-      name: "PicaKitTests",
-      dependencies: ["PicaKit"],
-      path: "PicaKitTests",
+      name: "RDLKitTests",
+      dependencies: ["RDLKit"],
+      path: "RDLKitTests",
       exclude: ["README.md", "Info.plist"],
       cSettings: [
         .headerSearchPath("."),

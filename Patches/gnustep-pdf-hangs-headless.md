@@ -7,14 +7,14 @@
 printed is GNUstep's own notice:
 
 ```
-picagen[…] Creating a default printer since no printer has been set in the
+rdlgen[…] Creating a default printer since no printer has been set in the
 user defaults (under the GSLPRPrinters key).
 ```
 
 and the process then sits until it is killed. Bounded at 120 seconds in CI:
 
 ```
-Error: timed out after 120s: xvfb-run -a PicaGen/obj/picagen … -o /tmp/out.pdf
+Error: timed out after 120s: xvfb-run -a RDLGen/obj/rdlgen … -o /tmp/out.pdf
 Error: Process completed with exit code 124.
 ```
 

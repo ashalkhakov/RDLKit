@@ -29,31 +29,31 @@ jobs:
 
       # Built first and on its own, so a compile error in the library is
       # reported as that rather than as a test failure.
-      - name: Build PicaKit
+      - name: Build RDLKit
         run: |
-          xcodebuild -project RDLKit.xcodeproj -scheme PicaKit \
+          xcodebuild -project RDLKit.xcodeproj -scheme RDLKit \
             -destination 'platform=macOS' -configuration Debug build
 
       - name: Build the designer and the CLI
         run: |
-          for scheme in Pica PicaGen; do
+          for scheme in RDLDesigner RDLGen; do
             xcodebuild -project RDLKit.xcodeproj -scheme "$scheme" \
               -destination 'platform=macOS' -configuration Debug build
           done
 
-      - name: Test PicaKit
+      - name: Test RDLKit
         run: |
-          xcodebuild -project RDLKit.xcodeproj -scheme PicaKitTests \
+          xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests \
             -destination 'platform=macOS' \
-            -resultBundlePath "$RUNNER_TEMP/PicaKitTests.xcresult" test
+            -resultBundlePath "$RUNNER_TEMP/RDLKitTests.xcresult" test
 
       # The designer's cases open real modal panels, so they need a session
       # that can make windows. A GitHub macOS runner has one.
-      - name: Test PicaDesigner
+      - name: Test RDLDesigner
         run: |
-          xcodebuild -project RDLKit.xcodeproj -scheme PicaDesignerTests \
+          xcodebuild -project RDLKit.xcodeproj -scheme RDLDesignerTests \
             -destination 'platform=macOS' \
-            -resultBundlePath "$RUNNER_TEMP/PicaDesignerTests.xcresult" test
+            -resultBundlePath "$RUNNER_TEMP/RDLDesignerTests.xcresult" test
 
       # 86 report definitions written by somebody else. The count is asserted
       # rather than merely printed, so a regression that quietly starts
@@ -68,39 +68,39 @@ jobs:
           [ "${ok:-0}" -ge 79 ] \
             || { echo "::error::corpus coverage fell to ${ok} of 86 (was 79)"; exit 1; }
 
-      - name: Smoke-test picagen
+      - name: Smoke-test rdlgen
         run: |
-          built=$(xcodebuild -project RDLKit.xcodeproj -scheme PicaGen \
+          built=$(xcodebuild -project RDLKit.xcodeproj -scheme RDLGen \
                     -destination 'platform=macOS' -showBuildSettings 2>/dev/null \
                   | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
           sample=Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl
-          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" --check
-          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" --contract > /dev/null
-          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" -f html -o /tmp/out.html
-          DYLD_FRAMEWORK_PATH="$built" "$built/picagen" "$sample" -o /tmp/out.pdf
+          DYLD_FRAMEWORK_PATH="$built" "$built/rdlgen" "$sample" --check
+          DYLD_FRAMEWORK_PATH="$built" "$built/rdlgen" "$sample" --contract > /dev/null
+          DYLD_FRAMEWORK_PATH="$built" "$built/rdlgen" "$sample" -f html -o /tmp/out.html
+          DYLD_FRAMEWORK_PATH="$built" "$built/rdlgen" "$sample" -o /tmp/out.pdf
           test -s /tmp/out.html && test -s /tmp/out.pdf
 
       # Unsigned: signing needs the Developer ID secrets and belongs to a
       # release. These are for trying a build, and say so in the name.
       - name: Package
         run: |
-          built=$(xcodebuild -project RDLKit.xcodeproj -scheme Pica \
+          built=$(xcodebuild -project RDLKit.xcodeproj -scheme RDLDesigner \
                     -destination 'platform=macOS' -showBuildSettings 2>/dev/null \
                   | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $2; exit}')
-          # picagen links @rpath/PicaKit.framework, so the executable on its own
+          # rdlgen links @rpath/RDLKit.framework, so the executable on its own
           # will not start. Ship it beside the framework it needs.
-          rm -rf "$RUNNER_TEMP/picagen" && mkdir -p "$RUNNER_TEMP/picagen"
-          cp "$built/picagen" "$RUNNER_TEMP/picagen/"
-          cp -R "$built/PicaKit.framework" "$RUNNER_TEMP/picagen/"
-          ditto -c -k --keepParent "$built/Pica.app" "Pica-macOS-unsigned.zip"
-          ditto -c -k --keepParent "$RUNNER_TEMP/picagen" "picagen-macOS-unsigned.zip"
+          rm -rf "$RUNNER_TEMP/rdlgen" && mkdir -p "$RUNNER_TEMP/rdlgen"
+          cp "$built/rdlgen" "$RUNNER_TEMP/rdlgen/"
+          cp -R "$built/RDLKit.framework" "$RUNNER_TEMP/rdlgen/"
+          ditto -c -k --keepParent "$built/RDLDesigner.app" "RDLDesigner-macOS-unsigned.zip"
+          ditto -c -k --keepParent "$RUNNER_TEMP/rdlgen" "rdlgen-macOS-unsigned.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: RDLKit-macOS-${{ github.sha }}
           path: |
-            Pica-macOS-unsigned.zip
-            picagen-macOS-unsigned.zip
+            RDLDesigner-macOS-unsigned.zip
+            rdlgen-macOS-unsigned.zip
           retention-days: 14
 
       - name: Upload test results
@@ -145,8 +145,8 @@ jobs:
       - name: No macOS-only imports
         run: |
           if grep -rn "CoreGraphics\|<Cocoa/Cocoa.h>\|QuartzCore" \
-               --include="*.h" --include="*.m" PicaKit PicaDesigner PicaGen \
-               PicaKitTests PicaDesignerTests; then
+               --include="*.h" --include="*.m" RDLKit RDLDesigner RDLGen \
+               RDLKitTests RDLDesignerTests; then
             echo "::error::a macOS-only framework is imported; GNUstep has no such header"
             exit 1
           fi
@@ -180,10 +180,10 @@ jobs:
       # Restored and saved as two separate steps rather than with the combined
       # action, because the combined one saves at the end of the job -- by
       # which time packaging has run "make install
-      # GNUSTEP_INSTALLATION_DOMAIN=SYSTEM" and put PicaKit's own headers into
+      # GNUSTEP_INSTALLATION_DOMAIN=SYSTEM" and put RDLKit's own headers into
       # the prefix. The next run then restores a prefix containing them, and
       # every declaration is seen twice: once from
-      # System/Library/Headers/PicaKit and once from ../PicaKit. Saving here
+      # System/Library/Headers/RDLKit and once from ../RDLKit. Saving here
       # captures the stack before anything of ours is installed into it.
       - name: Restore GNUstep
         id: gnustep-cache
@@ -203,23 +203,23 @@ jobs:
           path: ${{ env.INSTALL_PATH }}
           key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
 
-      - name: Build PicaKit
+      - name: Build RDLKit
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
-          make -C PicaKit
+          make -C RDLKit
 
       - name: Build the CLI and the designer
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
-          make -C PicaGen
-          make -C PicaDesigner
+          make -C RDLGen
+          make -C RDLDesigner
 
       # Both suites are ordinary XCTest, which GNUstep supplies through
       # tools-xctest. `make run-tests` builds the bundle and runs it under
       # xctest. SANITIZE=1 while the port is being brought up: a segfault or a
       # heap overflow then arrives as a symbolized backtrace naming the write,
       # rather than as one line saying the process died.
-      - name: Test PicaKit
+      - name: Test RDLKit
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           # Where gnustep-make installed the backend, and where libs-base
@@ -229,20 +229,20 @@ jobs:
           echo "system lib:   $(gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARY)"
           ls -la "$INSTALL_PATH/etc" 2>&1 | head
           find "$INSTALL_PATH" -maxdepth 6 -name 'libgnustep-back*' -o -maxdepth 6 -name 'GNUstep.conf'
-          xvfb-run -a make -C PicaKitTests run-tests SANITIZE=1
+          xvfb-run -a make -C RDLKitTests run-tests SANITIZE=1
 
-      - name: Test PicaDesigner
+      - name: Test RDLDesigner
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
-          xvfb-run -a make -C PicaDesignerTests run-tests SANITIZE=1
+          xvfb-run -a make -C RDLDesignerTests run-tests SANITIZE=1
 
-      - name: Smoke-test picagen
+      - name: Smoke-test rdlgen
         run: |
           . $INSTALL_PATH/System/Library/Makefiles/GNUstep.sh
           # Find what was actually built rather than assuming gnustep-make's
           # object directory is called "obj": it varies with the library combo.
-          lib=$(find PicaKit -name 'libPicaKit*' -print -quit)
-          tool=$(find PicaGen -name picagen -type f -print -quit)
+          lib=$(find RDLKit -name 'libRDLKit*' -print -quit)
+          tool=$(find RDLGen -name rdlgen -type f -print -quit)
           echo "library: $lib"
           echo "tool:    $tool"
           export LD_LIBRARY_PATH="$(dirname "$lib"):$LD_LIBRARY_PATH"
@@ -288,7 +288,7 @@ jobs:
         run: |
           image=$(ls RDLKit-Linux-*.AppImage)
           chmod +x "$image"
-          timeout 120 ./"$image" picagen \
+          timeout 120 ./"$image" rdlgen \
             Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl --check
 
       - uses: actions/upload-artifact@v4

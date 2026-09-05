@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run a command inside the GNUstep image, with this checkout mounted.
 #
-#   .tools/gnustep.sh make -C PicaKitTests run-tests
+#   .tools/gnustep.sh make -C RDLKitTests run-tests
 #
 # The image is not on any registry -- it is built locally from
 # gnustep.Dockerfile, which compiles the whole GNUstep stack from source and

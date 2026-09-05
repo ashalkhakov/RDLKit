@@ -4,7 +4,7 @@
 # decides where they land.
 set -euo pipefail
 appdir=${1:-AppDir}
-for name in Pica picagen; do
+for name in RDLDesigner rdlgen; do
   find "$appdir" -type f -name "$name" -perm -111 -exec file {} \; 2>/dev/null \
     | awk -F: '/ELF/{print $1; exit}'
 done
