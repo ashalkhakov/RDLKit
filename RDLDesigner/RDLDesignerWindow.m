@@ -12,6 +12,7 @@
 #import "RDLTabBadge.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
+#import "RDLPageGeometry.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
@@ -31,6 +32,7 @@
 // there rather than looking broken.
 @property (nonatomic, strong) IBOutlet NSView *leftTabBar, *rightTabBar;
 @property (nonatomic, strong) IBOutlet NSSegmentedControl *centerMode;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *zoomPop;
 @property (nonatomic, strong) IBOutlet NSTabView *leftTabView, *centerTabView, *rightTabView;
 // Inside the right pane's Attributes tab: the element inspector or the dataset
 // field inspector, whichever the selection calls for.
@@ -101,6 +103,10 @@
                name:RDLDocumentDidChangeNotification
              object:context.document];
     [nc addObserver:self
+           selector:@selector(viewStateDidChange:)
+               name:RDLViewStateDidChangeNotification
+             object:context];
+    [nc addObserver:self
            selector:@selector(selectionDidChange:)
                name:RDLSelectionDidChangeNotification
              object:context.selection];
@@ -140,6 +146,13 @@
     [self updateWindowTitle];
   // The panes read the report itself, so they follow any change to it.
   [self reloadPanes];
+}
+
+// Zoom is view state, not a document change; it arrives on its own notice.
+- (void)viewStateDidChange:(NSNotification *)note {
+  RDL_UNUSED(note);
+  [self syncZoomControl];
+  [self updateRulers];
 }
 
 - (void)selectionDidChange:(NSNotification *)note {
@@ -290,7 +303,69 @@ static void RDLFillHost(NSView *host, NSView *view) {
   [host addSubview:view];
 }
 
+// The zoom the popup's titles name. Parsed from the title rather than kept in a
+// parallel array: the two would drift, and the title is already the number.
+static CGFloat RDLZoomFromTitle(NSString *title) {
+  return [[title stringByReplacingOccurrencesOfString:@"%" withString:@""] doubleValue] / 100.0;
+}
+
+- (void)zoomChanged:(id)sender {
+  RDL_UNUSED(sender);
+  CGFloat zoom = RDLZoomFromTitle([_zoomPop titleOfSelectedItem]);
+  if (zoom > 0)
+    _context.zoom = zoom;
+  [self updateRulers];
+}
+
+// The popup follows the context, so zooming from the menu or the keyboard
+// shows there too. The nearest listed zoom wins when the context holds one the
+// popup does not offer.
+- (void)syncZoomControl {
+  CGFloat zoom = _context.zoom;
+  NSInteger best = -1;
+  CGFloat closest = CGFLOAT_MAX;
+  for (NSInteger i = 0; i < [_zoomPop numberOfItems]; i++) {
+    CGFloat candidate = RDLZoomFromTitle([[_zoomPop itemAtIndex:i] title]);
+    if (fabs(candidate - zoom) < closest) {
+      closest = fabs(candidate - zoom);
+      best = i;
+    }
+  }
+  if (best >= 0)
+    [_zoomPop selectItemAtIndex:best];
+}
+
+// Rulers come from NSScrollView, which both platforms implement, rather than
+// being drawn here. The unit is the report's own -- inches -- and it has to be
+// re-registered per zoom, because a ruler measures the document view's
+// coordinates and one inch of paper is 72 points times the zoom. Zero is the
+// paper's top-left, not the view's, so the numbers are the ones on the page.
+- (void)updateRulers {
+  CGFloat zoom = _context.zoom > 0 ? _context.zoom : 1.0;
+  NSString *unit = [NSString stringWithFormat:@"RDLInches@%.2f", zoom];
+  [NSRulerView registerUnitWithName:unit
+                       abbreviation:@"in"
+       unitToPointsConversionFactor:72.0 * zoom
+                        stepUpCycle:@[ @2 ]
+                      stepDownCycle:@[ @0.5, @0.5 ]];
+  NSPoint paper = [RDLPageGeometry defaultPaperOrigin];
+  for (NSRulerView *ruler in @[ [_canvasScroll horizontalRulerView] ?: (id)[NSNull null],
+                                [_canvasScroll verticalRulerView] ?: (id)[NSNull null] ]) {
+    if (![ruler isKindOfClass:[NSRulerView class]])
+      continue;
+    [ruler setClientView:_canvas];
+    [ruler setMeasurementUnits:unit];
+    [ruler setOriginOffset:[ruler orientation] == NSHorizontalRuler ? paper.x : paper.y];
+  }
+}
+
 - (void)buildPanes {
+  [_canvasScroll setHasHorizontalRuler:YES];
+  [_canvasScroll setHasVerticalRuler:YES];
+  [_canvasScroll setRulersVisible:YES];
+  [self updateRulers];
+  [self syncZoomControl];
+
   // The report's own inspector: the same view the Attributes tab uses, told to
   // stay on the report rather than follow the selection.
   _reportInspector = [[RDLInspectorView alloc] initWithFrame:[_reportInspectorHost bounds]

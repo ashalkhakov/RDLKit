@@ -12,6 +12,7 @@
                 <outlet property="canvasScroll" destination="canvasScroll" id="canvasScrollOutlet"/>
                 <outlet property="centerTabView" destination="centerTabView" id="centerTabViewOutlet"/>
                 <outlet property="centerMode" destination="centerMode" id="centerModeOutlet"/>
+                <outlet property="zoomPop" destination="zoomPop" id="zoomPopOutlet"/>
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
@@ -189,6 +190,25 @@
                                         </segmentedCell>
                                         <connections><action selector="centerModeChanged:" target="-2" id="centerModeAction"/></connections>
                                     </segmentedControl>
+                                    <popUpButton toolTip="Zoom" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="zoomPop">
+                                        <rect key="frame" x="176" y="710" width="86" height="22"/>
+                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                        <popUpButtonCell key="cell" type="push" title="100%" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" pullsDown="NO" selectedItem="zoom100" id="zoomPopCell">
+                                            <behavior key="behavior" lightByContents="YES"/>
+                                            <font key="font" metaFont="smallSystem"/>
+                                            <menu key="menu" title="OtherViews" id="zoomMenu">
+                                                <items>
+                                                    <menuItem title="50%" id="zoom50"/>
+                                                    <menuItem title="75%" id="zoom75"/>
+                                                    <menuItem title="100%" state="on" id="zoom100"/>
+                                                    <menuItem title="125%" id="zoom125"/>
+                                                    <menuItem title="150%" id="zoom150"/>
+                                                    <menuItem title="200%" id="zoom200"/>
+                                                </items>
+                                            </menu>
+                                        </popUpButtonCell>
+                                        <connections><action selector="zoomChanged:" target="-2" id="zoomPopAction"/></connections>
+                                    </popUpButton>
                                     <tabView fixedFrame="YES" type="noTabsNoBorder" translatesAutoresizingMaskIntoConstraints="NO" id="centerTabView">
                                         <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

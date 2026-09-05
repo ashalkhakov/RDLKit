@@ -2265,6 +2265,44 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // A font size that is computed. The literal side is an RDLLength, so this is a
 // separate kind from the text one: writing the string "10pt" into fontSize
 // would put the wrong type in the model.
+// The zoom control and the rulers. Both read the context rather than keeping
+// their own copy of the zoom, so zooming from the menu has to move the popup
+// and re-measure the rulers -- which is the part that silently would not.
+- (void)testPreviewZoomAndRulers {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"RDLDesignerWindow.xib did not load");
+    return;
+  }
+  NSScrollView *scroll = [wc valueForKey:@"canvasScroll"];
+  NSPopUpButton *zoom = [wc valueForKey:@"zoomPop"];
+  if (![scroll rulersVisible] || [scroll horizontalRulerView] == nil ||
+      [scroll verticalRulerView] == nil)
+    XCTFail(@"%@", @"the preview has no rulers");
+
+  // Choosing a zoom in the popup changes the context.
+  [zoom selectItemWithTitle:@"150%"];
+  [wc zoomChanged:zoom];
+  if (fabs(ctx.zoom - 1.5) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the context is at %.2f, not 1.5", ctx.zoom]);
+
+  // ... and zooming elsewhere moves the popup back.
+  [ctx setZoom:1.0];
+  if (![[zoom titleOfSelectedItem] isEqualToString:@"100%"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the popup shows %@ after the context went to 100%%",
+                                              [zoom titleOfSelectedItem]]);
+
+  // An inch on the ruler is an inch on the paper, at whatever zoom: the unit is
+  // re-registered per zoom because a ruler measures the view's coordinates.
+  [ctx setZoom:2.0];
+  NSRulerView *ruler = [scroll horizontalRulerView];
+  NSString *unit = [ruler measurementUnits];
+  if ([unit rangeOfString:@"2.00"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the ruler is measuring in %@ at 200%% zoom", unit]);
+}
+
 - (void)testLengthExpressionBinding {
   RDLReport *report = [RDLSamples blankLetter];
   RDLTextbox *box = nil;

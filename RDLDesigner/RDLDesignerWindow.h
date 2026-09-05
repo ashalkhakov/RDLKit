@@ -14,6 +14,7 @@
 - (void)exportPDF:(id)sender;
 - (void)leftTabChanged:(id)sender;
 - (void)rightTabChanged:(id)sender;
+- (void)zoomChanged:(id)sender;
 - (void)centerModeChanged:(id)sender;
 - (void)addElement:(id)sender;
 - (void)removeElement:(id)sender;
