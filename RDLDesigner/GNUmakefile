@@ -33,6 +33,7 @@ RDLDesigner_OBJC_FILES = \
   RDLDataView.m \
   RDLWelcomeWindow.m \
   RDLExpressionEditor.m \
+  RDLInsertPalette.m \
   RDLExpressionField.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \

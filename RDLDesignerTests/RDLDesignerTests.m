@@ -30,6 +30,8 @@
 #import "RDLRichTextFormatter.h"
 #import "RDLRichTextCodec.h"
 #import "RDLRichTextEditor.h"
+#import "RDLInsertPalette.h"
+#import "RDLCanvasView.h"
 #import "RDLInspectorFields.h"
 #import "RDLPageGeometry.h"
 #import "RDLRichTextCodec.h"
@@ -2289,6 +2291,80 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // way an xf:output sits among the text in XForms -- not the text of the
 // expression pasted in. The codec has to carry that both ways, and the editor
 // has to show it as one thing.
+// The quick-insert palette: what it offers, and that dropping one of its
+// bindings on the canvas makes a textbox already bound to it. The drag itself
+// is AppKit's; what the palette puts on the pasteboard and what the canvas does
+// with it are ours.
+- (void)testInsertPaletteBinding {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInsertPalette *palette =
+      [[RDLInsertPalette alloc] initWithFrame:NSMakeRect(0, 0, 220, 400) context:ctx];
+
+  // Parameters, each dataset's fields, and the globals -- with headers between
+  // them, which are not draggable because there is nothing to bind to a name.
+  NSMutableSet *expressions = [NSMutableSet set];
+  BOOL sawHeader = NO;
+  for (NSDictionary *row in palette.rows) {
+    if (row[@"expression"] == nil) {
+      sawHeader = YES;
+      continue;
+    }
+    [expressions addObject:row[@"expression"]];
+  }
+  if (!sawHeader)
+    XCTFail(@"%@", @"the palette should group what it offers");
+  BOOL sawField = NO, sawParameter = NO, sawGlobal = NO;
+  for (NSString *e in expressions) {
+    sawField |= [e hasPrefix:@"=Fields!"];
+    sawParameter |= [e hasPrefix:@"=Parameters!"];
+    sawGlobal |= [e hasPrefix:@"=Globals!"];
+  }
+  if (!sawField || !sawParameter || !sawGlobal)
+    XCTFail(@"%@", [NSString stringWithFormat:@"fields %d, parameters %d, globals %d",
+                                              sawField, sawParameter, sawGlobal]);
+
+  // Dropping on the body makes a textbox there, bound, named after the field,
+  // and selected so the inspector is already showing it.
+  RDLCanvasView *canvas =
+      [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  RDLPageGeometry *geometry = [canvas geometry];
+  RDLBandFrame *body = nil;
+  for (RDLBandFrame *f in geometry.bandFrames)
+    if ([f.bandKey isEqualToString:@"body"])
+      body = f;
+  if (body == nil) {
+    XCTFail(@"%@", @"the report has no body band");
+    return;
+  }
+  NSUInteger before = [body.band.items count];
+  NSPoint drop = NSMakePoint(NSMinX(body.frame) + 72, NSMinY(body.frame) + 36);
+  if (![canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
+                   atPoint:drop]) {
+    XCTFail(@"%@", @"the canvas refused a drop inside the body");
+    return;
+  }
+  if ([body.band.items count] != before + 1) {
+    XCTFail(@"%@", @"nothing was inserted");
+    return;
+  }
+  RDLTextbox *made = (RDLTextbox *)[body.band.items lastObject];
+  if (![made.value isEqualToString:@"=Fields!Amount.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the textbox reads %@", made.value]);
+  if ([made.name rangeOfString:@"Amount"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"it is named %@", made.name]);
+  if ([ctx selectedItem] != made)
+    XCTFail(@"%@", @"what was just dropped should be selected");
+  // An inch in, half an inch down, at zoom 1 -- snapped to the grid.
+  if (made.left <= 0 || made.top <= 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"it landed at %.2f, %.2f", made.left, made.top]);
+
+  // Dropping outside every band is refused rather than guessed at.
+  if ([canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
+                  atPoint:NSMakePoint(2, 2)])
+    XCTFail(@"%@", @"a drop outside the bands should be refused");
+}
+
 - (void)testRichTextExpressionRuns {
   RDLTextbox *box = [[RDLTextbox alloc] init];
   box.name = @"Greeting";
@@ -2857,8 +2933,11 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
     XCTFail(@"%@", @"the tab bars did not come out of the XIB as DMTabBars");
     return;
   }
-  if ([[leftBar tabBarItems] count] != 2 || [[rightBar tabBarItems] count] != 2)
-    XCTFail(@"%@", @"the bars were not given their items");
+  // Outline, Datasets, Insert on the left; Report and Attributes on the right.
+  if ([[leftBar tabBarItems] count] != 3 || [[rightBar tabBarItems] count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the bars hold %lu and %lu items",
+                                              (unsigned long)[[leftBar tabBarItems] count],
+                                              (unsigned long)[[rightBar tabBarItems] count]]);
 
   // Datasets, then back to Outline. The bar is the sender, as DMTabBar sends it.
   leftBar.selectedIndex = 1;
@@ -3050,10 +3129,10 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   if ([xib rangeOfString:@"id=\"attributeTabView\""].location == NSNotFound)
     XCTFail(@"%@", @"the Attributes tab has nothing to swap between");
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
-  // Left: outline, datasets. Centre: preview, source, dataset. Right: report,
-  // attributes -- and inside attributes, element and dataset field.
-  if (items != 9)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 9 panes across the four tab views, got %lu",
+  // Left: outline, datasets, insert. Centre: preview, source, dataset. Right:
+  // report, attributes -- and inside attributes, element and dataset field.
+  if (items != 10)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 10 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
 }
 

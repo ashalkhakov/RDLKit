@@ -16,6 +16,7 @@
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
+                <outlet property="paletteHost" destination="paletteHost" id="paletteHostOutlet"/>
                 <outlet property="inspector" destination="inspector" id="inspectorOutlet"/>
                 <outlet property="inspectorScroll" destination="inspectorScroll" id="inspectorScrollOutlet"/>
                 <outlet property="leftTabView" destination="leftTabView" id="leftTabViewOutlet"/>
@@ -166,6 +167,18 @@
                                                                     </textFieldCell>
                                                                 </textField>
                                                             </subviews>
+                                                        </customView>
+                                                    </subviews>
+                                                </view>
+                                            </tabViewItem>
+                                            <tabViewItem label="Insert" identifier="insert" id="leftInsertItem">
+                                                <view key="view" id="leftInsertItemView">
+                                                    <rect key="frame" x="0.0" y="0.0" width="220" height="708"/>
+                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                    <subviews>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="paletteHost">
+                                                            <rect key="frame" x="0.0" y="0.0" width="220" height="708"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                         </customView>
                                                     </subviews>
                                                 </view>

@@ -12,6 +12,7 @@
 #import "RDLTabBadge.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
+#import "RDLInsertPalette.h"
 #import "RDLPageGeometry.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
@@ -42,8 +43,9 @@
 @property (nonatomic, strong) RDLInspectorView *reportInspector;
 @property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
+@property (nonatomic, strong) RDLInsertPalette *palette;
 @property (nonatomic, strong) NSTextView *sourceText;
-@property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost;
+@property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
 // RDLPreviewWindow.xib
@@ -382,6 +384,9 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
                                                        context:_context];
   RDLFillHost(_datasetInspectorHost, _datasetFields);
 
+  _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
+  RDLFillHost(_paletteHost, _palette);
+
   // The source pane shows what the report would be written as. Read-only for
   // now: editing it means parsing the result and deciding what to do when it
   // does not parse, which is its own piece of work.
@@ -404,6 +409,7 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_reportInspector reload];
   [_datasetNavigator reload];
   [_datasetFields reload];
+  [_palette reload];
   [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
 }
 
@@ -435,6 +441,7 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, @[
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
+    @[ @"I", @"Insert", @0.32, @0.60, @0.53 ],
   ]);
   // Report first -- page size and margins, which belong to the document rather
   // than to anything in it -- then the attributes of whatever is selected.
