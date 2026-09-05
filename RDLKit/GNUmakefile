@@ -25,6 +25,7 @@ RDLKit_OBJC_FILES = \
   RDLDocxReader.m \
   RDLImporter.m \
   RDLExpression.m \
+  RDLExpressionCatalog.m \
   RDLLayoutEngine.m \
   RDLView.m \
   RDLHTMLBackend.m \

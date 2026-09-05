@@ -11,6 +11,7 @@
 #import "RDLDocxReader.h"
 #import "RDLImporter.h"
 #import "RDLExpression.h"
+#import "RDLExpressionCatalog.h"
 #import "RDLLayoutEngine.h"
 #import "RDLView.h"
 #import "RDLBackend.h"

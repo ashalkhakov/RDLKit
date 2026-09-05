@@ -4980,4 +4980,43 @@ static NSString *RDLFixturesDirectory(void) {
   }
 }
 
+// The picker must not offer a function this evaluator does not have. The
+// catalogue was taken from RDLExec's dispatch, and this checks it still
+// matches: the source is read rather than trusted, because the two drift in
+// opposite directions -- a function added to the evaluator is merely absent
+// from the picker, but one removed from it makes the picker lie.
+- (void)testExpressionCatalogMatchesTheEvaluator {
+  NSString *source =
+      [NSString stringWithContentsOfFile:[RDLSourceDirectory()
+                                             stringByAppendingPathComponent:
+                                                 @"../RDLKit/RDLExpression.m"]
+                                encoding:NSUTF8StringEncoding
+                                   error:NULL];
+  if ([source length] == 0) {
+    XCTFail(@"%@", @"cannot read RDLExpression.m");
+    return;
+  }
+  NSArray<RDLFunctionInfo *> *functions = [RDLExpressionCatalog functions];
+  if ([functions count] < 100)
+    XCTFail(@"%@", @"the catalogue is suspiciously short");
+
+  for (RDLFunctionInfo *f in functions) {
+    NSString *dispatch =
+        [NSString stringWithFormat:@"isEqualToString:@\"%@\"", [f.name lowercaseString]];
+    if ([source rangeOfString:dispatch].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue offers %@, which the "
+                                                @"evaluator does not implement",
+                                                f.name]);
+    if ([f.signature length] == 0 || [f.summary length] == 0 || [f.category length] == 0)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing its description", f.name]);
+    if (![[RDLExpressionCatalog categories] containsObject:f.category])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is in category %@, which the picker "
+                                                @"does not show", f.name, f.category]);
+  }
+
+  // Looked up the way a user types it.
+  if ([[RDLExpressionCatalog functionNamed:@"sum"].name isEqualToString:@"Sum"] == NO)
+    XCTFail(@"%@", @"lookup is case sensitive; the evaluator's is not");
+}
+
 @end

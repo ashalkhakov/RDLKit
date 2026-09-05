@@ -65,6 +65,7 @@
 		9C525284C4FE682D677B4E12 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5BC4A9A4E48001E3E80DBB5A /* Cocoa.framework */; };
 		9EE8663597592E060D9B85E5 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 52D939EF9898701ED8C0484C /* main.m */; };
 		9FBD142AFC677F41736F21C6 /* RDLExpression.h in Headers */ = {isa = PBXBuildFile; fileRef = 1B73D39AEAC5AB3BBF0BBAEF /* RDLExpression.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		E4025888B9969228E6FBF445 /* RDLExpressionCatalog.h in Headers */ = {isa = PBXBuildFile; fileRef = 690DD4BAEE75B7692F7F7A2F /* RDLExpressionCatalog.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */ = {isa = PBXBuildFile; fileRef = A69B8AA7A0888F1CCFEA1A09 /* RDLChecker.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */ = {isa = PBXBuildFile; fileRef = 5287B31A4A81269C168B694D /* RDLView.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 388AD53F1764907577168AE8 /* RDLLayoutEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -129,6 +130,7 @@
 		F0908E034271ACFC6E8487F5 /* RDLParser.m in Sources */ = {isa = PBXBuildFile; fileRef = E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */; };
 		F4AD7C00306AE84C038A4131 /* RDLDocxReader.h in Headers */ = {isa = PBXBuildFile; fileRef = 56D1A1CB0C8D9E6BADBF8A27 /* RDLDocxReader.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		F56E72CC18EFFE5521469BD5 /* RDLExpression.m in Sources */ = {isa = PBXBuildFile; fileRef = 7CECB821FFED22DFD87FEE06 /* RDLExpression.m */; };
+		A09D0BF40CC7E5EB0B51E9AB /* RDLExpressionCatalog.m in Sources */ = {isa = PBXBuildFile; fileRef = 79BBBCA4D537CA0698FE43F8 /* RDLExpressionCatalog.m */; };
 		F8724BD64637BEC16321612C /* RDLItemFactory.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B5800982DB92CA9D51B03CC /* RDLItemFactory.m */; };
 		F8EA04B9F8175CF7FCE6FEAD /* RDLInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* RDLInspectorFields.m */; };
 /* End PBXBuildFile section */
@@ -239,6 +241,8 @@
 		7994E9DA249D01FF65771325 /* RDLChange.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChange.h; sourceTree = "<group>"; };
 		7B5800982DB92CA9D51B03CC /* RDLItemFactory.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLItemFactory.m; sourceTree = "<group>"; };
 		7CECB821FFED22DFD87FEE06 /* RDLExpression.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpression.m; sourceTree = "<group>"; };
+		79BBBCA4D537CA0698FE43F8 /* RDLExpressionCatalog.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionCatalog.m; sourceTree = "<group>"; };
+		690DD4BAEE75B7692F7F7A2F /* RDLExpressionCatalog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionCatalog.h; sourceTree = "<group>"; };
 		7ED4103CA65B712F3FBE7DB0 /* RDLCanvasRenderer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCanvasRenderer.h; sourceTree = "<group>"; };
 		7EFA16D79BB10E2489A21CC2 /* RDLInspectorView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLInspectorView.m; sourceTree = "<group>"; };
 		8399CC90B6584EEB8751BAD3 /* RDLNewReportPanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLNewReportPanel.xib; sourceTree = "<group>"; };
@@ -470,6 +474,8 @@
 				CB30BBD185439ABC015B8C91 /* RDLReport.m */,
 				E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */,
 				7CECB821FFED22DFD87FEE06 /* RDLExpression.m */,
+				79BBBCA4D537CA0698FE43F8 /* RDLExpressionCatalog.m */,
+				690DD4BAEE75B7692F7F7A2F /* RDLExpressionCatalog.h */,
 				BB06AE65D2508BE359426E27 /* RDLLayoutEngine.m */,
 				F1EE0475B7EBC42015D59375 /* RDLView.m */,
 				2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */,
@@ -563,6 +569,7 @@
 				EA1ECD1351FA319CC3B4E37C /* RDLReport.h in Headers */,
 				C3EB649CC42680C456B883E3 /* RDLParser.h in Headers */,
 				9FBD142AFC677F41736F21C6 /* RDLExpression.h in Headers */,
+				E4025888B9969228E6FBF445 /* RDLExpressionCatalog.h in Headers */,
 				A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Headers */,
 				A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */,
 				32E8E73DCB0DEF3A0DE88EF1 /* RDLBackend.h in Headers */,
@@ -847,6 +854,7 @@
 				B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */,
 				F0908E034271ACFC6E8487F5 /* RDLParser.m in Sources */,
 				F56E72CC18EFFE5521469BD5 /* RDLExpression.m in Sources */,
+				A09D0BF40CC7E5EB0B51E9AB /* RDLExpressionCatalog.m in Sources */,
 				247A1B99F9F61E2ED8DBF10A /* RDLLayoutEngine.m in Sources */,
 				7DEB25C2F77B206818A7D8EA /* RDLView.m in Sources */,
 				2F259D5D4809D39F5BB5823F /* RDLHTMLBackend.m in Sources */,
