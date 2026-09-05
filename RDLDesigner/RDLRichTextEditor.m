@@ -216,16 +216,28 @@
   [NSApp stopModalWithCode:NSModalResponseCancel];
 }
 
-+ (BOOL)runForTextbox:(RDLTextbox *)item context:(RDLEditingContext *)context {
++ (NSColor *)paperColorForItem:(RDLTextbox *)item {
+  // Paper, not ink: a textbox with no fill of its own is edited on white,
+  // whatever the desktop appearance is.
+  return RDLColorIsTransparent(item.style.backgroundColor)
+             ? [NSColor whiteColor]
+             : RDLColorFromHex(item.style.backgroundColor);
+}
+
++ (NSColor *)inkColorForItem:(RDLTextbox *)item {
+  return RDLColorFromHex(item.style.color);
+}
+
++ (instancetype)editorForTextbox:(RDLTextbox *)item context:(RDLEditingContext *)context {
   if (item == nil || ![item isKindOfClass:[RDLTextbox class]])
-    return NO;
+    return nil;
   RDLRichTextEditor *ed = [[RDLRichTextEditor alloc] init];
   // The panel -- window, formatting bar, text view and buttons -- is all in
   // the XIB.
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLRichTextEditor"
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
-    return NO;
+    return nil;
 
   // Escape is the one thing the XIB cannot carry: XML forbids U+001B, as a raw
   // byte and as a character reference alike, so ibtool rejects the file outright.
@@ -238,19 +250,33 @@
   // its own colours -- so it is painted like paper rather than following the
   // system appearance. Left to inherit, a dark-mode desktop gave a dark
   // background under the report's own dark ink and the text vanished.
+  NSColor *paper = [self paperColorForItem:item];
   [tv setDrawsBackground:YES];
-  [tv setBackgroundColor:[item.style.backgroundColor length]
-                             ? RDLColorFromHex(item.style.backgroundColor)
-                             : [NSColor whiteColor]];
-  [tv setInsertionPointColor:RDLColorFromHex(item.style.color)];
+  [tv setBackgroundColor:paper];
+  [tv setTextColor:[self inkColorForItem:item]];
+  [tv setInsertionPointColor:[self inkColorForItem:item]];
+  // The clip view as well as the scroll view. A text view shorter than the
+  // area it scrolls in leaves the rest of that area to the clip view, which
+  // paints in the desktop appearance -- dark, under the report's own dark ink.
+  // -[NSScrollView setBackgroundColor:] forwards to the clip view on both
+  // platforms, but saying so directly means it does not depend on that.
   [[tv enclosingScrollView] setDrawsBackground:YES];
-  [[tv enclosingScrollView] setBackgroundColor:[tv backgroundColor]];
+  [[tv enclosingScrollView] setBackgroundColor:paper];
+  [[[tv enclosingScrollView] contentView] setDrawsBackground:YES];
+  [[[tv enclosingScrollView] contentView] setBackgroundColor:paper];
   [[tv textStorage] setAttributedString:[self attributedStringForItem:item]];
   [tv setTypingAttributes:[RDLTextAttributes attributesForStyle:item.style
                                                  paragraphAlign:RDLTextAlignUnspecified
                                                           scale:1.0]];
   [ed prepareToolbar];
   [ed syncToolbar];
+  return ed;
+}
+
++ (BOOL)runForTextbox:(RDLTextbox *)item context:(RDLEditingContext *)context {
+  RDLRichTextEditor *ed = [self editorForTextbox:item context:context];
+  if (ed == nil)
+    return NO;
   [ed.window center];
   NSInteger code = [NSApp runModalForWindow:ed.window];
   // Ordered out rather than closed, once, on both paths: the text storage is

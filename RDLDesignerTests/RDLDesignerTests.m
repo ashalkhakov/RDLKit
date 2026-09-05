@@ -37,6 +37,7 @@
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
 #import "RDLTablixEditor.h"
+#import "RDLRichTextEditor.h"
 #import "RDLNewReportPanel.h"
 
 // A grouped-jobs report, mirroring the kit checks' fixture, so the editing
@@ -154,6 +155,33 @@ static RDLReport *RDLGroupedJobs(void) {
 // modal session: what these panels owe us is that they are built and wired,
 // and a session only exercises AppKit's modal machinery, which is not ours and
 // does not behave the same on GNUstep.
+// NSColor equality is not useful across colour spaces, and a colour that has
+// been through a view has been through one. Compares what actually gets drawn,
+// and returns what is wrong with it, or nil -- reporting is the caller's, so
+// that this works the same under either XCTest.
+static CGFloat RDLLuminance(NSColor *color) {
+  NSColor *c = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (c == nil)
+    return -1;
+  CGFloat r, g, b, a;
+  [c getRed:&r green:&g blue:&b alpha:&a];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+static NSString *RDLColorMismatch(NSColor *actual, NSColor *expected, NSString *what) {
+  NSColor *a = [actual colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *b = [expected colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (a == nil)
+    return [NSString stringWithFormat:@"%@ has no background colour", what];
+  CGFloat ar, ag, ab, aa, br, bg, bb, ba;
+  [a getRed:&ar green:&ag blue:&ab alpha:&aa];
+  [b getRed:&br green:&bg blue:&bb alpha:&ba];
+  if (fabs(ar - br) > 0.01 || fabs(ag - bg) > 0.01 || fabs(ab - bb) > 0.01)
+    return [NSString stringWithFormat:@"%@ is (%.2f %.2f %.2f), expected (%.2f %.2f %.2f)",
+                                      what, ar, ag, ab, br, bg, bb];
+  return nil;
+}
+
 static NSButton *RDLFindButtonTitled(NSView *view, NSString *title) {
   for (NSView *v in [view subviews]) {
     if ([v isKindOfClass:[NSButton class]] &&
@@ -2188,6 +2216,60 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
         (nextItem.location != NSNotFound && action.location > nextItem.location))
       XCTFail(@"%@", @"New Report… no longer sends -newDocument:, so it does nothing");
   }
+}
+
+// The rich-text editor edits report content, which is printed on paper. What
+// it must not do is take its colours from the desktop: on a dark one that puts
+// the report's own dark ink on a dark ground and the text disappears. Checked
+// here rather than by eye, because the desktop that matters is the one CI runs
+// on and not this one.
+- (void)testRichTextEditorPaper {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  if (box == nil) {
+    XCTFail(@"%@", @"the letter sample has no textbox to edit");
+    return;
+  }
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRichTextEditor *editor = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (editor == nil) {
+    XCTFail(@"%@", @"RDLRichTextEditor.xib did not load");
+    return;
+  }
+  NSTextView *tv = [editor valueForKey:@"textView"];
+  if (tv == nil) {
+    XCTFail(@"%@", @"the text view outlet is not connected");
+    return;
+  }
+
+  NSColor *paper = [RDLRichTextEditor paperColorForItem:box];
+  if (![tv drawsBackground])
+    XCTFail(@"%@", @"the text view does not paint its background, so the desktop shows through");
+  for (NSString *bad in @[
+         RDLColorMismatch([tv backgroundColor], paper, @"the text view") ?: @"",
+         RDLColorMismatch([[tv enclosingScrollView] backgroundColor], paper,
+                          @"the scroll view") ?: @"",
+         RDLColorMismatch([[[tv enclosingScrollView] contentView] backgroundColor], paper,
+                          @"the clip view") ?: @"" ])
+    if ([bad length])
+      XCTFail(@"%@", bad);
+
+  // And the ink is legible against it: the report's colours, not the system's.
+  NSColor *ink = [RDLRichTextEditor inkColorForItem:box];
+  // Through RGB rather than a grey space: converting to NSCalibratedWhite can
+  // return nil, and a nil colour reads as 0 -- black paper, which is precisely
+  // the failure this is meant to detect, reported for the wrong reason.
+  CGFloat inkLuma = RDLLuminance(ink), paperLuma = RDLLuminance(paper);
+  if (fabs(inkLuma - paperLuma) < 0.25)
+    XCTFail(@"%@", [NSString stringWithFormat:
+                                @"ink %.2f on paper %.2f is not readable (background %@)",
+                                inkLuma, paperLuma, box.style.backgroundColor]);
 }
 
 - (void)testScaffoldedTablixEditor {

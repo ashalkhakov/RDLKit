@@ -162,7 +162,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
     [RDLColorFromHex(it.style.color) set];
     NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
-    if (it.style.backgroundColor && ![it.style.backgroundColor isEqualToString:@"Transparent"]) {
+    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
       [RDLColorFromHex(it.style.backgroundColor) set];
       NSRectFill(r);
     }
@@ -182,8 +182,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   } else {
     // Textbox (and unknown kinds): full WYSIWYG preview — background, border,
     // padding and the attributed value.
-    if (it.style.backgroundColor.length &&
-        ![it.style.backgroundColor isEqualToString:@"Transparent"]) {
+    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
       [RDLColorFromHex(it.style.backgroundColor) set];
       NSRectFill(r);
     }

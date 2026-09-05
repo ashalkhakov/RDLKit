@@ -80,6 +80,15 @@ static inline NSString *RDLHexForColorName(NSString *name) {
   return names[[name lowercaseString]];
 }
 
+// "Transparent" is a colour in RDL's grammar, and it means no fill at all. It
+// has to be recognised before RDLColorFromHex sees it: that scans "Transp" as
+// hex and yields black, which is how the rich-text editor came up with a black
+// page under the report's own dark ink.
+static inline BOOL RDLColorIsTransparent(NSString *color) {
+  return color == nil || [color length] == 0 ||
+         [color caseInsensitiveCompare:@"Transparent"] == NSOrderedSame;
+}
+
 static inline NSColor *RDLColorFromHex(NSString *hex) {
   if (hex == nil || [hex length] == 0) {
     return RDL_COLOR(0.10, 0.10, 0.09, 1);

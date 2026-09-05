@@ -26,6 +26,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLRichTextFormatter.m \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
+  ../RDLDesigner/RDLRichTextEditor.m \
   ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
 RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner
@@ -33,9 +34,10 @@ ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesignerTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
 RDLDesignerTests_NEEDS_GUI = yes
 
-# The two modal panels the checks open are looked up with -bundleForClass:,
+# The panels the checks open are looked up with -bundleForClass:,
 # which resolves to this bundle rather than to RDLDesigner.app.
 RDLDesignerTests_RESOURCE_FILES = \
+  ../RDLDesigner/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLTablixEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib
 
