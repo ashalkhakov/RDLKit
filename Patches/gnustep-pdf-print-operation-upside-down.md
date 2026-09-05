@@ -43,19 +43,22 @@ backend compensates for a flip nobody applied, and the mirroring is of both the
 glyphs and the layout, which is what distinguishes it from a simple
 origin-at-the-wrong-corner bug.
 
-**Workaround here.** `RDLPrintView -drawRect:` concats that same matrix itself
-under `#ifdef GNUSTEP`, when the view is flipped and has no window — putting
-the context in the state the view is in when it draws on screen, where it is
-correct. macOS applies the transform in its own printing machinery and must not
-get a second one.
+**Fix.** `gnustep-gui-pdf-print-operation.patch`, beside this file, deletes the
+override. `NSPrintOperation`'s own `-_print` needs nothing from the subclass:
+`-_runOperation` has already made `-createContext`'s context current, and
+`-_printPaginateWithInfo:knowsRange:` sets `NSPrintSheetBounds` itself. The
+inherited implementation paginates, honours `-knowsPageRange:`/`-rectForPage:`
+and applies the transform, so both the orientation and the page count come out
+right. `gnustep-patch-repros/pdf-print-operation-test.m` demonstrates it and
+decides PASS/FAIL on the page count.
 
-**The real fix.** `GSPDFPrintOperation` should not override `-_print` at all:
-the inherited implementation paginates, honours the page range and applies the
-transform. The override is marked in its own source as copied from
-`GSEPSPrintOperation`, where single-sheet output is correct because EPS is
-single-sheet by definition. Fixing it upstream would remove the workaround
-above and give multi-page PDFs on GNUstep, which the workaround does not.
+**Applied where.** `.github/scripts/dependencies.sh`, in the libs-gui step, the
+way `gnustep-build/Scripts/build-gnustep.sh` applies its own patches. PicaKit
+briefly carried a `#ifdef GNUSTEP` workaround that supplied the missing matrix
+in `RDLPrintView -drawRect:`; it has been removed, because the patch and the
+workaround together would correct the orientation twice.
 
-**Impact here.** Orientation is corrected; pagination is not. A multi-page
-report exported on GNUstep is one sheet the height of the whole document, as it
-was before. macOS produces one PDF page per report page.
+**Consequence for packagers.** RDLKit on GNUstep expects a gnustep-gui with
+this patch. Built against a pristine one, exported PDFs are upside down and
+multi-page reports come out as a single sheet. The AppImage carries a patched
+build.

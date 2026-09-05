@@ -28,6 +28,10 @@
 # Expects: CC, CXX, LIBRARY_COMBO, RUNTIME_VERSION, DEPS_PATH, INSTALL_PATH.
 set -ex
 
+# Captured before anything cds away: the patches below are named relative to
+# the checkout.
+WORKSPACE_DIR=$(pwd)
+
 mkdir -p "$DEPS_PATH"
 
 # With --with-layout=gnustep this is where tools-make puts the makefiles.
@@ -127,6 +131,12 @@ install_libs_gui() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_GUI_BRANCH:-master} https://github.com/gnustep/libs-gui.git
     cd libs-gui
+    # GSPDFPrintOperation overrides -_print with a single-sheet copy of
+    # GSEPSPrintOperation's, so PDF output ignores -knowsPageRange: and comes
+    # out upside down -- see Patches/gnustep-gui-pdf-print-operation.patch and
+    # the repro beside it. Applied here, not worked around in PicaKit: a
+    # workaround and the patch together would correct it twice.
+    git apply "$WORKSPACE_DIR/Patches/gnustep-gui-pdf-print-operation.patch"
     ./configure --prefix="$INSTALL_PATH" || cat config.log
     make install
     echo "::endgroup::"
