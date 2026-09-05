@@ -5,6 +5,16 @@
 #import "RDLLayoutEngine.h"
 #import "PicaCompatibility.h"
 
+// The view the PDF is actually made from. RDLView is the designer's canvas --
+// grey backdrop, tinted paper, a frame and a gap between pages -- and all of
+// that was ending up in exported files, on one enormous page.
+@interface RDLView (RDLPageDrawing)
+- (void)drawItemsOfPage:(RDLLaidOutPage *)page atY:(CGFloat)originY;
+@end
+
+@interface RDLPrintView : RDLView
+@end
+
 static const CGFloat kPicaDPI = 72.0;
 static const CGFloat kPageGap = 18.0;
 
@@ -126,7 +136,12 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
   NSRectFill(paper);
   [[NSColor colorWithCalibratedWhite:0.7 alpha:1] set];
   NSFrameRect(paper);
+  [self drawItemsOfPage:page atY:originY];
+}
 
+// The page content alone: no paper tint, no frame. The canvas draws its
+// chrome around this; print and PDF output draw only this.
+- (void)drawItemsOfPage:(RDLLaidOutPage *)page atY:(CGFloat)originY {
   for (RDLLaidOutItem *it in page.items) {
     NSRect r = NSMakeRect(it.x * kPicaDPI, originY + it.y * kPicaDPI, it.w * kPicaDPI, it.h * kPicaDPI);
     if ([it isKindOfClass:[RDLLaidOutLine class]]) {
@@ -249,26 +264,80 @@ static void PicaFillBackground(NSRect r, RDLStyle *s) {
 - (NSData *)PDFData {
   if ([self.pages count] == 0)
     [self reloadLayout];
-  else
-    [self sizeToPages];
 
-  // Hosted in an unflipped container rather than printed directly. A view
-  // with neither a window nor a superview never builds a coordinate matrix at
-  // all -- GNUstep's -_rebuildCoordinates takes the identity branch, and
-  // applies its flip only where a view's flippedness differs from its
-  // superview's -- so the flip the print machinery applies for a flipped view
-  // is left to compound with the one the backend applies from
-  // GSWSetViewIsFlipped, and the page comes out upside down. A flipped
-  // document view inside an unflipped parent is what NSScrollView does, and
-  // it gives exactly one flip on both platforms.
-  NSView *container = [[NSView alloc] initWithFrame:self.bounds];
-  NSRect frame = self.frame;
-  frame.origin = NSZeroPoint;
-  self.frame = frame;
-  [container addSubview:self];
-  NSData *data = [container dataWithPDFInsideRect:container.bounds];
-  [self removeFromSuperview];
+  RDLPrintView *printView = [[RDLPrintView alloc] initWithFrame:NSZeroRect];
+  printView.pages = self.pages;
+  [printView sizeToPages];
+
+  NSPrintInfo *info = [[NSPrintInfo alloc] initWithDictionary:@{}];
+  RDLLaidOutPage *first = [self.pages firstObject];
+  if (first)
+    [info setPaperSize:NSMakeSize(first.width * kPicaDPI, first.height * kPicaDPI)];
+  // The report has already been laid out to the page: its own margins are
+  // part of the item positions, and a second set here would inset them again.
+  [info setLeftMargin:0];
+  [info setRightMargin:0];
+  [info setTopMargin:0];
+  [info setBottomMargin:0];
+
+  NSMutableData *data = [NSMutableData data];
+  NSPrintOperation *op = [NSPrintOperation PDFOperationWithView:printView
+                                                     insideRect:printView.bounds
+                                                         toData:data
+                                                      printInfo:info];
+  [op runOperation];
   return data;
+}
+
+@end
+
+@implementation RDLPrintView
+
+// Stacked with no gaps: every point of this view belongs to some page.
+- (void)sizeToPages {
+  CGFloat w = 8.5 * kPicaDPI;
+  CGFloat h = 0;
+  for (RDLLaidOutPage *p in self.pages) {
+    w = MAX(w, p.width * kPicaDPI);
+    h += p.height * kPicaDPI;
+  }
+  [self setFrameSize:NSMakeSize(w, MAX(h, 72))];
+}
+
+// Telling the print machinery the page range and each page's rect is what
+// makes this a paginated document rather than one tall image: AppKit asks for
+// a rect at a time, gives each its own PDF page, and applies whatever
+// coordinate transform that page needs. It is also why nothing here has to
+// know which way up the destination is.
+- (BOOL)knowsPageRange:(NSRange *)range {
+  range->location = 1;
+  range->length = MAX((NSUInteger)[self.pages count], (NSUInteger)1);
+  return YES;
+}
+
+- (NSRect)rectForPage:(NSInteger)page {
+  CGFloat y = 0;
+  NSInteger index = 1;
+  for (RDLLaidOutPage *p in self.pages) {
+    NSRect r = NSMakeRect(0, y, p.width * kPicaDPI, p.height * kPicaDPI);
+    if (index == page)
+      return r;
+    y += p.height * kPicaDPI;
+    index++;
+  }
+  return self.bounds;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  [[NSColor whiteColor] set];
+  NSRectFill(dirtyRect);
+  CGFloat y = 0;
+  for (RDLLaidOutPage *page in self.pages) {
+    NSRect r = NSMakeRect(0, y, page.width * kPicaDPI, page.height * kPicaDPI);
+    if (NSIntersectsRect(r, dirtyRect))
+      [self drawItemsOfPage:page atY:y];
+    y += page.height * kPicaDPI;
+  }
 }
 
 @end
