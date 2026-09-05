@@ -2274,6 +2274,58 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // region, and the inspector edits that column's spec. A cell is not an item of
 // its own -- it is an entry in columnSpecs -- so the cell travels with the item
 // selection rather than replacing it.
+// The tablix editor's three lists, and the rule about aggregates. Checked
+// through the lists rather than by dragging: dragging is AppKit's, the
+// partition and the rule are ours.
+- (void)testTablixEditorGroupsAndAggregates {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  if (tablix == nil) {
+    XCTFail(@"%@", @"the invoice sample should have a tablix");
+    return;
+  }
+  tablix.rowGroups = @[ @"Region", @"City" ];
+  tablix.columnGroups = @[ @"Year" ];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablixEditor *ed = [RDLTablixEditor editorForTablix:tablix context:ctx];
+  if (ed == nil) {
+    XCTFail(@"%@", @"RDLTablixEditor.xib did not load");
+    return;
+  }
+
+  // The lists arrive holding what the tablix holds, in order.
+  if (![ed.rowGroups isEqualToArray:@[ @"Region", @"City" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the row group list reads %@", ed.rowGroups]);
+  if (![ed.colGroups isEqualToArray:@[ @"Year" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the column group list reads %@", ed.colGroups]);
+
+  // A column dragged in while there are column groups aggregates: a crosstab
+  // has no details row, so a bare field has nowhere to be shown raw.
+  NSDictionary *spec = [ed specForField:@"Amount"];
+  if (![spec[@"aggregate"] isEqualToString:@"Sum"])
+    XCTFail(@"%@", @"a column of a crosstab should aggregate");
+
+  // Saving forces the rule on columns that predate it.
+  for (NSArray *saved in @[ [ed columnSpecsForSaving] ])
+    for (NSDictionary *column in saved)
+      if ([column[@"aggregate"] length] == 0)
+        XCTFail(@"%@", [NSString stringWithFormat:@"column %@ has no aggregate in a crosstab",
+                                                  column[@"header"]]);
+
+  // Without column groups there IS a details row, and a raw field belongs
+  // there -- so the rule does not apply and nothing is forced.
+  [ed.colGroups removeAllObjects];
+  NSDictionary *plain = [ed specForField:@"Amount"];
+  if ([plain[@"aggregate"] length])
+    XCTFail(@"%@", @"a column of a grouped table should not be forced to aggregate");
+}
+
 - (void)testTablixCellSelection {
   RDLReport *report = [RDLSamples atelierInvoice];
   RDLTablix *tablix = nil;

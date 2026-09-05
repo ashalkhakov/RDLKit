@@ -18,4 +18,9 @@
 // AppKit's modal machinery, which is not ours. Returns nil for anything that is
 // not a tablix.
 + (instancetype)editorForTablix:(RDLTablix *)tablix context:(RDLEditingContext *)context;
+// The three lists the dialog edits, and the specs it would save. Exposed so
+// what the dialog does can be checked without dragging anything.
+@property (nonatomic, readonly, strong) NSMutableArray<NSString *> *rowGroups, *colGroups;
+- (NSArray *)columnSpecsForSaving;
+- (NSMutableDictionary *)specForField:(NSString *)field;
 @end
