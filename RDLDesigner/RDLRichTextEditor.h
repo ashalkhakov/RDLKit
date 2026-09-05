@@ -19,6 +19,14 @@
 // The paper the text is edited on, and the ink of text that names no colour of
 // its own. Report content is printed, so both come from the item rather than
 // from the desktop appearance.
+// The pill rules, declared because they are what this editor does about
+// expressions and what a check drives: a caret never rests inside one, and a
+// selection crossing an edge takes the whole of it.
+- (NSRange)textView:(NSTextView *)view
+    willChangeSelectionFromCharacterRange:(NSRange)from
+                         toCharacterRange:(NSRange)to;
+- (void)insertExpression:(id)sender;
+
 + (NSColor *)paperColorForItem:(RDLTextbox *)item;
 + (NSColor *)inkColorForItem:(RDLTextbox *)item;
 

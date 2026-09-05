@@ -29,6 +29,7 @@
 #import "RDLSamples.h"
 #import "RDLRichTextFormatter.h"
 #import "RDLRichTextCodec.h"
+#import "RDLRichTextEditor.h"
 #import "RDLInspectorFields.h"
 #import "RDLPageGeometry.h"
 #import "RDLRichTextCodec.h"
@@ -2284,6 +2285,115 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // Where the group brackets land. Drawing cannot be checked here, but the
 // geometry can, and the geometry is what would be wrong: a bracket inside the
 // region would sit on the data, and two at the same distance would read as one.
+// An expression inside rich text is a run whose Value is that expression, the
+// way an xf:output sits among the text in XForms -- not the text of the
+// expression pasted in. The codec has to carry that both ways, and the editor
+// has to show it as one thing.
+- (void)testRichTextExpressionRuns {
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Greeting";
+  box.style.fontFamily = @"Georgia";
+
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *hello = [[RDLTextRun alloc] init];
+  hello.value = @"Dear ";
+  RDLTextRun *name = [[RDLTextRun alloc] init];
+  name.value = @"=Fields!Customer.Value";
+  RDLTextRun *rest = [[RDLTextRun alloc] init];
+  rest.value = @", thank you.";
+  [para.runs addObject:hello];
+  [para.runs addObject:name];
+  [para.runs addObject:rest];
+  box.paragraphs = [NSMutableArray arrayWithObject:para];
+
+  // Model -> attributed: the expression run is marked, and only it.
+  NSAttributedString *text = [RDLRichTextCodec attributedStringForItem:box];
+  NSRange marked = NSMakeRange(NSNotFound, 0);
+  id value = [text attribute:RDLExpressionRunAttributeName
+                     atIndex:[@"Dear " length]
+              effectiveRange:&marked];
+  if (![value isEqualToString:@"=Fields!Customer.Value"]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the run is marked %@", value]);
+    return;
+  }
+  if (marked.location != [@"Dear " length] ||
+      marked.length != [@"=Fields!Customer.Value" length])
+    XCTFail(@"%@", @"the mark does not cover exactly the expression run");
+  if ([text attribute:RDLExpressionRunAttributeName atIndex:0 effectiveRange:NULL] != nil)
+    XCTFail(@"%@", @"the literal text before it should not be marked");
+
+  // Attributed -> model: three runs again, the middle one an expression, and
+  // its Value is the expression rather than the text that was shown.
+  RDLTextbox *out = [[RDLTextbox alloc] init];
+  out.style = box.style;
+  [RDLRichTextCodec applyAttributedString:text toItem:out];
+  RDLParagraph *back = [out.paragraphs firstObject];
+  if ([back.runs count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu runs came back, expected 3",
+                                              (unsigned long)[back.runs count]]);
+    return;
+  }
+  if (![[back.runs[1] value] isEqualToString:@"=Fields!Customer.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the middle run reads %@",
+                                              [back.runs[1] value]]);
+  if (![[back.runs[0] value] isEqualToString:@"Dear "])
+    XCTFail(@"%@", @"the literal runs should survive unchanged");
+
+  // A run built for insertion carries the mark, so what the editor puts in is
+  // already an expression run rather than text to be recognised later.
+  NSAttributedString *fresh = [RDLRichTextCodec expressionRun:@"=Sum(Fields!Due.Value)"
+                                                    baseStyle:box.style];
+  if ([fresh attribute:RDLExpressionRunAttributeName atIndex:0 effectiveRange:NULL] == nil)
+    XCTFail(@"%@", @"an inserted expression should be marked from the start");
+}
+
+// A pill is one thing: the caret does not rest inside it and a selection that
+// crosses an edge takes the whole of it.
+- (void)testRichTextPillsAreAtomic {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRichTextEditor *ed = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (ed == nil) {
+    XCTFail(@"%@", @"RDLRichTextEditor.xib did not load");
+    return;
+  }
+  NSTextView *tv = [ed valueForKey:@"textView"];
+  NSAttributedString *run = [RDLRichTextCodec expressionRun:@"=Fields!Total.Value"
+                                                  baseStyle:box.style];
+  [[tv textStorage] setAttributedString:[[NSAttributedString alloc] initWithString:@"AB"]];
+  [[tv textStorage] insertAttributedString:run atIndex:1];
+
+  // A caret aimed at the middle of the pill lands on the whole pill instead.
+  NSRange inside = NSMakeRange(1 + [@"=Fields" length], 0);
+  NSRange adjusted = [ed textView:tv
+      willChangeSelectionFromCharacterRange:NSMakeRange(0, 0)
+                           toCharacterRange:inside];
+  if (adjusted.location != 1 || adjusted.length != [run length])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a caret inside the pill became %@",
+                                              NSStringFromRange(adjusted)]);
+
+  // A selection that starts before it and ends inside it swallows it whole.
+  NSRange across = [ed textView:tv
+      willChangeSelectionFromCharacterRange:NSMakeRange(0, 0)
+                           toCharacterRange:NSMakeRange(0, 3)];
+  if (NSMaxRange(across) != 1 + [run length])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a selection across the edge became %@",
+                                              NSStringFromRange(across)]);
+
+  // Text outside a pill is untouched.
+  NSRange plain = [ed textView:tv
+      willChangeSelectionFromCharacterRange:NSMakeRange(0, 0)
+                           toCharacterRange:NSMakeRange(0, 1)];
+  if (!NSEqualRanges(plain, NSMakeRange(0, 1)))
+    XCTFail(@"%@", @"a selection clear of the pill should be left alone");
+}
+
 - (void)testGroupBracketGeometry {
   NSRect region = NSMakeRect(120, 80, 400, 200);
   NSArray<NSValue *> *rows = [RDLPageGeometry rowGroupBracketsForCount:3 inRect:region];

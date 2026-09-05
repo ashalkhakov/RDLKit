@@ -16,6 +16,9 @@
 // Kept so the expression editor can offer this report's own fields and
 // parameters, which is most of what makes the picker useful.
 @property (nonatomic, strong) RDLReport *report;
+// The textbox being edited: its style is the base a new expression run takes,
+// so a pill reads in the same face as the text around it.
+@property (nonatomic, strong) RDLTextbox *item;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
 // The formatting bar.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *fontPopup;
@@ -225,23 +228,110 @@
 // may be an expression, so it is inserted here, at the insertion point, taking
 // the formatting of the text around it. The field beside a plain attribute
 // cannot offer this, which is why the editor has its own way in.
+// On a pill this edits that expression and replaces it; elsewhere it inserts a
+// new one. The same button either way, as the XForms Designer does with
+// xf:output, which is the same idea: an element interspersed with the text
+// whose content is computed rather than typed.
 - (void)insertExpression:(id)sender {
   (void)sender;
-  NSString *source = [RDLExpressionEditor runForSource:@""
+  NSRange pill = [self expressionRunAtSelection];
+  NSString *existing = pill.location == NSNotFound
+                           ? @""
+                           : [[_textView textStorage] attribute:RDLExpressionRunAttributeName
+                                                        atIndex:pill.location
+                                                 effectiveRange:NULL];
+  NSString *source = [RDLExpressionEditor runForSource:existing ?: @""
                                                context:RDLExpressionContextText
                                                 report:_report];
   if ([source length] == 0)
     return;
-  NSRange at = [_textView selectedRange];
+
+  NSRange at = pill.location != NSNotFound ? pill : [_textView selectedRange];
   if (at.location == NSNotFound)
     at = NSMakeRange([[_textView textStorage] length], 0);
-  NSDictionary *attrs = [_textView typingAttributes];
-  [[_textView textStorage]
-      replaceCharactersInRange:at
-          withAttributedString:[[NSAttributedString alloc] initWithString:source
-                                                              attributes:attrs]];
-  [_textView setSelectedRange:NSMakeRange(at.location + [source length], 0)];
+  // A run of its own, carrying the expression: what goes into the report is a
+  // TextRun whose Value is that expression, not the text of it pasted in.
+  NSAttributedString *run = [RDLRichTextCodec expressionRun:source baseStyle:_item.style];
+  [[_textView textStorage] replaceCharactersInRange:at withAttributedString:run];
+  [_textView setSelectedRange:NSMakeRange(at.location + [run length], 0)];
+  [self retintExpressionRuns];
   [self syncToolbar];
+}
+
+// Typing can split or delete a pill's characters, so the tint is reapplied
+// from the attribute rather than left where it was drawn.
+- (void)textDidChange:(NSNotification *)note {
+  (void)note;
+  [self retintExpressionRuns];
+}
+
+#pragma mark - Pills
+
+// The expression run the selection is on, or NSNotFound. A caret anywhere
+// inside one counts, which is what makes the button read as editing it.
+- (NSRange)expressionRunAtSelection {
+  NSTextStorage *storage = [_textView textStorage];
+  NSRange sel = [_textView selectedRange];
+  if ([storage length] == 0)
+    return NSMakeRange(NSNotFound, 0);
+  NSUInteger probe = sel.location;
+  if (probe >= [storage length])
+    probe = [storage length] - 1;
+  NSRange effective = NSMakeRange(NSNotFound, 0);
+  id value = [storage attribute:RDLExpressionRunAttributeName
+                        atIndex:probe
+                 effectiveRange:&effective];
+  return value ? effective : NSMakeRange(NSNotFound, 0);
+}
+
+// An expression reads as a pill: tinted, so it is plainly one thing rather
+// than text that happens to start with "=".
+- (void)retintExpressionRuns {
+  NSTextStorage *storage = [_textView textStorage];
+  NSRange all = NSMakeRange(0, [storage length]);
+  if (all.length == 0)
+    return;
+  [storage beginEditing];
+  [storage removeAttribute:NSBackgroundColorAttributeName range:all];
+  NSColor *tint = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.18];
+  [storage enumerateAttribute:RDLExpressionRunAttributeName
+                      inRange:all
+                      options:0
+                   usingBlock:^(id value, NSRange range, BOOL *stop) {
+                     (void)stop;
+                     if (value)
+                       [storage addAttribute:NSBackgroundColorAttributeName
+                                       value:tint
+                                       range:range];
+                   }];
+  [storage endEditing];
+}
+
+// A pill is atomic: a caret may not rest inside one, and a selection that
+// crosses an edge swallows it whole. Editing half an expression would leave
+// text that is neither the expression nor a literal.
+- (NSRange)textView:(NSTextView *)view
+    willChangeSelectionFromCharacterRange:(NSRange)from
+                         toCharacterRange:(NSRange)to {
+  (void)from;
+  NSTextStorage *storage = [view textStorage];
+  if ([storage length] == 0)
+    return to;
+  __block NSUInteger start = to.location;
+  __block NSUInteger end = NSMaxRange(to);
+  [storage enumerateAttribute:RDLExpressionRunAttributeName
+                      inRange:NSMakeRange(0, [storage length])
+                      options:0
+                   usingBlock:^(id value, NSRange range, BOOL *stop) {
+                     (void)stop;
+                     if (value == nil)
+                       return;
+                     if (start > range.location && start < NSMaxRange(range))
+                       start = range.location;
+                     if (end > range.location && end < NSMaxRange(range))
+                       end = NSMaxRange(range);
+                   }];
+  return NSMakeRange(start, end - start);
 }
 
 + (NSColor *)paperColorForItem:(RDLTextbox *)item {
@@ -297,6 +387,8 @@
                                                  paragraphAlign:RDLTextAlignUnspecified
                                                           scale:1.0]];
   ed.report = context.report;
+  ed.item = item;
+  [ed retintExpressionRuns];
   [ed prepareToolbar];
   [ed syncToolbar];
   return ed;

@@ -1,4 +1,6 @@
 #import "RDLRichTextCodec.h"
+
+NSString * const RDLExpressionRunAttributeName = @"RDLExpressionRun";
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 
@@ -82,9 +84,39 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
     return [RDLTextAttributes attributedStringForText:item.value ?: @""
                                                 style:item.style
                                                 scale:1.0];
-  return [RDLTextAttributes attributedStringForParagraphs:item.paragraphs
-                                               baseStyle:item.style
-                                                   scale:1.0];
+  NSMutableAttributedString *out =
+      [[RDLTextAttributes attributedStringForParagraphs:item.paragraphs
+                                             baseStyle:item.style
+                                                 scale:1.0] mutableCopy];
+  // The kit builds the text; the runs that are expressions are marked here,
+  // walking the same paragraphs in the same order so the ranges line up.
+  NSUInteger at = 0;
+  BOOL first = YES;
+  for (RDLParagraph *para in item.paragraphs) {
+    if (!first)
+      at += 1;  // the newline the kit puts between paragraphs
+    first = NO;
+    for (RDLTextRun *run in para.runs) {
+      NSUInteger length = [run.value length];
+      if (length && [RDLExpr isExpressionSource:run.value] && at + length <= [out length])
+        [out addAttribute:RDLExpressionRunAttributeName
+                    value:run.value
+                    range:NSMakeRange(at, length)];
+      at += length;
+    }
+  }
+  return out;
+}
+
++ (NSAttributedString *)expressionRun:(NSString *)source baseStyle:(RDLStyle *)style {
+  if ([source length] == 0)
+    return [[NSAttributedString alloc] initWithString:@""];
+  NSMutableDictionary *attrs =
+      [[RDLTextAttributes attributesForStyle:style
+                              paragraphAlign:RDLTextAlignUnspecified
+                                       scale:1.0] mutableCopy];
+  attrs[RDLExpressionRunAttributeName] = source;
+  return [[NSAttributedString alloc] initWithString:source attributes:attrs];
 }
 
 + (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLTextbox *)item {
@@ -126,7 +158,11 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
       NSDictionary *attrs = [text attributesAtIndex:loc effectiveRange:&eff];
       NSRange runRange = NSIntersectionRange(eff, paraRange);
       RDLTextRun *run = [[RDLTextRun alloc] init];
-      run.value = [plain substringWithRange:runRange];
+      // A marked run carries its expression; the text it shows is that source,
+      // but the mark is what says it was meant as one rather than as a literal
+      // that happens to begin with "=".
+      NSString *expression = attrs[RDLExpressionRunAttributeName];
+      run.value = [expression length] ? expression : [plain substringWithRange:runRange];
       RDLStyle *sparse = RDLSparseRunStyle(attrs, base);
       if (!RDLStyleIsEmpty(sparse)) {
         run.style = sparse;
