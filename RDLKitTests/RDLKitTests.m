@@ -5143,4 +5143,61 @@ static NSString *RDLFixturesDirectory(void) {
     XCTFail(@"%@", @"clearing groupBy left inner groups behind");
 }
 
+// A crosstab nests on both axes. Rows were generalised first; this is the
+// column side, and the pair of them is what Report Builder's two lists produce.
+- (void)testTablixNestsManyColumnGroups {
+  RDLTablix *t = [[RDLTablix alloc] init];
+  t.name = @"Sales";
+  t.headerHeight = 0.25;
+  t.rowHeight = 0.22;
+  t.columnSpecs = @[ @{ @"width" : @1.4, @"header" : @"Amount",
+                        @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum" } ];
+  t.rowGroups = @[ @"Region", @"City" ];
+  t.columnGroups = @[ @"Year", @"Quarter" ];
+  [t rebuildTablix];
+
+  // pivotBy still reads the first column group, which is what a report written
+  // before there could be two assigns and expects back.
+  if (![t.pivotBy isEqualToString:@"Year"])
+    XCTFail(@"%@", @"pivotBy should read the first column group");
+
+  NSUInteger (^depthOf)(RDLTablixHierarchy *) = ^NSUInteger(RDLTablixHierarchy *h) {
+    NSUInteger depth = 0;
+    RDLTablixMember *at = [h.members lastObject];
+    while (at != nil && [at.groupExpressions count]) {
+      depth++;
+      RDLTablixMember *next = nil;
+      for (RDLTablixMember *child in at.members)
+        if ([child.groupExpressions count]) {
+          next = child;
+          break;
+        }
+      at = next;
+    }
+    return depth;
+  };
+  if (depthOf(t.columnHierarchy) != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the column hierarchy nests %lu deep, not 2",
+                                              (unsigned long)depthOf(t.columnHierarchy)]);
+  if (depthOf(t.rowHierarchy) != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the row hierarchy nests %lu deep, not 2",
+                                              (unsigned long)depthOf(t.rowHierarchy)]);
+
+  // The body stays one cell: in a matrix it is the leaves of the two
+  // hierarchies that multiply, not the rows written here.
+  if ([t.tablixBody.rows count] != 1 || [[t.tablixBody.rows firstObject] cells].count != 1)
+    XCTFail(@"%@", @"a matrix body should hold the one measure cell");
+
+  // The corner names both axes, rows before columns.
+  RDLTablixCell *corner = [[t.cornerRows firstObject] firstObject];
+  if (![[(RDLTextbox *)corner.item value] isEqualToString:@"Region / City \\ Year / Quarter"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the corner reads %@",
+                                              [(RDLTextbox *)corner.item value]]);
+
+  // Two row groups means two header columns before the data starts.
+  if (t.width < 2 * 1.2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%.2fin is too narrow for two row headers",
+                                              t.width]);
+}
+
 @end

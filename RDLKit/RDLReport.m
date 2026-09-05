@@ -796,7 +796,7 @@ static NSString *RDLCellValue(RDLTablixCell *cell) {
 }
 
 - (BOOL)rdlIsMatrix {
-  return [self.pivotBy length] > 0 && [self.groupBy length] > 0;
+  return [[self rdlEffectiveColumnGroups] count] > 0 && [[self rdlEffectiveRowGroups] count] > 0;
 }
 
 - (CGFloat)headerHeight {
@@ -862,7 +862,7 @@ static NSString *RDLAggregateOfValue(NSString *value) {
 - (NSArray *)rdlDerivedColumns {
   if ([_tablixBody.columns count] == 0)
     return @[];
-  if ([self.pivotBy length] && [self.groupBy length]) {
+  if ([self rdlIsMatrix]) {
     // Matrix: one measure column; recover the designer spec from the data cell.
     RDLItem *cell = _tablixBody.rows.firstObject.cells.firstObject.item;
     NSString *val = RDLCellValue(_tablixBody.rows.firstObject.cells.firstObject) ?: @"";
@@ -988,6 +988,14 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 
 // The row groups actually to build with: empty names would produce a group on
 // no field, which RDL has no meaning for.
+- (NSArray<NSString *> *)rdlEffectiveColumnGroups {
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSString *field in _columnGroups)
+    if ([field length])
+      [out addObject:field];
+  return out;
+}
+
 - (NSArray<NSString *> *)rdlEffectiveRowGroups {
   NSMutableArray *out = [NSMutableArray array];
   for (NSString *field in _rowGroups)
@@ -1147,36 +1155,63 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
   [data.cells addObject:dc];
   [body.rows addObject:data];
 
+  // Both axes nest as deep as they are given, outermost first, each group
+  // holding the next one in. The body stays one cell: in a matrix the leaves of
+  // the two hierarchies are what multiply, and the cell is the measure at
+  // whatever pair of groups a column and a row meet.
+  NSArray<NSString *> *columnGroups = [self rdlEffectiveColumnGroups];
+  NSArray<NSString *> *rowGroups = [self rdlEffectiveRowGroups];
+
   RDLTablixHierarchy *colH = [[RDLTablixHierarchy alloc] init];
-  RDLTablixMember *cMem = [[RDLTablixMember alloc] init];
-  cMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.pivotBy];
-  [cMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy]]];
-  RDLTablixHeader *chd = [[RDLTablixHeader alloc] init];
-  chd.size = hh;
-  RDLTextbox *cht = [[RDLTextbox alloc] init];
-  cht.name = [NSString stringWithFormat:@"%@CHdr", self.name ?: @"T"];
-  cht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.pivotBy];
-  cht.style.fontWeight = RDLFontWeightBold;
-  cht.style.backgroundColor = @"#ece6d8";
-  cht.style.textAlign = RDLTextAlignCenter;
-  chd.item = cht;
-  cMem.header = chd;
-  [colH.members addObject:cMem];
+  RDLTablixMember *innerCol = nil;
+  for (NSUInteger depth = [columnGroups count]; depth > 0; depth--) {
+    NSUInteger index = depth - 1;
+    NSString *field = columnGroups[index];
+    RDLTablixMember *cMem = [[RDLTablixMember alloc] init];
+    cMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
+    [cMem.groupExpressions
+        addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]]];
+    RDLTablixHeader *chd = [[RDLTablixHeader alloc] init];
+    chd.size = hh;
+    RDLTextbox *cht = [[RDLTextbox alloc] init];
+    cht.name = [NSString stringWithFormat:@"%@CHdr%@", self.name ?: @"T", RDLGroupSuffix(index)];
+    cht.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+    cht.style.fontWeight = RDLFontWeightBold;
+    cht.style.backgroundColor = @"#ece6d8";
+    cht.style.textAlign = RDLTextAlignCenter;
+    chd.item = cht;
+    cMem.header = chd;
+    if (innerCol)
+      [cMem.members addObject:innerCol];
+    innerCol = cMem;
+  }
+  if (innerCol)
+    [colH.members addObject:innerCol];
 
   RDLTablixHierarchy *rowH = [[RDLTablixHierarchy alloc] init];
-  RDLTablixMember *rMem = [[RDLTablixMember alloc] init];
-  rMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", self.groupBy];
-  [rMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy]]];
-  rMem.keepTogether = YES;
-  RDLTablixHeader *rhd = [[RDLTablixHeader alloc] init];
-  rhd.size = 1.2;
-  RDLTextbox *rht = [[RDLTextbox alloc] init];
-  rht.name = [NSString stringWithFormat:@"%@RHdr", self.name ?: @"T"];
-  rht.value = [NSString stringWithFormat:@"=Fields!%@.Value", self.groupBy];
-  rht.style.fontWeight = RDLFontWeightBold;
-  rhd.item = rht;
-  rMem.header = rhd;
-  [rowH.members addObject:rMem];
+  RDLTablixMember *innerRow = nil;
+  for (NSUInteger depth = [rowGroups count]; depth > 0; depth--) {
+    NSUInteger index = depth - 1;
+    NSString *field = rowGroups[index];
+    RDLTablixMember *rMem = [[RDLTablixMember alloc] init];
+    rMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
+    [rMem.groupExpressions
+        addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]]];
+    rMem.keepTogether = YES;
+    RDLTablixHeader *rhd = [[RDLTablixHeader alloc] init];
+    rhd.size = 1.2;
+    RDLTextbox *rht = [[RDLTextbox alloc] init];
+    rht.name = [NSString stringWithFormat:@"%@RHdr%@", self.name ?: @"T", RDLGroupSuffix(index)];
+    rht.value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+    rht.style.fontWeight = RDLFontWeightBold;
+    rhd.item = rht;
+    rMem.header = rhd;
+    if (innerRow)
+      [rMem.members addObject:innerRow];
+    innerRow = rMem;
+  }
+  if (innerRow)
+    [rowH.members addObject:innerRow];
 
   if (self.showGrandTotal) {
     // Column totals: a trailing static row whose cell aggregates each pivot
@@ -1205,15 +1240,19 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
   RDLTablixCell *corner = [[RDLTablixCell alloc] init];
   RDLTextbox *ct = [[RDLTextbox alloc] init];
   ct.name = [NSString stringWithFormat:@"%@Corner", self.name ?: @"T"];
-  ct.value = [NSString stringWithFormat:@"%@ \\ %@", self.groupBy, self.pivotBy];
+  ct.value = [NSString stringWithFormat:@"%@ \\ %@",
+                                        [rowGroups componentsJoinedByString:@" / "],
+                                        [columnGroups componentsJoinedByString:@" / "]];
   ct.style.fontWeight = RDLFontWeightBold;
   ct.style.fontSize = [RDLLength points:8];
   ct.style.color = @"#5c574e";
   corner.item = ct;
   self.cornerRows = [NSMutableArray arrayWithObject:[NSMutableArray arrayWithObject:corner]];
 
-  if (self.width < 1.2 + 2 * cw)
-    self.width = 1.2 + 2 * cw;
+  // A header column per row group, and room for at least two pivot columns.
+  CGFloat headerW = 1.2 * (CGFloat)[rowGroups count];
+  if (self.width < headerW + 2 * cw)
+    self.width = headerW + 2 * cw;
   CGFloat wantH = hh + rh + (self.showGrandTotal ? rh : 0);
   if (self.height < wantH)
     self.height = wantH;
@@ -1249,7 +1288,7 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
     hh = 0.3;
   if (rh <= 0)
     rh = 0.28;
-  if ([self.pivotBy length] && [self.groupBy length]) {
+  if ([self rdlIsMatrix]) {
     [self rdlBuildMatrix:cols headerHeight:hh rowHeight:rh];
     return;
   }
