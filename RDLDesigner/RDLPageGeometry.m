@@ -69,6 +69,33 @@ static const CGFloat kColumnBorderSlop = 3.0;
                     report.page.pageHeight * scale + kCanvasPadding * 2);
 }
 
+// Between one bracket and the next out, and how far the ends turn in. Constants
+// rather than numbers in the drawing code: the renderer and anything checking
+// the layout have to agree about where a bracket is.
+static const CGFloat kRDLBracketStep = 9;
+static const CGFloat kRDLBracketTick = 4;
+static const CGFloat kRDLBracketGap = 3;
+
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSUInteger i = 0; i < count; i++) {
+    CGFloat x = NSMinX(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
+    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick,
+                                                     NSHeight(rect))]];
+  }
+  return out;
+}
+
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSUInteger i = 0; i < count; i++) {
+    CGFloat y = NSMinY(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
+    [out addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(rect), y, NSWidth(rect),
+                                                     kRDLBracketTick)]];
+  }
+  return out;
+}
+
 + (NSPoint)defaultPaperOrigin {
   return NSMakePoint(kCanvasPadding, kPaperTopInset);
 }

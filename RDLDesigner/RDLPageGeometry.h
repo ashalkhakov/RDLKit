@@ -79,6 +79,14 @@ typedef NS_ENUM(NSInteger, RDLTablixPart) {
                  bandKey:(NSString **)outBandKey
                     rect:(NSRect *)outRect;
 
+// Where a selected tablix's group brackets go: one per row group down the left
+// of `rect`, one per column group across the top, outermost furthest out so the
+// nesting reads outwards. Each rect is the bracket's extent, including its
+// turned-in ends. Geometry rather than drawing, so where they land can be
+// checked without rendering anything.
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
+
 // The band whose frame contains `point`, or nil.
 - (NSString *)bandKeyAtPoint:(NSPoint)point;
 

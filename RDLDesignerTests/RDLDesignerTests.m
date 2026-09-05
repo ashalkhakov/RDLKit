@@ -2277,6 +2277,92 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The tablix editor's three lists, and the rule about aggregates. Checked
 // through the lists rather than by dragging: dragging is AppKit's, the
 // partition and the rule are ours.
+// The crosstab sample is the one that exercises groups on both axes, so it is
+// checked as a shape and not only as something that lays out: the hierarchies
+// nest as deep as the sample says, and its measure aggregates, which is the
+// rule a matrix cannot do without.
+// Where the group brackets land. Drawing cannot be checked here, but the
+// geometry can, and the geometry is what would be wrong: a bracket inside the
+// region would sit on the data, and two at the same distance would read as one.
+- (void)testGroupBracketGeometry {
+  NSRect region = NSMakeRect(120, 80, 400, 200);
+  NSArray<NSValue *> *rows = [RDLPageGeometry rowGroupBracketsForCount:3 inRect:region];
+  NSArray<NSValue *> *cols = [RDLPageGeometry columnGroupBracketsForCount:2 inRect:region];
+  if ([rows count] != 3 || [cols count] != 2) {
+    XCTFail(@"%@", @"one bracket per group, on each axis");
+    return;
+  }
+
+  CGFloat previousX = -CGFLOAT_MAX;
+  for (NSValue *v in rows) {
+    NSRect b = [v rectValue];
+    if (NSMaxX(b) > NSMinX(region))
+      XCTFail(@"%@", @"a row bracket reaches into the region");
+    if (fabs(NSMinY(b) - NSMinY(region)) > 0.01 || fabs(NSHeight(b) - NSHeight(region)) > 0.01)
+      XCTFail(@"%@", @"a row bracket does not span the region's height");
+    if (NSMinX(b) <= previousX)
+      XCTFail(@"%@", @"row brackets should step outwards, outermost furthest from the region");
+    previousX = NSMinX(b);
+  }
+  // Outermost first: the first bracket is the furthest out.
+  if (NSMinX([rows[0] rectValue]) >= NSMinX([[rows lastObject] rectValue]))
+    XCTFail(@"%@", @"the outermost row group should be the furthest from the region");
+
+  for (NSValue *v in cols) {
+    NSRect b = [v rectValue];
+    if (NSMaxY(b) > NSMinY(region))
+      XCTFail(@"%@", @"a column bracket reaches into the region");
+    if (fabs(NSMinX(b) - NSMinX(region)) > 0.01 || fabs(NSWidth(b) - NSWidth(region)) > 0.01)
+      XCTFail(@"%@", @"a column bracket does not span the region's width");
+  }
+  if (NSMinY([cols[0] rectValue]) >= NSMinY([[cols lastObject] rectValue]))
+    XCTFail(@"%@", @"the outermost column group should be the furthest from the region");
+
+  // A tablix with no groups gets no brackets, rather than an empty one drawn.
+  if ([[RDLPageGeometry rowGroupBracketsForCount:0 inRect:region] count] != 0)
+    XCTFail(@"%@", @"no groups should mean no brackets");
+}
+
+- (void)testCrosstabSample {
+  RDLReport *r = [RDLSamples regionalSales];
+  RDLTablix *tab = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tab = (RDLTablix *)it;
+      break;
+    }
+  if (tab == nil) {
+    XCTFail(@"%@", @"the crosstab sample has no tablix");
+    return;
+  }
+  if ([tab.rowGroups count] != 2 || [tab.columnGroups count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu row and %lu column groups; expected two of each",
+                                              (unsigned long)[tab.rowGroups count],
+                                              (unsigned long)[tab.columnGroups count]]);
+  // It names a dataset, and that dataset has the fields the groups name.
+  RDLDataSet *ds = nil;
+  for (RDLDataSet *candidate in r.dataSets)
+    if ([candidate.name isEqualToString:tab.dataSetName])
+      ds = candidate;
+  if (ds == nil) {
+    XCTFail(@"%@", @"the crosstab's tablix names no dataset of the report");
+    return;
+  }
+  for (NSString *field in [tab.rowGroups arrayByAddingObjectsFromArray:tab.columnGroups])
+    if (![[ds fieldNames] containsObject:field])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the sample groups on %@, which %@ does not have",
+                                                field, ds.name]);
+  // Every column aggregates, because there is no details row to read raw.
+  for (NSDictionary *spec in tab.columnSpecs)
+    if ([spec[@"aggregate"] length] == 0)
+      XCTFail(@"%@", [NSString stringWithFormat:@"column %@ does not aggregate", spec[@"header"]]);
+
+  // And it lays out: a sample that does not is worse than no sample.
+  NSArray *pages = [RDLLayoutEngine pagesForReport:r paramValues:nil];
+  if ([pages count] == 0)
+    XCTFail(@"%@", @"the crosstab sample lays out to nothing");
+}
+
 - (void)testTablixEditorGroupsAndAggregates {
   RDLReport *report = [RDLSamples atelierInvoice];
   RDLTablix *tablix = nil;

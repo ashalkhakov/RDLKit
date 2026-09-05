@@ -38,7 +38,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   NSRectFill(hr);
 
   // Hovered cell highlight: shows which region a double-click would edit.
-  if (_overlay.hoverTablix == it && _overlay.hoverPart != nil &&
+  if (_overlay.hoverTablix == it && _overlay.hoverPart != RDLTablixPartNone &&
       _overlay.editingItem == nil) {
     NSRect cell = [RDLTablixGeometry cellRectOf:it
                                        itemRect:r
@@ -155,6 +155,71 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   }
 }
 
+// The group structure at a glance, the way Report Builder shows it: a bracket
+// outside the region per group, nested outwards, labelled with the field. Rows
+// bracket down the left, columns across the top, so a crosstab reads as the two
+// axes it is. Drawn only for the selected tablix -- it is orientation, not
+// decoration, and on every region at once it would be noise.
+// The group structure at a glance, the way Report Builder shows it: a bracket
+// outside the region per group, nested outwards, labelled with the field. Rows
+// bracket down the left, columns across the top, so a crosstab reads as the two
+// axes it is. Drawn only for the selected tablix -- it is orientation, not
+// decoration, and on every region at once it would be noise. Where each bracket
+// goes is RDLPageGeometry's, so it can be checked without drawing.
+static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
+  NSArray<NSString *> *rows = tablix.rowGroups ?: @[];
+  NSArray<NSString *> *cols = tablix.columnGroups ?: @[];
+  if ([rows count] == 0 && [cols count] == 0)
+    return;
+
+  NSColor *ink = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.85];
+  NSDictionary *attrs = @{
+    NSFontAttributeName : [NSFont boldSystemFontOfSize:8],
+    NSForegroundColorAttributeName : ink,
+  };
+  [ink set];
+
+  NSArray<NSValue *> *rowBrackets = [RDLPageGeometry rowGroupBracketsForCount:[rows count]
+                                                                       inRect:r];
+  for (NSUInteger i = 0; i < [rows count]; i++) {
+    NSRect b = [rowBrackets[i] rectValue];
+    NSBezierPath *path = [NSBezierPath bezierPath];
+    [path moveToPoint:NSMakePoint(NSMaxX(b), NSMinY(b))];
+    [path lineToPoint:NSMakePoint(NSMinX(b), NSMinY(b))];
+    [path lineToPoint:NSMakePoint(NSMinX(b), NSMaxY(b))];
+    [path lineToPoint:NSMakePoint(NSMaxX(b), NSMaxY(b))];
+    [path setLineWidth:1];
+    [path stroke];
+    // Along the bracket, turned to read with it.
+    NSString *label = rows[i];
+    NSSize size = [label sizeWithAttributes:attrs];
+    NSAffineTransform *turn = [NSAffineTransform transform];
+    [NSGraphicsContext saveGraphicsState];
+    [turn translateXBy:NSMinX(b) - 2 yBy:NSMidY(b) + size.width / 2];
+    [turn rotateByDegrees:-90];
+    [turn concat];
+    [label drawAtPoint:NSZeroPoint withAttributes:attrs];
+    [NSGraphicsContext restoreGraphicsState];
+  }
+
+  NSArray<NSValue *> *colBrackets = [RDLPageGeometry columnGroupBracketsForCount:[cols count]
+                                                                          inRect:r];
+  for (NSUInteger i = 0; i < [cols count]; i++) {
+    NSRect b = [colBrackets[i] rectValue];
+    NSBezierPath *path = [NSBezierPath bezierPath];
+    [path moveToPoint:NSMakePoint(NSMinX(b), NSMaxY(b))];
+    [path lineToPoint:NSMakePoint(NSMinX(b), NSMinY(b))];
+    [path lineToPoint:NSMakePoint(NSMaxX(b), NSMinY(b))];
+    [path lineToPoint:NSMakePoint(NSMaxX(b), NSMaxY(b))];
+    [path setLineWidth:1];
+    [path stroke];
+    NSString *label = cols[i];
+    NSSize size = [label sizeWithAttributes:attrs];
+    [label drawAtPoint:NSMakePoint(NSMidX(b) - size.width / 2, NSMinY(b) - size.height - 1)
+        withAttributes:attrs];
+  }
+}
+
 - (void)drawItem:(RDLItem *)it origin:(NSPoint)origin {
   BOOL sel = it == [_ctx selectedItem];
   NSRect r = [_geometry rectForItem:it origin:origin];
@@ -170,6 +235,8 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it isKindOfClass:[RDLTablix class]]) {
     [self drawTablix:(RDLTablix *)it inRect:r];
+    if (sel)
+      RDLDrawGroupBrackets((RDLTablix *)it, r);
   } else if ([it isKindOfClass:[RDLChart class]]) {
     // The canvas shows the real chart, not a stand-in: the model is laid out
     // against whatever data is bound and drawn by the same RDLChartRenderer
