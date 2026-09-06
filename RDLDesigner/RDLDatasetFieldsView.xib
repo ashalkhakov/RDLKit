@@ -17,8 +17,9 @@
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
         <customView id="content">
             <rect key="frame" x="0.0" y="0.0" width="400" height="300"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField id="title">
+                <textField focusRingType="none" id="title">
                     <rect key="frame" x="8" y="274" width="384" height="22"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="titleCell">
@@ -30,21 +31,21 @@
                         <action selector="renameDataSet:" target="-2" id="titleAction"/>
                     </connections>
                 </textField>
-                <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" hasVerticalScroller="YES" id="tableScroll">
-                    <rect key="frame" x="0" y="26" width="400" height="244"/>
+                <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="tableScroll">
+                    <rect key="frame" x="0.0" y="26" width="400" height="244"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                     <clipView key="contentView" copiesOnScroll="NO" id="tableClip">
-                        <rect key="frame" x="1" y="1" width="383" height="242"/>
+                        <rect key="frame" x="1" y="1" width="383" height="227"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="table">
-                                <rect key="frame" x="0.0" y="0.0" width="383" height="242"/>
+                                <rect key="frame" x="0.0" y="0.0" width="383" height="227"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="2"/>
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                 <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                 <tableColumns>
-                                    <tableColumn identifier="name" editable="YES" width="220" minWidth="40" maxWidth="1000" id="nameCol">
+                                    <tableColumn identifier="name" width="220" minWidth="40" maxWidth="1000" id="nameCol">
                                         <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Field">
                                             <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
@@ -55,7 +56,7 @@
                                             <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                         </textFieldCell>
                                     </tableColumn>
-                                    <tableColumn identifier="type" editable="YES" width="140" minWidth="40" maxWidth="1000" id="typeCol">
+                                    <tableColumn identifier="type" width="140" minWidth="40" maxWidth="1000" id="typeCol">
                                         <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Type">
                                             <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
@@ -75,12 +76,12 @@
                         </subviews>
                     </clipView>
                     <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                        <rect key="frame" x="384" y="1" width="15" height="242"/>
+                        <rect key="frame" x="384" y="1" width="15" height="227"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                     </scroller>
                 </scrollView>
                 <button toolTip="Add a field" id="addButton">
-                    <rect key="frame" x="0" y="1" width="32" height="24"/>
+                    <rect key="frame" x="0.0" y="1" width="32" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <buttonCell key="cell" type="square" title="+" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="addButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -102,6 +103,7 @@
                     </connections>
                 </button>
             </subviews>
+            <point key="canvasLocation" x="140" y="154"/>
         </customView>
     </objects>
 </document>

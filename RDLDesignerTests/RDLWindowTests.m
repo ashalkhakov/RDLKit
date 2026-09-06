@@ -381,6 +381,15 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSTableView *fieldTable = [fields valueForKey:@"table"];
   if ([fieldTable numberOfRows] != (NSInteger)[[ds fields] count])
     XCTFail(@"%@", @"the fields view's table does not show the dataset's fields");
+  // Both columns are edited in place, the way the Core Data model builder
+  // edits an entity's attributes. A cell-based table asks the column's data
+  // cell, not the column, so editable on the column alone changes nothing.
+  for (NSString *column in @[ @"name", @"type" ]) {
+    NSTableColumn *c = [fieldTable tableColumnWithIdentifier:column];
+    if (![[c dataCell] isEditable])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the %@ column cannot be edited in place",
+                                                column]);
+  }
 
   // The field inspector: the popup is filled in code from the enumeration,
   // which only happens if the outlet arrived.

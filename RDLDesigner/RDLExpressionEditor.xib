@@ -36,7 +36,7 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="sourceScroll">
+                    <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="sourceScroll">
                         <rect key="frame" x="12" y="308" width="676" height="140"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="sourceScrollClip">
@@ -46,8 +46,8 @@
                                 <textView importsGraphics="NO" verticallyResizable="YES" allowsUndo="YES" id="sourceView">
                                     <rect key="frame" x="0.0" y="0.0" width="660" height="123"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
-                                    <size key="minSize" width="643" height="123"/>
-                                    <size key="maxSize" width="660" height="10000000"/>
+                                    <size key="minSize" width="659" height="123"/>
+                                    <size key="maxSize" width="677" height="10000000"/>
                                     <color key="insertionPointColor" name="textColor" catalog="System" colorSpace="catalog"/>
                                 </textView>
                             </subviews>
@@ -60,7 +60,6 @@
                             <rect key="frame" x="660" y="1" width="15" height="123"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
-                        
                     </scrollView>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="lblCat">
                         <rect key="frame" x="12" y="284" width="160" height="16"/>
@@ -80,7 +79,7 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="categoryScroll">
+                    <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="categoryScroll">
                         <rect key="frame" x="12" y="92" width="160" height="184"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="categoryScrollClip">
@@ -121,9 +120,8 @@
                             <rect key="frame" x="144" y="1" width="15" height="167"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
-                        
                     </scrollView>
-                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="itemScroll">
+                    <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="itemScroll">
                         <rect key="frame" x="184" y="92" width="504" height="184"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="itemScrollClip">
@@ -164,12 +162,11 @@
                             <rect key="frame" x="488" y="1" width="15" height="167"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
-                        
                     </scrollView>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="summaryLabel">
                         <rect key="frame" x="12" y="68" width="676" height="16"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="" id="summaryLabelCell">
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" id="summaryLabelCell">
                             <font key="font" metaFont="smallSystem"/>
                             <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
@@ -178,7 +175,7 @@
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="statusLabel">
                         <rect key="frame" x="12" y="46" width="676" height="16"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="" id="statusLabelCell">
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" id="statusLabelCell">
                             <font key="font" metaFont="smallSystem"/>
                             <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
@@ -190,9 +187,10 @@
                         <buttonCell key="cell" type="push" title="Insert" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="insertButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                            
                         </buttonCell>
-                        <connections><action selector="insert:" target="-2" id="insertButtonAction"/></connections>
+                        <connections>
+                            <action selector="insert:" target="-2" id="insertButtonAction"/>
+                        </connections>
                     </button>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="cancelButton">
                         <rect key="frame" x="510" y="10" width="84" height="26"/>
@@ -200,12 +198,13 @@
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                            
-                                                    <string key="keyEquivalent" base64-UTF8="YES">
+                            <string key="keyEquivalent" base64-UTF8="YES">
 Gw
 </string>
-</buttonCell>
-                        <connections><action selector="cancel:" target="-2" id="cancelButtonAction"/></connections>
+                        </buttonCell>
+                        <connections>
+                            <action selector="cancel:" target="-2" id="cancelButtonAction"/>
+                        </connections>
                     </button>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="okButton">
                         <rect key="frame" x="602" y="10" width="86" height="26"/>
@@ -217,7 +216,9 @@ Gw
 DQ
 </string>
                         </buttonCell>
-                        <connections><action selector="ok:" target="-2" id="okButtonAction"/></connections>
+                        <connections>
+                            <action selector="ok:" target="-2" id="okButtonAction"/>
+                        </connections>
                     </button>
                 </subviews>
             </view>
