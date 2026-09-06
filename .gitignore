@@ -60,3 +60,6 @@ obj/
 # addresses and account numbers; the committed fixtures in
 # RDLKitTests/Fixtures are scrubbed copies of them.
 /*.docx
+
+# Local Claude session tooling (per-machine, not project state)
+/.claude/
