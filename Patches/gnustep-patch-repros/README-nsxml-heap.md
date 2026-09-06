@@ -108,9 +108,28 @@ who frees the tree.
 
 A Foundation-only document of the same shape, built and released in the same
 loop, does not reproduce it -- `nsxml-document-teardown.m` survives 200 rounds
-either way. So something about the tree this writer builds decides whether the
-teardown is fatal, and finding what is the next narrowing: the probe makes that
-bisection reliable, which it was not before.
+either way. Chasing that difference is where this stops, and the chase is worth
+recording because of how much it excludes.
+
+`nsxml-empty-report.m` is generated from the writer's own output, so it builds
+the same tree node for node: 70 statements, the same elements, attributes,
+values and nesting. It survives 400 rounds. Then, one at a time:
+
+* with the strings built at runtime rather than as literals -- survives
+* linked against gnustep-gui as well as base -- survives
+* with libRDLKit loaded and a report alive beside it -- survives
+* skipping each section of the real writer in turn -- all die, sooner with
+  fewer nodes, so no one section is responsible and the damage is cumulative
+
+And the writer's calls were traced to be sure the mimic was not missing any:
+38 of them for an empty report, every one accounted for in the output. Same
+tree, same calls, same libraries, same process -- the mimic lives and the
+writer dies.
+
+So it is not the shape of the tree, not the strings, not the libraries loaded,
+and not any section of the writer on its own. What is left is an interaction
+between the writer's own allocation sequence and something else in that
+process, which is beyond what these instruments can separate.
 
 ## Where that leaves it
 
@@ -137,8 +156,12 @@ techniques are heavier than the ones tried -- running with ASLR disabled to get
 a repeatable address, then a hardware watchpoint on the chunk that ends up
 corrupted, which needs SYS_PTRACE in the container.
 
-The reproduction is small enough to hand to GNUstep as it stands, which may be
-the better next move: six writes of an empty report, no AppKit, no XIBs.
+The reproduction is small enough to hand to GNUstep as it stands, which is now
+the recommended next move: six writes of an empty report through
+`Patches/gnustep-patch-repros/empty-loop.m`, no AppKit, no XIBs, with
+`Scripts/gnustep-box` to build the environment it happens in. A
+Foundation-only reproduction would be better and has not been found; the
+attempts above are the evidence for why.
 
 ## Also found, and separately real
 
