@@ -72,9 +72,43 @@ into chunks that were simply handed back out, including against the fixed build
 that never crashes, so it corroborates the location rather than proving a single
 guilty write. The switches are the solid evidence.)
 
-This still stays worth handing to GNUstep as a base defect -- the teardown
-should not depend on the number of live wrappers -- and `empty-loop.m` with its
-three switches is enough to show it. The kit no longer waits on that fix.
+## Foundation-only reproduction found, and a base patch
+
+The base defect is now pinned to one thing, with a Foundation-only
+reproduction and a fix. `nsxml-xmlns-attribute-teardown.m` (beside this file)
+builds an element, declares a *prefixed* namespace on it as an attribute --
+`[el addAttribute:[NSXMLNode attributeWithName:@"xmlns:rd" stringValue:...]]`,
+which is exactly what the writer did for `xmlns:rd` -- adds a few children,
+wraps it in a document, serialises, and releases. It aborts within a few rounds
+under Foundation alone. Three controls localise it: declaring the same
+namespace through `-addNamespace:` never crashes, keeping the documents alive
+never crashes, and declaring only the *default* namespace (`xmlns`, no prefix)
+never crashes. Only a prefixed declaration added as an attribute, on a released
+document, reaches it.
+
+Root cause: `-[NSXMLNode setName:]` on an attribute named `xmlns:rd` splits it
+into prefix `xmlns` + local `rd` and, treating `xmlns` as an ordinary prefix,
+manufactures a namespace node with the reserved prefix `xmlns` and a NULL href.
+`xmlns` is reserved -- `xmlns:rd` declares the prefix `rd`, it is not an
+attribute in a namespace called `xmlns` -- so that node is malformed, and it is
+its teardown, across the private detached documents `-detach` builds as the
+pool drains after the document is released, that writes through freed chunks.
+That the RDL writer materialises a wrapper for every node is what makes the peel
+long enough to land on a live chunk; the shared reserved-prefix namespace is
+what is actually mishandled. This is also why the same-shape
+`nsxml-document-teardown.m` above, which uses only a default `xmlns`, does not
+reproduce.
+
+`gnustep-base-xmlns-attribute.patch` (beside this file) fixes it in
+gnustep-base: `-[NSXMLNode setName:]` stops manufacturing a namespace for the
+reserved `xmlns`/`xml` prefixes, and `-[NSXMLElement addAttribute:]` registers
+an `xmlns:prefix` attribute as a real namespace (the `-addNamespace:` path that
+never crashed), so prefixed descendants still resolve and the serialisation is
+unchanged bar the order of a prefixed declaration relative to a co-located
+default-`xmlns` attribute. With the patch every mode of the reproduction
+survives, the gnustep-base NSXML suite (420 tests) is unaffected, and the
+original document-based writer survives 500+ rounds. The kit keeps its own fix
+(the writer needs no document); the patch is what to hand upstream.
 
 ## What has been ruled out
 
@@ -213,12 +247,12 @@ techniques are heavier than the ones tried -- running with ASLR disabled to get
 a repeatable address, then a hardware watchpoint on the chunk that ends up
 corrupted, which needs SYS_PTRACE in the container.
 
-The reproduction is small enough to hand to GNUstep as it stands, which is now
-the recommended next move: six writes of an empty report through
-`Patches/gnustep-patch-repros/empty-loop.m`, no AppKit, no XIBs, with
-`Scripts/gnustep-box` to build the environment it happens in. A
-Foundation-only reproduction would be better and has not been found; the
-attempts above are the evidence for why.
+The reproduction is small enough to hand to GNUstep as it stands. A
+Foundation-only reproduction would be better -- and was later found once the
+trigger was narrowed to a prefixed namespace declaration added as an attribute;
+see "Foundation-only reproduction found, and a base patch" above,
+`nsxml-xmlns-attribute-teardown.m`, and `gnustep-base-xmlns-attribute.patch`.
+The attempts recorded here are what excluded everything else first.
 
 ## Also found, and separately real
 

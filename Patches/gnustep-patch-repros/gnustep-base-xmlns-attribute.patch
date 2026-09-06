@@ -1,0 +1,148 @@
+NSXML: a namespace declaration supplied via -addAttribute: corrupts the heap
+
+A prefixed namespace declaration added to an element as an attribute --
+[el addAttribute:[NSXMLNode attributeWithName:@"xmlns:rd" stringValue:...]] --
+corrupts the heap on release of the enclosing NSXMLDocument, aborting the
+process in glibc's allocator within a few build/serialise/release cycles
+("malloc_consolidate(): unaligned fastbin chunk detected", in whatever later
+allocation looks next). A self-contained Foundation-only reproduction is in
+nsxml-xmlns-attribute-teardown.m beside this patch.
+
+Root cause: -[NSXMLNode setName:] on an attribute whose qualified name is
+"xmlns:rd" calls xmlSplitQName2, gets prefix "xmlns" + local "rd", and then --
+because it treats "xmlns" as an ordinary prefix -- manufactures a namespace
+node with the reserved prefix "xmlns" and a NULL href. "xmlns" and "xml" are
+reserved: "xmlns:rd" declares the prefix rd, it is not an attribute in a
+namespace named "xmlns". The manufactured node is malformed, and its teardown
+across the private detached documents -detach creates (one per element wrapper
+as the autorelease pool drains after the document is released) writes through
+freed chunks. Declaring the same namespace through -addNamespace: never
+crashes; keeping the documents alive never crashes; only a *prefixed*
+declaration added as an attribute, on a released document, reaches the fault.
+
+This changes two things:
+
+  1. -[NSXMLNode setName:] no longer resolves or manufactures a namespace for
+     the reserved "xmlns"/"xml" prefixes; it keeps the qualified name literal.
+     libxml prints an unnamespaced attribute by its full name, so a bare
+     "xmlns:rd" attribute still serialises as xmlns:rd="...".
+
+  2. -[NSXMLElement addAttribute:] registers a "xmlns:prefix" attribute as a
+     real namespace (the -addNamespace: path, which never crashed) rather than
+     as an attribute, so prefixed descendants resolve against a proper
+     declaration and print with their prefix. The default declaration
+     ("xmlns", no prefix) is left as an attribute -- it never took the
+     reserved-prefix path and never provoked the fault.
+
+Serialisation is unchanged except that a prefixed xmlns declaration, now a
+real namespace, prints before a co-located default-xmlns attribute rather than
+after it (declaration order is not significant). The gnustep-base NSXML test
+suite (NSXMLNode / NSXMLDocument / NSXMLElement, 420 tests) passes unchanged.
+
+Applies to current master with `patch -p1` (git apply may need --3way or a
+trivial rebase depending on nearby churn); developed and tested against the
+gnustep/libs-base tree current in early 2026.
+
+diff --git a/Source/NSXMLElement.m b/Source/NSXMLElement.m
+index 7484209..6797862 100644
+--- a/Source/NSXMLElement.m
++++ b/Source/NSXMLElement.m
+@@ -253,6 +253,30 @@ GS_PRIVATE_INTERNAL(NSXMLElement)
+ 		  format: @"Tried to add attribute to multiple parents."];
+     }
+ 
++  /* A prefixed namespace declaration supplied as an attribute --
++   * "xmlns:prefix" -- is not an ordinary attribute: it declares a namespace
++   * on this element.  Register it as a real namespace rather than storing it
++   * as an attribute.  Doing otherwise builds a namespace node with the
++   * reserved prefix "xmlns" and a NULL href (see -[NSXMLNode setName:]) whose
++   * teardown corrupts the heap when the enclosing document is released, and
++   * leaves prefixed descendants unable to resolve against a proper
++   * declaration.  The serialisation is unchanged: a real namespace prints as
++   * xmlns:prefix="href" just as the attribute did, and prefixed elements
++   * bound to it now print with their prefix.  The default declaration
++   * ("xmlns", no prefix) is left as an attribute: it does not take the
++   * reserved-prefix path in -setName: and does not provoke the fault. */
++  {
++    NSString *aname = [attribute name];
++
++    if ([aname hasPrefix: @"xmlns:"] && [aname length] > 6)
++      {
++        NSXMLNode *ns = [NSXMLNode namespaceWithName: [aname substringFromIndex: 6]
++                                         stringValue: [attribute stringValue]];
++        [self addNamespace: ns];
++        return;
++      }
++  }
++
+   if (attr->ns != NULL)
+     {
+       xmlNsPtr ns = attr->ns;
+diff --git a/Source/NSXMLNode.m b/Source/NSXMLNode.m
+index bab9640..cc5fe17 100644
+--- a/Source/NSXMLNode.m
++++ b/Source/NSXMLNode.m
+@@ -164,7 +164,35 @@ setTreeDoc(xmlNodePtr node, xmlDocPtr doc)
+       node->content
+ 	= (xmlChar *)adoptString(node->content, oldDoc, doc, adoptStr);
+     }
+-  
++
++  /* An attribute node detached directly (e.g. NSXMLElement's
++   * -removeAttributeForName:, or the subnode detach that -dealloc
++   * performs) arrives here as the top-level node.  Its name is
++   * interned in the old document's dictionary and must be adopted,
++   * or xmlFreeProp later frees an interior pointer of that
++   * dictionary. The value text children are handled by the
++   * recursive children walk below.
++   */
++  if (node->type == XML_ATTRIBUTE_NODE)
++    {
++      node->name = adoptString(node->name, oldDoc, doc, adoptStr);
++    }
++
++  /* Content-bearing nodes other than text: same dictionary-interning
++   * hazard for their content (and a processing instruction's name).
++   */
++  if (node->type == XML_COMMENT_NODE
++    || node->type == XML_CDATA_SECTION_NODE
++    || node->type == XML_PI_NODE)
++    {
++      node->content
++	= (xmlChar *)adoptString(node->content, oldDoc, doc, adoptStr);
++      if (node->type == XML_PI_NODE)
++	{
++	  node->name = adoptString(node->name, oldDoc, doc, adoptStr);
++	}
++    }
++
+   if (node->type == XML_ELEMENT_NODE)
+     {
+       xmlAttrPtr attr;
+@@ -2115,7 +2143,25 @@ execute_xpath(xmlNodePtr node, NSString *xpath_exp, NSDictionary *constants,
+         }
+       
+       localName = xmlSplitQName2(xmlName, &prefix);
+-      if (prefix != NULL)
++      if (prefix != NULL
++        && (xmlStrEqual(prefix, (const xmlChar *)"xmlns")
++            || xmlStrEqual(prefix, (const xmlChar *)"xml")))
++        {
++          /* "xmlns" and "xml" are reserved prefixes: "xmlns:foo" is a
++           * namespace declaration, not an attribute in a namespace named
++           * "xmlns", and "xml:foo" uses the built-in XML namespace.  They
++           * must not be resolved or manufactured as ordinary prefixes --
++           * doing so builds a namespace node with the reserved prefix and a
++           * NULL href whose teardown corrupts the heap when the document is
++           * released (a namespace supplied through -addAttribute: as e.g.
++           * xmlns:rd="...").  Keep the qualified name literal; libxml prints
++           * an unnamespaced attribute by its full name, so the serialisation
++           * is unchanged. */
++          xmlNodeSetName(theNode, xmlName);
++          xmlFree(localName);
++          xmlFree(prefix);
++        }
++      else if (prefix != NULL)
+         {
+           if ((theNode->type == XML_ATTRIBUTE_NODE)
+ 	    || (theNode->type == XML_ELEMENT_NODE))
