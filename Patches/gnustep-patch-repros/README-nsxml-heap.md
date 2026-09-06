@@ -34,9 +34,32 @@ Each of these was tested, in the container `Scripts/gnustep-box` builds:
   a two-line writer survives 500 rounds. Adding the header back three elements
   at a time crosses the threshold, and each of those three alone does not --
   so it depends on the volume and mix of allocations rather than on one call.
-* Not visible to AddressSanitizer, valgrind, or NSZombieEnabled: all three
-  replace or delay the allocator, and the fault survives none of them. Only
-  glibc's own bookkeeping sees it.
+* Not visible to AddressSanitizer, valgrind, or NSZombieEnabled, and not to a
+  canary on every allocation in the process. Every one of them either replaces
+  the allocator whose bookkeeping breaks, or checks only the code it compiled.
+  Only glibc's own bookkeeping sees it.
+
+* Not a fault in gnustep-base's own accesses: with base built against
+  AddressSanitizer the loop runs clean.
+
+## What the instruments said
+
+`xml-alloc-trace.m` puts a canary past the end of every block libxml2
+allocates; `heap-canary.c` does the same for every allocation in the process,
+gnustep-base and libobjc2 included. Neither ever sees a block written past its
+end, over hundreds of rounds. So this is not a buffer overrun.
+
+`Scripts/gnustep-box/asan-base.sh` rebuilds gnustep-base itself with
+AddressSanitizer -- 2640 sanitizer symbols in the installed library, which the
+script checks before believing the run -- and the loop then survives 200
+rounds with nothing reported. That says gnustep-base's own accesses are clean:
+no use-after-free written by its code, which is where the shape of
+-[NSXMLNode dealloc] had pointed.
+
+What that leaves is libxml2's own accesses, which nothing has instrumented
+yet: ASan checks only code it compiled, so a write from inside libxml2 into
+memory ASan knows is freed is still invisible. Building libxml2 with the
+sanitizer as well is the next experiment.
 
 ## Also found, and separately real
 
@@ -49,11 +72,28 @@ Valgrind on the same stack reports, on every XIB load:
        at malloc
        by GSSAXHandler _initLibXML     (GSXML.m:3801)
 
+There are two, both worth patching upstream on their own.
+
+### The SAX handler is never zeroed
+
 `GSXML.m:3801` allocates an `xmlSAXHandler` with `malloc` and hands it straight
 to `xmlSAX2InitDefaultSAXHandler`, which begins `if (hdlr->initialized != 0)
 return;`. When the uninitialised field happens to be non-zero the handler is
-left as it was found. `calloc` fixes it; a patch and a repro for that one are
-worth making on their own.
+left as it was found. `calloc` fixes it: see `../gnustep-base-sax-handler-calloc.patch`, applied by
+`.github/scripts/dependencies.sh`, with `sax-handler-init.m` beside this file
+as its reproduction. In practice `_initLibXML` goes on to call
+`xmlSAXVersion()`, which re-establishes the callbacks, so what this costs is an
+uninitialised read on every parse rather than a broken parser.
+
+### libxml2 is given memory it did not allocate
+
+`XMLStringCopy` in `NSXMLPrivate.h` allocates with plain `malloc` the strings it
+hands to libxml2 -- a document's version and encoding, a DTD's public and
+system ids, an entity's name -- and libxml2 frees them with `xmlFree`. That is
+harmless while `xmlFree` is `free`, and corrupts the heap for any program that
+calls `xmlMemSetup` to install its own, which is a documented thing to do and
+what `xml-alloc-trace.m` here does. Two such blocks are freed per report
+written. `xmlMalloc`/`xmlStrdup` would be the fix.
 
 ## Running these
 
