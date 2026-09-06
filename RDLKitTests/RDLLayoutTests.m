@@ -1005,6 +1005,73 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"rebuild without a stored spec should fall back to the derived one");
 }
 
+// HideIfNoRows on a static member: the column header the report says not to
+// draw when the dataset came back empty. Carried through the file as well as
+// acted on, since a report that loses it prints a header over nothing on the
+// next run.
+- (void)testTablixHideIfNoRows {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  tab.noRowsMessage = nil;  // the message is a different answer to the same question
+  tab.rowGroups = @[];
+  [tab rebuildTablix];
+  RDLTablixMember *header = [tab.rowHierarchy.members firstObject];
+  header.hideIfNoRows = YES;
+
+  // With rows, the header is drawn.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  BOOL drawn = NO;
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      drawn |= [RDLLaidText(it) isEqualToString:@"Job"];
+  if (!drawn)
+    XCTFail(@"%@", @"the header should be drawn when the dataset has rows");
+
+  // With none, it is not.
+  r.dataSets[0].rows = @[];
+  pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) isEqualToString:@"Job"])
+        XCTFail(@"%@", @"HideIfNoRows was ignored: the header was drawn over no rows");
+
+  // And it survives the file.
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
+  RDLTablix *pt = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      pt = (RDLTablix *)it;
+  if (![[pt.rowHierarchy.members firstObject] hideIfNoRows])
+    XCTFail(@"%@", @"HideIfNoRows did not survive the round trip");
+}
+
+// The two Tablix properties that describe how the region is laid out rather
+// than what is in it. Neither backend acts on them yet -- RTL would mirror the
+// region, and GroupsBeforeRowHeaders moves column groups over the corner --
+// but a report that has them must not lose them on the next save.
+- (void)testTablixLayoutPropertiesRoundTrip {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  tab.layoutDirection = RDLLayoutDirectionRTL;
+  tab.groupsBeforeRowHeaders = 1;
+
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<LayoutDirection>RTL</LayoutDirection>"].location == NSNotFound ||
+      [xml rangeOfString:@"<GroupsBeforeRowHeaders>1</GroupsBeforeRowHeaders>"].location == NSNotFound)
+    XCTFail(@"%@", @"the writer dropped the tablix layout properties");
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  RDLTablix *pt = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      pt = (RDLTablix *)it;
+  if (pt.layoutDirection != RDLLayoutDirectionRTL || pt.groupsBeforeRowHeaders != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"round-trip gave direction %ld, %ld before headers",
+                                              (long)pt.layoutDirection,
+                                              (long)pt.groupsBeforeRowHeaders]);
+}
+
 - (void)testTablixFit {
 
   // Ungrouped: nothing is taken away.

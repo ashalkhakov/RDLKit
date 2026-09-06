@@ -39,7 +39,9 @@ static NSString *RDLLegacyTableRDL(void) {
          @"          <TableCell><ReportItems><Textbox Name=\"F2\"><Value>=Sum(Fields!Pop.Value)</Value></Textbox></ReportItems></TableCell>\n"
          @"        </TableCells></TableRow></TableRows></Footer>\n"
          @"      </TableGroup></TableGroups>\n"
-         @"      <Details><TableRows><TableRow><Height>0.25in</Height><TableCells>\n"
+         @"      <Details>\n"
+         @"        <Visibility><Hidden>true</Hidden><ToggleItem>G1</ToggleItem></Visibility>\n"
+         @"        <TableRows><TableRow><Height>0.25in</Height><TableCells>\n"
          @"        <TableCell><ReportItems><Textbox Name=\"D1\"><Value>=Fields!City.Value</Value></Textbox></ReportItems></TableCell>\n"
          @"        <TableCell><ReportItems><Textbox Name=\"D2\"><Value>=Fields!Pop.Value</Value></Textbox></ReportItems></TableCell>\n"
          @"      </TableCells></TableRow></TableRows></Details>\n"
@@ -207,9 +209,36 @@ static NSString *RDLLegacyTableRDL(void) {
   if ([group.groupExpressions count] != 1 ||
       ![[group.groupExpressions[0] source] isEqualToString:@"=Fields!City.Value"])
     XCTFail(@"%@", @"Grouping/GroupExpressions should become Group/GroupExpressions");
-  if ([group.members count] != 3)
+  if ([group.members count] != 3) {
     XCTFail(@"%@", [NSString stringWithFormat:@"group should hold header+detail+footer, has %lu",
                                                (unsigned long)[group.members count]]);
+    return;
+  }
+
+  // A 2005 drill-down: the Details section is hidden and names the textbox
+  // that expands it. That Visibility belongs to the member the section becomes
+  // -- losing it does not only lose the toggle, it prints rows the report says
+  // should start collapsed.
+  RDLTablixMember *detail = group.members[1];
+  if (![[detail.hidden source] isEqualToString:@"true"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the detail member's Hidden is %@",
+                                              [detail.hidden source]]);
+  if (![detail.toggleItem isEqualToString:@"G1"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"ToggleItem → %@", detail.toggleItem]);
+
+  // And it survives being written back out, which is what makes the round trip
+  // non-destructive for a drill-down report.
+  RDLReport *again = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:&err];
+  RDLTablix *t2 = nil;
+  for (RDLItem *it in again.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      t2 = (RDLTablix *)it;
+  RDLTablixMember *detail2 = [[t2.rowHierarchy.members lastObject].members count] > 1
+                                 ? [t2.rowHierarchy.members lastObject].members[1]
+                                 : nil;
+  if (![detail2.toggleItem isEqualToString:@"G1"] ||
+      ![[detail2.hidden source] isEqualToString:@"true"])
+    XCTFail(@"%@", @"the drill-down did not survive the round trip");
   // The designer's own view of it: a grouped table.
   if (![t.rowGroups isEqualToArray:@[ @"City" ]])
     XCTFail(@"%@", [NSString stringWithFormat:@"row groups → %@", t.rowGroups]);

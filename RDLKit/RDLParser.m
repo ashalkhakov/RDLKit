@@ -51,6 +51,7 @@ static RDLValue *RDLValueFromElement(NSXMLElement *el) {
 }
 
 static RDLValue *RDLParseVisibility(NSXMLElement *el);
+static NSString *RDLParseToggleItem(NSXMLElement *el);
 static RDLValue *RDLParseHyperlink(NSXMLElement *el);
 
 // Warnings raised while parsing; see gRDLParseWarnings below.
@@ -534,6 +535,9 @@ static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
   RDLValue *hid = RDLParseVisibility(el);
   if (hid)
     m.hidden = hid;
+  m.toggleItem = RDLParseToggleItem(el);
+  NSString *hnr = RDLText(RDLChild(el, @"HideIfNoRows"));
+  m.hideIfNoRows = [hnr isEqualToString:@"true"] || [hnr isEqualToString:@"True"];
   NSXMLElement *headerEl = RDLChild(el, @"TablixHeader");
   if (headerEl) {
     RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
@@ -698,6 +702,15 @@ static RDLValue *RDLParseVisibility(NSXMLElement *el) {
   return vis ? RDLValueFromElement(RDLChild(vis, @"Hidden")) : nil;
 }
 
+// Visibility/ToggleItem: the textbox that shows and hides this one. Nothing
+// paginated can act on it, but a report that has it is a drill-down and would
+// stop being one if it were dropped on the next save.
+static NSString *RDLParseToggleItem(NSXMLElement *el) {
+  NSXMLElement *vis = RDLChild(el, @"Visibility");
+  NSString *toggle = vis ? RDLText(RDLChild(vis, @"ToggleItem")) : nil;
+  return [toggle length] ? toggle : nil;
+}
+
 static RDLValue *RDLParseHyperlink(NSXMLElement *el) {
   NSXMLElement *info = RDLChild(el, @"ActionInfo");
   if (info == nil)
@@ -771,6 +784,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
   RDLBox(el, item);
   item.style = RDLParseStyle(RDLChild(el, @"Style"));
   item.hidden = RDLParseVisibility(el);
+  item.toggleItem = RDLParseToggleItem(el);
   NSString *zi = RDLText(RDLChild(el, @"ZIndex"));
   if ([zi length])
     item.zIndex = [zi integerValue];
@@ -878,6 +892,11 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     }
     tablix.tablixBody = body;
     tablix.noRowsMessage = RDLText(RDLChild(el, @"NoRowsMessage"));
+    RDL_PARSE_ENUM(tablix.layoutDirection, @"LayoutDirection", RDLLayoutDirectionFromString,
+                    RDLText(RDLChild(el, @"LayoutDirection")));
+    NSString *gbrh = RDLText(RDLChild(el, @"GroupsBeforeRowHeaders"));
+    if ([gbrh length])
+      tablix.groupsBeforeRowHeaders = [gbrh integerValue];
     NSString *rch = RDLText(RDLChild(el, @"RepeatColumnHeaders"));
     tablix.repeatColumnHeaders = [rch isEqualToString:@"true"] || [rch isEqualToString:@"True"];
     NSString *rrh = RDLText(RDLChild(el, @"RepeatRowHeaders"));
@@ -1390,11 +1409,13 @@ static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, BOOL
   [parent addChild:pb];
 }
 
-static void RDLAddVisibility(NSXMLElement *parent, RDLValue *hidden) {
-  if (hidden == nil)
+static void RDLAddVisibility(NSXMLElement *parent, RDLValue *hidden, NSString *toggleItem) {
+  if (hidden == nil && [toggleItem length] == 0)
     return;
   NSXMLElement *vis = RDLEl(@"Visibility");
-  RDLAddValue(vis, @"Hidden", hidden);
+  if (hidden)
+    RDLAddValue(vis, @"Hidden", hidden);
+  RDLAddIf(vis, @"ToggleItem", toggleItem);
   [parent addChild:vis];
 }
 
@@ -1451,7 +1472,9 @@ static void RDLAddMember(NSXMLElement *parent, RDLTablixMember *m) {
     RDLAdd(me, @"KeepWithGroup", RDLStringFromKeepWithGroup(m.keepWithGroup));
   if (m.keepTogether)
     RDLAdd(me, @"KeepTogether", @"true");
-  RDLAddVisibility(me, m.hidden);
+  if (m.hideIfNoRows)
+    RDLAdd(me, @"HideIfNoRows", @"true");
+  RDLAddVisibility(me, m.hidden, m.toggleItem);
   if ([m.members count]) {
     NSXMLElement *kids = RDLEl(@"TablixMembers");
     for (RDLTablixMember *c in m.members)
@@ -1517,7 +1540,7 @@ static void RDLAddChart(NSXMLElement *parent, RDLChart *chart) {
   NSXMLElement *el = RDLEl(@"Chart");
   RDLAddAttr(el, @"Name", chart.name);
   RDLAddBox(el, chart);
-  RDLAddVisibility(el, chart.hidden);
+  RDLAddVisibility(el, chart.hidden, chart.toggleItem);
   RDLAddItemPagination(el, chart);
   RDLAddStyle(el, chart.style);
   RDLAddIf(el, @"DataSetName", chart.dataSetName);
@@ -1595,6 +1618,11 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   RDLAddBox(tx, it);
   RDLAdd(tx, @"DataSetName", it.dataSetName);
   RDLAddIf(tx, @"NoRowsMessage", it.noRowsMessage);
+  if (it.layoutDirection != RDLLayoutDirectionUnspecified)
+    RDLAdd(tx, @"LayoutDirection", RDLStringFromLayoutDirection(it.layoutDirection));
+  if (it.groupsBeforeRowHeaders > 0)
+    RDLAdd(tx, @"GroupsBeforeRowHeaders",
+           [NSString stringWithFormat:@"%ld", (long)it.groupsBeforeRowHeaders]);
   if (it.repeatColumnHeaders)
     RDLAdd(tx, @"RepeatColumnHeaders", @"true");
   if (it.repeatRowHeaders)
@@ -1697,7 +1725,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Line");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddStyle(el, it.style);
     [parent addChild:el];
     return;
@@ -1707,7 +1735,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Image");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddHyperlink(el, it);
     RDLAdd(el, @"Source", RDLStringFromImageSource(img.source) ?: @"External");
     RDLAdd(el, @"Value", img.value);
@@ -1720,7 +1748,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Rectangle");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddItemPagination(el, it);
     RDLAddStyle(el, it.style);
     if ([it.childItems count]) {
@@ -1745,7 +1773,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
   NSXMLElement *el = RDLEl(@"Textbox");
   RDLAddAttr(el, @"Name", it.name);
   RDLAddBox(el, it);
-  RDLAddVisibility(el, it.hidden);
+  RDLAddVisibility(el, it.hidden, it.toggleItem);
   RDLAddHyperlink(el, it);
   RDLAddItemPagination(el, it);
   RDLAdd(el, @"CanGrow", tb.canGrow ? @"true" : @"false");

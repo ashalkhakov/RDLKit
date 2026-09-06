@@ -107,6 +107,15 @@ NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v) {
 
 static const char *const kRDLKeepWithGroupNames[] = {"", "None", "Before", "After"};
 static const NSInteger kRDLKeepWithGroupNamesCount = (NSInteger)(sizeof(kRDLKeepWithGroupNames) / sizeof(*kRDLKeepWithGroupNames));
+static const char *const kRDLLayoutDirectionNames[] = {"", "LTR", "RTL"};
+static const NSInteger kRDLLayoutDirectionNamesCount = (NSInteger)(sizeof(kRDLLayoutDirectionNames) / sizeof(*kRDLLayoutDirectionNames));
+RDLLayoutDirection RDLLayoutDirectionFromString(NSString *s) {
+  return (RDLLayoutDirection)RDLEnumFromString(s, kRDLLayoutDirectionNames, kRDLLayoutDirectionNamesCount);
+}
+NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v) {
+  return RDLStringFromEnum(v, kRDLLayoutDirectionNames, kRDLLayoutDirectionNamesCount);
+}
+
 RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s) {
   return (RDLKeepWithGroup)RDLEnumFromString(s, kRDLKeepWithGroupNames, kRDLKeepWithGroupNamesCount);
 }
