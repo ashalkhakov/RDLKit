@@ -15,22 +15,44 @@ NSString *RDLExpressionContextDescription(RDLExpressionContext context) {
 }
 
 @implementation RDLFunctionInfo
+
+// A picker that has nothing better to type types the name itself.
+- (NSString *)insertion {
+  return _insertion ?: _name;
+}
+
+@end
+
+@implementation RDLFunctionCategory
+
++ (instancetype)categoryNamed:(NSString *)name
+                   containing:(NSArray<RDLFunctionInfo *> *)functions {
+  RDLFunctionCategory *category = [[self alloc] init];
+  category->_name = [name copy];
+  category->_functions = [functions copy];
+  for (RDLFunctionInfo *f in category->_functions)
+    f.category = category;
+  return category;
+}
+
 @end
 
 @implementation RDLExpressionCatalog
 
-+ (NSArray<NSString *> *)categories {
-  return @[ @"Aggregate", @"Text", @"Number", @"Date", @"Logical", @"Report", @"Lookup", @"Conversion" ];
-}
-
-// Built once. Every name here is one RDLExec dispatches on; the list was
-// taken from that switch rather than from the RDL specification, so the
-// picker cannot offer a function this evaluator does not have.
-+ (NSArray<RDLFunctionInfo *> *)functions {
-  static NSArray *functions;
+// Built once, and the one place any of this is written down. Every name here
+// is one RDLExec dispatches on; the list was taken from that switch rather
+// than from the RDL specification, so the picker cannot offer a function this
+// evaluator does not have.
+//
+// The order the categories come out in is the order of the last column below,
+// first appearance first. It is a reading order -- what a report author
+// reaches for soonest -- and not an alphabet, which is why it is not sorted.
++ (NSArray<RDLFunctionCategory *> *)categories {
+  static NSArray *categories;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
-    NSMutableArray *all = [NSMutableArray array];
+    NSMutableDictionary *grouped = [NSMutableDictionary dictionary];
+    NSMutableArray *order = [NSMutableArray array];
     NSArray *rows = @[
       @[ @"Sum", @"Sum(expression)", @"Total of the expression over the scope.", @"Aggregate" ],
       @[ @"Avg", @"Avg(expression)", @"Mean of the expression over the scope.", @"Aggregate" ],
@@ -149,20 +171,44 @@ NSString *RDLExpressionContextDescription(RDLExpressionContext context) {
       f.name = row[0];
       f.signature = row[1];
       f.summary = row[2];
-      f.category = row[3];
-      [all addObject:f];
+      // The bracket comes with it: what a function needs next is its
+      // arguments, and the caret lands where they go.
+      f.insertion = [row[0] stringByAppendingString:@"("];
+
+      NSMutableArray *bucket = grouped[row[3]];
+      if (bucket == nil) {
+        grouped[row[3]] = bucket = [NSMutableArray array];
+        [order addObject:row[3]];
+      }
+      [bucket addObject:f];
     }
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSString *name in order)
+      [out addObject:[RDLFunctionCategory categoryNamed:name containing:grouped[name]]];
+    categories = [out copy];
+  });
+  return categories;
+}
+
+// Every function there is, which is every function in a category: a function
+// with no category would be one the picker could never reach.
++ (NSArray<RDLFunctionInfo *> *)functions {
+  static NSArray *functions;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSMutableArray *all = [NSMutableArray array];
+    for (RDLFunctionCategory *c in [self categories])
+      [all addObjectsFromArray:c.functions];
     functions = [all copy];
   });
   return functions;
 }
 
-+ (NSArray<RDLFunctionInfo *> *)functionsInCategory:(NSString *)category {
-  NSMutableArray *out = [NSMutableArray array];
-  for (RDLFunctionInfo *f in [self functions])
-    if ([f.category isEqualToString:category])
-      [out addObject:f];
-  return out;
++ (RDLFunctionCategory *)categoryNamed:(NSString *)name {
+  for (RDLFunctionCategory *c in [self categories])
+    if ([c.name isEqualToString:name])
+      return c;
+  return nil;
 }
 
 + (RDLFunctionInfo *)functionNamed:(NSString *)name {

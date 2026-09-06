@@ -1265,12 +1265,42 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
       XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue offers %@, which the "
                                                 @"evaluator does not implement",
                                                 f.name]);
-    if ([f.signature length] == 0 || [f.summary length] == 0 || [f.category length] == 0)
+    if ([f.signature length] == 0 || [f.summary length] == 0)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing its description", f.name]);
+    // Exactly one category, and the category agrees: a function whose back
+    // pointer says otherwise would show up under a heading it is not under.
+    if (f.category == nil || ![f.category.functions containsObject:f])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not in the category it says it is",
+                                                f.name]);
     if (![[RDLExpressionCatalog categories] containsObject:f.category])
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is in category %@, which the picker "
-                                                @"does not show", f.name, f.category]);
+                                                @"does not show", f.name, f.category.name]);
   }
+
+  // The categories account for every function and repeat none, which is what
+  // "each function is assigned to one category" has to mean for a picker: a
+  // function in two categories would be inserted from either, and one in none
+  // could be reached from neither.
+  NSCountedSet *seen = [[NSCountedSet alloc] init];
+  for (RDLFunctionCategory *c in [RDLExpressionCatalog categories]) {
+    if ([c.name length] == 0 || [c.functions count] == 0)
+      XCTFail(@"%@", @"a category with no name or nothing in it");
+    for (RDLFunctionInfo *f in c.functions)
+      [seen addObject:f];
+  }
+  if ([seen count] != [functions count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the categories hold %lu of %lu functions",
+                                              (unsigned long)[seen count],
+                                              (unsigned long)[functions count]]);
+  for (RDLFunctionInfo *f in functions)
+    if ([seen countForObject:f] != 1)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ appears in %lu categories", f.name,
+                                                (unsigned long)[seen countForObject:f]]);
+
+  // What the picker types. A function opens its bracket; the caret is left
+  // where its arguments go.
+  if (![[RDLExpressionCatalog functionNamed:@"Sum"].insertion isEqualToString:@"Sum("])
+    XCTFail(@"%@", @"a function should be inserted with its bracket open");
 
   // Looked up the way a user types it.
   if ([[RDLExpressionCatalog functionNamed:@"sum"].name isEqualToString:@"Sum"] == NO)

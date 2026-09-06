@@ -17,54 +17,83 @@
 @implementation RDLExpressionEditor {
   RDLReport *_report;
   RDLExpressionContext _context;
-  NSArray<NSString *> *_categories;
-  NSArray *_items;  // RDLFunctionInfo, or NSString for the report's own names
+  NSArray<RDLFunctionCategory *> *_categories;
+  NSArray<RDLFunctionInfo *> *_items;
 }
 
 #pragma mark - What there is to pick
 
-// The catalogue's categories, plus the names this particular report offers.
-// Fields depend on the datasets it has, so they are gathered per report rather
-// than listed anywhere.
+// The catalogue's categories, plus three the report itself provides. Those
+// depend on the datasets and parameters it has, so they are built here rather
+// than listed anywhere -- but they are categories of the same kind, holding
+// entries of the same kind, and that is what lets the two tables below be as
+// plain as they are.
 - (void)buildCategories {
-  NSMutableArray *names = [NSMutableArray arrayWithArray:[RDLExpressionCatalog categories]];
-  [names insertObject:@"Fields" atIndex:0];
-  [names insertObject:@"Parameters" atIndex:1];
-  [names insertObject:@"Globals" atIndex:2];
-  _categories = [names copy];
+  NSMutableArray *categories = [NSMutableArray array];
+  [categories addObject:[RDLFunctionCategory categoryNamed:@"Fields"
+                                                containing:[self fieldEntries]]];
+  [categories addObject:[RDLFunctionCategory categoryNamed:@"Parameters"
+                                                containing:[self parameterEntries]]];
+  [categories addObject:[RDLFunctionCategory categoryNamed:@"Globals"
+                                                containing:[self globalEntries]]];
+  [categories addObjectsFromArray:[RDLExpressionCatalog categories]];
+  _categories = [categories copy];
+}
+
+// A name that stands on its own: it goes in whole, so it is its own insertion,
+// and it is its own signature too -- there is nothing to say about its
+// arguments because it takes none.
+static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
+  RDLFunctionInfo *f = [[RDLFunctionInfo alloc] init];
+  f.name = name;
+  f.signature = name;
+  f.summary = summary;
+  return f;
+}
+
+- (NSArray<RDLFunctionInfo *> *)fieldEntries {
+  NSMutableArray *out = [NSMutableArray array];
+  for (RDLDataSet *ds in _report.dataSets)
+    for (RDLField *f in ds.fields)
+      if ([f.name length])
+        [out addObject:RDLEntry([NSString stringWithFormat:@"Fields!%@.Value", f.name],
+                                [NSString stringWithFormat:@"The %@ field of %@.", f.name,
+                                                           ds.name ?: @"the dataset"])];
+  return out;
+}
+
+- (NSArray<RDLFunctionInfo *> *)parameterEntries {
+  NSMutableArray *out = [NSMutableArray array];
+  for (RDLParameter *p in _report.parameters)
+    if ([p.name length])
+      [out addObject:RDLEntry([NSString stringWithFormat:@"Parameters!%@.Value", p.name],
+                              [NSString stringWithFormat:@"The %@ parameter.", p.name])];
+  return out;
+}
+
+- (NSArray<RDLFunctionInfo *> *)globalEntries {
+  return @[
+    RDLEntry(@"Globals!PageNumber", @"The page being printed."),
+    RDLEntry(@"Globals!TotalPages", @"How many pages there are."),
+    RDLEntry(@"Globals!ReportName", @"The report's name."),
+    RDLEntry(@"Globals!ExecutionTime", @"When the report was run."),
+    RDLEntry(@"Globals!PageName", @"The name of the page being printed."),
+    RDLEntry(@"Globals!UserID", @"Who is running the report."),
+  ];
 }
 
 - (NSArray<NSString *> *)categoryNames {
-  return _categories;
-}
-
-- (NSArray *)itemsInCategory:(NSString *)category {
-  if ([category isEqualToString:@"Fields"]) {
-    NSMutableArray *out = [NSMutableArray array];
-    for (RDLDataSet *ds in _report.dataSets)
-      for (RDLField *f in ds.fields)
-        if ([f.name length])
-          [out addObject:[NSString stringWithFormat:@"Fields!%@.Value", f.name]];
-    return out;
-  }
-  if ([category isEqualToString:@"Parameters"]) {
-    NSMutableArray *out = [NSMutableArray array];
-    for (RDLParameter *p in _report.parameters)
-      if ([p.name length])
-        [out addObject:[NSString stringWithFormat:@"Parameters!%@.Value", p.name]];
-    return out;
-  }
-  if ([category isEqualToString:@"Globals"])
-    return @[ @"Globals!PageNumber", @"Globals!TotalPages", @"Globals!ReportName",
-              @"Globals!ExecutionTime", @"Globals!PageName", @"Globals!UserID" ];
-  return [RDLExpressionCatalog functionsInCategory:category];
+  NSMutableArray *names = [NSMutableArray array];
+  for (RDLFunctionCategory *c in _categories)
+    [names addObject:c.name];
+  return names;
 }
 
 - (void)selectCategoryNamed:(NSString *)name {
-  NSUInteger i = [_categories indexOfObject:name];
+  NSUInteger i = [[self categoryNames] indexOfObject:name];
   if (i == NSNotFound)
     return;
-  _items = [self itemsInCategory:name];
+  _items = [_categories[i] functions];
   [_categoryTable selectRowIndexes:[NSIndexSet indexSetWithIndex:i] byExtendingSelection:NO];
   [_itemTable reloadData];
   [self showSummary];
@@ -105,13 +134,8 @@
     [_summaryLabel setStringValue:@""];
     return;
   }
-  id item = _items[(NSUInteger)row];
-  if ([item isKindOfClass:[RDLFunctionInfo class]]) {
-    RDLFunctionInfo *f = item;
-    [_summaryLabel setStringValue:[NSString stringWithFormat:@"%@ — %@", f.signature, f.summary]];
-  } else {
-    [_summaryLabel setStringValue:item];
-  }
+  RDLFunctionInfo *f = _items[(NSUInteger)row];
+  [_summaryLabel setStringValue:[NSString stringWithFormat:@"%@ — %@", f.signature, f.summary]];
 }
 
 #pragma mark - Actions
@@ -123,10 +147,7 @@
   NSInteger row = [_itemTable selectedRow];
   if (row < 0 || row >= (NSInteger)[_items count])
     return;
-  id item = _items[(NSUInteger)row];
-  NSString *text = [item isKindOfClass:[RDLFunctionInfo class]]
-                       ? [NSString stringWithFormat:@"%@(", [(RDLFunctionInfo *)item name]]
-                       : item;
+  NSString *text = [_items[(NSUInteger)row] insertion];
   NSTextStorage *storage = [_sourceView textStorage];
   NSRange at = [_sourceView selectedRange];
   if (at.location == NSNotFound)
@@ -162,18 +183,15 @@
                           row:(NSInteger)row {
   (void)column;
   if (tableView == _categoryTable)
-    return row < (NSInteger)[_categories count] ? _categories[(NSUInteger)row] : @"";
-  if (row >= (NSInteger)[_items count])
-    return @"";
-  id item = _items[(NSUInteger)row];
-  return [item isKindOfClass:[RDLFunctionInfo class]] ? [(RDLFunctionInfo *)item name] : item;
+    return row < (NSInteger)[_categories count] ? [_categories[(NSUInteger)row] name] : @"";
+  return row < (NSInteger)[_items count] ? [_items[(NSUInteger)row] name] : @"";
 }
 
 - (void)tableViewSelectionDidChange:(NSNotification *)note {
   if ([note object] == _categoryTable) {
     NSInteger row = [_categoryTable selectedRow];
     if (row >= 0 && row < (NSInteger)[_categories count]) {
-      _items = [self itemsInCategory:_categories[(NSUInteger)row]];
+      _items = [_categories[(NSUInteger)row] functions];
       [_itemTable reloadData];
     }
   }
@@ -204,7 +222,7 @@
   [[ed.sourceView textStorage] setAttributedString:
                                    [[NSAttributedString alloc] initWithString:source ?: @""]];
   [ed.sourceView setDelegate:ed];
-  [ed selectCategoryNamed:[ed->_categories firstObject]];
+  [ed selectCategoryNamed:[[ed categoryNames] firstObject]];
   [ed showStatus];
   return ed;
 }

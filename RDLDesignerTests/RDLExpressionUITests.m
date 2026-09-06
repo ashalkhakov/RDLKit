@@ -72,6 +72,23 @@
       : nil;
   if (![first hasPrefix:@"Fields!"] || ![first hasSuffix:@".Value"])
     XCTFail(@"%@", [NSString stringWithFormat:@"a field reads as %@", first]);
+
+  // And a field goes in whole. A function is inserted with its bracket open
+  // because its arguments come next; a reference takes none, and "Fields!A(" is
+  // not something anyone meant to type.
+  RDLExpressionEditor *third = [RDLExpressionEditor editorForSource:@""
+                                                            context:RDLExpressionContextText
+                                                             report:report];
+  [third selectCategoryNamed:@"Fields"];
+  NSTableView *fieldRows = [third valueForKey:@"itemTable"];
+  [fieldRows selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+  [third insert:nil];
+  if ([[third source] hasSuffix:@"("])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a field was inserted as a call: %@",
+                                              [third source]]);
+  if (![[third source] hasSuffix:@".Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a field was not inserted whole: %@",
+                                              [third source]]);
 }
 
 - (void)testCompletion {
