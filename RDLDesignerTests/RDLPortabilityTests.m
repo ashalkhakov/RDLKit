@@ -3,6 +3,9 @@
 #import "DMTabBar.h"
 #import "DMTabBarItem.h"
 #import "RDLToolbarIcons.h"
+#import "RDLDesignerWindow.h"
+#import "RDLDatasetNavigator.h"
+#import "RDLDatasetFieldsView.h"
 
 // What only breaks on the other platform. Each of these passed on macOS while
 // being wrong on GNUstep, which is the only reason they are worth writing
@@ -76,6 +79,105 @@
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ has a user font with no size, which "
                                                 @"GNUstep cannot size", file]);
   }
+}
+
+// The reported sequence, in order and through the window: a dataset added with
+// the +, two fields added with its +, then a tablix inserted. On GNUstep this
+// aborts with "corrupted double-linked list" -- a heap that has already been
+// damaged, so what shows the damage is not necessarily what did it. Reproduced
+// here so it runs under a hardened allocator on both platforms.
+- (void)testAddingADatasetThenFieldsThenATablix {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Fresh"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+
+  RDLDatasetNavigator *nav = [wc valueForKey:@"datasetNavigator"];
+  [nav addDataSet:nil];
+  RDLDataSet *ds = [report.dataSets lastObject];
+  if (ds == nil) {
+    XCTFail(@"%@", @"the + added no dataset");
+    return;
+  }
+  [wc datasetNavigator:nav didSelectDataSet:ds];
+
+  RDLDatasetFieldsView *fields = [wc valueForKey:@"datasetFields"];
+  [fields addField:nil];
+  [fields addField:nil];
+  if ([[ds fields] count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the dataset has %lu fields, not two",
+                                              (unsigned long)[[ds fields] count]]);
+
+  // Insert into the body, which is where the panel would put it.
+  [ctx.selection selectBandWithKey:@"body"];
+  [ctx addItemOfKind:@"Tablix"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  if (tablix == nil) {
+    XCTFail(@"%@", @"no tablix was inserted");
+    return;
+  }
+  // Bound to the dataset that exists, with a column per field and a body to
+  // draw -- a tablix that scaffolds onto nothing is how a zero width, and a
+  // geometry the drawing code cannot use, gets made.
+  if (![tablix.dataSetName isEqualToString:ds.name])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the tablix names %@ and the dataset is %@",
+                                              tablix.dataSetName, ds.name]);
+  if ([tablix.columnSpecs count] != 2 || [tablix.tablixBody.rows count] == 0)
+    XCTFail(@"%@", @"the tablix was not scaffolded onto the dataset");
+  if (!(tablix.width > 0) || !(tablix.height > 0))
+    XCTFail(@"%@", [NSString stringWithFormat:@"the tablix is %g by %g", tablix.width,
+                                              tablix.height]);
+
+  // And it renders: a dataset with fields and no rows at all is what this
+  // sequence produces, and it is the case a report never has on disk.
+  NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{}];
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      // Not a NaN and not a negative: both come out of dividing by a width
+      // nothing set, and both reach the drawing code as a size to allocate.
+      if (!(it.w >= 0) || !(it.h >= 0) || !(it.x == it.x) || !(it.y == it.y))
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ is laid out at %g,%g %g by %g", it.name,
+                                                  it.x, it.y, it.w, it.h]);
+}
+
+// A window in a XIB that a controller holds must say it does not release
+// itself when closed. Cocoa forgives the extra release for long enough that
+// nothing shows; GNUstep aborts in the allocator, somewhere else entirely.
+- (void)testXIBWindowsDoNotReleaseThemselves {
+  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
+                            stringByDeletingLastPathComponent]
+                           stringByAppendingPathComponent:@"RDLDesigner"];
+  NSArray *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer error:NULL];
+  NSUInteger windows = 0;
+  for (NSString *name in names) {
+    if (![[name pathExtension] isEqualToString:@"xib"])
+      continue;
+    NSString *xml = [NSString stringWithContentsOfFile:[designer stringByAppendingPathComponent:name]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    NSRange at = [xml rangeOfString:@"<window "];
+    while (at.location != NSNotFound) {
+      NSRange rest = NSMakeRange(NSMaxRange(at), [xml length] - NSMaxRange(at));
+      NSRange close = [xml rangeOfString:@">" options:0 range:rest];
+      NSString *tag = [xml substringWithRange:NSMakeRange(at.location,
+                                                          NSMaxRange(close) - at.location)];
+      windows++;
+      if ([tag rangeOfString:@"releasedWhenClosed=\"NO\""].location == NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"the window in %@ releases itself when it "
+                                                  @"closes, and its controller releases it too",
+                                                  name]);
+      rest = NSMakeRange(NSMaxRange(close), [xml length] - NSMaxRange(close));
+      at = [xml rangeOfString:@"<window " options:0 range:rest];
+    }
+  }
+  if (windows == 0 && [names count])
+    XCTFail(@"%@", @"no windows were found to check");
 }
 
 @end

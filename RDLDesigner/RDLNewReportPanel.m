@@ -1,4 +1,5 @@
 #import "RDLNewReportPanel.h"
+#import "RDLPane.h"
 
 @interface RDLNewReportPanel ()
 @property (nonatomic, strong) IBOutlet NSWindow *window;
@@ -98,6 +99,7 @@
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLNewReportPanel"
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:panel topLevelObjects:NULL];
+  RDLOwnWindow(panel.window);
   // Escape cannot be written as a key equivalent in a XIB -- XML has no way to
   // carry U+001B -- so Cancel gets it here, as the other panels do.
   [panel.detailsView setEditable:NO];

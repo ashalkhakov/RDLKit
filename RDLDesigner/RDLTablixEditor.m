@@ -1,5 +1,6 @@
 #import "RDLTablixEditor.h"
 #import "RDLToolbarIcons.h"
+#import "RDLPane.h"
 #import "RDLEditingContext.h"
 #import "RDLExpressionCell.h"
 #import "RDLExpressionEditor.h"
@@ -81,6 +82,7 @@ static NSString *RDLFieldOfValue(NSString *value) {
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLTablixEditor"
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
+  RDLOwnWindow(_window);
 
   // Glyphs rather than titles: "<" and ">" came out as question marks on
   // GNUstep, and a title that does not arrive leaves the platform's own.

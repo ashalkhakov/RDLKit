@@ -1,4 +1,5 @@
 #import "RDLRichTextEditor.h"
+#import "RDLPane.h"
 #import "RDLExpressionEditor.h"
 #import "RDLRichTextFormatter.h"
 #import "RDLRichTextCodec.h"
@@ -66,14 +67,15 @@
   // What each button shows. A letter in a 30-point button is a title the
   // platform has to draw for us, and GNUstep draws its own default instead --
   // eight buttons reading "Butt". A drawn glyph belongs to us.
-  RDLToolbarGlyph glyphs[] = {
-    RDLToolbarGlyphBold,      RDLToolbarGlyphItalic,      RDLToolbarGlyphUnderline,
-    RDLToolbarGlyphStrikethrough, RDLToolbarGlyphAlignLeft, RDLToolbarGlyphAlignCenter,
-    RDLToolbarGlyphAlignRight, RDLToolbarGlyphAlignJustify
-  };
+  NSArray<NSNumber *> *glyphs = @[
+    @(RDLToolbarGlyphBold), @(RDLToolbarGlyphItalic), @(RDLToolbarGlyphUnderline),
+    @(RDLToolbarGlyphStrikethrough), @(RDLToolbarGlyphAlignLeft),
+    @(RDLToolbarGlyphAlignCenter), @(RDLToolbarGlyphAlignRight),
+    @(RDLToolbarGlyphAlignJustify)
+  ];
   NSArray<NSButton *> *buttons = [self allToolbarButtons];
-  for (NSUInteger i = 0; i < [buttons count]; i++)
-    RDLSetToolbarIcon(buttons[i], glyphs[i]);
+  for (NSUInteger i = 0; i < [buttons count] && i < [glyphs count]; i++)
+    RDLSetToolbarIcon(buttons[i], (RDLToolbarGlyph)[glyphs[i] integerValue]);
 
   for (NSButton *b in buttons) {
     // Push-on/push-off so a button can show that the selection is already
@@ -367,6 +369,7 @@
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
     return nil;
+  RDLOwnWindow(ed.window);
 
 
   [ed.window setTitle:[NSString stringWithFormat:@"Rich Text — %@", item.name]];

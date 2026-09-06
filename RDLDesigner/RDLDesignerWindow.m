@@ -202,6 +202,7 @@
                                         bundle:[NSBundle bundleForClass:[self class]]];
   if (![nib instantiateWithOwner:self topLevelObjects:NULL])
     return;
+  RDLOwnWindow(_palettePanel);
   [_paletteCancelButton setTag:0];
 
   CGFloat height = 92 + 30 * (CGFloat)[kinds count];
@@ -227,10 +228,13 @@
 
   [_palettePanel center];
   NSInteger code = [NSApp runModalForWindow:_palettePanel];
-  // Off screen before the last reference goes, or the panel would be
-  // deallocated while still visible.
   [_palettePanel orderOut:nil];
-  _palettePanel = nil;
+  // Kept, not dropped here. The modal session has only just ended and the
+  // window is still on its way out of the event loop and the theme, so
+  // releasing it inside the same turn hands back memory something else is
+  // still holding -- which on GNUstep is an abort in the allocator rather
+  // than anything that names this line. The next -addElement: loads the nib
+  // again and the outlet's old panel goes then, well clear of all that.
   if (code >= 1 && code <= (NSInteger)[kinds count])
     [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
 }

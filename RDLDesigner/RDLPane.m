@@ -12,3 +12,7 @@ BOOL RDLLoadPaneNib(NSView *pane, NSString *name) {
                                         bundle:[NSBundle bundleForClass:[pane class]]];
   return nib != nil && [nib instantiateWithOwner:pane topLevelObjects:NULL];
 }
+
+void RDLOwnWindow(NSWindow *window) {
+  [window setReleasedWhenClosed:NO];
+}

@@ -2,6 +2,7 @@
 #import "RDLExpressionEditor.h"
 #import "RDLExpressionField.h"
 #import "RDLExpressionTextStorage.h"
+#import "RDLPane.h"
 
 @interface RDLExpressionEditor () <NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
@@ -216,6 +217,7 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
     return nil;
+  RDLOwnWindow(ed.window);
   // In code and not in the XIB: a text view's storage is reached through its
   // layout manager, and Interface Builder has no way to repoint that.
   [RDLExpressionTextStorage installedInTextView:ed.sourceView];
