@@ -33,7 +33,11 @@ ADDITIONAL_OBJCFLAGS += -fsanitize=address -fno-omit-frame-pointer -g
 ADDITIONAL_LDFLAGS += -fsanitize=address
 # The bundle is dlopened by an xctest binary that is not instrumented, so the
 # ASan runtime has to be loaded first or its interceptors are never installed.
-ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-x86_64.so)
+# Named after the architecture, so this cannot be hardcoded: on anything but
+# x86_64 the lookup returns the name it was given, LD_PRELOAD then fails
+# quietly, and the run proceeds with no interceptors and no report.
+ASAN_ARCH := $(shell uname -m)
+ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-$(ASAN_ARCH).so)
 # Leaks are not what is being looked for here, and a test bundle reports plenty.
 # handle_abort=1 so the SIGABRT the timeout below sends is reported by ASan
 # with a symbolized backtrace, instead of the process simply disappearing.
