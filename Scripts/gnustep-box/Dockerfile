@@ -4,23 +4,37 @@
 FROM debian:13
 
 ENV DEBIAN_FRONTEND=noninteractive
-# Retries, because the mirror hands back a truncated file often enough through
-# Docker's NAT to fail a build on its own, and the CDN rather than the
-# round-robin because it is the difference between ten minutes and an hour
-# here. Pipelining is deliberately left alone: turning it off fetches one
-# package per connection and is a worse failure than the one it avoids.
-RUN printf 'Acquire::Retries "8";\n' > /etc/apt/apt.conf.d/99retries \
+# Fetching Debian through Docker's NAT fails in two different ways here, and
+# both are the network rather than the recipe: truncated files from the
+# round-robin mirror, and "Hash Sum mismatch" from something caching along the
+# way. So: the CDN, which is minutes rather than an hour; No-Cache and
+# BrokenProxy, which is what a mismatch calls for; and a loop that empties the
+# half-fetched cache and asks again, because both faults are per-file and
+# transient.
+RUN printf 'Acquire::Retries "8";\nAcquire::http::No-Cache "true";\nAcquire::BrokenProxy "true";\n' \
+      > /etc/apt/apt.conf.d/99resilient \
     && sed -i 's|deb\.debian\.org|cdn-aws.deb.debian.org|g' \
          /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list 2>/dev/null; true
-RUN apt-get -q -y update && apt-get -q -y --fix-missing install \
-      clang lld cmake make git pkg-config ca-certificates \
-      libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
-      libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
-      libgmp-dev libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
-      libbsd-dev \
-      libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
-      xvfb gdb xz-utils \
-    && rm -rf /var/lib/apt/lists/*
+
+RUN set -e; \
+    for attempt in 1 2 3 4 5; do \
+      echo "=== apt attempt $attempt ==="; \
+      apt-get -q -y update && apt-get -q -y --fix-missing install \
+        clang lld cmake make git pkg-config ca-certificates \
+        libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
+        libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
+        libgmp-dev libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
+        libbsd-dev \
+        libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
+        xvfb gdb xz-utils \
+      && break; \
+      echo "=== attempt $attempt failed; clearing what was half-fetched ==="; \
+      rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
+             /var/cache/apt/archives/partial/*; \
+      sleep 10; \
+      [ "$attempt" = 5 ] && exit 1; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
 RUN update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 10
 
 ENV CC=clang CXX=clang++ \
