@@ -17,6 +17,10 @@
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report;
 @property (nonatomic, readonly, copy) NSString *source;
+// The text behind the source, which is what colours it -- see
+// RDLExpressionTextStorage. Published so a test can change the text the way
+// something other than typing would.
+@property (nonatomic, readonly, strong) NSTextStorage *sourceStorage;
 // The row the picker would insert, for the category selected.
 - (void)insert:(id)sender;
 - (void)selectCategoryNamed:(NSString *)name;

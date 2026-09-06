@@ -4,6 +4,7 @@
 // must not take the document's undo manager with it.
 #import "RDLDesignerTestSupport.h"
 #import "RDLExpressionCell.h"
+#import "RDLExpressionTextStorage.h"
 
 // Records what a cell's button action was sent, since the action is the only
 // thing a cell can report and the sender is what carries the row.
@@ -250,22 +251,57 @@
   if (sender != cell)
     XCTFail(@"%@", @"the cell should send itself, so the table can say which row");
 
-  // The three inks, shared with the fields and the editor so nothing drifts.
-  if ([RDLExpressionField inkForSource:@"plain"] !=
-      [NSColor controlTextColor])
+  // The three inks, from the theme the fields and the editor also use, so
+  // nothing drifts.
+  RDLExpressionTheme *theme = [RDLExpressionTheme defaultTheme];
+  if ([theme inkForSource:@"plain"] != [NSColor controlTextColor])
     XCTFail(@"%@", @"a literal should be drawn in the ordinary ink");
-  if ([RDLExpressionField inkForSource:@"=Sum(Fields!A.Value)"] ==
-      [RDLExpressionField inkForSource:@"=Sum(Fields!A.Value) leftovers"])
+  if ([theme inkForSource:@"=Sum(Fields!A.Value)"] ==
+      [theme inkForSource:@"=Sum(Fields!A.Value) leftovers"])
     XCTFail(@"%@", @"an expression with tokens left over should not look like a whole one");
 
-  // And highlighting is the shared one: a function is coloured as a function.
+  // And the colouring is the theme's: a function is coloured as a function.
   NSMutableAttributedString *text = [[NSMutableAttributedString alloc]
       initWithString:@"=Sum(Fields!A.Value)"];
-  [RDLExpressionField highlight:text];
+  [theme colour:text];
   NSRange effective = NSMakeRange(NSNotFound, 0);
   id ink = [text attribute:NSForegroundColorAttributeName atIndex:1 effectiveRange:&effective];
   if (ink == nil || effective.length != 3)
     XCTFail(@"%@", @"Sum should be coloured as a function, on its own");
+}
+
+// The editor colours through its text storage, not through a -textDidChange:
+// of its own. What that buys is the changes a delegate never hears about: this
+// types into the storage directly, the way an undo or a paste from another
+// application arrives, and the colours still follow.
+- (void)testEditorRecoloursThroughItsTextStorage {
+  RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@"=1"
+                                                         context:RDLExpressionContextNumber
+                                                          report:[[RDLReport alloc] init]];
+  if (ed == nil) {
+    XCTFail(@"%@", @"the editor did not load");
+    return;
+  }
+  NSTextStorage *storage = ed.sourceStorage;
+  if (![storage isKindOfClass:[RDLExpressionTextStorage class]]) {
+    XCTFail(@"%@", @"the editor's text view kept the storage it came with");
+    return;
+  }
+
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Sum(1)"];
+  NSRange effective = NSMakeRange(NSNotFound, 0);
+  id ink = [storage attribute:NSForegroundColorAttributeName atIndex:1 effectiveRange:&effective];
+  if (ink == nil || effective.length != 3)
+    XCTFail(@"%@", @"Sum should have been coloured as a function by the storage itself");
+  if (![[storage string] isEqualToString:[ed source]])
+    XCTFail(@"%@", @"the editor reads its source from somewhere other than its storage");
+
+  // And back to a literal: the old colours have to go, or a word stays green
+  // after it stops being a field reference.
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"plain text"];
+  id plain = [storage attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:&effective];
+  if (plain != nil && plain != [NSColor controlTextColor])
+    XCTFail(@"%@", @"a literal kept a colour from what was typed before it");
 }
 
 // Escape comes from the XIB, not from code putting it there afterwards.

@@ -222,7 +222,7 @@ static NSDate *RDLAsDate(id v, NSDate *fallback) {
 @implementation RDLTok
 @end
 
-@implementation RDLExprHighlight
+@implementation RDLExprToken
 @end
 
 // The lexer's own kinds, mapped once, here, where they are defined. Nothing
@@ -1963,7 +1963,7 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   return _complete;
 }
 
-+ (NSArray<RDLExprHighlight *> *)highlightsForSource:(NSString *)source {
++ (NSArray<RDLExprToken *> *)tokensForSource:(NSString *)source {
   NSMutableArray *out = [NSMutableArray array];
   if ([source length] == 0)
     return out;
@@ -1971,10 +1971,11 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   void (^add)(NSRange, RDLExprTokenKind) = ^(NSRange r, RDLExprTokenKind kind) {
     if (r.length == 0)
       return;
-    RDLExprHighlight *h = [[RDLExprHighlight alloc] init];
-    h.range = r;
-    h.kind = kind;
-    [out addObject:h];
+    RDLExprToken *tok = [[RDLExprToken alloc] init];
+    tok.range = r;
+    tok.kind = kind;
+    tok.text = [source substringWithRange:r];
+    [out addObject:tok];
   };
 
   // Text that is not an expression has nothing to colour, and the leading "="

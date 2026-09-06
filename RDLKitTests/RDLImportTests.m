@@ -1277,12 +1277,12 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
     XCTFail(@"%@", @"lookup is case sensitive; the evaluator's is not");
 }
 
-// Highlighting comes from the lexer that parses, not a second one written for
-// the editor: the runs have to cover the source end to end, so an editor can
-// attribute the whole string in one pass and nothing is left uncoloured.
-- (void)testExpressionHighlighting {
+// The tokens come from the lexer that parses, not a second one written for the
+// editor, and they tile the source end to end -- trivia included -- so an
+// editor can attribute the whole string in one pass with nothing left over.
+- (void)testExpressionTokens {
   NSString *source = @"=IIf(Fields!Due.Value < 0, \"late\", Sum(Fields!Paid.Value))";
-  NSArray<RDLExprHighlight *> *runs = [RDLExpr highlightsForSource:source];
+  NSArray<RDLExprToken *> *runs = [RDLExpr tokensForSource:source];
   if ([runs count] == 0) {
     XCTFail(@"%@", @"nothing to colour");
     return;
@@ -1290,10 +1290,13 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
 
   // End to end, in order, no gaps and no overlaps.
   NSUInteger at = 0;
-  for (RDLExprHighlight *h in runs) {
+  for (RDLExprToken *h in runs) {
     if (h.range.location != at)
-      XCTFail(@"%@", [NSString stringWithFormat:@"a gap or an overlap at %lu: run starts at %lu",
+      XCTFail(@"%@", [NSString stringWithFormat:@"a gap or an overlap at %lu: token starts at %lu",
                                                 (unsigned long)at, (unsigned long)h.range.location]);
+    if (![h.text isEqualToString:[source substringWithRange:h.range]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"a token's text is not what its range covers: '%@'",
+                                                h.text]);
     at = NSMaxRange(h.range);
   }
   if (at != [source length])
@@ -1302,9 +1305,8 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
 
   // The kinds an editor colours differently.
   NSMutableDictionary *byKind = [NSMutableDictionary dictionary];
-  for (RDLExprHighlight *h in runs) {
-    NSString *text = [source substringWithRange:h.range];
-    byKind[@(h.kind)] = ([byKind[@(h.kind)] ?: @[] arrayByAddingObject:text]);
+  for (RDLExprToken *h in runs) {
+    byKind[@(h.kind)] = ([byKind[@(h.kind)] ?: @[] arrayByAddingObject:h.text]);
   }
   if (![byKind[@(RDLExprTokenKindFunction)] containsObject:@"IIf"] ||
       ![byKind[@(RDLExprTokenKindFunction)] containsObject:@"Sum"])
@@ -1317,16 +1319,16 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
     XCTFail(@"%@", @"0 should read as a number");
 
   // A name that is not a function is not coloured as one, however it is spelled.
-  NSArray<RDLExprHighlight *> *plain = [RDLExpr highlightsForSource:@"=Frobnicate(1)"];
-  for (RDLExprHighlight *h in plain)
+  NSArray<RDLExprToken *> *plain = [RDLExpr tokensForSource:@"=Frobnicate(1)"];
+  for (RDLExprToken *h in plain)
     if (h.kind == RDLExprTokenKindFunction)
       XCTFail(@"%@", @"Frobnicate is not a function this evaluator has");
 
   // Text that is not an expression is one run, so an editor can show a literal
   // through the same path.
-  NSArray<RDLExprHighlight *> *literal = [RDLExpr highlightsForSource:@"#336699"];
+  NSArray<RDLExprToken *> *literal = [RDLExpr tokensForSource:@"#336699"];
   if ([literal count] != 1 || [literal[0] kind] != RDLExprTokenKindTrivia)
-    XCTFail(@"%@", @"a literal should be one uncoloured run");
+    XCTFail(@"%@", @"a literal should be a single token of trivia");
 }
 
 // Row groups nest as deep as they are given. Two was the limit the scaffolding

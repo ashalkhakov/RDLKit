@@ -127,10 +127,13 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
   RDLExprTokenKindInvalid
 };
 
-// One coloured run of an expression's source.
-@interface RDLExprHighlight : NSObject
+// One lexeme of an expression's source, with where it sits in it. Trivia is a
+// token here too, so the tokens of a source tile it exactly -- an editor can
+// walk them and account for every character without consulting the source.
+@interface RDLExprToken : NSObject
 @property (nonatomic, assign) NSRange range;
 @property (nonatomic, assign) RDLExprTokenKind kind;
+@property (nonatomic, copy) NSString *text;
 @end
 
 // One parsed RDL expression, kept losslessly.
@@ -160,7 +163,10 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
 // whitespace, so an editor can attribute the whole string in one pass. Works on
 // any text, expression or not: a source without a leading "=" is one run of
 // trivia, which is what an editor showing a literal wants.
-+ (NSArray<RDLExprHighlight *> *)highlightsForSource:(NSString *)source;
+// The source, tiled into tokens. What a token means is as far as this goes:
+// deciding what a token should look like belongs to whoever is drawing it, and
+// RDLKit does not know about colours.
++ (NSArray<RDLExprToken *> *)tokensForSource:(NSString *)source;
 @end
 
 // An RDL property that is either a literal or an expression that produces one.

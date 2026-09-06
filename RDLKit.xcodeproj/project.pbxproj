@@ -95,6 +95,10 @@
 		26AF4F929B7D09D4537E8693 /* RDLTabBadge.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01TABBADGE0000000001 /* RDLTabBadge.m */; };
 		E59F0A51816E0175BB8E3BED /* DMTabBar.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABBAR000000001 /* DMTabBar.m */; };
 		16BD892896D9DFA8B382B39C /* DMTabBarItem.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABITEM00000001 /* DMTabBarItem.m */; };
+		9D18134A68023E99D187DD12 /* RDLExpressionTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 3D93A9E92008296B4FE0BF39 /* RDLExpressionTheme.m */; };
+		A646F8BA68219062FF71A378 /* RDLExpressionTheme.m in Sources */ = {isa = PBXBuildFile; fileRef = 3D93A9E92008296B4FE0BF39 /* RDLExpressionTheme.m */; };
+		B4CE5D4C180B5B2D1F46E34A /* RDLExpressionTextStorage.m in Sources */ = {isa = PBXBuildFile; fileRef = FF4F31495B90A98D00683CAD /* RDLExpressionTextStorage.m */; };
+		849A0BB123A8AEA4D685BE1F /* RDLExpressionTextStorage.m in Sources */ = {isa = PBXBuildFile; fileRef = FF4F31495B90A98D00683CAD /* RDLExpressionTextStorage.m */; };
 		831ECDE46490BDDFA993A689 /* RDLExpressionField.m in Sources */ = {isa = PBXBuildFile; fileRef = B87C6EFCB77B80797692C3C3 /* RDLExpressionField.m */; };
 		F2D0801B7F564982F2A71FA6 /* RDLExpressionEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 2FD025815654CEDFAAEE73CF /* RDLExpressionEditor.m */; };
 		8B7001125BF202F1EF6C3563 /* RDLInsertPalette.m in Sources */ = {isa = PBXBuildFile; fileRef = C70CCF437FA426E4884C9BFB /* RDLInsertPalette.m */; };
@@ -327,6 +331,10 @@
 		5421B5A4D5EEB992DA5D7F10 /* RDLExpressionEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLExpressionEditor.xib; sourceTree = "<group>"; };
 		C359DF7EADC9BA2A080806D1 /* RDLExpressionEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionEditor.h; sourceTree = "<group>"; };
 		2FD025815654CEDFAAEE73CF /* RDLExpressionEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionEditor.m; sourceTree = "<group>"; };
+		3D93A9E92008296B4FE0BF39 /* RDLExpressionTheme.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionTheme.m; sourceTree = "<group>"; };
+		400600DC58BF94D441DABEC7 /* RDLExpressionTheme.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionTheme.h; sourceTree = "<group>"; };
+		FF4F31495B90A98D00683CAD /* RDLExpressionTextStorage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionTextStorage.m; sourceTree = "<group>"; };
+		4232BC9D056F56B4EF3325DE /* RDLExpressionTextStorage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionTextStorage.h; sourceTree = "<group>"; };
 		B87C6EFCB77B80797692C3C3 /* RDLExpressionField.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionField.m; sourceTree = "<group>"; };
 		853320B40D8CC7853A04791C /* RDLExpressionField.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExpressionField.h; sourceTree = "<group>"; };
 		AA04TABBADGE000000001 /* RDLTabBadge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTabBadge.h; sourceTree = "<group>"; };
@@ -444,6 +452,10 @@
 				5421B5A4D5EEB992DA5D7F10 /* RDLExpressionEditor.xib */,
 				C359DF7EADC9BA2A080806D1 /* RDLExpressionEditor.h */,
 				2FD025815654CEDFAAEE73CF /* RDLExpressionEditor.m */,
+				3D93A9E92008296B4FE0BF39 /* RDLExpressionTheme.m */,
+				400600DC58BF94D441DABEC7 /* RDLExpressionTheme.h */,
+				FF4F31495B90A98D00683CAD /* RDLExpressionTextStorage.m */,
+				4232BC9D056F56B4EF3325DE /* RDLExpressionTextStorage.h */,
 				B87C6EFCB77B80797692C3C3 /* RDLExpressionField.m */,
 				853320B40D8CC7853A04791C /* RDLExpressionField.h */,
 				AA04TABBADGE000000001 /* RDLTabBadge.h */,
@@ -869,6 +881,8 @@
 				9424909E6EE670EF371FC07D /* RDLSamples.m in Sources */,
 				C64526DBC3B8898C885ECA7F /* RDLWelcomeWindow.m in Sources */,
 				CEBAF52B30470D1500D62319 /* RDLExpressionHelper.m in Sources */,
+				A646F8BA68219062FF71A378 /* RDLExpressionTheme.m in Sources */,
+				849A0BB123A8AEA4D685BE1F /* RDLExpressionTextStorage.m in Sources */,
 				092ECA4ECBE8C04F72A550F2 /* RDLExpressionField.m in Sources */,
 				10E1771CF0E486F8012F5F5C /* RDLExpressionEditor.m in Sources */,
 				C69EE91088C65CBBD163C6F6 /* RDLInsertPalette.m in Sources */,
@@ -934,6 +948,8 @@
 				26AF4F929B7D09D4537E8693 /* RDLTabBadge.m in Sources */,
 				E59F0A51816E0175BB8E3BED /* DMTabBar.m in Sources */,
 				16BD892896D9DFA8B382B39C /* DMTabBarItem.m in Sources */,
+				9D18134A68023E99D187DD12 /* RDLExpressionTheme.m in Sources */,
+				B4CE5D4C180B5B2D1F46E34A /* RDLExpressionTextStorage.m in Sources */,
 				831ECDE46490BDDFA993A689 /* RDLExpressionField.m in Sources */,
 				F2D0801B7F564982F2A71FA6 /* RDLExpressionEditor.m in Sources */,
 				8B7001125BF202F1EF6C3563 /* RDLInsertPalette.m in Sources */,

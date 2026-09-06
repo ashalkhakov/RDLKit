@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLExpressionCell.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionTheme.h"
 #import "RDLKit.h"
 
 static const CGFloat kRDLCellButtonWidth = 26;
@@ -26,11 +27,11 @@ static const CGFloat kRDLCellButtonWidth = 26;
       initWithString:source
           attributes:@{
             NSFontAttributeName : [self font] ?: [NSFont systemFontOfSize:11],
-            NSForegroundColorAttributeName : [RDLExpressionField inkForSource:source],
+            NSForegroundColorAttributeName : [[RDLExpressionTheme defaultTheme] inkForSource:source],
           }];
   // The same colours the editor and the fields use, from the same lexer.
   if ([RDLExpr isExpressionSource:source])
-    [RDLExpressionField highlight:text];
+    [[RDLExpressionTheme defaultTheme] colour:text];
 
   NSRect textRect = [[self class] textRectInFrame:frame];
   textRect.origin.y += (NSHeight(textRect) - [text size].height) / 2;

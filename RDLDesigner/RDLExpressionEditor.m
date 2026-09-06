@@ -1,10 +1,12 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLExpressionEditor.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionTextStorage.h"
 
 @interface RDLExpressionEditor () <NSTableViewDataSource, NSTableViewDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
 @property (nonatomic, strong) IBOutlet NSTextView *sourceView;
+- (void)showStatus;
 @property (nonatomic, strong) IBOutlet NSTableView *categoryTable;
 @property (nonatomic, strong) IBOutlet NSTableView *itemTable;
 @property (nonatomic, strong) IBOutlet NSTextField *summaryLabel;
@@ -71,24 +73,11 @@
 #pragma mark - The source
 
 - (NSString *)source {
-  return [[_sourceView textStorage] string];
+  return [[self sourceStorage] string];
 }
 
-// Colours come from the lexer that parses the expression, through
-// -highlightsForSource:, so the editor cannot disagree with the evaluator about
-// what a run of text is.
-- (void)recolour {
-  NSTextStorage *storage = [_sourceView textStorage];
-  NSString *text = [storage string];
-  [storage beginEditing];
-  [storage setAttributes:@{
-    NSFontAttributeName : [NSFont userFixedPitchFontOfSize:12] ?: [NSFont systemFontOfSize:12],
-    NSForegroundColorAttributeName : [NSColor controlTextColor],
-  }
-                   range:NSMakeRange(0, [text length])];
-  [RDLExpressionField highlight:storage];
-  [storage endEditing];
-  [self showStatus];
+- (NSTextStorage *)sourceStorage {
+  return [_sourceView textStorage];
 }
 
 // What the expression is, in one line: a literal, an expression that parses, or
@@ -149,7 +138,7 @@
   }
   [storage replaceCharactersInRange:at withString:text];
   [_sourceView setSelectedRange:NSMakeRange(at.location + [text length], 0)];
-  [self recolour];
+  [self showStatus];
 }
 
 - (void)ok:(id)sender {
@@ -193,7 +182,7 @@
 
 - (void)textDidChange:(NSNotification *)note {
   (void)note;
-  [self recolour];
+  [self showStatus];
 }
 
 #pragma mark - Running
@@ -209,11 +198,14 @@
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
     return nil;
+  // In code and not in the XIB: a text view's storage is reached through its
+  // layout manager, and Interface Builder has no way to repoint that.
+  [RDLExpressionTextStorage installedInTextView:ed.sourceView];
   [[ed.sourceView textStorage] setAttributedString:
                                    [[NSAttributedString alloc] initWithString:source ?: @""]];
   [ed.sourceView setDelegate:ed];
   [ed selectCategoryNamed:[ed->_categories firstObject]];
-  [ed recolour];
+  [ed showStatus];
   return ed;
 }
 
