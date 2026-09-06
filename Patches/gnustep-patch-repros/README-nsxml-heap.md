@@ -72,6 +72,46 @@ Each of those produced a confident, meaningless "survived 200 rounds".
 `Scripts/gnustep-box/asan-libobjc2.sh` does the same for libobjc2, where the
 first abort of this hunt landed. Verified loaded; 200 rounds; nothing reported.
 
+## Where the damage happens
+
+The tool that finally said something is the simplest one here: `heap-probe.h`
+leaves glibc's allocator alone and gives it work between steps -- a burst of
+allocations and frees across several size classes, which walks the free lists
+the damage lands in. The last probe to complete is the last moment the heap was
+whole. `Scripts/gnustep-box/probe-writer.sh` puts those probes through the
+writer and around the call.
+
+The answer is not in the writing at all:
+
+    == round 22 ==
+    [probe] before the call
+    [probe] after root and header ... after page
+    [probe] after building the document
+    [probe] after writing the string
+    [probe] after the call, pool still holding
+    malloc_consolidate(): unaligned fastbin chunk detected
+
+Everything the writer does completes with the heap intact. It dies in the
+autorelease pool drain that follows -- the teardown.
+
+And one switch settles which part of the teardown. With RDL_KEEP_DOC every
+document built is retained forever, so the drain releases the element wrappers
+and nothing else:
+
+    ordinary:              dies in round 4
+    documents kept alive:  survives 40 rounds, cleanly
+
+So it is releasing the NSXMLDocument that damages the heap, not releasing the
+wrappers, and not anything the writer builds. Detaching the root before the
+document goes (RDL_DETACH_ROOT) does not help, so it is not simply a matter of
+who frees the tree.
+
+A Foundation-only document of the same shape, built and released in the same
+loop, does not reproduce it -- `nsxml-document-teardown.m` survives 200 rounds
+either way. So something about the tree this writer builds decides whether the
+teardown is fatal, and finding what is the next narrowing: the probe makes that
+bisection reliable, which it was not before.
+
 ## Where that leaves it
 
 Every library that could be the writer has now been built with AddressSanitizer
