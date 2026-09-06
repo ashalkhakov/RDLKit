@@ -1,4 +1,5 @@
 #import "RDLTablixEditor.h"
+#import "RDLToolbarIcons.h"
 #import "RDLEditingContext.h"
 #import "RDLExpressionCell.h"
 #import "RDLExpressionEditor.h"
@@ -30,6 +31,8 @@ static NSString *RDLFieldOfValue(NSString *value) {
 @property (nonatomic, strong) IBOutlet NSButton *grandTotalCheck;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
+@property (nonatomic, strong) IBOutlet NSButton *addColumnButton, *removeColumnButton;
+@property (nonatomic, strong) IBOutlet NSButton *moveLeftButton, *moveRightButton;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
 @property (nonatomic, strong) RDLReport *report;
 @end
@@ -79,6 +82,12 @@ static NSString *RDLFieldOfValue(NSString *value) {
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
 
+  // Glyphs rather than titles: "<" and ">" came out as question marks on
+  // GNUstep, and a title that does not arrive leaves the platform's own.
+  RDLSetToolbarIcon(_addColumnButton, RDLToolbarGlyphAdd);
+  RDLSetToolbarIcon(_removeColumnButton, RDLToolbarGlyphRemove);
+  RDLSetToolbarIcon(_moveLeftButton, RDLToolbarGlyphMoveLeft);
+  RDLSetToolbarIcon(_moveRightButton, RDLToolbarGlyphMoveRight);
 
   [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
 

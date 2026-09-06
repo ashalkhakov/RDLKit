@@ -317,7 +317,8 @@
   // after it stops being a field reference.
   [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"plain text"];
   id plain = [storage attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:&effective];
-  if (plain != nil && plain != [NSColor controlTextColor])
+  id base = [(RDLExpressionTextStorage *)storage baseAttributes][NSForegroundColorAttributeName];
+  if (plain != nil && ![plain isEqual:base])
     XCTFail(@"%@", @"a literal kept a colour from what was typed before it");
 }
 

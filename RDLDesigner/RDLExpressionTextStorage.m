@@ -13,6 +13,13 @@
   if (lm == nil)
     return nil;
   RDLExpressionTextStorage *storage = [[self alloc] init];
+  // Paper, not ink -- the same call the rich text editor makes, and for the
+  // same reason: an expression is read on white whatever the desktop
+  // appearance is. Without it GNUstep in a dark theme draws this text view on
+  // black, and the colours below, which are chosen to read on paper, vanish.
+  [view setDrawsBackground:YES];
+  [view setBackgroundColor:[NSColor whiteColor]];
+  [view setInsertionPointColor:[NSColor blackColor]];
   [storage replaceCharactersInRange:NSMakeRange(0, 0) withString:[[view textStorage] string] ?: @""];
   // -replaceTextStorage: moves every layout manager over, which is the whole
   // of what installing means; doing it by hand risks leaving the view pointing
@@ -29,7 +36,10 @@
     _theme = [RDLExpressionTheme defaultTheme];
     _baseAttributes = @{
       NSFontAttributeName : [NSFont userFixedPitchFontOfSize:12] ?: [NSFont systemFontOfSize:12],
-      NSForegroundColorAttributeName : [NSColor controlTextColor],
+      // Black, not controlTextColor: this text is drawn on the white the
+      // storage is installed onto, and controlTextColor is white in a dark
+      // appearance.
+      NSForegroundColorAttributeName : [NSColor blackColor],
     };
   }
   return self;

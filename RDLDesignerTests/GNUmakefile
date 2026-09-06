@@ -39,6 +39,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLInsertPalette.m \
   ../RDLDesigner/RDLExpressionCell.m \
   ../RDLDesigner/RDLExpressionField.m \
+  ../RDLDesigner/RDLToolbarIcons.m \
   ../RDLDesigner/RDLPane.m \
   ../RDLDesigner/RDLExpressionTheme.m \
   ../RDLDesigner/RDLExpressionTextStorage.m \

@@ -9,6 +9,10 @@
         <customObject id="-2" userLabel="File's Owner" customClass="RDLTablixEditor">
             <connections>
                 <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
+                <outlet property="addColumnButton" destination="addColumnButton" id="addColumnButtonOutlet"/>
+                <outlet property="removeColumnButton" destination="removeColumnButton" id="removeColumnButtonOutlet"/>
+                <outlet property="moveLeftButton" destination="moveLeftButton" id="moveLeftButtonOutlet"/>
+                <outlet property="moveRightButton" destination="moveRightButton" id="moveRightButtonOutlet"/>
                 <outlet property="rowGroupTable" destination="rowGroupTable" id="rowGroupTableOutlet"/>
                 <outlet property="colGroupTable" destination="colGroupTable" id="colGroupTableOutlet"/>
                 <outlet property="datasetPop" destination="datasetPop" id="datasetPopOutlet"/>

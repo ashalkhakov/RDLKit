@@ -406,6 +406,73 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"the inspector is still showing its empty state");
 }
 
+// The three things that crash the designer on GNUstep, driven the way a user
+// drives them and through a real window, because that is what makes the
+// difference: a window rebuilds its outline, its panes and its source view on
+// every structural change, and none of that runs when a pane is tested on its
+// own. Everything here passes on macOS; it is on GNUstep that it earns its
+// keep.
+- (void)testStructuralEditsThroughTheWindow {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+
+  // 1. The + under the dataset list.
+  RDLDatasetNavigator *nav = [wc valueForKey:@"datasetNavigator"];
+  NSUInteger datasets = [report.dataSets count];
+  [nav addDataSet:nil];
+  if ([report.dataSets count] != datasets + 1)
+    XCTFail(@"%@", @"the + did not add a dataset");
+
+  // 2. Dragging a global out of the palette onto the body. The report's own
+  // name and the time it ran are the two that were reported crashing.
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLBandFrame *body = nil;
+  for (RDLBandFrame *f in [[canvas geometry] bandFrames])
+    if ([f.bandKey isEqualToString:@"body"])
+      body = f;
+  if (body == nil) {
+    XCTFail(@"%@", @"the report has no body band");
+    return;
+  }
+  NSPoint drop = NSMakePoint(NSMinX(body.frame) + 72, NSMinY(body.frame) + 36);
+  for (NSDictionary *binding in @[
+         @{ @"expression" : @"=Globals!ExecutionTime", @"label" : @"ExecutionTime" },
+         @{ @"expression" : @"=Globals!ReportName", @"label" : @"ReportName" }
+       ]) {
+    NSUInteger before = [body.band.items count];
+    if (![canvas dropBinding:binding atPoint:drop] || [body.band.items count] != before + 1)
+      XCTFail(@"%@", [NSString stringWithFormat:@"dropping %@ did nothing",
+                                                binding[@"expression"]]);
+  }
+
+  // 3. Putting an expression into a textbox that is already there, which is
+  // what the expression editor does when it returns.
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]])
+      box = (RDLTextbox *)it;
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  [ctx.editor setValue:@"=Globals!ExecutionTime" forKeyPath:@"value" ofItem:box];
+  if (![box.value isEqualToString:@"=Globals!ExecutionTime"])
+    XCTFail(@"%@", @"the textbox did not take the expression");
+
+  // And the report still renders: a date reaching the page is where the
+  // formatting of one gets decided, and that is platform-dependent.
+  NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{}];
+  if ([pages count] == 0)
+    XCTFail(@"%@", @"the report with a date in it produced no pages");
+  NSUInteger drawn = 0;
+  for (RDLLaidOutPage *p in pages)
+    drawn += [p.items count];
+  if (drawn == 0)
+    XCTFail(@"%@", @"nothing was drawn at all");
+}
+
 // The quick-insert palette: what it offers, and that dropping one of its
 // bindings on the canvas makes a textbox already bound to it. The drag itself
 // is AppKit's; what the palette puts on the pasteboard and what the canvas does

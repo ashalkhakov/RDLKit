@@ -113,8 +113,16 @@ static NSString *RDLStr(id v) {
     return bv ? @"True" : @"False";
   if ([v isKindOfClass:[NSDate class]]) {
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    // Say which behaviour, rather than taking the default: a formatter left at
+    // the default uses the 10.0 style on GNUstep, where dateStyle means
+    // nothing and the answer can come back nil. And take the description if it
+    // does come back empty -- every caller here is building a string, and a
+    // nil in the middle of that is how a report ends up rendering nothing at
+    // all rather than an unformatted date.
+    [f setFormatterBehavior:NSDateFormatterBehavior10_4];
     f.dateStyle = NSDateFormatterMediumStyle;
-    return [f stringFromDate:v];
+    NSString *formatted = [f stringFromDate:v];
+    return [formatted length] ? formatted : [v description];
   }
   return [v description];
 }

@@ -5,6 +5,7 @@
 #import "RDLRichTextFormatter.h"
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
+#import "RDLToolbarIcons.h"
 
 // The attributed-string <-> Paragraphs/TextRuns conversion lives in
 // RDLRichTextCodec and the formatting itself in RDLRichTextFormatter, both
@@ -62,7 +63,19 @@
   for (NSNumber *size in [RDLRichTextFormatter standardFontSizes])
     [_sizeCombo addItemWithObjectValue:[size stringValue]];
 
-  for (NSButton *b in [self allToolbarButtons]) {
+  // What each button shows. A letter in a 30-point button is a title the
+  // platform has to draw for us, and GNUstep draws its own default instead --
+  // eight buttons reading "Butt". A drawn glyph belongs to us.
+  RDLToolbarGlyph glyphs[] = {
+    RDLToolbarGlyphBold,      RDLToolbarGlyphItalic,      RDLToolbarGlyphUnderline,
+    RDLToolbarGlyphStrikethrough, RDLToolbarGlyphAlignLeft, RDLToolbarGlyphAlignCenter,
+    RDLToolbarGlyphAlignRight, RDLToolbarGlyphAlignJustify
+  };
+  NSArray<NSButton *> *buttons = [self allToolbarButtons];
+  for (NSUInteger i = 0; i < [buttons count]; i++)
+    RDLSetToolbarIcon(buttons[i], glyphs[i]);
+
+  for (NSButton *b in buttons) {
     // Push-on/push-off so a button can show that the selection is already
     // bold. Set here because the raw XIB spelling for a toggle is fiddly and
     // this is provably right.

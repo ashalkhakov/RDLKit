@@ -4,10 +4,13 @@
 #import "RDLEditor.h"
 #import "RDLKit.h"
 #import "RDLPane.h"
+#import "RDLToolbarIcons.h"
 
 @interface RDLDatasetFieldsView () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
+@property (nonatomic, strong) IBOutlet NSButton *addButton;
+@property (nonatomic, strong) IBOutlet NSButton *removeButton;
 // The dataset's own settings. Only its name so far, which is what a report
 // refers to it by and the one thing that was not editable anywhere.
 @property (nonatomic, strong) IBOutlet NSTextField *title;
@@ -25,6 +28,8 @@
   if (!RDLLoadPaneNib(self, @"RDLDatasetFieldsView"))
     return nil;
   RDLFillHost(self, _content);
+  RDLSetToolbarIcon(_addButton, RDLToolbarGlyphAdd);
+  RDLSetToolbarIcon(_removeButton, RDLToolbarGlyphRemove);
   return self;
 }
 

@@ -4,10 +4,13 @@
 #import "RDLEditor.h"
 #import "RDLKit.h"
 #import "RDLPane.h"
+#import "RDLToolbarIcons.h"
 
 @interface RDLDatasetNavigator () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
+@property (nonatomic, strong) IBOutlet NSButton *addButton;
+@property (nonatomic, strong) IBOutlet NSButton *removeButton;
 @end
 
 @implementation RDLDatasetNavigator {
@@ -22,6 +25,8 @@
   if (!RDLLoadPaneNib(self, @"RDLDatasetNavigator"))
     return nil;
   RDLFillHost(self, _content);
+  RDLSetToolbarIcon(_addButton, RDLToolbarGlyphAdd);
+  RDLSetToolbarIcon(_removeButton, RDLToolbarGlyphRemove);
   // -tableViewSelectionDidChange: only fires when the selection CHANGES, so
   // clicking the row that is already selected says nothing. It is still the
   // user asking for that dataset, so the click itself is an action too -- the

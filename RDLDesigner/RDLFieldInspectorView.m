@@ -6,6 +6,7 @@
 #import "RDLExpressionEditor.h"
 #import "RDLKit.h"
 #import "RDLPane.h"
+#import "RDLToolbarIcons.h"
 
 @interface RDLFieldInspectorView () <NSTextFieldDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
@@ -39,6 +40,7 @@
   for (RDLFieldDataType t = RDLFieldDataTypeBoolean; t <= RDLFieldDataTypeString; t++)
     [_typePop addItemWithTitle:RDLStringFromFieldDataType(t)];
   _valueField.expressionContext = RDLExpressionContextText;
+  RDLSetToolbarIcon(_valueExprButton, RDLToolbarGlyphExpression);
   [self showField:nil ofDataSet:nil];
   return self;
 }

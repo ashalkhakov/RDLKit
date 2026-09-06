@@ -10,6 +10,8 @@
             <connections>
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="table" destination="table" id="tableOutlet"/>
+                <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
+                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
                 <outlet property="title" destination="title" id="titleOutlet"/>
             </connections>
         </customObject>

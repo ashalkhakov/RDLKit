@@ -5,6 +5,7 @@
 #import "RDLSelection.h"
 #import "RDLEditingContext.h"
 #import "RDLKit.h"
+#import "RDLToolbarIcons.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
@@ -117,6 +118,11 @@
   // way to know; the dataset popups are filled per report in -reload.
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
+  // f(x) is a picture, not two letters and two brackets: at 24 points wide the
+  // title is the platform's to draw, and GNUstep draws its own instead.
+  for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
+                         _rectBGExprButton, _sizeExprButton, _cellExprButton ])
+    RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
                          _imageBox, _chartBox, _tablixBox, _cellBox ])
     [self addSubview:box];
