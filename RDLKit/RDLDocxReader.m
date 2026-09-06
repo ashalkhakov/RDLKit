@@ -477,7 +477,9 @@ static NSArray<RDLImportRun *> *RDLExtractPlaceholders(NSArray<RDLImportRun *> *
         piece.text = [run.text substringWithRange:NSMakeRange(MAX(consumed, start) - start,
                                                               range.location - MAX(consumed, start))];
         [out addObject:piece];
-        consumed = range.location;
+        // No assignment to `consumed` here: the placeholder is emitted right
+        // after this loop and sets it to the end of the range, so writing the
+        // start of the range first only reads as if it mattered.
       }
       break;
     }

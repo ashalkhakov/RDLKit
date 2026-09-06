@@ -105,6 +105,25 @@ ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-$(ASAN_ARCH).so)
 SANITIZE_ENV := LD_PRELOAD="$(ASAN_LIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:handle_abort=1
 endif
 
+# Undefined behaviour, which is a different question from memory safety and a
+# different tool: UBSAN=1 checks signed overflow, shifts, misaligned and null
+# pointers, out-of-range enum and bool loads, and float-to-integer conversions
+# that do not fit. None of it touches the allocator, so unlike the sanitizers
+# above it does not change the shape of the heap it is run against.
+#
+#   make -C RDLKit UBSAN=1 && make -C RDLKitTests run-tests UBSAN=1
+ifeq ($(UBSAN),1)
+ADDITIONAL_OBJCFLAGS += -fsanitize=undefined -fno-omit-frame-pointer -g
+ADDITIONAL_CFLAGS += -fsanitize=undefined -fno-omit-frame-pointer -g
+ADDITIONAL_LDFLAGS += -fsanitize=undefined
+# As with AddressSanitizer: the bundle is dlopened by an xctest binary that is
+# not instrumented, so the runtime has to be loaded first. halt_on_error=0 so
+# one run reports everything it finds rather than the first thing only.
+UBSAN_ARCH := $(shell uname -m)
+UBSAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.ubsan_standalone-$(UBSAN_ARCH).so)
+SANITIZE_ENV := LD_PRELOAD="$(UBSAN_LIB)" UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=0
+endif
+
 include $(GNUSTEP_MAKEFILES)/bundle.make
 
 XCTEST ?= xctest
