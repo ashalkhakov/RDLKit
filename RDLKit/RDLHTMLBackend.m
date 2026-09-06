@@ -59,7 +59,7 @@ static void RDLAppendCSSBorder(NSMutableString *st, NSString *side, RDLBorder *b
 static void RDLAppendCSSBox(NSMutableString *st, RDLStyle *s) {
   if (s == nil)
     return;
-  if (s.backgroundColor.length && ![s.backgroundColor isEqualToString:@"Transparent"])
+  if (!RDLColorIsTransparent(s.backgroundColor))
     [st appendFormat:@"background:%@;", s.backgroundColor];
   RDLBorder *all = (s.border && s.border.style != RDLBorderStyleUnspecified && s.border.style != RDLBorderStyleNone)
                        ? s.border

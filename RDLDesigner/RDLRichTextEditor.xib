@@ -13,6 +13,7 @@
                 <outlet property="alignLeftButton" destination="alignLeftButton" id="alignLeftOutlet"/>
                 <outlet property="alignRightButton" destination="alignRightButton" id="alignRightOutlet"/>
                 <outlet property="boldButton" destination="boldButton" id="boldButtonOutlet"/>
+                <outlet property="exprButton" destination="exprButton" id="exprButtonOutlet"/>
                 <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="fontPopup" destination="fontPopup" id="fontPopupOutlet"/>
@@ -26,7 +27,7 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <window title="Rich Text" allowsToolTipsWhenApplicationIsInactive="NO" visibleAtLaunch="NO" animationBehavior="default" id="panel">
+        <window title="Rich Text" allowsToolTipsWhenApplicationIsInactive="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" animationBehavior="default" id="panel">
             <windowStyleMask key="styleMask" titled="YES" resizable="YES"/>
             <rect key="contentRect" x="0.0" y="0.0" width="620" height="380"/>
             <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
@@ -185,10 +186,22 @@
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                        </buttonCell>
+                                                    <string key="keyEquivalent" base64-UTF8="YES">
+Gw
+</string>
+</buttonCell>
                         <connections>
                             <action selector="cancel:" target="-2" id="cancelAction"/>
                         </connections>
+                    </button>
+                    <button toolTip="Insert an expression at the insertion point" id="exprButton">
+                        <rect key="frame" x="12" y="10.0" width="130" height="26.0"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="Insert Expression…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="exprButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections><action selector="insertExpression:" target="-2" id="exprButtonAction"/></connections>
                     </button>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="okButton">
                         <rect key="frame" x="528" y="10" width="80" height="26"/>

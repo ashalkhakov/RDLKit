@@ -20,7 +20,7 @@
   // Hovered tablix cell.
   RDLItem *_hoverTablix;
   NSUInteger _hoverCol;
-  NSString *_hoverPart;
+  RDLTablixPart _hoverPart;
   // A double-click's edit starts on mouse-up (see -mouseUp:).
   RDLItem *_pendingEditItem;
   NSPoint _pendingEditPoint;
@@ -43,7 +43,7 @@
   return _hoverCol;
 }
 
-- (NSString *)hoverPart {
+- (RDLTablixPart)hoverPart {
   return _hoverPart;
 }
 
@@ -59,7 +59,24 @@
   NSRect itemRect = NSZeroRect;
   RDLItem *hit = [[_host interactionGeometry] itemAtPoint:p kind:&kind bandKey:&bandKey rect:&itemRect];
   if (hit) {
-    [_ctx.selection selectItem:hit inBandWithKey:bandKey];
+    // A click inside a scaffolded tablix selects the cell as well as the
+    // region, so the inspector can show that column rather than the whole
+    // table. A click elsewhere in it selects the tablix with no cell.
+    NSUInteger cellCol = 0;
+    RDLTablixPart cellPart = RDLTablixPartNone;
+    if ([hit isKindOfClass:[RDLTablix class]] &&
+        [RDLTablixGeometry tablix:(RDLTablix *)hit
+                         itemRect:itemRect
+                            point:p
+                           column:&cellCol
+                             part:&cellPart
+                             zoom:_ctx.zoom])
+      [_ctx.selection selectItem:hit
+                   inBandWithKey:bandKey
+                          column:(NSInteger)cellCol
+                            part:cellPart];
+    else
+      [_ctx.selection selectItem:hit inBandWithKey:bandKey];
     if ([event clickCount] >= 2) {
       // The edit starts from mouseUp: -- the reliable Cocoa pattern -- so
       // remember what was hit for the second click's release to act on.
@@ -214,11 +231,11 @@
 // which raised an unrecognized selector on every exit.
 - (void)mouseExited {
   [[NSCursor arrowCursor] set];
-  if (_hoverTablix == nil && _hoverPart == nil)
+  if (_hoverTablix == nil && _hoverPart == RDLTablixPartNone)
     return;
   _hoverTablix = nil;
   _hoverCol = 0;
-  _hoverPart = nil;
+  _hoverPart = RDLTablixPartNone;
   [_host interactionNeedsRedraw];
 }
 
@@ -227,7 +244,7 @@
   CGFloat z = _ctx.zoom;
   RDLItem *hoverTab = nil;
   NSUInteger hoverCol = 0;
-  NSString *hoverPart = nil;
+  RDLTablixPart hoverPart = RDLTablixPartNone;
   BOOL onBorder = NO;
 
   // Every tablix in the report, nested ones included. The old per-band scan
@@ -244,7 +261,7 @@
       break;
     }
     NSUInteger col = 0;
-    NSString *part = nil;
+    RDLTablixPart part = RDLTablixPartNone;
     if ([RDLTablixGeometry tablix:it itemRect:ir point:p column:&col part:&part zoom:z]) {
       hoverTab = it;
       hoverCol = col;
@@ -254,8 +271,7 @@
   }
 
   [onBorder ? [NSCursor resizeLeftRightCursor] : [NSCursor arrowCursor] set];
-  if (hoverTab != _hoverTablix || hoverCol != _hoverCol ||
-      (hoverPart != _hoverPart && ![hoverPart isEqualToString:_hoverPart])) {
+  if (hoverTab != _hoverTablix || hoverCol != _hoverCol || hoverPart != _hoverPart) {
     _hoverTablix = hoverTab;
     _hoverCol = hoverCol;
     _hoverPart = hoverPart;

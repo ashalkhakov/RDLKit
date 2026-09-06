@@ -43,6 +43,12 @@
                 inReport:(RDLReport *)report;
 
 // Naming. Both search bands and nested Rectangle children.
+// The size, style and stand-in content a newly made item starts with. Exported
+// so anything that builds an item another way -- a binding dragged from the
+// palette, say -- starts it the same as one inserted from the menu, rather
+// than inventing a second set of defaults that drift apart.
++ (void)applyDefaultsTo:(RDLItem *)item report:(RDLReport *)report;
+
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report;
 + (void)renameTreeUniquely:(RDLItem *)item inReport:(RDLReport *)report;
 

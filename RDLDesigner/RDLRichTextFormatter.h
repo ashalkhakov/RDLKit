@@ -36,6 +36,15 @@ typedef NS_ENUM(NSInteger, RDLTriState) {
 @property (nonatomic, assign) BOOL alignmentMixed;
 @end
 
+// Walking the runs of an attributed string, portably.
+// -enumerateAttribute:inRange:options:usingBlock: is a Cocoa addition that
+// GNUstep's Foundation does not declare; -attribute:atIndex:
+// longestEffectiveRange:inRange: exists on both and is what the block form is
+// built on. Exported so nothing has to write this walk a second time.
+FOUNDATION_EXPORT void RDLEnumerateAttribute(NSAttributedString *text, NSString *name,
+                                             NSRange range,
+                                             void (^block)(id value, NSRange r, BOOL *stop));
+
 @interface RDLRichTextFormatter : NSObject
 
 // What `range` of `text` currently looks like. An empty range reads from

@@ -104,6 +104,14 @@ typedef NS_ENUM(NSInteger, RDLPageBreakLocation) {
   RDLPageBreakLocationBetween,
 };
 
+// Tablix/LayoutDirection: which way the columns run. RTL mirrors the region,
+// so the row headers sit on the right and the first column is the rightmost.
+typedef NS_ENUM(NSInteger, RDLLayoutDirection) {
+  RDLLayoutDirectionUnspecified = 0,
+  RDLLayoutDirectionLTR,
+  RDLLayoutDirectionRTL,
+};
+
 typedef NS_ENUM(NSInteger, RDLKeepWithGroup) {
   RDLKeepWithGroupUnspecified = 0,
   RDLKeepWithGroupNone,
@@ -241,6 +249,8 @@ FOUNDATION_EXPORT RDLImageSizing RDLImageSizingFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromImageSizing(RDLImageSizing v);
 FOUNDATION_EXPORT RDLPageBreakLocation RDLPageBreakLocationFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v);
+FOUNDATION_EXPORT RDLLayoutDirection RDLLayoutDirectionFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v);
 FOUNDATION_EXPORT RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s);
 FOUNDATION_EXPORT NSString *RDLStringFromKeepWithGroup(RDLKeepWithGroup v);
 FOUNDATION_EXPORT RDLFilterOperator RDLFilterOperatorFromString(NSString *s);
@@ -387,6 +397,11 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLStyle *style;
 // Visibility/Hidden: "true"/"false", or an expression evaluated per instance.
 @property (nonatomic, strong) RDLValue *hidden;
+// Visibility/ToggleItem: the name of the textbox whose +/- shows and hides
+// this. Interactive rendering only -- a paginated backend has nothing to click
+// -- but it is what makes a report a drill-down, so it is carried rather than
+// dropped, and `hidden` still decides how it comes out on paper.
+@property (nonatomic, copy) NSString *toggleItem;
 // Action/Hyperlink: a URL, or an expression yielding one.
 @property (nonatomic, strong) RDLValue *hyperlink;
 // MS-RDL puts these on rectangles and data regions rather than on every item,
@@ -505,6 +520,12 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLTablixHierarchy *columnHierarchy;
 @property (nonatomic, strong) RDLTablixHierarchy *rowHierarchy;
 @property (nonatomic, copy) NSString *noRowsMessage;
+@property (nonatomic, assign) RDLLayoutDirection layoutDirection;
+// How many of the column hierarchy's groups are drawn before the row headers
+// rather than after them, which is what puts a matrix's outer column groups
+// over its corner. 0 -- all of them after -- is the default and what the
+// scaffolding builds.
+@property (nonatomic, assign) NSInteger groupsBeforeRowHeaders;
 @property (nonatomic, assign) BOOL repeatColumnHeaders;
 @property (nonatomic, assign) BOOL repeatRowHeaders;
 // FixedColumnHeaders / FixedRowHeaders: freeze the headers while the region is
@@ -521,15 +542,18 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // effect; call -rebuildTablix to project it onto the MS-RDL Tablix structures
 // (tablixBody, rowHierarchy, columnHierarchy, cornerRows). Splitting the two
 // removes the ordering hazard the old `columns` setter had: the rebuild reads
-// groupBy, groupBy2, pivotBy, showGrandTotal, name and the heights, so with an
+// rowGroups, columnGroups, showGrandTotal, name and the heights, so with an
 // implicit rebuild-on-set those all had to be assigned *before* the columns.
 @property (nonatomic, copy) NSArray<NSDictionary *> *columnSpecs;
 @property (nonatomic, assign) CGFloat headerHeight;
 @property (nonatomic, assign) CGFloat rowHeight;
-@property (nonatomic, copy) NSString *groupBy; // rebuilds grouped header + details + footer
-@property (nonatomic, copy) NSString *groupBy2; // nested child row group (requires groupBy)
+// The row and column groups, outermost first. A crosstab is a tablix with at
+// least one of each; a grouped table has row groups only; a plain table has
+// neither. Report Builder shows exactly these two lists beside the columns
+// that are left, and this is that model.
+@property (nonatomic, copy) NSArray<NSString *> *rowGroups;
+@property (nonatomic, copy) NSArray<NSString *> *columnGroups;
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
-@property (nonatomic, copy) NSString *pivotBy; // column group field → crosstab (matrix)
 // Rebuild the Tablix structures from columnSpecs (falling back to the spec
 // derived from the current tablixBody when none is stored, e.g. an RDL 2005
 // List). Destroys any hand-made edits to tablixBody/hierarchies/cornerRows.
@@ -579,6 +603,12 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @interface RDLTablixMember : NSObject
 @property (nonatomic, copy) NSString *groupName; // nil / empty = static member
 @property (nonatomic, strong) RDLValue *hidden;  // Visibility/Hidden
+// Visibility/ToggleItem, as on RDLItem: the textbox whose +/- collapses this
+// group. Interactive rendering only.
+@property (nonatomic, copy) NSString *toggleItem;
+// HideIfNoRows: drop this static member when the group has no rows -- what
+// keeps a subtotal or a header row from being drawn over nothing.
+@property (nonatomic, assign) BOOL hideIfNoRows;
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *groupExpressions;
 // Group/Parent: the expression giving *this* row's parent key, which makes the
 // group a recursive hierarchy — an org chart, a bill of materials, a threaded

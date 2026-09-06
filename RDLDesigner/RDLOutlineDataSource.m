@@ -28,10 +28,24 @@ typedef NS_ENUM(NSInteger, RDLNodeKind) {
 @end
 
 
+// What a node stands for, so the same thing gets the same node every time the
+// tree is rebuilt. NSOutlineView remembers the items it was handed -- which
+// rows are expanded, which is selected, what it has already laid out -- so
+// handing it a fresh object for the same report item on every reload throws
+// all of that away, and leaves it holding objects nothing else does. The
+// XForms Designer sidesteps this by using the model objects themselves as
+// items; a report tree needs nodes for its bands, which are not objects, so
+// the nodes are kept and reused instead.
+static id RDLNodeKeyForItem(RDLItem *item) {
+  return [NSValue valueWithPointer:(__bridge const void *)item];
+}
+
 @implementation RDLOutlineDataSource {
   NSOutlineView *_outlineView;
   RDLEditingContext *_ctx;
   RDLOutlineNode *_rootNode;
+  NSMutableDictionary *_nodesByKey;
+  NSMutableDictionary *_previousNodesByKey;
   // Guards against feedback, not against notification storms:
   // -selectRowIndexes: below makes the outline call back into
   // -outlineViewSelectionDidChange:, which would re-post a selection change.
@@ -44,6 +58,7 @@ typedef NS_ENUM(NSInteger, RDLNodeKind) {
   if (self) {
     _outlineView = outlineView;
     _ctx = context;
+    _nodesByKey = [NSMutableDictionary dictionary];
     [outlineView setDataSource:self];
     [outlineView setDelegate:self];
     [self reload];
@@ -82,10 +97,22 @@ typedef NS_ENUM(NSInteger, RDLNodeKind) {
               byExtendingSelection:NO];
 }
 
+// The node standing for `key`, reused from the last rebuild if it is still
+// there, emptied of the children it had. New objects are made only for things
+// that were not in the tree before.
+- (RDLOutlineNode *)nodeForKey:(id)key kind:(RDLNodeKind)kind {
+  RDLOutlineNode *node = _previousNodesByKey[key];
+  if (node == nil)
+    node = [[RDLOutlineNode alloc] init];
+  node.kind = kind;
+  [node.children removeAllObjects];
+  _nodesByKey[key] = node;
+  return node;
+}
+
 - (void)addNodesForItems:(NSArray *)items to:(RDLOutlineNode *)parent bandKey:(NSString *)key {
   for (RDLItem *it in items) {
-    RDLOutlineNode *n = [[RDLOutlineNode alloc] init];
-    n.kind = RDLNodeItem;
+    RDLOutlineNode *n = [self nodeForKey:RDLNodeKeyForItem(it) kind:RDLNodeItem];
     n.title = [NSString stringWithFormat:@"%@  %@", it.rdlElementName, it.name ?: @""];
     n.bandKey = key;
     n.item = it;
@@ -97,18 +124,22 @@ typedef NS_ENUM(NSInteger, RDLNodeKind) {
 
 - (void)rebuildTree {
   RDLReport *report = _ctx.report;
-  RDLOutlineNode *root = [[RDLOutlineNode alloc] init];
-  root.kind = RDLNodeReport;
+  _previousNodesByKey = _nodesByKey;
+  _nodesByKey = [NSMutableDictionary dictionary];
+  RDLOutlineNode *root = [self nodeForKey:@"report" kind:RDLNodeReport];
   root.title = report.name ?: @"Report";
   for (NSString *key in [RDLReport bandKeys]) {
-    RDLOutlineNode *bn = [[RDLOutlineNode alloc] init];
-    bn.kind = RDLNodeBand;
+    RDLOutlineNode *bn = [self nodeForKey:[@"band:" stringByAppendingString:key]
+                                     kind:RDLNodeBand];
     bn.title = [RDLItemFactory titleForBandKey:key];
     bn.bandKey = key;
     [root.children addObject:bn];
     [self addNodesForItems:[report bandWithKey:key].items to:bn bandKey:key];
   }
   _rootNode = root;
+  // Held only until the next rebuild has taken what it needs; a node for an
+  // item that is gone goes with it.
+  _previousNodesByKey = nil;
 }
 
 - (RDLOutlineNode *)findSelectedNodeIn:(RDLOutlineNode *)node {

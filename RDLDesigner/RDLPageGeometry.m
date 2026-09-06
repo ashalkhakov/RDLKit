@@ -8,8 +8,6 @@ NSString * const RDLHandleSouthEast = @"se";
 NSString * const RDLHandleEast = @"e";
 NSString * const RDLHandleSouth = @"s";
 
-NSString * const RDLTablixPartHeader = @"header";
-NSString * const RDLTablixPartValue = @"value";
 
 // The canvas leaves this much room around the paper, and the drag handles are
 // this big. Both are geometry, so they live with the rest of it rather than
@@ -69,6 +67,33 @@ static const CGFloat kColumnBorderSlop = 3.0;
   CGFloat scale = RDLPointsPerInch * (zoom > 0 ? zoom : 1.0);
   return NSMakeSize(report.page.pageWidth * scale + kCanvasPadding * 2,
                     report.page.pageHeight * scale + kCanvasPadding * 2);
+}
+
+// Between one bracket and the next out, and how far the ends turn in. Constants
+// rather than numbers in the drawing code: the renderer and anything checking
+// the layout have to agree about where a bracket is.
+static const CGFloat kRDLBracketStep = 9;
+static const CGFloat kRDLBracketTick = 4;
+static const CGFloat kRDLBracketGap = 3;
+
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSUInteger i = 0; i < count; i++) {
+    CGFloat x = NSMinX(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
+    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick,
+                                                     NSHeight(rect))]];
+  }
+  return out;
+}
+
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSUInteger i = 0; i < count; i++) {
+    CGFloat y = NSMinY(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
+    [out addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(rect), y, NSWidth(rect),
+                                                     kRDLBracketTick)]];
+  }
+  return out;
 }
 
 + (NSPoint)defaultPaperOrigin {
@@ -249,7 +274,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
 + (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
               column:(NSUInteger)column
-                part:(NSString *)part
+                part:(RDLTablixPart)part
                 zoom:(CGFloat)zoom {
   NSArray *specs = tablix.columnSpecs ?: @[];
   CGFloat x = NSMinX(itemRect);
@@ -257,7 +282,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
     x += [self widthOfColumn:i in:specs zoom:zoom];
   CGFloat w = [self widthOfColumn:column in:specs zoom:zoom];
   CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
-  BOOL header = [part isEqualToString:RDLTablixPartHeader];
+  BOOL header = part == RDLTablixPartHeader;
   return NSMakeRect(x, header ? NSMinY(itemRect) : NSMinY(itemRect) + hh, w,
                     header ? hh : [self rowHeightOf:tablix zoom:zoom]);
 }
@@ -266,14 +291,14 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
         column:(NSUInteger *)outColumn
-          part:(NSString **)outPart
+          part:(RDLTablixPart *)outPart
           zoom:(CGFloat)zoom {
   NSArray *specs = tablix.columnSpecs ?: @[];
   if ([specs count] == 0 || !NSPointInRect(point, itemRect))
     return NO;
   CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
   CGFloat rh = [self rowHeightOf:tablix zoom:zoom];
-  NSString *part;
+  RDLTablixPart part;
   if (point.y < NSMinY(itemRect) + hh)
     part = RDLTablixPartHeader;
   else if (point.y < NSMinY(itemRect) + hh + rh)

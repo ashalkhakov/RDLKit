@@ -51,6 +51,7 @@ static RDLValue *RDLValueFromElement(NSXMLElement *el) {
 }
 
 static RDLValue *RDLParseVisibility(NSXMLElement *el);
+static NSString *RDLParseToggleItem(NSXMLElement *el);
 static RDLValue *RDLParseHyperlink(NSXMLElement *el);
 
 // Warnings raised while parsing; see gRDLParseWarnings below.
@@ -266,33 +267,39 @@ static RDLValue *RDLParsePageBreakName(NSXMLElement *el) {
 }
 
 // First member (depth-first) carrying group expressions — the outer group.
-static RDLTablixMember *RDLFindGroupMember(NSArray<RDLTablixMember *> *members) {
-  for (RDLTablixMember *mm in members) {
-    if ([mm.groupExpressions count])
-      return mm;
-    RDLTablixMember *nested = RDLFindGroupMember(mm.members);
-    if (nested)
-      return nested;
-  }
-  return nil;
+// The field a member groups on, or nil when it is static or groups on
+// something that is not a plain field reference.
+static NSString *RDLGroupField(RDLTablixMember *member) {
+  if ([member.groupExpressions count] == 0)
+    return nil;
+  NSString *ex = [member.groupExpressions[0] source];
+  NSRange r = [ex rangeOfString:@"Fields!"];
+  if (r.location == NSNotFound)
+    return nil;
+  NSString *rest = [ex substringFromIndex:r.location + 7];
+  NSRange dot = [rest rangeOfString:@"."];
+  return dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
 }
 
-static NSString *RDLFindGroupBy(NSArray<RDLTablixMember *> *members) {
+// The chain of dynamic groups down a hierarchy, outermost first -- which is
+// exactly what rowGroups and columnGroups are. A hierarchy nests each group
+// inside the one before it, so the chain is found by descending rather than by
+// searching: the first dynamic member at this level, then its own chain. The
+// static members around it (a header row, a subtotal, a grand total) group on
+// nothing and are stepped over.
+static NSArray<NSString *> *RDLGroupChain(NSArray<RDLTablixMember *> *members) {
   for (RDLTablixMember *mm in members) {
-    if ([mm.groupExpressions count]) {
-      NSString *ex = [mm.groupExpressions[0] source];
-      NSRange r = [ex rangeOfString:@"Fields!"];
-      if (r.location != NSNotFound) {
-        NSString *rest = [ex substringFromIndex:r.location + 7];
-        NSRange dot = [rest rangeOfString:@"."];
-        return dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
-      }
+    NSString *field = RDLGroupField(mm);
+    if (field) {
+      NSMutableArray *chain = [NSMutableArray arrayWithObject:field];
+      [chain addObjectsFromArray:RDLGroupChain(mm.members)];
+      return chain;
     }
-    NSString *nested = RDLFindGroupBy(mm.members);
-    if (nested)
+    NSArray *nested = RDLGroupChain(mm.members);
+    if ([nested count])
       return nested;
   }
-  return nil;
+  return @[];
 }
 
 static RDLItem *RDLParseItem(NSXMLElement *el);
@@ -528,6 +535,9 @@ static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
   RDLValue *hid = RDLParseVisibility(el);
   if (hid)
     m.hidden = hid;
+  m.toggleItem = RDLParseToggleItem(el);
+  NSString *hnr = RDLText(RDLChild(el, @"HideIfNoRows"));
+  m.hideIfNoRows = [hnr isEqualToString:@"true"] || [hnr isEqualToString:@"True"];
   NSXMLElement *headerEl = RDLChild(el, @"TablixHeader");
   if (headerEl) {
     RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
@@ -692,6 +702,15 @@ static RDLValue *RDLParseVisibility(NSXMLElement *el) {
   return vis ? RDLValueFromElement(RDLChild(vis, @"Hidden")) : nil;
 }
 
+// Visibility/ToggleItem: the textbox that shows and hides this one. Nothing
+// paginated can act on it, but a report that has it is a drill-down and would
+// stop being one if it were dropped on the next save.
+static NSString *RDLParseToggleItem(NSXMLElement *el) {
+  NSXMLElement *vis = RDLChild(el, @"Visibility");
+  NSString *toggle = vis ? RDLText(RDLChild(vis, @"ToggleItem")) : nil;
+  return [toggle length] ? toggle : nil;
+}
+
 static RDLValue *RDLParseHyperlink(NSXMLElement *el) {
   NSXMLElement *info = RDLChild(el, @"ActionInfo");
   if (info == nil)
@@ -765,6 +784,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
   RDLBox(el, item);
   item.style = RDLParseStyle(RDLChild(el, @"Style"));
   item.hidden = RDLParseVisibility(el);
+  item.toggleItem = RDLParseToggleItem(el);
   NSString *zi = RDLText(RDLChild(el, @"ZIndex"));
   if ([zi length])
     item.zIndex = [zi integerValue];
@@ -872,6 +892,11 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     }
     tablix.tablixBody = body;
     tablix.noRowsMessage = RDLText(RDLChild(el, @"NoRowsMessage"));
+    RDL_PARSE_ENUM(tablix.layoutDirection, @"LayoutDirection", RDLLayoutDirectionFromString,
+                    RDLText(RDLChild(el, @"LayoutDirection")));
+    NSString *gbrh = RDLText(RDLChild(el, @"GroupsBeforeRowHeaders"));
+    if ([gbrh length])
+      tablix.groupsBeforeRowHeaders = [gbrh integerValue];
     NSString *rch = RDLText(RDLChild(el, @"RepeatColumnHeaders"));
     tablix.repeatColumnHeaders = [rch isEqualToString:@"true"] || [rch isEqualToString:@"True"];
     NSString *rrh = RDLText(RDLChild(el, @"RepeatRowHeaders"));
@@ -903,10 +928,8 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     NSXMLElement *ch = RDLChild(el, @"TablixColumnHierarchy");
     if (ch)
       tablix.columnHierarchy = RDLParseHierarchy(ch);
-    // Designer convenience: a dynamic column group means crosstab (matrix).
-    NSString *pivot = RDLFindGroupBy(tablix.columnHierarchy.members);
-    if (pivot)
-      tablix.pivotBy = pivot;
+    // Designer convenience: any dynamic column group means crosstab (matrix).
+    tablix.columnGroups = RDLGroupChain(tablix.columnHierarchy.members);
     NSXMLElement *rh = RDLChild(el, @"TablixRowHierarchy");
     if (rh)
       tablix.rowHierarchy = RDLParseHierarchy(rh);
@@ -921,16 +944,9 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
       [synth.members addObject:dMem];
       tablix.rowHierarchy = synth;
     }
-    NSString *found = RDLFindGroupBy(tablix.rowHierarchy.members);
-    if (found) {
-      tablix.groupBy = found;
-      // A second dynamic group nested inside the outer one is the child
-      // row group (designer convenience groupBy2).
-      RDLTablixMember *outer = RDLFindGroupMember(tablix.rowHierarchy.members);
-      NSString *inner = RDLFindGroupBy(outer.members);
-      if (inner && ![inner isEqualToString:found])
-        tablix.groupBy2 = inner;
-    }
+    // Every level of it, not the first two: the hierarchy nests as deep as it
+    // was written, and the scaffolding builds it back to the same depth.
+    tablix.rowGroups = RDLGroupChain(tablix.rowHierarchy.members);
     // Designer convenience: a trailing static top-level member is a grand
     // total row (see -[RDLItem rdlBuildTable:...]).
     RDLTablixMember *lastMem = tablix.rowHierarchy.members.lastObject;
@@ -938,7 +954,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
         [lastMem.groupName length] == 0 && [lastMem.groupExpressions count] == 0 &&
         [lastMem.members count] == 0)
       tablix.showGrandTotal = YES;
-    // Recover the designer column spec now that pivotBy/groupBy/showGrandTotal
+    // Recover the designer column spec now that the groups and showGrandTotal
     // are known (the recovery reads them), so an item loaded from disk carries
     // a spec and -rebuildTablix has something authoritative to build from.
     [tablix inferColumnSpecsFromTablixBody];
@@ -1393,11 +1409,13 @@ static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, BOOL
   [parent addChild:pb];
 }
 
-static void RDLAddVisibility(NSXMLElement *parent, RDLValue *hidden) {
-  if (hidden == nil)
+static void RDLAddVisibility(NSXMLElement *parent, RDLValue *hidden, NSString *toggleItem) {
+  if (hidden == nil && [toggleItem length] == 0)
     return;
   NSXMLElement *vis = RDLEl(@"Visibility");
-  RDLAddValue(vis, @"Hidden", hidden);
+  if (hidden)
+    RDLAddValue(vis, @"Hidden", hidden);
+  RDLAddIf(vis, @"ToggleItem", toggleItem);
   [parent addChild:vis];
 }
 
@@ -1454,7 +1472,9 @@ static void RDLAddMember(NSXMLElement *parent, RDLTablixMember *m) {
     RDLAdd(me, @"KeepWithGroup", RDLStringFromKeepWithGroup(m.keepWithGroup));
   if (m.keepTogether)
     RDLAdd(me, @"KeepTogether", @"true");
-  RDLAddVisibility(me, m.hidden);
+  if (m.hideIfNoRows)
+    RDLAdd(me, @"HideIfNoRows", @"true");
+  RDLAddVisibility(me, m.hidden, m.toggleItem);
   if ([m.members count]) {
     NSXMLElement *kids = RDLEl(@"TablixMembers");
     for (RDLTablixMember *c in m.members)
@@ -1520,7 +1540,7 @@ static void RDLAddChart(NSXMLElement *parent, RDLChart *chart) {
   NSXMLElement *el = RDLEl(@"Chart");
   RDLAddAttr(el, @"Name", chart.name);
   RDLAddBox(el, chart);
-  RDLAddVisibility(el, chart.hidden);
+  RDLAddVisibility(el, chart.hidden, chart.toggleItem);
   RDLAddItemPagination(el, chart);
   RDLAddStyle(el, chart.style);
   RDLAddIf(el, @"DataSetName", chart.dataSetName);
@@ -1598,6 +1618,11 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   RDLAddBox(tx, it);
   RDLAdd(tx, @"DataSetName", it.dataSetName);
   RDLAddIf(tx, @"NoRowsMessage", it.noRowsMessage);
+  if (it.layoutDirection != RDLLayoutDirectionUnspecified)
+    RDLAdd(tx, @"LayoutDirection", RDLStringFromLayoutDirection(it.layoutDirection));
+  if (it.groupsBeforeRowHeaders > 0)
+    RDLAdd(tx, @"GroupsBeforeRowHeaders",
+           [NSString stringWithFormat:@"%ld", (long)it.groupsBeforeRowHeaders]);
   if (it.repeatColumnHeaders)
     RDLAdd(tx, @"RepeatColumnHeaders", @"true");
   if (it.repeatRowHeaders)
@@ -1700,7 +1725,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Line");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddStyle(el, it.style);
     [parent addChild:el];
     return;
@@ -1710,7 +1735,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Image");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddHyperlink(el, it);
     RDLAdd(el, @"Source", RDLStringFromImageSource(img.source) ?: @"External");
     RDLAdd(el, @"Value", img.value);
@@ -1723,7 +1748,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     NSXMLElement *el = RDLEl(@"Rectangle");
     RDLAddAttr(el, @"Name", it.name);
     RDLAddBox(el, it);
-    RDLAddVisibility(el, it.hidden);
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddItemPagination(el, it);
     RDLAddStyle(el, it.style);
     if ([it.childItems count]) {
@@ -1748,7 +1773,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
   NSXMLElement *el = RDLEl(@"Textbox");
   RDLAddAttr(el, @"Name", it.name);
   RDLAddBox(el, it);
-  RDLAddVisibility(el, it.hidden);
+  RDLAddVisibility(el, it.hidden, it.toggleItem);
   RDLAddHyperlink(el, it);
   RDLAddItemPagination(el, it);
   RDLAdd(el, @"CanGrow", tb.canGrow ? @"true" : @"false");
@@ -1924,6 +1949,30 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   [page addChild:footer];
   [root addChild:page];
 
+  /*
+  // Serialise the root element directly rather than wrapping it in an
+  // NSXMLDocument. On GNUstep, allocating an NSXMLDocument over a fully
+  // materialised element tree and then releasing it corrupts the heap:
+  // -[NSXMLDocument dealloc] moves the root subtree into a private detached
+  // document, and every element wrapper still alive in the pool then peels
+  // its own node out one at a time (xmlNewDoc / xmlSetTreeDoc / xmlFreeNode
+  // per node), a cascade whose freed chunks get written after release. The
+  // trigger is isolated to releasing the document: keeping every document
+  // alive does not crash, and neither does this -- never creating one --
+  // over 500+ rounds. The writer sets every
+  // namespace as a plain xmlns attribute (see the root comment above), so the
+  // element carries no live libxml namespace nodes and its serialisation is
+  // byte-for-byte the document's: declaration line included, this produces
+  // output identical to the NSXMLDocument path on every report tested, on
+  // both platforms. The document was only ever a serialisation envelope.
+  // Pretty-printed: NSXML only adds whitespace between elements, and a
+  // text-only element keeps its content exactly (verified by
+  // RDLRunWriterWhitespaceChecks), so the file stays diff-friendly.
+  NSString *rootXML = [root XMLStringWithOptions:NSXMLNodePrettyPrint];
+  return [@"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+             stringByAppendingString:rootXML];
+  */
+  // Try the old way again (see patch: gnustep-basexmlns-attribute.patch)
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithRootElement:root];
   [doc setVersion:@"1.0"];
   [doc setCharacterEncoding:@"utf-8"];

@@ -1,0 +1,14 @@
+# The box plus the tools that can see inside GNUstep itself. AddressSanitizer
+# only instruments what it compiles, so a write past the end of a buffer inside
+# libs-base or libs-gui is invisible to it -- and that is where a heap this
+# code does not touch directly gets damaged. Valgrind instruments everything,
+# at about thirty times the cost.
+#
+# The fonts come too. Without them a run has no italic face to convert to and
+# the rich text tests fail for reasons that have nothing to do with the code;
+# these are the two families the AppImage bundles, for the same reason.
+FROM rdlkit-gnustep
+RUN printf 'Acquire::Retries "8";\n' > /etc/apt/apt.conf.d/99retries \
+    && apt-get -q -y update && apt-get -q -y install valgrind xdotool x11-utils \
+        fonts-dejavu fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*

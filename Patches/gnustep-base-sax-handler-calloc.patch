@@ -1,0 +1,46 @@
+Zero the SAX handler before libxml2 is asked to initialise it
+
+-[GSSAXHandler _initLibXML] allocates an xmlSAXHandler with malloc and hands
+it straight to xmlSAX2InitDefaultSAXHandler, whose first act is
+
+    if ((hdlr == NULL) || (hdlr->initialized != 0)) return;
+
+so whenever the uninitialised `initialized` field happens to be non-zero, the
+call does nothing at all and the handler keeps whatever the heap had in it.
+
+In practice _initLibXML then calls xmlSAXVersion(), which re-establishes the
+standard callbacks, so this is not usually visible as a parse failure -- the
+cost is a read of uninitialised memory on every parse, an initialisation that
+silently does nothing, and the remaining fields of the handler being whatever
+was in that memory before.
+
+Valgrind names it on every XIB load, since the xib unarchiver parses through
+NSXMLParser and this handler:
+
+    Conditional jump or move depends on uninitialised value(s)
+       at xmlSAX2InitDefaultSAXHandler (libxml2)
+       by -[GSSAXHandler _initLibXML]  (GSXML.m:3808)
+     Uninitialised value was created by a heap allocation
+       at malloc
+       by -[GSSAXHandler _initLibXML]  (GSXML.m:3801)
+
+calloc costs nothing here -- one structure per parser -- and makes the
+initialisation deterministic.
+
+A standalone reproduction is in gnustep-patch-repros/sax-handler-init.m: six
+frames under valgrind, and silent with this patch applied.
+
+--- a/Source/Additions/GSXML.m
++++ b/Source/Additions/GSXML.m
+@@ -3798,7 +3798,10 @@
+  */
+ - (BOOL) _initLibXML
+ {
+-  lib = (xmlSAXHandler*)malloc(sizeof(xmlSAXHandler));
++  /* Zeroed, not merely allocated: xmlSAX2InitDefaultSAXHandler() returns
++   * without doing anything when the handler's `initialized' field is not
++   * zero, so an uninitialised one is silently left uninitialised. */
++  lib = (xmlSAXHandler*)calloc(1, sizeof(xmlSAXHandler));
+   if (lib == NULL)
+     {
+       return NO;

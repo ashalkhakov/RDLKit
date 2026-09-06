@@ -27,9 +27,15 @@ extern NSString * const RDLHandleSouthEast;
 extern NSString * const RDLHandleEast;
 extern NSString * const RDLHandleSouth;
 
-// Tablix preview parts, as returned by +tablix:itemRect:point:column:part:.
-extern NSString * const RDLTablixPartHeader;
-extern NSString * const RDLTablixPartValue;
+// Which row of a tablix's preview a point fell in, as returned by
+// +tablix:itemRect:point:column:part:. An enumeration rather than the two
+// strings this was: the vocabulary is fixed, and a mistyped comparison against
+// a string is a branch that never runs and that nothing diagnoses.
+typedef NS_ENUM(NSInteger, RDLTablixPart) {
+  RDLTablixPartNone = 0,
+  RDLTablixPartHeader,
+  RDLTablixPartValue
+};
 
 // One band's placement, paired with its key so callers never have to index two
 // parallel arrays (a previous source of drift).
@@ -73,6 +79,14 @@ extern NSString * const RDLTablixPartValue;
                  bandKey:(NSString **)outBandKey
                     rect:(NSRect *)outRect;
 
+// Where a selected tablix's group brackets go: one per row group down the left
+// of `rect`, one per column group across the top, outermost furthest out so the
+// nesting reads outwards. Each rect is the bracket's extent, including its
+// turned-in ends. Geometry rather than drawing, so where they land can be
+// checked without rendering anything.
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
+
 // The band whose frame contains `point`, or nil.
 - (NSString *)bandKeyAtPoint:(NSPoint)point;
 
@@ -90,14 +104,14 @@ extern NSString * const RDLTablixPartValue;
 + (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
               column:(NSUInteger)column
-                part:(NSString *)part
+                part:(RDLTablixPart)part
                 zoom:(CGFloat)zoom;
 // The column and part under `point`, or NO outside the editable grid.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
         column:(NSUInteger *)outColumn
-          part:(NSString **)outPart
+          part:(RDLTablixPart *)outPart
           zoom:(CGFloat)zoom;
 // An INTERNAL column border under `point`, for width dragging. The last
 // column's right edge is deliberately excluded: that is the item's own east

@@ -22,8 +22,8 @@ static void RDLEnumerateAttributes(NSAttributedString *text, NSRange range,
   }
 }
 
-static void RDLEnumerateAttribute(NSAttributedString *text, NSString *name, NSRange range,
-                                   void (^block)(id value, NSRange r, BOOL *stop)) {
+void RDLEnumerateAttribute(NSAttributedString *text, NSString *name, NSRange range,
+                            void (^block)(id value, NSRange r, BOOL *stop)) {
   NSUInteger at = range.location;
   BOOL stop = NO;
   while (at < NSMaxRange(range) && !stop) {

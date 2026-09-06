@@ -13,17 +13,30 @@
                 <outlet property="bandBGField" destination="bandBGField" id="bandBGFieldOutlet"/>
                 <outlet property="bandBox" destination="bandBox" id="bandBoxOutlet"/>
                 <outlet property="bandHField" destination="bandHField" id="bandHFieldOutlet"/>
+                <outlet property="bgColorWell" destination="bgColorWell" id="bgColorWellOutlet"/>
                 <outlet property="bodyHField" destination="bodyHField" id="bodyHFieldOutlet"/>
                 <outlet property="catField" destination="catField" id="catFieldOutlet"/>
+                <outlet property="cellAggPop" destination="cellAggPop" id="cellAggPopOutlet"/>
+                <outlet property="cellAlignPop" destination="cellAlignPop" id="cellAlignPopOutlet"/>
+                <outlet property="cellBox" destination="cellBox" id="cellBoxOutlet"/>
+                <outlet property="cellExprButton" destination="cellExprButton" id="cellExprButtonOutlet"/>
+                <outlet property="cellHeaderField" destination="cellHeaderField" id="cellHeaderFieldOutlet"/>
+                <outlet property="cellValueField" destination="cellValueField" id="cellValueFieldOutlet"/>
+                <outlet property="cellWidthField" destination="cellWidthField" id="cellWidthFieldOutlet"/>
                 <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
                 <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
                 <outlet property="chartKindPop" destination="chartKindPop" id="chartKindPopOutlet"/>
+                <outlet property="colorExprButton" destination="colorExprButton" id="colorExprButtonOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
+                <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="descField" destination="descField" id="descFieldOutlet"/>
                 <outlet property="docBox" destination="docBox" id="docBoxOutlet"/>
                 <outlet property="docNameField" destination="docNameField" id="docNameFieldOutlet"/>
+                <outlet property="fontExprButton" destination="fontExprButton" id="fontExprButtonOutlet"/>
                 <outlet property="fontField" destination="fontField" id="fontFieldOutlet"/>
+                <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
                 <outlet property="footerHField" destination="footerHField" id="footerHFieldOutlet"/>
+                <outlet property="formatExprButton" destination="formatExprButton" id="formatExprButtonOutlet"/>
                 <outlet property="formatField" destination="formatField" id="formatFieldOutlet"/>
                 <outlet property="geoBox" destination="geoBox" id="geoBoxOutlet"/>
                 <outlet property="headerHField" destination="headerHField" id="headerHFieldOutlet"/>
@@ -39,8 +52,11 @@
                 <outlet property="marginField" destination="marginField" id="marginFieldOutlet"/>
                 <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
                 <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
+                <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
                 <outlet property="rectBGField" destination="rectBGField" id="rectBGFieldOutlet"/>
                 <outlet property="rectBox" destination="rectBox" id="rectBoxOutlet"/>
+                <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
+                <outlet property="sizeExprButton" destination="sizeExprButton" id="sizeExprButtonOutlet"/>
                 <outlet property="sizeField" destination="sizeField" id="sizeFieldOutlet"/>
                 <outlet property="tablixBox" destination="tablixBox" id="tablixBoxOutlet"/>
                 <outlet property="tablixDatasetPop" destination="tablixDatasetPop" id="tablixDatasetPopOutlet"/>
@@ -50,6 +66,7 @@
                 <outlet property="titleField" destination="titleField" id="titleFieldOutlet"/>
                 <outlet property="topField" destination="topField" id="topFieldOutlet"/>
                 <outlet property="valField" destination="valField" id="valFieldOutlet"/>
+                <outlet property="valueExprButton" destination="valueExprButton" id="valueExprButtonOutlet"/>
                 <outlet property="valueField" destination="valueField" id="valueFieldOutlet"/>
                 <outlet property="weightPop" destination="weightPop" id="weightPopOutlet"/>
                 <outlet property="widthField" destination="widthField" id="widthFieldOutlet"/>
@@ -57,12 +74,12 @@
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <textField verticalHuggingPriority="750" id="kindLabel">
+        <textField focusRingType="none" verticalHuggingPriority="750" id="kindLabel">
             <rect key="frame" x="0.0" y="0.0" width="240" height="16"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <textFieldCell key="cell" title="Report" id="kindLabelCell">
                 <font key="font" metaFont="smallSystemBold"/>
-                <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
             </textFieldCell>
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
@@ -70,15 +87,15 @@
             <rect key="frame" x="0.0" y="28" width="260" height="290"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl1">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Name" id="lbl1Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="docNameField">
+                <textField focusRingType="none" id="docNameField">
                     <rect key="frame" x="10" y="20" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="docNameFieldCell">
@@ -91,15 +108,15 @@
                         <outlet property="delegate" destination="-2" id="docNameFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl2">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl2">
                     <rect key="frame" x="10" y="48" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Author" id="lbl2Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="authorField">
+                <textField focusRingType="none" id="authorField">
                     <rect key="frame" x="10" y="64" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="authorFieldCell">
@@ -112,15 +129,15 @@
                         <outlet property="delegate" destination="-2" id="authorFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl3">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl3">
                     <rect key="frame" x="10" y="92" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Description" id="lbl3Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="descField">
+                <textField focusRingType="none" id="descField">
                     <rect key="frame" x="10" y="108" width="240" height="44"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="descFieldCell">
@@ -133,12 +150,12 @@
                         <outlet property="delegate" destination="-2" id="descFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl4">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl4">
                     <rect key="frame" x="10" y="158" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Page" id="lbl4Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="pagePop">
@@ -153,23 +170,23 @@
                         <action selector="changed:" target="-2" id="pagePopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl5">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl5">
                     <rect key="frame" x="10" y="202" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Header in" id="lbl5Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl6">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl6">
                     <rect key="frame" x="136" y="202" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Body in" id="lbl6Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="headerHField">
+                <textField focusRingType="none" id="headerHField">
                     <rect key="frame" x="10" y="218" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="headerHFieldCell">
@@ -182,7 +199,7 @@
                         <outlet property="delegate" destination="-2" id="headerHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField id="bodyHField">
+                <textField focusRingType="none" id="bodyHField">
                     <rect key="frame" x="136" y="218" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bodyHFieldCell">
@@ -195,23 +212,23 @@
                         <outlet property="delegate" destination="-2" id="bodyHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl7">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl7">
                     <rect key="frame" x="10" y="246" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Footer in" id="lbl7Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl8">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl8">
                     <rect key="frame" x="136" y="246" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Margin in" id="lbl8Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="footerHField">
+                <textField focusRingType="none" id="footerHField">
                     <rect key="frame" x="10" y="262" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="footerHFieldCell">
@@ -224,7 +241,7 @@
                         <outlet property="delegate" destination="-2" id="footerHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField id="marginField">
+                <textField focusRingType="none" id="marginField">
                     <rect key="frame" x="136" y="262" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="marginFieldCell">
@@ -243,15 +260,15 @@
             <rect key="frame" x="0.0" y="28" width="260" height="92"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl9">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl9">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Height in" id="lbl9Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="bandHField">
+                <textField focusRingType="none" id="bandHField">
                     <rect key="frame" x="10" y="20" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bandHFieldCell">
@@ -264,15 +281,15 @@
                         <outlet property="delegate" destination="-2" id="bandHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl10">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl10">
                     <rect key="frame" x="10" y="48" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Background" id="lbl10Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="bandBGField">
+                <textField focusRingType="none" id="bandBGField">
                     <rect key="frame" x="10" y="64" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bandBGFieldCell">
@@ -291,15 +308,15 @@
             <rect key="frame" x="0.0" y="28" width="260" height="140"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl11">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl11">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Name" id="lbl11Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="nameField">
+                <textField focusRingType="none" id="nameField">
                     <rect key="frame" x="10" y="20" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="nameFieldCell">
@@ -312,15 +329,15 @@
                         <outlet property="delegate" destination="-2" id="nameFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl12">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl12">
                     <rect key="frame" x="10" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Left" id="lbl12Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="leftField">
+                <textField focusRingType="none" id="leftField">
                     <rect key="frame" x="10" y="64" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="leftFieldCell">
@@ -333,15 +350,15 @@
                         <outlet property="delegate" destination="-2" id="leftFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl13">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl13">
                     <rect key="frame" x="136" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Top" id="lbl13Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="topField">
+                <textField focusRingType="none" id="topField">
                     <rect key="frame" x="136" y="64" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="topFieldCell">
@@ -354,15 +371,15 @@
                         <outlet property="delegate" destination="-2" id="topFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl14">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl14">
                     <rect key="frame" x="10" y="92" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Width" id="lbl14Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="widthField">
+                <textField focusRingType="none" id="widthField">
                     <rect key="frame" x="10" y="108" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="widthFieldCell">
@@ -375,15 +392,15 @@
                         <outlet property="delegate" destination="-2" id="widthFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl15">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl15">
                     <rect key="frame" x="136" y="92" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Height" id="lbl15Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="heightField">
+                <textField focusRingType="none" id="heightField">
                     <rect key="frame" x="136" y="108" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="heightFieldCell">
@@ -398,20 +415,161 @@
                 </textField>
             </subviews>
         </customView>
-        <customView id="textBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="246"/>
+        <customView id="cellBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="176"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl16">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell0">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Column" id="lblCell0Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="cellHeaderField">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellHeaderFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellHeaderFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellHeaderFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell1">
+                    <rect key="frame" x="10" y="46" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Value" id="lblCell1Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="cellValueField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="62" width="214" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellValueFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellValueFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellValueFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="cellExprButton">
+                    <rect key="frame" x="226" y="62" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cellExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="cellExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell2">
+                    <rect key="frame" x="10" y="88" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Width in" id="lblCell2Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell3">
+                    <rect key="frame" x="136" y="88" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Align" id="lblCell3Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="cellWidthField">
+                    <rect key="frame" x="10" y="104" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellWidthFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellWidthFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellWidthFieldDelegate"/>
+                    </connections>
+                </textField>
+                <popUpButton id="cellAlignPop">
+                    <rect key="frame" x="136" y="104" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" title="Default" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" selectedItem="cellAlignPopItem0" id="cellAlignPopCell">
+                        <behavior key="behavior" lightByContents="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                        <menu key="menu" title="OtherViews" id="cellAlignPopMenu">
+                            <items>
+                                <menuItem title="Default" state="on" id="cellAlignPopItem0"/>
+                                <menuItem title="Left" id="cellAlignPopItem1"/>
+                                <menuItem title="Center" id="cellAlignPopItem2"/>
+                                <menuItem title="Right" id="cellAlignPopItem3"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellAlignPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell4">
+                    <rect key="frame" x="10" y="130" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Total" id="lblCell4Cell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="cellAggPop">
+                    <rect key="frame" x="10" y="146" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" title="None" bezelStyle="rounded" alignment="left" controlSize="small" lineBreakMode="truncatingTail" state="on" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" selectedItem="cellAggPopItem0" id="cellAggPopCell">
+                        <behavior key="behavior" lightByContents="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                        <menu key="menu" title="OtherViews" id="cellAggPopMenu">
+                            <items>
+                                <menuItem title="None" state="on" id="cellAggPopItem0"/>
+                                <menuItem title="Sum" id="cellAggPopItem1"/>
+                                <menuItem title="Avg" id="cellAggPopItem2"/>
+                                <menuItem title="Count" id="cellAggPopItem3"/>
+                                <menuItem title="Min" id="cellAggPopItem4"/>
+                                <menuItem title="Max" id="cellAggPopItem5"/>
+                            </items>
+                        </menu>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellAggPopAction"/>
+                    </connections>
+                </popUpButton>
+            </subviews>
+        </customView>
+        <customView id="textBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="270"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl16">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Value" id="lbl16Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="valueField">
-                    <rect key="frame" x="10" y="20" width="240" height="44"/>
+                <textField focusRingType="none" id="valueField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="20" width="212" height="44"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valueFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -423,16 +581,38 @@
                         <outlet property="delegate" destination="-2" id="valueFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl17">
-                    <rect key="frame" x="10" y="70" width="240" height="14"/>
+                <button toolTip="Edit this as an expression" id="valueExprButton">
+                    <rect key="frame" x="226" y="20" width="24" height="44"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="valueExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="valueExprButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Edit this textbox as rich text" id="richTextButton">
+                    <rect key="frame" x="188" y="66" width="62" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Rich…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="richTextButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editRichText:" target="-2" id="richTextButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl17">
+                    <rect key="frame" x="10" y="94" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Typeface" id="lbl17Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="fontField">
-                    <rect key="frame" x="10" y="86" width="240" height="22"/>
+                <textField focusRingType="none" id="fontField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="110" width="144" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="fontFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -444,24 +624,46 @@
                         <outlet property="delegate" destination="-2" id="fontFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl18">
-                    <rect key="frame" x="10" y="114" width="114" height="14"/>
+                <button toolTip="Edit this as an expression" id="fontExprButton">
+                    <rect key="frame" x="158" y="110" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="fontExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="fontExprButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Choose the font, size and weight in the font panel" id="fontPanelButton">
+                    <rect key="frame" x="188" y="110" width="62" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Font…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="fontPanelButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="openFontPanel:" target="-2" id="fontPanelButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl18">
+                    <rect key="frame" x="10" y="138" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Size" id="lbl18Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl19">
-                    <rect key="frame" x="136" y="114" width="114" height="14"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl19">
+                    <rect key="frame" x="136" y="138" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Weight" id="lbl19Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="sizeField">
-                    <rect key="frame" x="10" y="130" width="114" height="22"/>
+                <textField focusRingType="none" id="sizeField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="154" width="86" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="sizeFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -473,8 +675,19 @@
                         <outlet property="delegate" destination="-2" id="sizeFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Edit this as an expression" id="sizeExprButton">
+                    <rect key="frame" x="100" y="154" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="sizeExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="sizeExprButtonAction"/>
+                    </connections>
+                </button>
                 <popUpButton id="weightPop">
-                    <rect key="frame" x="136" y="130" width="114" height="22"/>
+                    <rect key="frame" x="136" y="154" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="weightPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -490,16 +703,16 @@
                         <action selector="changed:" target="-2" id="weightPopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl20">
-                    <rect key="frame" x="10" y="158" width="240" height="14"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl20">
+                    <rect key="frame" x="10" y="182" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Align" id="lbl20Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="alignPop">
-                    <rect key="frame" x="10" y="174" width="240" height="22"/>
+                    <rect key="frame" x="10" y="198" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="alignPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -516,24 +729,24 @@
                         <action selector="changed:" target="-2" id="alignPopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl21">
-                    <rect key="frame" x="10" y="202" width="114" height="14"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl21">
+                    <rect key="frame" x="10" y="226" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Ink" id="lbl21Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl22">
-                    <rect key="frame" x="136" y="202" width="114" height="14"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl22">
+                    <rect key="frame" x="136" y="226" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Format" id="lbl22Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="colorField">
-                    <rect key="frame" x="10" y="218" width="114" height="22"/>
+                <textField focusRingType="none" id="colorField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="242" width="58" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="colorFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -545,8 +758,27 @@
                         <outlet property="delegate" destination="-2" id="colorFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField id="formatField">
-                    <rect key="frame" x="136" y="218" width="114" height="22"/>
+                <button toolTip="Edit this as an expression" id="colorExprButton">
+                    <rect key="frame" x="72" y="242" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="colorExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="colorExprButtonAction"/>
+                    </connections>
+                </button>
+                <colorWell toolTip="Text colour" id="colorWell">
+                    <rect key="frame" x="100" y="242" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="colorWellAction"/>
+                    </connections>
+                </colorWell>
+                <textField focusRingType="none" id="formatField" customClass="RDLExpressionField">
+                    <rect key="frame" x="136" y="242" width="86" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="formatFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -558,21 +790,32 @@
                         <outlet property="delegate" destination="-2" id="formatFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Edit this as an expression" id="formatExprButton">
+                    <rect key="frame" x="226" y="242" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="formatExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="formatExprButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="lineBox">
             <rect key="frame" x="0.0" y="28" width="260" height="48"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl23">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl23">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Ink" id="lbl23Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="lineColorField">
+                <textField focusRingType="none" id="lineColorField">
                     <rect key="frame" x="10" y="20" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="lineColorFieldCell">
@@ -591,16 +834,16 @@
             <rect key="frame" x="0.0" y="28" width="260" height="48"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl24">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl24">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Background" id="lbl24Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="rectBGField">
-                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                <textField focusRingType="none" id="rectBGField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="20" width="152" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rectBGFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -612,21 +855,40 @@
                         <outlet property="delegate" destination="-2" id="rectBGFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="Edit this as an expression" id="rectBGExprButton">
+                    <rect key="frame" x="166" y="20" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="rectBGExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="rectBGExprButtonAction"/>
+                    </connections>
+                </button>
+                <colorWell toolTip="Background colour" id="bgColorWell">
+                    <rect key="frame" x="196" y="20" width="44" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bgColorWellAction"/>
+                    </connections>
+                </colorWell>
             </subviews>
         </customView>
         <customView id="imageBox">
             <rect key="frame" x="0.0" y="28" width="260" height="92"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl25">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl25">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Image (name or =expr)" id="lbl25Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="imageValueField">
+                <textField focusRingType="none" id="imageValueField">
                     <rect key="frame" x="10" y="20" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="imageValueFieldCell">
@@ -639,20 +901,20 @@
                         <outlet property="delegate" destination="-2" id="imageValueFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl26">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl26">
                     <rect key="frame" x="10" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Source" id="lbl26Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl27">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl27">
                     <rect key="frame" x="136" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Sizing" id="lbl27Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="imageSourcePop">
@@ -697,12 +959,12 @@
             <rect key="frame" x="0.0" y="28" width="260" height="180"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl28">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl28">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Dataset" id="lbl28Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="chartDatasetPop">
@@ -717,15 +979,15 @@
                         <action selector="changed:" target="-2" id="chartDatasetPopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl29">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl29">
                     <rect key="frame" x="10" y="48" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Title" id="lbl29Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="titleField">
+                <textField focusRingType="none" id="titleField">
                     <rect key="frame" x="10" y="64" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="titleFieldCell">
@@ -738,12 +1000,12 @@
                         <outlet property="delegate" destination="-2" id="titleFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl30">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl30">
                     <rect key="frame" x="10" y="92" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Kind" id="lbl30Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="chartKindPop">
@@ -768,23 +1030,23 @@
                         <action selector="changed:" target="-2" id="chartKindPopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl31">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl31">
                     <rect key="frame" x="10" y="136" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Category field" id="lbl31Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl32">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl32">
                     <rect key="frame" x="136" y="136" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Value field" id="lbl32Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="catField">
+                <textField focusRingType="none" id="catField">
                     <rect key="frame" x="10" y="152" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="catFieldCell">
@@ -797,7 +1059,7 @@
                         <outlet property="delegate" destination="-2" id="catFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField id="valField">
+                <textField focusRingType="none" id="valField">
                     <rect key="frame" x="136" y="152" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valFieldCell">
@@ -816,12 +1078,12 @@
             <rect key="frame" x="0.0" y="28" width="260" height="122"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField verticalHuggingPriority="750" id="lbl33">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl33">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Dataset" id="lbl33Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
                 <popUpButton id="tablixDatasetPop">
@@ -836,23 +1098,23 @@
                         <action selector="changed:" target="-2" id="tablixDatasetPopAction"/>
                     </connections>
                 </popUpButton>
-                <textField verticalHuggingPriority="750" id="lbl34">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl34">
                     <rect key="frame" x="10" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Header in" id="lbl34Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" id="lbl35">
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl35">
                     <rect key="frame" x="136" y="48" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Row in" id="lbl35Cell">
                         <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField id="tablixHeaderHField">
+                <textField focusRingType="none" id="tablixHeaderHField">
                     <rect key="frame" x="10" y="64" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="tablixHeaderHFieldCell">
@@ -865,7 +1127,7 @@
                         <outlet property="delegate" destination="-2" id="tablixHeaderHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField id="tablixRowHField">
+                <textField focusRingType="none" id="tablixRowHField">
                     <rect key="frame" x="136" y="64" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="tablixRowHFieldCell">

@@ -5,6 +5,7 @@
 // model, a geometry snapshot and a small overlay: given those three it draws
 // the same thing every time, and it never mutates anything.
 #import <AppKit/AppKit.h>
+#import "RDLPageGeometry.h"
 
 @class RDLEditingContext;
 @class RDLItem;
@@ -16,7 +17,7 @@
 // Highlights the cell a double-click would edit, so the grid is discoverable.
 @property (nonatomic, strong) RDLItem *hoverTablix;
 @property (nonatomic, assign) NSUInteger hoverColumn;
-@property (nonatomic, copy) NSString *hoverPart;
+@property (nonatomic, assign) RDLTablixPart hoverPart;
 // An open in-place editor covers the text it is editing; drawing it underneath
 // shows through the field on GNUstep and doubles it on Cocoa.
 @property (nonatomic, strong) RDLItem *editingItem;

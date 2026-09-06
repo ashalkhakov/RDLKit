@@ -106,6 +106,36 @@ FOUNDATION_EXPORT NSString *RDLStringFromExprOperator(RDLExprOperator op);
 @property (nonatomic, strong) NSMutableArray<RDLExprNode *> *args;
 @end
 
+// What a run of an expression's source is, for an editor that colours it. An
+// enumeration rather than the lexer's own kind strings: those are internal and
+// a mistyped comparison against one is a branch that never runs.
+typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
+  RDLExprTokenKindUnspecified = 0,
+  // Whitespace and comments between tokens.
+  RDLExprTokenKindTrivia,
+  RDLExprTokenKindNumber,
+  RDLExprTokenKindString,
+  // A name the evaluator implements, as listed by RDLExpressionCatalog.
+  RDLExprTokenKindFunction,
+  // Fields!, Parameters!, Globals!, ReportItems! and the name after it.
+  RDLExprTokenKindReference,
+  // Any other name.
+  RDLExprTokenKindIdentifier,
+  RDLExprTokenKindOperator,
+  RDLExprTokenKindPunctuation,
+  // A lexeme the lexer could not make sense of.
+  RDLExprTokenKindInvalid
+};
+
+// One lexeme of an expression's source, with where it sits in it. Trivia is a
+// token here too, so the tokens of a source tile it exactly -- an editor can
+// walk them and account for every character without consulting the source.
+@interface RDLExprToken : NSObject
+@property (nonatomic, assign) NSRange range;
+@property (nonatomic, assign) RDLExprTokenKind kind;
+@property (nonatomic, copy) NSString *text;
+@end
+
 // One parsed RDL expression, kept losslessly.
 //
 // The tree is the only representation: every token carries the exact lexeme it
@@ -129,6 +159,14 @@ FOUNDATION_EXPORT NSString *RDLStringFromExprOperator(RDLExprOperator op);
 // it understood, so the tree is a prefix of what was written and evaluating it
 // silently does less than the author asked. RDLChecker reports these.
 @property (nonatomic, readonly) BOOL parsedCompletely;
+// The source split into runs to colour, covering it end to end including the
+// whitespace, so an editor can attribute the whole string in one pass. Works on
+// any text, expression or not: a source without a leading "=" is one run of
+// trivia, which is what an editor showing a literal wants.
+// The source, tiled into tokens. What a token means is as far as this goes:
+// deciding what a token should look like belongs to whoever is drawing it, and
+// RDLKit does not know about colours.
++ (NSArray<RDLExprToken *> *)tokensForSource:(NSString *)source;
 @end
 
 // An RDL property that is either a literal or an expression that produces one.

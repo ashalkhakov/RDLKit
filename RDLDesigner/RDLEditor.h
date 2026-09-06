@@ -14,6 +14,7 @@
 
 @class RDLDocument;
 @class RDLItem;
+@class RDLDataSet;
 @class NSAttributedString;
 
 @interface RDLEditor : NSObject
@@ -63,14 +64,29 @@
 // The array that holds `item` — a band's items or a Rectangle's children.
 - (NSMutableArray *)containerOfItem:(RDLItem *)item bandKey:(NSString **)outBandKey;
 
+// --- Datasets -------------------------------------------------------------
+// Each is the other's inverse, so a dataset added and undone leaves the report
+// as it was, in the position it held.
+- (void)addDataSet:(RDLDataSet *)dataSet;
+- (void)removeDataSet:(RDLDataSet *)dataSet;
+// Undo of a removal; the navigator calls -addDataSet: instead.
+- (void)insertDataSet:(RDLDataSet *)dataSet atIndex:(NSUInteger)index;
+// The whole field list at once, and its inverse is the previous list: fields
+// are edited as a set, and a rename plus a retype is one step.
+- (void)setFields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet;
+// Renaming carries the references with it: every tablix and chart that names
+// this dataset is pointed at the new name in the same step, because a region
+// naming a dataset that is not there is not a state to pass through.
+- (void)renameDataSet:(RDLDataSet *)dataSet to:(NSString *)name;
+
 // --- Tablix ---------------------------------------------------------------
 // All of these go through columnSpecs + -rebuildTablix, so the inverse is
 // simply the previous spec, and the ordering hazard of the old implicit
 // rebuild-on-set does not arise.
 - (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix;
 // Apply several tablix properties and rebuild ONCE, as a single inverse.
-// Necessary rather than convenient: the rebuild reads columnSpecs, groupBy,
-// groupBy2, pivotBy, showGrandTotal and the heights together, so setting them
+// Necessary rather than convenient: the rebuild reads columnSpecs, rowGroups,
+// columnGroups, showGrandTotal and the heights together, so setting them
 // through separate undoable steps would undo them one at a time and rebuild
 // against a half-restored state. Values may be NSNull to mean nil.
 - (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix;

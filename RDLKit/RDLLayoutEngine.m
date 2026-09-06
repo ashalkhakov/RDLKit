@@ -503,6 +503,15 @@ static void RDLColPlanWalk(NSArray<RDLTablixMember *> *members, NSArray *dataRow
       leaf += count;
       continue;
     }
+    // HideIfNoRows: a static member -- a column-header row, a total -- the
+    // report says not to draw when the dataset came back empty. Skipped like a
+    // hidden one, and like a hidden one it still consumes its leaves: the body
+    // rows are matched to members by position, so a member that is not drawn
+    // must still be counted.
+    if (m.hideIfNoRows && [dataRows count] == 0) {
+      leaf += count;
+      continue;
+    }
     CGFloat w = leaf < (NSInteger)[cols count] ? cols[(NSUInteger)leaf].width : 1.0;
     if ([m.groupName length] && [m.groupExpressions count]) {
       NSArray *parts = RDLPartition(dataRows, m.groupExpressions, scope);
@@ -736,11 +745,13 @@ static NSArray<RDLRecursiveNode *> *RDLRecursiveOrder(NSArray<NSArray *> *parts,
 
 static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
-                                NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames);
+                                NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames,
+                                BOOL dataIsEmpty);
 
 static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
-                                NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames) {
+                                NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames,
+                                BOOL dataIsEmpty) {
   NSMutableArray *out = [NSMutableArray array];
   NSInteger leaf = leafStart;
   RDLTablixBody *body = tab.tablixBody;
@@ -754,6 +765,15 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
     NSArray *exprs = m.groupExpressions;
     CGFloat childX = headerX + m.header.size;
     if (RDLIsHiddenExpr(m.hidden, scope)) {
+      leaf += count;
+      continue;
+    }
+    // HideIfNoRows: a static member -- a column-header row, a total -- the
+    // report says not to draw when the dataset came back empty. Skipped like a
+    // hidden one, and like a hidden one it still consumes its leaves: the body
+    // rows are matched to members by position, so a member that is not drawn
+    // must still be counted.
+    if (m.hideIfNoRows && dataIsEmpty) {
       leaf += count;
       continue;
     }
@@ -801,7 +821,7 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
         RDLRecursiveNode *node = nodes ? nodes[(NSUInteger)partIndex] : nil;
         NSArray *childInsts =
             nested ? RDLWalkMembers(m.members, part, childX, leaf, tab, scope, headerW, plan,
-                                     innerScopes)
+                                     innerScopes, NO)
                    : RDLEmitRuns(m, leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : nil,
                                   part, NO, [part firstObject], part, tab, innerScopes, headerW,
                                   plan);
@@ -867,7 +887,7 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
 
     if (nested) {
       NSArray *childInsts = RDLWalkMembers(m.members, currentRows, childX, leaf, tab, scope,
-                                            headerW, plan, innerScopes);
+                                            headerW, plan, innerScopes, dataIsEmpty);
       [out addObjectsFromArray:childInsts];
       leaf += count;
       continue;
@@ -950,7 +970,8 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
   NSArray<NSString *> *rootScopes = [ds.name length] ? @[ ds.name ] : @[];
   NSArray *walked;
   if ([members count]) {
-    walked = RDLWalkMembers(members, rows, 0, 0, tab, scope, headerW, plan, rootScopes);
+    walked = RDLWalkMembers(members, rows, 0, 0, tab, scope, headerW, plan, rootScopes,
+                             [dataRows count] == 0);
   } else {
     NSMutableArray *synth = [NSMutableArray array];
     for (NSUInteger i = 0; i < [body.rows count]; i++) {
@@ -963,7 +984,8 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
       }
       [synth addObject:m];
     }
-    walked = RDLWalkMembers(synth, rows, 0, 0, tab, scope, headerW, plan, rootScopes);
+    walked = RDLWalkMembers(synth, rows, 0, 0, tab, scope, headerW, plan, rootScopes,
+                             [dataRows count] == 0);
   }
 
   // Crosstab: emit one column-header row per column-group tier. Consecutive

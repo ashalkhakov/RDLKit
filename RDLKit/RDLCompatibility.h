@@ -80,6 +80,15 @@ static inline NSString *RDLHexForColorName(NSString *name) {
   return names[[name lowercaseString]];
 }
 
+// "Transparent" is a colour in RDL's grammar, and it means no fill at all. It
+// has to be recognised before RDLColorFromHex sees it: that scans "Transp" as
+// hex and yields black, which is how the rich-text editor came up with a black
+// page under the report's own dark ink.
+static inline BOOL RDLColorIsTransparent(NSString *color) {
+  return color == nil || [color length] == 0 ||
+         [color caseInsensitiveCompare:@"Transparent"] == NSOrderedSame;
+}
+
 static inline NSColor *RDLColorFromHex(NSString *hex) {
   if (hex == nil || [hex length] == 0) {
     return RDL_COLOR(0.10, 0.10, 0.09, 1);
@@ -98,6 +107,22 @@ static inline NSColor *RDLColorFromHex(NSString *hex) {
   CGFloat g = ((rgb >> 8) & 0xFF) / 255.0;
   CGFloat b = (rgb & 0xFF) / 255.0;
   return RDL_COLOR(r, g, b, 1);
+}
+
+// The inverse of RDLColorFromHex, for controls that hand back a colour. RDL
+// writes colours as #rrggbb, so the colour has to be resolved to RGB first: a
+// well can return one in any space, and a catalog colour has no components at
+// all until it is.
+static inline NSString *RDLHexFromColor(NSColor *color) {
+  NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (rgb == nil)
+    return nil;
+  CGFloat r = 0, g = 0, b = 0, a = 0;
+  [rgb getRed:&r green:&g blue:&b alpha:&a];
+  // Lower case, which is what the rich-text codec wrote when this lived there
+  // as a file-static; RDL does not care, but the fixtures do.
+  return [NSString stringWithFormat:@"#%02x%02x%02x", (unsigned)round(r * 255),
+                                    (unsigned)round(g * 255), (unsigned)round(b * 255)];
 }
 
 static inline CGFloat RDLInchesFromString(NSString *raw) {

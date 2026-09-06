@@ -103,6 +103,12 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
 + (NSArray<NSDictionary *> *)catalog {
   return @[
     @{
+      @"id" : @"crosstab",
+      @"title" : @"Regional Sales",
+      @"kicker" : @"Crosstab",
+      @"blurb" : @"Region and city against year and quarter — two groups on each axis, one total where they meet."
+    },
+    @{
       @"id" : @"finish",
       @"title" : @"Workshop by Finish",
       @"kicker" : @"Groups",
@@ -152,6 +158,8 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
     return [self studioRoster];
   if ([sampleId isEqualToString:@"finish"])
     return [self workshopByFinish];
+  if ([sampleId isEqualToString:@"crosstab"])
+    return [self regionalSales];
   return [self blankLetter];
 }
 
@@ -418,6 +426,70 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
   return r;
 }
 
+// A crosstab: two row groups against two column groups, with one measure at
+// their intersection. It is here to show the shape the tablix editor's two
+// lists produce -- and because a matrix is the one arrangement where every
+// measure cell has to aggregate, having no details row to hold a raw value.
++ (RDLReport *)regionalSales {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Regional Sales"];
+  r.reportDescription = @"Sales by region and city against year and quarter — a crosstab with "
+                        @"two groups on each axis.";
+  r.author = @"RDLDesigner";
+  [r.parameters addObject:RDLPar(@"Shop", @"Merrick & Vale")];
+  [r.dataSets addObject:RDLSet(@"Sales", @[ @"Region", @"City", @"Year", @"Quarter", @"Amount" ], @[
+      @{@"Region" : @"North", @"City" : @"Aberdene", @"Year" : @"2025", @"Quarter" : @"Q1", @"Amount" : @1840},
+      @{@"Region" : @"North", @"City" : @"Aberdene", @"Year" : @"2025", @"Quarter" : @"Q2", @"Amount" : @2110},
+      @{@"Region" : @"North", @"City" : @"Kirkwall", @"Year" : @"2025", @"Quarter" : @"Q1", @"Amount" : @960},
+      @{@"Region" : @"North", @"City" : @"Kirkwall", @"Year" : @"2026", @"Quarter" : @"Q1", @"Amount" : @1240},
+      @{@"Region" : @"South", @"City" : @"Marlow", @"Year" : @"2025", @"Quarter" : @"Q1", @"Amount" : @3020},
+      @{@"Region" : @"South", @"City" : @"Marlow", @"Year" : @"2025", @"Quarter" : @"Q2", @"Amount" : @2760},
+      @{@"Region" : @"South", @"City" : @"Thornbury", @"Year" : @"2026", @"Quarter" : @"Q1", @"Amount" : @1490},
+      @{@"Region" : @"South", @"City" : @"Thornbury", @"Year" : @"2026", @"Quarter" : @"Q2", @"Amount" : @1875}
+    ])];
+
+  r.pageHeader.height = 0.62;
+  [r.pageHeader.items addObject:RDLTB(@"Studio", @"=Parameters!Shop.Value", 0, 0.02, 4.6, 0.28,
+                                       @"Georgia", [RDLLength points:13], RDLFontWeightBold, kInk,
+                                       RDLTextAlignLeft)];
+  [r.pageHeader.items addObject:RDLTB(@"Kind", @"REGIONAL SALES", 4.6, 0.04, 2.9, 0.24, @"Helvetica",
+                                       [RDLLength points:10], RDLFontWeightBold, kMuted,
+                                       RDLTextAlignRight)];
+  [r.pageHeader.items addObject:RDLTB(@"Tag",
+                                       @"Region and city down the side, year and quarter across the "
+                                       @"top; the cell is the total where they meet.",
+                                       0, 0.28, 7.5, 0.18, @"Helvetica", [RDLLength points:8],
+                                       RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
+  [r.pageHeader.items addObject:RDLMakeLine(@"HRule", 0, 0.5, 7.5)];
+
+  r.body.height = 4.0;
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"SalesMatrix";
+  tab.dataSetName = @"Sales";
+  tab.left = 0;
+  tab.top = 0.12;
+  tab.width = 7.5;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.rowGroups = @[ @"Region", @"City" ];
+  tab.columnGroups = @[ @"Year", @"Quarter" ];
+  tab.showGrandTotal = YES;
+  tab.noRowsMessage = @"No sales in this period.";
+  // One measure, aggregated: in a crosstab there is no details row for a bare
+  // field to be read on.
+  tab.columnSpecs = @[ @{ @"width" : @1.2, @"header" : @"Amount",
+                          @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum",
+                          @"align" : @"Right" } ];
+  [tab rebuildTablix];
+  [r.body.items addObject:tab];
+
+  r.pageFooter.height = 0.3;
+  [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.02, 7.5)];
+  [r.pageFooter.items addObject:RDLTB(@"Page", @"=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",
+                                       0, 0.08, 7.5, 0.16, @"Helvetica", [RDLLength points:8],
+                                       RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
+  return r;
+}
+
 + (RDLReport *)workshopByFinish {
   RDLReport *r = [RDLReport emptyReportNamed:@"Workshop by Finish"];
   r.reportDescription = @"Jobs grouped by finish, with a group header, details, and subtotal footer.";
@@ -454,7 +526,7 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
   tab.width = 7.5;
   tab.headerHeight = 0.3;
   tab.rowHeight = 0.28;
-  tab.groupBy = @"Finish";
+  tab.rowGroups = @[ @"Finish" ];
   tab.noRowsMessage = @"No jobs in this run.";
   // 6.3in of columns, because grouping adds a 1.2in row-header column in front
   // of them: 1.2 + 6.3 is the 7.5in body width the tablix is given above.
