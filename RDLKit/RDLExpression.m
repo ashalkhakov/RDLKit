@@ -205,7 +205,12 @@ static NSDate *RDLAsDate(id v, NSDate *fallback) {
 #pragma mark - Token / AST
 
 @interface RDLTok : NSObject
-@property (nonatomic, copy) NSString *kind;
+// The published kind, not a string of its own: a mistyped comparison against
+// "num" is a branch that never runs and that nothing diagnoses, and the lexer
+// is the one place that decides what a lexeme is. Identifier here covers every
+// name; whether one is a function or the head of a Fields! reference is decided
+// afterwards, from the catalogue and the token that follows.
+@property (nonatomic, assign) RDLExprTokenKind kind;
 @property (nonatomic, copy) NSString *s;   // decoded value (string escapes resolved)
 @property (nonatomic, assign) double n;
 // Losslessness: `text` is the exact lexeme as written and `leading` is the
@@ -222,36 +227,26 @@ static NSDate *RDLAsDate(id v, NSDate *fallback) {
 
 // The lexer's own kinds, mapped once, here, where they are defined. Nothing
 // outside sees them.
+// The lexer's kind, refined. Everything but a name is already what it is; a
+// name is a function when the catalogue has one by that spelling, and the head
+// of a reference when a "!" follows it -- which is what tells Fields!Amount
+// from a variable someone called Fields.
 static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
-  NSString *k = t.kind;
-  if ([k isEqualToString:@"num"])
-    return RDLExprTokenKindNumber;
-  if ([k isEqualToString:@"str"])
-    return RDLExprTokenKindString;
-  if ([k isEqualToString:@"op"])
-    return RDLExprTokenKindOperator;
-  if ([k isEqualToString:@"p"])
-    return RDLExprTokenKindPunctuation;
-  if ([k isEqualToString:@"bad"])
-    return RDLExprTokenKindInvalid;
-  if ([k isEqualToString:@"id"]) {
-    // Fields!Amount reads as three tokens; the collection name is what marks
-    // the reference, and the "!" after it is what distinguishes it from a bare
-    // name that happens to be spelled Fields.
-    static NSSet *collections;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      collections = [NSSet setWithArray:@[ @"fields", @"parameters", @"globals",
-                                           @"reportitems", @"recursive" ]];
-    });
-    if ([collections containsObject:[t.s lowercaseString]] &&
-        [next.kind isEqualToString:@"p"] && [next.s isEqualToString:@"!"])
-      return RDLExprTokenKindReference;
-    if ([RDLExpressionCatalog functionNamed:t.s] != nil)
-      return RDLExprTokenKindFunction;
-    return RDLExprTokenKindIdentifier;
-  }
-  return RDLExprTokenKindUnspecified;
+  if (t.kind != RDLExprTokenKindIdentifier)
+    return t.kind;
+
+  static NSSet *collections;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    collections = [NSSet setWithArray:@[ @"fields", @"parameters", @"globals",
+                                         @"reportitems", @"recursive" ]];
+  });
+  if ([collections containsObject:[t.s lowercaseString]] &&
+      next.kind == RDLExprTokenKindPunctuation && [next.s isEqualToString:@"!"])
+    return RDLExprTokenKindReference;
+  if ([RDLExpressionCatalog functionNamed:t.s] != nil)
+    return RDLExprTokenKindFunction;
+  return RDLExprTokenKindIdentifier;
 }
 
 @implementation RDLExprNode {
@@ -305,7 +300,7 @@ static void RDLTokAppend(NSMutableArray *out, RDLTok *t, NSString *src, NSUInteg
   [out addObject:t];
 }
 
-static RDLTok *RDLMkTok(NSString *kind, NSString *s, double n) {
+static RDLTok *RDLMkTok(RDLExprTokenKind kind, NSString *s, double n) {
   RDLTok *t = [[RDLTok alloc] init];
   t.kind = kind;
   t.s = s;
@@ -404,7 +399,7 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
         [buf appendFormat:@"%C", q];
         i += 1;
       }
-      RDLTokAppend(out, RDLMkTok(@"str", buf, 0), src, start, i, &lastEnd);
+      RDLTokAppend(out, RDLMkTok(RDLExprTokenKindString, buf, 0), src, start, i, &lastEnd);
       continue;
     }
     if ([digits characterIsMember:c] ||
@@ -418,7 +413,7 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
           i += 1;
       }
       NSString *num = [src substringWithRange:NSMakeRange(start, i - start)];
-      RDLTokAppend(out, RDLMkTok(@"num", num, [num doubleValue]), src, start, i, &lastEnd);
+      RDLTokAppend(out, RDLMkTok(RDLExprTokenKindNumber, num, [num doubleValue]), src, start, i, &lastEnd);
       continue;
     }
     if ([letters characterIsMember:c] || c == '_') {
@@ -431,7 +426,7 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
         else
           break;
       }
-      RDLTokAppend(out, RDLMkTok(@"id", [src substringWithRange:NSMakeRange(start, i - start)], 0),
+      RDLTokAppend(out, RDLMkTok(RDLExprTokenKindIdentifier, [src substringWithRange:NSMakeRange(start, i - start)], 0),
                     src, start, i, &lastEnd);
       continue;
     }
@@ -439,19 +434,19 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
       NSString *two = [src substringWithRange:NSMakeRange(i, 2)];
       if ([two isEqualToString:@"<>"] || [two isEqualToString:@">="] || [two isEqualToString:@"<="]) {
         i += 2;
-        RDLTokAppend(out, RDLMkTok(@"op", two, 0), src, start, i, &lastEnd);
+        RDLTokAppend(out, RDLMkTok(RDLExprTokenKindOperator, two, 0), src, start, i, &lastEnd);
         continue;
       }
     }
     NSString *one = [src substringWithRange:NSMakeRange(i, 1)];
     if ([@"+-*/\\^&=<>%" rangeOfString:one].location != NSNotFound) {
       i += 1;
-      RDLTokAppend(out, RDLMkTok(@"op", one, 0), src, start, i, &lastEnd);
+      RDLTokAppend(out, RDLMkTok(RDLExprTokenKindOperator, one, 0), src, start, i, &lastEnd);
       continue;
     }
     if ([@"(),.!" rangeOfString:one].location != NSNotFound) {
       i += 1;
-      RDLTokAppend(out, RDLMkTok(@"p", one, 0), src, start, i, &lastEnd);
+      RDLTokAppend(out, RDLMkTok(RDLExprTokenKindPunctuation, one, 0), src, start, i, &lastEnd);
       continue;
     }
     // A character no rule above claimed. Dropping it silently is how
@@ -459,7 +454,7 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
     // arguments, so it becomes a token the parser will refuse to consume --
     // which is what makes the expression report as only partly understood.
     i += 1;
-    RDLTokAppend(out, RDLMkTok(@"bad", one, 0), src, start, i, &lastEnd);
+    RDLTokAppend(out, RDLMkTok(RDLExprTokenKindInvalid, one, 0), src, start, i, &lastEnd);
   }
   if (outTrailing)
     *outTrailing = [src substringWithRange:NSMakeRange(lastEnd, n - lastEnd)];
@@ -493,11 +488,11 @@ static NSArray *RDLLex(NSString *src) {
   if (t == nil)
     return NO;
   NSString *want = [v lowercaseString];
-  if ([t.kind isEqualToString:@"op"] && [t.s caseInsensitiveCompare:want] == NSOrderedSame) {
+  if (t.kind == RDLExprTokenKindOperator && [t.s caseInsensitiveCompare:want] == NSOrderedSame) {
     _i += 1;
     return YES;
   }
-  if ([t.kind isEqualToString:@"id"] && [t.s caseInsensitiveCompare:want] == NSOrderedSame) {
+  if (t.kind == RDLExprTokenKindIdentifier && [t.s caseInsensitiveCompare:want] == NSOrderedSame) {
     NSString *w = want;
     if ([w isEqualToString:@"and"] || [w isEqualToString:@"andalso"] || [w isEqualToString:@"or"] ||
         [w isEqualToString:@"orelse"] || [w isEqualToString:@"xor"] || [w isEqualToString:@"not"] ||
@@ -511,7 +506,7 @@ static NSArray *RDLLex(NSString *src) {
 }
 - (BOOL)matchP:(NSString *)v {
   RDLTok *t = [self peek];
-  if (t && [t.kind isEqualToString:@"p"] && [t.s isEqualToString:v]) {
+  if (t && t.kind == RDLExprTokenKindPunctuation && [t.s isEqualToString:v]) {
     _i += 1;
     return YES;
   }
@@ -558,7 +553,7 @@ static NSArray *RDLLex(NSString *src) {
   RDLExprNode *left = [self parseConcat];
   RDLTok *t = [self peek];
   RDLExprOperator op = RDLExprOperatorNone;
-  if (t && [t.kind isEqualToString:@"op"]) {
+  if (t && t.kind == RDLExprTokenKindOperator) {
     static NSDictionary *byText = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -574,7 +569,7 @@ static NSArray *RDLLex(NSString *src) {
     NSNumber *found = byText[t.s ?: @""];
     if (found)
       op = (RDLExprOperator)[found integerValue];
-  } else if (t && [t.kind isEqualToString:@"id"]) {
+  } else if (t && t.kind == RDLExprTokenKindIdentifier) {
     if ([t.s caseInsensitiveCompare:@"like"] == NSOrderedSame)
       op = RDLExprOperatorLike;
     else if ([t.s caseInsensitiveCompare:@"isnot"] == NSOrderedSame)
@@ -642,7 +637,7 @@ static NSArray *RDLLex(NSString *src) {
   RDLExprNode *a = [[RDLExprNode alloc] init];
   a.kind = RDLExprNodeKindCall;
   a.name = name;
-  if (![[self peek].kind isEqualToString:@"p"] || ![[self peek].s isEqualToString:@")"]) {
+  if (![self peek].kind == RDLExprTokenKindPunctuation || ![[self peek].s isEqualToString:@")"]) {
     [a.args addObject:[self parseOr]];
     while ([self matchP:@","])
       [a.args addObject:[self parseOr]];
@@ -671,7 +666,7 @@ static NSArray *RDLLex(NSString *src) {
   if ([low isEqualToString:@"vbtab"])
     return RDLLit(@"\t");
   RDLTok *next = [self peek];
-  if (next && [next.kind isEqualToString:@"p"] && [next.s isEqualToString:@"("])
+  if (next && next.kind == RDLExprTokenKindPunctuation && [next.s isEqualToString:@"("])
     return [self parseCall:ident];
   if ([low isEqualToString:@"now"] || [low isEqualToString:@"today"]) {
     RDLExprNode *c = [[RDLExprNode alloc] init];
@@ -733,21 +728,21 @@ static NSArray *RDLLex(NSString *src) {
   RDLTok *t = [self peek];
   if (t == nil)
     return RDLLit([NSNull null]);
-  if ([t.kind isEqualToString:@"num"]) {
+  if (t.kind == RDLExprTokenKindNumber) {
     [self eat];
     return RDLLit(@(t.n));
   }
-  if ([t.kind isEqualToString:@"str"]) {
+  if (t.kind == RDLExprTokenKindString) {
     [self eat];
     return RDLLit(t.s);
   }
-  if ([t.kind isEqualToString:@"p"] && [t.s isEqualToString:@"("]) {
+  if (t.kind == RDLExprTokenKindPunctuation && [t.s isEqualToString:@"("]) {
     [self eat];
     RDLExprNode *v = [self parseOr];
     [self matchP:@")"];
     return v;
   }
-  if ([t.kind isEqualToString:@"id"])
+  if (t.kind == RDLExprTokenKindIdentifier)
     return [self parseIdent];
   [self eat];
   return RDLLit([NSNull null]);
