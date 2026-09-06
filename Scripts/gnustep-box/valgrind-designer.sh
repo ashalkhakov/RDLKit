@@ -11,7 +11,14 @@ cd /work/rdlkit
 make -C RDLKit -j4 2>&1 | tail -2
 make -C RDLDesigner -j4 2>&1 | tail -2
 make -C RDLDesignerTests -j4 2>&1 | tail -2
-BUNDLE=$(find RDLDesignerTests -name '*.xctest' -maxdepth 2 | head -n 1)
+# gnustep-make builds a .bundle, not a .xctest, and the run needs the library
+# beside it on the loader path -- which is what the makefile's own run-tests
+# target does. Getting either wrong gives "No tests found" and a clean report
+# of nothing at all.
+cd RDLDesignerTests
+BUNDLE=$(find . -maxdepth 1 -name '*.bundle' | head -n 1)
+[ -n "$BUNDLE" ] || { echo "no test bundle was built"; exit 1; }
 echo "=== $BUNDLE under valgrind ==="
+LD_LIBRARY_PATH="$PWD/../RDLKit/$(gnustep-config --variable=GNUSTEP_OBJ_DIR 2>/dev/null || echo obj):$LD_LIBRARY_PATH" \
 xvfb-run -a valgrind --error-limit=no --num-callers=25 --track-origins=yes \
-    --suppressions=/dev/null xctest "$BUNDLE" 2>&1 | tail -150
+    xctest "$BUNDLE" 2>&1 | tail -200
