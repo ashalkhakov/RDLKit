@@ -1,0 +1,5 @@
+# The image only needs the dependency script and the patches; everything else
+# is mounted at run time, so keep the build context small.
+*
+!.github/scripts/dependencies.sh
+!Patches
