@@ -19,6 +19,63 @@ to kill it. That path is now lazy (RDLDesignerWindow rewrites the source only
 while the pane is visible), which moves the fault out of the way without
 pretending it is fixed.
 
+## Resolved: the writer no longer builds an NSXMLDocument
+
+The fault is the `NSXMLDocument` teardown specifically, and the writer never
+needed the document. `+[RDLWriter XMLStringFromReport:]` now serialises the
+root element directly -- `[root XMLStringWithOptions:NSXMLNodePrettyPrint]`
+with the XML declaration prepended -- and never allocates a document. The loop
+survives 500+ rounds, and the kit test suite, which used to abort partway
+through `RDLLayoutTests`, now runs to completion (the only remaining failures
+are font weights and PDF printing, both from the headless test box, both
+previously hidden because the crash aborted the run before those tests ran).
+
+The evidence that pinned it needs no instrumentation, only three switches on the writer, the first two injected by
+`Scripts/gnustep-box/probe-writer.sh` and the third the fix itself:
+
+    ordinary (release the document each round):   dies round ~6
+    RDL_KEEP_DOC (never release the documents):   survives
+    the writer serialising the root element:      survives 500+
+
+So it is releasing the `NSXMLDocument`, not the wrappers and not anything the
+writer builds. `RDL_DETACH_ROOT` does not help, so it is not simply which
+object frees the tree.
+
+The output is byte-for-byte what the document path produced -- verified equal
+on every sample report, small and large -- because the writer writes each
+namespace as a plain `xmlns` attribute, so the element carries no live libxml
+namespace nodes and its string is just the declaration plus the subtree the
+document would have wrapped. The document was only ever a serialisation
+envelope. The lazy source-pane rewrite in RDLDesignerWindow is now belt-and-
+braces rather than load-bearing.
+
+The mechanism, read back from `-[NSXMLNode dealloc]` and `-detach`: GNUstep
+keeps one wrapper per libxml node, retained through its parent's `subNodes`,
+and each wrapper is also autoreleased. Releasing the document detaches the root
+into a fresh private `xmlDoc` and frees the empty document, leaving the whole
+wrapper tree alive in the pool over that private document. When the pool then
+drains -- children before parents -- each wrapper `-detach`s its own node into
+yet another private `xmlDoc` (`xmlNewDoc` + `xmlSetTreeDoc` + `xmlUnlinkNode`)
+and, being parentless, `xmlFreeNode`s its subtree. That peeling cascade -- one
+private document allocated and freed per node, with the elements' shared
+namespace pointers still crossing the splits -- is volume-sensitive: a two-line
+writer survives, the full writer does not. That is why a same-shape
+Foundation-only document (`nsxml-document-teardown.m`) does not reach it -- it
+never materialises a wrapper for every node, so the pool has almost nothing to
+peel -- which is the difference the earlier chase could not name.
+
+(A freed-chunk interposer was tried as well, snapshotting the link words of
+every small freed block and rechecking them on the next allocator call. It does
+show a foreign-looking write during the teardown drain and never during the
+writing, which agrees with the switches above; but it also flags benign writes
+into chunks that were simply handed back out, including against the fixed build
+that never crashes, so it corroborates the location rather than proving a single
+guilty write. The switches are the solid evidence.)
+
+This still stays worth handing to GNUstep as a base defect -- the teardown
+should not depend on the number of live wrappers -- and `empty-loop.m` with its
+three switches is enough to show it. The kit no longer waits on that fix.
+
 ## What has been ruled out
 
 Each of these was tested, in the container `Scripts/gnustep-box` builds:

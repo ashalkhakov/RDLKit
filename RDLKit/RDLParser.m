@@ -1949,13 +1949,27 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   [page addChild:footer];
   [root addChild:page];
 
-  NSXMLDocument *doc = [[NSXMLDocument alloc] initWithRootElement:root];
-  [doc setVersion:@"1.0"];
-  [doc setCharacterEncoding:@"utf-8"];
+  // Serialise the root element directly rather than wrapping it in an
+  // NSXMLDocument. On GNUstep, allocating an NSXMLDocument over a fully
+  // materialised element tree and then releasing it corrupts the heap:
+  // -[NSXMLDocument dealloc] moves the root subtree into a private detached
+  // document, and every element wrapper still alive in the pool then peels
+  // its own node out one at a time (xmlNewDoc / xmlSetTreeDoc / xmlFreeNode
+  // per node), a cascade whose freed chunks get written after release. The
+  // trigger is isolated to releasing the document: keeping every document
+  // alive does not crash, and neither does this -- never creating one --
+  // over 500+ rounds. The writer sets every
+  // namespace as a plain xmlns attribute (see the root comment above), so the
+  // element carries no live libxml namespace nodes and its serialisation is
+  // byte-for-byte the document's: declaration line included, this produces
+  // output identical to the NSXMLDocument path on every report tested, on
+  // both platforms. The document was only ever a serialisation envelope.
   // Pretty-printed: NSXML only adds whitespace between elements, and a
   // text-only element keeps its content exactly (verified by
   // RDLRunWriterWhitespaceChecks), so the file stays diff-friendly.
-  return [doc XMLStringWithOptions:NSXMLNodePrettyPrint];
+  NSString *rootXML = [root XMLStringWithOptions:NSXMLNodePrettyPrint];
+  return [@"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+             stringByAppendingString:rootXML];
 }
 
 @end
