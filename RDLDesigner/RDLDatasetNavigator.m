@@ -15,6 +15,20 @@
 
 @implementation RDLDatasetNavigator {
   RDLEditingContext *_context;
+  // Set while this pane is putting the selection back after a reload.
+  // -selectRowIndexes: tells the delegate the selection changed even when it
+  // has not on GNUstep, where Cocoa stays quiet -- and the delegate answers by
+  // switching panes and tabs, from inside the table's own reload. The outline
+  // guards its own reselection the same way, for the same reason.
+  BOOL _reselecting;
+}
+
+// Puts the selection back without telling anyone: this is the pane catching up
+// with the report, not the user choosing a dataset.
+- (void)selectRow:(NSUInteger)row {
+  _reselecting = YES;
+  [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+  _reselecting = NO;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -46,7 +60,7 @@
   [_table reloadData];
   NSUInteger i = was ? [_context.report.dataSets indexOfObject:was] : NSNotFound;
   if (i != NSNotFound)
-    [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:i] byExtendingSelection:NO];
+    [self selectRow:i];
 }
 
 #pragma mark - Adding and removing
@@ -68,8 +82,11 @@
   [_context.editor addDataSet:ds];
   [self reload];
   NSUInteger i = [_context.report.dataSets indexOfObject:ds];
-  if (i != NSNotFound)
-    [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:i] byExtendingSelection:NO];
+  if (i != NSNotFound) {
+    // Adding one IS choosing it, so this selection is announced.
+    [self selectRow:i];
+    [_delegate datasetNavigator:self didSelectDataSet:ds];
+  }
 }
 
 - (void)removeDataSet:(id)sender {
@@ -110,6 +127,8 @@
 
 - (void)tableViewSelectionDidChange:(NSNotification *)note {
   (void)note;
+  if (_reselecting)
+    return;
   [_delegate datasetNavigator:self didSelectDataSet:[self selectedDataSet]];
 }
 
