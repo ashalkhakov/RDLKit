@@ -134,6 +134,18 @@
     XCTFail(@"%@", [NSString stringWithFormat:@"the tablix is %g by %g", tablix.width,
                                               tablix.height]);
 
+  // A textbox after all that, which is the other thing reported dying: the
+  // same insert path, onto a report that now has a dataset nothing has ever
+  // put a row in.
+  [ctx.selection selectBandWithKey:@"body"];
+  [ctx addItemOfKind:@"Textbox"];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]])
+      box = (RDLTextbox *)it;
+  if (box == nil)
+    XCTFail(@"%@", @"no textbox was inserted");
+
   // And it renders: a dataset with fields and no rows at all is what this
   // sequence produces, and it is the case a report never has on disk.
   NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{}];

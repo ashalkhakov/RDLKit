@@ -4,23 +4,27 @@
 FROM debian:13
 
 ENV DEBIAN_FRONTEND=noninteractive
-# Fetching Debian through Docker's NAT fails in two different ways here, and
-# both are the network rather than the recipe: truncated files from the
-# round-robin mirror, and "Hash Sum mismatch" from something caching along the
-# way. So: the CDN, which is minutes rather than an hour; No-Cache and
-# BrokenProxy, which is what a mismatch calls for; and a loop that empties the
-# half-fetched cache and asks again, because both faults are per-file and
-# transient.
+# Fetching Debian through Docker's NAT fails here in two ways, neither of them
+# the recipe: truncated files, and "Hash Sum mismatch" -- both the signature of
+# something caching in the middle and answering with the wrong bytes. HTTPS is
+# what actually settles that, since a cache cannot rewrite what it cannot read,
+# but the base image has no CA bundle, so certificates are fetched over plain
+# HTTP first. That one package is small enough to arrive intact; the other
+# hundred are the ones that were not.
 RUN printf 'Acquire::Retries "8";\nAcquire::http::No-Cache "true";\nAcquire::BrokenProxy "true";\n' \
       > /etc/apt/apt.conf.d/99resilient \
-    && sed -i 's|deb\.debian\.org|cdn-aws.deb.debian.org|g' \
+    && apt-get -q -y update \
+    && apt-get -q -y install --no-install-recommends ca-certificates \
+    && sed -i 's|http://deb\.debian\.org|https://cdn-aws.deb.debian.org|g' \
          /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list 2>/dev/null; true
 
+# And still in a loop: a transient fault is transient, and clearing what was
+# half-fetched before asking again costs a minute against a failed build.
 RUN set -e; \
     for attempt in 1 2 3 4 5; do \
       echo "=== apt attempt $attempt ==="; \
       apt-get -q -y update && apt-get -q -y --fix-missing install \
-        clang lld cmake make git pkg-config ca-certificates \
+        clang lld cmake make git pkg-config \
         libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
         libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
         libgmp-dev libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
@@ -35,6 +39,7 @@ RUN set -e; \
       [ "$attempt" = 5 ] && exit 1; \
     done; \
     rm -rf /var/lib/apt/lists/*
+
 RUN update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 10
 
 ENV CC=clang CXX=clang++ \
