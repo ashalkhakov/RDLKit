@@ -1949,6 +1949,7 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   [page addChild:footer];
   [root addChild:page];
 
+  /*
   // Serialise the root element directly rather than wrapping it in an
   // NSXMLDocument. On GNUstep, allocating an NSXMLDocument over a fully
   // materialised element tree and then releasing it corrupts the heap:
@@ -1970,6 +1971,15 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   NSString *rootXML = [root XMLStringWithOptions:NSXMLNodePrettyPrint];
   return [@"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
              stringByAppendingString:rootXML];
+  */
+  // Try the old way again (see patch: gnustep-basexmlns-attribute.patch)
+  NSXMLDocument *doc = [[NSXMLDocument alloc] initWithRootElement:root];
+  [doc setVersion:@"1.0"];
+  [doc setCharacterEncoding:@"utf-8"];
+  // Pretty-printed: NSXML only adds whitespace between elements, and a
+  // text-only element keeps its content exactly (verified by
+  // RDLRunWriterWhitespaceChecks), so the file stays diff-friendly.
+  return [doc XMLStringWithOptions:NSXMLNodePrettyPrint];
 }
 
 @end
