@@ -56,10 +56,22 @@ rounds with nothing reported. That says gnustep-base's own accesses are clean:
 no use-after-free written by its code, which is where the shape of
 -[NSXMLNode dealloc] had pointed.
 
-What that leaves is libxml2's own accesses, which nothing has instrumented
-yet: ASan checks only code it compiled, so a write from inside libxml2 into
-memory ASan knows is freed is still invisible. Building libxml2 with the
-sanitizer as well is the next experiment.
+`Scripts/gnustep-box/asan-libxml2.sh` then does the same for libxml2 v2.9.14,
+the version Debian ships and the one in the traces. Verified loaded -- the
+script refuses to report otherwise, having twice been fooled by a clean run
+against the system copy -- and the loop survives 200 rounds with nothing
+reported. libxml2's own accesses are clean as well.
+
+Three attempts were needed to get that library actually loaded, which is worth
+recording: LD_LIBRARY_PATH loses to a RUNPATH, an install directory without the
+soname link is skipped silently, replacing the system copy breaks every tool in
+the image that uses it, and clang links the sanitizer runtime statically unless
+told `-shared-libasan`, which an instrumented library cannot resolve against.
+Each of those produced a confident, meaningless "survived 200 rounds".
+
+What is left uninstrumented is the runtime itself, libobjc2 -- where the very
+first abort of this hunt landed, in SparseArrayCopy building a dispatch table.
+`Scripts/gnustep-box/asan-libobjc2.sh` is that experiment.
 
 ## Also found, and separately real
 
