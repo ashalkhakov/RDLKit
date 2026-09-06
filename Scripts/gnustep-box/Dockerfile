@@ -25,6 +25,16 @@ ENV CC=clang CXX=clang++ \
 WORKDIR /build
 COPY .github/scripts/dependencies.sh /build/.github/scripts/dependencies.sh
 COPY Patches /build/Patches
-RUN sh /build/.github/scripts/dependencies.sh 2>&1 | tail -40
+# Not piped to tail: a pipeline's status is the last command's, so piping a
+# failed build into tail would leave a green layer holding half a stack. Kept
+# in full, and the tail is printed only when it fails.
+RUN sh /build/.github/scripts/dependencies.sh > /tmp/deps.log 2>&1 \
+    || { tail -80 /tmp/deps.log; false; }
+
+# What the stack has to have for any of this to mean anything.
+RUN . /gnustep/System/Library/Makefiles/GNUstep.sh \
+    && gnustep-config --variable=GNUSTEP_SYSTEM_LIBRARY \
+    && find /gnustep -name 'libgnustep-base.so*' -o -name 'libgnustep-gui.so*' \
+       -o -name 'libgnustep-back*.bundle' | head
 
 WORKDIR /work
