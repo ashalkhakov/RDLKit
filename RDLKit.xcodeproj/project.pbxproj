@@ -145,6 +145,7 @@
 		1DB9EE7A0E6AFE983EB8C8B5 /* RDLEditingCoreTests.m in Sources */ = {isa = PBXBuildFile; fileRef = BED4F7F47370280134D98924 /* RDLEditingCoreTests.m */; };
 		540D0C1C6CAFBFD472A8964A /* RDLCanvasTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 846F4768697B4DEE47CF9E84 /* RDLCanvasTests.m */; };
 		A011904659CD3E55C5C0F2F7 /* RDLDesignerTestSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 44568EE3E1F9A8DC7CDE9231 /* RDLDesignerTestSupport.m */; };
+		E1543EEAD224CFB4C3F43F4A /* RDLPortabilityTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 56059A3DD661348C2A9A4FA0 /* RDLPortabilityTests.m */; };
 		2939B78CAC5AE5F28E8E3EDA /* RDLWindowTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D39E02F85B650039C8E476FB /* RDLWindowTests.m */; };
 		F8CD6C169FCC5E2921D4EF59 /* RDLInspectorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 23D1684C2D8DAF646E15E2EE /* RDLInspectorTests.m */; };
 		D3CE3A2920691428D717DDBC /* RDLExpressionUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = DE1BA51B1878045B3834CE9D /* RDLExpressionUITests.m */; };
@@ -279,6 +280,7 @@
 		BED4F7F47370280134D98924 /* RDLEditingCoreTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLEditingCoreTests.m; sourceTree = "<group>"; };
 		846F4768697B4DEE47CF9E84 /* RDLCanvasTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCanvasTests.m; sourceTree = "<group>"; };
 		44568EE3E1F9A8DC7CDE9231 /* RDLDesignerTestSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDesignerTestSupport.m; sourceTree = "<group>"; };
+		56059A3DD661348C2A9A4FA0 /* RDLPortabilityTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPortabilityTests.m; sourceTree = "<group>"; };
 		D39E02F85B650039C8E476FB /* RDLWindowTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLWindowTests.m; sourceTree = "<group>"; };
 		23D1684C2D8DAF646E15E2EE /* RDLInspectorTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLInspectorTests.m; sourceTree = "<group>"; };
 		DE1BA51B1878045B3834CE9D /* RDLExpressionUITests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionUITests.m; sourceTree = "<group>"; };
@@ -631,6 +633,7 @@
 						BED4F7F47370280134D98924 /* RDLEditingCoreTests.m */,
 				846F4768697B4DEE47CF9E84 /* RDLCanvasTests.m */,
 				44568EE3E1F9A8DC7CDE9231 /* RDLDesignerTestSupport.m */,
+				56059A3DD661348C2A9A4FA0 /* RDLPortabilityTests.m */,
 				D39E02F85B650039C8E476FB /* RDLWindowTests.m */,
 				23D1684C2D8DAF646E15E2EE /* RDLInspectorTests.m */,
 				DE1BA51B1878045B3834CE9D /* RDLExpressionUITests.m */,
@@ -958,6 +961,7 @@
 						1DB9EE7A0E6AFE983EB8C8B5 /* RDLEditingCoreTests.m in Sources */,
 				540D0C1C6CAFBFD472A8964A /* RDLCanvasTests.m in Sources */,
 				A011904659CD3E55C5C0F2F7 /* RDLDesignerTestSupport.m in Sources */,
+				E1543EEAD224CFB4C3F43F4A /* RDLPortabilityTests.m in Sources */,
 				2939B78CAC5AE5F28E8E3EDA /* RDLWindowTests.m in Sources */,
 				F8CD6C169FCC5E2921D4EF59 /* RDLInspectorTests.m in Sources */,
 				D3CE3A2920691428D717DDBC /* RDLExpressionUITests.m in Sources */,

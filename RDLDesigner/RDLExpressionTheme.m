@@ -49,7 +49,8 @@ static NSColor *RDLBrokenExpressionInk(void) {
   NSUInteger length = [text length];
   for (RDLExprToken *tok in [RDLExpr tokensForSource:[text string]]) {
     NSDictionary *attrs = [self attributesForKind:tok.kind];
-    if (attrs != nil && NSMaxRange(tok.range) <= length)
+    // A zero-length run has nothing to colour, and GNUstep logs the attempt.
+    if (attrs != nil && tok.range.length > 0 && NSMaxRange(tok.range) <= length)
       [text addAttributes:attrs range:tok.range];
   }
 }

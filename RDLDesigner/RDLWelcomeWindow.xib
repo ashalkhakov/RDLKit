@@ -9,6 +9,8 @@
         <customObject id="-2" userLabel="File's Owner" customClass="RDLWelcomeWindow">
             <connections>
                 <outlet property="window" destination="welcomeWindow" id="welcomeWindowOutlet"/>
+                <outlet property="designerCard" destination="designerCard" id="designerCardOutlet"/>
+                <outlet property="generatorCard" destination="generatorCard" id="generatorCardOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -26,7 +28,7 @@
                         <autoresizingMask key="autoresizingMask" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="RDLDesigner" id="titleLabelCell">
                             <font key="font" metaFont="user" size="28"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="subtitleLabel">
@@ -34,7 +36,7 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="Two native components. Objective-C, ARC, AppKit — Cocoa and GNUstep." id="subtitleLabelCell">
                             <font key="font" metaFont="user" size="13"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorCard">
@@ -64,19 +66,19 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" title="1  Generator" id="generatorHeadingCell">
                             <font key="font" metaFont="systemBold" size="18"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorBody" customClass="RDLCardLabel">
                         <rect key="frame" x="40" y="72" width="308" height="96"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" id="generatorBodyCell">
-                            <font key="font" metaFont="user"/>
+                            <font key="font" metaFont="system" size="12"/>
                             <string key="title">Takes an RDL file, data sources, and input parameters.
 Produces PDF or HTML.
 
 RDLKit  ·  RDLDemo  ·  RDLKitTests</string>
-                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="disabledControlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerHeading" customClass="RDLCardLabel">
@@ -84,19 +86,19 @@ RDLKit  ·  RDLDemo  ·  RDLKitTests</string>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" title="2  Designer" id="designerHeadingCell">
                             <font key="font" metaFont="systemBold" size="18"/>
-                            <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerBody" customClass="RDLCardLabel">
                         <rect key="frame" x="392" y="72" width="308" height="96"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" id="designerBodyCell">
-                            <font key="font" metaFont="user"/>
+                            <font key="font" metaFont="system" size="12"/>
                             <string key="title">Create and edit RDL files.
 Outline, canvas, inspector, datasets.
 
 RDLDesigner.app</string>
-                            <color key="textColor" name="secondaryLabelColor" catalog="System" colorSpace="catalog"/>
+                            <color key="textColor" name="disabledControlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
                 </subviews>

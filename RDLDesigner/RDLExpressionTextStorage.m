@@ -83,7 +83,8 @@
   if (_colouring || (mask & NSTextStorageEditedCharacters) == 0)
     return;
   _colouring = YES;
-  [self setAttributes:_baseAttributes range:NSMakeRange(0, [_backing length])];
+  if ([_backing length])
+    [self setAttributes:_baseAttributes range:NSMakeRange(0, [_backing length])];
   [_theme colour:self];
   _colouring = NO;
 }

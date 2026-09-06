@@ -121,6 +121,11 @@ static NSString *RDLStr(id v) {
     // all rather than an unformatted date.
     [f setFormatterBehavior:NSDateFormatterBehavior10_4];
     f.dateStyle = NSDateFormatterMediumStyle;
+    // With the time: an unformatted date in a report is most often
+    // Globals!ExecutionTime, and "when this ran" that says only the day is
+    // half an answer. A report that wants the date alone asks for it, through
+    // Format(..., "d") or FormatDateTime.
+    f.timeStyle = NSDateFormatterShortStyle;
     NSString *formatted = [f stringFromDate:v];
     return [formatted length] ? formatted : [v description];
   }
@@ -1794,8 +1799,11 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   NSDate *dateVal = [value isKindOfClass:[NSDate class]] ? value : RDLAsDate(value, nil);
   if (dateVal && ([f isEqualToString:@"D"] || [f isEqualToString:@"d"])) {
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
+    // As in RDLStr: name the behaviour, and never hand back nothing.
+    [df setFormatterBehavior:NSDateFormatterBehavior10_4];
     df.dateStyle = [f isEqualToString:@"D"] ? NSDateFormatterFullStyle : NSDateFormatterShortStyle;
-    return [df stringFromDate:dateVal];
+    NSString *formatted = [df stringFromDate:dateVal];
+    return [formatted length] ? formatted : [dateVal description];
   }
   double n = RDLNum(value);
   NSString *low = [f lowercaseString];

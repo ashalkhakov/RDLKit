@@ -15,6 +15,7 @@ RDLDesignerTests_OBJC_FILES = \
   RDLCanvasTests.m \
   RDLDesignerTestSupport.m \
   RDLWindowTests.m \
+  RDLPortabilityTests.m \
   RDLInspectorTests.m \
   RDLExpressionUITests.m \
   RDLRichTextTests.m \
