@@ -28,13 +28,21 @@ GNUSTEP_SH="$PREFIX/System/Library/Makefiles/GNUstep.sh"
 # of many.
 export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1:handle_abort=1:print_stacktrace=1"
 
-echo "=== building instrumented ==="
+# Cleaned first, and this matters: gnustep-make rebuilds when a source is
+# newer than its object, not when the flags changed, so building over an
+# ordinary build leaves most of the code uninstrumented and the report empty
+# where the bug is.
+echo "=== building instrumented (from clean) ==="
+make -C RDLKit clean >/dev/null 2>&1 || true
+make -C RDLDesigner clean >/dev/null 2>&1 || true
 make -C RDLKit SANITIZE=1
 make -C RDLDesigner SANITIZE=1
 
 if [ "$WHAT" = tests ]; then
   # Xvfb because both suites make windows, and a window needs a display even
   # when nobody is looking at it.
+  make -C RDLKitTests clean >/dev/null 2>&1 || true
+  make -C RDLDesignerTests clean >/dev/null 2>&1 || true
   xvfb-run -a make -C RDLKitTests run-tests SANITIZE=1
   xvfb-run -a make -C RDLDesignerTests run-tests SANITIZE=1
   exit 0
