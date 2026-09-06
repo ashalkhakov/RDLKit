@@ -209,8 +209,6 @@
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
     return nil;
-  // Escape is the one thing the XIB cannot carry: XML forbids U+001B.
-  [ed.cancelButton setKeyEquivalent:@"\033"];
   [[ed.sourceView textStorage] setAttributedString:
                                    [[NSAttributedString alloc] initWithString:source ?: @""]];
   [ed.sourceView setDelegate:ed];

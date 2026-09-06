@@ -268,4 +268,38 @@
     XCTFail(@"%@", @"Sum should be coloured as a function, on its own");
 }
 
+// Escape comes from the XIB, not from code putting it there afterwards.
+// Interface Builder writes a non-printable key equivalent as base64 -- <string
+// key="keyEquivalent" base64-UTF8="YES">Gw</string> -- and both platforms
+// decode it: GNUstep's xib5 unarchiver inherits that from GSXibKeyedUnarchiver.
+// The panels here already used it for Return on the OK button while setting
+// Escape by hand two lines away.
+- (void)testPanelsCarryTheirOwnEscape {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+
+  RDLExpressionEditor *expr = [RDLExpressionEditor editorForSource:@""
+                                                           context:RDLExpressionContextText
+                                                            report:report];
+  NSButton *cancel = [expr valueForKey:@"cancelButton"];
+  if (![[cancel keyEquivalent] isEqualToString:@"\033"])
+    XCTFail(@"%@", @"the expression editor's Cancel does not answer to Escape");
+
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  RDLRichTextEditor *rich = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (![[[rich valueForKey:@"cancelButton"] keyEquivalent] isEqualToString:@"\033"])
+    XCTFail(@"%@", @"the rich-text editor's Cancel does not answer to Escape");
+
+  // And OK still answers to Return, which came from the same mechanism all
+  // along.
+  NSButton *ok = RDLFindButtonTitled([[expr valueForKey:@"window"] contentView], @"OK");
+  if (![[ok keyEquivalent] isEqualToString:@"\r"])
+    XCTFail(@"%@", @"OK should still be the default button");
+}
+
 @end

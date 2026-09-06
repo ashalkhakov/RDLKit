@@ -201,7 +201,6 @@
                                         bundle:[NSBundle bundleForClass:[self class]]];
   if (![nib instantiateWithOwner:self topLevelObjects:NULL])
     return;
-  [_paletteCancelButton setKeyEquivalent:@"\033"]; // XML cannot carry U+001B
   [_paletteCancelButton setTag:0];
 
   CGFloat height = 92 + 30 * (CGFloat)[kinds count];

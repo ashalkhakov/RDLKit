@@ -100,7 +100,6 @@
   [nib instantiateWithOwner:panel topLevelObjects:NULL];
   // Escape cannot be written as a key equivalent in a XIB -- XML has no way to
   // carry U+001B -- so Cancel gets it here, as the other panels do.
-  [panel.cancelButton setKeyEquivalent:@"\033"];
   [panel.detailsView setEditable:NO];
   [panel chooseBlank:nil];
   [panel.window center];

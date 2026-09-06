@@ -130,7 +130,10 @@
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                        </buttonCell>
+                                                    <string key="keyEquivalent" base64-UTF8="YES">
+Gw
+</string>
+</buttonCell>
                         <connections>
                             <action selector="cancel:" target="-2" id="cancelAction"/>
                         </connections>

@@ -79,10 +79,6 @@ static NSString *RDLFieldOfValue(NSString *value) {
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
 
-  // Two things the XIB cannot carry, both silently dropped by ibtool rather
-  // than reported: a table's header view, and Escape as a key equivalent
-  // (XML has no way to write U+001B at all).
-  [_cancelButton setKeyEquivalent:@"\033"];
 
   [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
 

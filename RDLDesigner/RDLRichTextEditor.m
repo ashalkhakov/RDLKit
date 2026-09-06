@@ -355,9 +355,6 @@
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
     return nil;
 
-  // Escape is the one thing the XIB cannot carry: XML forbids U+001B, as a raw
-  // byte and as a character reference alike, so ibtool rejects the file outright.
-  [ed.cancelButton setKeyEquivalent:@"\033"];
 
   [ed.window setTitle:[NSString stringWithFormat:@"Rich Text — %@", item.name]];
   NSTextView *tv = ed.textView;

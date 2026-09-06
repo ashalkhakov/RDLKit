@@ -201,7 +201,10 @@
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
                             
-                        </buttonCell>
+                                                    <string key="keyEquivalent" base64-UTF8="YES">
+Gw
+</string>
+</buttonCell>
                         <connections><action selector="cancel:" target="-2" id="cancelButtonAction"/></connections>
                     </button>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="okButton">
@@ -210,7 +213,9 @@
                         <buttonCell key="cell" type="push" title="OK" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="okButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                            <string key="keyEquivalent">\r</string>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+DQ
+</string>
                         </buttonCell>
                         <connections><action selector="ok:" target="-2" id="okButtonAction"/></connections>
                     </button>
