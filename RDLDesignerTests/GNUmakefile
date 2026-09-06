@@ -39,6 +39,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLInsertPalette.m \
   ../RDLDesigner/RDLExpressionCell.m \
   ../RDLDesigner/RDLExpressionField.m \
+  ../RDLDesigner/RDLPane.m \
   ../RDLDesigner/RDLExpressionTheme.m \
   ../RDLDesigner/RDLExpressionTextStorage.m \
   ../RDLDesigner/RDLDatasetNavigator.m \
@@ -70,6 +71,10 @@ RDLDesignerTests_NEEDS_GUI = yes
 RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLDesignerWindow.xib \
   ../RDLDesigner/RDLInspectorSections.xib \
+  ../RDLDesigner/RDLDatasetNavigator.xib \
+  ../RDLDesigner/RDLInsertPalette.xib \
+  ../RDLDesigner/RDLDatasetFieldsView.xib \
+  ../RDLDesigner/RDLFieldInspectorView.xib \
   ../RDLDesigner/RDLExpressionEditor.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLTablixEditor.xib \

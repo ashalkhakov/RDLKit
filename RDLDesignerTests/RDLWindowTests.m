@@ -128,11 +128,21 @@ static NSTabView *_centerTabViewOf(id wc) {
   // Every host got a view: a pane that loads and shows nothing is the state
   // these were in before.
   for (NSString *host in @[ @"reportInspectorHost", @"datasetNavigatorHost",
-                            @"datasetInspectorHost", @"sourceHost" ]) {
+                            @"datasetInspectorHost" ]) {
     NSView *view = [wc valueForKey:host];
     if ([[view subviews] count] < 2)  // the XIB's label, plus what belongs here
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is still empty", host]);
   }
+
+  // The source pane is not filled that way any more: its text view and
+  // scrollers come from the XIB, so what this checks is that the outlet
+  // arrived and that it is inside the pane rather than adrift.
+  NSTextView *source = [wc valueForKey:@"sourceText"];
+  NSView *sourceHost = [wc valueForKey:@"sourceHost"];
+  if (source == nil || ![source isDescendantOf:sourceHost])
+    XCTFail(@"%@", @"the source pane's text view is not in the source pane");
+  if ([[source string] length] == 0)
+    XCTFail(@"%@", @"the source pane is empty; it should show the report as RDL");
 
   // Selecting an element shows the element inspector; selecting a dataset
   // shows that dataset's fields instead, and takes the canvas selection with it.
@@ -326,6 +336,67 @@ static NSTabView *_centerTabViewOf(id wc) {
 // way an xf:output sits among the text in XForms -- not the text of the
 // expression pasted in. The codec has to carry that both ways, and the editor
 // has to show it as one thing.
+// Every pane is a XIB, and a XIB that loads is not the same as a XIB that is
+// connected: an outlet nobody linked is nil, and a message to nil is quiet.
+// So this drives each pane through the controls its XIB is supposed to have
+// given it, rather than checking the file loaded.
+- (void)testPanesComeFromTheirXIBs {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+
+  // The navigator's table: its own +/- act through the selection, so a table
+  // that is not there or is not the data source shows as a lost selection.
+  RDLDatasetNavigator *nav =
+      [[RDLDatasetNavigator alloc] initWithFrame:NSMakeRect(0, 0, 260, 300) context:ctx];
+  NSTableView *navTable = [nav valueForKey:@"table"];
+  if (navTable == nil || [navTable dataSource] != nav)
+    XCTFail(@"%@", @"the navigator's table is not connected to it");
+  if ([navTable numberOfRows] != (NSInteger)[report.dataSets count])
+    XCTFail(@"%@", @"the navigator's table does not show the report's datasets");
+  NSUInteger before = [report.dataSets count];
+  [nav addDataSet:nil];
+  if ([report.dataSets count] != before + 1 || nav.selectedDataSet == nil)
+    XCTFail(@"%@", @"adding a dataset did not select it, so the table is not wired");
+
+  // The palette's table, the same way.
+  RDLInsertPalette *palette =
+      [[RDLInsertPalette alloc] initWithFrame:NSMakeRect(0, 0, 240, 400) context:ctx];
+  NSTableView *paletteTable = [palette valueForKey:@"table"];
+  if (paletteTable == nil || [paletteTable numberOfRows] != (NSInteger)[palette.rows count])
+    XCTFail(@"%@", @"the palette's table does not show its rows");
+
+  // The fields view: its title field renames the dataset, which is an outlet
+  // and an action, both from the XIB.
+  RDLDataSet *ds = [report.dataSets firstObject];
+  RDLDatasetFieldsView *fields =
+      [[RDLDatasetFieldsView alloc] initWithFrame:NSMakeRect(0, 0, 400, 300) context:ctx];
+  fields.dataSet = ds;
+  NSTextField *title = [fields valueForKey:@"title"];
+  if (![[title stringValue] isEqualToString:ds.name])
+    XCTFail(@"%@", @"the fields view is not showing the dataset's name");
+  [title setStringValue:@"Renamed"];
+  [fields renameDataSet:title];
+  if (![ds.name isEqualToString:@"Renamed"])
+    XCTFail(@"%@", @"renaming through the title field did not reach the dataset");
+  NSTableView *fieldTable = [fields valueForKey:@"table"];
+  if ([fieldTable numberOfRows] != (NSInteger)[[ds fields] count])
+    XCTFail(@"%@", @"the fields view's table does not show the dataset's fields");
+
+  // The field inspector: the popup is filled in code from the enumeration,
+  // which only happens if the outlet arrived.
+  RDLFieldInspectorView *inspector =
+      [[RDLFieldInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400) context:ctx];
+  NSPopUpButton *typePop = [inspector valueForKey:@"typePop"];
+  if ([typePop numberOfItems] == 0)
+    XCTFail(@"%@", @"the type popup is empty, so the XIB did not hand it over");
+  [inspector showField:[[ds fields] firstObject] ofDataSet:ds];
+  NSTextField *nameField = [inspector valueForKey:@"nameField"];
+  if (![[nameField stringValue] isEqualToString:[[ds fields] firstObject].name])
+    XCTFail(@"%@", @"the inspector's name field is not showing the field");
+  if ([nameField isHidden])
+    XCTFail(@"%@", @"the inspector is still showing its empty state");
+}
+
 // The quick-insert palette: what it offers, and that dropping one of its
 // bindings on the canvas makes a textbox already bound to it. The drag itself
 // is AppKit's; what the palette puts on the pasteboard and what the canvas does

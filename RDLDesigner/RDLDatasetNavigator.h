@@ -10,9 +10,7 @@
         didSelectDataSet:(RDLDataSet *)dataSet;
 @end
 
-// The Datasets navigator: the report's datasets, with add and remove. Built in
-// code rather than in a XIB, as RDLDataView beside it is -- a table filling its
-// host with two buttons under it is not the form layout that argument is about.
+// The Datasets navigator: the report's datasets, with add and remove.
 @interface RDLDatasetNavigator : NSView
 @property (nonatomic, weak) id<RDLDatasetNavigatorDelegate> delegate;
 @property (nonatomic, readonly, strong) RDLDataSet *selectedDataSet;

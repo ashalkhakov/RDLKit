@@ -13,6 +13,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLInsertPalette.h"
+#import "RDLPane.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLPageGeometry.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
@@ -46,7 +47,7 @@
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
 @property (nonatomic, strong) RDLInsertPalette *palette;
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
-@property (nonatomic, strong) NSTextView *sourceText;
+@property (nonatomic, strong) IBOutlet NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
@@ -298,14 +299,6 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
     [tabView selectTabViewItemAtIndex:i];
 }
 
-// Each empty host in the XIB gets its view here. They fill their hosts, so
-// nothing has to be laid out twice when the window resizes.
-static void RDLFillHost(NSView *host, NSView *view) {
-  [view setFrame:[host bounds]];
-  [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  [host addSubview:view];
-}
-
 // The zoom the popup's titles name. Parsed from the title rather than kept in a
 // parallel array: the two would drift, and the title is already the number.
 static CGFloat RDLZoomFromTitle(NSString *title) {
@@ -400,21 +393,18 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
   RDLFillHost(_paletteHost, _palette);
 
-  // The source pane shows what the report would be written as. Read-only for
-  // now: editing it means parsing the result and deciding what to do when it
-  // does not parse, which is its own piece of work.
-  NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:[_sourceHost bounds]];
-  [scroll setHasVerticalScroller:YES];
-  [scroll setHasHorizontalScroller:YES];
-  _sourceText = [[NSTextView alloc] initWithFrame:[[scroll contentView] bounds]];
+  // The source pane's text view and its scrollers are in the XIB. What is set
+  // here is not layout: the pane shows what the report would be written as,
+  // read-only for now -- editing it means parsing the result and deciding what
+  // to do when it does not parse, which is its own piece of work -- and source
+  // is read in a fixed pitch, in lines that are as long as they are rather than
+  // wrapped.
   [_sourceText setEditable:NO];
   [_sourceText setRichText:NO];
   [_sourceText setFont:[NSFont userFixedPitchFontOfSize:11] ?: [NSFont systemFontOfSize:11]];
   [[_sourceText textContainer] setWidthTracksTextView:NO];
   [[_sourceText textContainer] setContainerSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
   [_sourceText setHorizontallyResizable:YES];
-  [scroll setDocumentView:_sourceText];
-  RDLFillHost(_sourceHost, scroll);
   [self reloadPanes];
 }
 

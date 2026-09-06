@@ -27,6 +27,7 @@
                 <outlet property="rightTabBar" destination="rightTabBar" id="rightTabBarOutlet"/>
                 <outlet property="rightTabView" destination="rightTabView" id="rightTabViewOutlet"/>
                 <outlet property="sourceHost" destination="sourceHost" id="sourceHostOutlet"/>
+                <outlet property="sourceText" destination="sourceText" id="sourceTextOutlet"/>
                 <outlet property="split" destination="split" id="splitOutlet"/>
                 <outlet property="window" destination="designerWindow" id="designerWindowOutlet"/>
             </connections>
@@ -266,15 +267,31 @@
                                                             <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                             <subviews>
-                                                                <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="sourceLabel">
-                                                                    <rect key="frame" x="8" y="346" width="762" height="17"/>
-                                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES" flexibleMinY="YES"/>
-                                                                    <textFieldCell key="cell" controlSize="small" lineBreakMode="wordWrapping" selectable="YES" alignment="center" title="RDL source" id="sourceLabelCell">
-                                                                        <font key="font" metaFont="smallSystem"/>
-                                                                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
-                                                                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                                                                    </textFieldCell>
-                                                                </textField>
+<scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" hasVerticalScroller="YES" hasHorizontalScroller="YES" id="sourceScroll">
+                                                                    <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
+                                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                                    <clipView key="contentView" copiesOnScroll="NO" id="sourceScrollClip">
+                                                                        <rect key="frame" x="1" y="16" width="761" height="691"/>
+                                                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                                        <subviews>
+                                                                            <textView importsGraphics="NO" verticallyResizable="YES" id="sourceText">
+                                                                                <rect key="frame" x="0.0" y="0.0" width="761" height="691"/>
+                                                                                <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                                                                                <size key="minSize" width="761" height="691"/>
+                                                                                <size key="maxSize" width="10000000" height="10000000"/>
+                                                                                <color key="insertionPointColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                                                                            </textView>
+                                                                        </subviews>
+                                                                    </clipView>
+                                                                    <scroller key="horizontalScroller" verticalHuggingPriority="750" horizontal="YES" id="sourceScrollH">
+                                                                        <rect key="frame" x="1" y="1" width="761" height="15"/>
+                                                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
+                                                                    </scroller>
+                                                                    <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="sourceScrollV">
+                                                                        <rect key="frame" x="762" y="16" width="15" height="691"/>
+                                                                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
+                                                                    </scroller>
+                                                                </scrollView>
                                                             </subviews>
                                                         </customView>
                                                     </subviews>

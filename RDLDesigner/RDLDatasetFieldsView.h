@@ -20,6 +20,9 @@
 @property (nonatomic, readonly, strong) RDLField *selectedField;
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context;
 - (void)reload;
+// The XIB's actions: the +/- buttons and the name field. Declared because they
+// are what the pane does, and so that they can be driven without a click.
 - (void)addField:(id)sender;
 - (void)removeField:(id)sender;
+- (void)renameDataSet:(id)sender;
 @end

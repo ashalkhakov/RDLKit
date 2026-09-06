@@ -3,14 +3,15 @@
 #import "RDLEditingContext.h"
 #import "RDLEditor.h"
 #import "RDLKit.h"
+#import "RDLPane.h"
 
 @interface RDLDatasetNavigator () <NSTableViewDataSource, NSTableViewDelegate>
+@property (nonatomic, strong) IBOutlet NSView *content;
+@property (nonatomic, strong) IBOutlet NSTableView *table;
 @end
 
 @implementation RDLDatasetNavigator {
   RDLEditingContext *_context;
-  NSTableView *_table;
-  NSScrollView *_scroll;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -18,43 +19,14 @@
   if (self == nil)
     return nil;
   _context = context;
-
-  CGFloat bar = 26;
-  _scroll = [[NSScrollView alloc]
-      initWithFrame:NSMakeRect(0, bar, NSWidth(frame), NSHeight(frame) - bar)];
-  [_scroll setHasVerticalScroller:YES];
-  [_scroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-  _table = [[NSTableView alloc] initWithFrame:[[_scroll contentView] bounds]];
-  NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"name"];
-  [[column headerCell] setStringValue:@"Datasets"];
-  [column setWidth:NSWidth(frame) - 20];
-  [column setEditable:NO];
-  [_table addTableColumn:column];
-  [_table setDataSource:self];
-  [_table setDelegate:self];
-  [_table setAllowsEmptySelection:YES];
+  if (!RDLLoadPaneNib(self, @"RDLDatasetNavigator"))
+    return nil;
+  RDLFillHost(self, _content);
   // -tableViewSelectionDidChange: only fires when the selection CHANGES, so
   // clicking the row that is already selected says nothing. It is still the
-  // user asking for that dataset, so the click itself is an action too.
-  [_table setTarget:self];
-  [_table setAction:@selector(rowClicked:)];
-  [_scroll setDocumentView:_table];
-  [self addSubview:_scroll];
-
-  NSButton *(^button)(NSString *, CGFloat, SEL, NSString *) =
-      ^NSButton *(NSString *title, CGFloat x, SEL action, NSString *tip) {
-    NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(x, 1, 32, 24)];
-    [b setTitle:title];
-    [b setBezelStyle:NSShadowlessSquareBezelStyle];
-    [b setTarget:self];
-    [b setAction:action];
-    [b setToolTip:tip];
-    [b setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
-    return b;
-  };
-  [self addSubview:button(@"+", 0, @selector(addDataSet:), @"Add a dataset")];
-  [self addSubview:button(@"–", 32, @selector(removeDataSet:), @"Remove the selected dataset")];
+  // user asking for that dataset, so the click itself is an action too -- the
+  // XIB connects it to -rowClicked:.
+  [_table setAllowsEmptySelection:YES];
   return self;
 }
 

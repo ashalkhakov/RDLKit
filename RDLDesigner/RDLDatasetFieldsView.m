@@ -3,14 +3,18 @@
 #import "RDLEditingContext.h"
 #import "RDLEditor.h"
 #import "RDLKit.h"
+#import "RDLPane.h"
 
 @interface RDLDatasetFieldsView () <NSTableViewDataSource, NSTableViewDelegate>
+@property (nonatomic, strong) IBOutlet NSView *content;
+@property (nonatomic, strong) IBOutlet NSTableView *table;
+// The dataset's own settings. Only its name so far, which is what a report
+// refers to it by and the one thing that was not editable anywhere.
+@property (nonatomic, strong) IBOutlet NSTextField *title;
 @end
 
 @implementation RDLDatasetFieldsView {
   RDLEditingContext *_context;
-  NSTableView *_table;
-  NSTextField *_title;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -18,53 +22,9 @@
   if (self == nil)
     return nil;
   _context = context;
-
-  CGFloat bar = 26, head = 30;
-  // The dataset's own settings. Only its name so far, which is what a report
-  // refers to it by and the one thing that was not editable anywhere.
-  _title = [[NSTextField alloc]
-      initWithFrame:NSMakeRect(8, NSHeight(frame) - head + 4, NSWidth(frame) - 16, 22)];
-  [_title setEditable:YES];
-  [_title setBezeled:YES];
-  [_title setTarget:self];
-  [_title setAction:@selector(renameDataSet:)];
-  [_title setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  [self addSubview:_title];
-
-  NSScrollView *scroll = [[NSScrollView alloc]
-      initWithFrame:NSMakeRect(0, bar, NSWidth(frame), NSHeight(frame) - bar - head)];
-  [scroll setHasVerticalScroller:YES];
-  [scroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-  _table = [[NSTableView alloc] initWithFrame:[[scroll contentView] bounds]];
-  NSTableColumn *name = [[NSTableColumn alloc] initWithIdentifier:@"name"];
-  [[name headerCell] setStringValue:@"Field"];
-  [name setWidth:NSWidth(frame) * 0.55];
-  NSTableColumn *type = [[NSTableColumn alloc] initWithIdentifier:@"type"];
-  [[type headerCell] setStringValue:@"Type"];
-  [type setWidth:NSWidth(frame) * 0.35];
-  for (NSTableColumn *c in @[ name, type ]) {
-    [c setEditable:YES];
-    [_table addTableColumn:c];
-  }
-  [_table setDataSource:self];
-  [_table setDelegate:self];
-  [scroll setDocumentView:_table];
-  [self addSubview:scroll];
-
-  NSButton *(^button)(NSString *, CGFloat, SEL, NSString *) =
-      ^NSButton *(NSString *t, CGFloat x, SEL action, NSString *tip) {
-    NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(x, 1, 32, 24)];
-    [b setTitle:t];
-    [b setBezelStyle:NSShadowlessSquareBezelStyle];
-    [b setTarget:self];
-    [b setAction:action];
-    [b setToolTip:tip];
-    [b setAutoresizingMask:NSViewMaxXMargin | NSViewMaxYMargin];
-    return b;
-  };
-  [self addSubview:button(@"+", 0, @selector(addField:), @"Add a field")];
-  [self addSubview:button(@"–", 32, @selector(removeField:), @"Remove the selected field")];
+  if (!RDLLoadPaneNib(self, @"RDLDatasetFieldsView"))
+    return nil;
+  RDLFillHost(self, _content);
   return self;
 }
 

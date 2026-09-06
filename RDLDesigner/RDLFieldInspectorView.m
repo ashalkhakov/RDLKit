@@ -5,18 +5,24 @@
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"
 #import "RDLKit.h"
+#import "RDLPane.h"
 
 @interface RDLFieldInspectorView () <NSTextFieldDelegate>
+@property (nonatomic, strong) IBOutlet NSView *content;
+@property (nonatomic, strong) IBOutlet NSTextField *nameField;
+@property (nonatomic, strong) IBOutlet NSTextField *dataFieldField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *typePop;
+// A calculated field: the expression that produces it, instead of a column
+// read from the data.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *valueField;
+@property (nonatomic, strong) IBOutlet NSButton *valueExprButton;
+// What the pane says when nothing is selected.
+@property (nonatomic, strong) IBOutlet NSTextField *empty;
 @end
 
 @implementation RDLFieldInspectorView {
   RDLEditingContext *_context;
   RDLDataSet *_dataSet;
-  NSTextField *_nameField, *_dataFieldField;
-  NSPopUpButton *_typePop;
-  RDLExpressionField *_valueField;
-  NSButton *_valueExprButton;
-  NSTextField *_empty;
   BOOL _filling;
 }
 
@@ -25,79 +31,14 @@
   if (self == nil)
     return nil;
   _context = context;
-
-  CGFloat w = NSWidth(frame) - 20;
-  __block CGFloat y = NSHeight(frame) - 30;
-  NSTextField *(^label)(NSString *) = ^NSTextField *(NSString *title) {
-    NSTextField *l = [[NSTextField alloc] initWithFrame:NSMakeRect(10, y, w, 14)];
-    [l setStringValue:title];
-    [l setBezeled:NO];
-    [l setDrawsBackground:NO];
-    [l setEditable:NO];
-    [l setSelectable:NO];
-    [l setFont:[NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
-    [l setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-    [self addSubview:l];
-    y -= 24;
-    return l;
-  };
-  NSTextField *(^field)(void) = ^NSTextField *(void) {
-    NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(10, y, w, 22)];
-    [f setTarget:self];
-    [f setAction:@selector(changed:)];
-    [f setDelegate:self];
-    [f setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-    [self addSubview:f];
-    y -= 28;
-    return f;
-  };
-
-  label(@"Name");
-  _nameField = field();
-  label(@"Data field");
-  _dataFieldField = field();
-  label(@"Type");
-  _typePop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(10, y, w, 22)];
+  if (!RDLLoadPaneNib(self, @"RDLFieldInspectorView"))
+    return nil;
+  RDLFillHost(self, _content);
+  // The types are the enumeration's, which the XIB has no way to know -- the
+  // same reason the page sizes are filled in code in the other inspector.
   for (RDLFieldDataType t = RDLFieldDataTypeBoolean; t <= RDLFieldDataTypeString; t++)
     [_typePop addItemWithTitle:RDLStringFromFieldDataType(t)];
-  [_typePop setTarget:self];
-  [_typePop setAction:@selector(changed:)];
-  [_typePop setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  [self addSubview:_typePop];
-  y -= 28;
-
-  // A calculated field: the expression that produces it, instead of a column
-  // read from the data.
-  label(@"Value");
-  _valueField = [[RDLExpressionField alloc] initWithFrame:NSMakeRect(10, y, w - 28, 22)];
   _valueField.expressionContext = RDLExpressionContextText;
-  [_valueField setTarget:self];
-  [_valueField setAction:@selector(changed:)];
-  [_valueField setDelegate:self];
-  [_valueField setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  [self addSubview:_valueField];
-  _valueExprButton = [[NSButton alloc] initWithFrame:NSMakeRect(NSWidth(frame) - 34, y, 24, 22)];
-  [_valueExprButton setTitle:@"f(x)"];
-  [_valueExprButton setBezelStyle:NSRoundedBezelStyle];
-  [[_valueExprButton cell] setControlSize:NSSmallControlSize];
-  [_valueExprButton setFont:[NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
-  [_valueExprButton setTarget:self];
-  [_valueExprButton setAction:@selector(editValueExpression:)];
-  [_valueExprButton setAutoresizingMask:NSViewMinXMargin | NSViewMinYMargin];
-  [self addSubview:_valueExprButton];
-
-  _empty = [[NSTextField alloc]
-      initWithFrame:NSMakeRect(10, NSHeight(frame) / 2 - 8, w, 17)];
-  [_empty setStringValue:@"No attribute selected"];
-  [_empty setBezeled:NO];
-  [_empty setDrawsBackground:NO];
-  [_empty setEditable:NO];
-  [_empty setSelectable:NO];
-  [_empty setAlignment:NSTextAlignmentCenter];
-  [_empty setFont:[NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
-  [_empty setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin | NSViewMaxYMargin];
-  [self addSubview:_empty];
-
   [self showField:nil ofDataSet:nil];
   return self;
 }

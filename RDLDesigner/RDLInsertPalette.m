@@ -2,6 +2,7 @@
 #import "RDLInsertPalette.h"
 #import "RDLEditingContext.h"
 #import "RDLKit.h"
+#import "RDLPane.h"
 
 NSString * const RDLPaletteDragType = @"org.rdl.designer.palette-binding";
 NSString * const RDLPaletteExpressionKey = @"expression";
@@ -11,11 +12,12 @@ NSString * const RDLPaletteLabelKey = @"label";
 static NSString * const kRDLPaletteHeader = @"header";
 
 @interface RDLInsertPalette () <NSTableViewDataSource, NSTableViewDelegate>
+@property (nonatomic, strong) IBOutlet NSView *content;
+@property (nonatomic, strong) IBOutlet NSTableView *table;
 @end
 
 @implementation RDLInsertPalette {
   RDLEditingContext *_context;
-  NSTableView *_table;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -23,21 +25,9 @@ static NSString * const kRDLPaletteHeader = @"header";
   if (self == nil)
     return nil;
   _context = context;
-
-  NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:[self bounds]];
-  [scroll setHasVerticalScroller:YES];
-  [scroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  _table = [[NSTableView alloc] initWithFrame:[[scroll contentView] bounds]];
-  NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"label"];
-  [[column headerCell] setStringValue:@"Insert"];
-  [column setWidth:NSWidth(frame) - 20];
-  [column setEditable:NO];
-  [_table addTableColumn:column];
-  [_table setDataSource:self];
-  [_table setDelegate:self];
-  [scroll setDocumentView:_table];
-  [self addSubview:scroll];
-
+  if (!RDLLoadPaneNib(self, @"RDLInsertPalette"))
+    return nil;
+  RDLFillHost(self, _content);
   [self reload];
   return self;
 }
