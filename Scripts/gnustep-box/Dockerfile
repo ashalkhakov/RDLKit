@@ -4,7 +4,15 @@
 FROM debian:13
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -q -y update && apt-get -q -y install \
+# Retries, because the mirror hands back a truncated file often enough through
+# Docker's NAT to fail a build on its own, and the CDN rather than the
+# round-robin because it is the difference between ten minutes and an hour
+# here. Pipelining is deliberately left alone: turning it off fetches one
+# package per connection and is a worse failure than the one it avoids.
+RUN printf 'Acquire::Retries "8";\n' > /etc/apt/apt.conf.d/99retries \
+    && sed -i 's|deb\.debian\.org|cdn-aws.deb.debian.org|g' \
+         /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list 2>/dev/null; true
+RUN apt-get -q -y update && apt-get -q -y --fix-missing install \
       clang lld cmake make git pkg-config ca-certificates \
       libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
       libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
