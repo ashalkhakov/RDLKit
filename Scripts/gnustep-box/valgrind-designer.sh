@@ -19,6 +19,7 @@ cd RDLDesignerTests
 BUNDLE=$(find . -maxdepth 1 -name '*.bundle' | head -n 1)
 [ -n "$BUNDLE" ] || { echo "no test bundle was built"; exit 1; }
 echo "=== $BUNDLE under valgrind ==="
-LD_LIBRARY_PATH="$PWD/../RDLKit/$(gnustep-config --variable=GNUSTEP_OBJ_DIR 2>/dev/null || echo obj):$LD_LIBRARY_PATH" \
+LIBDIR=$(dirname "$(find "$PWD/../RDLKit" -name 'libRDLKit.so*' | head -n 1)")
+export LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH"
 xvfb-run -a valgrind --error-limit=no --num-callers=25 --track-origins=yes \
     xctest "$BUNDLE" 2>&1 | tail -200
