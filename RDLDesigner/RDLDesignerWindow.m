@@ -62,6 +62,7 @@
 @end
 
 @implementation RDLDesignerWindow {
+  BOOL _sourceNeedsRewrite;
   RDLExpressionFieldEditor *_fieldEditor;
 }
 
@@ -417,6 +418,26 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_datasetNavigator reload];
   [_datasetFields reload];
   [_palette reload];
+  // The source is written when it is being looked at, not on every edit.
+  // Serialising the whole report to answer a change nobody can see is waste on
+  // any platform; on GNUstep it is worse than waste, because building and
+  // discarding an NSXMLDocument repeatedly damages the heap there -- see
+  // Patches/gnustep-patch-repros/empty-loop.m, which kills a process in six
+  // rounds with no RDLKit UI in it at all. Doing it only when the pane is in
+  // front takes the fault off the path of every edit.
+  _sourceNeedsRewrite = YES;
+  [self rewriteSourceIfVisible];
+}
+
+// Index 1 of the centre tabs is the source; 0 is the canvas and 2 the dataset.
+- (BOOL)sourceIsVisible {
+  return [_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 1;
+}
+
+- (void)rewriteSourceIfVisible {
+  if (!_sourceNeedsRewrite || ![self sourceIsVisible])
+    return;
+  _sourceNeedsRewrite = NO;
   [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
 }
 
@@ -476,6 +497,8 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)centerModeChanged:(id)sender {
   RDL_UNUSED(sender);
   [_centerTabView selectTabViewItemAtIndex:[_centerMode selectedSegment] == 1 ? 1 : 0];
+  // Switching to the source is when it gets written.
+  [self rewriteSourceIfVisible];
 }
 
 - (void)showDatasetPane {

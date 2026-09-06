@@ -141,8 +141,15 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSView *sourceHost = [wc valueForKey:@"sourceHost"];
   if (source == nil || ![source isDescendantOf:sourceHost])
     XCTFail(@"%@", @"the source pane's text view is not in the source pane");
+  // Written when it is looked at, not on every edit -- so ask for it the way a
+  // user does, by switching the centre to the source.
+  NSTabView *centre = [wc valueForKey:@"centerTabView"];
+  [centre selectTabViewItemAtIndex:1];
+  [wc performSelector:@selector(rewriteSourceIfVisible)];
   if ([[source string] length] == 0)
-    XCTFail(@"%@", @"the source pane is empty; it should show the report as RDL");
+    XCTFail(@"%@", @"the source pane is empty after being shown");
+  if ([[source string] rangeOfString:@"<Report"].location == NSNotFound)
+    XCTFail(@"%@", @"the source pane is not showing the report as RDL");
 
   // Selecting an element shows the element inspector; selecting a dataset
   // shows that dataset's fields instead, and takes the canvas selection with it.
