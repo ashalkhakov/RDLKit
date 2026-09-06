@@ -111,7 +111,7 @@ install_libs_base() {
     # "initialized" field is not zero. See the patch and the repro beside it.
     git apply "$WORKSPACE_DIR/Patches/gnustep-base-sax-handler-calloc.patch"
     # Add a fix to the gnustep-base XML namespace added as attribute
-    git apply "$WORKSPACE_DIR/Patches/gnustep-patch-repros/gnustep-basexmlns-attribute.patch"
+    git apply "$WORKSPACE_DIR/Patches/gnustep-patch-repros/gnustep-base-xmlns-attribute.patch"
     # The reference recipe names $PREFIX/etc/GNUstep.conf here. This
     # gnustep-make writes it to $PREFIX/etc/GNUstep/GNUstep.conf instead, and
     # when the named file does not exist libs-base falls back to the built-in
