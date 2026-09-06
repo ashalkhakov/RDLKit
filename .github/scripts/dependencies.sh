@@ -106,6 +106,10 @@ install_libs_base() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
+    # -[GSSAXHandler _initLibXML] hands libxml2 an xmlSAXHandler it never
+    # zeroed, and xmlSAX2InitDefaultSAXHandler does nothing when the handler's
+    # "initialized" field is not zero. See the patch and the repro beside it.
+    git apply "$WORKSPACE_DIR/Patches/gnustep-base-sax-handler-calloc.patch"
     # The reference recipe names $PREFIX/etc/GNUstep.conf here. This
     # gnustep-make writes it to $PREFIX/etc/GNUstep/GNUstep.conf instead, and
     # when the named file does not exist libs-base falls back to the built-in
