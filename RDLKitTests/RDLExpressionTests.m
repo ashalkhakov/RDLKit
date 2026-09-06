@@ -421,8 +421,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
     tab.name = @"T";
     tab.dataSetName = @"Sales";
     tab.width = 6;
-    tab.groupBy = @"Region";
-    tab.groupBy2 = @"City";
+    tab.rowGroups = @[ @"Region", @"City" ];
     tab.columnSpecs = @[
       @{@"width" : @2, @"header" : @"Row", @"value" : @"=RowNumber(\"Sales\")"},
       @{@"width" : @2, @"header" : @"In", @"value" : @"=InScope(\"T_Region\")"},

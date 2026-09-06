@@ -946,7 +946,7 @@ static NSString *RDLAggregateOfValue(NSString *value) {
 // rebuild reads: shrinking only the built columns would overflow again.
 - (NSArray<NSDictionary *> *)rdlSpecsFittingWidth:(NSArray<NSDictionary *> *)specs {
   NSArray *rowGroups = [self rdlEffectiveRowGroups];
-  if ([rowGroups count] == 0 || [self.pivotBy length] || [specs count] == 0)
+  if ([rowGroups count] == 0 || [self.columnGroups count] || [specs count] == 0)
     return specs; // no row header, or a matrix, which uses one measure column
   CGFloat avail = [self rdlAvailableWidth];
   CGFloat headerW = [self rdlRowHeaderWidthForGroupCount:[rowGroups count]];
@@ -1004,66 +1004,6 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
   return out;
 }
 
-
-// groupBy, groupBy2 and pivotBy are windows onto the arrays. Keeping one
-// representation rather than two removes the question of which is authoritative
-// when they disagree -- the answer used to be "whichever was assigned last",
-// which is not an answer.
-
-- (NSString *)groupBy {
-  return [_rowGroups count] > 0 ? _rowGroups[0] : nil;
-}
-
-- (void)setGroupBy:(NSString *)field {
-  NSMutableArray *groups = [_rowGroups mutableCopy] ?: [NSMutableArray array];
-  if ([field length] == 0) {
-    // No outer group means no grouping: an inner group with nothing around it
-    // is not a shape RDL has.
-    _rowGroups = @[];
-    return;
-  }
-  if ([groups count] == 0)
-    [groups addObject:field];
-  else
-    groups[0] = field;
-  _rowGroups = [groups copy];
-}
-
-- (NSString *)groupBy2 {
-  return [_rowGroups count] > 1 ? _rowGroups[1] : nil;
-}
-
-- (void)setGroupBy2:(NSString *)field {
-  NSMutableArray *groups = [_rowGroups mutableCopy] ?: [NSMutableArray array];
-  if ([field length] == 0) {
-    if ([groups count] > 1)
-      [groups removeObjectsInRange:NSMakeRange(1, [groups count] - 1)];
-  } else if ([groups count] == 0) {
-    return;  // requires an outer group; assigning one alone is meaningless
-  } else if ([groups count] == 1) {
-    [groups addObject:field];
-  } else {
-    groups[1] = field;
-  }
-  _rowGroups = [groups copy];
-}
-
-- (NSString *)pivotBy {
-  return [_columnGroups count] > 0 ? _columnGroups[0] : nil;
-}
-
-- (void)setPivotBy:(NSString *)field {
-  if ([field length] == 0) {
-    _columnGroups = @[];
-    return;
-  }
-  NSMutableArray *groups = [_columnGroups mutableCopy] ?: [NSMutableArray array];
-  if ([groups count] == 0)
-    [groups addObject:field];
-  else
-    groups[0] = field;
-  _columnGroups = [groups copy];
-}
 
 - (void)rebuildTablix {
   NSArray *specs = _columnSpecs ?: [self rdlDerivedColumns];
@@ -1292,7 +1232,6 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
     [self rdlBuildMatrix:cols headerHeight:hh rowHeight:rh];
     return;
   }
-  NSString *groupBy = [self.groupBy length] ? self.groupBy : nil;
   RDLTablixBody *body = [[RDLTablixBody alloc] init];
   RDLTablixRow *header = [[RDLTablixRow alloc] init];
   header.height = hh;

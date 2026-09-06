@@ -526,7 +526,7 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
   tab.width = 7.5;
   tab.headerHeight = 0.3;
   tab.rowHeight = 0.28;
-  tab.groupBy = @"Finish";
+  tab.rowGroups = @[ @"Finish" ];
   tab.noRowsMessage = @"No jobs in this run.";
   // 6.3in of columns, because grouping adds a 1.2in row-header column in front
   // of them: 1.2 + 6.3 is the 7.5in body width the tablix is given above.

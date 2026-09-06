@@ -521,7 +521,7 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // effect; call -rebuildTablix to project it onto the MS-RDL Tablix structures
 // (tablixBody, rowHierarchy, columnHierarchy, cornerRows). Splitting the two
 // removes the ordering hazard the old `columns` setter had: the rebuild reads
-// groupBy, groupBy2, pivotBy, showGrandTotal, name and the heights, so with an
+// rowGroups, columnGroups, showGrandTotal, name and the heights, so with an
 // implicit rebuild-on-set those all had to be assigned *before* the columns.
 @property (nonatomic, copy) NSArray<NSDictionary *> *columnSpecs;
 @property (nonatomic, assign) CGFloat headerHeight;
@@ -532,16 +532,7 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // that are left, and this is that model.
 @property (nonatomic, copy) NSArray<NSString *> *rowGroups;
 @property (nonatomic, copy) NSArray<NSString *> *columnGroups;
-// The first two row groups and the first column group, under the names the
-// scaffolding used when there could only be that many. Derived: they read and
-// write the arrays above, so nothing that assigns them has to change and a
-// report round-trips the same either way. Setting groupBy to nil clears the
-// row grouping entirely, since an inner group without an outer one is not a
-// shape RDL has.
-@property (nonatomic, copy) NSString *groupBy;
-@property (nonatomic, copy) NSString *groupBy2;
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
-@property (nonatomic, copy) NSString *pivotBy;
 // Rebuild the Tablix structures from columnSpecs (falling back to the spec
 // derived from the current tablixBody when none is stored, e.g. an RDL 2005
 // List). Destroys any hand-made edits to tablixBody/hierarchies/cornerRows.

@@ -154,7 +154,7 @@ RDLReport *RDLGroupedJobs(void) {
   tab.width = 7.5;
   tab.headerHeight = 0.3;
   tab.rowHeight = 0.28;
-  tab.groupBy = @"Finish";
+  tab.rowGroups = @[ @"Finish" ];
   tab.noRowsMessage = @"No jobs in this run.";
   tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},

@@ -1380,11 +1380,6 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   t.rowGroups = @[ @"Region", @"Country", @"City" ];
   [t rebuildTablix];
 
-  // The three names are readable through the old windows as well, which is
-  // what keeps a report written against them working.
-  if (![t.groupBy isEqualToString:@"Region"] || ![t.groupBy2 isEqualToString:@"Country"])
-    XCTFail(@"%@", @"groupBy and groupBy2 should read the first two row groups");
-
   // Nested innermost-last: Region > Country > City > details.
   RDLTablixMember *outer = [t.rowHierarchy.members lastObject];
   NSUInteger depth = 0;
@@ -1426,11 +1421,25 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   if (![cornerBox.value isEqualToString:@"Region / Country / City"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the corner reads %@", cornerBox.value]);
 
-  // And clearing the outermost group clears them all: an inner group with
-  // nothing around it is not a shape RDL has.
-  t.groupBy = nil;
-  if ([t.rowGroups count] != 0)
-    XCTFail(@"%@", @"clearing groupBy left inner groups behind");
+  // And all three come back. The hierarchy is the only place the groups are
+  // written -- rowGroups is scaffolding and never reaches the file -- so what
+  // the parser recovers is however deep it walks. It used to stop at two,
+  // which turned a three-level report into a two-level one on the next save.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Nested"];
+  [report.body.items addObject:t];
+  NSString *xml = [RDLWriter XMLStringFromReport:report];
+  NSError *err = nil;
+  RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
+  if (parsed == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"parse failed: %@", err.localizedDescription]);
+    return;
+  }
+  RDLTablix *pt = nil;
+  for (RDLItem *it in parsed.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      pt = (RDLTablix *)it;
+  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"Country", @"City" ])])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@", pt.rowGroups]);
 }
 
 // A crosstab nests on both axes. Rows were generalised first; this is the
@@ -1444,12 +1453,23 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
                         @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum" } ];
   t.rowGroups = @[ @"Region", @"City" ];
   t.columnGroups = @[ @"Year", @"Quarter" ];
+  t.width = 7.5;
   [t rebuildTablix];
 
-  // pivotBy still reads the first column group, which is what a report written
-  // before there could be two assigns and expects back.
-  if (![t.pivotBy isEqualToString:@"Year"])
-    XCTFail(@"%@", @"pivotBy should read the first column group");
+  // Both axes come back from the file, to the depth they were written.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Nested"];
+  [report.body.items addObject:t];
+  NSError *err = nil;
+  RDLReport *parsed = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report]
+                                               error:&err];
+  RDLTablix *pt = nil;
+  for (RDLItem *it in parsed.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      pt = (RDLTablix *)it;
+  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"City" ])] ||
+      ![pt.columnGroups isEqualToArray:(@[ @"Year", @"Quarter" ])])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@ by %@", pt.rowGroups,
+                                              pt.columnGroups]);
 
   NSUInteger (^depthOf)(RDLTablixHierarchy *) = ^NSUInteger(RDLTablixHierarchy *h) {
     NSUInteger depth = 0;

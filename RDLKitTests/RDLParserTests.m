@@ -211,8 +211,8 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", [NSString stringWithFormat:@"group should hold header+detail+footer, has %lu",
                                                (unsigned long)[group.members count]]);
   // The designer's own view of it: a grouped table.
-  if (![t.groupBy isEqualToString:@"City"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"groupBy → %@", t.groupBy]);
+  if (![t.rowGroups isEqualToArray:@[ @"City" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"row groups → %@", t.rowGroups]);
 
   // And it has to actually lay out, which is the whole point.
   RDLDataSet *ds = r.dataSets.firstObject;

@@ -60,7 +60,7 @@ static RDLReport *RDLGroupedJobs(void) {
   tab.width = 7.5;
   tab.headerHeight = 0.3;
   tab.rowHeight = 0.28;
-  tab.groupBy = @"Finish";
+  tab.rowGroups = @[ @"Finish" ];
   tab.noRowsMessage = @"No jobs in this run.";
   tab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
@@ -344,14 +344,14 @@ static RDLReport *RDLGroupedJobs(void) {
   RDLEditor *ed3 = [[RDLEditor alloc] initWithDocument:doc3];
   RDLTablix *tab3 = (RDLTablix *)r3.body.items.firstObject;
   NSArray *specsBefore = tab3.columnSpecs;
-  NSString *groupBefore = tab3.groupBy;
+  NSArray *groupsBefore = tab3.rowGroups;
   // The row hierarchy is what distinguishes the two states: grouped gives
   // header + group (2 members), flat-with-total gives header + details + total
   // (3). The body row COUNT happens to be 3 either way, which is exactly the
   // kind of coincidence that would hide this bug.
   NSUInteger membersBefore = [tab3.rowHierarchy.members count];
   [ed3 setTablixValues:@{
-    @"groupBy" : @"",
+    @"rowGroups" : @[],
     @"showGrandTotal" : @YES,
     @"columnSpecs" : @[
       @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
@@ -360,27 +360,28 @@ static RDLReport *RDLGroupedJobs(void) {
     ]
   }
               ofTablix:tab3];
-  if ([tab3.groupBy length] != 0 || !tab3.showGrandTotal)
+  if ([tab3.rowGroups count] != 0 || !tab3.showGrandTotal)
     XCTFail(@"%@", @"combined tablix apply did not take effect");
   if ([tab3.rowHierarchy.members count] == membersBefore)
     XCTFail(@"%@", @"combined tablix apply should have rebuilt the row hierarchy");
   [doc3.undoManager undo];
-  if (![tab3.groupBy isEqualToString:groupBefore])
-    XCTFail(@"%@", @"undo should restore groupBy");
+  if (![tab3.rowGroups isEqualToArray:groupsBefore])
+    XCTFail(@"%@", @"undo should restore the row groups");
   if (![tab3.columnSpecs isEqualToArray:specsBefore])
     XCTFail(@"%@", @"undo should restore the column spec");
   // The restored body must agree with the restored grouping, rather than being
   // a rebuild made against half-reverted state.
   if ([tab3.rowHierarchy.members count] != membersBefore)
     XCTFail(@"%@", [NSString stringWithFormat:
-                                  @"restored hierarchy should match restored groupBy: %lu vs %lu members",
+                                  @"restored hierarchy should match the restored groups: %lu vs %lu members",
                                   (unsigned long)[tab3.rowHierarchy.members count],
                                   (unsigned long)membersBefore]);
   RDLTablixMember *restoredGroup = [tab3.rowHierarchy.members count] > 1
                                        ? tab3.rowHierarchy.members[1]
                                        : nil;
   if ([restoredGroup.groupExpressions count] == 0 ||
-      [[restoredGroup.groupExpressions[0] source] rangeOfString:groupBefore].location == NSNotFound)
+      [[restoredGroup.groupExpressions[0] source]
+          rangeOfString:[groupsBefore firstObject]].location == NSNotFound)
     XCTFail(@"%@", @"the restored group member should group by the restored field");
 
   // Grand total toggles and untoggles.
@@ -598,7 +599,7 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", [NSString stringWithFormat:@"copied tablix specs %lu vs %lu",
                                                (unsigned long)[tabCopy.columnSpecs count],
                                                (unsigned long)[tab.columnSpecs count]]);
-  if (![tabCopy.groupBy isEqualToString:@"Finish"])
+  if (![tabCopy.rowGroups isEqualToArray:@[ @"Finish" ]])
     XCTFail(@"%@", @"a copied tablix should keep its row group");
 }
 

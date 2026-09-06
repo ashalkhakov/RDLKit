@@ -503,8 +503,8 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     for (RDLItem *it in parsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.groupBy isEqualToString:@"Finish"])
-      XCTFail(@"%@", [NSString stringWithFormat:@"groupBy round-trip %@", pt.groupBy]);
+    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"row groups round-trip %@", pt.rowGroups]);
     if ([pt.rowHierarchy.members[1].groupExpressions count] == 0)
       XCTFail(@"%@", @"parsed GroupExpressions empty");
     if (pt.rowHierarchy.members[1].header == nil)
@@ -639,7 +639,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   if (![derived.lastObject[@"align"] isEqualToString:@"Right"])
     XCTFail(@"%@", @"derived align should be Right");
 
-  // Round-trip: writer XML → parser keeps groupBy, showGrandTotal, aggregates.
+  // Round-trip: writer XML → parser keeps the row group, showGrandTotal, aggregates.
   NSString *xml = [RDLWriter XMLStringFromReport:r];
   NSError *err = nil;
   RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
@@ -651,8 +651,8 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     for (RDLItem *it in parsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.groupBy isEqualToString:@"Finish"])
-      XCTFail(@"%@", @"round-trip lost groupBy");
+    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
+      XCTFail(@"%@", @"round-trip lost the row group");
     if (!pt.showGrandTotal)
       XCTFail(@"%@", @"round-trip lost showGrandTotal");
     NSArray *pcols = pt.columnSpecs;
@@ -679,7 +679,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   // Flat tablix with a grand total: no group needed.
   RDLReport *flat = RDLGroupedJobs();
   RDLTablix *ftab = (RDLTablix *)flat.body.items.firstObject;
-  ftab.groupBy = @"";
+  ftab.rowGroups = @[];
   ftab.showGrandTotal = YES;
   ftab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
@@ -726,11 +726,11 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   if ([[(RDLTextbox *)sub.cells.lastObject.item value] length] != 0)
     XCTFail(@"%@", @"explicit aggregates disable the last-column Sum fallback");
 
-  // Matrix (crosstab) via the designer convenience: pivotBy + groupBy.
+  // Matrix (crosstab) via the designer convenience: a row group and a column group.
   RDLReport *mx = RDLGroupedJobs();
   RDLTablix *mtab = (RDLTablix *)mx.body.items.firstObject;
-  mtab.groupBy = @"Finish";
-  mtab.pivotBy = @"Job";
+  mtab.rowGroups = @[ @"Finish" ];
+  mtab.columnGroups = @[ @"Job" ];
   mtab.showGrandTotal = YES;
   mtab.columnSpecs = @[ @{
     @"width" : @1.5,
@@ -789,7 +789,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   if (deskSums < 2)
     XCTFail(@"%@", @"matrix should show Desk sum 1840 in the Oil row and the totals row");
 
-  // Round-trip: writer XML → parser keeps pivotBy, groupBy and the measure.
+  // Round-trip: writer XML → parser keeps both groups and the measure.
   NSString *mxml = [RDLWriter XMLStringFromReport:mx];
   NSError *merr = nil;
   RDLReport *mparsed = [RDLParser reportFromXMLString:mxml error:&merr];
@@ -801,10 +801,10 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     for (RDLItem *it in mparsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.pivotBy isEqualToString:@"Job"])
-      XCTFail(@"%@", [NSString stringWithFormat:@"round-trip pivotBy %@", pt.pivotBy]);
-    if (![pt.groupBy isEqualToString:@"Finish"])
-      XCTFail(@"%@", @"matrix round-trip lost groupBy");
+    if (![pt.columnGroups isEqualToArray:@[ @"Job" ]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"round-trip column groups %@", pt.columnGroups]);
+    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
+      XCTFail(@"%@", @"matrix round-trip lost the row group");
     if (!pt.showGrandTotal)
       XCTFail(@"%@", @"matrix round-trip lost showGrandTotal");
     NSArray *pcols = pt.columnSpecs;
@@ -812,8 +812,8 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
       XCTFail(@"%@", @"matrix round-trip lost measure aggregate");
   }
 
-  // Clearing pivotBy falls back to the plain table build.
-  mtab.pivotBy = @"";
+  // Clearing the column group falls back to the plain table build.
+  mtab.columnGroups = @[];
   mtab.showGrandTotal = NO;
   mtab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
@@ -821,14 +821,13 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   ];
   [mtab rebuildTablix];
   if ([mtab.tablixBody.columns count] != 2 || [mtab.tablixBody.rows count] != 3)
-    XCTFail(@"%@", @"clearing pivotBy should rebuild the grouped table");
+    XCTFail(@"%@", @"clearing the column group should rebuild the grouped table");
 
   // Nested row groups: outer Finish, inner Job — two header levels, two
   // subtotal scopes, plus a grand total.
   RDLReport *nx = RDLGroupedJobs();
   RDLTablix *ntab = (RDLTablix *)nx.body.items.firstObject;
-  ntab.groupBy = @"Finish";
-  ntab.groupBy2 = @"Job";
+  ntab.rowGroups = @[ @"Finish", @"Job" ];
   ntab.showGrandTotal = YES;
   ntab.columnSpecs = @[
     @{@"width" : @2.8, @"header" : @"Item", @"value" : @"=Fields!Job.Value"},
@@ -906,20 +905,18 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     for (RDLItem *it in nparsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.groupBy isEqualToString:@"Finish"])
-      XCTFail(@"%@", @"nested round-trip lost outer groupBy");
-    if (![pt.groupBy2 isEqualToString:@"Job"])
-      XCTFail(@"%@", [NSString stringWithFormat:@"nested round-trip groupBy2 %@", pt.groupBy2]);
+    if (![pt.rowGroups isEqualToArray:(@[ @"Finish", @"Job" ])])
+      XCTFail(@"%@", [NSString stringWithFormat:@"nested round-trip row groups %@", pt.rowGroups]);
     if (!pt.showGrandTotal)
       XCTFail(@"%@", @"nested round-trip lost showGrandTotal");
   }
 
   // Clearing the child group falls back to single-level grouping.
-  ntab.groupBy2 = @"";
+  ntab.rowGroups = @[ @"Finish" ];
   ntab.showGrandTotal = NO;
   [ntab rebuildTablix];
   if ([ntab.tablixBody.rows count] != 3)
-    XCTFail(@"%@", @"clearing groupBy2 should rebuild the single-level table");
+    XCTFail(@"%@", @"dropping the inner group should rebuild the single-level table");
 }
 
 - (void)testTablixRebuild {
@@ -931,7 +928,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   // no longer matters.
   RDLReport *r = RDLGroupedJobs();
   RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
-  tab.groupBy = @"";
+  tab.rowGroups = @[];
   tab.showGrandTotal = NO;
   [tab rebuildTablix];
   NSUInteger flatRows = [tab.tablixBody.rows count];
@@ -946,7 +943,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"assigning columnSpecs must not rebuild on its own");
 
   // Now set the grouping *after* the spec — the case the old setter got wrong.
-  tab.groupBy = @"Finish";
+  tab.rowGroups = @[ @"Finish" ];
   tab.showGrandTotal = YES;
   [tab rebuildTablix];
   if ([tab.tablixBody.rows count] != 4)
@@ -1019,7 +1016,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   // Grouped, columns already filling the width: the 1.2in header comes out of
   // them and the tablix still ends where it did.
   RDLTablix *grouped = RDLFitTablix(7.5);
-  grouped.groupBy = @"G";
+  grouped.rowGroups = @[ @"G" ];
   [grouped rebuildTablix];
   if (fabs(RDLColumnsWidth(grouped) - 6.3) > 1e-6)
     XCTFail(@"%@", [NSString stringWithFormat:@"grouped columns → %.4f, wanted 6.3",
@@ -1038,8 +1035,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 
   // Two group levels take two header columns' worth.
   RDLTablix *nested = RDLFitTablix(7.5);
-  nested.groupBy = @"G";
-  nested.groupBy2 = @"H";
+  nested.rowGroups = @[ @"G", @"H" ];
   [nested rebuildTablix];
   if (fabs(RDLColumnsWidth(nested) - 5.1) > 1e-6)
     XCTFail(@"%@", [NSString stringWithFormat:@"two-level grouped columns → %.4f, wanted 5.1",
@@ -1047,7 +1043,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 
   // Room to spare: left exactly as authored.
   RDLTablix *roomy = RDLFitTablix(20.0);
-  roomy.groupBy = @"G";
+  roomy.rowGroups = @[ @"G" ];
   [roomy rebuildTablix];
   if (fabs(RDLColumnsWidth(roomy) - 7.5) > 1e-6)
     XCTFail(@"%@", @"a tablix with room for the header should keep its columns");
@@ -1055,7 +1051,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   // No width of its own: the report it was adopted into supplies the bound.
   RDLReport *r = [RDLReport emptyReportNamed:@"Fit"]; // 7.5in body
   RDLTablix *unsized = RDLFitTablix(0);
-  unsized.groupBy = @"G";
+  unsized.rowGroups = @[ @"G" ];
   [r.body.items addObject:unsized];
   [r adoptItems];
   if (unsized.report != r)
@@ -1067,7 +1063,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 
   // Already wider than the page: the report clamps both columns and frame.
   RDLTablix *over = RDLFitTablix(9.0);
-  over.groupBy = @"G";
+  over.rowGroups = @[ @"G" ];
   [r.body.items addObject:over];
   [r adoptItems];
   [over rebuildTablix];
@@ -1084,7 +1080,7 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   RDLReport *single = [RDLReport emptyReportNamed:@"Fit1"];
   [single.dataSets addObject:ds];
   RDLTablix *t = RDLFitTablix(7.5);
-  t.groupBy = @"G";
+  t.rowGroups = @[ @"G" ];
   [single.body.items addObject:t];
   [single adoptItems];
   [t rebuildTablix];

@@ -85,8 +85,8 @@
 // rebuild-on-set does not arise.
 - (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix;
 // Apply several tablix properties and rebuild ONCE, as a single inverse.
-// Necessary rather than convenient: the rebuild reads columnSpecs, groupBy,
-// groupBy2, pivotBy, showGrandTotal and the heights together, so setting them
+// Necessary rather than convenient: the rebuild reads columnSpecs, rowGroups,
+// columnGroups, showGrandTotal and the heights together, so setting them
 // through separate undoable steps would undo them one at a time and rebuild
 // against a half-restored state. Values may be NSNull to mean nil.
 - (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix;
