@@ -69,9 +69,36 @@ the image that uses it, and clang links the sanitizer runtime statically unless
 told `-shared-libasan`, which an instrumented library cannot resolve against.
 Each of those produced a confident, meaningless "survived 200 rounds".
 
-What is left uninstrumented is the runtime itself, libobjc2 -- where the very
-first abort of this hunt landed, in SparseArrayCopy building a dispatch table.
-`Scripts/gnustep-box/asan-libobjc2.sh` is that experiment.
+`Scripts/gnustep-box/asan-libobjc2.sh` does the same for libobjc2, where the
+first abort of this hunt landed. Verified loaded; 200 rounds; nothing reported.
+
+## Where that leaves it
+
+Every library that could be the writer has now been built with AddressSanitizer
+and checked in turn -- gnustep-base, libxml2, libobjc2, and RDLKit itself --
+and every one of them is clean. Valgrind, which checks all of them at once,
+is clean. Canaries on every allocation in the process are clean. Zombies are
+clean.
+
+And in each of those runs the crash also stops happening.
+
+That is the shape of the whole thing: the fault exists only under glibc's own
+allocator, and no memory-safety tool observes an illegal access. AddressSanitizer
+interposes free() for every library whether instrumented or not, so a double
+free or a free of something never malloc'd would have been caught wherever it
+came from; none was. A write past the end of any block would have hit a canary;
+none did. A write into freed memory from instrumented code would have hit a
+poisoned shadow; none did.
+
+So what corrupts the heap is a write that every tool considers legal, into
+memory that glibc's bookkeeping cares about and theirs does not. That is worth
+saying plainly rather than dressing up: it is not solved, and the remaining
+techniques are heavier than the ones tried -- running with ASLR disabled to get
+a repeatable address, then a hardware watchpoint on the chunk that ends up
+corrupted, which needs SYS_PTRACE in the container.
+
+The reproduction is small enough to hand to GNUstep as it stands, which may be
+the better next move: six writes of an empty report, no AppKit, no XIBs.
 
 ## Also found, and separately real
 
