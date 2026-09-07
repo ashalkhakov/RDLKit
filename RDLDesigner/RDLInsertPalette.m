@@ -92,11 +92,6 @@ static NSString * const kRDLPaletteHeader = @"header";
   return row >= 0 && row < (NSInteger)[_rows count] && _rows[(NSUInteger)row][kRDLPaletteHeader] == nil;
 }
 
-// Two ways of saying the same thing. -pasteboardWriterForRow: is the modern
-// one and is what macOS calls; GNUstep's NSTableView declares only
-// -writeRowsWithIndexes:toPasteboard:, and an optional delegate method it does
-// not have is not an error -- the drag simply never starts. So both are here,
-// and each platform uses the one it has.
 - (BOOL)tableView:(NSTableView *)tableView
     writeRowsWithIndexes:(NSIndexSet *)rows
             toPasteboard:(NSPasteboard *)pasteboard {
