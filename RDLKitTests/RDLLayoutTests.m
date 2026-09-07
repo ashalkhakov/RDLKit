@@ -1527,4 +1527,94 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"named RDL colours should resolve, and hex should not");
 }
 
+// TopN and its three relatives cannot be decided a row at a time: which rows
+// they keep depends on how the rest rank. Until they were implemented the
+// evaluator let every row through, so a report asking for its ten largest
+// silently rendered all of them -- wrong output rather than a missing feature.
+//
+// RDLGroupedJobs pays: Desk 1840, Chair 420, Lamp 265, Shade 48, Shelf 610,
+// Stool 190, Frame 95.
+- (void)testRankingFilters {
+  NSArray<NSString *> *(^textsFor)(RDLFilterOperator, NSString *) =
+      ^NSArray<NSString *> *(RDLFilterOperator op, NSString *amount) {
+    RDLReport *r = RDLGroupedJobs();
+    RDLFilter *f = [[RDLFilter alloc] init];
+    f.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+    f.oper = op;
+    [f.values addObject:[RDLValue literal:amount]];
+    [[(RDLTablix *)r.body.items.firstObject filters] addObject:f];
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+      for (RDLLaidOutItem *it in p.items)
+        if ([RDLLaidText(it) length])
+          [texts addObject:RDLLaidText(it)];
+    return texts;
+  };
+
+  // The three largest: Desk, Shelf, Chair. Nothing smaller.
+  NSArray<NSString *> *top3 = textsFor(RDLFilterOperatorTopN, @"3");
+  for (NSString *kept in @[ @"Desk", @"Shelf", @"Chair" ])
+    if (![top3 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopN 3 dropped %@", kept]);
+  for (NSString *gone in @[ @"Shade", @"Frame", @"Stool", @"Lamp" ])
+    if ([top3 containsObject:gone])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopN 3 kept %@", gone]);
+
+  // Selecting is not sorting: what it keeps stays in the order it arrived, so
+  // Desk still comes before Chair.
+  if ([top3 indexOfObject:@"Desk"] > [top3 indexOfObject:@"Chair"])
+    XCTFail(@"%@", @"TopN reordered the rows it kept");
+
+  // The two smallest: Shade 48 and Frame 95.
+  NSArray<NSString *> *bottom2 = textsFor(RDLFilterOperatorBottomN, @"2");
+  for (NSString *kept in @[ @"Shade", @"Frame" ])
+    if (![bottom2 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"BottomN 2 dropped %@", kept]);
+  if ([bottom2 containsObject:@"Desk"])
+    XCTFail(@"%@", @"BottomN 2 kept the largest row");
+
+  // 30% of seven rows is 2.1, and the row it lands in is kept: three.
+  NSArray<NSString *> *top30 = textsFor(RDLFilterOperatorTopPercent, @"30");
+  for (NSString *kept in @[ @"Desk", @"Shelf", @"Chair" ])
+    if (![top30 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopPercent 30 dropped %@", kept]);
+  if ([top30 containsObject:@"Stool"])
+    XCTFail(@"%@", @"TopPercent 30 kept a fourth row");
+
+  // More than there are keeps them all; none keeps none.
+  if ([textsFor(RDLFilterOperatorTopN, @"99") count] <= [top3 count])
+    XCTFail(@"%@", @"TopN 99 should keep every row");
+  NSArray<NSString *> *none = textsFor(RDLFilterOperatorTopN, @"0");
+  for (NSString *gone in @[ @"Desk", @"Chair", @"Shade" ])
+    if ([none containsObject:gone])
+      XCTFail(@"%@", @"TopN 0 should keep no rows at all");
+
+  // And a ranking filter ranks what the ordinary ones left: of the three Oil
+  // jobs -- Desk 1840, Chair 420, Frame 95 -- the largest is Desk.
+  RDLReport *both = RDLGroupedJobs();
+  RDLFilter *oil = [[RDLFilter alloc] init];
+  oil.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  oil.oper = RDLFilterOperatorEqual;
+  [oil.values addObject:[RDLValue literal:@"Oil"]];
+  RDLFilter *biggest = [[RDLFilter alloc] init];
+  biggest.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  biggest.oper = RDLFilterOperatorTopN;
+  [biggest.values addObject:[RDLValue literal:@"1"]];
+  RDLTablix *tab = (RDLTablix *)both.body.items.firstObject;
+  [tab.filters addObject:oil];
+  [tab.filters addObject:biggest];
+  NSMutableArray *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:both parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  if (![texts containsObject:@"Desk"])
+    XCTFail(@"%@", @"the largest Oil job should survive both filters");
+  if ([texts containsObject:@"Shelf"])
+    XCTFail(@"%@", @"Shelf is larger but is not Oil; the pair should have dropped it");
+  if ([texts containsObject:@"Chair"])
+    XCTFail(@"%@", @"only the largest Oil job should be left");
+}
+
+
 @end

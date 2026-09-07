@@ -395,6 +395,69 @@ static BOOL RDLPassesFilter(id row, RDLFilter *f, RDLEvalScope *scope) {
   return YES;
 }
 
+// TopN, BottomN, TopPercent and BottomPercent cannot be decided a row at a
+// time: which rows they keep depends on how the rest of the set ranks. So they
+// are separated from the rest and applied afterwards, over what the per-row
+// filters left.
+static BOOL RDLIsRankingFilter(RDLFilterOperator op) {
+  return op == RDLFilterOperatorTopN || op == RDLFilterOperatorBottomN ||
+         op == RDLFilterOperatorTopPercent || op == RDLFilterOperatorBottomPercent;
+}
+
+// The rows this filter keeps, in the order they arrived. Filtering selects; it
+// does not reorder -- that is what SortExpressions are for -- so the ranking is
+// used to choose and then thrown away.
+static NSArray *RDLApplyRankingFilter(NSArray *rows, RDLFilter *f, RDLEvalScope *scope) {
+  NSUInteger total = [rows count];
+  if (total == 0)
+    return rows;
+
+  // The count, or the percentage, is one value for the whole set rather than
+  // one per row, so it is evaluated once, in the scope the first row gives it.
+  double amount = [f.values count]
+                      ? RDLAsN(RDLEvalRow(f.values[0], [rows firstObject], scope))
+                      : 0;
+  BOOL percent = f.oper == RDLFilterOperatorTopPercent ||
+                 f.oper == RDLFilterOperatorBottomPercent;
+  // A percentage that does not divide evenly keeps the row it lands in: 10% of
+  // fifteen rows is two, not one and a half.
+  double wanted = percent ? ceil((double)total * amount / 100.0) : floor(amount);
+  if (wanted <= 0)
+    return @[];
+  if (wanted >= (double)total)
+    return rows;
+  NSUInteger keep = (NSUInteger)wanted;
+
+  // Evaluated once per row, not once per comparison.
+  NSMutableArray *ranks = [NSMutableArray arrayWithCapacity:total];
+  for (id row in rows)
+    [ranks addObject:RDLEvalRow(f.expression, row, scope) ?: [NSNull null]];
+
+  BOOL fromTop = f.oper == RDLFilterOperatorTopN || f.oper == RDLFilterOperatorTopPercent;
+  NSMutableArray<NSNumber *> *order = [NSMutableArray arrayWithCapacity:total];
+  for (NSUInteger i = 0; i < total; i++)
+    [order addObject:@(i)];
+  NSArray<NSNumber *> *ranked = [order sortedArrayUsingComparator:^NSComparisonResult(NSNumber *a,
+                                                                                       NSNumber *b) {
+    NSUInteger i = [a unsignedIntegerValue], j = [b unsignedIntegerValue];
+    NSComparisonResult c = RDLCmp(ranks[i], ranks[j]);
+    if (fromTop)
+      c = c == NSOrderedAscending ? NSOrderedDescending
+                                  : (c == NSOrderedDescending ? NSOrderedAscending : NSOrderedSame);
+    // Ties go to the earlier row, so the same report renders the same way
+    // twice: nothing above says which of two equal rows is the higher.
+    if (c == NSOrderedSame)
+      return i < j ? NSOrderedAscending : NSOrderedDescending;
+    return c;
+  }];
+
+  NSMutableIndexSet *kept = [NSMutableIndexSet indexSet];
+  for (NSUInteger i = 0; i < keep; i++)
+    [kept addIndex:[ranked[i] unsignedIntegerValue]];
+  // -objectsAtIndexes: answers in index order, which is the order they came in.
+  return [rows objectsAtIndexes:kept];
+}
+
 static NSArray *RDLApplyFilters(NSArray *rows, NSArray<RDLFilter *> *filters, RDLEvalScope *scope) {
   if ([filters count] == 0)
     return rows;
@@ -402,6 +465,8 @@ static NSArray *RDLApplyFilters(NSArray *rows, NSArray<RDLFilter *> *filters, RD
   for (id row in rows) {
     BOOL ok = YES;
     for (RDLFilter *f in filters) {
+      if (RDLIsRankingFilter(f.oper))
+        continue;  // decided below, over the whole set
       if (!RDLPassesFilter(row, f, scope)) {
         ok = NO;
         break;
@@ -410,7 +475,15 @@ static NSArray *RDLApplyFilters(NSArray *rows, NSArray<RDLFilter *> *filters, RD
     if (ok)
       [out addObject:row];
   }
-  return out;
+
+  // Then the ranking ones, in the order the report wrote them: "top 10 by
+  // amount, then bottom 3 of those by date" is two filters and means what it
+  // says.
+  NSArray *result = out;
+  for (RDLFilter *f in filters)
+    if (RDLIsRankingFilter(f.oper))
+      result = RDLApplyRankingFilter(result, f, scope);
+  return result;
 }
 
 static NSArray *RDLApplySort(NSArray *rows, NSArray<RDLSortExpression *> *sorts, RDLEvalScope *scope) {
