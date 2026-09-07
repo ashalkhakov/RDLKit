@@ -29,7 +29,18 @@
 
 // Model → editable text. Falls back to the plain `value` when the item has no
 // paragraphs.
+// Marks a run that IS an expression rather than one whose text happens to
+// begin with "=". Its value is the expression source, which is also what the
+// run displays, so the editor can show it as a pill and write it back as a
+// TextRun whose Value is that expression -- which is what RDL means by an
+// expression inside rich text. Not a kit attribute: the renderer never sees
+// one, because the layout engine evaluates every run before anything is drawn.
+extern NSString * const RDLExpressionRunAttributeName;
+
 + (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item;
+// An expression as a run of its own, ready to be inserted at the caret.
++ (NSAttributedString *)expressionRun:(NSString *)source
+                            baseStyle:(RDLStyle *)style;
 
 // Text → model. Sets `value` to the flattened text always, and `paragraphs`
 // only when the text is genuinely rich — more than one run, a run that differs

@@ -79,7 +79,7 @@ static void RDLDrawBorders(NSRect r, RDLStyle *s) {
 
 static void RDLFillBackground(NSRect r, RDLStyle *s) {
   NSString *bg = s.backgroundColor;
-  if (bg.length && ![bg isEqualToString:@"Transparent"]) {
+  if (!RDLColorIsTransparent(bg)) {
     [RDLColorFromHex(bg) set];
     NSRectFill(r);
   }

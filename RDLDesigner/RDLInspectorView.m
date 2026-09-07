@@ -5,9 +5,14 @@
 #import "RDLSelection.h"
 #import "RDLEditingContext.h"
 #import "RDLKit.h"
+#import "RDLToolbarIcons.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
+#import "RDLExpressionField.h"
+#import "RDLExpressionEditor.h"
+#import "RDLRichTextEditor.h"
+#import "RDLTextAttributes.h"
 
 // Model-Builder-style inspector: one compact section per selection kind,
 // filled from the model on selection change and applied back field by field.
@@ -15,6 +20,18 @@
 // One declaration per field drives both directions; see RDLInspectorFields.
 @property (nonatomic, strong) RDLFieldBindings *bindings;
 @property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
+@property (nonatomic, strong) IBOutlet NSColorWell *colorWell, *bgColorWell;
+@property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
+@property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
+// The selected tablix column. A cell is an entry in columnSpecs rather than an
+// item, so these are applied by hand rather than through a key path binding.
+@property (nonatomic, strong) IBOutlet NSView *cellBox;
+@property (nonatomic, strong) IBOutlet NSTextField *cellHeaderField, *cellWidthField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *cellValueField;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *cellAlignPop, *cellAggPop;
+@property (nonatomic, strong) IBOutlet NSButton *cellExprButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -29,14 +46,15 @@
 @property (nonatomic, strong) IBOutlet NSTextField *leftField, *topField, *widthField, *heightField;
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
-@property (nonatomic, strong) IBOutlet NSTextField *valueField, *fontField, *sizeField, *colorField, *formatField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *valueField, *fontField, *colorField, *formatField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
 @property (nonatomic, strong) IBOutlet NSView *lineBox;
 @property (nonatomic, strong) IBOutlet NSTextField *lineColorField;
 // Rectangle section
 @property (nonatomic, strong) IBOutlet NSView *rectBox;
-@property (nonatomic, strong) IBOutlet NSTextField *rectBGField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *rectBGField;
 // Image section
 @property (nonatomic, strong) IBOutlet NSView *imageBox;
 @property (nonatomic, strong) IBOutlet NSTextField *imageValueField;
@@ -100,8 +118,13 @@
   // way to know; the dataset popups are filled per report in -reload.
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
+  // f(x) is a picture, not two letters and two brackets: at 24 points wide the
+  // title is the platform's to draw, and GNUstep draws its own instead.
+  for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
+                         _rectBGExprButton, _sizeExprButton, _cellExprButton ])
+    RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
-                         _imageBox, _chartBox, _tablixBox ])
+                         _imageBox, _chartBox, _tablixBox, _cellBox ])
     [self addSubview:box];
   [self declareBindings];
 }
@@ -161,9 +184,9 @@
 
   // Textbox.
   [_bindings bind:_fontField keyPath:@"style.fontFamily" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText values:nil placeholder:@"Georgia"];
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:@"Georgia"];
   [_bindings bind:_sizeField keyPath:@"style.fontSize" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLength values:nil placeholder:@"10pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"10pt"];
   // Vocabulary popups map menu index to the enum case, so the model value and
   // the menu title no longer have to be the same word ("Roman" shows Normal).
   [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:RDLFieldScopeItem
@@ -175,15 +198,19 @@
            values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
       placeholder:nil];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
+             kind:RDLFieldKindColor];
   [_bindings bind:_formatField keyPath:@"style.format" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText];
+             kind:RDLFieldKindTextOrExpression];
 
   // Line and Rectangle each expose one style property.
   [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
   [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
-             kind:RDLFieldKindText];
+             kind:RDLFieldKindTextOrExpression];
+  [_bindings bind:_bgColorWell keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindColor];
 
   // Image.
   [_bindings bind:_imageValueField keyPath:@"value" scope:RDLFieldScopeItem
@@ -243,7 +270,8 @@
 
 - (void)stackBoxes:(NSArray *)boxes {
   NSArray *all = @[
-    _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox, _chartBox, _tablixBox
+    _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox, _chartBox, _tablixBox,
+    _cellBox
   ];
   for (NSView *v in all)
     [v setHidden:YES];
@@ -266,6 +294,12 @@
     [pop selectItemWithTitle:name];
 }
 
+// Applied once the XIB's objects exist.
+- (void)awakeFromNib {
+  [super awakeFromNib];
+  [self applyExpressionContexts];
+}
+
 - (void)reload {
   if (_reloading)
     return;
@@ -274,6 +308,12 @@
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
   RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
+  // The Report tab shows the document's own fields whatever is selected, which
+  // is the same branch the shared inspector falls to when nothing is.
+  if (_showsReportOnly) {
+    it = nil;
+    band = nil;
+  }
 
   if (it != nil) {
       [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@",
@@ -297,6 +337,8 @@
         [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
+      if ([self fillCellFromTablix:(RDLTablix *)it column:sel.tablixColumn])
+        [boxes addObject:_cellBox];
         [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
     }
     [self stackBoxes:boxes];
@@ -322,6 +364,59 @@
 
   [_bindings fillFromItem:it band:band report:report];
   _reloading = NO;
+}
+
+// The selected column's spec, or NO when the selection names no column -- in
+// which case the section is not shown at all rather than shown empty.
+- (BOOL)fillCellFromTablix:(RDLTablix *)tablix column:(NSInteger)column {
+  NSArray *specs = tablix.columnSpecs ?: @[];
+  if (column < 0 || column >= (NSInteger)[specs count])
+    return NO;
+  NSDictionary *spec = specs[(NSUInteger)column];
+  [_cellHeaderField setStringValue:spec[@"header"] ?: @""];
+  [_cellValueField setStringValue:spec[@"value"] ?: @""];
+  [_cellWidthField setStringValue:[NSString stringWithFormat:@"%.3f",
+                                                            [spec[@"width"] doubleValue]]];
+  NSString *align = spec[@"align"] ?: @"Default";
+  [_cellAlignPop selectItemWithTitle:[_cellAlignPop itemWithTitle:align] ? align : @"Default"];
+  NSString *agg = spec[@"aggregate"] ?: @"None";
+  [_cellAggPop selectItemWithTitle:[_cellAggPop itemWithTitle:agg] ? agg : @"None"];
+  return YES;
+}
+
+// One column changed: the whole spec array goes back, because that is the unit
+// -rebuildTablix reads and the unit the inverse restores.
+- (BOOL)applyCellControl:(id)sender {
+  RDLSelection *sel = _context.selection;
+  RDLItem *it = [_context selectedItem];
+  if (![it isKindOfClass:[RDLTablix class]] || sel.tablixColumn < 0)
+    return NO;
+  if (sender != _cellHeaderField && sender != _cellValueField && sender != _cellWidthField &&
+      sender != _cellAlignPop && sender != _cellAggPop)
+    return NO;
+  RDLTablix *tablix = (RDLTablix *)it;
+  NSMutableArray *specs = [(tablix.columnSpecs ?: @[]) mutableCopy];
+  if (sel.tablixColumn >= (NSInteger)[specs count])
+    return NO;
+  NSMutableDictionary *spec = [specs[(NSUInteger)sel.tablixColumn] mutableCopy];
+  spec[@"header"] = [_cellHeaderField stringValue];
+  spec[@"value"] = [_cellValueField stringValue];
+  CGFloat width = [[_cellWidthField stringValue] doubleValue];
+  if (width > 0)
+    spec[@"width"] = @(width);
+  NSString *align = [_cellAlignPop titleOfSelectedItem];
+  if ([align isEqualToString:@"Default"])
+    [spec removeObjectForKey:@"align"];
+  else
+    spec[@"align"] = align;
+  NSString *agg = [_cellAggPop titleOfSelectedItem];
+  if ([agg isEqualToString:@"None"])
+    [spec removeObjectForKey:@"aggregate"];
+  else
+    spec[@"aggregate"] = agg;
+  specs[(NSUInteger)sel.tablixColumn] = spec;
+  [_context.editor setColumnSpecs:specs ofTablix:tablix];
+  return YES;
 }
 
 #pragma mark - Apply (UI → model)
@@ -401,6 +496,8 @@
 
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
+  if ([self applyCellControl:sender])
+    return;
   if (sender == _marginField) {
     [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
     return;
@@ -416,6 +513,123 @@
     }
     return;
   }
+}
+
+// What each expression-capable field has to produce. Set once: it is a
+// property of the attribute, not of what is selected.
+- (void)applyExpressionContexts {
+  _valueField.expressionContext = RDLExpressionContextText;
+  _fontField.expressionContext = RDLExpressionContextText;
+  _colorField.expressionContext = RDLExpressionContextColor;
+  _rectBGField.expressionContext = RDLExpressionContextColor;
+  _formatField.expressionContext = RDLExpressionContextText;
+  _sizeField.expressionContext = RDLExpressionContextLength;
+  _cellValueField.expressionContext = RDLExpressionContextText;
+}
+
+// Which field each f(x) button belongs to. One action for all of them: the
+// button says which attribute is being edited, and the field is where the
+// answer goes back.
+- (RDLExpressionField *)expressionFieldForButton:(id)sender {
+  if (sender == _valueExprButton) return _valueField;
+  if (sender == _fontExprButton) return _fontField;
+  if (sender == _colorExprButton) return _colorField;
+  if (sender == _formatExprButton) return _formatField;
+  if (sender == _rectBGExprButton) return _rectBGField;
+  if (sender == _sizeExprButton) return _sizeField;
+  if (sender == _cellExprButton) return _cellValueField;
+  return nil;
+}
+
+- (void)editExpression:(id)sender {
+  RDLExpressionField *field = [self expressionFieldForButton:sender];
+  if (field == nil)
+    return;
+  NSString *edited = [RDLExpressionEditor runForSource:[field stringValue]
+                                               context:field.expressionContext
+                                                report:_context.report];
+  if (edited == nil)
+    return;  // cancelled: the field keeps what it had
+  [field setStringValue:edited];
+  // Through the same path as typing, so it is one edit and it undoes.
+  [self changed:field];
+}
+
+#pragma mark - Font and rich text panels
+
+// The font panel is the standard way to choose a family, a size and a weight,
+// and it is one panel rather than three controls that have to agree. The
+// inspector keeps its own font and size fields: a report often specifies a
+// face by name that is not installed here, and typing it has to stay possible.
+// The font panel's action arrives through the responder chain, so this view
+// has to be able to hold first responder.
+- (BOOL)acceptsFirstResponder {
+  return YES;
+}
+
+- (void)openFontPanel:(id)sender {
+  RDLItem *item = [_context selectedItem];
+  if (item == nil)
+    return;
+  NSFontManager *manager = [NSFontManager sharedFontManager];
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:item.style
+                                              paragraphAlign:RDLTextAlignUnspecified
+                                                       scale:1.0];
+  NSFont *font = attrs[NSFontAttributeName];
+  if (font)
+    [manager setSelectedFont:font isMultiple:NO];
+  [manager setAction:@selector(changeFont:)];
+  // Not -setTarget:. That is a macOS convenience; the documented behaviour, and
+  // GNUstep's, is that the font manager sends its action to nil -- down the
+  // responder chain. So the inspector has to be IN that chain rather than name
+  // itself as a target, which also ends any field edit in progress, committing
+  // it before the font changes underneath it.
+  [[self window] makeFirstResponder:self];
+  [[manager fontPanel:YES] orderFront:sender];
+}
+
+// Family, size, weight and slant arrive together and are written together, as
+// one undo step: undoing a font choice one property at a time would leave the
+// style in a state the user never chose.
+- (void)changeFont:(id)sender {
+  RDLItem *item = [_context selectedItem];
+  if (item == nil)
+    return;
+  NSDictionary *attrs = [RDLTextAttributes attributesForStyle:item.style
+                                              paragraphAlign:RDLTextAlignUnspecified
+                                                       scale:1.0];
+  NSFont *current = attrs[NSFontAttributeName];
+  NSFont *chosen = current ? [sender convertFont:current] : [sender selectedFont];
+  if (chosen == nil)
+    return;
+
+  NSFontManager *manager = [NSFontManager sharedFontManager];
+  NSFontTraitMask traits = [manager traitsOfFont:chosen];
+  RDLEditor *editor = _context.editor;
+  [editor beginGroup:@"Font"];
+  [editor setValue:[chosen familyName] forKeyPath:@"style.fontFamily" ofItem:item];
+  [editor setValue:[RDLLength points:[chosen pointSize]]
+        forKeyPath:@"style.fontSize"
+            ofItem:item];
+  [editor setValue:@((traits & NSBoldFontMask) ? RDLFontWeightBold : RDLFontWeightNormal)
+        forKeyPath:@"style.fontWeight"
+            ofItem:item];
+  [editor setValue:@((traits & NSItalicFontMask) ? RDLFontStyleItalic : RDLFontStyleNormal)
+        forKeyPath:@"style.fontStyle"
+            ofItem:item];
+  [editor endGroup];
+  [self reload];
+}
+
+// The value field holds one line; a textbox that carries paragraphs and runs
+// needs the rich-text editor, which is a panel rather than a field.
+- (void)editRichText:(id)sender {
+  RDL_UNUSED(sender);
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTextbox class]])
+    return;
+  if ([RDLRichTextEditor runForTextbox:(RDLTextbox *)item context:_context])
+    [self reload];
 }
 
 @end

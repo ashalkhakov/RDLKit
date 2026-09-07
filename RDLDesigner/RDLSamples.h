@@ -10,4 +10,5 @@
 + (RDLReport *)salesLedger;
 + (RDLReport *)studioRoster;
 + (RDLReport *)workshopByFinish;
++ (RDLReport *)regionalSales;
 @end

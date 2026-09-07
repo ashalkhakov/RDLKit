@@ -54,7 +54,7 @@
   if ([hit isKindOfClass:[RDLTablix class]]) {
     RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger col = 0;
-    NSString *part = nil;
+    RDLTablixPart part = RDLTablixPartNone;
     if ([RDLTablixGeometry tablix:tablixHit
                          itemRect:itemRect
                             point:p
@@ -79,7 +79,7 @@
                    color:RDLColorFromHex(hit.style.color)];
 }
 
-- (void)beginEditingTablix:(RDLTablix *)tab col:(NSUInteger)col part:(NSString *)part {
+- (void)beginEditingTablix:(RDLTablix *)tab col:(NSUInteger)col part:(RDLTablixPart)part {
   NSArray *cols = tab.columnSpecs ?: @[];
   if (col >= [cols count])
     return;
@@ -92,12 +92,13 @@
                                          part:part
                                          zoom:_ctx.zoom];
   cell.size.height = MAX(NSHeight(cell), 19);
-  NSString *initial = [part isEqualToString:@"header"] ? (cols[col][@"header"] ?: @"")
-                                                       : (cols[col][@"value"] ?: @"");
-  NSFont *font = [part isEqualToString:@"header"] ? [NSFont boldSystemFontOfSize:10]
-                                                  : [NSFont userFontOfSize:10];
+  BOOL editingHeader = part == RDLTablixPartHeader;
+  NSString *initial = editingHeader ? (cols[col][@"header"] ?: @"")
+                                    : (cols[col][@"value"] ?: @"");
+  NSFont *font = editingHeader ? [NSFont boldSystemFontOfSize:10]
+                               : [NSFont userFontOfSize:10];
   [self startFieldForItem:tab
-                  context:@{ @"col" : @(col), @"part" : part }
+                  context:@{ @"col" : @(col), @"part" : @(part) }
                     rect:cell
                  initial:initial
                     font:font
@@ -171,7 +172,7 @@
     return;
   }
   NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
-  NSString *key = [ctx[@"part"] isEqualToString:@"header"] ? @"header" : @"value";
+  NSString *key = [ctx[@"part"] integerValue] == RDLTablixPartHeader ? @"header" : @"value";
   RDLTablix *tablix = (RDLTablix *)it;
   NSMutableArray *specs = [tablix.columnSpecs mutableCopy];
   if (specs == nil || ci >= [specs count])
@@ -249,7 +250,7 @@
     if (n2 == 0)
       return;
     NSInteger ci = (NSInteger)[ctx[@"col"] unsignedIntegerValue];
-    BOOL header = [ctx[@"part"] isEqualToString:@"header"];
+    BOOL header = [ctx[@"part"] integerValue] == RDLTablixPartHeader;
     if (movement == NSTabTextMovement) {
       ci += 1;
       if (ci >= n2) {
@@ -265,7 +266,7 @@
     }
     [self beginEditingTablix:(RDLTablix *)it
                            col:(NSUInteger)ci
-                          part:header ? @"header" : @"value"];
+                          part:header ? RDLTablixPartHeader : RDLTablixPartValue];
   } else {
     [[_hostView window] makeFirstResponder:_hostView];
   }

@@ -1,4 +1,6 @@
 #import "RDLCanvasView.h"
+#import "RDLInsertPalette.h"
+#import "RDLItemFactory.h"
 #import "RDLChange.h"
 #import "RDLPageGeometry.h"
 #import "RDLSelection.h"
@@ -35,10 +37,12 @@
 }
 
 - (void)setContext:(RDLEditingContext *)context {
+  [self registerForPaletteDrops];
   if (_context == context)
     return;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   _context = context;
+  [self registerForPaletteDrops];
   if (context == nil)
     return;
   _renderer = [[RDLCanvasRenderer alloc] initWithContext:context];
@@ -90,6 +94,72 @@
   RDL_UNUSED(note);
   [self sizeToPage]; // zoom changed
   [self setNeedsDisplay:YES];
+}
+
+#pragma mark - Dropping a binding from the palette
+
+// The palette drags a binding; the canvas turns it into a textbox already
+// showing it. Registered here rather than in the palette because the drop is
+// what needs the geometry: where the pointer is decides which band the item
+// lands in and where inside it.
+- (void)registerForPaletteDrops {
+  [self registerForDraggedTypes:@[ RDLPaletteDragType ]];
+}
+
+- (NSDragOperation)draggingEntered:(id<NSDraggingInfo>)info {
+  return [[info draggingPasteboard] propertyListForType:RDLPaletteDragType] ? NSDragOperationCopy
+                                                                            : NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id<NSDraggingInfo>)info {
+  return [self draggingEntered:info];
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)info {
+  NSDictionary *binding = [[info draggingPasteboard] propertyListForType:RDLPaletteDragType];
+  return [self dropBinding:binding
+                   atPoint:[self convertPoint:[info draggingLocation] fromView:nil]];
+}
+
+// The drop itself, apart from the drag that delivered it: where the pointer is
+// decides the band and the position inside it.
+- (BOOL)dropBinding:(NSDictionary *)binding atPoint:(NSPoint)p {
+  NSString *expression = binding[RDLPaletteExpressionKey];
+  if ([expression length] == 0)
+    return NO;
+
+  // Which band, and where inside it. A drop outside every band has nowhere to
+  // go, so it is refused rather than guessed at.
+  RDLPageGeometry *geometry = [self geometry];
+  RDLBandFrame *target = nil;
+  for (RDLBandFrame *frame in geometry.bandFrames)
+    if (NSPointInRect(p, frame.frame))
+      target = frame;
+  if (target == nil)
+    return NO;
+
+  // Into inches, which is what an item's position is in: the band frame is in
+  // view points, so the distance has to be divided by the points in an inch as
+  // well as by the zoom. Dividing by the zoom alone stored points as inches and
+  // put the item a hundred inches off the page, where it drew nowhere and could
+  // not be clicked.
+  CGFloat zoom = geometry.zoom > 0 ? geometry.zoom : 1.0;
+  CGFloat perInch = RDLPointsPerInch * zoom;
+  CGFloat left = (p.x - NSMinX(target.frame)) / perInch;
+  CGFloat top = (p.y - NSMinY(target.frame)) / perInch;
+
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = [RDLItemFactory uniqueNameWithPrefix:binding[RDLPaletteLabelKey] ?: @"Field"
+                                         inReport:_context.report];
+  // The same size and style an inserted textbox gets, so a dropped one is not
+  // a differently shaped kind of textbox.
+  [RDLItemFactory applyDefaultsTo:box report:_context.report];
+  box.value = expression;
+  box.left = MAX(0, [RDLEditor snap:left]);
+  box.top = MAX(0, [RDLEditor snap:top]);
+  [_context.editor addItem:box into:target.band.items bandKey:target.bandKey];
+  [_context.selection selectItem:box inBandWithKey:target.bandKey];
+  return YES;
 }
 
 - (BOOL)isFlipped {
@@ -252,7 +322,7 @@
   if ([hit isKindOfClass:[RDLTablix class]]) {
     RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger col = 0;
-    NSString *part = nil;
+    RDLTablixPart part = RDLTablixPartNone;
     BOOL onCell = [RDLTablixGeometry tablix:tablixHit
                                    itemRect:itemRect
                                       point:p

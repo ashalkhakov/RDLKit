@@ -7,6 +7,7 @@
 // the pointer is over. None of it is view state in any meaningful sense -- it
 // is the state of a gesture -- so it is easier to reason about on its own.
 #import <AppKit/AppKit.h>
+#import "RDLPageGeometry.h"
 
 @class RDLCanvasInteraction;
 @class RDLEditingContext;
@@ -30,7 +31,7 @@
 // The cell the pointer is over, for the discoverability highlight.
 @property (nonatomic, readonly, strong) RDLItem *hoverTablix;
 @property (nonatomic, readonly, assign) NSUInteger hoverColumn;
-@property (nonatomic, readonly, copy) NSString *hoverPart;
+@property (nonatomic, readonly, assign) RDLTablixPart hoverPart;
 
 - (void)mouseDown:(NSEvent *)event;
 - (void)mouseDragged:(NSEvent *)event;

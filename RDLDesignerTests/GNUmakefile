@@ -11,7 +11,16 @@ BUNDLE_NAME = RDLDesignerTests
 # editing logic, not the window shell, which is why RDLAppDelegate and the
 # window controllers are absent.
 RDLDesignerTests_OBJC_FILES = \
-  RDLDesignerTests.m \
+  RDLEditingCoreTests.m \
+  RDLCanvasTests.m \
+  RDLDesignerTestSupport.m \
+  RDLWindowTests.m \
+  RDLPortabilityTests.m \
+  RDLInspectorTests.m \
+  RDLExpressionUITests.m \
+  RDLRichTextTests.m \
+  RDLTablixUITests.m \
+  RDLNewReportTests.m \
   ../RDLDesigner/RDLChange.m \
   ../RDLDesigner/RDLDocument.m \
   ../RDLDesigner/RDLEditingContext.m \
@@ -26,16 +35,50 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLRichTextFormatter.m \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
+  ../RDLDesigner/RDLRichTextEditor.m \
+  ../RDLDesigner/RDLExpressionEditor.m \
+  ../RDLDesigner/RDLInsertPalette.m \
+  ../RDLDesigner/RDLExpressionCell.m \
+  ../RDLDesigner/RDLExpressionField.m \
+  ../RDLDesigner/RDLToolbarIcons.m \
+  ../RDLDesigner/RDLPane.m \
+  ../RDLDesigner/RDLExpressionTheme.m \
+  ../RDLDesigner/RDLExpressionTextStorage.m \
+  ../RDLDesigner/RDLDatasetNavigator.m \
+  ../RDLDesigner/RDLDesignerWindow.m \
+  ../RDLDesigner/RDLCanvasView.m \
+  ../RDLDesigner/RDLCanvasRenderer.m \
+  ../RDLDesigner/RDLCanvasInteraction.m \
+  ../RDLDesigner/RDLInPlaceEditor.m \
+  ../RDLDesigner/RDLInspectorView.m \
+  ../RDLDesigner/RDLDataView.m \
+  ../RDLDesigner/RDLOutlineDataSource.m \
+  ../RDLDesigner/RDLTabBadge.m \
+  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m \
+  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
+  ../RDLDesigner/RDLFieldInspectorView.m \
+  ../RDLDesigner/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
-RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner
+# ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
+# Xcode resolves through its header map and gnustep-make has no equivalent for.
+RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner \
+                                -I../RDLDesigner/ThirdParty/DMTabBar
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesignerTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
 RDLDesignerTests_NEEDS_GUI = yes
 
-# The two modal panels the checks open are looked up with -bundleForClass:,
+# The panels the checks open are looked up with -bundleForClass:,
 # which resolves to this bundle rather than to RDLDesigner.app.
 RDLDesignerTests_RESOURCE_FILES = \
+  ../RDLDesigner/RDLDesignerWindow.xib \
+  ../RDLDesigner/RDLInspectorSections.xib \
+  ../RDLDesigner/RDLDatasetNavigator.xib \
+  ../RDLDesigner/RDLInsertPalette.xib \
+  ../RDLDesigner/RDLDatasetFieldsView.xib \
+  ../RDLDesigner/RDLFieldInspectorView.xib \
+  ../RDLDesigner/RDLExpressionEditor.xib \
+  ../RDLDesigner/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLTablixEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib
 
@@ -51,11 +94,34 @@ ADDITIONAL_OBJCFLAGS += -fsanitize=address -fno-omit-frame-pointer -g
 ADDITIONAL_LDFLAGS += -fsanitize=address
 # The bundle is dlopened by an xctest binary that is not instrumented, so the
 # ASan runtime has to be loaded first or its interceptors are never installed.
-ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-x86_64.so)
+# Named after the architecture, so this cannot be hardcoded: on anything but
+# x86_64 the lookup returns the name it was given, LD_PRELOAD then fails
+# quietly, and the run proceeds with no interceptors and no report.
+ASAN_ARCH := $(shell uname -m)
+ASAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.asan-$(ASAN_ARCH).so)
 # Leaks are not what is being looked for here, and a test bundle reports plenty.
 # handle_abort=1 so the SIGABRT the timeout below sends is reported by ASan
 # with a symbolized backtrace, instead of the process simply disappearing.
 SANITIZE_ENV := LD_PRELOAD="$(ASAN_LIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:handle_abort=1
+endif
+
+# Undefined behaviour, which is a different question from memory safety and a
+# different tool: UBSAN=1 checks signed overflow, shifts, misaligned and null
+# pointers, out-of-range enum and bool loads, and float-to-integer conversions
+# that do not fit. None of it touches the allocator, so unlike the sanitizers
+# above it does not change the shape of the heap it is run against.
+#
+#   make -C RDLKit UBSAN=1 && make -C RDLKitTests run-tests UBSAN=1
+ifeq ($(UBSAN),1)
+ADDITIONAL_OBJCFLAGS += -fsanitize=undefined -fno-omit-frame-pointer -g
+ADDITIONAL_CFLAGS += -fsanitize=undefined -fno-omit-frame-pointer -g
+ADDITIONAL_LDFLAGS += -fsanitize=undefined
+# As with AddressSanitizer: the bundle is dlopened by an xctest binary that is
+# not instrumented, so the runtime has to be loaded first. halt_on_error=0 so
+# one run reports everything it finds rather than the first thing only.
+UBSAN_ARCH := $(shell uname -m)
+UBSAN_LIB := $(shell $(CC) -print-file-name=libclang_rt.ubsan_standalone-$(UBSAN_ARCH).so)
+SANITIZE_ENV := LD_PRELOAD="$(UBSAN_LIB)" UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=0
 endif
 
 include $(GNUSTEP_MAKEFILES)/bundle.make

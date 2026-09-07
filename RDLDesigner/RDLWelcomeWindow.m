@@ -23,10 +23,25 @@ NSString * const RDLOpenGeneratorNotification = @"RDLOpenGeneratorNotification";
 
 // Otherwise the chooser is entirely static, so it is RDLWelcomeWindow.xib in
 // full and this class is just the two actions the cards send.
+@interface RDLWelcomeWindow ()
+@property (nonatomic, strong) IBOutlet NSButton *designerCard, *generatorCard;
+@end
+
 @implementation RDLWelcomeWindow
 
 - (instancetype)init {
   return [super initWithWindowNibName:@"RDLWelcomeWindow"];
+}
+
+// The cards carry their text in labels laid over them, so the buttons
+// themselves have no title -- which on GNUstep means they keep the one an
+// NSButton starts with, and each card reads "Button" under its heading. Said
+// out loud here because a XIB has no way to write an empty title: Interface
+// Builder drops title="" as redundant.
+- (void)windowDidLoad {
+  [super windowDidLoad];
+  [_designerCard setTitle:@""];
+  [_generatorCard setTitle:@""];
 }
 
 - (void)openGenerator:(id)sender {

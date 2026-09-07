@@ -1,9 +1,22 @@
 #import "RDLInspectorFields.h"
 #import "RDLEditor.h"
 #import "RDLKit.h"
+#import "RDLCompatibility.h"
 
 @implementation RDLFieldBinding
 @end
+
+// style.color -> style.expressions.color. The model keeps the two beside each
+// other under the owning style, so the expression's path is the literal's with
+// "expressions" put in front of the last component.
+static NSString *RDLExpressionKeyPath(NSString *keyPath) {
+  NSRange dot = [keyPath rangeOfString:@"." options:NSBackwardsSearch];
+  if (dot.location == NSNotFound)
+    return [@"expressions." stringByAppendingString:keyPath];
+  return [NSString stringWithFormat:@"%@.expressions.%@",
+                                    [keyPath substringToIndex:dot.location],
+                                    [keyPath substringFromIndex:NSMaxRange(dot)]];
+}
 
 @implementation RDLFieldBindings {
   NSMutableArray<RDLFieldBinding *> *_bindings;
@@ -113,6 +126,41 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
           [pop selectItemAtIndex:0];
         break;
       }
+      case RDLFieldKindTextOrExpression: {
+        RDLExpr *expr = nil;
+        @try {
+          expr = [target valueForKeyPath:RDLExpressionKeyPath(b.keyPath)];
+        } @catch (NSException *e) {
+          expr = nil;  // a target whose style has no expressions object yet
+        }
+        if (expr != nil)
+          [(NSTextField *)b.control setStringValue:[expr source] ?: @""];
+        else {
+          NSString *literal = [value isKindOfClass:[NSString class]] ? value : nil;
+          [(NSTextField *)b.control setStringValue:literal ?: (b.placeholder ?: @"")];
+        }
+        break;
+      }
+      case RDLFieldKindLengthOrExpression: {
+        RDLExpr *expr = [target valueForKeyPath:RDLExpressionKeyPath(b.keyPath)];
+        if (expr != nil) {
+          [(NSTextField *)b.control setStringValue:[expr source] ?: @""];
+        } else {
+          RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
+          [(NSTextField *)b.control
+              setStringValue:len ? [len stringValue] : (b.placeholder ?: @"")];
+        }
+        break;
+      }
+      case RDLFieldKindColor: {
+        NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
+        // A transparent background is not a colour the well can show, so it
+        // shows the paper it would let through.
+        [(NSColorWell *)b.control setColor:RDLColorIsTransparent(hex)
+                                               ? [NSColor whiteColor]
+                                               : RDLColorFromHex(hex)];
+        break;
+      }
       case RDLFieldKindPopUpIndex: {
         NSPopUpButton *pop = (NSPopUpButton *)b.control;
         NSUInteger index = [b.values indexOfObject:(value ?: [NSNull null])];
@@ -155,6 +203,70 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       case RDLFieldKindPopUpTitle:
         value = [(NSPopUpButton *)b.control titleOfSelectedItem];
+        break;
+      case RDLFieldKindTextOrExpression: {
+        NSString *text = [(NSTextField *)b.control stringValue];
+        NSString *exprPath = RDLExpressionKeyPath(b.keyPath);
+        BOOL isExpression = [RDLExpr isExpressionSource:text];
+        // Both are written, one of them to nil: leaving the old literal behind
+        // an expression would resurrect it the moment the expression was
+        // cleared, and the writer would have two answers to choose between.
+        id expr = isExpression ? [RDLExpr expressionWithSource:text] : nil;
+        switch (b.scope) {
+          case RDLFieldScopeItem:
+            if (item) {
+              [editor setValue:expr forKeyPath:exprPath ofItem:item];
+              [editor setValue:isExpression ? nil : ([text length] ? text : nil)
+                    forKeyPath:b.keyPath
+                        ofItem:item];
+            }
+            break;
+          case RDLFieldScopeBand:
+            if ([bandKey length]) {
+              [editor setValue:expr forKeyPath:exprPath ofBandWithKey:bandKey];
+              [editor setValue:isExpression ? nil : ([text length] ? text : nil)
+                    forKeyPath:b.keyPath
+                 ofBandWithKey:bandKey];
+            }
+            break;
+          case RDLFieldScopeReport:
+            [editor setReportValue:expr forKeyPath:exprPath];
+            [editor setReportValue:isExpression ? nil : ([text length] ? text : nil)
+                        forKeyPath:b.keyPath];
+            break;
+        }
+        return YES;
+      }
+      case RDLFieldKindLengthOrExpression: {
+        NSString *text = [(NSTextField *)b.control stringValue];
+        NSString *exprPath = RDLExpressionKeyPath(b.keyPath);
+        BOOL isExpression = [RDLExpr isExpressionSource:text];
+        id expr = isExpression ? [RDLExpr expressionWithSource:text] : nil;
+        // Clearing the field removes the measurement rather than storing zero,
+        // as the plain length kind does.
+        id length = isExpression ? nil : [RDLLength lengthFromString:text];
+        switch (b.scope) {
+          case RDLFieldScopeItem:
+            if (item) {
+              [editor setValue:expr forKeyPath:exprPath ofItem:item];
+              [editor setValue:length forKeyPath:b.keyPath ofItem:item];
+            }
+            break;
+          case RDLFieldScopeBand:
+            if ([bandKey length]) {
+              [editor setValue:expr forKeyPath:exprPath ofBandWithKey:bandKey];
+              [editor setValue:length forKeyPath:b.keyPath ofBandWithKey:bandKey];
+            }
+            break;
+          case RDLFieldScopeReport:
+            [editor setReportValue:expr forKeyPath:exprPath];
+            [editor setReportValue:length forKeyPath:b.keyPath];
+            break;
+        }
+        return YES;
+      }
+      case RDLFieldKindColor:
+        value = RDLHexFromColor([(NSColorWell *)b.control color]);
         break;
       case RDLFieldKindPopUpIndex: {
         NSInteger i = [(NSPopUpButton *)b.control indexOfSelectedItem];

@@ -219,6 +219,17 @@ static NSXMLElement *RDLUpgradeRow(NSXMLElement *row, NSString *cellsName, NSStr
 }
 
 // A leaf in the row hierarchy: one body row that is not a group.
+// A 2005 section -- Details, or a group's Header or Footer -- can be hidden,
+// and hidden with a ToggleItem naming the textbox that expands it: that is how
+// a 2005 report spells a drill-down. In 2010 that Visibility sits on the
+// TablixMember the section becomes. Dropping it does not merely lose the
+// toggle, it renders rows that were meant to start collapsed.
+static void RDLCarryVisibility(NSXMLElement *section, NSXMLElement *member) {
+  NSXMLElement *vis = RDLKid(section, @"Visibility");
+  if (vis != nil)
+    [member addChild:[vis copy]];
+}
+
 static NSXMLElement *RDLStaticMember(BOOL repeatOnNewPage, NSString *keepWithGroup) {
   NSXMLElement *m = RDLNew(@"TablixMember");
   if (repeatOnNewPage)
@@ -279,7 +290,9 @@ static NSArray<NSXMLElement *> *RDLTableSectionMembers(NSXMLElement *section, NS
   BOOL repeat = [[RDLTrimmed(RDLKid(section, @"RepeatOnNewPage")) lowercaseString] isEqualToString:@"true"];
   for (NSXMLElement *row in RDLKids(RDLKid(section, @"TableRows"), @"TableRow")) {
     [rows addObject:RDLUpgradeRow(row, @"TableCells", @"TableCell")];
-    [members addObject:RDLStaticMember(repeat, keepWithGroup)];
+    NSXMLElement *m = RDLStaticMember(repeat, keepWithGroup);
+    RDLCarryVisibility(section, m);
+    [members addObject:m];
   }
   return members;
 }
@@ -299,6 +312,7 @@ static NSArray<NSXMLElement *> *RDLTableGroupChain(NSArray<NSXMLElement *> *grou
       // row; the rest are plain leaves.
       if ([members count] == 0)
         RDLAddGroup(m, grouping, sorting);
+      RDLCarryVisibility(details, m);
       [members addObject:m];
     }
     return members;

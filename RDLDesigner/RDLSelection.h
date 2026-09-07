@@ -7,6 +7,7 @@
 // invalidated any held pointer. With granular undo the report object survives
 // an edit, so a resolved reference is both simpler and cheaper.
 #import <Foundation/Foundation.h>
+#import "RDLPageGeometry.h"
 #import "RDLKit.h"
 
 @class RDLItem;
@@ -31,6 +32,17 @@ extern NSString * const RDLSelectionDidChangeNotification;
 - (void)selectReport;
 - (void)selectBandWithKey:(NSString *)bandKey;
 - (void)selectItem:(RDLItem *)item inBandWithKey:(NSString *)bandKey;
+
+// A cell of a scaffolded tablix: the tablix is the selected item, and these say
+// which of its columns and which row of the preview was clicked. A cell is not
+// an item of its own -- it is an entry in the tablix's columnSpecs -- so it
+// travels with the item selection rather than replacing it.
+@property (nonatomic, readonly, assign) NSInteger tablixColumn;  // -1 when none
+@property (nonatomic, readonly, assign) RDLTablixPart tablixPart;
+- (void)selectItem:(RDLItem *)item
+    inBandWithKey:(NSString *)bandKey
+           column:(NSInteger)column
+             part:(RDLTablixPart)part;
 
 // The selected item was removed from the report: fall back to its band.
 - (void)itemWasRemoved:(RDLItem *)item;
