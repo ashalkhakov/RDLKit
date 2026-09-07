@@ -8,11 +8,11 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLDatasetFieldsView">
             <connections>
-                <outlet property="content" destination="content" id="contentOutlet"/>
-                <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
-                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
+                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="title" destination="title" id="titleOutlet"/>
             </connections>
         </customObject>

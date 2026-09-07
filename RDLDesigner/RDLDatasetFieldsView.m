@@ -94,9 +94,7 @@
 
 #pragma mark - Editing
 
-// Fields are RDLField objects, always: a dataset that declared bare names was
-// the shape that let -isEqualToString: reach an RDLField. A new field is
-// String, which is what an unknown column is until someone says otherwise.
+// Fields are RDLField objects. A new field is String by default.
 - (void)addField:(id)sender {
   (void)sender;
   if (_dataSet == nil)
