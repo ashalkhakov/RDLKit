@@ -36,12 +36,11 @@ This changes two things:
 
 Serialisation is unchanged except that a prefixed xmlns declaration, now a
 real namespace, prints before a co-located default-xmlns attribute rather than
-after it (declaration order is not significant). The gnustep-base NSXML test
-suite (NSXMLNode / NSXMLDocument / NSXMLElement, 420 tests) passes unchanged.
-
-Applies to current master with `patch -p1` (git apply may need --3way or a
-trivial rebase depending on nearby churn); developed and tested against the
-gnustep/libs-base tree current in early 2026.
+after it (declaration order is not significant). Verified against libs-base
+master (3d7013e): the reproduction's prefixed-attribute mode crashes without
+this patch and survives with it, the NSXMLNode / NSXMLDocument / NSXMLElement
+test suites pass unchanged (251 / 37 / 132), and the patch applies cleanly with
+`git apply` on a fresh master checkout.
 
 diff --git a/Source/NSXMLElement.m b/Source/NSXMLElement.m
 index 7484209..6797862 100644
@@ -79,47 +78,10 @@ index 7484209..6797862 100644
      {
        xmlNsPtr ns = attr->ns;
 diff --git a/Source/NSXMLNode.m b/Source/NSXMLNode.m
-index bab9640..cc5fe17 100644
+index e8300f8..14ddce9 100644
 --- a/Source/NSXMLNode.m
 +++ b/Source/NSXMLNode.m
-@@ -164,7 +164,35 @@ setTreeDoc(xmlNodePtr node, xmlDocPtr doc)
-       node->content
- 	= (xmlChar *)adoptString(node->content, oldDoc, doc, adoptStr);
-     }
--  
-+
-+  /* An attribute node detached directly (e.g. NSXMLElement's
-+   * -removeAttributeForName:, or the subnode detach that -dealloc
-+   * performs) arrives here as the top-level node.  Its name is
-+   * interned in the old document's dictionary and must be adopted,
-+   * or xmlFreeProp later frees an interior pointer of that
-+   * dictionary. The value text children are handled by the
-+   * recursive children walk below.
-+   */
-+  if (node->type == XML_ATTRIBUTE_NODE)
-+    {
-+      node->name = adoptString(node->name, oldDoc, doc, adoptStr);
-+    }
-+
-+  /* Content-bearing nodes other than text: same dictionary-interning
-+   * hazard for their content (and a processing instruction's name).
-+   */
-+  if (node->type == XML_COMMENT_NODE
-+    || node->type == XML_CDATA_SECTION_NODE
-+    || node->type == XML_PI_NODE)
-+    {
-+      node->content
-+	= (xmlChar *)adoptString(node->content, oldDoc, doc, adoptStr);
-+      if (node->type == XML_PI_NODE)
-+	{
-+	  node->name = adoptString(node->name, oldDoc, doc, adoptStr);
-+	}
-+    }
-+
-   if (node->type == XML_ELEMENT_NODE)
-     {
-       xmlAttrPtr attr;
-@@ -2115,7 +2143,25 @@ execute_xpath(xmlNodePtr node, NSString *xpath_exp, NSDictionary *constants,
+@@ -2132,7 +2132,25 @@ execute_xpath(xmlNodePtr node, NSString *xpath_exp, NSDictionary *constants,
          }
        
        localName = xmlSplitQName2(xmlName, &prefix);
