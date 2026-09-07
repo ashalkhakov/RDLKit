@@ -370,7 +370,8 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 - (BOOL)isEmpty {
   return _fontFamily == nil && _fontSize == nil && _fontWeight == nil && _fontStyle == nil &&
          _color == nil && _backgroundColor == nil && _textAlign == nil && _verticalAlign == nil &&
-         _textDecoration == nil && _format == nil && _paddingLeft == nil && _paddingRight == nil &&
+         _textDecoration == nil && _format == nil && _language == nil &&
+         _paddingLeft == nil && _paddingRight == nil &&
          _paddingTop == nil && _paddingBottom == nil;
 }
 @end
@@ -447,6 +448,7 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   s.textDecoration =
       run.textDecoration != RDLTextDecorationUnspecified ? run.textDecoration : base.textDecoration;
   s.format = [run.format length] ? run.format : base.format;
+  s.language = [run.language length] ? run.language : base.language;
   s.paddingLeft = base.paddingLeft;
   s.paddingRight = base.paddingRight;
   s.paddingTop = base.paddingTop;

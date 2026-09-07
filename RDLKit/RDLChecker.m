@@ -648,13 +648,36 @@ static RDLScope *RDLSubScope(RDLScope *outer, NSString *step, RDLDataSet *ds) {
 
 static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run);
 
+// Language, wherever it is written. A code is checked against the cultures
+// this machine knows, because "en-UK" and "de_DE " format as if they were
+// English and say nothing about it -- the report just quietly comes out wrong.
+// An expression is checked as an expression instead; what it yields is only
+// known when the report runs.
+static void RDLCheckLanguage(RDLValue *language, RDLScope *scope, RDLCheckRun *run) {
+  if (language == nil)
+    return;
+  if ([language isExpression]) {
+    RDLCheckValue(language, scope, run);
+    return;
+  }
+  if (!RDLLanguageIsKnown([language literal]))
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"unknown-language", scope,
+               [language source],
+               [NSString stringWithFormat:@"'%@' is not a culture this machine knows; "
+                                          @"the report will format as if no Language were set",
+                                          [language literal]]);
+}
+
 static void RDLCheckStyle(RDLStyle *style, RDLScope *scope, RDLCheckRun *run) {
   RDLStyleExpressions *e = style.expressions;
+  if ([style.language length] && e.language == nil)
+    RDLCheckLanguage([RDLValue literal:style.language], scope, run);
   if (e == nil)
     return;
   for (RDLExpr *expr in @[
          e.color ?: [NSNull null], e.backgroundColor ?: [NSNull null],
-         e.fontFamily ?: [NSNull null], e.fontSize ?: [NSNull null], e.format ?: [NSNull null]
+         e.fontFamily ?: [NSNull null], e.fontSize ?: [NSNull null], e.format ?: [NSNull null],
+         e.language ?: [NSNull null]
        ]) {
     if ((id)expr == [NSNull null])
       continue;
@@ -773,6 +796,8 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   RDLScope *root = [[RDLScope alloc] init];
   root.report = report;
   root.path = @"";
+
+  RDLCheckLanguage(report.language, RDLSubScope(root, @"Language", nil), run);
 
   // Calculated fields are expressions over their own dataset.
   for (RDLDataSet *ds in report.dataSets) {

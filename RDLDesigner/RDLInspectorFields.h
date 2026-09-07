@@ -44,6 +44,11 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   // font size is "10pt", not the string "10pt", so the two kinds cannot share
   // an implementation without writing the wrong type into the model.
   RDLFieldKindLengthOrExpression,
+  // NSTextField over an RDLValue -- a property the file lets be either a
+  // constant or an expression, held as one object rather than as a pair.
+  // "en-US" and "=User!Language" both go in the same box, and RDLValue is
+  // what decides which of the two was written.
+  RDLFieldKindValue,
   // NSColorWell over an RDL colour string. The well opens NSColorPanel, which
   // is the standard way to pick one; the hex field beside it stays, because a
   // report's colours are often given rather than chosen.

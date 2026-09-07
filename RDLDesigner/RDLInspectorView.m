@@ -48,6 +48,9 @@
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *valueField, *fontField, *colorField, *formatField;
+// Localization: the report's culture, and one text box's override of it.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *docLanguageField, *languageField;
+@property (nonatomic, strong) IBOutlet NSButton *docLanguageExprButton, *languageExprButton;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
@@ -123,6 +126,7 @@
   // f(x) is a picture, not two letters and two brackets: at 24 points wide the
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
+                         _languageExprButton, _docLanguageExprButton,
                          _rectBGExprButton, _sizeExprButton, _cellExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
@@ -224,6 +228,11 @@
              kind:RDLFieldKindColor];
   [_bindings bind:_formatField keyPath:@"style.format" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
+  // A text box may be written in its own culture: dates and numbers in it are
+  // then formatted that way whatever the report says. Empty means "the
+  // report's", which is what nearly every text box wants.
+  [_bindings bind:_languageField keyPath:@"style.language" scope:RDLFieldScopeItem
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:nil];
 
   // Line and Rectangle each expose one style property.
   [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
@@ -277,6 +286,10 @@
              kind:RDLFieldKindText];
   [_bindings bind:_authorField keyPath:@"author" scope:RDLFieldScopeReport
              kind:RDLFieldKindText];
+  // The report's own culture: a code, or an expression -- "=User!Language" to
+  // follow whoever is reading, "=Parameters!Culture.Value" to let them choose.
+  [_bindings bind:_docLanguageField keyPath:@"language" scope:RDLFieldScopeReport
+             kind:RDLFieldKindValue values:nil placeholder:RDLHostLanguage()];
   [_bindings bind:_descField keyPath:@"reportDescription" scope:RDLFieldScopeReport
              kind:RDLFieldKindText];
   [_bindings bind:_headerHField keyPath:@"pageHeader.height" scope:RDLFieldScopeReport
@@ -544,6 +557,8 @@
   _colorField.expressionContext = RDLExpressionContextColor;
   _rectBGField.expressionContext = RDLExpressionContextColor;
   _formatField.expressionContext = RDLExpressionContextText;
+  _languageField.expressionContext = RDLExpressionContextText;
+  _docLanguageField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
   _cellValueField.expressionContext = RDLExpressionContextText;
 }
@@ -556,6 +571,8 @@
   if (sender == _fontExprButton) return _fontField;
   if (sender == _colorExprButton) return _colorField;
   if (sender == _formatExprButton) return _formatField;
+  if (sender == _languageExprButton) return _languageField;
+  if (sender == _docLanguageExprButton) return _docLanguageField;
   if (sender == _rectBGExprButton) return _rectBGField;
   if (sender == _sizeExprButton) return _sizeField;
   if (sender == _cellExprButton) return _cellValueField;

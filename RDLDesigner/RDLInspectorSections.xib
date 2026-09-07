@@ -32,6 +32,8 @@
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="descField" destination="descField" id="descFieldOutlet"/>
                 <outlet property="docBox" destination="docBox" id="docBoxOutlet"/>
+                <outlet property="docLanguageExprButton" destination="docLanguageExprButton" id="docLanguageExprButtonOutlet"/>
+                <outlet property="docLanguageField" destination="docLanguageField" id="docLanguageFieldOutlet"/>
                 <outlet property="docNameField" destination="docNameField" id="docNameFieldOutlet"/>
                 <outlet property="fontExprButton" destination="fontExprButton" id="fontExprButtonOutlet"/>
                 <outlet property="fontField" destination="fontField" id="fontFieldOutlet"/>
@@ -47,6 +49,8 @@
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
                 <outlet property="kindLabel" destination="kindLabel" id="kindLabelOutlet"/>
+                <outlet property="languageExprButton" destination="languageExprButton" id="languageExprButtonOutlet"/>
+                <outlet property="languageField" destination="languageField" id="languageFieldOutlet"/>
                 <outlet property="leftField" destination="leftField" id="leftFieldOutlet"/>
                 <outlet property="lineBox" destination="lineBox" id="lineBoxOutlet"/>
                 <outlet property="lineColorField" destination="lineColorField" id="lineColorFieldOutlet"/>
@@ -85,7 +89,7 @@
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
         <customView id="docBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="290"/>
+            <rect key="frame" x="0.0" y="0.0" width="260" height="334"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
@@ -255,7 +259,40 @@
                         <outlet property="delegate" destination="-2" id="marginFieldDelegate"/>
                     </connections>
                 </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblDocLanguage">
+                    <rect key="frame" x="10" y="290" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Language" id="lblDocLanguageCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The culture this report is written in — en-US, de-DE, or an expression such as =User!Language" focusRingType="none" id="docLanguageField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="306" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="docLanguageFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="docLanguageFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="docLanguageFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="docLanguageExprButton">
+                    <rect key="frame" x="226" y="306" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="docLanguageExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="docLanguageExprButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
+            <point key="canvasLocation" x="140" y="-86"/>
         </customView>
         <customView id="bandBox">
             <rect key="frame" x="0.0" y="28" width="260" height="92"/>
@@ -558,7 +595,7 @@
             </subviews>
         </customView>
         <customView id="textBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="270"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="314"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl16">
@@ -800,6 +837,38 @@
                     </buttonCell>
                     <connections>
                         <action selector="editExpression:" target="-2" id="formatExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblTextLanguage">
+                    <rect key="frame" x="10" y="270" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Language" id="lblTextLanguageCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The culture this text box's numbers and dates are written in; empty follows the report" focusRingType="none" id="languageField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="286" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="languageFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="languageFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="languageFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="languageExprButton">
+                    <rect key="frame" x="226" y="286" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="languageExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="languageExprButtonAction"/>
                     </connections>
                 </button>
             </subviews>
@@ -1073,7 +1142,7 @@
                         <outlet property="delegate" destination="-2" id="valFieldDelegate"/>
                     </connections>
                 </textField>
-                            <button toolTip="The rows this chart keeps" id="chartFiltersButton">
+                <button toolTip="The rows this chart keeps" id="chartFiltersButton">
                     <rect key="frame" x="10" y="180" width="240" height="20"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="Filters…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="chartFiltersButtonCell">
@@ -1084,7 +1153,7 @@
                         <action selector="editChartFilters:" target="-2" id="chartFiltersButtonAction"/>
                     </connections>
                 </button>
-</subviews>
+            </subviews>
         </customView>
         <customView id="tablixBox">
             <rect key="frame" x="0.0" y="28" width="260" height="122"/>

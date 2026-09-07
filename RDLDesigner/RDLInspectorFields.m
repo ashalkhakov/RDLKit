@@ -152,6 +152,12 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         }
         break;
       }
+      case RDLFieldKindValue: {
+        RDLValue *v = [value isKindOfClass:[RDLValue class]] ? value : nil;
+        NSString *src = [v source];
+        [(NSTextField *)b.control setStringValue:[src length] ? src : (b.placeholder ?: @"")];
+        break;
+      }
       case RDLFieldKindColor: {
         NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
         // A transparent background is not a colour the well can show, so it
@@ -264,6 +270,12 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
             break;
         }
         return YES;
+      }
+      case RDLFieldKindValue: {
+        // Clearing the box removes the property: a report with no Language is
+        // a different thing from one whose Language is the empty string.
+        value = [RDLValue valueWithSource:[(NSTextField *)b.control stringValue]];
+        break;
       }
       case RDLFieldKindColor:
         value = RDLHexFromColor([(NSColorWell *)b.control color]);

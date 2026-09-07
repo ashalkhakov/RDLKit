@@ -70,6 +70,7 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * TextAlign
   * VerticalAlign
   * TextDecoration
+  * `Language` (per item; see Localization)
   * conditional formatting: any style property may be an `=` expression
 * **Behavior**
   * `Visibility/Hidden` (static or expression) on items and tablix members
@@ -87,6 +88,11 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * calculated fields (`Field/Value`)
   * dataset-level `Filters`
   * group/sort/filter on tablix members
+* **Localization**
+  * report `Language`, static (`en-US`) or an expression (`=User!Language`, `=Parameters!Culture.Value`)
+  * per-item `Style/Language`, which overrides it for that item and everything inside it
+  * numbers, currency and dates formatted in that culture (`Format`, `FormatCurrency`, `FormatNumber`, `FormatPercent`, `Style/Format`, and values with no format at all)
+  * `User!Language` — the reader's culture, passed in per render
 * **Parameters**
   * String/Integer/Float/Boolean/DateTime coercion
   * `Nullable`
@@ -220,6 +226,47 @@ node in an expression memoises the spelling per row class: resolved once,
 fetched per row. All three shapes then cost the same. The memo re-resolves when
 the row class changes, and when a cached key misses on a dictionary, so rows
 need not all be alike.
+
+## Localization
+
+A report's `Language` decides how its numbers, currency and dates are written.
+It is a culture code, or an expression:
+
+```objc
+report.language = [RDLValue valueWithSource:@"de-DE"];          // always German
+report.language = [RDLValue valueWithSource:@"=User!Language"]; // whoever is reading
+report.language = [RDLValue valueWithSource:@"=Parameters!Culture.Value"];
+```
+
+A single item may say it differently, which is what `Style/Language` is for --
+an amount always in euros, say, in a report otherwise written in English:
+
+```objc
+textbox.style.language = @"de-DE";
+```
+
+An item's `Language` applies to it and to everything inside it, so setting it
+on a rectangle or a tablix cell localizes what it contains.
+
+`User!Language` is the culture of whoever is reading, which is what a report
+following its reader is written in. It is passed in per render, and defaults to
+the machine's own -- the fallback RDL itself describes for a report that names
+no `Language`:
+
+```objc
+[RDLGenerator renderReport:report parameters:params usingBackend:backend userLanguage:@"fr-FR"];
+```
+
+```sh
+rdlgen report.rdl -o out.pdf --language fr-FR
+```
+
+A `Language` that is not a culture this machine knows is reported by the
+checker (`unknown-language`) rather than silently formatting as English.
+
+Not supported: `Calendar`, `NumeralLanguage` and `NumeralVariant`; and
+localized *labels*, which RDL has no native form for -- SSRS reports do it with
+a custom assembly or a lookup table, and so would a report here.
 
 ## Checking a report without running it
 

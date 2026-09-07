@@ -39,7 +39,14 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 @property (nonatomic, strong) NSDate *executionTime;
 @property (nonatomic, copy) NSDictionary<NSString *, id> *paramValues; // NSString or NSArray (MultiValue)
 @property (nonatomic, copy) NSString *userID;
+// The culture whatever is being rendered right now is written in: the
+// report's Language, or an item's own override of it. Format() and every
+// formatted value read this.
 @property (nonatomic, copy) NSString *language;
+// The culture of whoever is reading the report, which is what User!Language
+// answers -- and what a report following its reader sets Language to. The
+// machine's own when nothing says otherwise.
+@property (nonatomic, copy) NSString *userLanguage;
 @end
 
 // What a node of a parsed expression is. An enum rather than a string,
@@ -203,11 +210,30 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 - (BOOL)evaluateBoolInScope:(RDLEvalScope *)scope;
 @end
 
+// The locale a culture code names -- "en-US", "de_DE", nil for the machine's
+// own. RDL writes these with a hyphen and NSLocale with an underscore, which
+// is the whole of the difference this papers over.
+FOUNDATION_EXPORT NSLocale *RDLLocaleForLanguage(NSString *language);
+// This machine's own culture, as RDL writes one: "en-US". The fallback for a
+// report that names no Language, and the default for User!Language.
+FOUNDATION_EXPORT NSString *RDLHostLanguage(void);
+// NO for a code no locale on this machine answers to, so a report can be told
+// that its Language is a typo rather than silently formatting as if it were
+// English. An empty code is known: it means "the machine's own".
+FOUNDATION_EXPORT BOOL RDLLanguageIsKnown(NSString *language);
+
 // VB-style RDL expressions: tokenize → AST (translation) → execute.
 @interface RDLExpression : NSObject
 + (id)evaluate:(NSString *)expr scope:(RDLEvalScope *)scope;
 + (NSString *)evaluateText:(NSString *)expr scope:(RDLEvalScope *)scope;
 + (NSString *)formatValue:(id)value format:(NSString *)format;
+// The same, in a culture: "de-DE" writes 1.234,50 € where "en-US" writes
+// $1,234.50, and month names come out in that language. `language` nil or
+// empty means the machine's own locale, which is the fallback RDL itself
+// describes for a report that names no Language.
++ (NSString *)formatValue:(id)value
+                   format:(NSString *)format
+                 language:(NSString *)language;
 /// Compact S-expression of the parsed AST. Empty if the text is not an `=` expression.
 + (NSString *)translationOf:(NSString *)expr;
 @end

@@ -53,19 +53,18 @@ static RDLChartShape *RDLTextShape(NSString *text, NSPoint at, CGFloat size,
 
 // Numbers on a value axis: enough decimals to tell the steps apart, and no
 // more, plus thousands separators once the numbers get long.
-static NSString *RDLAxisNumber(double v, double interval) {
+static NSString *RDLAxisNumber(double v, double interval, NSString *language) {
   NSInteger decimals = 0;
   if (interval > 0 && interval < 1)
     decimals = (NSInteger)ceil(-log10(interval));
   if (decimals > 6)
     decimals = 6;
-  static NSNumberFormatter *fmt = nil;
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{
-    fmt = [[NSNumberFormatter alloc] init];
-    [fmt setNumberStyle:NSNumberFormatterDecimalStyle];
-    [fmt setLocale:[NSLocale systemLocale]];
-  });
+  // Built per call rather than cached: the culture is the chart's, and a
+  // cached formatter would hand the first chart's culture to every later one.
+  NSNumberFormatter *fmt = [[NSNumberFormatter alloc] init];
+  [fmt setFormatterBehavior:NSNumberFormatterBehavior10_4];
+  [fmt setNumberStyle:NSNumberFormatterDecimalStyle];
+  [fmt setLocale:RDLLocaleForLanguage(language)];
   [fmt setMinimumFractionDigits:(NSUInteger)decimals];
   [fmt setMaximumFractionDigits:(NSUInteger)decimals];
   return [fmt stringFromNumber:@(v)] ?: [NSString stringWithFormat:@"%.*f", (int)decimals, v];
@@ -297,7 +296,7 @@ static void RDLDrawPie(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
   CGFloat valueGutter = 0;
   if (!chart.valueAxisHidden) {
     for (double v = chart.axisMinimum; v <= chart.axisMaximum + 1e-9; v += chart.axisInterval) {
-      NSString *label = RDLAxisNumber(v, chart.axisInterval);
+      NSString *label = RDLAxisNumber(v, chart.axisInterval, chart.language);
       valueGutter = MAX(valueGutter, [self approximateWidthOfText:label atSize:fontSize bold:NO]);
       if (chart.axisInterval <= 0)
         break;
@@ -336,7 +335,7 @@ static void RDLDrawPie(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
   if (chart.axisInterval > 0) {
     for (double v = chart.axisMinimum; v <= chart.axisMaximum + 1e-9; v += chart.axisInterval) {
       double f = RDLAxisFraction(chart, v);
-      NSString *label = percent ? [NSString stringWithFormat:@"%.0f%%", v] : RDLAxisNumber(v, chart.axisInterval);
+      NSString *label = percent ? [NSString stringWithFormat:@"%.0f%%", v] : RDLAxisNumber(v, chart.axisInterval, chart.language);
       if (horizontal) {
         CGFloat x = plot.origin.x + (CGFloat)f * plot.size.width;
         if (chart.showValueGridLines)
@@ -498,7 +497,7 @@ static void RDLDrawPie(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
           NSPoint at = horizontal
                            ? NSMakePoint(NSMaxX(bar) + 3, NSMidY(bar) + fontSize * 0.35f)
                            : NSMakePoint(NSMidX(bar), bar.origin.y - 3);
-          [out addObject:RDLTextShape(RDLAxisNumber(raw, chart.axisInterval), at, fontSize,
+          [out addObject:RDLTextShape(RDLAxisNumber(raw, chart.axisInterval, chart.language), at, fontSize,
                                        horizontal ? RDLChartTextAnchorStart : RDLChartTextAnchorMiddle,
                                        kRDLChartMuted, NO)];
         }

@@ -318,6 +318,8 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLExpr *verticalAlign;
 @property (nonatomic, strong) RDLExpr *textDecoration;
 @property (nonatomic, strong) RDLExpr *format;
+// The culture this item's numbers and dates are written in; see RDLStyle.
+@property (nonatomic, strong) RDLExpr *language;
 @property (nonatomic, strong) RDLExpr *paddingLeft;
 @property (nonatomic, strong) RDLExpr *paddingRight;
 @property (nonatomic, strong) RDLExpr *paddingTop;
@@ -357,6 +359,11 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) RDLVerticalAlign verticalAlign;
 @property (nonatomic, assign) RDLTextDecoration textDecoration;
 @property (nonatomic, copy) NSString *format;
+// The culture whose conventions this item's numbers, currency and dates are
+// written in -- "en-US", "de-DE" -- overriding the report's own Language for
+// this item and anything inside it. Empty means "whatever is inherited",
+// which is what most items say.
+@property (nonatomic, copy) NSString *language;
 @property (nonatomic, strong) RDLLength *paddingLeft, *paddingRight, *paddingTop, *paddingBottom;
 @property (nonatomic, strong) RDLBorder *border;
 @property (nonatomic, strong) RDLBorder *borderLeft, *borderRight, *borderTop, *borderBottom;
@@ -722,6 +729,13 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *author;
 @property (nonatomic, copy) NSString *reportDescription;
+// The culture the report is rendered in: a code like "en-US", or an
+// expression -- "=User!Language" to follow whoever is reading it, or
+// "=Parameters!Culture.Value" to let them choose. It decides how numbers,
+// currency and dates come out wherever the report does not say otherwise.
+// Nothing set means the machine's own locale, which is what SSRS falls back
+// to as well.
+@property (nonatomic, strong) RDLValue *language;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, strong) RDLPage *page;
 @property (nonatomic, strong) RDLBand *pageHeader;
@@ -804,6 +818,9 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @end
 
 @interface RDLLaidOutChart : RDLLaidOutItem
+// The culture in force where the chart sits, so its axis numbers are written
+// the way the rest of the report's numbers are.
+@property (nonatomic, copy) NSString *language;
 @property (nonatomic, copy) NSArray<NSString *> *categories;
 @property (nonatomic, copy) NSArray<RDLLaidOutChartSeries *> *chartSeries;
 @property (nonatomic, assign) RDLChartType chartType;

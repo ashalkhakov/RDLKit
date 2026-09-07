@@ -741,4 +741,38 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"a dataset with no fields has no names");
 }
 
+// Language is written and read at both levels, and a code that is not a
+// culture is reported rather than quietly formatting as English.
+- (void)testLanguageRoundTripsAndIsChecked {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Localized"];
+  r.language = [RDLValue valueWithSource:@"=User!Language"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Amount";
+  tb.value = @"=1234.5";
+  tb.style.format = @"C";
+  tb.style.language = @"de-DE";
+  tb.width = 2;
+  tb.height = 0.3;
+  [r.body.items addObject:tb];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  if (![back.language isExpression] ||
+      ![[back.language source] isEqualToString:@"=User!Language"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"report Language → %@", [back.language source]]);
+  RDLTextbox *btb = (RDLTextbox *)[back.body.items firstObject];
+  if (![btb.style.language isEqualToString:@"de-DE"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"text box Language → %@", btb.style.language]);
+
+  // A typo in a culture code is a real defect: it formats as if no Language
+  // were set, and nothing else would ever mention it.
+  RDLReport *typo = [RDLReport emptyReportNamed:@"Typo"];
+  typo.language = [RDLValue literal:@"en-UK"];
+  BOOL warned = NO;
+  for (RDLDiagnostic *d in [RDLChecker checkReport:typo])
+    if ([d.rule isEqualToString:@"unknown-language"])
+      warned = YES;
+  if (!warned)
+    XCTFail(@"%@", @"an invented culture code should be reported");
+}
+
 @end

@@ -1741,4 +1741,83 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 }
 
 
+// Language, from the file to the rendered text: the report's own culture, one
+// text box overriding it, and a report that follows whoever is reading it.
+// What a culture looks like is the platform's; that the right culture reaches
+// the formatter is ours, so each rendering is checked against the formatter
+// asked the same question directly.
+- (void)testTheReportsLanguageReachesWhatIsRendered {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Localized"];
+  r.language = [RDLValue valueWithSource:@"de-DE"];
+  r.body.height = 2;
+
+  RDLTextbox *follows = [[RDLTextbox alloc] init];
+  follows.name = @"Follows";
+  follows.value = @"=1234.5";
+  follows.style.format = @"C";
+  follows.left = 0;
+  follows.top = 0;
+  follows.width = 3;
+  follows.height = 0.3;
+  [r.body.items addObject:follows];
+
+  RDLTextbox *override = [[RDLTextbox alloc] init];
+  override.name = @"Override";
+  override.value = @"=1234.5";
+  override.style.format = @"C";
+  override.style.language = @"en-US";
+  override.left = 3.5;
+  override.top = 0;
+  override.width = 3;
+  override.height = 0.3;
+  [r.body.items addObject:override];
+
+  NSDictionary *texts = [self textsOfReport:r params:nil];
+  if (![texts[@"Follows"] isEqualToString:[RDLExpression formatValue:@1234.5
+                                                              format:@"C"
+                                                            language:@"de-DE"]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the report's culture did not reach the text: %@",
+                                              texts[@"Follows"]]);
+  if (![texts[@"Override"] isEqualToString:[RDLExpression formatValue:@1234.5
+                                                               format:@"C"
+                                                             language:@"en-US"]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a text box's own Language did not win: %@",
+                                              texts[@"Override"]]);
+
+  // A report written to follow its reader.
+  r.language = [RDLValue valueWithSource:@"=User!Language"];
+  NSDictionary *followed = [self textsOfReport:r params:nil];
+  if (![followed[@"Follows"] isEqualToString:[RDLExpression formatValue:@1234.5
+                                                                 format:@"C"
+                                                               language:RDLHostLanguage()]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"=User!Language should render as this machine: %@",
+                                              followed[@"Follows"]]);
+
+  // And one the reader chooses, which is how a multilingual report is done:
+  // a parameter, and Language reading it.
+  RDLParameter *culture = [[RDLParameter alloc] init];
+  culture.name = @"Culture";
+  culture.dataType = RDLParameterDataTypeString;
+  culture.defaultValue = [RDLValue literal:@"en-US"];
+  [r.parameters addObject:culture];
+  r.language = [RDLValue valueWithSource:@"=Parameters!Culture.Value"];
+  NSDictionary *chosen = [self textsOfReport:r params:@{ @"Culture" : @"de-DE" }];
+  if (![chosen[@"Follows"] isEqualToString:[RDLExpression formatValue:@1234.5
+                                                               format:@"C"
+                                                             language:@"de-DE"]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a culture parameter did not reach Language: %@",
+                                              chosen[@"Follows"]]);
+}
+
+// Every laid-out textbox of a report, by name.
+- (NSDictionary<NSString *, NSString *> *)textsOfReport:(RDLReport *)report
+                                                 params:(NSDictionary *)params {
+  NSMutableDictionary *out = [NSMutableDictionary dictionary];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report paramValues:params])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        out[item.name ?: @""] = [(RDLLaidOutTextbox *)item text] ?: @"";
+  return out;
+}
+
 @end

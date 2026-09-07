@@ -170,6 +170,7 @@ static RDLStyle *RDLParseStyle(NSXMLElement *el) {
                           RDLTextDecorationFromString,
                           RDLText(RDLChild(el, @"TextDecoration")));
   RDLSetStyleString(s, RDLText(RDLChild(el, @"Format")), @"format");
+  RDLSetStyleString(s, RDLText(RDLChild(el, @"Language")), @"language");
   RDLSetStyleString(s, RDLText(RDLChild(el, @"BackgroundColor")), @"backgroundColor");
   {
     RDLExpr *pe = nil;
@@ -607,6 +608,7 @@ static RDLStyle *RDLParseSparseStyle(NSXMLElement *el) {
   RDL_PARSE_ENUM(s.textDecoration, @"TextDecoration", RDLTextDecorationFromString,
                   RDLText(RDLChild(el, @"TextDecoration")));
   s.format = RDLText(RDLChild(el, @"Format"));
+  s.language = RDLText(RDLChild(el, @"Language"));
   return s;
 }
 
@@ -615,7 +617,8 @@ static BOOL RDLSparseStyleIsEmpty(RDLStyle *s) {
          s.fontWeight == RDLFontWeightUnspecified && s.fontStyle == RDLFontStyleUnspecified &&
          ![s.color length] && ![s.backgroundColor length] &&
          s.textAlign == RDLTextAlignUnspecified &&
-         s.textDecoration == RDLTextDecorationUnspecified && ![s.format length];
+         s.textDecoration == RDLTextDecorationUnspecified && ![s.format length] &&
+         ![s.language length];
 }
 
 // Does this run's style say anything the textbox's own style does not? The
@@ -1059,6 +1062,10 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
     r.name = nm;
   r.author = RDLText(RDLChild(root, @"Author"));
   r.reportDescription = RDLText(RDLChild(root, @"Description"));
+  // Static code or expression, whichever was written: "en-US" and
+  // "=User!Language" are both Language, and RDLValue is the one shape that
+  // holds either.
+  r.language = [RDLValue valueWithSource:RDLText(RDLChild(root, @"Language"))];
   r.width = RDLInchesFromString(RDLText(RDLChild(root, @"Width")));
   NSXMLElement *pageEl = RDLChild(root, @"Page");
   // An element that is not there must leave RDLPage's default alone -- RDL
@@ -1282,6 +1289,7 @@ static NSXMLElement *RDLSparseStyleElement(RDLStyle *s) {
   if (s.textDecoration != RDLTextDecorationUnspecified)
     RDLAdd(el, @"TextDecoration", RDLStringFromTextDecoration(s.textDecoration));
   RDLAddIf(el, @"Format", s.format);
+  RDLAddIf(el, @"Language", s.language);
   return [el childCount] ? el : nil;
 }
 
@@ -1329,6 +1337,10 @@ static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
     RDLAdd(el, @"Format", [s.expressions.format source]);
   else
     RDLAddIf(el, @"Format", s.format);
+  if (s.expressions.language)
+    RDLAdd(el, @"Language", [s.expressions.language source]);
+  else
+    RDLAddIf(el, @"Language", s.language);
   if (s.expressions.backgroundColor)
     RDLAdd(el, @"BackgroundColor", [s.expressions.backgroundColor source]);
   else if (s.backgroundColor && ![s.backgroundColor isEqualToString:@"Transparent"])
@@ -1834,6 +1846,7 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   RDLAdd(root, @"Name", report.name);
   RDLAdd(root, @"Description", report.reportDescription);
   RDLAdd(root, @"Author", report.author);
+  RDLAddValue(root, @"Language", report.language);
   RDLAdd(root, @"Width", RDLIn(report.width));
 
   NSXMLElement *sources = RDLEl(@"DataSources");

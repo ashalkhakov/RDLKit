@@ -379,4 +379,58 @@
                                               [box.style.fontSize stringValue]]);
 }
 
+// Language, in the inspector. The report's is an RDLValue -- one box holding
+// either a culture code or an expression -- and a text box's is a style
+// property like Format, so both directions of both are checked here rather
+// than only that the fields exist.
+- (void)testLanguageBindings {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLTextbox *box = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTextbox class]]) {
+      box = (RDLTextbox *)it;
+      break;
+    }
+  report.language = [RDLValue valueWithSource:@"de-DE"];
+  box.style.language = @"fr-FR";
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSTextField *reportField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 120, 22)];
+  NSTextField *itemField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 120, 22)];
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:reportField keyPath:@"language" scope:RDLFieldScopeReport
+            kind:RDLFieldKindValue values:nil placeholder:nil];
+  [bindings bind:itemField keyPath:@"style.language" scope:RDLFieldScopeItem
+            kind:RDLFieldKindTextOrExpression values:nil placeholder:nil];
+
+  // Model -> fields.
+  [bindings fillFromItem:box band:nil report:report];
+  if (![[reportField stringValue] isEqualToString:@"de-DE"] ||
+      ![[itemField stringValue] isEqualToString:@"fr-FR"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"filled with %@ / %@", [reportField stringValue],
+                                              [itemField stringValue]]);
+
+  // Fields -> model. An expression in the report's box is an expression, which
+  // is how a report follows whoever is reading it.
+  [reportField setStringValue:@"=User!Language"];
+  if (![bindings applyControl:reportField editor:ctx.editor item:box bandKey:nil])
+    XCTFail(@"%@", @"the report's Language field is bound but was not claimed");
+  if (![report.language isExpression] ||
+      ![[report.language source] isEqualToString:@"=User!Language"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"report Language → %@", [report.language source]]);
+
+  [itemField setStringValue:@"en-GB"];
+  if (![bindings applyControl:itemField editor:ctx.editor item:box bandKey:nil])
+    XCTFail(@"%@", @"the text box's Language field is bound but was not claimed");
+  if (![box.style.language isEqualToString:@"en-GB"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"text box Language → %@", box.style.language]);
+
+  // Cleared, it goes back to being unset: no Language and an empty one are
+  // different things in the file.
+  [reportField setStringValue:@""];
+  [bindings applyControl:reportField editor:ctx.editor item:box bandKey:nil];
+  if (report.language != nil)
+    XCTFail(@"%@", @"clearing the box should remove the report's Language");
+}
+
 @end

@@ -14,6 +14,12 @@
                  error:(NSError **)error;
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
                                    parameters:(NSDictionary<NSString *, NSString *> *)params;
+// Rendered for a reader in `userLanguage` -- what User!Language answers, and
+// so what a report written to follow its reader comes out in. nil is this
+// machine's culture. A report that names its own Language keeps it.
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                   parameters:(NSDictionary<NSString *, NSString *> *)params
+                                 userLanguage:(NSString *)userLanguage;
 + (NSArray<id<RDLBackend>> *)backends;
 + (id<RDLBackend>)backendNamed:(NSString *)name;
 + (NSData *)renderPages:(NSArray<RDLLaidOutPage *> *)pages
@@ -22,6 +28,10 @@
 + (NSData *)renderReport:(RDLReport *)report
               parameters:(NSDictionary<NSString *, NSString *> *)params
              usingBackend:(id<RDLBackend>)backend;
++ (NSData *)renderReport:(RDLReport *)report
+              parameters:(NSDictionary<NSString *, NSString *> *)params
+             usingBackend:(id<RDLBackend>)backend
+            userLanguage:(NSString *)userLanguage;
 + (NSData *)PDFForReport:(RDLReport *)report
               parameters:(NSDictionary<NSString *, NSString *> *)params;
 + (NSString *)HTMLStringForReport:(RDLReport *)report
