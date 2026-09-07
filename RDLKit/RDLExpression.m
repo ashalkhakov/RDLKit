@@ -132,6 +132,20 @@ static NSString *RDLStr(id v) {
   return [v description];
 }
 
+// RDLStr, in a named culture: the same rules, but the date comes out the way
+// that culture writes dates rather than the way this machine does.
+static NSString *RDLStrInLocale(id v, NSLocale *locale) {
+  if (locale == nil || ![v isKindOfClass:[NSDate class]])
+    return RDLStr(v);
+  NSDateFormatter *f = [[NSDateFormatter alloc] init];
+  [f setFormatterBehavior:NSDateFormatterBehavior10_4];
+  f.locale = locale;
+  f.dateStyle = NSDateFormatterMediumStyle;
+  f.timeStyle = NSDateFormatterShortStyle;
+  NSString *formatted = [f stringFromDate:v];
+  return [formatted length] ? formatted : RDLStr(v);
+}
+
 static double RDLNum(id v) {
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
@@ -1017,7 +1031,7 @@ static id RDLUser(RDLEvalScope *scope, NSString *name) {
   if ([n isEqualToString:@"userid"])
     return scope.userID.length ? scope.userID : @"RDLDesigner";
   if ([n isEqualToString:@"language"])
-    return scope.language.length ? scope.language : @"en-US";
+    return scope.userLanguage.length ? scope.userLanguage : RDLHostLanguage();
   return @"";
 }
 
@@ -1268,13 +1282,13 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
   id a1 = [vals count] > 1 ? vals[1] : nil;
   id a2 = [vals count] > 2 ? vals[2] : nil;
   if ([n isEqualToString:@"format"])
-    return [RDLExpression formatValue:a0 format:RDLStr(a1)];
+    return [RDLExpression formatValue:a0 format:RDLStr(a1) language:scope.language];
   if ([n isEqualToString:@"formatcurrency"])
-    return [RDLExpression formatValue:a0 format:@"C"];
+    return [RDLExpression formatValue:a0 format:@"C" language:scope.language];
   if ([n isEqualToString:@"formatnumber"])
-    return [RDLExpression formatValue:a0 format:@"N"];
+    return [RDLExpression formatValue:a0 format:@"N" language:scope.language];
   if ([n isEqualToString:@"formatpercent"])
-    return [RDLExpression formatValue:a0 format:@"P"];
+    return [RDLExpression formatValue:a0 format:@"P" language:scope.language];
   if ([n isEqualToString:@"cstr"])
     return RDLStr(a0);
   if ([n isEqualToString:@"csng"] || [n isEqualToString:@"cbyte"])
@@ -1793,67 +1807,117 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   return @"";
 }
 
+NSLocale *RDLLocaleForLanguage(NSString *language) {
+  if ([language length] == 0)
+    return [NSLocale currentLocale];
+  // RDL writes "de-DE"; NSLocale wants "de_DE". Nothing else differs.
+  NSString *ident = [language stringByReplacingOccurrencesOfString:@"-" withString:@"_"];
+  return [NSLocale localeWithLocaleIdentifier:ident] ?: [NSLocale currentLocale];
+}
+
+NSString *RDLHostLanguage(void) {
+  NSString *ident = [[NSLocale currentLocale] localeIdentifier];
+  NSString *culture = [ident stringByReplacingOccurrencesOfString:@"_" withString:@"-"];
+  // An identifier can carry more than the culture ("en_US@calendar=..."), and
+  // RDL's Language is only ever the culture.
+  NSRange at = [culture rangeOfString:@"@"];
+  if (at.location != NSNotFound)
+    culture = [culture substringToIndex:at.location];
+  return [culture length] ? culture : @"en-US";
+}
+
+BOOL RDLLanguageIsKnown(NSString *language) {
+  if ([language length] == 0)
+    return YES;  // "the machine's own" is always a language
+  NSString *ident = [language stringByReplacingOccurrencesOfString:@"-" withString:@"_"];
+  for (NSString *known in [NSLocale availableLocaleIdentifiers])
+    if ([known caseInsensitiveCompare:ident] == NSOrderedSame)
+      return YES;
+  // A bare language with no country -- "de", "fr" -- is a culture too, and is
+  // not in the list of identifiers, which pairs them with countries.
+  NSString *base = [[ident componentsSeparatedByString:@"_"] firstObject];
+  if ([base length] && [ident isEqualToString:base])
+    for (NSString *code in [NSLocale ISOLanguageCodes])
+      if ([code caseInsensitiveCompare:base] == NSOrderedSame)
+        return YES;
+  return NO;
+}
+
 @implementation RDLExpression
 
 + (NSString *)formatValue:(id)value format:(NSString *)format {
+  return [self formatValue:value format:format language:nil];
+}
+
++ (NSString *)formatValue:(id)value
+                   format:(NSString *)format
+                 language:(NSString *)language {
+  NSLocale *locale = RDLLocaleForLanguage(language);
   if (format == nil || [format length] == 0)
-    return RDLStr(value);
+    return RDLStrInLocale(value, locale);
   NSString *f = [format stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   NSDate *dateVal = [value isKindOfClass:[NSDate class]] ? value : RDLAsDate(value, nil);
   if (dateVal && ([f isEqualToString:@"D"] || [f isEqualToString:@"d"])) {
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
     // As in RDLStr: name the behaviour, and never hand back nothing.
     [df setFormatterBehavior:NSDateFormatterBehavior10_4];
+    df.locale = locale;
     df.dateStyle = [f isEqualToString:@"D"] ? NSDateFormatterFullStyle : NSDateFormatterShortStyle;
     NSString *formatted = [df stringFromDate:dateVal];
     return [formatted length] ? formatted : [dateVal description];
   }
   double n = RDLNum(value);
   NSString *low = [f lowercaseString];
-  if ([low hasPrefix:@"c"]) {
+  // The three standard numeric formats. Each takes its separators, and
+  // currency its symbol, from the culture: "C" is $1,234.50 in en-US and
+  // 1.234,50 € in de-DE, which is the whole point of Language.
+  if ([low hasPrefix:@"c"] || [low hasPrefix:@"n"] || [low hasPrefix:@"p"]) {
     NSNumberFormatter *nf = [[NSNumberFormatter alloc] init];
-    nf.numberStyle = NSNumberFormatterCurrencyStyle;
-    nf.currencyCode = @"USD";
+    [nf setFormatterBehavior:NSNumberFormatterBehavior10_4];
+    nf.locale = locale;
+    nf.numberStyle = [low hasPrefix:@"c"]   ? NSNumberFormatterCurrencyStyle
+                     : [low hasPrefix:@"n"] ? NSNumberFormatterDecimalStyle
+                                            : NSNumberFormatterPercentStyle;
     NSInteger digits = [[f substringFromIndex:1] integerValue];
+    // A bare letter takes the format's own default: two decimals for money and
+    // for numbers, none for a percentage.
     if ([f length] == 1)
-      digits = 2;
+      digits = [low hasPrefix:@"p"] ? 0 : 2;
     nf.minimumFractionDigits = digits;
     nf.maximumFractionDigits = digits;
-    return [nf stringFromNumber:@(n)] ?: RDLStr(value);
-  }
-  if ([low hasPrefix:@"n"]) {
-    NSNumberFormatter *nf = [[NSNumberFormatter alloc] init];
-    nf.numberStyle = NSNumberFormatterDecimalStyle;
-    NSInteger digits = [[f substringFromIndex:1] integerValue];
-    if ([f length] == 1)
-      digits = 2;
-    nf.minimumFractionDigits = digits;
-    nf.maximumFractionDigits = digits;
-    return [nf stringFromNumber:@(n)] ?: RDLStr(value);
-  }
-  if ([low hasPrefix:@"p"]) {
-    NSNumberFormatter *nf = [[NSNumberFormatter alloc] init];
-    nf.numberStyle = NSNumberFormatterPercentStyle;
-    NSInteger digits = [[f substringFromIndex:1] integerValue];
-    nf.minimumFractionDigits = [f length] == 1 ? 0 : digits;
-    nf.maximumFractionDigits = [f length] == 1 ? 0 : digits;
-    return [nf stringFromNumber:@(n)] ?: RDLStr(value);
+    NSString *formatted = [nf stringFromNumber:@(n)];
+    return [formatted length] ? formatted : RDLStrInLocale(value, locale);
   }
   if ([f rangeOfString:@"#"].location != NSNotFound || [f rangeOfString:@"0"].location != NSNotFound) {
+    // A picture like "#,##0.00" says how many decimals and whether to group;
+    // which characters do the grouping and the decimal point is the culture's
+    // business, not the picture's.
     NSArray *parts = [f componentsSeparatedByString:@"."];
     NSUInteger dec = [parts count] > 1 ? [parts[1] length] : 0;
-    return [NSString stringWithFormat:@"%.*f", (int)dec, n];
+    NSNumberFormatter *nf = [[NSNumberFormatter alloc] init];
+    [nf setFormatterBehavior:NSNumberFormatterBehavior10_4];
+    nf.locale = locale;
+    nf.numberStyle = NSNumberFormatterDecimalStyle;
+    nf.usesGroupingSeparator = [parts[0] rangeOfString:@","].location != NSNotFound;
+    nf.minimumFractionDigits = dec;
+    nf.maximumFractionDigits = dec;
+    NSString *formatted = [nf stringFromNumber:@(n)];
+    return [formatted length] ? formatted : [NSString stringWithFormat:@"%.*f", (int)dec, n];
   }
   if (dateVal && ([low rangeOfString:@"yy"].location != NSNotFound || [low rangeOfString:@"mm"].location != NSNotFound ||
                   [low rangeOfString:@"dd"].location != NSNotFound || [f rangeOfString:@"M"].location != NSNotFound ||
                   [low rangeOfString:@"hh"].location != NSNotFound || [low rangeOfString:@"ss"].location != NSNotFound)) {
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
-    df.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    [df setFormatterBehavior:NSDateFormatterBehavior10_4];
+    // The pattern says the shape; the culture says what the names in it are,
+    // so "MMMM yyyy" is "March 2026" or "März 2026". With no culture named the
+    // POSIX locale keeps the old behaviour: English names, everywhere.
+    df.locale = [language length] ? locale : [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     NSString *pat = [f stringByReplacingOccurrencesOfString:@"tt" withString:@"a"];
     df.dateFormat = pat;
     return [df stringFromDate:dateVal];
   }
-  return RDLStr(value);
+  return RDLStrInLocale(value, locale);
 }
 
 + (id)evaluate:(NSString *)expr scope:(RDLEvalScope *)scope {

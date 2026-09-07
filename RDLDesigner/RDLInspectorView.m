@@ -48,6 +48,15 @@
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *valueField, *fontField, *colorField, *formatField;
+// Localization: the report's culture, and one text box's override of it.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *docLanguageField, *languageField;
+// The unit the report is authored in, and the labels that have to say which
+// unit their box is in. RDL measurements carry their own unit, so this is a
+// matter of what the author reads and types, not of what the file means.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *unitPop;
+@property (nonatomic, strong) IBOutlet NSTextField *headerHLabel, *bodyHLabel, *footerHLabel,
+    *marginLabel, *bandHeightLabel, *cellWidthLabel, *tablixHeaderLabel, *tablixRowLabel;
+@property (nonatomic, strong) IBOutlet NSButton *docLanguageExprButton, *languageExprButton;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
@@ -120,9 +129,12 @@
   // way to know; the dataset popups are filled per report in -reload.
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
+  [_unitPop addItemWithTitle:@"Inches"];
+  [_unitPop addItemWithTitle:@"Centimeters"];
   // f(x) is a picture, not two letters and two brackets: at 24 points wide the
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
+                         _languageExprButton, _docLanguageExprButton,
                          _rectBGExprButton, _sizeExprButton, _cellExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
@@ -224,6 +236,11 @@
              kind:RDLFieldKindColor];
   [_bindings bind:_formatField keyPath:@"style.format" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
+  // A text box may be written in its own culture: dates and numbers in it are
+  // then formatted that way whatever the report says. Empty means "the
+  // report's", which is what nearly every text box wants.
+  [_bindings bind:_languageField keyPath:@"style.language" scope:RDLFieldScopeItem
+             kind:RDLFieldKindTextOrExpression values:nil placeholder:nil];
 
   // Line and Rectangle each expose one style property.
   [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
@@ -277,6 +294,16 @@
              kind:RDLFieldKindText];
   [_bindings bind:_authorField keyPath:@"author" scope:RDLFieldScopeReport
              kind:RDLFieldKindText];
+  // The report's own culture: a code, or an expression -- "=User!Language" to
+  // follow whoever is reading, "=Parameters!Culture.Value" to let them choose.
+  // The unit is the report's, the way its page size is: every measurement box
+  // in the inspector is read and written in it.
+  [_bindings bind:_unitPop keyPath:@"unit" scope:RDLFieldScopeReport
+             kind:RDLFieldKindPopUpIndex
+           values:@[ @(RDLReportUnitInch), @(RDLReportUnitCentimeter) ]
+      placeholder:nil];
+  [_bindings bind:_docLanguageField keyPath:@"language" scope:RDLFieldScopeReport
+             kind:RDLFieldKindValue values:nil placeholder:RDLHostLanguage()];
   [_bindings bind:_descField keyPath:@"reportDescription" scope:RDLFieldScopeReport
              kind:RDLFieldKindText];
   [_bindings bind:_headerHField keyPath:@"pageHeader.height" scope:RDLFieldScopeReport
@@ -321,10 +348,31 @@
   [self applyExpressionContexts];
 }
 
+// Every measurement box says which unit it is in, because "0.5" means two very
+// different rectangles in the two of them.
+- (void)syncUnitLabels {
+  NSString *abbr = RDLAbbreviationForReportUnit(_context.report.unit);
+  NSDictionary *titles = @{
+    @"headerHLabel" : @"Header",
+    @"bodyHLabel" : @"Body",
+    @"footerHLabel" : @"Footer",
+    @"marginLabel" : @"Margin",
+    @"bandHeightLabel" : @"Height",
+    @"cellWidthLabel" : @"Width",
+    @"tablixHeaderLabel" : @"Header",
+    @"tablixRowLabel" : @"Row"
+  };
+  for (NSString *key in titles) {
+    NSTextField *label = [self valueForKey:key];
+    [label setStringValue:[NSString stringWithFormat:@"%@ %@", titles[key], abbr]];
+  }
+}
+
 - (void)reload {
   if (_reloading)
     return;
   _reloading = YES;
+  [self syncUnitLabels];
   RDLReport *report = _context.report;
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
@@ -544,6 +592,8 @@
   _colorField.expressionContext = RDLExpressionContextColor;
   _rectBGField.expressionContext = RDLExpressionContextColor;
   _formatField.expressionContext = RDLExpressionContextText;
+  _languageField.expressionContext = RDLExpressionContextText;
+  _docLanguageField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
   _cellValueField.expressionContext = RDLExpressionContextText;
 }
@@ -556,6 +606,8 @@
   if (sender == _fontExprButton) return _fontField;
   if (sender == _colorExprButton) return _colorField;
   if (sender == _formatExprButton) return _formatField;
+  if (sender == _languageExprButton) return _languageField;
+  if (sender == _docLanguageExprButton) return _docLanguageField;
   if (sender == _rectBGExprButton) return _rectBGField;
   if (sender == _sizeExprButton) return _sizeField;
   if (sender == _cellExprButton) return _cellValueField;

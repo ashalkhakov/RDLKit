@@ -50,7 +50,13 @@
 
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
                                    parameters:(NSDictionary<NSString *, NSString *> *)params {
-  return [RDLLayoutEngine pagesForReport:report paramValues:params];
+  return [self pagesForReport:report parameters:params userLanguage:nil];
+}
+
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                   parameters:(NSDictionary<NSString *, NSString *> *)params
+                                 userLanguage:(NSString *)userLanguage {
+  return [RDLLayoutEngine pagesForReport:report paramValues:params userLanguage:userLanguage];
 }
 
 + (NSArray<id<RDLBackend>> *)backends {
@@ -76,7 +82,14 @@
 + (NSData *)renderReport:(RDLReport *)report
               parameters:(NSDictionary<NSString *, NSString *> *)params
              usingBackend:(id<RDLBackend>)backend {
-  NSArray *pages = [self pagesForReport:report parameters:params];
+  return [self renderReport:report parameters:params usingBackend:backend userLanguage:nil];
+}
+
++ (NSData *)renderReport:(RDLReport *)report
+              parameters:(NSDictionary<NSString *, NSString *> *)params
+             usingBackend:(id<RDLBackend>)backend
+            userLanguage:(NSString *)userLanguage {
+  NSArray *pages = [self pagesForReport:report parameters:params userLanguage:userLanguage];
   return [self renderPages:pages title:report.name ?: @"Report" usingBackend:backend];
 }
 

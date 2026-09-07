@@ -5,7 +5,7 @@ static void RDLUsage(void) {
   fprintf(stderr,
           "RDLDesigner generator — RDL + data + parameters → PDF or HTML\n"
           "usage: rdlgen report.rdl [-o out.pdf|out.html] [-f pdf|html]\n"
-          "                [-p Name=Value] [-d DataSet=file.json]\n"
+          "                [-p Name=Value] [-d DataSet=file.json] [--language en-US]\n"
           "       rdlgen report.rdl --check      static check, no data needed\n"
           "       rdlgen report.rdl --contract   the data shape the report needs\n");
 }
@@ -21,6 +21,9 @@ int main(int argc, const char *argv[]) {
     NSString *format = nil;
     NSMutableDictionary *params = [NSMutableDictionary dictionary];
     NSMutableArray *binds = [NSMutableArray array];
+    // Who the report is being rendered for. A report that names its own
+    // Language keeps it; one written as "=User!Language" follows this.
+    NSString *userLanguage = nil;
     BOOL check = NO, contract = NO;
     for (int i = 1; i < argc; i++) {
       NSString *a = [NSString stringWithUTF8String:argv[i]];
@@ -35,6 +38,8 @@ int main(int argc, const char *argv[]) {
           params[[kv substringToIndex:eq.location]] = [kv substringFromIndex:eq.location + 1];
       } else if ([a isEqualToString:@"-d"] && i + 1 < argc) {
         [binds addObject:[NSString stringWithUTF8String:argv[++i]]];
+      } else if ([a isEqualToString:@"--language"] && i + 1 < argc) {
+        userLanguage = [NSString stringWithUTF8String:argv[++i]];
       } else if ([a isEqualToString:@"--check"]) {
         check = YES;
       } else if ([a isEqualToString:@"--contract"]) {
@@ -118,9 +123,14 @@ int main(int argc, const char *argv[]) {
       fprintf(stderr, "unknown backend: %s (pdf or html)\n", format.UTF8String);
       return 2;
     }
-    NSData *out = [RDLGenerator renderReport:report parameters:params usingBackend:backend];
+    NSData *out = [RDLGenerator renderReport:report
+                                  parameters:params
+                                 usingBackend:backend
+                                userLanguage:userLanguage];
     [out writeToFile:outPath atomically:YES];
-    NSArray *pages = [RDLGenerator pagesForReport:report parameters:params];
+    NSArray *pages = [RDLGenerator pagesForReport:report
+                                       parameters:params
+                                     userLanguage:userLanguage];
     fprintf(stdout, "wrote %s (%lu bytes) pages=%lu backend=%s\n", outPath.UTF8String,
             (unsigned long)[out length], (unsigned long)[pages count], backend.name.UTF8String);
   }

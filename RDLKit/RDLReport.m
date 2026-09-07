@@ -275,6 +275,36 @@ BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op) {
   return op == RDLFilterOperatorIn || op == RDLFilterOperatorBetween;
 }
 
+// One inch, in the units RDL knows. Written once here rather than as 2.54 in
+// each place that needs it.
+const double RDLCentimetersPerInch = 2.54;
+
+RDLReportUnit RDLReportUnitFromString(NSString *name) {
+  NSString *n = [name lowercaseString];
+  if ([n isEqualToString:@"cm"] || [n isEqualToString:@"centimeter"] ||
+      [n isEqualToString:@"centimetre"] || [n isEqualToString:@"mm"])
+    return RDLReportUnitCentimeter;
+  if ([n isEqualToString:@"inch"] || [n isEqualToString:@"in"])
+    return RDLReportUnitInch;
+  return RDLReportUnitUnspecified;
+}
+
+NSString *RDLStringFromReportUnit(RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? @"Cm" : @"Inch";
+}
+
+NSString *RDLAbbreviationForReportUnit(RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? @"cm" : @"in";
+}
+
+double RDLUnitsFromInches(double inches, RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? inches * RDLCentimetersPerInch : inches;
+}
+
+double RDLInchesFromUnits(double value, RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? value / RDLCentimetersPerInch : value;
+}
+
 @implementation RDLLength
 
 + (instancetype)lengthWithValue:(double)value unit:(RDLLengthUnit)unit {
@@ -370,7 +400,8 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 - (BOOL)isEmpty {
   return _fontFamily == nil && _fontSize == nil && _fontWeight == nil && _fontStyle == nil &&
          _color == nil && _backgroundColor == nil && _textAlign == nil && _verticalAlign == nil &&
-         _textDecoration == nil && _format == nil && _paddingLeft == nil && _paddingRight == nil &&
+         _textDecoration == nil && _format == nil && _language == nil &&
+         _paddingLeft == nil && _paddingRight == nil &&
          _paddingTop == nil && _paddingBottom == nil;
 }
 @end
@@ -447,6 +478,7 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   s.textDecoration =
       run.textDecoration != RDLTextDecorationUnspecified ? run.textDecoration : base.textDecoration;
   s.format = [run.format length] ? run.format : base.format;
+  s.language = [run.language length] ? run.language : base.language;
   s.paddingLeft = base.paddingLeft;
   s.paddingRight = base.paddingRight;
   s.paddingTop = base.paddingTop;

@@ -229,6 +229,20 @@ static BOOL RDLStyleIsDynamic(RDLStyle *s) {
          RDLBorderIsDynamic(s.borderBottom);
 }
 
+// The culture a report renders in. Language may be a code or an expression --
+// "=User!Language" to follow the reader, "=Parameters!Culture.Value" to let
+// them pick -- so it is evaluated, and evaluated after the scope knows who is
+// reading and what the parameters are. A report that names none renders in the
+// machine's own culture, which is the fallback RDL describes.
+static void RDLApplyReportLanguage(RDLEvalScope *scope, RDLReport *report) {
+  if ([scope.userLanguage length] == 0)
+    scope.userLanguage = RDLHostLanguage();
+  if ([scope.language length] == 0) {
+    NSString *named = [report.language evaluateTextInScope:scope];
+    scope.language = [named length] ? named : scope.userLanguage;
+  }
+}
+
 static RDLStyle *RDLResolveStyle(RDLStyle *s, RDLEvalScope *scope) {
   if (s == nil || scope == nil || !RDLStyleIsDynamic(s))
     return s;
@@ -241,6 +255,7 @@ static RDLStyle *RDLResolveStyle(RDLStyle *s, RDLEvalScope *scope) {
   r.fontSize = e.fontSize ? [RDLLength lengthFromString:[e.fontSize evaluateTextInScope:scope]]
                           : s.fontSize;
   r.format = e.format ? [e.format evaluateTextInScope:scope] : s.format;
+  r.language = e.language ? [e.language evaluateTextInScope:scope] : s.language;
   // A vocabulary property's expression yields one of that vocabulary's names.
   r.fontWeight = e.fontWeight ? RDLFontWeightFromString([e.fontWeight evaluateTextInScope:scope])
                               : s.fontWeight;
@@ -314,7 +329,8 @@ static CGFloat RDLTextboxGrownHeight(RDLTextbox *item, CGFloat width, RDLEvalSco
     return item.height;
   RDLStyle *st = RDLResolveStyle(item.style, scope);
   NSString *text = [RDLExpression formatValue:[RDLExpression evaluate:item.value scope:scope]
-                                       format:st.format];
+                                       format:st.format
+                                     language:[st.language length] ? st.language : scope.language];
   CGFloat needed = RDLEstimateTextHeight(text, st ?: item.style, width > 0 ? width : item.width);
   return MAX(item.height, needed);
 }
@@ -1341,6 +1357,7 @@ static double RDLNiceInterval(double span, NSInteger want) {
 }
 
 static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *scope) {
+  lc.language = scope.language;
   lc.chartType = chart.chartType != RDLChartTypeUnspecified ? chart.chartType : RDLChartTypeColumn;
   lc.subtype = chart.subtype != RDLChartSubtypeUnspecified ? chart.subtype : RDLChartSubtypePlain;
   lc.title = [chart.chartTitle evaluateTextInScope:scope];
@@ -1464,6 +1481,7 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   RDLEvalScope *scope = [[RDLEvalScope alloc] init];
   scope.report = report;
   scope.paramValues = params;
+  RDLApplyReportLanguage(scope, report);
   RDLLayOutChart(chart, out, scope);
   out.w = chart.width;
   out.h = chart.height;
@@ -1509,6 +1527,12 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   li.h = h;
   li.zIndex = item.zIndex;
   li.style = RDLResolveStyle(item.style, scope);
+  // An item's own Language is in force for it and for everything it contains,
+  // which is what makes a Language on a rectangle or a tablix cell mean
+  // anything. Put back before returning, because the scope outlives the item.
+  NSString *savedLanguage = scope.language;
+  if ([li.style.language length])
+    scope.language = li.style.language;
   if (item.hyperlink != nil) {
     NSString *url = [item.hyperlink evaluateTextInScope:scope];
     if ([url length])
@@ -1518,7 +1542,8 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     RDLTextbox *tb0 = (RDLTextbox *)item;
     RDLLaidOutTextbox *lt = (RDLLaidOutTextbox *)li;
     lt.text = [RDLExpression formatValue:[RDLExpression evaluate:tb0.value scope:scope]
-                                  format:(li.style ?: item.style).format];
+                                  format:(li.style ?: item.style).format
+                                language:scope.language];
     if ([tb0.paragraphs count]) {
       NSMutableArray *spans = [NSMutableArray array];
       NSMutableArray *flat = [NSMutableArray array];
@@ -1531,8 +1556,11 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
           outRun.style = run.style;
           NSString *fmt = [run.style.format length] ? run.style.format
                                                     : (li.style ?: item.style).format;
+          // A run may name its own culture, the way it may name its own format.
+          NSString *runLang = [run.style.language length] ? run.style.language : scope.language;
           outRun.value = [RDLExpression formatValue:[RDLExpression evaluate:run.value scope:scope]
-                                             format:fmt];
+                                             format:fmt
+                                           language:runLang];
           [outPara.runs addObject:outRun];
           [paraText appendString:outRun.value ?: @""];
         }
@@ -1563,9 +1591,11 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     [page.items addObject:li];
     for (RDLItem *child in item.childItems)
       [self placeItem:child originX:x originY:y scope:scope onPage:page clipTop:clipTop clipBottom:clipBottom];
+    scope.language = savedLanguage;
     return;
   }
   [page.items addObject:li];
+  scope.language = savedLanguage;
 }
 
 + (void)placeTablixInst:(RDLTablixInst *)inst
@@ -1797,6 +1827,12 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
 
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
                                   paramValues:(NSDictionary<NSString *, NSString *> *)params {
+  return [self pagesForReport:report paramValues:params userLanguage:nil];
+}
+
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                  paramValues:(NSDictionary<NSString *, NSString *> *)params
+                                 userLanguage:(NSString *)userLanguage {
   CGFloat mx = report.page.leftMargin;
   CGFloat my = report.page.topMargin;
   CGFloat headerH = report.pageHeader.height;
@@ -1812,6 +1848,8 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
   measure.report = report;
   measure.executionTime = [NSDate date];
   measure.paramValues = params ?: @{};
+  measure.userLanguage = userLanguage;
+  RDLApplyReportLanguage(measure, report);
   if ([report.dataSets count])
     measure.dataSet = report.dataSets[0];
 
@@ -1947,6 +1985,8 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
     scope.pageName = pname;
     scope.executionTime = [NSDate date];
     scope.paramValues = params ?: @{};
+    scope.userLanguage = userLanguage;
+    RDLApplyReportLanguage(scope, report);
     if ([report.dataSets count])
       scope.dataSet = report.dataSets[0];
 

@@ -585,4 +585,48 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
   }
 }
 
+// Language, at the level a value is formatted. What a culture's numbers look
+// like is the platform's business -- this checks that the culture reaches the
+// formatter at all, and that the two ends of the property (the report's and
+// User!Language) are told apart.
+- (void)testFormattingFollowsTheCulture {
+  NSString *dollars = [RDLExpression formatValue:@1234.5 format:@"C" language:@"en-US"];
+  NSString *euros = [RDLExpression formatValue:@1234.5 format:@"C" language:@"de-DE"];
+  if ([dollars rangeOfString:@"1"].location == NSNotFound ||
+      [euros rangeOfString:@"1"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"C → %@ / %@", dollars, euros]);
+  if ([dollars isEqualToString:euros]) {
+    // Not a failure of ours: a platform whose formatter does not separate
+    // these cultures formats both the same way, and everything below still
+    // has to hold.
+    NSLog(@"this platform's NSNumberFormatter does not distinguish en-US from de-DE");
+  } else if ([dollars rangeOfString:@"$"].location == NSNotFound) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"en-US currency → %@", dollars]);
+  }
+
+  // An unknown code is not silently English: the checker is what says so, and
+  // it needs a definite answer.
+  if (!RDLLanguageIsKnown(@"de-DE") || !RDLLanguageIsKnown(@"en-US") ||
+      !RDLLanguageIsKnown(@"") || !RDLLanguageIsKnown(@"de"))
+    XCTFail(@"%@", @"these are all cultures");
+  if (RDLLanguageIsKnown(@"klingon-KL"))
+    XCTFail(@"%@", @"an invented culture should not pass for one");
+
+  // The two ends of it: what the report formats in, and who is reading.
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"de-DE";
+  scope.userLanguage = @"fr-FR";
+  if (![[RDLExpression evaluateText:@"=User!Language" scope:scope] isEqualToString:@"fr-FR"])
+    XCTFail(@"%@", @"User!Language is the reader's culture, not the one being formatted in");
+  NSString *viaFormat = [RDLExpression evaluateText:@"=Format(1234.5, \"C\")" scope:scope];
+  if (![viaFormat isEqualToString:[RDLExpression formatValue:@1234.5 format:@"C" language:@"de-DE"]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Format() ignored the scope's culture: %@", viaFormat]);
+
+  // And with nothing set, User!Language is this machine, which is the fallback
+  // RDL describes for a report that names no Language.
+  RDLEvalScope *bare = [[RDLEvalScope alloc] init];
+  if (![[RDLExpression evaluateText:@"=User!Language" scope:bare] isEqualToString:RDLHostLanguage()])
+    XCTFail(@"%@", @"with nothing set, the reader's culture is the machine's");
+}
+
 @end
