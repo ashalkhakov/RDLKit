@@ -364,7 +364,6 @@ static void RDLReportDiagnostic(RDLCheckRun *run, RDLDiagnosticSeverity sev, NSS
 
 static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *source,
                                RDLCheckRun *run);
-static RDLDataSet *RDLDataSetNamed(RDLReport *report, NSString *name);
 
 static RDLType *RDLCheckOp(RDLExprNode *node, RDLScope *scope, NSString *source,
                              RDLCheckRun *run) {
@@ -471,7 +470,7 @@ static RDLType *RDLCheckCall(RDLExprNode *node, RDLScope *scope, NSString *sourc
     for (RDLExprNode *arg in node.args) {
       if (arg.kind != RDLExprNodeKindLiteral || ![arg.value isKindOfClass:[NSString class]])
         continue;
-      RDLDataSet *named = RDLDataSetNamed(scope.report, arg.value);
+      RDLDataSet *named = [scope.report dataSetNamed:arg.value];
       if (named == nil)
         continue;
       inner = [[RDLScope alloc] init];
@@ -647,13 +646,6 @@ static RDLScope *RDLSubScope(RDLScope *outer, NSString *step, RDLDataSet *ds) {
   return s;
 }
 
-static RDLDataSet *RDLDataSetNamed(RDLReport *report, NSString *name) {
-  for (RDLDataSet *d in report.dataSets)
-    if ([d.name isEqualToString:name])
-      return d;
-  return nil;
-}
-
 static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run);
 
 static void RDLCheckStyle(RDLStyle *style, RDLScope *scope, RDLCheckRun *run) {
@@ -702,7 +694,7 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   if ([item isKindOfClass:[RDLDataRegion class]]) {
     NSString *name = [(RDLDataRegion *)item dataSetName];
     if ([name length]) {
-      ds = RDLDataSetNamed(outer.report, name);
+      ds = [outer.report dataSetNamed:name];
       if (ds == nil) {
         RDLScope *s = RDLSubScope(outer, step, nil);
         RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-dataset", s, nil,

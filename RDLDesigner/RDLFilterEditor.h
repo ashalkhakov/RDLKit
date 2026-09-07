@@ -37,6 +37,11 @@
 // it cannot, which is how a hand-written expression survives being looked at.
 + (NSString *)fieldNameInExpression:(NSString *)source;
 
+// The parameter a plain "=Parameters!X.Value" refers to, or nil. Both of these
+// read the parsed expression rather than its text, so they agree with the rest
+// of the kit about what a reference is.
++ (NSString *)parameterNameInExpression:(NSString *)source;
+
 // The operators the panel offers, in the order it shows them. Published
 // because the operator column holds an index into this list, and a test
 // setting that column has to know which index means what.

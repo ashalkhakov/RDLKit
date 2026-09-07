@@ -32,13 +32,7 @@
       }];
     return NO;
   }
-  RDLDataSet *ds = nil;
-  for (RDLDataSet *d in report.dataSets) {
-    if ([d.name isEqualToString:name]) {
-      ds = d;
-      break;
-    }
-  }
+  RDLDataSet *ds = [report dataSetNamed:name];
   if (ds == nil) {
     ds = [[RDLDataSet alloc] init];
     ds.name = name;

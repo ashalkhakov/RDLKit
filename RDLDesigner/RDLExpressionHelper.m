@@ -45,11 +45,7 @@ static NSArray<NSString *> *RDLUserMembers(void) {
 }
 
 + (instancetype)scopeWithReport:(RDLReport *)report dataSetName:(NSString *)dataSetName {
-  RDLDataSet *ds = nil;
-  for (RDLDataSet *d in report.dataSets) {
-    if ([d.name isEqualToString:dataSetName])
-      ds = d;
-  }
+  RDLDataSet *ds = [report dataSetNamed:dataSetName];
   // An unnamed or unknown dataset falls back to the report's first, which is
   // what a single-dataset report always wants.
   if (ds == nil)

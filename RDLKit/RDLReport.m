@@ -1553,6 +1553,20 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   return nil;
 }
 
+// The dataset a name refers to, or nil when the report has none by it. The
+// one place that search lives: the checker, the evaluator, the layout engine
+// and the designer all need it, and each had grown its own copy. Names are
+// matched exactly, the way RDL means them -- a lookup that forgave case would
+// resolve a reference the report itself does not.
+- (RDLDataSet *)dataSetNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLDataSet *ds in self.dataSets)
+    if ([ds.name isEqualToString:name])
+      return ds;
+  return nil;
+}
+
 + (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
   return [bandKey isEqualToString:@"body"];
 }

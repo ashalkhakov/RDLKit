@@ -49,11 +49,8 @@ static NSString *RDLFieldOfValue(NSString *value) {
 @implementation RDLTablixEditor
 
 - (RDLDataSet *)selectedDataset {
-  NSString *name = [_datasetPop titleOfSelectedItem];
-  for (RDLDataSet *ds in _report.dataSets)
-    if ([ds.name isEqualToString:name])
-      return ds;
-  return _report.dataSets.firstObject;
+  RDLDataSet *ds = [_report dataSetNamed:[_datasetPop titleOfSelectedItem]];
+  return ds ?: _report.dataSets.firstObject;
 }
 
 - (void)datasetChanged:(id)sender {

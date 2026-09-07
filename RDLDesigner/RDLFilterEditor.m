@@ -35,21 +35,33 @@
 // columns and becomes an arbitrary expression.
 static NSString * const kRDLFilterExpressionItem = @"Expression…";
 
+// The reference an expression is, when it is nothing but one: the field of
+// "=Fields!Amount.Value", the parameter of "=Parameters!Finishes.Value".
+//
+// Asked of the parsed tree rather than of the text. RDLKit parses these, so
+// there is no reason for a second, worse reader here: the parser already knows
+// that "=fields!Amount.value" is the same reference whatever its case, that
+// "=Fields!Amount.Value + 1" is an operator rather than a field, and that
+// "=Sum(Fields!Amount.Value)" is a call -- none of which a prefix and a suffix
+// check can tell apart.
+static NSString *RDLReferenceName(NSString *source, RDLExprNodeKind wanted) {
+  RDLExpr *expr = [RDLExpr expressionWithSource:source];
+  RDLExprNode *root = [expr root];
+  if (expr == nil || ![expr parsedCompletely] || root == nil || root.kind != wanted)
+    return nil;
+  // Fields!X.Value is the field; Fields!X.IsMissing is a question about it.
+  if ([root.prop length] && [root.prop caseInsensitiveCompare:@"Value"] != NSOrderedSame)
+    return nil;
+  return [root.name length] ? root.name : nil;
+}
+
 + (NSString *)fieldNameInExpression:(NSString *)source {
-  NSString *text =
-      [source stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  if (![text hasPrefix:@"=Fields!"] || ![text hasSuffix:@".Value"])
-    return nil;
-  NSRange name = NSMakeRange(8, [text length] - 8 - [@".Value" length]);
-  NSString *field = [text substringWithRange:name];
-  // A field name, not an expression that merely starts with one: anything with
-  // an operator or a bracket in it is the user's own writing.
-  NSCharacterSet *plain = [NSCharacterSet characterSetWithCharactersInString:
-      @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ "];
-  if ([field length] == 0 ||
-      [field rangeOfCharacterFromSet:[plain invertedSet]].location != NSNotFound)
-    return nil;
-  return field;
+  return RDLReferenceName(source, RDLExprNodeKindField);
+}
+
+// The parameter a plain "=Parameters!X.Value" refers to, or nil.
++ (NSString *)parameterNameInExpression:(NSString *)source {
+  return RDLReferenceName(source, RDLExprNodeKindParameter);
 }
 
 // The report's multi-value parameters, by name. A filter on a list of things
@@ -62,16 +74,6 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
     if (p.multiValue && [p.name length])
       [names addObject:p.name];
   return names;
-}
-
-// The parameter a plain "=Parameters!X.Value" refers to, or nil.
-+ (NSString *)parameterNameInExpression:(NSString *)source {
-  NSString *text =
-      [source stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  if (![text hasPrefix:@"=Parameters!"] || ![text hasSuffix:@".Value"])
-    return nil;
-  NSRange name = NSMakeRange(12, [text length] - 12 - [@".Value" length]);
-  return [name.length ? [text substringWithRange:name] : nil copy];
 }
 
 // What the popup shows for one row: every field, then the row's own expression
@@ -137,14 +139,15 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
   return [parts componentsJoinedByString:@", "];
 }
 
-// Split on commas, except inside an expression: "=Fields!A.Value, 3" is two
-// values, and IIf(x, 1, 2) is one. Anything beginning with = is taken whole.
+// One expression, or a comma-separated list of literals. Whether the text is
+// an expression is the kit's question to answer, not ours -- and once it is
+// one it is taken whole, because the commas inside IIf(x, 1, 2) belong to it.
 + (NSArray<RDLValue *> *)valuesFromString:(NSString *)text {
   NSString *trimmed =
       [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   if ([trimmed length] == 0)
     return @[];
-  if ([trimmed hasPrefix:@"="])
+  if ([RDLExpr isExpressionSource:trimmed])
     return @[ [RDLValue valueWithSource:trimmed] ];
   NSMutableArray *out = [NSMutableArray array];
   for (NSString *piece in [trimmed componentsSeparatedByString:@","]) {

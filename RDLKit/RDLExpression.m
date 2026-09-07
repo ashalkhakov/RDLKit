@@ -839,10 +839,7 @@ static NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName) {
     return scope.groupRows;
   RDLDataSet *ds = scope.dataSet;
   if ([dsName length]) {
-    ds = nil;
-    for (RDLDataSet *d in scope.report.dataSets)
-      if ([d.name isEqualToString:dsName])
-        ds = d;
+    ds = [scope.report dataSetNamed:dsName];
     // Not a dataset name: treat as a group scope name → current group rows.
     if (ds == nil && [scope.groupRows count])
       return scope.groupRows;

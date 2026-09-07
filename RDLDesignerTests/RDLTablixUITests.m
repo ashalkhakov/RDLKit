@@ -469,6 +469,21 @@
     XCTFail(@"%@", @"a plain field reference should read as its field");
   if ([RDLFilterEditor fieldNameInExpression:@"=Sum(Fields!Amount.Value)"] != nil)
     XCTFail(@"%@", @"an expression is not a field and should not pretend to be one");
+  // Read by parsing rather than by matching text, which is what lets these
+  // four hold: RDL is case-insensitive about its collections, a reference with
+  // arithmetic on it is not a field, and Fields!X.IsMissing asks about the
+  // field rather than being it.
+  if (![[RDLFilterEditor fieldNameInExpression:@"=fields!Amount.value"] isEqualToString:@"Amount"])
+    XCTFail(@"%@", @"a field reference is a field reference whatever its case");
+  if ([RDLFilterEditor fieldNameInExpression:@"=Fields!Amount.Value + 1"] != nil)
+    XCTFail(@"%@", @"a sum is not one of the report's columns");
+  if ([RDLFilterEditor fieldNameInExpression:@"=Fields!Amount.IsMissing"] != nil)
+    XCTFail(@"%@", @"IsMissing is a question about a field, not the field");
+  if (![[RDLFilterEditor parameterNameInExpression:@"=Parameters!Finishes.Value"]
+          isEqualToString:@"Finishes"])
+    XCTFail(@"%@", @"a plain parameter reference should read as its parameter");
+  if ([RDLFilterEditor parameterNameInExpression:@"=Fields!Finishes.Value"] != nil)
+    XCTFail(@"%@", @"a field is not a parameter");
 }
 
 @end

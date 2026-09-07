@@ -71,12 +71,9 @@
 - (void)addDataSet:(id)sender {
   (void)sender;
   RDLDataSet *ds = [[RDLDataSet alloc] init];
-  NSMutableSet *taken = [NSMutableSet set];
-  for (RDLDataSet *existing in _context.report.dataSets)
-    [taken addObject:existing.name ?: @""];
   NSUInteger n = 1;
   NSString *name = @"DataSet1";
-  while ([taken containsObject:name])
+  while ([_context.report dataSetNamed:name])
     name = [NSString stringWithFormat:@"DataSet%lu", (unsigned long)++n];
   ds.name = name;
   [_context.editor addDataSet:ds];

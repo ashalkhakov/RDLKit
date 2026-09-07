@@ -116,13 +116,6 @@
 
 @implementation RDLLayoutEngine
 
-static RDLDataSet *RDLFindSet(RDLReport *report, NSString *name) {
-  for (RDLDataSet *d in report.dataSets)
-    if ([d.name isEqualToString:name])
-      return d;
-  return nil;
-}
-
 static NSInteger RDLLeafCount(NSArray<RDLTablixMember *> *members) {
   NSInteger n = 0;
   for (RDLTablixMember *m in members) {
@@ -1034,7 +1027,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
   RDLTablixBody *body = tab.tablixBody;
   if ([body.rows count] == 0)
     return @[];
-  RDLDataSet *ds = RDLFindSet(report, tab.dataSetName);
+  RDLDataSet *ds = [report dataSetNamed:tab.dataSetName];
   NSArray *dataRows = ds.rows ?: @[];
   dataRows = RDLApplyFilters(dataRows, tab.filters, scope);
   dataRows = RDLApplySort(dataRows, tab.sortExpressions, scope);
@@ -1362,7 +1355,7 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
                           ? chart.legendPosition
                           : RDLChartLegendPositionRightCenter;
 
-  RDLDataSet *ds = RDLFindSet(scope.report, chart.dataSetName);
+  RDLDataSet *ds = [scope.report dataSetNamed:chart.dataSetName];
   NSArray *rows = ds.rows ?: @[];
   rows = RDLApplyFilters(rows, chart.filters, scope);
   rows = RDLApplySort(rows, chart.sortExpressions, scope);
@@ -1599,7 +1592,7 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   scope.activeScopes = inst.activeScopes;
   scope.recursionLevel = inst.recursionLevel;
   scope.recursiveRows = inst.recursiveRows;
-  scope.dataSet = RDLFindSet(scope.report, tab.dataSetName) ?: savedSet;
+  scope.dataSet = [scope.report dataSetNamed:tab.dataSetName] ?: savedSet;
   if (inst.groupRows)
     scope.groupRows = inst.groupRows;
   for (RDLTablixCellInst *cell in inst.cells) {

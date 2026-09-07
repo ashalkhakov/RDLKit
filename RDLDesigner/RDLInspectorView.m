@@ -139,10 +139,7 @@
   if (![item isKindOfClass:[RDLChart class]])
     return;
   RDLChart *chart = (RDLChart *)item;
-  RDLDataSet *ds = nil;
-  for (RDLDataSet *candidate in _context.report.dataSets)
-    if ([candidate.name isEqualToString:chart.dataSetName])
-      ds = candidate;
+  RDLDataSet *ds = [_context.report dataSetNamed:chart.dataSetName];
   NSArray<RDLFilter *> *edited =
       [RDLFilterEditor runForFilters:chart.filters
                                title:chart.name
