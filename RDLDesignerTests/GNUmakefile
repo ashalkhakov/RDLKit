@@ -60,7 +60,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLFieldInspectorView.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLTablixEditor.m
-RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall
+RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
 # Xcode resolves through its header map and gnustep-make has no equivalent for.
 RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner \

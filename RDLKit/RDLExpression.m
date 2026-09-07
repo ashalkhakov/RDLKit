@@ -78,25 +78,24 @@ static BOOL RDLIsNothing(id v) {
 }
 
 // Boolean NSNumber detection that does not rely on CFBoolean singletons
-// (portable across Apple Foundation and GNUstep).
-static BOOL RDLAsBoolObj(id v, BOOL *out) {
-  if (![v isKindOfClass:[NSNumber class]])
+// (portable across Apple Foundation and GNUstep). The singletons where they
+// are shared; otherwise a char-sized number that is exactly true or false --
+// which a 5 stored in a char is not.
+BOOL RDLNumberIsBoolean(id value) {
+  if (![value isKindOfClass:[NSNumber class]])
     return NO;
-  if (v == (id)@YES) {
-    *out = YES;
+  if (value == (id)@YES || value == (id)@NO)
     return YES;
-  }
-  if (v == (id)@NO) {
-    *out = NO;
-    return YES;
-  }
-  const char *t = [(NSNumber *)v objCType];
-  if (t != NULL && (t[0] == 'c' || t[0] == 'B') &&
-      ([v isEqual:@YES] || [v isEqual:@NO])) {
-    *out = [(NSNumber *)v boolValue];
-    return YES;
-  }
-  return NO;
+  const char *t = [(NSNumber *)value objCType];
+  return t != NULL && (t[0] == 'c' || t[0] == 'B') &&
+         ([value isEqual:@YES] || [value isEqual:@NO]);
+}
+
+static BOOL RDLAsBoolObj(id v, BOOL *out) {
+  if (!RDLNumberIsBoolean(v))
+    return NO;
+  *out = [(NSNumber *)v boolValue];
+  return YES;
 }
 
 static NSString *RDLStr(id v) {
@@ -670,7 +669,7 @@ static NSArray *RDLLex(NSString *src) {
   RDLExprNode *a = [[RDLExprNode alloc] init];
   a.kind = RDLExprNodeKindCall;
   a.name = name;
-  if (![self peek].kind == RDLExprTokenKindPunctuation || ![[self peek].s isEqualToString:@")"]) {
+  if ([self peek].kind != RDLExprTokenKindPunctuation || ![[self peek].s isEqualToString:@")"]) {
     [a.args addObject:[self parseOr]];
     while ([self matchP:@","])
       [a.args addObject:[self parseOr]];

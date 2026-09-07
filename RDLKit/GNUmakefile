@@ -3,7 +3,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 LIBRARY_NAME = RDLKit
 RDLKit_NEEDS_GUI = yes
 RDLKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
-RDLKit_OBJCFLAGS += -fobjc-arc -Wall
+RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \

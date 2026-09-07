@@ -2,7 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = RDLDesigner
 RDLDesigner_NEEDS_GUI = yes
-RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit
+RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -Werror=logical-not-parentheses
 RDLDesigner_OBJC_FILES = \
   main.m \
   RDLEditingContext.m \

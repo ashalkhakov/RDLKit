@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDataProvider.h"
 #import "RDLDataProviderInternal.h"
+#import "RDLExpression.h"
 // The binder hands out the three the kit implements unless a host replaces them.
 #import "RDLCSVDataProvider.h"
 #import "RDLJSONDataProvider.h"
@@ -123,13 +124,6 @@ NSArray *RDLRowsFromSelection(NSArray *selected) {
 
 #pragma mark - Reading the types off the values
 
-// A JSON boolean is an NSNumber like any other, and telling it apart matters:
-// "true" is a Boolean field, 1 is an Integer one.
-static BOOL RDLIsJSONBoolean(id value) {
-  return [value isKindOfClass:[NSNumber class]] &&
-         CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID();
-}
-
 // A date, only when the text is written the way a date is written -- the ISO
 // forms JSON documents use. Anything looser and a product code or a version
 // number becomes a date, which is worse than calling it a string.
@@ -155,7 +149,8 @@ static BOOL RDLLooksLikeADate(NSString *text) {
 static RDLFieldDataType RDLTypeOfValue(id value) {
   if (value == nil || value == [NSNull null])
     return RDLFieldDataTypeUnknown;
-  if (RDLIsJSONBoolean(value))
+  // "true" is a Boolean field; 1 is an Integer one.
+  if (RDLNumberIsBoolean(value))
     return RDLFieldDataTypeBoolean;
   if ([value isKindOfClass:[NSNumber class]]) {
     const char *kind = [(NSNumber *)value objCType];
