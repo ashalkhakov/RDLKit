@@ -905,4 +905,81 @@ static RDLReport *RDLGroupedJobs(void) {
   }
 }
 
+// The Kiln Log sample is the one that carries a dataset with both kinds of
+// field and filters at two levels, so what it claims is checked by laying it
+// out rather than by reading the builder: the empty test firing is gone before
+// anything sees it, the yield is worked out per row, the total sums a
+// calculated field, and the second table asks its own question of the same
+// dataset.
+- (void)testKilnSampleShowsCalculatedFieldsAndFiltersAtBothLevels {
+  RDLReport *r = [RDLSamples kilnLog];
+  RDLDataSet *ds = [r dataSetNamed:@"Firings"];
+  if ([ds.filters count] != 1)
+    XCTFail(@"%@", @"the dataset should filter the empty firing out itself");
+  NSUInteger calculated = 0;
+  for (RDLField *f in ds.fields)
+    if ([f isCalculated])
+      calculated += 1;
+  if (calculated != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu calculated fields, expected 2",
+                                              (unsigned long)calculated]);
+
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+
+  NSUInteger (^appearances)(NSString *) = ^NSUInteger(NSString *wanted) {
+    NSUInteger n = 0;
+    for (NSString *t in texts)
+      if ([t isEqualToString:wanted])
+        n += 1;
+    return n;
+  };
+  NSString *(^dump)(void) = ^NSString *(void) {
+    return [texts componentsJoinedByString:@" | "];
+  };
+
+  // The dataset filter, at the level where it protects everything downstream:
+  // the empty firing would divide by zero in Yield.
+  if (appearances(@"B-000") != 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the empty firing reached the report: %@", dump()]);
+  // Once in the firings table, and again in the table filtered to the losses.
+  if (appearances(@"B-101") != 2 || appearances(@"B-103") != 2 || appearances(@"B-105") != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a cracked batch should be in both tables: %@",
+                                              dump()]);
+  // The table filter, which is the second level: these two cracked too little
+  // to be worth a look, so only the firings table has them.
+  if (appearances(@"B-102") != 1 || appearances(@"B-104") != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the watch table should have filtered these out: %@",
+                                              dump()]);
+  // The calculated fields: one worked out per row, one summed across them.
+  if (appearances(@"91.7") == 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"no yield was worked out: %@", dump()]);
+  if (appearances(@"119") == 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the sound total should sum a calculated field: %@",
+                                              dump()]);
+
+  // And it has to survive being saved, because a sample is a document as much
+  // as it is a demonstration: both filters and both calculated fields are
+  // written and read back.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  RDLDataSet *bds = [back dataSetNamed:@"Firings"];
+  NSUInteger backCalculated = 0;
+  for (RDLField *f in bds.fields)
+    if ([f isCalculated])
+      backCalculated += 1;
+  if ([bds.filters count] != 1 || backCalculated != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"after a round trip: %lu filters, %lu calculated",
+                                              (unsigned long)[bds.filters count],
+                                              (unsigned long)backCalculated]);
+  RDLTablix *bwatch = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]] && [it.name isEqualToString:@"Watch"])
+      bwatch = (RDLTablix *)it;
+  if ([bwatch.filters count] != 1)
+    XCTFail(@"%@", @"the watch table's own filter did not survive the file");
+}
+
 @end

@@ -23,7 +23,13 @@
 // The XIB's actions: the +/- buttons and the name field. Declared because they
 // are what the pane does, and so that they can be driven without a click.
 - (void)addField:(id)sender;
+- (void)addCalculatedField:(id)sender;
 - (void)removeField:(id)sender;
 - (void)renameDataSet:(id)sender;
 - (void)editFilters:(id)sender;
+// What the two kinds of field are called and what each one is read from, in
+// the words Report Builder uses. Published so the inspector's Kind popup and
+// this table say the same thing, and so a test can ask what a row reads.
++ (NSString *)nameOfKindCalculated:(BOOL)calculated;
++ (NSString *)sourceOfField:(RDLField *)field;
 @end

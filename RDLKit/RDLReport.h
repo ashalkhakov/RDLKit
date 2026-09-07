@@ -651,6 +651,11 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // A calculated field: the expression that produces it, nil for a plain one.
 @property (nonatomic, strong) RDLValue *value;
 @property (nonatomic, assign) RDLFieldDataType dataType;
+// Which of the two kinds of field this is. RDL gives a Field either a
+// DataField, naming a column of the query, or a Value, computing it -- never
+// both -- and the designer says which out loud rather than leaving it to be
+// inferred from an expression box that happens to have something in it.
+@property (nonatomic, readonly) BOOL isCalculated;
 @end
 
 @interface RDLEmbeddedImage : NSObject

@@ -133,6 +133,12 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
       @"blurb" : @"Column chart of receipts with a monthly tablix and quarter total."
     },
     @{
+      @"id" : @"kiln",
+      @"title" : @"Kiln Log",
+      @"kicker" : @"Fields & filters",
+      @"blurb" : @"Calculated fields worked out per firing, a dataset filter that drops the empty runs, and a second table filtered to the batches worth a look."
+    },
+    @{
       @"id" : @"roster",
       @"title" : @"Studio Roster",
       @"kicker" : @"Directory",
@@ -160,6 +166,8 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
     return [self workshopByFinish];
   if ([sampleId isEqualToString:@"crosstab"])
     return [self regionalSales];
+  if ([sampleId isEqualToString:@"kiln"])
+    return [self kilnLog];
   return [self blankLetter];
 }
 
@@ -420,6 +428,99 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
                ])];
   [r.body.items addObject:RDLTB(@"Count", @"=Count(Fields!Name.Value) & \" names on the floor\"", 0,
                                  2.4, 7.5, 0.24, @"Georgia", [RDLLength points:10], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
+  [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.04, 7.5)];
+  [r.pageFooter.items addObject:RDLTB(@"F", @"=\"Page \" & Globals!PageNumber", 0, 0.12, 7.5, 0.2,
+                                       @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
+  return r;
+}
+
+// A field the report works out rather than reads, for the samples: the two
+// kinds of field are a thing the designer now names, so at least one sample
+// has both.
+static RDLField *RDLCalc(NSString *name, NSString *expression, RDLFieldDataType type) {
+  RDLField *f = [[RDLField alloc] init];
+  f.name = name;
+  f.value = [RDLValue valueWithSource:expression];
+  f.dataType = type;
+  return f;
+}
+
+// One filter, written the way the panel writes them.
+static RDLFilter *RDLKeep(NSString *expression, RDLFilterOperator oper, NSString *value) {
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:expression];
+  f.oper = oper;
+  [f.values addObject:[RDLValue literal:value]];
+  return f;
+}
+
+// The sample for the data side of a report rather than the drawing side: a
+// dataset whose fields are of both kinds, a filter on the dataset itself, and
+// a second table over the same dataset that filters again.
+//
+// The two filters are at the two levels on purpose. The dataset filter throws
+// out the empty test firing before anything sees it -- which is also what
+// keeps Yield from dividing by zero, and is why a filter belongs on the
+// dataset and not on each table. The table filter is a question asked of one
+// table only: the same rows, narrowed to the batches that cracked.
++ (RDLReport *)kilnLog {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Kiln Log"];
+  r.reportDescription = @"Firings with calculated yield, a dataset filter, and a table filtered "
+                         "to the losses.";
+  r.author = @"RDLDesigner";
+  [r.parameters addObject:RDLPar(@"Season", @"Summer 2026")];
+
+  RDLDataSet *ds = RDLSet(@"Firings", @[ @"Batch", @"Kiln", @"FiredOn", @"Pieces", @"Cracked" ], @[
+    @{@"Batch" : @"B-101", @"Kiln" : @"North", @"FiredOn" : @"2026-06-03", @"Pieces" : @24, @"Cracked" : @2},
+    @{@"Batch" : @"B-102", @"Kiln" : @"North", @"FiredOn" : @"2026-06-05", @"Pieces" : @30, @"Cracked" : @0},
+    @{@"Batch" : @"B-103", @"Kiln" : @"South", @"FiredOn" : @"2026-06-09", @"Pieces" : @18, @"Cracked" : @5},
+    @{@"Batch" : @"B-104", @"Kiln" : @"South", @"FiredOn" : @"2026-06-12", @"Pieces" : @26, @"Cracked" : @1},
+    @{@"Batch" : @"B-105", @"Kiln" : @"North", @"FiredOn" : @"2026-06-16", @"Pieces" : @33, @"Cracked" : @4},
+    // The kiln was run empty to test the new elements. It is in the data, and
+    // the dataset filter is what keeps it out of the report.
+    @{@"Batch" : @"B-000", @"Kiln" : @"North", @"FiredOn" : @"2026-06-01", @"Pieces" : @0, @"Cracked" : @0}
+  ]);
+  ds.fields = [ds.fields arrayByAddingObjectsFromArray:@[
+    RDLCalc(@"Sound", @"=Fields!Pieces.Value - Fields!Cracked.Value", RDLFieldDataTypeInteger),
+    RDLCalc(@"Yield",
+            @"=Round(100 * (Fields!Pieces.Value - Fields!Cracked.Value) / Fields!Pieces.Value, 1)",
+            RDLFieldDataTypeFloat)
+  ]];
+  [ds.filters addObject:RDLKeep(@"=Fields!Pieces.Value", RDLFilterOperatorGreaterThan, @"0")];
+  [r.dataSets addObject:ds];
+
+  [r.pageHeader.items addObject:RDLTB(@"Title", @"Kiln log", 0, 0.04, 4.5, 0.3, @"Georgia",
+                                       [RDLLength points:16], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
+  [r.pageHeader.items addObject:RDLTB(@"Season", @"=Parameters!Season.Value", 4.5, 0.1, 3, 0.22,
+                                       @"Helvetica", [RDLLength points:10], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
+  [r.pageHeader.items addObject:RDLMakeLine(@"HRule", 0, 0.46, 7.5)];
+
+  r.body.height = 4.4;
+  [r.body.items addObject:RDLMakeTablix(@"Firings", @"Firings", 0, 0.15, 7.5, 0.3, 0.28, @[
+                 RDLCol(@"Batch", @"=Fields!Batch.Value", 1.3, @"Left"),
+                 RDLCol(@"Kiln", @"=Fields!Kiln.Value", 1.2, @"Left"),
+                 RDLCol(@"Fired", @"=Fields!FiredOn.Value", 1.5, @"Left"),
+                 RDLCol(@"Pieces", @"=Fields!Pieces.Value", 1.1, @"Right"),
+                 RDLCol(@"Sound", @"=Fields!Sound.Value", 1.1, @"Right"),
+                 RDLCol(@"Yield %", @"=Fields!Yield.Value", 1.3, @"Right")
+               ])];
+  [r.body.items addObject:RDLTB(@"SoundLbl", @"Sound pieces this season", 0, 1.95, 4.5, 0.26,
+                                 @"Georgia", [RDLLength points:11], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
+  [r.body.items addObject:RDLTB(@"SoundVal", @"=Sum(Fields!Sound.Value)", 4.5, 1.95, 3, 0.26,
+                                 @"Georgia", [RDLLength points:11], RDLFontWeightBold, kInk, RDLTextAlignRight)];
+
+  [r.body.items addObject:RDLTB(@"WatchLbl", @"Batches that cracked", 0, 2.4, 7.5, 0.24, @"Georgia",
+                                 [RDLLength points:11], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
+  RDLTablix *watch = (RDLTablix *)RDLMakeTablix(@"Watch", @"Firings", 0, 2.72, 7.5, 0.3, 0.28, @[
+                 RDLCol(@"Batch", @"=Fields!Batch.Value", 1.5, @"Left"),
+                 RDLCol(@"Kiln", @"=Fields!Kiln.Value", 1.5, @"Left"),
+                 RDLCol(@"Pieces", @"=Fields!Pieces.Value", 1.5, @"Right"),
+                 RDLCol(@"Cracked", @"=Fields!Cracked.Value", 1.5, @"Right"),
+                 RDLCol(@"Yield %", @"=Fields!Yield.Value", 1.5, @"Right")
+               ]);
+  [watch.filters addObject:RDLKeep(@"=Fields!Cracked.Value", RDLFilterOperatorGreaterThanOrEqual, @"2")];
+  [r.body.items addObject:watch];
+
   [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items addObject:RDLTB(@"F", @"=\"Page \" & Globals!PageNumber", 0, 0.12, 7.5, 0.2,
                                        @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];

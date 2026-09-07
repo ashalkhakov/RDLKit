@@ -9,6 +9,7 @@
         <customObject id="-2" userLabel="File's Owner" customClass="RDLDatasetFieldsView">
             <connections>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
+                <outlet property="addCalculatedButton" destination="addCalculatedButton" id="addCalculatedButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
@@ -48,7 +49,7 @@
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                 <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                 <tableColumns>
-                                    <tableColumn identifier="name" width="220" minWidth="40" maxWidth="1000" id="nameCol">
+                                    <tableColumn identifier="name" width="150" minWidth="40" maxWidth="1000" id="nameCol">
                                         <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Field">
                                             <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
@@ -59,12 +60,34 @@
                                             <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                         </textFieldCell>
                                     </tableColumn>
-                                    <tableColumn identifier="type" width="140" minWidth="40" maxWidth="1000" id="typeCol">
+                                    <tableColumn identifier="kind" width="90" minWidth="40" maxWidth="1000" id="kindCol">
+                                        <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Kind">
+                                            <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
+                                            <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
+                                        </tableHeaderCell>
+                                        <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Text Cell" id="kindColCell">
+                                            <font key="font" metaFont="system"/>
+                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                            <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                        </textFieldCell>
+                                    </tableColumn>
+                                    <tableColumn identifier="type" width="100" minWidth="40" maxWidth="1000" id="typeCol">
                                         <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Type">
                                             <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                         </tableHeaderCell>
                                         <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" editable="YES" alignment="left" title="Text Cell" id="typeColCell">
+                                            <font key="font" metaFont="system"/>
+                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                            <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                        </textFieldCell>
+                                    </tableColumn>
+                                    <tableColumn identifier="source" width="200" minWidth="40" maxWidth="1000" id="sourceCol">
+                                        <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Source">
+                                            <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
+                                            <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
+                                        </tableHeaderCell>
+                                        <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Text Cell" id="sourceColCell">
                                             <font key="font" metaFont="system"/>
                                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                             <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -94,8 +117,19 @@
                         <action selector="addField:" target="-2" id="addButtonAction"/>
                     </connections>
                 </button>
+                <button toolTip="Add a calculated field: an expression instead of a column" id="addCalculatedButton">
+                    <rect key="frame" x="32" y="1" width="32" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="square" title="+fx" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="addCalculatedButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="addCalculatedField:" target="-2" id="addCalculatedButtonAction"/>
+                    </connections>
+                </button>
                 <button toolTip="The rows this dataset keeps" id="filtersButton">
-                    <rect key="frame" x="70" y="1" width="90" height="24"/>
+                    <rect key="frame" x="102" y="1" width="90" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <buttonCell key="cell" type="square" title="Filters…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="filtersButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -106,7 +140,7 @@
                     </connections>
                 </button>
                 <button toolTip="Remove the selected field" id="removeButton">
-                    <rect key="frame" x="32" y="1" width="32" height="24"/>
+                    <rect key="frame" x="64" y="1" width="32" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <buttonCell key="cell" type="square" title="–" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="removeButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>

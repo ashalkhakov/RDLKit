@@ -1871,7 +1871,7 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
       NSXMLElement *fe = RDLEl(@"Field");
       RDLAddAttr(fe, @"Name", fld.name);
       // A calculated field carries an expression instead of a source column.
-      if (fld.value != nil)
+      if ([fld isCalculated])
         RDLAddValue(fe, @"Value", fld.value);
       else
         RDLAdd(fe, @"DataField", [fld.dataField length] ? fld.dataField : fld.name);

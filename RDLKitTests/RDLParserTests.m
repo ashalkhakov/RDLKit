@@ -345,6 +345,13 @@ static NSString *RDLLegacyTableRDL(void) {
       bcalc = fl;
   if (bcalc == nil || ![bcalc.value isExpression])
     XCTFail(@"%@", @"calculated field should come back as an expression");
+  // Which kind a field is, asked of the field rather than of its value: the
+  // designer says "Query" or "Calculated" from this, so it has to survive the
+  // file as surely as the expression does.
+  if (![bcalc isCalculated])
+    XCTFail(@"%@", @"a field with an expression is a calculated field");
+  if ([[bds.fields firstObject] isCalculated])
+    XCTFail(@"%@", @"a field read from a column is not a calculated one");
 
   // A calculated field is resolved by evaluating the RDLValue it now holds,
   // so check it actually computes rather than only surviving the round trip.

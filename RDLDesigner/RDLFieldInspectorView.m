@@ -5,6 +5,7 @@
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"
 #import "RDLKit.h"
+#import "RDLDatasetFieldsView.h"
 #import "RDLPane.h"
 #import "RDLToolbarIcons.h"
 
@@ -12,6 +13,15 @@
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTextField *nameField;
 @property (nonatomic, strong) IBOutlet NSTextField *dataFieldField;
+@property (nonatomic, strong) IBOutlet NSTextField *dataFieldLabel;
+// The two kinds of field, said out loud: a query field reads a column, a
+// calculated field is an expression the report evaluates. RDL gives a Field
+// either a DataField or a Value and never both, so this is a choice and not a
+// pair of boxes to fill in as you like.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *kindPop;
+@property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
+@property (nonatomic, strong) IBOutlet NSTextField *kindHint;
+@property (nonatomic, strong) IBOutlet NSTextField *valueLabel;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *typePop;
 // A calculated field: the expression that produces it, instead of a column
 // read from the data.
@@ -39,6 +49,10 @@
   // same reason the page sizes are filled in code in the other inspector.
   for (RDLFieldDataType t = RDLFieldDataTypeBoolean; t <= RDLFieldDataTypeString; t++)
     [_typePop addItemWithTitle:RDLStringFromFieldDataType(t)];
+  for (NSInteger calculated = 0; calculated <= 1; calculated++)
+    [_kindPop addItemWithTitle:
+        [NSString stringWithFormat:@"%@ field",
+                                   [RDLDatasetFieldsView nameOfKindCalculated:calculated == 1]]];
   _valueField.expressionContext = RDLExpressionContextText;
   RDLSetToolbarIcon(_valueExprButton, RDLToolbarGlyphExpression);
   [self showField:nil ofDataSet:nil];
@@ -50,7 +64,7 @@
   _dataSet = dataSet;
   _filling = YES;
   BOOL any = field != nil;
-  for (NSView *v in @[ _nameField, _dataFieldField, _typePop, _valueField, _valueExprButton ])
+  for (NSView *v in @[ _nameField, _kindPop, _kindLabel, _kindHint, _typePop ])
     [v setHidden:!any];
   [_empty setHidden:any];
   if (any) {
@@ -60,8 +74,57 @@
     if ([_typePop itemWithTitle:type])
       [_typePop selectItemWithTitle:type];
     [_valueField setStringValue:[field.value source] ?: @""];
+    [_kindPop selectItemAtIndex:[field isCalculated] ? 1 : 0];
   }
+  [self syncKind];
   _filling = NO;
+}
+
+// A field is read one way or the other, so the pane shows one way or the
+// other: the column box for a query field, the expression box for a calculated
+// one. Showing both, with one of them permanently empty, is what left the two
+// kinds looking like one kind with an optional extra.
+- (void)syncKind {
+  BOOL any = _field != nil;
+  BOOL calculated = any && [_kindPop indexOfSelectedItem] == 1;
+  for (NSView *v in @[ _dataFieldField, _dataFieldLabel ])
+    [v setHidden:!any || calculated];
+  for (NSView *v in @[ _valueField, _valueLabel, _valueExprButton ])
+    [v setHidden:!any || !calculated];
+  [_kindHint setStringValue:
+      calculated ? @"An expression the report works out for every row."
+                 : @"A column of the query, read as it comes."];
+}
+
+// Changing the kind rewrites the field as the other kind, because that is what
+// the choice means in the file: the Value goes and a DataField appears, or the
+// other way round. A calculated field that has not been written yet starts as
+// Nothing -- an empty expression is not a calculated field at all, and would
+// come back from the writer as a query field.
+- (void)kindChanged:(id)sender {
+  (void)sender;
+  if (_filling || _field == nil || _dataSet == nil)
+    return;
+  BOOL calculated = [_kindPop indexOfSelectedItem] == 1;
+  if (calculated == [_field isCalculated]) {
+    [self syncKind];
+    return;
+  }
+  if (calculated) {
+    NSString *written = [_valueField stringValue];
+    _field.value = [RDLValue valueWithSource:[written length] ? written : @"=Nothing"];
+    _field.dataField = nil;
+  } else {
+    _field.value = nil;
+    if ([_field.dataField length] == 0)
+      _field.dataField = _field.name;
+  }
+  [self syncKind];
+  _filling = YES;
+  [_dataFieldField setStringValue:_field.dataField ?: @""];
+  [_valueField setStringValue:[_field.value source] ?: @""];
+  _filling = NO;
+  [_context.editor setFields:[[_dataSet fields] mutableCopy] ofDataSet:_dataSet];
 }
 
 // The whole field list goes back, as the table's own edits do: it is the unit
@@ -78,13 +141,21 @@
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   if ([name length])
     _field.name = name;
-  NSString *dataField = [_dataFieldField stringValue];
-  _field.dataField = [dataField length] ? dataField : nil;
   RDLFieldDataType type = RDLFieldDataTypeFromString([_typePop titleOfSelectedItem]);
   if (type != RDLFieldDataTypeUnknown)
     _field.dataType = type;
-  NSString *value = [_valueField stringValue];
-  _field.value = [value length] ? [RDLValue valueWithSource:value] : nil;
+  // Whichever kind it is, only that kind's box is written back: the other one
+  // is not on screen, and a stale value left in it would change the field
+  // behind the user.
+  if ([_kindPop indexOfSelectedItem] == 1) {
+    NSString *value = [_valueField stringValue];
+    _field.value = [RDLValue valueWithSource:[value length] ? value : @"=Nothing"];
+    _field.dataField = nil;
+  } else {
+    NSString *dataField = [_dataFieldField stringValue];
+    _field.dataField = [dataField length] ? dataField : _field.name;
+    _field.value = nil;
+  }
   [_context.editor setFields:fields ofDataSet:_dataSet];
 }
 
