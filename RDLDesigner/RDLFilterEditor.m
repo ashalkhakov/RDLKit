@@ -80,20 +80,27 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
 
 // What the value column means for this operator, so the panel can say it
 // rather than leave the user to find out by running the report.
+//
+// The forms are spelled out because a value is read the same way on every
+// machine, not the way the machine happens to be set: a number is written with
+// a dot and no thousands separators, and a date is written the ISO way. That
+// is what makes a report mean one thing everywhere -- "07.09.2026" would not.
 + (NSString *)valueHintForOperator:(RDLFilterOperator)op {
   switch (op) {
     case RDLFilterOperatorIn:
-      return @"a comma-separated list";
+      return @"a comma-separated list — Oil, Wax";
     case RDLFilterOperatorBetween:
-      return @"two values, separated by a comma";
+      return @"two values, separated by a comma — 100, 500";
     case RDLFilterOperatorTopN:
     case RDLFilterOperatorBottomN:
-      return @"how many rows to keep";
+      return @"how many rows to keep — 10";
     case RDLFilterOperatorTopPercent:
     case RDLFilterOperatorBottomPercent:
-      return @"a percentage of the rows";
+      return @"a percentage of the rows — 25";
+    case RDLFilterOperatorLike:
+      return @"a pattern — Oil%";
     default:
-      return @"the value to compare against";
+      return @"the value to compare against — 1234.5, or 2026-09-07 for a date";
   }
 }
 

@@ -335,6 +335,17 @@ static double RDLAsN(id v) {
 }
 
 static NSComparisonResult RDLCmp(id a, id b) {
+  // A date against anything is compared as a date. It used to fall through to
+  // the string comparison below, which puts "Sep 7, 2026" before "Oct 1, 2026"
+  // because S comes before O -- wrong for a filter and wrong for a sort, and
+  // silently so. The text is read in the POSIX locale, so "2026-09-07" means
+  // the same thing on every machine.
+  if ([a isKindOfClass:[NSDate class]] || [b isKindOfClass:[NSDate class]]) {
+    NSDate *da = RDLDateFromValue(a);
+    NSDate *db = RDLDateFromValue(b);
+    if (da != nil && db != nil)
+      return [da compare:db];
+  }
   BOOL numeric = [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
   if (numeric) {
     double d = RDLAsN(a) - RDLAsN(b);

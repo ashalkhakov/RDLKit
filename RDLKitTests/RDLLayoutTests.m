@@ -1527,6 +1527,73 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"named RDL colours should resolve, and hex should not");
 }
 
+// A filter or a sort on a date has to compare dates, not the words a date is
+// printed as: "Sep 7, 2026" comes before "Oct 1, 2026" alphabetically and
+// after it in time. And the text a report is written with means one thing
+// everywhere -- "2026-09-07" is the seventh of September on every machine,
+// which "07.09.2026" is not.
+- (void)testDatesCompareAsDates {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Dates"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Runs";
+  ds.dataSourceName = @"Demo";
+  [ds setFieldNames:@[ @"Job", @"When" ]];
+  NSDateFormatter *iso = [[NSDateFormatter alloc] init];
+  iso.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+  iso.dateFormat = @"yyyy-MM-dd";
+  ds.rows = @[
+    @{ @"Job" : @"Autumn", @"When" : [iso dateFromString:@"2026-09-07"] },
+    @{ @"Job" : @"Spring", @"When" : [iso dateFromString:@"2026-03-11"] },
+    @{ @"Job" : @"Winter", @"When" : [iso dateFromString:@"2026-12-01"] },
+  ];
+  [r.dataSets addObject:ds];
+
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"Runs";
+  tab.dataSetName = @"Runs";
+  tab.width = 6;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.columnSpecs = @[ @{ @"width" : @3.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value" } ];
+  [tab rebuildTablix];
+
+  // Everything after the summer, which is Autumn and Winter but not Spring.
+  RDLFilter *after = [[RDLFilter alloc] init];
+  after.expression = [RDLValue valueWithSource:@"=Fields!When.Value"];
+  after.oper = RDLFilterOperatorGreaterThan;
+  [after.values addObject:[RDLValue literal:@"2026-06-30"]];
+  [tab.filters addObject:after];
+  [r.body.items addObject:tab];
+
+  NSMutableArray *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  if (![texts containsObject:@"Autumn"] || ![texts containsObject:@"Winter"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the later runs were dropped: %@", texts]);
+  if ([texts containsObject:@"Spring"])
+    XCTFail(@"%@", @"March is not after June; the comparison read the printed date");
+
+  // And a sort puts them in date order, not alphabetical-by-month order.
+  [tab.filters removeAllObjects];
+  RDLSortExpression *byDate = [[RDLSortExpression alloc] init];
+  byDate.expression = [RDLValue valueWithSource:@"=Fields!When.Value"];
+  byDate.direction = RDLSortDirectionAscending;
+  [tab.sortExpressions addObject:byDate];
+  [texts removeAllObjects];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  NSUInteger spring = [texts indexOfObject:@"Spring"], autumn = [texts indexOfObject:@"Autumn"],
+             winter = [texts indexOfObject:@"Winter"];
+  if (spring == NSNotFound || autumn == NSNotFound || winter == NSNotFound ||
+      !(spring < autumn && autumn < winter))
+    XCTFail(@"%@", [NSString stringWithFormat:@"March, September, December is the order: %@",
+                                              texts]);
+}
+
 // TopN and its three relatives cannot be decided a row at a time: which rows
 // they keep depends on how the rest rank. Until they were implemented the
 // evaluator let every row through, so a report asking for its ten largest

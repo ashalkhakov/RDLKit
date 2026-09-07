@@ -136,6 +136,16 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
 @property (nonatomic, copy) NSString *text;
 @end
 
+// A value as a date, or nil when it is not one. The one place text becomes a
+// date in this kit: the formats are fixed and read in the POSIX locale, so a
+// report means the same thing on every machine -- "2026-09-07" is the seventh
+// of September wherever it is opened, which "07.09.2026" is not.
+//
+// Accepted: yyyy-MM-dd, yyyy-MM-dd'T'HH:mm:ss, yyyy-MM-dd HH:mm:ss,
+// MM/dd/yyyy, d MMM yyyy, MMM d, yyyy. ISO first, so an unambiguous form wins
+// before the American one is tried.
+FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
+
 // One parsed RDL expression, kept losslessly.
 //
 // The tree is the only representation: every token carries the exact lexeme it

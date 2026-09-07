@@ -192,6 +192,12 @@ static id RDLYes(BOOL b) {
   return b ? @YES : @NO;
 }
 
+static NSDate *RDLAsDate(id v, NSDate *fallback);
+
+NSDate *RDLDateFromValue(id value) {
+  return RDLAsDate(value, nil);
+}
+
 static NSDate *RDLAsDate(id v, NSDate *fallback) {
   if ([v isKindOfClass:[NSDate class]])
     return v;

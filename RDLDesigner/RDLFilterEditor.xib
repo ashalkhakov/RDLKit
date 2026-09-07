@@ -28,7 +28,7 @@
                     <textField verticalHuggingPriority="750" id="headingLabel">
                         <rect key="frame" x="14" y="336" width="540" height="14"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Rows are kept when every filter is true of them." id="headingLabelCell">
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Rows are kept when every filter is true of them. Numbers use a dot; dates are yyyy-mm-dd." id="headingLabelCell">
                             <font key="font" metaFont="smallSystemBold"/>
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
