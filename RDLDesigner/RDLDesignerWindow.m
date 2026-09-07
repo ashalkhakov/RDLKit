@@ -45,6 +45,8 @@
 @property (nonatomic, strong) RDLInspectorView *reportInspector;
 @property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
+// The centre's Dataset tab shows the dataset being edited or the data view.
+- (void)showDatasetFields:(BOOL)show;
 @property (nonatomic, strong) RDLInsertPalette *palette;
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
 @property (nonatomic, strong) IBOutlet NSTextView *sourceText;
@@ -169,6 +171,7 @@
   // dataset and has nothing to do with the element now selected.
   if ([_context selectedItem] != nil) {
     _datasetFields.dataSet = nil;
+    [self showDatasetFields:NO];
     if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2)
       [self centerModeChanged:nil];
   }
@@ -379,15 +382,19 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _datasetNavigator.delegate = self;
   RDLFillHost(_datasetNavigatorHost, _datasetNavigator);
 
-  // The dataset's attributes table sits in the centre, over the data view: it
-  // is what is being edited when a dataset is chosen, the way the Core Data
-  // builder shows an entity's attributes. The data view stays underneath as
-  // what the pane shows when no dataset is selected.
-  _datasetFields = [[RDLDatasetFieldsView alloc] initWithFrame:[_dataView bounds]
+  // The dataset's attributes table is what the centre shows when a dataset is
+  // chosen, the way the Core Data builder shows an entity's attributes; the
+  // data view is what it shows when none is. They are siblings in the tab's
+  // view and only one of them is visible -- NOT one inside the other's scroll
+  // view, which is where this began: a second subview of a clip view has no
+  // background, so the data view drew through the attributes on top of it, and
+  // scrolling the one underneath would have carried them along.
+  NSScrollView *dataScroll = [_dataView enclosingScrollView];
+  _datasetFields = [[RDLDatasetFieldsView alloc] initWithFrame:[dataScroll frame]
                                                        context:_context];
   _datasetFields.delegate = self;
-  [_datasetFields setHidden:YES];
-  RDLFillHost([_dataView superview], _datasetFields);
+  RDLFillHost([dataScroll superview], _datasetFields);
+  [self showDatasetFields:NO];
 
   // ... and the settings of whichever attribute is selected go where every
   // other selection's settings go.
@@ -441,13 +448,19 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
 }
 
+// The centre's Dataset tab shows one of the two, never both.
+- (void)showDatasetFields:(BOOL)show {
+  [_datasetFields setHidden:!show];
+  [[_dataView enclosingScrollView] setHidden:show];
+}
+
 // A dataset selected shows it in the centre and puts its fields in the right
 // pane; deselecting hands both back to the report and the selected element.
 - (void)datasetNavigator:(RDLDatasetNavigator *)navigator
         didSelectDataSet:(RDLDataSet *)dataSet {
   RDL_UNUSED(navigator);
   _datasetFields.dataSet = dataSet;
-  [_datasetFields setHidden:dataSet == nil];
+  [self showDatasetFields:dataSet != nil];
   [_fieldInspector showField:nil ofDataSet:dataSet];
   if (dataSet != nil) {
     // One selection at a time. Choosing a dataset is choosing to edit it, so

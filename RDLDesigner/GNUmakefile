@@ -36,6 +36,7 @@ RDLDesigner_OBJC_FILES = \
   RDLInsertPalette.m \
   RDLExpressionCell.m \
   RDLExpressionField.m \
+  RDLFilterEditor.m \
   RDLToolbarIcons.m \
   RDLPane.m \
   RDLExpressionTheme.m \
@@ -65,6 +66,7 @@ RDLDesigner_RESOURCE_FILES = \
   RDLDesignerWindow.xib \
   RDLGeneratorWindow.xib \
   RDLInspectorSections.xib \
+  RDLFilterEditor.xib \
   RDLDatasetNavigator.xib \
   RDLInsertPalette.xib \
   RDLDatasetFieldsView.xib \

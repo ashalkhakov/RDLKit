@@ -1214,10 +1214,30 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 }
 
 // Dynamic group member with a 1.2in bold row header showing the field value.
+// The filters already on the group for this field, if the hierarchy being
+// replaced had one. A rebuild redraws the scaffolding; it is not an
+// instruction to drop what the report says about which rows a group keeps.
+- (NSArray<RDLFilter *> *)rdlExistingFiltersForGroupField:(NSString *)field {
+  NSString *wanted = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  NSMutableArray<RDLTablixMember *> *pending = [NSMutableArray array];
+  [pending addObjectsFromArray:self.rowHierarchy.members];
+  [pending addObjectsFromArray:self.columnHierarchy.members];
+  while ([pending count]) {
+    RDLTablixMember *m = [pending firstObject];
+    [pending removeObjectAtIndex:0];
+    for (RDLValue *e in m.groupExpressions)
+      if ([[e source] isEqualToString:wanted])
+        return [m.filters count] ? [m.filters copy] : nil;
+    [pending addObjectsFromArray:m.members];
+  }
+  return nil;
+}
+
 - (RDLTablixMember *)rdlGroupMemberForField:(NSString *)field suffix:(NSString *)suffix {
   RDLTablixMember *gMem = [[RDLTablixMember alloc] init];
   gMem.groupName = [NSString stringWithFormat:@"%@_%@", self.name ?: @"Tablix", field];
   [gMem.groupExpressions addObject:[RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]]];
+  [gMem.filters addObjectsFromArray:[self rdlExistingFiltersForGroupField:field] ?: @[]];
   gMem.keepTogether = YES;
   RDLTablixHeader *th = [[RDLTablixHeader alloc] init];
   th.size = kRDLGroupHeaderWidth;
@@ -1530,6 +1550,20 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   for (RDLEmbeddedImage *img in self.embeddedImages)
     if ([img.name caseInsensitiveCompare:name] == NSOrderedSame)
       return img;
+  return nil;
+}
+
+// The dataset a name refers to, or nil when the report has none by it. The
+// one place that search lives: the checker, the evaluator, the layout engine
+// and the designer all need it, and each had grown its own copy. Names are
+// matched exactly, the way RDL means them -- a lookup that forgave case would
+// resolve a reference the report itself does not.
+- (RDLDataSet *)dataSetNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLDataSet *ds in self.dataSets)
+    if ([ds.name isEqualToString:name])
+      return ds;
   return nil;
 }
 

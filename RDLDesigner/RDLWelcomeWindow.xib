@@ -8,9 +8,9 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLWelcomeWindow">
             <connections>
-                <outlet property="window" destination="welcomeWindow" id="welcomeWindowOutlet"/>
                 <outlet property="designerCard" destination="designerCard" id="designerCardOutlet"/>
                 <outlet property="generatorCard" destination="generatorCard" id="generatorCardOutlet"/>
+                <outlet property="window" destination="welcomeWindow" id="welcomeWindowOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -23,7 +23,7 @@
                 <rect key="frame" x="0.0" y="0.0" width="740" height="420"/>
                 <autoresizingMask key="autoresizingMask" flexibleMinY="YES" flexibleMaxY="YES"/>
                 <subviews>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="titleLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="titleLabel">
                         <rect key="frame" x="28" y="364" width="400" height="32"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="RDLDesigner" id="titleLabelCell">
@@ -31,7 +31,7 @@
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="subtitleLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="subtitleLabel">
                         <rect key="frame" x="28" y="320" width="680" height="36"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="Two native components. Objective-C, ARC, AppKit — Cocoa and GNUstep." id="subtitleLabelCell">
@@ -61,7 +61,7 @@
                             <action selector="openDesigner:" target="-2" id="openDesignerAction"/>
                         </connections>
                     </button>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorHeading" customClass="RDLCardLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorHeading" customClass="RDLCardLabel">
                         <rect key="frame" x="40" y="176" width="308" height="26"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" title="1  Generator" id="generatorHeadingCell">
@@ -69,11 +69,11 @@
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorBody" customClass="RDLCardLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="generatorBody" customClass="RDLCardLabel">
                         <rect key="frame" x="40" y="72" width="308" height="96"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" id="generatorBodyCell">
-                            <font key="font" metaFont="system" size="12"/>
+                            <font key="font" metaFont="cellTitle"/>
                             <string key="title">Takes an RDL file, data sources, and input parameters.
 Produces PDF or HTML.
 
@@ -81,7 +81,7 @@ RDLKit  ·  RDLDemo  ·  RDLKitTests</string>
                             <color key="textColor" name="disabledControlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerHeading" customClass="RDLCardLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerHeading" customClass="RDLCardLabel">
                         <rect key="frame" x="392" y="176" width="308" height="26"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" title="2  Designer" id="designerHeadingCell">
@@ -89,11 +89,11 @@ RDLKit  ·  RDLDemo  ·  RDLKitTests</string>
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerBody" customClass="RDLCardLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="designerBody" customClass="RDLCardLabel">
                         <rect key="frame" x="392" y="72" width="308" height="96"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         <textFieldCell key="cell" alignment="center" id="designerBodyCell">
-                            <font key="font" metaFont="system" size="12"/>
+                            <font key="font" metaFont="cellTitle"/>
                             <string key="title">Create and edit RDL files.
 Outline, canvas, inspector, datasets.
 

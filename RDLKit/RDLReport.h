@@ -729,6 +729,8 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // Parser diagnostics: names of unsupported/skipped elements ("Subreport 'X'", …).
 @property (nonatomic, strong) NSMutableArray<NSString *> *warnings;
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
+// The dataset with this name, or nil. Exact match, as RDL names are.
+- (RDLDataSet *)dataSetNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
 // Stamp every item in the report with a back-pointer to it. Cheap, idempotent,
 // and called after anything that adds or moves items, because there is no hook

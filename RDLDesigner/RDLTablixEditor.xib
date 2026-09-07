@@ -8,16 +8,18 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLTablixEditor">
             <connections>
-                <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
                 <outlet property="addColumnButton" destination="addColumnButton" id="addColumnButtonOutlet"/>
-                <outlet property="removeColumnButton" destination="removeColumnButton" id="removeColumnButtonOutlet"/>
-                <outlet property="moveLeftButton" destination="moveLeftButton" id="moveLeftButtonOutlet"/>
-                <outlet property="moveRightButton" destination="moveRightButton" id="moveRightButtonOutlet"/>
-                <outlet property="rowGroupTable" destination="rowGroupTable" id="rowGroupTableOutlet"/>
+                <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
                 <outlet property="colGroupTable" destination="colGroupTable" id="colGroupTableOutlet"/>
                 <outlet property="datasetPop" destination="datasetPop" id="datasetPopOutlet"/>
+                <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
                 <outlet property="grandTotalCheck" destination="grandTotalCheck" id="grandTotalCheckOutlet"/>
+                <outlet property="groupFiltersButton" destination="groupFiltersButton" id="groupFiltersButtonOutlet"/>
                 <outlet property="headerHField" destination="headerHField" id="headerHFieldOutlet"/>
+                <outlet property="moveLeftButton" destination="moveLeftButton" id="moveLeftButtonOutlet"/>
+                <outlet property="moveRightButton" destination="moveRightButton" id="moveRightButtonOutlet"/>
+                <outlet property="removeColumnButton" destination="removeColumnButton" id="removeColumnButtonOutlet"/>
+                <outlet property="rowGroupTable" destination="rowGroupTable" id="rowGroupTableOutlet"/>
                 <outlet property="rowHField" destination="rowHField" id="rowHFieldOutlet"/>
                 <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="window" destination="panel" id="panelOutlet"/>
@@ -33,7 +35,7 @@
                 <rect key="frame" x="0.0" y="0.0" width="640" height="466"/>
                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                 <subviews>
-                    <textField verticalHuggingPriority="750" id="datasetLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="datasetLabel">
                         <rect key="frame" x="14" y="432" width="90" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" title="Dataset" id="datasetLabelCell">
@@ -61,7 +63,7 @@
                             <font key="font" metaFont="system"/>
                         </buttonCell>
                     </button>
-                    <textField verticalHuggingPriority="750" id="rowGroupTableLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="rowGroupTableLabel">
                         <rect key="frame" x="198" y="448" width="208" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Row groups" id="rowGroupTableLabelCell">
@@ -70,15 +72,15 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="rowGroupTableScroll">
+                    <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="rowGroupTableScroll">
                         <rect key="frame" x="198" y="368" width="208" height="76"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="rowGroupTableClip">
-                            <rect key="frame" x="1" y="1" width="191" height="74"/>
+                            <rect key="frame" x="1" y="1" width="191" height="59"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
                                 <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="rowGroupTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="191" height="74"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="191" height="59"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -104,11 +106,11 @@
                             </subviews>
                         </clipView>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="rowGroupTableV">
-                            <rect key="frame" x="192" y="1" width="15" height="74"/>
+                            <rect key="frame" x="192" y="1" width="15" height="59"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
                     </scrollView>
-                    <textField verticalHuggingPriority="750" id="colGroupTableLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="colGroupTableLabel">
                         <rect key="frame" x="418" y="448" width="208" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Column groups" id="colGroupTableLabelCell">
@@ -117,15 +119,15 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="colGroupTableScroll">
+                    <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="colGroupTableScroll">
                         <rect key="frame" x="418" y="368" width="208" height="76"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="colGroupTableClip">
-                            <rect key="frame" x="1" y="1" width="191" height="74"/>
+                            <rect key="frame" x="1" y="1" width="191" height="59"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
                                 <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="colGroupTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="191" height="74"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="191" height="59"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -151,11 +153,11 @@
                             </subviews>
                         </clipView>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="colGroupTableV">
-                            <rect key="frame" x="192" y="1" width="15" height="74"/>
+                            <rect key="frame" x="192" y="1" width="15" height="59"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
                     </scrollView>
-                    <textField verticalHuggingPriority="750" id="columnsLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="columnsLabel">
                         <rect key="frame" x="14" y="350" width="560" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" title="Columns — Total picks the aggregate; with a column group (pivot) the first column is the measure" id="columnsLabelCell">
@@ -308,7 +310,7 @@
                             <action selector="moveRight:" target="-2" id="moveRightButtonAction"/>
                         </connections>
                     </button>
-                    <textField verticalHuggingPriority="750" id="headerHLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="headerHLabel">
                         <rect key="frame" x="14" y="58" width="80" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" title="Header in" id="headerHLabelCell">
@@ -316,7 +318,7 @@
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField id="headerHField">
+                    <textField focusRingType="none" id="headerHField">
                         <rect key="frame" x="96" y="54" width="70" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="headerHFieldCell">
@@ -325,7 +327,7 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" id="rowHLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="rowHLabel">
                         <rect key="frame" x="182" y="58" width="56" height="14"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" title="Row in" id="rowHLabelCell">
@@ -333,7 +335,7 @@
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField id="rowHField">
+                    <textField focusRingType="none" id="rowHField">
                         <rect key="frame" x="240" y="54" width="70" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rowHFieldCell">
@@ -342,16 +344,38 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <button toolTip="The rows the selected group keeps" id="groupFiltersButton">
+                        <rect key="frame" x="418" y="340" width="208" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="Filter the selected group…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="groupFiltersButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editGroupFilters:" target="-2" id="groupFiltersButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="The rows this tablix keeps" id="filtersButton">
+                        <rect key="frame" x="330" y="54" width="96" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="Filters…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="filtersButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editFilters:" target="-2" id="filtersButtonAction"/>
+                        </connections>
+                    </button>
                     <button id="cancelButton">
                         <rect key="frame" x="450" y="12" width="80" height="28"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                                                    <string key="keyEquivalent" base64-UTF8="YES">
+                            <string key="keyEquivalent" base64-UTF8="YES">
 Gw
 </string>
-</buttonCell>
+                        </buttonCell>
                         <connections>
                             <action selector="cancel:" target="-2" id="cancelButtonAction"/>
                         </connections>

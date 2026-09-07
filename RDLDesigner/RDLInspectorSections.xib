@@ -25,6 +25,7 @@
                 <outlet property="cellWidthField" destination="cellWidthField" id="cellWidthFieldOutlet"/>
                 <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
                 <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
+                <outlet property="chartFiltersButton" destination="chartFiltersButton" id="chartFiltersButtonOutlet"/>
                 <outlet property="chartKindPop" destination="chartKindPop" id="chartKindPopOutlet"/>
                 <outlet property="colorExprButton" destination="colorExprButton" id="colorExprButtonOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
@@ -956,7 +957,7 @@
             </subviews>
         </customView>
         <customView id="chartBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="180"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="206"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl28">
@@ -1072,7 +1073,18 @@
                         <outlet property="delegate" destination="-2" id="valFieldDelegate"/>
                     </connections>
                 </textField>
-            </subviews>
+                            <button toolTip="The rows this chart keeps" id="chartFiltersButton">
+                    <rect key="frame" x="10" y="180" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Filters…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="chartFiltersButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editChartFilters:" target="-2" id="chartFiltersButtonAction"/>
+                    </connections>
+                </button>
+</subviews>
         </customView>
         <customView id="tablixBox">
             <rect key="frame" x="0.0" y="28" width="260" height="122"/>

@@ -663,4 +663,49 @@ static NSTabView *_centerTabViewOf(id wc) {
                                               hit ? hit.name : @"nothing"]);
 }
 
+
+// The centre's Dataset tab shows one thing at a time. It used to show two: the
+// attributes pane was added as a second subview of the data view's clip view,
+// where it had no background of its own, so the data view's own labels --
+// "Parameters", the dataset buttons -- drew straight through the attributes on
+// top of them, and scrolling the view underneath would have carried the pane
+// with it. Both halves are checked: where the pane lives, and that exactly one
+// of the two is visible whichever way the selection goes.
+- (void)testTheDatasetPaneReplacesTheDataViewRatherThanCoveringIt {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSView *fields = [wc valueForKey:@"datasetFields"];
+  NSView *dataView = [wc valueForKey:@"dataView"];
+  NSScrollView *dataScroll = [dataView enclosingScrollView];
+
+  if ([fields superview] != [dataScroll superview])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the attributes pane hangs off a %@, not the "
+                                              @"data view's own host",
+                                              [[fields superview] class]]);
+  if ([fields isDescendantOf:dataScroll])
+    XCTFail(@"%@", @"the attributes pane is inside the data view's scroll view");
+
+  // Nothing chosen: the data view is the pane.
+  [wc datasetNavigator:[wc valueForKey:@"datasetNavigator"] didSelectDataSet:nil];
+  if (![fields isHidden] || [dataScroll isHidden])
+    XCTFail(@"%@", @"with no dataset chosen the centre should be the data view");
+
+  // A dataset chosen: its attributes are, and the data view is out of the way.
+  [wc datasetNavigator:[wc valueForKey:@"datasetNavigator"] didSelectDataSet:ds];
+  if ([fields isHidden] || ![dataScroll isHidden])
+    XCTFail(@"%@", @"choosing a dataset should show its attributes and only those");
+
+  // Selecting something on the canvas ends the dataset's turn, in the centre
+  // as well as in the inspector.
+  [ctx.selection selectItem:[report.body.items firstObject] inBandWithKey:@"body"];
+  if (![fields isHidden] || [dataScroll isHidden])
+    XCTFail(@"%@", @"selecting an element should hand the centre back to the data view");
+}
+
 @end

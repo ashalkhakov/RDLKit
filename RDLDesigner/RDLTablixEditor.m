@@ -1,5 +1,6 @@
 #import "RDLTablixEditor.h"
 #import "RDLToolbarIcons.h"
+#import "RDLFilterEditor.h"
 #import "RDLPane.h"
 #import "RDLEditingContext.h"
 #import "RDLExpressionCell.h"
@@ -32,20 +33,24 @@ static NSString *RDLFieldOfValue(NSString *value) {
 @property (nonatomic, strong) IBOutlet NSButton *grandTotalCheck;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
+@property (nonatomic, strong) IBOutlet NSButton *filtersButton;
+@property (nonatomic, strong) IBOutlet NSButton *groupFiltersButton;
 @property (nonatomic, strong) IBOutlet NSButton *addColumnButton, *removeColumnButton;
 @property (nonatomic, strong) IBOutlet NSButton *moveLeftButton, *moveRightButton;
 @property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
 @property (nonatomic, strong) RDLReport *report;
+// The tablix being edited, and its filters as the filter panel last left them
+// -- nil until that panel has been through, so an untouched dialog leaves the
+// filters exactly as they were rather than rewriting them with equal ones.
+@property (nonatomic, strong) RDLTablix *tablix;
+@property (nonatomic, copy) NSArray<RDLFilter *> *editedFilters;
 @end
 
 @implementation RDLTablixEditor
 
 - (RDLDataSet *)selectedDataset {
-  NSString *name = [_datasetPop titleOfSelectedItem];
-  for (RDLDataSet *ds in _report.dataSets)
-    if ([ds.name isEqualToString:name])
-      return ds;
-  return _report.dataSets.firstObject;
+  RDLDataSet *ds = [_report dataSetNamed:[_datasetPop titleOfSelectedItem]];
+  return ds ?: _report.dataSets.firstObject;
 }
 
 - (void)datasetChanged:(id)sender {
@@ -318,6 +323,92 @@ static NSString *RDLFieldOfValue(NSString *value) {
   [self moveColumn:1];
 }
 
+// The filters are edited in their own panel and held here until this one is
+// accepted, so the whole dialog is still one undoable step and cancelling it
+// cancels them too.
+- (void)editFilters:(id)sender {
+  (void)sender;
+  NSArray<RDLFilter *> *edited =
+      [RDLFilterEditor runForFilters:_editedFilters ?: _tablix.filters
+                               title:_tablix.name
+                              fields:[[self selectedDataset] fieldNames]
+                              report:_report];
+  if (edited == nil)
+    return;
+  _editedFilters = edited;
+  [self syncFiltersButton];
+}
+
+// A group filters the rows inside it, after the region's own filters have run.
+// The group is chosen in one of the two lists beside the columns; its filters
+// live on the member the scaffolding builds for that field, which is why
+// -rdlGroupMemberForField: carries them across a rebuild.
+- (void)editGroupFilters:(id)sender {
+  (void)sender;
+  NSString *field = [self selectedGroupField];
+  if (field == nil) {
+    NSBeep();
+    return;
+  }
+  RDLTablixMember *member = [self groupMemberForField:field];
+  NSArray<RDLFilter *> *edited =
+      [RDLFilterEditor runForFilters:member.filters ?: @[]
+                               title:[NSString stringWithFormat:@"group by %@", field]
+                              fields:[[self selectedDataset] fieldNames]
+                              report:_report];
+  if (edited == nil)
+    return;
+  // Written straight onto the member: the group hierarchy is not part of what
+  // the dialog rebuilds from its own fields, and a rebuild now keeps them.
+  [member.filters removeAllObjects];
+  [member.filters addObjectsFromArray:edited];
+  [self syncFiltersButton];
+}
+
+// Whichever of the two group lists has a selection; the row list wins when
+// both do, since that is the one most reports group by.
+- (NSString *)selectedGroupField {
+  NSInteger row = [_rowGroupTable selectedRow];
+  if (row >= 0 && row < (NSInteger)[_rowGroups count])
+    return _rowGroups[(NSUInteger)row];
+  NSInteger col = [_colGroupTable selectedRow];
+  if (col >= 0 && col < (NSInteger)[_colGroups count])
+    return _colGroups[(NSUInteger)col];
+  return nil;
+}
+
+- (RDLTablixMember *)groupMemberForField:(NSString *)field {
+  NSString *wanted = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  NSMutableArray<RDLTablixMember *> *pending = [NSMutableArray array];
+  [pending addObjectsFromArray:_tablix.rowHierarchy.members];
+  [pending addObjectsFromArray:_tablix.columnHierarchy.members];
+  while ([pending count]) {
+    RDLTablixMember *m = [pending firstObject];
+    [pending removeObjectAtIndex:0];
+    for (RDLValue *e in m.groupExpressions)
+      if ([[e source] isEqualToString:wanted])
+        return m;
+    [pending addObjectsFromArray:m.members];
+  }
+  return nil;
+}
+
+// The button says how many there are, because a filter is otherwise invisible
+// from here and a report that returns no rows is a mystery worth one word.
+- (void)syncFiltersButton {
+  NSString *field = [self selectedGroupField];
+  RDLTablixMember *member = field ? [self groupMemberForField:field] : nil;
+  [_groupFiltersButton setEnabled:member != nil];
+  [_groupFiltersButton setTitle:[member.filters count]
+                                    ? [NSString stringWithFormat:@"Filter this group (%lu)…",
+                                                                 (unsigned long)[member.filters count]]
+                                    : @"Filter the selected group…"];
+  NSUInteger count = [(_editedFilters ?: _tablix.filters) count];
+  [_filtersButton setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…",
+                                                              (unsigned long)count]
+                                 : @"Filters…"];
+}
+
 - (void)accept:(id)sender {
   (void)sender;
   [self commitTableEditing];
@@ -387,7 +478,9 @@ static NSString *RDLFieldOfValue(NSString *value) {
   if ([cols count] == 0)
     [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
   ed.cols = cols;
+  ed.tablix = tablix;
   [ed buildPanelForTablix:tablix];
+  [ed syncFiltersButton];
   return ed;
 }
 
@@ -414,7 +507,11 @@ static NSString *RDLFieldOfValue(NSString *value) {
     @"showGrandTotal" : @([ed.grandTotalCheck state] == NSOnState),
     @"headerHeight" : @([[ed.headerHField stringValue] doubleValue]),
     @"rowHeight" : @([[ed.rowHField stringValue] doubleValue]),
-    @"columnSpecs" : [ed columnSpecsForSaving]
+    @"columnSpecs" : [ed columnSpecsForSaving],
+    // Only when the filter panel was actually opened and accepted: an
+    // untouched dialog must leave the filters alone, not replace them with
+    // equal ones and register an edit that changed nothing.
+    @"filters" : [(ed.editedFilters ?: tablix.filters) mutableCopy]
   }
                          ofTablix:tablix];
   return YES;

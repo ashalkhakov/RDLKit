@@ -1527,4 +1527,218 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"named RDL colours should resolve, and hex should not");
 }
 
+// The way a report filters on a list of things: a multi-value parameter, and
+// In against it. SSRS writes that as [@Param] and means "one of the values
+// chosen"; the parameter reaches the filter as an array, and comparing a row
+// against the array as a whole matches nothing at all.
+- (void)testInAgainstAMultiValueParameter {
+  RDLReport *r = RDLGroupedJobs();
+  RDLParameter *finishes = [[RDLParameter alloc] init];
+  finishes.name = @"Finishes";
+  finishes.dataType = RDLParameterDataTypeString;
+  finishes.multiValue = YES;
+  [r.parameters addObject:finishes];
+
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  f.oper = RDLFilterOperatorIn;
+  [f.values addObject:[RDLValue valueWithSource:@"=Parameters!Finishes.Value"]];
+  [tab.filters addObject:f];
+
+  NSArray<NSString *> *(^render)(id) = ^NSArray<NSString *> *(id chosen) {
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r
+                                               parameters:@{ @"Finishes" : chosen }])
+      for (RDLLaidOutItem *it in p.items)
+        if ([RDLLaidText(it) length])
+          [texts addObject:RDLLaidText(it)];
+    return texts;
+  };
+
+  // Two of the three finishes: the Lacquer jobs go, the rest stay.
+  NSArray<NSString *> *two = render(@[ @"Oil", @"Wax" ]);
+  for (NSString *kept in @[ @"Desk", @"Chair", @"Frame", @"Shelf", @"Stool" ])
+    if (![two containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"In [Oil, Wax] dropped %@", kept]);
+  for (NSString *gone in @[ @"Lamp", @"Shade" ])
+    if ([two containsObject:gone])
+      XCTFail(@"%@", [NSString stringWithFormat:@"In [Oil, Wax] kept the Lacquer job %@", gone]);
+
+  // One value, passed as a bare string rather than a list, still filters.
+  NSArray<NSString *> *one = render(@"Wax");
+  if (![one containsObject:@"Shelf"] || [one containsObject:@"Desk"])
+    XCTFail(@"%@", @"a single chosen value should filter to that value");
+
+  // And constants still work, since the file format allows a list of them
+  // whatever the designer offers to type.
+  [tab.filters removeAllObjects];
+  RDLFilter *literal = [[RDLFilter alloc] init];
+  literal.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  literal.oper = RDLFilterOperatorIn;
+  [literal.values addObject:[RDLValue literal:@"Lacquer"]];
+  [literal.values addObject:[RDLValue literal:@"Wax"]];
+  [tab.filters addObject:literal];
+  NSArray<NSString *> *constants = render(@[]);
+  if (![constants containsObject:@"Lamp"] || [constants containsObject:@"Desk"])
+    XCTFail(@"%@", @"a list of constant values should still filter");
+}
+
+// A filter or a sort on a date has to compare dates, not the words a date is
+// printed as: "Sep 7, 2026" comes before "Oct 1, 2026" alphabetically and
+// after it in time. And the text a report is written with means one thing
+// everywhere -- "2026-09-07" is the seventh of September on every machine,
+// which "07.09.2026" is not.
+- (void)testDatesCompareAsDates {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Dates"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Runs";
+  ds.dataSourceName = @"Demo";
+  [ds setFieldNames:@[ @"Job", @"When" ]];
+  NSDateFormatter *iso = [[NSDateFormatter alloc] init];
+  iso.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+  iso.dateFormat = @"yyyy-MM-dd";
+  ds.rows = @[
+    @{ @"Job" : @"Autumn", @"When" : [iso dateFromString:@"2026-09-07"] },
+    @{ @"Job" : @"Spring", @"When" : [iso dateFromString:@"2026-03-11"] },
+    @{ @"Job" : @"Winter", @"When" : [iso dateFromString:@"2026-12-01"] },
+  ];
+  [r.dataSets addObject:ds];
+
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"Runs";
+  tab.dataSetName = @"Runs";
+  tab.width = 6;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.columnSpecs = @[ @{ @"width" : @3.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value" } ];
+  [tab rebuildTablix];
+
+  // Everything after the summer, which is Autumn and Winter but not Spring.
+  RDLFilter *after = [[RDLFilter alloc] init];
+  after.expression = [RDLValue valueWithSource:@"=Fields!When.Value"];
+  after.oper = RDLFilterOperatorGreaterThan;
+  [after.values addObject:[RDLValue literal:@"2026-06-30"]];
+  [tab.filters addObject:after];
+  [r.body.items addObject:tab];
+
+  NSMutableArray *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  if (![texts containsObject:@"Autumn"] || ![texts containsObject:@"Winter"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the later runs were dropped: %@", texts]);
+  if ([texts containsObject:@"Spring"])
+    XCTFail(@"%@", @"March is not after June; the comparison read the printed date");
+
+  // And a sort puts them in date order, not alphabetical-by-month order.
+  [tab.filters removeAllObjects];
+  RDLSortExpression *byDate = [[RDLSortExpression alloc] init];
+  byDate.expression = [RDLValue valueWithSource:@"=Fields!When.Value"];
+  byDate.direction = RDLSortDirectionAscending;
+  [tab.sortExpressions addObject:byDate];
+  [texts removeAllObjects];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  NSUInteger spring = [texts indexOfObject:@"Spring"], autumn = [texts indexOfObject:@"Autumn"],
+             winter = [texts indexOfObject:@"Winter"];
+  if (spring == NSNotFound || autumn == NSNotFound || winter == NSNotFound ||
+      !(spring < autumn && autumn < winter))
+    XCTFail(@"%@", [NSString stringWithFormat:@"March, September, December is the order: %@",
+                                              texts]);
+}
+
+// TopN and its three relatives cannot be decided a row at a time: which rows
+// they keep depends on how the rest rank. Until they were implemented the
+// evaluator let every row through, so a report asking for its ten largest
+// silently rendered all of them -- wrong output rather than a missing feature.
+//
+// RDLGroupedJobs pays: Desk 1840, Chair 420, Lamp 265, Shade 48, Shelf 610,
+// Stool 190, Frame 95.
+- (void)testRankingFilters {
+  NSArray<NSString *> *(^textsFor)(RDLFilterOperator, NSString *) =
+      ^NSArray<NSString *> *(RDLFilterOperator op, NSString *amount) {
+    RDLReport *r = RDLGroupedJobs();
+    RDLFilter *f = [[RDLFilter alloc] init];
+    f.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+    f.oper = op;
+    [f.values addObject:[RDLValue literal:amount]];
+    [[(RDLTablix *)r.body.items.firstObject filters] addObject:f];
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+      for (RDLLaidOutItem *it in p.items)
+        if ([RDLLaidText(it) length])
+          [texts addObject:RDLLaidText(it)];
+    return texts;
+  };
+
+  // The three largest: Desk, Shelf, Chair. Nothing smaller.
+  NSArray<NSString *> *top3 = textsFor(RDLFilterOperatorTopN, @"3");
+  for (NSString *kept in @[ @"Desk", @"Shelf", @"Chair" ])
+    if (![top3 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopN 3 dropped %@", kept]);
+  for (NSString *gone in @[ @"Shade", @"Frame", @"Stool", @"Lamp" ])
+    if ([top3 containsObject:gone])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopN 3 kept %@", gone]);
+
+  // Selecting is not sorting: what it keeps stays in the order it arrived, so
+  // Desk still comes before Chair.
+  if ([top3 indexOfObject:@"Desk"] > [top3 indexOfObject:@"Chair"])
+    XCTFail(@"%@", @"TopN reordered the rows it kept");
+
+  // The two smallest: Shade 48 and Frame 95.
+  NSArray<NSString *> *bottom2 = textsFor(RDLFilterOperatorBottomN, @"2");
+  for (NSString *kept in @[ @"Shade", @"Frame" ])
+    if (![bottom2 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"BottomN 2 dropped %@", kept]);
+  if ([bottom2 containsObject:@"Desk"])
+    XCTFail(@"%@", @"BottomN 2 kept the largest row");
+
+  // 30% of seven rows is 2.1, and the row it lands in is kept: three.
+  NSArray<NSString *> *top30 = textsFor(RDLFilterOperatorTopPercent, @"30");
+  for (NSString *kept in @[ @"Desk", @"Shelf", @"Chair" ])
+    if (![top30 containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"TopPercent 30 dropped %@", kept]);
+  if ([top30 containsObject:@"Stool"])
+    XCTFail(@"%@", @"TopPercent 30 kept a fourth row");
+
+  // More than there are keeps them all; none keeps none.
+  if ([textsFor(RDLFilterOperatorTopN, @"99") count] <= [top3 count])
+    XCTFail(@"%@", @"TopN 99 should keep every row");
+  NSArray<NSString *> *none = textsFor(RDLFilterOperatorTopN, @"0");
+  for (NSString *gone in @[ @"Desk", @"Chair", @"Shade" ])
+    if ([none containsObject:gone])
+      XCTFail(@"%@", @"TopN 0 should keep no rows at all");
+
+  // And a ranking filter ranks what the ordinary ones left: of the three Oil
+  // jobs -- Desk 1840, Chair 420, Frame 95 -- the largest is Desk.
+  RDLReport *both = RDLGroupedJobs();
+  RDLFilter *oil = [[RDLFilter alloc] init];
+  oil.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  oil.oper = RDLFilterOperatorEqual;
+  [oil.values addObject:[RDLValue literal:@"Oil"]];
+  RDLFilter *biggest = [[RDLFilter alloc] init];
+  biggest.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  biggest.oper = RDLFilterOperatorTopN;
+  [biggest.values addObject:[RDLValue literal:@"1"]];
+  RDLTablix *tab = (RDLTablix *)both.body.items.firstObject;
+  [tab.filters addObject:oil];
+  [tab.filters addObject:biggest];
+  NSMutableArray *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:both parameters:@{}])
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  if (![texts containsObject:@"Desk"])
+    XCTFail(@"%@", @"the largest Oil job should survive both filters");
+  if ([texts containsObject:@"Shelf"])
+    XCTFail(@"%@", @"Shelf is larger but is not Oil; the pair should have dropped it");
+  if ([texts containsObject:@"Chair"])
+    XCTFail(@"%@", @"only the largest Oil job should be left");
+}
+
+
 @end

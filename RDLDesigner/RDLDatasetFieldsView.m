@@ -4,12 +4,14 @@
 #import "RDLEditor.h"
 #import "RDLKit.h"
 #import "RDLPane.h"
+#import "RDLFilterEditor.h"
 #import "RDLToolbarIcons.h"
 
 @interface RDLDatasetFieldsView () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSButton *addButton;
+@property (nonatomic, strong) IBOutlet NSButton *filtersButton;
 @property (nonatomic, strong) IBOutlet NSButton *removeButton;
 // The dataset's own settings. Only its name so far, which is what a report
 // refers to it by and the one thing that was not editable anywhere.
@@ -40,6 +42,11 @@
 
 - (void)reload {
   [_title setStringValue:_dataSet.name ?: @""];
+  NSUInteger filters = [_dataSet.filters count];
+  [_filtersButton setTitle:filters ? [NSString stringWithFormat:@"Filters (%lu)…",
+                                                                (unsigned long)filters]
+                                   : @"Filters…"];
+  [_filtersButton setEnabled:_dataSet != nil];
   [_title setEnabled:_dataSet != nil];
   [_table reloadData];
 }
@@ -64,6 +71,22 @@
   [self reload];
 }
 
+// A dataset filters its own rows, before any region sees them. Same panel as
+// a region's filters and a group's, because it is the same question.
+- (void)editFilters:(id)sender {
+  (void)sender;
+  if (_dataSet == nil)
+    return;
+  NSArray<RDLFilter *> *edited = [RDLFilterEditor runForFilters:_dataSet.filters
+                                                          title:_dataSet.name
+                                                         fields:[_dataSet fieldNames]
+                                                         report:_context.report];
+  if (edited == nil)
+    return;
+  [_context.editor setFilters:edited ofDataSet:_dataSet];
+  [self reload];
+}
+
 - (void)tableViewSelectionDidChange:(NSNotification *)note {
   (void)note;
   [_delegate datasetFieldsView:self didSelectField:[self selectedField]];
@@ -71,9 +94,7 @@
 
 #pragma mark - Editing
 
-// Fields are RDLField objects, always: a dataset that declared bare names was
-// the shape that let -isEqualToString: reach an RDLField. A new field is
-// String, which is what an unknown column is until someone says otherwise.
+// Fields are RDLField objects. A new field is String by default.
 - (void)addField:(id)sender {
   (void)sender;
   if (_dataSet == nil)
