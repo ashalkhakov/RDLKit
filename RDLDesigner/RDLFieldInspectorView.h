@@ -13,4 +13,7 @@
 // A control finished editing: read it back into the field. Declared because
 // the settings are driven through it, in the app and in checks alike.
 - (void)changed:(id)sender;
+// The Kind popup: rewrites the field as the other kind of field. Declared for
+// the same reason -- it is what the pane does, and it is driven in checks.
+- (void)kindChanged:(id)sender;
 @end

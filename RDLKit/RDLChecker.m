@@ -879,7 +879,7 @@ static NSDictionary *RDLObjCTypeForParameter(RDLParameterDataType t) {
       entry[@"rdlType"] = RDLStringFromFieldDataType(fld.dataType) ?: @"Unknown";
       // A calculated field is produced by the report, not supplied by the
       // caller, so say so rather than asking for it.
-      if (fld.value != nil) {
+      if ([fld isCalculated]) {
         entry[@"computed"] = @YES;
         entry[@"expression"] = [fld.value source] ?: @"";
       }

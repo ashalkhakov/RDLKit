@@ -11,4 +11,5 @@
 + (RDLReport *)studioRoster;
 + (RDLReport *)workshopByFinish;
 + (RDLReport *)regionalSales;
++ (RDLReport *)kilnLog;
 @end

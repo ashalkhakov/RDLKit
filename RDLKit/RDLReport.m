@@ -1425,6 +1425,12 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 @end
 
 @implementation RDLField
+
+// The one rule for telling the kinds apart, so nothing has to remember that it
+// is written as "the value is not nil".
+- (BOOL)isCalculated {
+  return self.value != nil;
+}
 @end
 
 @implementation RDLEmbeddedImage

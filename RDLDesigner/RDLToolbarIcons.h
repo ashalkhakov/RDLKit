@@ -19,6 +19,9 @@ typedef NS_ENUM(NSInteger, RDLToolbarGlyph) {
   // f(x): edit this as an expression.
   RDLToolbarGlyphExpression,
   RDLToolbarGlyphAdd,
+  // Add, but of the other kind of field: a plus beside the fx that means an
+  // expression, so the two add buttons cannot be mistaken for each other.
+  RDLToolbarGlyphAddCalculated,
   RDLToolbarGlyphRemove,
   RDLToolbarGlyphMoveLeft,
   RDLToolbarGlyphMoveRight,

@@ -70,6 +70,26 @@ static void RDLDrawPlusMinus(BOOL plus) {
 // A chevron, drawn as a stroked path rather than a character, so it is the
 // same shape wherever the app runs -- the two arrows it replaces came out as
 // question marks on GNUstep, which is what started this.
+// The plus of the add button and the fx of the expression button, side by
+// side: adding a calculated field is both of those things at once, and a
+// second plain plus next to the first would say nothing about the difference.
+static void RDLDrawAddCalculated(void) {
+  [[NSColor blackColor] set];
+  CGFloat mid = kRDLIconSide / 2;
+  NSRectFill(NSMakeRect(0, mid - 1, 6, kRDLBarHeight));
+  NSRectFill(NSMakeRect(2, mid - 3, kRDLBarHeight, 6));
+  NSFont *font = [[NSFontManager sharedFontManager] convertFont:[NSFont systemFontOfSize:11]
+                                                    toHaveTrait:NSItalicFontMask]
+                     ?: [NSFont systemFontOfSize:11];
+  NSDictionary *attrs = @{
+    NSFontAttributeName : font,
+    NSForegroundColorAttributeName : [NSColor blackColor]
+  };
+  NSSize size = [@"fx" sizeWithAttributes:attrs];
+  [@"fx" drawAtPoint:NSMakePoint(kRDLIconSide - size.width, (kRDLIconSide - size.height) / 2)
+      withAttributes:attrs];
+}
+
 static void RDLDrawChevron(BOOL pointingLeft) {
   NSBezierPath *path = [NSBezierPath bezierPath];
   CGFloat near = pointingLeft ? kRDLIconSide - 5 : 5;
@@ -109,6 +129,9 @@ static void RDLDrawGlyph(RDLToolbarGlyph glyph) {
       break;
     case RDLToolbarGlyphAdd:
       RDLDrawPlusMinus(YES);
+      break;
+    case RDLToolbarGlyphAddCalculated:
+      RDLDrawAddCalculated();
       break;
     case RDLToolbarGlyphRemove:
       RDLDrawPlusMinus(NO);

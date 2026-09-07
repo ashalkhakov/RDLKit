@@ -929,7 +929,7 @@ static id RDLEvaluateField(RDLEvalScope *scope, RDLExprNode *node) {
       if (![f isKindOfClass:[RDLField class]])
         continue;
       RDLField *fld = (RDLField *)f;
-      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || fld.value == nil)
+      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || ![fld isCalculated])
         continue;
       v = [fld.value evaluateInScope:scope];
       break;

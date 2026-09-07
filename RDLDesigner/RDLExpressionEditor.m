@@ -57,9 +57,16 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
   for (RDLDataSet *ds in _report.dataSets)
     for (RDLField *f in ds.fields)
       if ([f.name length])
+        // The summary is where the two kinds of field are told apart here: an
+        // author choosing one should know whether it comes from the data or is
+        // worked out, and a calculated field says what it is worked out from.
         [out addObject:RDLEntry([NSString stringWithFormat:@"Fields!%@.Value", f.name],
-                                [NSString stringWithFormat:@"The %@ field of %@.", f.name,
-                                                           ds.name ?: @"the dataset"])];
+                                [f isCalculated]
+                                    ? [NSString stringWithFormat:@"The %@ calculated field of %@: %@",
+                                                                 f.name, ds.name ?: @"the dataset",
+                                                                 [f.value source] ?: @""]
+                                    : [NSString stringWithFormat:@"The %@ field of %@.", f.name,
+                                                                 ds.name ?: @"the dataset"])];
   return out;
 }
 

@@ -708,4 +708,75 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"selecting an element should hand the centre back to the data view");
 }
 
+// A dataset has two kinds of field and the designer says which is which, the
+// way Report Builder does: the table names the kind and what it is read from,
+// each kind has its own add button, and the inspector makes the choice a
+// choice -- one box for a column, another for an expression, never both at
+// once. Before this, a calculated field was only "the one that happens to have
+// something in the Value box".
+- (void)testTheTwoKindsOfFieldAreSpeltOut {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLDatasetFieldsView *table = [wc valueForKey:@"datasetFields"];
+  RDLFieldInspectorView *inspector = [wc valueForKey:@"fieldInspector"];
+  [wc datasetNavigator:[wc valueForKey:@"datasetNavigator"] didSelectDataSet:ds];
+
+  // Each button adds its own kind, and adding one selects it.
+  [table addField:nil];
+  RDLField *query = [[ds fields] lastObject];
+  if ([query isCalculated] || [query.dataField length] == 0)
+    XCTFail(@"%@", @"the plus button should add a field read from a column");
+  [table addCalculatedField:nil];
+  RDLField *calculated = [[ds fields] lastObject];
+  if (![calculated isCalculated])
+    XCTFail(@"%@", @"the fx plus button should add a calculated field");
+  if (calculated.dataField != nil)
+    XCTFail(@"%@", @"a calculated field reads no column");
+  if (table.selectedField != calculated)
+    XCTFail(@"%@", @"the field just added should be the one selected");
+
+  // The table names the kind and what each is read from.
+  if (![[RDLDatasetFieldsView nameOfKindCalculated:YES] isEqualToString:@"Calculated"] ||
+      ![[RDLDatasetFieldsView nameOfKindCalculated:NO] isEqualToString:@"Query"])
+    XCTFail(@"%@", @"the two kinds should be named as Report Builder names them");
+  if (![[RDLDatasetFieldsView sourceOfField:calculated]
+          isEqualToString:[calculated.value source]])
+    XCTFail(@"%@", @"a calculated field's source is its expression");
+  if (![[RDLDatasetFieldsView sourceOfField:query] isEqualToString:query.dataField])
+    XCTFail(@"%@", @"a query field's source is its column");
+
+  // The inspector shows the choice, and one box or the other -- not both.
+  [wc datasetFieldsView:table didSelectField:calculated];
+  NSPopUpButton *kind = [inspector valueForKey:@"kindPop"];
+  NSView *dataFieldField = [inspector valueForKey:@"dataFieldField"];
+  NSView *valueField = [inspector valueForKey:@"valueField"];
+  if ([kind indexOfSelectedItem] != 1)
+    XCTFail(@"%@", @"the Kind popup should say a calculated field is calculated");
+  if ([valueField isHidden] || ![dataFieldField isHidden])
+    XCTFail(@"%@", @"a calculated field is edited as an expression, not as a column");
+
+  // Choosing the other kind rewrites the field as that kind.
+  [kind selectItemAtIndex:0];
+  [inspector kindChanged:kind];
+  if ([calculated isCalculated] || ![calculated.dataField isEqualToString:calculated.name])
+    XCTFail(@"%@", @"made a query field, it should read a column and hold no expression");
+  if ([dataFieldField isHidden] || ![valueField isHidden])
+    XCTFail(@"%@", @"the pane should have swapped to the column box");
+
+  // And back, where an expression nobody has written yet is Nothing rather
+  // than empty -- an empty one would be written out as a query field again.
+  [kind selectItemAtIndex:1];
+  [inspector kindChanged:kind];
+  if (![calculated isCalculated] || [[calculated.value source] length] == 0)
+    XCTFail(@"%@", @"a field made calculated should hold an expression");
+  if (calculated.dataField != nil)
+    XCTFail(@"%@", @"it should have given up the column it used to read");
+}
+
 @end

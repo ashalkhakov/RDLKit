@@ -11,6 +11,7 @@
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSButton *addButton;
+@property (nonatomic, strong) IBOutlet NSButton *addCalculatedButton;
 @property (nonatomic, strong) IBOutlet NSButton *filtersButton;
 @property (nonatomic, strong) IBOutlet NSButton *removeButton;
 // The dataset's own settings. Only its name so far, which is what a report
@@ -31,6 +32,7 @@
     return nil;
   RDLFillHost(self, _content);
   RDLSetToolbarIcon(_addButton, RDLToolbarGlyphAdd);
+  RDLSetToolbarIcon(_addCalculatedButton, RDLToolbarGlyphAddCalculated);
   RDLSetToolbarIcon(_removeButton, RDLToolbarGlyphRemove);
   return self;
 }
@@ -47,8 +49,25 @@
                                                                 (unsigned long)filters]
                                    : @"Filters…"];
   [_filtersButton setEnabled:_dataSet != nil];
+  [_addButton setEnabled:_dataSet != nil];
+  [_addCalculatedButton setEnabled:_dataSet != nil];
   [_title setEnabled:_dataSet != nil];
   [_table reloadData];
+}
+
+// What each kind is called, in the words Report Builder uses, so the table and
+// the inspector cannot drift apart on the vocabulary.
++ (NSString *)nameOfKindCalculated:(BOOL)calculated {
+  return calculated ? @"Calculated" : @"Query";
+}
+
+// What a field is read from: the column of the query, or the expression that
+// computes it. Shown in the table because a name and a type alone do not say
+// which of the two kinds a field is.
++ (NSString *)sourceOfField:(RDLField *)field {
+  if ([field isCalculated])
+    return [field.value source] ?: @"";
+  return [field.dataField length] ? field.dataField : (field.name ?: @"");
 }
 
 - (RDLField *)selectedField {
@@ -115,6 +134,45 @@
   [fields addObject:field];
   [_context.editor setFields:fields ofDataSet:_dataSet];
   [self reload];
+  [self selectField:field];
+}
+
+// The other kind: a field the report computes rather than reads. It starts as
+// Nothing rather than as empty text, because a calculated field with no
+// expression is not one -- the writer would put it back as a query field --
+// and because the inspector's expression box is where it is meant to be
+// filled in, with the row selected and waiting.
+- (void)addCalculatedField:(id)sender {
+  (void)sender;
+  if (_dataSet == nil)
+    return;
+  NSMutableArray *fields = [[_dataSet fields] mutableCopy] ?: [NSMutableArray array];
+  NSMutableSet *taken = [NSMutableSet set];
+  for (RDLField *f in fields)
+    [taken addObject:f.name ?: @""];
+  NSUInteger n = 0;
+  NSString *name;
+  do {
+    name = [NSString stringWithFormat:@"Calculated%lu", (unsigned long)++n];
+  } while ([taken containsObject:name]);
+  RDLField *field = [[RDLField alloc] init];
+  field.name = name;
+  field.value = [RDLValue valueWithSource:@"=Nothing"];
+  field.dataType = RDLFieldDataTypeString;
+  [fields addObject:field];
+  [_context.editor setFields:fields ofDataSet:_dataSet];
+  [self reload];
+  [self selectField:field];
+}
+
+// Adding one is choosing it: the inspector is where the new field is finished,
+// so the row it belongs to is selected on the way there.
+- (void)selectField:(RDLField *)field {
+  NSUInteger index = [[_dataSet fields] indexOfObject:field];
+  if (index == NSNotFound)
+    return;
+  [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
+  [_delegate datasetFieldsView:self didSelectField:field];
 }
 
 - (void)removeField:(id)sender {
@@ -143,8 +201,13 @@
   if (row < 0 || row >= (NSInteger)[fields count])
     return @"";
   RDLField *f = fields[(NSUInteger)row];
-  if ([[column identifier] isEqualToString:@"type"])
+  NSString *ident = [column identifier];
+  if ([ident isEqualToString:@"type"])
     return RDLStringFromFieldDataType(f.dataType) ?: @"String";
+  if ([ident isEqualToString:@"kind"])
+    return [[self class] nameOfKindCalculated:[f isCalculated]];
+  if ([ident isEqualToString:@"source"])
+    return [[self class] sourceOfField:f];
   return f.name ?: @"";
 }
 
@@ -171,8 +234,10 @@
       return;
     f.name = text;
     // The name and the column it reads are the same thing until someone says
-    // otherwise, which is what the importer does too.
-    if ([f.dataField length] == 0)
+    // otherwise, which is what the importer does too. A calculated field has
+    // no column to name, and giving it one would turn it back into a plain one
+    // the next time the file is written.
+    if (![f isCalculated] && [f.dataField length] == 0)
       f.dataField = text;
   }
   [_context.editor setFields:edited ofDataSet:_dataSet];

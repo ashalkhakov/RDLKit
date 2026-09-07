@@ -57,7 +57,10 @@ static NSString * const kRDLPaletteHeader = @"header";
     header(ds.name ?: @"Dataset");
     for (RDLField *f in [ds fields])
       if ([f.name length])
-        entry(f.name, [NSString stringWithFormat:@"=Fields!%@.Value", f.name]);
+        // A calculated field drags the same way, but it is not a column of the
+        // data and the list says so -- fx is the mark Report Builder uses.
+        entry([f isCalculated] ? [NSString stringWithFormat:@"%@  fx", f.name] : f.name,
+              [NSString stringWithFormat:@"=Fields!%@.Value", f.name]);
   }
   header(@"Globals");
   for (NSString *global in @[ @"PageNumber", @"TotalPages", @"ReportName", @"ExecutionTime" ])
