@@ -345,6 +345,43 @@
   if ([[ed filters][1].values count] != 1)
     XCTFail(@"%@", @"an expression is one value, commas and all");
 
+  // In takes its list from a multi-value parameter, the way SSRS writes it:
+  // the value cell offers those parameters, and what it stores is the
+  // expression itself rather than a name something would have to resolve.
+  RDLParameter *finishes = [[RDLParameter alloc] init];
+  finishes.name = @"Finishes";
+  finishes.multiValue = YES;
+  [report.parameters addObject:finishes];
+  RDLFilterEditor *withParam = [RDLFilterEditor editorForFilters:@[]
+                                                           title:@"Items"
+                                                          fields:[ds fieldNames]
+                                                          report:report];
+  [withParam addFilter:nil];
+  NSTableView *paramTable = [withParam valueForKey:@"table"];
+  id paramSource = [paramTable dataSource];
+  NSUInteger inOp = [[RDLFilterEditor operators] indexOfObject:@(RDLFilterOperatorIn)];
+  [paramSource tableView:paramTable
+          setObjectValue:@(inOp)
+          forTableColumn:[paramTable tableColumnWithIdentifier:@"operator"]
+                     row:0];
+  id cell = [[paramTable delegate] tableView:paramTable
+                      dataCellForTableColumn:[paramTable tableColumnWithIdentifier:@"values"]
+                                         row:0];
+  if (![cell isKindOfClass:[NSComboBoxCell class]]) {
+    XCTFail(@"%@", @"an In row should offer the multi-value parameters");
+  } else if ([[cell objectValues] indexOfObject:@"=Parameters!Finishes.Value"] == NSNotFound) {
+    XCTFail(@"%@", @"the report's multi-value parameter should be one of them");
+  }
+  // A row that is not In keeps a plain text cell.
+  [paramSource tableView:paramTable
+          setObjectValue:@(0)
+          forTableColumn:[paramTable tableColumnWithIdentifier:@"operator"]
+                     row:0];
+  if ([[paramTable delegate] tableView:paramTable
+                dataCellForTableColumn:[paramTable tableColumnWithIdentifier:@"values"]
+                                   row:0] != nil)
+    XCTFail(@"%@", @"only In needs a list; the rest are typed");
+
   // A row with nothing to filter on is not a filter.
   [ed addFilter:nil];
   if ([[ed filters] count] != 2)

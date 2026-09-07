@@ -52,6 +52,28 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
   return field;
 }
 
+// The report's multi-value parameters, by name. A filter on a list of things
+// is written against one of these rather than against typed-in constants --
+// which is how SSRS does it, and it is the difference between a report whose
+// list is chosen when it runs and one whose list is baked into the file.
+- (NSArray<NSString *> *)multiValueParameterNames {
+  NSMutableArray *names = [NSMutableArray array];
+  for (RDLParameter *p in _report.parameters)
+    if (p.multiValue && [p.name length])
+      [names addObject:p.name];
+  return names;
+}
+
+// The parameter a plain "=Parameters!X.Value" refers to, or nil.
++ (NSString *)parameterNameInExpression:(NSString *)source {
+  NSString *text =
+      [source stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  if (![text hasPrefix:@"=Parameters!"] || ![text hasSuffix:@".Value"])
+    return nil;
+  NSRange name = NSMakeRange(12, [text length] - 12 - [@".Value" length]);
+  return [name.length ? [text substringWithRange:name] : nil copy];
+}
+
 // What the popup shows for one row: every field, then the row's own expression
 // when that is not one of them, then the way out to the expression editor.
 - (NSArray<NSString *> *)itemsForRow:(RDLFilterRow *)row {
@@ -85,10 +107,12 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
 // machine, not the way the machine happens to be set: a number is written with
 // a dot and no thousands separators, and a date is written the ISO way. That
 // is what makes a report mean one thing everywhere -- "07.09.2026" would not.
-+ (NSString *)valueHintForOperator:(RDLFilterOperator)op {
+- (NSString *)valueHintForOperator:(RDLFilterOperator)op {
   switch (op) {
     case RDLFilterOperatorIn:
-      return @"a comma-separated list — Oil, Wax";
+      return [[self multiValueParameterNames] count]
+                 ? @"a multi-value parameter — the list is chosen when the report runs"
+                 : @"a multi-value parameter; this report has none yet";
     case RDLFilterOperatorBetween:
       return @"two values, separated by a comma — 100, 500";
     case RDLFilterOperatorTopN:
@@ -210,6 +234,34 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
 
 // The popup's items depend on the row, since a row filtering on something
 // that is not a plain field shows that expression among them.
+// In is the operator that takes a list, and a list comes from a multi-value
+// parameter -- so on those rows the value column is a combo box: still text,
+// with the report's multi-value parameters offered in it. A popup would have
+// been tidier and wrong, because it leaves no way to type an expression, and
+// opening the expression editor from inside a cell edit runs a modal session
+// underneath a table that is still editing.
+- (id)tableView:(NSTableView *)tableView
+    dataCellForTableColumn:(NSTableColumn *)column
+                       row:(NSInteger)row {
+  (void)tableView;
+  if (column == nil || row < 0 || row >= (NSInteger)[_rows count])
+    return nil;
+  if (![[column identifier] isEqualToString:@"values"])
+    return nil;  // the column's own cell
+  if (_rows[(NSUInteger)row].oper != RDLFilterOperatorIn)
+    return nil;
+  NSComboBoxCell *combo = [[NSComboBoxCell alloc] initTextCell:@""];
+  [combo setEditable:YES];
+  [combo setBordered:NO];
+  [combo setCompletes:YES];
+  // The whole expression, not the bare name: what is picked is what is stored,
+  // and nothing has to guess later whether "Finishes" meant a parameter or a
+  // value that happens to be spelled like one.
+  for (NSString *name in [self multiValueParameterNames])
+    [combo addItemWithObjectValue:[NSString stringWithFormat:@"=Parameters!%@.Value", name]];
+  return combo;
+}
+
 - (void)tableView:(NSTableView *)tableView
     willDisplayCell:(id)cell
      forTableColumn:(NSTableColumn *)column
@@ -230,7 +282,7 @@ static NSString * const kRDLFilterExpressionItem = @"Expression…";
                              ? _rows[(NSUInteger)row].oper
                              : RDLFilterOperatorEqual;
   [_titleLabel setStringValue:[NSString stringWithFormat:@"Value: %@.",
-                                                         [[self class] valueHintForOperator:op]]];
+                                                         [self valueHintForOperator:op]]];
 }
 
 #pragma mark - Actions

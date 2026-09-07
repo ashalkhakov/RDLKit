@@ -1527,6 +1527,63 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"named RDL colours should resolve, and hex should not");
 }
 
+// The way a report filters on a list of things: a multi-value parameter, and
+// In against it. SSRS writes that as [@Param] and means "one of the values
+// chosen"; the parameter reaches the filter as an array, and comparing a row
+// against the array as a whole matches nothing at all.
+- (void)testInAgainstAMultiValueParameter {
+  RDLReport *r = RDLGroupedJobs();
+  RDLParameter *finishes = [[RDLParameter alloc] init];
+  finishes.name = @"Finishes";
+  finishes.dataType = RDLParameterDataTypeString;
+  finishes.multiValue = YES;
+  [r.parameters addObject:finishes];
+
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  f.oper = RDLFilterOperatorIn;
+  [f.values addObject:[RDLValue valueWithSource:@"=Parameters!Finishes.Value"]];
+  [tab.filters addObject:f];
+
+  NSArray<NSString *> *(^render)(id) = ^NSArray<NSString *> *(id chosen) {
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r
+                                               parameters:@{ @"Finishes" : chosen }])
+      for (RDLLaidOutItem *it in p.items)
+        if ([RDLLaidText(it) length])
+          [texts addObject:RDLLaidText(it)];
+    return texts;
+  };
+
+  // Two of the three finishes: the Lacquer jobs go, the rest stay.
+  NSArray<NSString *> *two = render(@[ @"Oil", @"Wax" ]);
+  for (NSString *kept in @[ @"Desk", @"Chair", @"Frame", @"Shelf", @"Stool" ])
+    if (![two containsObject:kept])
+      XCTFail(@"%@", [NSString stringWithFormat:@"In [Oil, Wax] dropped %@", kept]);
+  for (NSString *gone in @[ @"Lamp", @"Shade" ])
+    if ([two containsObject:gone])
+      XCTFail(@"%@", [NSString stringWithFormat:@"In [Oil, Wax] kept the Lacquer job %@", gone]);
+
+  // One value, passed as a bare string rather than a list, still filters.
+  NSArray<NSString *> *one = render(@"Wax");
+  if (![one containsObject:@"Shelf"] || [one containsObject:@"Desk"])
+    XCTFail(@"%@", @"a single chosen value should filter to that value");
+
+  // And constants still work, since the file format allows a list of them
+  // whatever the designer offers to type.
+  [tab.filters removeAllObjects];
+  RDLFilter *literal = [[RDLFilter alloc] init];
+  literal.expression = [RDLValue valueWithSource:@"=Fields!Finish.Value"];
+  literal.oper = RDLFilterOperatorIn;
+  [literal.values addObject:[RDLValue literal:@"Lacquer"]];
+  [literal.values addObject:[RDLValue literal:@"Wax"]];
+  [tab.filters addObject:literal];
+  NSArray<NSString *> *constants = render(@[]);
+  if (![constants containsObject:@"Lamp"] || [constants containsObject:@"Desk"])
+    XCTFail(@"%@", @"a list of constant values should still filter");
+}
+
 // A filter or a sort on a date has to compare dates, not the words a date is
 // printed as: "Sep 7, 2026" comes before "Oct 1, 2026" alphabetically and
 // after it in time. And the text a report is written with means one thing

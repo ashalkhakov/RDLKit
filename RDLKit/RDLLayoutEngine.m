@@ -397,8 +397,19 @@ static BOOL RDLPassesFilter(id row, RDLFilter *f, RDLEvalScope *scope) {
     return RDLCmp(left, right) != NSOrderedAscending && RDLCmp(left, hi) != NSOrderedDescending;
   }
   if (op == RDLFilterOperatorIn) {
+    // A value that evaluates to a list counts as all of its members. That is
+    // how a multi-value parameter filters -- In with [@Categories] means "one
+    // of the categories chosen", and the parameter arrives here as an array,
+    // which compared whole never equals anything.
     for (RDLValue *v in f.values) {
-      if (RDLCmp(left, RDLEvalRow(v, row, scope)) == NSOrderedSame)
+      id candidate = RDLEvalRow(v, row, scope);
+      if ([candidate isKindOfClass:[NSArray class]]) {
+        for (id one in (NSArray *)candidate)
+          if (RDLCmp(left, one) == NSOrderedSame)
+            return YES;
+        continue;
+      }
+      if (RDLCmp(left, candidate) == NSOrderedSame)
         return YES;
     }
     return NO;
