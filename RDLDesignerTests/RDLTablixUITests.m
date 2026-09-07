@@ -3,6 +3,7 @@
 // The tablix as the designer presents it: its editor's group lists, selecting a
 // cell, the brackets that show the group structure, and the crosstab sample.
 #import "RDLDesignerTestSupport.h"
+#import "RDLFilterEditor.h"
 
 
 
@@ -255,5 +256,94 @@
   if ([pages count] == 0)
     XCTFail(@"%@", @"the crosstab sample lays out to nothing");
 }
+
+// The filter panel: RDL puts filters on a dataset, on a data region and on a
+// group, and they mean the same thing in all three, so one panel edits them
+// and the caller says what is being filtered. This drives it without a modal
+// session, the way the other editors are tested.
+- (void)testFilterEditor {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLFilter *existing = [[RDLFilter alloc] init];
+  existing.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  existing.oper = RDLFilterOperatorGreaterThan;
+  [existing.values addObject:[RDLValue literal:@"100"]];
+
+  RDLFilterEditor *ed = [RDLFilterEditor editorForFilters:@[ existing ]
+                                                    title:@"Items"
+                                                   report:report];
+  if (ed == nil) {
+    XCTFail(@"%@", @"RDLFilterEditor.xib did not load");
+    return;
+  }
+
+  // What went in comes back out unchanged: an editor that quietly rewrites
+  // what it was given is worse than one that cannot edit at all.
+  NSArray<RDLFilter *> *out = [ed filters];
+  if ([out count] != 1 || out[0].oper != RDLFilterOperatorGreaterThan ||
+      ![[out[0].expression source] isEqualToString:@"=Fields!Amount.Value"] ||
+      [out[0].values count] != 1 ||
+      ![[out[0].values[0] source] isEqualToString:@"100"])
+    XCTFail(@"%@", @"the filter did not survive a round trip through the panel");
+
+  NSTableView *table = [ed valueForKey:@"table"];
+  if (table == nil || [table numberOfRows] != 1)
+    XCTFail(@"%@", @"the panel's table is not showing the filter");
+
+  // Adding one and filling it in through the table, as a user would.
+  [ed addFilter:nil];
+  if ([table numberOfRows] != 2) {
+    XCTFail(@"%@", @"Add did not add a row");
+    return;
+  }
+  id source = [table dataSource];
+  [source tableView:table
+        setObjectValue:@"=Fields!Finish.Value"
+        forTableColumn:[table tableColumnWithIdentifier:@"expression"]
+                   row:1];
+  // The operator column holds an index into the list the popup shows.
+  NSUInteger inIndex = [[RDLFilterEditor operators] indexOfObject:@(RDLFilterOperatorIn)];
+  [source tableView:table
+        setObjectValue:@(inIndex)
+        forTableColumn:[table tableColumnWithIdentifier:@"operator"]
+                   row:1];
+  [source tableView:table
+        setObjectValue:@"Oil, Wax"
+        forTableColumn:[table tableColumnWithIdentifier:@"values"]
+                   row:1];
+
+  out = [ed filters];
+  if ([out count] != 2) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"two filters expected, got %lu",
+                                              (unsigned long)[out count]]);
+    return;
+  }
+  // In takes a list, so the commas separate values rather than being part of
+  // one: this is the difference between filtering on two finishes and on a
+  // finish that happens to be called "Oil, Wax".
+  if (out[1].oper != RDLFilterOperatorIn || [out[1].values count] != 2 ||
+      ![[out[1].values[0] source] isEqualToString:@"Oil"] ||
+      ![[out[1].values[1] source] isEqualToString:@"Wax"])
+    XCTFail(@"%@", @"In should take the comma-separated values as a list");
+
+  // An expression, though, is one value however many commas are in it.
+  [source tableView:table
+        setObjectValue:@"=IIf(Fields!Amount.Value > 1, 2, 3)"
+        forTableColumn:[table tableColumnWithIdentifier:@"values"]
+                   row:1];
+  if ([[ed filters][1].values count] != 1)
+    XCTFail(@"%@", @"an expression is one value, commas and all");
+
+  // A row with nothing to filter on is not a filter.
+  [ed addFilter:nil];
+  if ([[ed filters] count] != 2)
+    XCTFail(@"%@", @"an empty row should not become a filter");
+
+  // And removing takes the selected one away.
+  [table selectRowIndexes:[NSIndexSet indexSetWithIndex:1] byExtendingSelection:NO];
+  [ed removeFilter:nil];
+  if ([[ed filters] count] != 1 || [[ed filters][0].expression source] == nil)
+    XCTFail(@"%@", @"Remove did not take the selected filter away");
+}
+
 
 @end

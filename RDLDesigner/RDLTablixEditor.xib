@@ -9,6 +9,7 @@
         <customObject id="-2" userLabel="File's Owner" customClass="RDLTablixEditor">
             <connections>
                 <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
+                <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
                 <outlet property="addColumnButton" destination="addColumnButton" id="addColumnButtonOutlet"/>
                 <outlet property="removeColumnButton" destination="removeColumnButton" id="removeColumnButtonOutlet"/>
                 <outlet property="moveLeftButton" destination="moveLeftButton" id="moveLeftButtonOutlet"/>
@@ -342,6 +343,17 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <button toolTip="The rows this tablix keeps" id="filtersButton">
+                        <rect key="frame" x="330" y="54" width="96" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="Filters…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="filtersButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editFilters:" target="-2" id="filtersButtonAction"/>
+                        </connections>
+                    </button>
                     <button id="cancelButton">
                         <rect key="frame" x="450" y="12" width="80" height="28"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
