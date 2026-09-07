@@ -433,4 +433,53 @@
     XCTFail(@"%@", @"clearing the box should remove the report's Language");
 }
 
+// A measurement box in the inspector is in the report's own unit. Inside, all
+// geometry stays inches -- the layout engine, the canvas and the file's own
+// default all measure in them -- so the conversion happens at the two edges,
+// and this is the test that they agree.
+- (void)testMeasurementFieldsAreInTheReportsUnit {
+  RDLReport *report = [RDLSamples blankLetter];
+  RDLItem *item = [report.body.items firstObject];
+  item.width = 2.0;  // inches, always
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSTextField *widthField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 80, 22)];
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:widthField keyPath:@"width" scope:RDLFieldScopeItem kind:RDLFieldKindNumber];
+
+  // In inches, two inches reads as two.
+  [bindings fillFromItem:item band:nil report:report];
+  if (fabs([[widthField stringValue] doubleValue] - 2.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"inches → %@", [widthField stringValue]]);
+
+  // In centimetres, the same item reads as 5.08 -- the item did not change.
+  report.unit = RDLReportUnitCentimeter;
+  [bindings fillFromItem:item band:nil report:report];
+  if (fabs([[widthField stringValue] doubleValue] - 5.08) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"centimetres → %@", [widthField stringValue]]);
+
+  // And typing centimetres stores inches, so everything downstream is
+  // unaffected by which unit the author happens to be working in.
+  [widthField setStringValue:@"10.16"];
+  if (![bindings applyControl:widthField editor:ctx.editor item:item bandKey:nil])
+    XCTFail(@"%@", @"the width field is bound but was not claimed");
+  if (fabs(item.width - 4.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"10.16cm should be 4in, stored %.4f", item.width]);
+
+  // The unit itself is a report property like any other, so it is edited the
+  // same way and undone the same way.
+  NSPopUpButton *unitPop = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 120, 22)];
+  [unitPop addItemWithTitle:@"Inches"];
+  [unitPop addItemWithTitle:@"Centimeters"];
+  [bindings bind:unitPop keyPath:@"unit" scope:RDLFieldScopeReport kind:RDLFieldKindPopUpIndex
+           values:@[ @(RDLReportUnitInch), @(RDLReportUnitCentimeter) ] placeholder:nil];
+  [bindings fillFromItem:item band:nil report:report];
+  if ([unitPop indexOfSelectedItem] != 1)
+    XCTFail(@"%@", @"the popup should show the report's unit");
+  [unitPop selectItemAtIndex:0];
+  [bindings applyControl:unitPop editor:ctx.editor item:item bandKey:nil];
+  if (report.unit != RDLReportUnitInch)
+    XCTFail(@"%@", @"choosing Inches should set the report's unit");
+}
+
 @end

@@ -54,9 +54,6 @@ static RDLValue *RDLParseVisibility(NSXMLElement *el);
 static NSString *RDLParseToggleItem(NSXMLElement *el);
 static RDLValue *RDLParseHyperlink(NSXMLElement *el);
 
-// Warnings raised while parsing; see gRDLParseWarnings below.
-static NSMutableArray *RDLWarnings(void);
-
 // Read an enum-valued element. An empty element leaves `dest` at whatever
 // default it already holds, and so does a value outside the vocabulary -- but
 // that second case is a real fidelity loss, because the file will not round
@@ -79,7 +76,7 @@ static NSMutableArray *RDLWarnings(void);
     if ([_rdlText length]) {                                                       \
       __typeof__(dest) _rdlValue = converter(_rdlText);                           \
       if (_rdlValue == 0)                                                          \
-        [RDLWarnings() addObject:[NSString stringWithFormat:                       \
+        [self.notes addObject:[NSString stringWithFormat:                          \
             @"unrecognised %@ value '%@' ignored", (elementName), _rdlText]];      \
       else                                                                          \
         (dest) = _rdlValue;                                                        \
@@ -105,7 +102,22 @@ static RDLLength *RDLParseLength(NSXMLElement *parent, NSString *name, RDLExpr *
   return [RDLLength lengthFromString:raw];
 }
 
-static RDLBorder *RDLParseBorder(NSXMLElement *el) {
+// Everything from here to the end of the implementation is one parse: the
+// helpers below are methods because they report into it -- a warning about a
+// value they did not recognise, or the unsupported element that stops it --
+// and plain C functions where they do not. Nothing is shared between parses,
+// which is why two of them may run at once.
+@interface RDLParser ()
+// One parse's state. Recoverable notes -- an unrecognised enum value, say --
+// end up in report.warnings; `failure` is the first unsupported element, which
+// is not recoverable and unwinds the parse.
+@property (nonatomic, strong) NSMutableArray<NSString *> *notes;
+@property (nonatomic, strong) NSError *failure;
+@end
+
+@implementation RDLParser
+
+- (RDLBorder *)parseBorder:(NSXMLElement *)el {
   if (el == nil)
     return [RDLBorder none];
   RDLBorder *b = [[RDLBorder alloc] init];
@@ -143,7 +155,7 @@ static void RDLSetStyleString(RDLStyle *s, NSString *raw, NSString *key) {
     [s setValue:raw forKey:key];
 }
 
-static RDLStyle *RDLParseStyle(NSXMLElement *el) {
+- (RDLStyle *)parseStyle:(NSXMLElement *)el {
   RDLStyle *s = [RDLStyle defaultStyle];
   if (el == nil)
     return s;
@@ -190,19 +202,19 @@ static RDLStyle *RDLParseStyle(NSXMLElement *el) {
     s.expressions = nil;
   NSXMLElement *border = RDLChild(el, @"Border");
   if (border)
-    s.border = RDLParseBorder(border);
+    s.border = [self parseBorder:border];
   NSXMLElement *bt = RDLChild(el, @"TopBorder");
   if (bt)
-    s.borderTop = RDLParseBorder(bt);
+    s.borderTop = [self parseBorder:bt];
   NSXMLElement *bb = RDLChild(el, @"BottomBorder");
   if (bb)
-    s.borderBottom = RDLParseBorder(bb);
+    s.borderBottom = [self parseBorder:bb];
   NSXMLElement *bl = RDLChild(el, @"LeftBorder");
   if (bl)
-    s.borderLeft = RDLParseBorder(bl);
+    s.borderLeft = [self parseBorder:bl];
   NSXMLElement *br = RDLChild(el, @"RightBorder");
   if (br)
-    s.borderRight = RDLParseBorder(br);
+    s.borderRight = [self parseBorder:br];
   return s;
 }
 
@@ -213,7 +225,7 @@ static void RDLBox(NSXMLElement *el, RDLItem *item) {
   item.height = RDLInchesFromString(RDLText(RDLChild(el, @"Height")));
 }
 
-static NSArray *RDLParseFilters(NSXMLElement *el) {
+- (NSArray *)parseFilters:(NSXMLElement *)el {
   NSMutableArray *out = [NSMutableArray array];
   if (el == nil)
     return out;
@@ -234,7 +246,7 @@ static NSArray *RDLParseFilters(NSXMLElement *el) {
   return out;
 }
 
-static NSArray *RDLParseSorts(NSXMLElement *el) {
+- (NSArray *)parseSorts:(NSXMLElement *)el {
   NSMutableArray *out = [NSMutableArray array];
   if (el == nil)
     return out;
@@ -251,7 +263,7 @@ static NSArray *RDLParseSorts(NSXMLElement *el) {
   return out;
 }
 
-static RDLPageBreakLocation RDLParsePageBreak(NSXMLElement *el) {
+- (RDLPageBreakLocation)parsePageBreak:(NSXMLElement *)el {
   RDLPageBreakLocation loc = RDLPageBreakLocationUnspecified;
   RDL_PARSE_ENUM(loc, @"BreakLocation", RDLPageBreakLocationFromString,
                   RDLText(RDLChild(el, @"BreakLocation")));
@@ -288,41 +300,27 @@ static NSString *RDLGroupField(RDLTablixMember *member) {
 // searching: the first dynamic member at this level, then its own chain. The
 // static members around it (a header row, a subtotal, a grand total) group on
 // nothing and are stepped over.
-static NSArray<NSString *> *RDLGroupChain(NSArray<RDLTablixMember *> *members) {
+- (NSArray<NSString *> *)groupChain:(NSArray<RDLTablixMember *> *)members {
   for (RDLTablixMember *mm in members) {
     NSString *field = RDLGroupField(mm);
     if (field) {
       NSMutableArray *chain = [NSMutableArray arrayWithObject:field];
-      [chain addObjectsFromArray:RDLGroupChain(mm.members)];
+      [chain addObjectsFromArray:[self groupChain:mm.members]];
       return chain;
     }
-    NSArray *nested = RDLGroupChain(mm.members);
+    NSArray *nested = [self groupChain:mm.members];
     if ([nested count])
       return nested;
   }
   return @[];
 }
 
-static RDLItem *RDLParseItem(NSXMLElement *el);
-
-// Collected during a single parse; reportFromXMLString: copies them into
-// report.warnings. These are recoverable notes -- an unrecognised enum value,
-// say. An element this kit does not model is not recoverable and fails the
-// parse instead; see RDLFailUnsupported.
-static NSMutableArray *gRDLParseWarnings = nil;
-
-static NSMutableArray *RDLWarnings(void) {
-  if (gRDLParseWarnings == nil)
-    gRDLParseWarnings = [NSMutableArray array];
-  return gRDLParseWarnings;
-}
 
 
 // An element outside the RDL subset this kit models is an error, not something
 // to skip: the report that came back would not be the report on disk. The first
-// one wins, and the parse unwinds by checking this at the top rather than
-// threading an NSError through every helper.
-static NSError *gRDLParseError = nil;
+// one wins, and the parse unwinds by checking `failure` at the top of each
+// helper rather than threading an NSError through every signature.
 
 // Where an element sits, named the way a person reads a report: /Report/Body/
 // ReportItems/Subreport. -XPath would do it on macOS but GNUstep answers with
@@ -341,8 +339,8 @@ static NSString *RDLElementPath(NSXMLElement *el) {
                        : ([el localName] ?: @"");
 }
 
-static void RDLFailUnsupported(NSXMLElement *el) {
-  if (gRDLParseError != nil)
+- (void)failUnsupported:(NSXMLElement *)el {
+  if (self.failure != nil)
     return;
   NSString *name = [el attributeForName:@"Name"].stringValue;
   NSString *where = RDLElementPath(el);
@@ -351,12 +349,12 @@ static void RDLFailUnsupported(NSXMLElement *el) {
                                                  [el localName], name, where]
                     : [NSString stringWithFormat:@"unsupported element %@ at %@",
                                                  [el localName], where];
-  gRDLParseError = [NSError errorWithDomain:@"RDLKit"
+  self.failure = [NSError errorWithDomain:@"RDLKit"
                                         code:2
                                     userInfo:@{NSLocalizedDescriptionKey : msg}];
 }
 
-static RDLTablixCell *RDLParseCellContents(NSXMLElement *contents) {
+- (RDLTablixCell *)parseCellContents:(NSXMLElement *)contents {
   RDLTablixCell *cell = [[RDLTablixCell alloc] init];
   for (NSXMLNode *k in [contents children]) {
     if (k.kind != NSXMLElementKind)
@@ -364,7 +362,7 @@ static RDLTablixCell *RDLParseCellContents(NSXMLElement *contents) {
     NSString *ln = [(NSXMLElement *)k localName];
     if ([ln isEqualToString:@"ColSpan"] || [ln isEqualToString:@"RowSpan"])
       continue;
-    cell.item = RDLParseItem((NSXMLElement *)k);
+    cell.item = [self parseItem:(NSXMLElement *)k];
     break;
   }
   NSString *cs = RDLText(RDLChild(contents, @"ColSpan"));
@@ -377,7 +375,7 @@ static RDLTablixCell *RDLParseCellContents(NSXMLElement *contents) {
 }
 
 // One ChartMember: the grouping and the label to write under it.
-static RDLChartMember *RDLParseChartMember(NSXMLElement *el) {
+- (RDLChartMember *)parseChartMember:(NSXMLElement *)el {
   RDLChartMember *m = [[RDLChartMember alloc] init];
   NSXMLElement *group = RDLChild(el, @"Group");
   m.groupName = [group attributeForName:@"Name"].stringValue;
@@ -390,15 +388,14 @@ static RDLChartMember *RDLParseChartMember(NSXMLElement *el) {
   return m;
 }
 
-static void RDLParseChartMembers(NSXMLElement *hierarchy,
-                                  NSMutableArray<RDLChartMember *> *into) {
+- (void)parseChartMembers:(NSXMLElement *)hierarchy into:(NSMutableArray<RDLChartMember *> *)into {
   for (NSXMLNode *n in [RDLChild(hierarchy, @"ChartMembers") children]) {
     if (n.kind == NSXMLElementKind)
-      [into addObject:RDLParseChartMember((NSXMLElement *)n)];
+      [into addObject:[self parseChartMember:(NSXMLElement *)n]];
   }
 }
 
-static void RDLParseChartAxis(NSXMLElement *el, RDLChartAxis *axis) {
+- (void)parseChartAxis:(NSXMLElement *)el into:(RDLChartAxis *)axis {
   if (el == nil)
     return;
   axis.hidden = [RDLText(RDLChild(el, @"Hidden")) isEqualToString:@"true"];
@@ -417,7 +414,7 @@ static void RDLParseChartAxis(NSXMLElement *el, RDLChartAxis *axis) {
 
 // MS-RDL 2008/2010 Chart. Older documents reach this having been rewritten
 // into the same shape by RDLUpgrader, so there is only one reader.
-static void RDLParseChart(NSXMLElement *el, RDLChart *chart) {
+- (void)parseChart:(NSXMLElement *)el into:(RDLChart *)chart {
   chart.dataSetName = RDLText(RDLChild(el, @"DataSetName"));
   RDL_PARSE_ENUM(chart.palette, @"Palette", RDLChartPaletteFromString,
                   RDLText(RDLChild(el, @"Palette")));
@@ -428,8 +425,8 @@ static void RDLParseChart(NSXMLElement *el, RDLChart *chart) {
     chart.chartTitle = RDLValueFromElement(RDLChild((NSXMLElement *)n, @"Caption"));
     break;
   }
-  RDLParseChartMembers(RDLChild(el, @"ChartCategoryHierarchy"), chart.categoryMembers);
-  RDLParseChartMembers(RDLChild(el, @"ChartSeriesHierarchy"), chart.seriesMembers);
+  [self parseChartMembers:RDLChild(el, @"ChartCategoryHierarchy") into:chart.categoryMembers];
+  [self parseChartMembers:RDLChild(el, @"ChartSeriesHierarchy") into:chart.seriesMembers];
 
   NSXMLElement *collection = RDLChild(RDLChild(el, @"ChartData"), @"ChartSeriesCollection");
   for (NSXMLNode *n in [collection children]) {
@@ -474,12 +471,12 @@ static void RDLParseChart(NSXMLElement *el, RDLChart *chart) {
   }
   for (NSXMLNode *n in [RDLChild(area, @"ChartCategoryAxes") children])
     if (n.kind == NSXMLElementKind) {
-      RDLParseChartAxis((NSXMLElement *)n, chart.categoryAxis);
+      [self parseChartAxis:(NSXMLElement *)n into:chart.categoryAxis];
       break;
     }
   for (NSXMLNode *n in [RDLChild(area, @"ChartValueAxes") children])
     if (n.kind == NSXMLElementKind) {
-      RDLParseChartAxis((NSXMLElement *)n, chart.valueAxis);
+      [self parseChartAxis:(NSXMLElement *)n into:chart.valueAxis];
       break;
     }
 
@@ -498,11 +495,11 @@ static void RDLParseChart(NSXMLElement *el, RDLChart *chart) {
   RDLChartSeries *first = [chart.series firstObject];
   chart.chartType = first.type;
   chart.subtype = first.subtype;
-  [chart.filters addObjectsFromArray:RDLParseFilters(RDLChild(el, @"Filters"))];
-  [chart.sortExpressions addObjectsFromArray:RDLParseSorts(RDLChild(el, @"SortExpressions"))];
+  [chart.filters addObjectsFromArray:[self parseFilters:RDLChild(el, @"Filters")]];
+  [chart.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"SortExpressions")]];
 }
 
-static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
+- (RDLTablixMember *)parseMember:(NSXMLElement *)el {
   RDLTablixMember *m = [[RDLTablixMember alloc] init];
   NSXMLElement *group = RDLChild(el, @"Group");
   if (group) {
@@ -514,14 +511,14 @@ static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
     // Group/Parent makes this a recursive hierarchy: the expression yields the
     // row's parent key, matched against the group expression of another row.
     m.parentExpression = RDLValueFromElement(RDLChild(group, @"Parent"));
-    RDLPageBreakLocation pb = RDLParsePageBreak(RDLChild(group, @"PageBreak"));
+    RDLPageBreakLocation pb = [self parsePageBreak:RDLChild(group, @"PageBreak")];
     if (pb != RDLPageBreakLocationUnspecified)
       m.pageBreak = pb;
     m.resetPageNumber = RDLParsePageBreakReset(RDLChild(group, @"PageBreak"));
     RDLValue *pn = RDLParsePageBreakName(RDLChild(group, @"PageBreak"));
     if (pn)
       m.pageName = pn;
-    NSArray *gf = RDLParseFilters(RDLChild(group, @"Filters"));
+    NSArray *gf = [self parseFilters:RDLChild(group, @"Filters")];
     if ([gf count])
       [m.filters addObjectsFromArray:gf];
   }
@@ -543,14 +540,14 @@ static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
   if (headerEl) {
     RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
     h.size = RDLInchesFromString(RDLText(RDLChild(headerEl, @"Size")));
-    RDLTablixCell *cc = RDLParseCellContents(RDLChild(headerEl, @"CellContents"));
+    RDLTablixCell *cc = [self parseCellContents:RDLChild(headerEl, @"CellContents")];
     h.item = cc.item;
     m.header = h;
   }
-  NSArray *sorts = RDLParseSorts(RDLChild(el, @"SortExpressions"));
+  NSArray *sorts = [self parseSorts:RDLChild(el, @"SortExpressions")];
   if ([sorts count])
     [m.sortExpressions addObjectsFromArray:sorts];
-  RDLPageBreakLocation mb = RDLParsePageBreak(RDLChild(el, @"PageBreak"));
+  RDLPageBreakLocation mb = [self parsePageBreak:RDLChild(el, @"PageBreak")];
   if (mb != RDLPageBreakLocationUnspecified)
     m.pageBreak = mb;
   if (RDLParsePageBreakReset(RDLChild(el, @"PageBreak")))
@@ -561,7 +558,7 @@ static RDLTablixMember *RDLParseMember(NSXMLElement *el) {
   NSXMLElement *kids = RDLChild(el, @"TablixMembers");
   for (NSXMLNode *n in [kids children]) {
     if (n.kind == NSXMLElementKind && [[(NSXMLElement *)n localName] isEqualToString:@"TablixMember"])
-      [m.members addObject:RDLParseMember((NSXMLElement *)n)];
+      [m.members addObject:[self parseMember:(NSXMLElement *)n]];
   }
   return m;
 }
@@ -591,7 +588,7 @@ static NSString *RDLTextboxValue(NSXMLElement *el) {
 
 // Sparse run/paragraph style: only fields present in the XML are set, so
 // renderers can inherit everything else from the textbox style.
-static RDLStyle *RDLParseSparseStyle(NSXMLElement *el) {
+- (RDLStyle *)parseSparseStyle:(NSXMLElement *)el {
   if (el == nil)
     return nil;
   RDLStyle *s = [[RDLStyle alloc] init];
@@ -649,7 +646,7 @@ static BOOL RDLSparseStyleAddsNothing(RDLStyle *run, RDLStyle *item) {
 // Rich text: keep the Paragraph/TextRun structure when any run or paragraph
 // carries its own style, or a paragraph holds more than one run. Otherwise the
 // flattened `value` string is a lossless representation and we return nil.
-static NSMutableArray *RDLParseParagraphs(NSXMLElement *el, RDLStyle *itemStyle) {
+- (NSMutableArray *)parseParagraphs:(NSXMLElement *)el itemStyle:(RDLStyle *)itemStyle {
   NSXMLElement *paragraphs = RDLChild(el, @"Paragraphs");
   if (paragraphs == nil)
     return nil;
@@ -659,7 +656,7 @@ static NSMutableArray *RDLParseParagraphs(NSXMLElement *el, RDLStyle *itemStyle)
     if (pn.kind != NSXMLElementKind || ![pn.localName isEqualToString:@"Paragraph"])
       continue;
     RDLParagraph *para = [[RDLParagraph alloc] init];
-    RDLStyle *ps = RDLParseSparseStyle(RDLChild((NSXMLElement *)pn, @"Style"));
+    RDLStyle *ps = [self parseSparseStyle:RDLChild((NSXMLElement *)pn, @"Style")];
     if (ps && !RDLSparseStyleIsEmpty(ps)) {
       para.style = ps;
       rich = YES;
@@ -669,7 +666,7 @@ static NSMutableArray *RDLParseParagraphs(NSXMLElement *el, RDLStyle *itemStyle)
         continue;
       RDLTextRun *run = [[RDLTextRun alloc] init];
       run.value = RDLElementText(RDLChild((NSXMLElement *)tn, @"Value"));
-      RDLStyle *rs = RDLParseSparseStyle(RDLChild((NSXMLElement *)tn, @"Style"));
+      RDLStyle *rs = [self parseSparseStyle:RDLChild((NSXMLElement *)tn, @"Style")];
       if (rs && !RDLSparseStyleIsEmpty(rs)) {
         run.style = rs;
         rich = YES;
@@ -728,12 +725,12 @@ static RDLValue *RDLParseHyperlink(NSXMLElement *el) {
   return nil;
 }
 
-static RDLTablixHierarchy *RDLParseHierarchy(NSXMLElement *el) {
+- (RDLTablixHierarchy *)parseHierarchy:(NSXMLElement *)el {
   RDLTablixHierarchy *h = [[RDLTablixHierarchy alloc] init];
   NSXMLElement *members = RDLChild(el, @"TablixMembers");
   for (NSXMLNode *n in [members children]) {
     if (n.kind == NSXMLElementKind && [[(NSXMLElement *)n localName] isEqualToString:@"TablixMember"])
-      [h.members addObject:RDLParseMember((NSXMLElement *)n)];
+      [h.members addObject:[self parseMember:(NSXMLElement *)n]];
   }
   return h;
 }
@@ -775,17 +772,17 @@ static RDLItem *RDLItemForElementName(NSString *name) {
 }
 
 // nil when the element is not one this kit models; the caller stops.
-static RDLItem *RDLParseItem(NSXMLElement *el) {
+- (RDLItem *)parseItem:(NSXMLElement *)el {
   RDLItem *item = ([el.localName isEqualToString:@"Rectangle"] && RDLRectangleIsChart(el))
                       ? [[RDLChart alloc] init]
                       : RDLItemForElementName(el.localName);
   if (item == nil) {
-    RDLFailUnsupported(el);
+    [self failUnsupported:el];
     return nil;
   }
   item.name = [el attributeForName:@"Name"].stringValue ?: el.localName;
   RDLBox(el, item);
-  item.style = RDLParseStyle(RDLChild(el, @"Style"));
+  item.style = [self parseStyle:RDLChild(el, @"Style")];
   item.hidden = RDLParseVisibility(el);
   item.toggleItem = RDLParseToggleItem(el);
   NSString *zi = RDLText(RDLChild(el, @"ZIndex"));
@@ -793,7 +790,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     item.zIndex = [zi integerValue];
   NSXMLElement *pbEl = RDLChild(el, @"PageBreak");
   if (pbEl) {
-    RDLPageBreakLocation pb = RDLParsePageBreak(pbEl);
+    RDLPageBreakLocation pb = [self parsePageBreak:pbEl];
     if (pb != RDLPageBreakLocationUnspecified)
       item.pageBreak = pb;
     item.resetPageNumber = RDLParsePageBreakReset(pbEl);
@@ -807,7 +804,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
   if ([item isKindOfClass:[RDLTextbox class]] && [el.localName isEqualToString:@"Textbox"]) {
     RDLTextbox *tb = (RDLTextbox *)item;
     tb.value = RDLTextboxValue(el);
-    tb.paragraphs = RDLParseParagraphs(el, item.style);
+    tb.paragraphs = [self parseParagraphs:el itemStyle:item.style];
     tb.hyperlink = RDLParseHyperlink(el);
     NSString *cg = RDLText(RDLChild(el, @"CanGrow"));
     tb.canGrow = ![cg isEqualToString:@"false"];
@@ -820,7 +817,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
                     RDLText(RDLChild(el, @"Sizing")));
     img.hyperlink = RDLParseHyperlink(el);
   } else if ([el.localName isEqualToString:@"Chart"]) {
-    RDLParseChart(el, (RDLChart *)item);
+    [self parseChart:el into:(RDLChart *)item];
   } else if ([el.localName isEqualToString:@"List"]) {
     RDLTablix *tablix = (RDLTablix *)item;
     // RDL 2005 List: single-column, single-details-row Tablix whose cell holds
@@ -835,7 +832,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     for (NSXMLNode *n in [ri children]) {
       if (n.kind != NSXMLElementKind)
         continue;
-      RDLItem *parsed = RDLParseItem((NSXMLElement *)n);
+      RDLItem *parsed = [self parseItem:(NSXMLElement *)n];
       if (parsed)
         [cellRect.items addObject:parsed];
     }
@@ -863,8 +860,8 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     }
     [rh.members addObject:dm];
     tablix.rowHierarchy = rh;
-    [tablix.sortExpressions addObjectsFromArray:RDLParseSorts(RDLChild(el, @"Sorting"))];
-    [tablix.filters addObjectsFromArray:RDLParseFilters(RDLChild(el, @"Filters"))];
+    [tablix.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"Sorting")]];
+    [tablix.filters addObjectsFromArray:[self parseFilters:RDLChild(el, @"Filters")]];
   } else if ([el.localName isEqualToString:@"Tablix"] || [el.localName isEqualToString:@"Table"]) {
     RDLTablix *tablix = (RDLTablix *)item;
 
@@ -889,7 +886,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
       for (NSXMLNode *cn in [RDLChild(rowEl, @"TablixCells") children]) {
         if (cn.kind != NSXMLElementKind)
           continue;
-        [row.cells addObject:RDLParseCellContents(RDLChild((NSXMLElement *)cn, @"CellContents"))];
+        [row.cells addObject:[self parseCellContents:RDLChild((NSXMLElement *)cn, @"CellContents")]];
       }
       [body.rows addObject:row];
     }
@@ -910,11 +907,11 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     tablix.fixedRowHeaders = [frh isEqualToString:@"true"] || [frh isEqualToString:@"True"];
     NSString *kt = RDLText(RDLChild(el, @"KeepTogether"));
     item.keepTogether = [kt isEqualToString:@"true"] || [kt isEqualToString:@"True"];
-    RDLPageBreakLocation pb = RDLParsePageBreak(RDLChild(el, @"PageBreak"));
+    RDLPageBreakLocation pb = [self parsePageBreak:RDLChild(el, @"PageBreak")];
     if (pb != RDLPageBreakLocationUnspecified)
       item.pageBreak = pb;
-    [tablix.filters addObjectsFromArray:RDLParseFilters(RDLChild(el, @"Filters"))];
-    [tablix.sortExpressions addObjectsFromArray:RDLParseSorts(RDLChild(el, @"SortExpressions"))];
+    [tablix.filters addObjectsFromArray:[self parseFilters:RDLChild(el, @"Filters")]];
+    [tablix.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"SortExpressions")]];
     NSXMLElement *corner = RDLChild(el, @"TablixCorner");
     for (NSXMLNode *cr in [RDLChild(corner, @"TablixCornerRows") children]) {
       if (cr.kind != NSXMLElementKind)
@@ -923,19 +920,19 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
       for (NSXMLNode *cc in [(NSXMLElement *)cr children]) {
         if (cc.kind != NSXMLElementKind)
           continue;
-        [crow addObject:RDLParseCellContents(RDLChild((NSXMLElement *)cc, @"CellContents"))];
+        [crow addObject:[self parseCellContents:RDLChild((NSXMLElement *)cc, @"CellContents")]];
       }
       if ([crow count])
         [tablix.cornerRows addObject:crow];
     }
     NSXMLElement *ch = RDLChild(el, @"TablixColumnHierarchy");
     if (ch)
-      tablix.columnHierarchy = RDLParseHierarchy(ch);
+      tablix.columnHierarchy = [self parseHierarchy:ch];
     // Designer convenience: any dynamic column group means crosstab (matrix).
-    tablix.columnGroups = RDLGroupChain(tablix.columnHierarchy.members);
+    tablix.columnGroups = [self groupChain:tablix.columnHierarchy.members];
     NSXMLElement *rh = RDLChild(el, @"TablixRowHierarchy");
     if (rh)
-      tablix.rowHierarchy = RDLParseHierarchy(rh);
+      tablix.rowHierarchy = [self parseHierarchy:rh];
     if ([tablix.rowHierarchy.members count] == 0 && [body.rows count] >= 2) {
       RDLTablixHierarchy *synth = [[RDLTablixHierarchy alloc] init];
       RDLTablixMember *hMem = [[RDLTablixMember alloc] init];
@@ -949,7 +946,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     }
     // Every level of it, not the first two: the hierarchy nests as deep as it
     // was written, and the scaffolding builds it back to the same depth.
-    tablix.rowGroups = RDLGroupChain(tablix.rowHierarchy.members);
+    tablix.rowGroups = [self groupChain:tablix.rowHierarchy.members];
     // Designer convenience: a trailing static top-level member is a grand
     // total row (see -[RDLItem rdlBuildTable:...]).
     RDLTablixMember *lastMem = tablix.rowHierarchy.members.lastObject;
@@ -990,7 +987,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
     for (NSXMLNode *n in [ri children]) {
       if (n.kind != NSXMLElementKind)
         continue;
-      RDLItem *parsed = RDLParseItem((NSXMLElement *)n);
+      RDLItem *parsed = [self parseItem:(NSXMLElement *)n];
       if (parsed)
         [rect.items addObject:parsed];
     }
@@ -998,7 +995,7 @@ static RDLItem *RDLParseItem(NSXMLElement *el) {
   return item;
 }
 
-static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
+- (RDLBand *)parseBand:(NSXMLElement *)el fallbackHeight:(CGFloat)fallback {
   RDLBand *b = [[RDLBand alloc] init];
   if (el == nil) {
     b.height = fallback;
@@ -1017,23 +1014,22 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
   for (NSXMLNode *n in [ri children]) {
     if (n.kind != NSXMLElementKind)
       continue;
-    RDLItem *parsed = RDLParseItem((NSXMLElement *)n);
+    RDLItem *parsed = [self parseItem:(NSXMLElement *)n];
     if (parsed)
       [b.items addObject:parsed];
   }
-  b.style = RDLChild(el, @"Style") ? RDLParseStyle(RDLChild(el, @"Style")) : nil;
+  b.style = RDLChild(el, @"Style") ? [self parseStyle:RDLChild(el, @"Style")] : nil;
   return b;
 }
 
-@implementation RDLParser
+// The common case: one report out of one string. Each parse gets its own
+// parser, which is what makes two of them at once harmless -- this used to be
+// a lock around shared globals.
 + (RDLReport *)reportFromXMLString:(NSString *)xml error:(NSError **)error {
-  // gRDLParseWarnings is shared parse state; serialize concurrent parses.
-  @synchronized (self) {
-    return [self rdlParseReportFromXMLString:xml error:error];
-  }
+  return [[[self alloc] init] reportFromXMLString:xml error:error];
 }
 
-+ (RDLReport *)rdlParseReportFromXMLString:(NSString *)xml error:(NSError **)error {
+- (RDLReport *)reportFromXMLString:(NSString *)xml error:(NSError **)error {
   // PreserveWhitespace, or a TextRun holding a single space arrives empty --
   // see RDLElementText.
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml
@@ -1053,8 +1049,8 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
     return nil;
   }
   RDLReport *r = [RDLReport emptyReportNamed:@"Report"];
-  gRDLParseWarnings = [NSMutableArray array];
-  gRDLParseError = nil;
+  self.notes = [NSMutableArray array];
+  self.failure = nil;
   NSString *nm = RDLText(RDLChild(root, @"Name"));
   if ([nm length] == 0)
     nm = RDLText(RDLChild(root, @"ReportName"));
@@ -1067,6 +1063,9 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
   // holds either.
   r.language = [RDLValue valueWithSource:RDLText(RDLChild(root, @"Language"))];
   r.width = RDLInchesFromString(RDLText(RDLChild(root, @"Width")));
+  // rd:ReportUnitType -- the unit the author works in. Not a measurement: it
+  // says how the ones in the file were written and how to show them.
+  r.unit = RDLReportUnitFromString(RDLText(RDLChild(root, @"ReportUnitType")));
   NSXMLElement *pageEl = RDLChild(root, @"Page");
   // An element that is not there must leave RDLPage's default alone -- RDL
   // says an absent PageWidth means Letter, and reading it as zero produces a
@@ -1077,9 +1076,9 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
   RDL_PAGE_INCHES(r.page.rightMargin, pageEl, @"RightMargin");
   RDL_PAGE_INCHES(r.page.topMargin, pageEl, @"TopMargin");
   RDL_PAGE_INCHES(r.page.bottomMargin, pageEl, @"BottomMargin");
-  r.pageHeader = RDLParseBand(RDLChild(pageEl, @"PageHeader") ?: RDLChild(root, @"PageHeader"), 0.5);
-  r.pageFooter = RDLParseBand(RDLChild(pageEl, @"PageFooter") ?: RDLChild(root, @"PageFooter"), 0.4);
-  r.body = RDLParseBand(RDLChild(root, @"Body"), 4.0);
+  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader") ?: RDLChild(root, @"PageHeader") fallbackHeight:0.5];
+  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter") ?: RDLChild(root, @"PageFooter") fallbackHeight:0.4];
+  r.body = [self parseBand:RDLChild(root, @"Body") fallbackHeight:4.0];
 
   [r.dataSources removeAllObjects];
   NSXMLElement *sources = RDLChild(root, @"DataSources");
@@ -1135,7 +1134,7 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
       [fields addObject:fld];
     }
     ds.fields = fields;
-    [ds.filters addObjectsFromArray:RDLParseFilters(RDLChild(dsEl, @"Filters"))];
+    [ds.filters addObjectsFromArray:[self parseFilters:RDLChild(dsEl, @"Filters")]];
     [r.dataSets addObject:ds];
   }
   [r.embeddedImages removeAllObjects];
@@ -1184,16 +1183,16 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
   if ([r.name length] == 0)
     r.name = @"Report";
   if (wasVersion != RDLSchemaVersion2010 && wasVersion != RDLSchemaVersion2016)
-    [gRDLParseWarnings insertObject:[NSString stringWithFormat:
+    [self.notes insertObject:[NSString stringWithFormat:
         @"upgraded from RDL %@ to the 2010 grammar",
         wasVersion == RDLSchemaVersionUnknown ? @"(no namespace)"
                                               : @((long)wasVersion).stringValue] atIndex:0];
-  [r.warnings setArray:gRDLParseWarnings];
-  gRDLParseWarnings = nil;
-  if (gRDLParseError) {
+  [r.warnings setArray:self.notes];
+  self.notes = nil;
+  if (self.failure) {
     if (error)
-      *error = gRDLParseError;
-    gRDLParseError = nil;
+      *error = self.failure;
+    self.failure = nil;
     return nil;
   }
   [r adoptItems];
@@ -1212,8 +1211,13 @@ static RDLBand *RDLParseBand(NSXMLElement *el, CGFloat fallback) {
 // against each other, and inserting indentation between them would change the
 // text content of mixed elements.
 
-static NSString *RDLIn(CGFloat n) {
-  return [NSString stringWithFormat:@"%.5fin", n];
+// A measurement, in this writer's unit. A document that came in metric goes
+// out metric: the lengths mean the same either way, and an author who set the
+// unit should not find it changed by a save.
+- (NSString *)measurement:(CGFloat)inches {
+  if (_unit == RDLReportUnitCentimeter)
+    return [NSString stringWithFormat:@"%.5fcm", RDLUnitsFromInches(inches, _unit)];
+  return [NSString stringWithFormat:@"%.5fin", inches];
 }
 
 static NSXMLElement *RDLEl(NSString *name) {
@@ -1367,14 +1371,13 @@ static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
   [parent addChild:el];
 }
 
-static void RDLAddBox(NSXMLElement *parent, RDLItem *it) {
-  RDLAdd(parent, @"Top", RDLIn(it.top));
-  RDLAdd(parent, @"Left", RDLIn(it.left));
-  RDLAdd(parent, @"Width", RDLIn(it.width));
-  RDLAdd(parent, @"Height", RDLIn(it.height));
+- (void)addBox:(RDLItem *)it to:(NSXMLElement *)parent {
+  RDLAdd(parent, @"Top", [self measurement:it.top]);
+  RDLAdd(parent, @"Left", [self measurement:it.left]);
+  RDLAdd(parent, @"Width", [self measurement:it.width]);
+  RDLAdd(parent, @"Height", [self measurement:it.height]);
 }
 
-static void RDLAddItem(NSXMLElement *parent, RDLItem *it);
 
 static void RDLAddFilters(NSXMLElement *parent, NSArray<RDLFilter *> *filters) {
   if ([filters count] == 0)
@@ -1449,7 +1452,7 @@ static void RDLAddItemPagination(NSXMLElement *parent, RDLItem *it) {
   RDLAddPageBreak(parent, it.pageBreak, it.resetPageNumber, it.pageName);
 }
 
-static void RDLAddMember(NSXMLElement *parent, RDLTablixMember *m) {
+- (void)addMember:(RDLTablixMember *)m to:(NSXMLElement *)parent {
   NSXMLElement *me = RDLEl(@"TablixMember");
   if ([m.groupName length]) {
     NSXMLElement *group = RDLEl(@"Group");
@@ -1469,10 +1472,10 @@ static void RDLAddMember(NSXMLElement *parent, RDLTablixMember *m) {
   RDLAddSorts(me, m.sortExpressions);
   if (m.header) {
     NSXMLElement *hdr = RDLEl(@"TablixHeader");
-    RDLAdd(hdr, @"Size", RDLIn(m.header.size));
+    RDLAdd(hdr, @"Size", [self measurement:m.header.size]);
     NSXMLElement *contents = RDLEl(@"CellContents");
     if (m.header.item)
-      RDLAddItem(contents, m.header.item);
+      [self addItem:m.header.item to:contents];
     [hdr addChild:contents];
     [me addChild:hdr];
   }
@@ -1490,7 +1493,7 @@ static void RDLAddMember(NSXMLElement *parent, RDLTablixMember *m) {
   if ([m.members count]) {
     NSXMLElement *kids = RDLEl(@"TablixMembers");
     for (RDLTablixMember *c in m.members)
-      RDLAddMember(kids, c);
+      [self addMember:c to:kids];
     [me addChild:kids];
   }
   [parent addChild:me];
@@ -1548,10 +1551,10 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   [parent addChild:collection];
 }
 
-static void RDLAddChart(NSXMLElement *parent, RDLChart *chart) {
+- (void)addChart:(RDLChart *)chart to:(NSXMLElement *)parent {
   NSXMLElement *el = RDLEl(@"Chart");
   RDLAddAttr(el, @"Name", chart.name);
-  RDLAddBox(el, chart);
+  [self addBox:chart to:el];
   RDLAddVisibility(el, chart.hidden, chart.toggleItem);
   RDLAddItemPagination(el, chart);
   RDLAddStyle(el, chart.style);
@@ -1622,12 +1625,12 @@ static void RDLAddChart(NSXMLElement *parent, RDLChart *chart) {
   [parent addChild:el];
 }
 
-static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
+- (void)addTablix:(RDLTablix *)it to:(NSXMLElement *)parent {
   if (it.tablixBody == nil || [it.tablixBody.rows count] == 0)
     [it rebuildTablix];
   NSXMLElement *tx = RDLEl(@"Tablix");
   RDLAddAttr(tx, @"Name", it.name);
-  RDLAddBox(tx, it);
+  [self addBox:it to:tx];
   RDLAdd(tx, @"DataSetName", it.dataSetName);
   RDLAddIf(tx, @"NoRowsMessage", it.noRowsMessage);
   if (it.layoutDirection != RDLLayoutDirectionUnspecified)
@@ -1658,7 +1661,7 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
         NSXMLElement *cc = RDLEl(@"TablixCornerCell");
         NSXMLElement *contents = RDLEl(@"CellContents");
         if (cell.item)
-          RDLAddItem(contents, cell.item);
+          [self addItem:cell.item to:contents];
         [cc addChild:contents];
         [row addChild:cc];
       }
@@ -1671,20 +1674,20 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   NSXMLElement *cols = RDLEl(@"TablixColumns");
   for (RDLTablixColumn *c in it.tablixBody.columns) {
     NSXMLElement *col = RDLEl(@"TablixColumn");
-    RDLAdd(col, @"Width", RDLIn(c.width));
+    RDLAdd(col, @"Width", [self measurement:c.width]);
     [cols addChild:col];
   }
   [body addChild:cols];
   NSXMLElement *rows = RDLEl(@"TablixRows");
   for (RDLTablixRow *row in it.tablixBody.rows) {
     NSXMLElement *re = RDLEl(@"TablixRow");
-    RDLAdd(re, @"Height", RDLIn(row.height));
+    RDLAdd(re, @"Height", [self measurement:row.height]);
     NSXMLElement *cells = RDLEl(@"TablixCells");
     for (RDLTablixCell *cell in row.cells) {
       NSXMLElement *ce = RDLEl(@"TablixCell");
       NSXMLElement *contents = RDLEl(@"CellContents");
       if (cell.item)
-        RDLAddItem(contents, cell.item);
+        [self addItem:cell.item to:contents];
       if (cell.colSpan > 1)
         RDLAdd(contents, @"ColSpan", [NSString stringWithFormat:@"%ld", (long)cell.colSpan]);
       if (cell.rowSpan > 1)
@@ -1702,7 +1705,7 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   NSXMLElement *colMembers = RDLEl(@"TablixMembers");
   if ([it.columnHierarchy.members count]) {
     for (RDLTablixMember *m in it.columnHierarchy.members)
-      RDLAddMember(colMembers, m);
+      [self addMember:m to:colMembers];
   } else {
     for (NSUInteger i = 0; i < [it.tablixBody.columns count]; i++)
       [colMembers addChild:RDLEl(@"TablixMember")];
@@ -1714,7 +1717,7 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   NSXMLElement *rowMembers = RDLEl(@"TablixMembers");
   if ([it.rowHierarchy.members count]) {
     for (RDLTablixMember *m in it.rowHierarchy.members)
-      RDLAddMember(rowMembers, m);
+      [self addMember:m to:rowMembers];
   } else {
     NSXMLElement *hdr = RDLEl(@"TablixMember");
     RDLAdd(hdr, @"RepeatOnNewPage", @"true");
@@ -1732,11 +1735,11 @@ static void RDLAddTablix(NSXMLElement *parent, RDLTablix *it) {
   [parent addChild:tx];
 }
 
-static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
+- (void)addItem:(RDLItem *)it to:(NSXMLElement *)parent {
   if ([it isKindOfClass:[RDLLine class]]) {
     NSXMLElement *el = RDLEl(@"Line");
     RDLAddAttr(el, @"Name", it.name);
-    RDLAddBox(el, it);
+    [self addBox:it to:el];
     RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddStyle(el, it.style);
     [parent addChild:el];
@@ -1746,7 +1749,7 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
     RDLImage *img = (RDLImage *)it;
     NSXMLElement *el = RDLEl(@"Image");
     RDLAddAttr(el, @"Name", it.name);
-    RDLAddBox(el, it);
+    [self addBox:it to:el];
     RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddHyperlink(el, it);
     RDLAdd(el, @"Source", RDLStringFromImageSource(img.source) ?: @"External");
@@ -1759,32 +1762,32 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
   if ([it isKindOfClass:[RDLRectangle class]]) {
     NSXMLElement *el = RDLEl(@"Rectangle");
     RDLAddAttr(el, @"Name", it.name);
-    RDLAddBox(el, it);
+    [self addBox:it to:el];
     RDLAddVisibility(el, it.hidden, it.toggleItem);
     RDLAddItemPagination(el, it);
     RDLAddStyle(el, it.style);
     if ([it.childItems count]) {
       NSXMLElement *kids = RDLEl(@"ReportItems");
       for (RDLItem *c in it.childItems)
-        RDLAddItem(kids, c);
+        [self addItem:c to:kids];
       [el addChild:kids];
     }
     [parent addChild:el];
     return;
   }
   if ([it isKindOfClass:[RDLChart class]]) {
-    RDLAddChart(parent, (RDLChart *)it);
+    [self addChart:(RDLChart *)it to:parent];
     return;
   }
   if ([it isKindOfClass:[RDLTablix class]]) {
-    RDLAddTablix(parent, (RDLTablix *)it);
+    [self addTablix:(RDLTablix *)it to:parent];
     return;
   }
 
   RDLTextbox *tb = (RDLTextbox *)it;
   NSXMLElement *el = RDLEl(@"Textbox");
   RDLAddAttr(el, @"Name", it.name);
-  RDLAddBox(el, it);
+  [self addBox:it to:el];
   RDLAddVisibility(el, it.hidden, it.toggleItem);
   RDLAddHyperlink(el, it);
   RDLAddItemPagination(el, it);
@@ -1819,19 +1822,33 @@ static void RDLAddItem(NSXMLElement *parent, RDLItem *it) {
   [parent addChild:el];
 }
 
-static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
-  RDLAdd(parent, @"Height", RDLIn(b.height));
+- (void)addBand:(RDLBand *)b to:(NSXMLElement *)parent {
+  RDLAdd(parent, @"Height", [self measurement:b.height]);
   RDLAdd(parent, @"PrintOnFirstPage", b.printOnFirstPage ? @"true" : @"false");
   RDLAdd(parent, @"PrintOnLastPage", b.printOnLastPage ? @"true" : @"false");
   if (b.style)
     RDLAddStyle(parent, b.style);
   NSXMLElement *items = RDLEl(@"ReportItems");
   for (RDLItem *it in b.items)
-    RDLAddItem(items, it);
+    [self addItem:it to:items];
   [parent addChild:items];
 }
 
+- (instancetype)initWithUnit:(RDLReportUnit)unit {
+  if ((self = [super init]))
+    _unit = unit != RDLReportUnitUnspecified ? unit : RDLReportUnitInch;
+  return self;
+}
+
+- (instancetype)init {
+  return [self initWithUnit:RDLReportUnitInch];
+}
+
 + (NSString *)XMLStringFromReport:(RDLReport *)report {
+  return [[[self alloc] initWithUnit:report.unit] XMLStringFromReport:report];
+}
+
+- (NSString *)XMLStringFromReport:(RDLReport *)report {
   NSXMLElement *root = RDLEl(@"Report");
   // Written as plain attributes rather than through -addNamespace:. Cocoa reads
   // +namespaceWithName:@"" as the default namespace; GNUstep copies the prefix
@@ -1842,12 +1859,12 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
               @"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition");
   RDLAddAttr(root, @"xmlns:rd",
               @"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner");
-  RDLAdd(root, @"rd:ReportUnitType", @"Inch");
+  RDLAdd(root, @"rd:ReportUnitType", RDLStringFromReportUnit(report.unit));
   RDLAdd(root, @"Name", report.name);
   RDLAdd(root, @"Description", report.reportDescription);
   RDLAdd(root, @"Author", report.author);
   RDLAddValue(root, @"Language", report.language);
-  RDLAdd(root, @"Width", RDLIn(report.width));
+  RDLAdd(root, @"Width", [self measurement:report.width]);
 
   NSXMLElement *sources = RDLEl(@"DataSources");
   NSArray *srcs = [report.dataSources count] ? report.dataSources : @[ [NSNull null] ];
@@ -1944,21 +1961,21 @@ static void RDLAddBand(NSXMLElement *parent, RDLBand *b) {
   }
 
   NSXMLElement *body = RDLEl(@"Body");
-  RDLAddBand(body, report.body);
+  [self addBand:report.body to:body];
   [root addChild:body];
 
   NSXMLElement *page = RDLEl(@"Page");
-  RDLAdd(page, @"PageHeight", RDLIn(report.page.pageHeight));
-  RDLAdd(page, @"PageWidth", RDLIn(report.page.pageWidth));
-  RDLAdd(page, @"LeftMargin", RDLIn(report.page.leftMargin));
-  RDLAdd(page, @"RightMargin", RDLIn(report.page.rightMargin));
-  RDLAdd(page, @"TopMargin", RDLIn(report.page.topMargin));
-  RDLAdd(page, @"BottomMargin", RDLIn(report.page.bottomMargin));
+  RDLAdd(page, @"PageHeight", [self measurement:report.page.pageHeight]);
+  RDLAdd(page, @"PageWidth", [self measurement:report.page.pageWidth]);
+  RDLAdd(page, @"LeftMargin", [self measurement:report.page.leftMargin]);
+  RDLAdd(page, @"RightMargin", [self measurement:report.page.rightMargin]);
+  RDLAdd(page, @"TopMargin", [self measurement:report.page.topMargin]);
+  RDLAdd(page, @"BottomMargin", [self measurement:report.page.bottomMargin]);
   NSXMLElement *header = RDLEl(@"PageHeader");
-  RDLAddBand(header, report.pageHeader);
+  [self addBand:report.pageHeader to:header];
   [page addChild:header];
   NSXMLElement *footer = RDLEl(@"PageFooter");
-  RDLAddBand(footer, report.pageFooter);
+  [self addBand:report.pageFooter to:footer];
   [page addChild:footer];
   [root addChild:page];
 

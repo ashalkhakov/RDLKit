@@ -88,6 +88,10 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * calculated fields (`Field/Value`)
   * dataset-level `Filters`
   * group/sort/filter on tablix members
+* **Units**
+  * measurements read in any RDL unit (`in`, `cm`, `mm`, `pt`, `pc`, `px`)
+  * `rd:ReportUnitType` remembered, shown and written back, so a metric document stays metric
+  * the designer's boxes, labels and rulers follow it
 * **Localization**
   * report `Language`, static (`en-US`) or an expression (`=User!Language`, `=Parameters!Culture.Value`)
   * per-item `Style/Language`, which overrides it for that item and everything inside it
@@ -226,6 +230,25 @@ node in an expression memoises the spelling per row class: resolved once,
 fetched per row. All three shapes then cost the same. The memo re-resolves when
 the row class changes, and when a cached key misses on a dictionary, so rows
 need not all be alike.
+
+## Units
+
+Geometry is inches everywhere inside the kit -- RDL's own default, and what
+every laid-out coordinate is in -- but a measurement in a file may be written
+in any unit RDL allows, and all of them are read.
+
+Which unit an author works in is a property of the document, kept where Report
+Builder keeps it:
+
+```objc
+report.unit = RDLReportUnitCentimeter;   // rd:ReportUnitType
+```
+
+A report read as metric is written back as metric (`5.08cm`, not `2in`), and
+the designer's measurement boxes, their labels and the rulers are all in that
+unit; the Units popup in the report inspector switches it. Nothing about the
+report's geometry changes -- 2in and 5.08cm are the same width, and everything
+downstream still measures in inches.
 
 ## Localization
 

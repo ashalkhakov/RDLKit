@@ -13,8 +13,10 @@
                 <outlet property="bandBGField" destination="bandBGField" id="bandBGFieldOutlet"/>
                 <outlet property="bandBox" destination="bandBox" id="bandBoxOutlet"/>
                 <outlet property="bandHField" destination="bandHField" id="bandHFieldOutlet"/>
+                <outlet property="bandHeightLabel" destination="lbl9" id="bandHeightLabelOutlet"/>
                 <outlet property="bgColorWell" destination="bgColorWell" id="bgColorWellOutlet"/>
                 <outlet property="bodyHField" destination="bodyHField" id="bodyHFieldOutlet"/>
+                <outlet property="bodyHLabel" destination="lbl6" id="bodyHLabelOutlet"/>
                 <outlet property="catField" destination="catField" id="catFieldOutlet"/>
                 <outlet property="cellAggPop" destination="cellAggPop" id="cellAggPopOutlet"/>
                 <outlet property="cellAlignPop" destination="cellAlignPop" id="cellAlignPopOutlet"/>
@@ -23,6 +25,7 @@
                 <outlet property="cellHeaderField" destination="cellHeaderField" id="cellHeaderFieldOutlet"/>
                 <outlet property="cellValueField" destination="cellValueField" id="cellValueFieldOutlet"/>
                 <outlet property="cellWidthField" destination="cellWidthField" id="cellWidthFieldOutlet"/>
+                <outlet property="cellWidthLabel" destination="lblCell2" id="cellWidthLabelOutlet"/>
                 <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
                 <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
                 <outlet property="chartFiltersButton" destination="chartFiltersButton" id="chartFiltersButtonOutlet"/>
@@ -39,10 +42,12 @@
                 <outlet property="fontField" destination="fontField" id="fontFieldOutlet"/>
                 <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
                 <outlet property="footerHField" destination="footerHField" id="footerHFieldOutlet"/>
+                <outlet property="footerHLabel" destination="lbl7" id="footerHLabelOutlet"/>
                 <outlet property="formatExprButton" destination="formatExprButton" id="formatExprButtonOutlet"/>
                 <outlet property="formatField" destination="formatField" id="formatFieldOutlet"/>
                 <outlet property="geoBox" destination="geoBox" id="geoBoxOutlet"/>
                 <outlet property="headerHField" destination="headerHField" id="headerHFieldOutlet"/>
+                <outlet property="headerHLabel" destination="lbl5" id="headerHLabelOutlet"/>
                 <outlet property="heightField" destination="heightField" id="heightFieldOutlet"/>
                 <outlet property="imageBox" destination="imageBox" id="imageBoxOutlet"/>
                 <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
@@ -55,6 +60,7 @@
                 <outlet property="lineBox" destination="lineBox" id="lineBoxOutlet"/>
                 <outlet property="lineColorField" destination="lineColorField" id="lineColorFieldOutlet"/>
                 <outlet property="marginField" destination="marginField" id="marginFieldOutlet"/>
+                <outlet property="marginLabel" destination="lbl8" id="marginLabelOutlet"/>
                 <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
                 <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
                 <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
@@ -66,10 +72,13 @@
                 <outlet property="tablixBox" destination="tablixBox" id="tablixBoxOutlet"/>
                 <outlet property="tablixDatasetPop" destination="tablixDatasetPop" id="tablixDatasetPopOutlet"/>
                 <outlet property="tablixHeaderHField" destination="tablixHeaderHField" id="tablixHeaderHFieldOutlet"/>
+                <outlet property="tablixHeaderLabel" destination="lbl34" id="tablixHeaderLabelOutlet"/>
                 <outlet property="tablixRowHField" destination="tablixRowHField" id="tablixRowHFieldOutlet"/>
+                <outlet property="tablixRowLabel" destination="lbl35" id="tablixRowLabelOutlet"/>
                 <outlet property="textBox" destination="textBox" id="textBoxOutlet"/>
                 <outlet property="titleField" destination="titleField" id="titleFieldOutlet"/>
                 <outlet property="topField" destination="topField" id="topFieldOutlet"/>
+                <outlet property="unitPop" destination="unitPop" id="unitPopOutlet"/>
                 <outlet property="valField" destination="valField" id="valFieldOutlet"/>
                 <outlet property="valueExprButton" destination="valueExprButton" id="valueExprButtonOutlet"/>
                 <outlet property="valueField" destination="valueField" id="valueFieldOutlet"/>
@@ -89,7 +98,7 @@
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
         <customView id="docBox">
-            <rect key="frame" x="0.0" y="0.0" width="260" height="334"/>
+            <rect key="frame" x="0.0" y="0.0" width="260" height="378"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
@@ -291,6 +300,26 @@
                         <action selector="editExpression:" target="-2" id="docLanguageExprButtonAction"/>
                     </connections>
                 </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblUnits">
+                    <rect key="frame" x="10" y="334" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Units" id="lblUnitsCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="The unit this report is authored in — what the boxes and rulers show" id="unitPop">
+                    <rect key="frame" x="10" y="350" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="unitPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="unitPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="unitPopAction"/>
+                    </connections>
+                </popUpButton>
             </subviews>
             <point key="canvasLocation" x="140" y="-86"/>
         </customView>

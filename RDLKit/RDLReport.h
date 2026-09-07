@@ -277,6 +277,29 @@ FOUNDATION_EXPORT NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette 
 // An RDL measurement: a number and the unit it was written in. RDL writes
 // these as "10pt", "0.5in", "3mm"; keeping the unit rather than normalising to
 // points means a report saves back in the units its author chose.
+// The unit a document is written and shown in. RDL measurements always carry
+// their own unit, so this changes nothing about what a report means -- it is
+// the unit the author works in, which Report Builder keeps in the report as
+// rd:ReportUnitType and offers as Inches or Centimeters. Millimetres are read
+// wherever they appear in a measurement; as a document unit, "metric" is
+// centimetres, which is the only metric value that element takes.
+typedef NS_ENUM(NSInteger, RDLReportUnit) {
+  RDLReportUnitUnspecified = 0,
+  RDLReportUnitInch,
+  RDLReportUnitCentimeter,
+};
+
+FOUNDATION_EXPORT RDLReportUnit RDLReportUnitFromString(NSString *name);
+// "Inch" / "Cm", as rd:ReportUnitType writes them.
+FOUNDATION_EXPORT NSString *RDLStringFromReportUnit(RDLReportUnit unit);
+// "in" / "cm", for a label or a ruler.
+FOUNDATION_EXPORT NSString *RDLAbbreviationForReportUnit(RDLReportUnit unit);
+// Geometry is held in inches throughout the kit, which is RDL's own default
+// and what every laid-out coordinate is in. These two are the only places a
+// document unit touches a number: on the way to a person, and back.
+FOUNDATION_EXPORT double RDLUnitsFromInches(double inches, RDLReportUnit unit);
+FOUNDATION_EXPORT double RDLInchesFromUnits(double value, RDLReportUnit unit);
+
 typedef NS_ENUM(NSInteger, RDLLengthUnit) {
   RDLLengthUnitUnspecified = 0,
   RDLLengthUnitPoint,
@@ -729,6 +752,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *author;
 @property (nonatomic, copy) NSString *reportDescription;
+// The unit this report is authored in -- what the designer's boxes and rulers
+// show, and what its measurements are written with. Inches unless the document
+// said otherwise; it changes no geometry, only how it reads.
+@property (nonatomic, assign) RDLReportUnit unit;
 // The culture the report is rendered in: a code like "en-US", or an
 // expression -- "=User!Language" to follow whoever is reading it, or
 // "=Parameters!Culture.Value" to let them choose. It decides how numbers,

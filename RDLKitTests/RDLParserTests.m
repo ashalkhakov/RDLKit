@@ -775,4 +775,121 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"an invented culture code should be reported");
 }
 
+// The unit a report is authored in. Every RDL measurement carries its own
+// unit, so this changes no geometry -- what it decides is how the file reads
+// and what the designer shows, and a document that arrives in centimetres has
+// to leave in centimetres rather than being quietly converted.
+- (void)testAReportKeepsTheUnitItWasWrittenIn {
+  NSString *metric =
+      @"<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\""
+      @" xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+      @"<Name>Metric</Name><rd:ReportUnitType>Cm</rd:ReportUnitType><Width>17.78cm</Width>"
+      @"<Body><Height>2.54cm</Height><ReportItems>"
+      @"<Textbox Name=\"T\"><Value>x</Value><Top>0cm</Top><Left>0mm</Left>"
+      @"<Width>50.8mm</Width><Height>1.27cm</Height></Textbox>"
+      @"</ReportItems></Body></Report>";
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:metric error:&err];
+  if (r == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"metric report did not parse: %@", err]);
+    return;
+  }
+  if (r.unit != RDLReportUnitCentimeter)
+    XCTFail(@"%@", @"rd:ReportUnitType said Cm");
+  // Read as inches, which is what the kit measures in: 17.78cm is 7in, 50.8mm
+  // is 2in. Millimetres are a measurement unit even though the document unit
+  // is centimetres, and both had to come through.
+  if (fabs(r.width - 7.0) > 0.001 || fabs(r.body.height - 1.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"width %.4f, body %.4f", r.width, r.body.height]);
+  RDLItem *tb = [r.body.items firstObject];
+  if (fabs(tb.width - 2.0) > 0.001 || fabs(tb.height - 0.5) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"item %.4f x %.4f", tb.width, tb.height]);
+
+  NSString *out = [RDLWriter XMLStringFromReport:r];
+  if ([out rangeOfString:@"<rd:ReportUnitType>Cm</rd:ReportUnitType>"].location == NSNotFound)
+    XCTFail(@"%@", @"the document unit was not written back");
+  if ([out rangeOfString:@"cm</Width>"].location == NSNotFound ||
+      [out rangeOfString:@"in</Width>"].location != NSNotFound)
+    XCTFail(@"%@", @"a metric report should be written in centimetres");
+  RDLReport *back = [RDLParser reportFromXMLString:out error:NULL];
+  if (back.unit != RDLReportUnitCentimeter || fabs(back.width - 7.0) > 0.001 ||
+      fabs([[back.body.items firstObject] width] - 2.0) > 0.001)
+    XCTFail(@"%@", @"a metric round trip changed the report");
+
+  // And the default is unchanged: a report that says nothing is in inches, and
+  // is written in them.
+  RDLReport *plain = [RDLReport emptyReportNamed:@"Plain"];
+  NSString *plainXML = [RDLWriter XMLStringFromReport:plain];
+  if ([plainXML rangeOfString:@"<rd:ReportUnitType>Inch</rd:ReportUnitType>"].location == NSNotFound ||
+      [plainXML rangeOfString:@"cm</Width>"].location != NSNotFound)
+    XCTFail(@"%@", @"a report with no unit is in inches");
+}
+
+// Reading and writing are objects with their own state, not class methods over
+// shared globals. Two of each, used at the same time, must not see each
+// other's -- which is the property the parser used to buy with a lock around
+// its globals, and the writer with a save-and-restore of one.
+- (void)testParsersAndWritersDoNotShareState {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Shared"];
+  r.width = 7.0;
+  r.unit = RDLReportUnitCentimeter;
+
+  // Two writers, one report, different units -- and the report's own unit is
+  // not what either of them was told to use.
+  RDLWriter *metric = [[RDLWriter alloc] initWithUnit:RDLReportUnitCentimeter];
+  RDLWriter *imperial = [[RDLWriter alloc] initWithUnit:RDLReportUnitInch];
+  NSString *inCm = [metric XMLStringFromReport:r];
+  NSString *inIn = [imperial XMLStringFromReport:r];
+  if ([inCm rangeOfString:@"17.78000cm</Width>"].location == NSNotFound)
+    XCTFail(@"%@", @"the metric writer should have written centimetres");
+  if ([inIn rangeOfString:@"7.00000in</Width>"].location == NSNotFound)
+    XCTFail(@"%@", @"the imperial writer should have written inches");
+  // Writing through one did not change the other, and neither changed the
+  // report: it is still authored in centimetres.
+  if (metric.unit != RDLReportUnitCentimeter || imperial.unit != RDLReportUnitInch ||
+      r.unit != RDLReportUnitCentimeter)
+    XCTFail(@"%@", @"a write changed something it does not own");
+
+  // Parsers: each collects its own notes. This document has a value outside
+  // the vocabulary, which is a warning rather than a failure.
+  NSString *odd =
+      @"<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+      @"<Name>Odd</Name><Width>7in</Width><Body><Height>1in</Height><ReportItems>"
+      @"<Textbox Name=\"T\"><Value>x</Value><Top>0in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>0.3in</Height>"
+      @"<Style><TextAlign>Sideways</TextAlign></Style></Textbox>"
+      @"</ReportItems></Body></Report>";
+  NSString *plain =
+      @"<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+      @"<Name>Plain</Name><Width>7in</Width><Body><Height>1in</Height><ReportItems/></Body></Report>";
+
+  RDLParser *one = [[RDLParser alloc] init];
+  RDLParser *two = [[RDLParser alloc] init];
+  RDLReport *odds = [one reportFromXMLString:odd error:NULL];
+  RDLReport *plains = [two reportFromXMLString:plain error:NULL];
+  if ([odds.warnings count] != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the odd report has %lu warnings",
+                                              (unsigned long)[odds.warnings count]]);
+  if ([plains.warnings count] != 0)
+    XCTFail(@"%@", @"the plain report picked up another parse's warning");
+  // The same parser used again starts clean rather than accumulating.
+  RDLReport *againPlain = [one reportFromXMLString:plain error:NULL];
+  if ([againPlain.warnings count] != 0)
+    XCTFail(@"%@", @"a second parse inherited the first one's warnings");
+
+  // And all of it at once, which is what the lock used to be for.
+  dispatch_apply(16, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(size_t i) {
+    BOOL wantsWarning = (i % 2) == 0;
+    RDLReport *got = [RDLParser reportFromXMLString:wantsWarning ? odd : plain error:NULL];
+    NSUInteger expected = wantsWarning ? 1 : 0;
+    if (got == nil || [got.warnings count] != expected)
+      XCTFail(@"%@", [NSString stringWithFormat:@"concurrent parse %lu saw %lu warnings",
+                                                (unsigned long)i,
+                                                (unsigned long)[got.warnings count]]);
+  });
+}
+
 @end

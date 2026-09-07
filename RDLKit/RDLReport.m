@@ -275,6 +275,36 @@ BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op) {
   return op == RDLFilterOperatorIn || op == RDLFilterOperatorBetween;
 }
 
+// One inch, in the units RDL knows. Written once here rather than as 2.54 in
+// each place that needs it.
+const double RDLCentimetersPerInch = 2.54;
+
+RDLReportUnit RDLReportUnitFromString(NSString *name) {
+  NSString *n = [name lowercaseString];
+  if ([n isEqualToString:@"cm"] || [n isEqualToString:@"centimeter"] ||
+      [n isEqualToString:@"centimetre"] || [n isEqualToString:@"mm"])
+    return RDLReportUnitCentimeter;
+  if ([n isEqualToString:@"inch"] || [n isEqualToString:@"in"])
+    return RDLReportUnitInch;
+  return RDLReportUnitUnspecified;
+}
+
+NSString *RDLStringFromReportUnit(RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? @"Cm" : @"Inch";
+}
+
+NSString *RDLAbbreviationForReportUnit(RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? @"cm" : @"in";
+}
+
+double RDLUnitsFromInches(double inches, RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? inches * RDLCentimetersPerInch : inches;
+}
+
+double RDLInchesFromUnits(double value, RDLReportUnit unit) {
+  return unit == RDLReportUnitCentimeter ? value / RDLCentimetersPerInch : value;
+}
+
 @implementation RDLLength
 
 + (instancetype)lengthWithValue:(double)value unit:(RDLLengthUnit)unit {

@@ -1,4 +1,5 @@
 #import "RDLInspectorFields.h"
+#import "RDLDocument.h"
 #import "RDLEditor.h"
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
@@ -108,8 +109,11 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       }
       case RDLFieldKindNumber:
+        // Geometry is inches inside; what a person reads is the unit the
+        // report is authored in, which for a metric document is centimetres.
         [(NSTextField *)b.control
-            setStringValue:[NSString stringWithFormat:@"%.3f", [value doubleValue]]];
+            setStringValue:[NSString stringWithFormat:@"%.3f",
+                                     RDLUnitsFromInches([value doubleValue], report.unit)]];
         break;
       case RDLFieldKindLength: {
         RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
@@ -201,7 +205,10 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       }
       case RDLFieldKindNumber:
-        value = @([[(NSTextField *)b.control stringValue] doubleValue]);
+        // ... and back again, so what was typed in centimetres is stored as
+        // the inches everything downstream measures in.
+        value = @(RDLInchesFromUnits([[(NSTextField *)b.control stringValue] doubleValue],
+                                     editor.document.report.unit));
         break;
       case RDLFieldKindLength:
         // Clearing the field removes the measurement rather than storing zero.

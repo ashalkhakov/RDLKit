@@ -148,6 +148,8 @@
   BOOL affectsTree = change.scope == RDLChangeScopeStructure ||
                      change.scope == RDLChangeScopeReport ||
                      [change affectsKeyPath:@"name"] || [change affectsKeyPath:@"type"];
+  if (change.scope == RDLChangeScopeReport || [change affectsKeyPath:@"unit"])
+    [self updateRulers];
   if (affectsTree)
     [self reloadUI];
   else
@@ -346,11 +348,20 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // paper's top-left, not the view's, so the numbers are the ones on the page.
 - (void)updateRulers {
   CGFloat zoom = _context.zoom > 0 ? _context.zoom : 1.0;
-  NSString *unit = [NSString stringWithFormat:@"RDLInches@%.2f", zoom];
+  // The report's own unit, so the numbers beside the page are the ones the
+  // author types into the inspector. Registered per unit as well as per zoom:
+  // a name already registered keeps its old conversion factor.
+  RDLReportUnit reportUnit = _context.report.unit;
+  NSString *abbr = RDLAbbreviationForReportUnit(reportUnit);
+  BOOL metric = reportUnit == RDLReportUnitCentimeter;
+  NSString *unit = [NSString stringWithFormat:@"RDL-%@@%.2f", abbr, zoom];
+  // One of the report's units, in points: an inch is 72 of them, and a
+  // centimetre is that divided by however many centimetres go to the inch.
+  CGFloat pointsPerUnit = RDLPointsPerInch / (CGFloat)RDLUnitsFromInches(1.0, reportUnit);
   [NSRulerView registerUnitWithName:unit
-                       abbreviation:@"in"
-       unitToPointsConversionFactor:72.0 * zoom
-                        stepUpCycle:@[ @2 ]
+                       abbreviation:abbr
+       unitToPointsConversionFactor:pointsPerUnit * zoom
+                        stepUpCycle:@[ metric ? @10 : @2 ]
                       stepDownCycle:@[ @0.5, @0.5 ]];
   NSPoint paper = [RDLPageGeometry defaultPaperOrigin];
   for (NSRulerView *ruler in @[ [_canvasScroll horizontalRulerView] ?: (id)[NSNull null],
