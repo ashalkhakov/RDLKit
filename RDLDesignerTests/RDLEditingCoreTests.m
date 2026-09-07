@@ -982,4 +982,132 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"the watch table's own filter did not survive the file");
 }
 
+// The data-source sample earns its place by being checked the way a reader
+// would check it: the documents in the report become rows, the deeper path
+// flattens the hierarchy, the filter in the path narrows it, the XML one is
+// read too, and the totals are over rows the report never wrote down.
+- (void)testHarborManifestReadsItsOwnDocuments {
+  RDLReport *r = [RDLSamples harborManifest];
+
+  struct {
+    __unsafe_unretained NSString *name;
+    NSUInteger rows;
+  } expected[] = {{@"Shipments", 3}, {@"Crates", 7}, {@"Heavy", 4}, {@"Ports", 3}};
+  for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
+    RDLDataSet *ds = [r dataSetNamed:expected[i].name];
+    if ([ds.rows count] != expected[i].rows)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ has %lu rows, expected %lu", expected[i].name,
+                                                (unsigned long)[ds.rows count],
+                                                (unsigned long)expected[i].rows]);
+  }
+  // The crates came out of the shipments, which is the point of the deeper
+  // path: a hierarchy a flat table can bind to.
+  NSDictionary *firstCrate = [[r dataSetNamed:@"Crates"].rows firstObject];
+  if (![firstCrate[@"Item"] isEqualToString:@"Stoneware bowls"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"first crate: %@", firstCrate]);
+  // The filter is in the path, so every row of Heavy is one.
+  for (NSDictionary *crate in [r dataSetNamed:@"Heavy"].rows)
+    if ([crate[@"Qty"] integerValue] < 10)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not a heavy crate", crate]);
+  // XML: an attribute and a child element are both fields.
+  NSDictionary *port = [[r dataSetNamed:@"Ports"].rows firstObject];
+  if (![port[@"Code"] isEqualToString:@"AST"] || ![port[@"Name"] isEqualToString:@"Astoria"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"first port: %@", port]);
+
+  // And it renders: the totals are aggregates over a dataset that arrived as a
+  // document rather than as rows in the file.
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+  BOOL totalled = NO;
+  for (NSString *text in texts)
+    if ([text rangeOfString:@"114"].location != NSNotFound &&
+        [text rangeOfString:@"7 crates"].location != NSNotFound &&
+        [text rangeOfString:@"871"].location != NSNotFound)
+      totalled = YES;
+  if (!totalled)
+    XCTFail(@"%@", [NSString stringWithFormat:@"no manifest total among %@",
+                                              [texts componentsJoinedByString:@" | "]]);
+  // Every crate reached the page, so the tables are bound and not just present.
+  BOOL sawFirebrick = NO;
+  for (NSString *text in texts)
+    if ([text isEqualToString:@"Firebrick"])
+      sawFirebrick = YES;
+  if (!sawFirebrick)
+    XCTFail(@"%@", @"the crates table did not render its rows");
+
+  // Saved and opened again, it still reads: an XML document carried inside an
+  // XML file has to survive being escaped and unescaped, and a JSONPath with
+  // quotes and brackets in it has to come back as the same query.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  RDLDataSet *heavy = [back dataSetNamed:@"Heavy"];
+  if (![heavy.commandText isEqualToString:@"$.Shipment[*].Crates[?(@.Qty >= 10)]"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the query came back as '%@'", heavy.commandText]);
+  if (![[[RDLDataBinder alloc] init] bindReport:back error:NULL])
+    XCTFail(@"%@", @"the saved report could not be bound");
+  if ([[back dataSetNamed:@"Crates"].rows count] != 7 ||
+      [[back dataSetNamed:@"Ports"].rows count] != 3)
+    XCTFail(@"%@", @"a saved report should read the same documents it did before");
+}
+
+// Nothing in the body may run into the footer, and no table may begin at the
+// foot of a page with nothing under it. Both are the same mistake seen from
+// two sides: an item that does not fit in what is left of a page belongs on
+// the next one, not drawn over what comes after it.
+//
+// Body content is told from the bands by name -- the header's and the footer's
+// items are known, and everything else on the page came out of the body,
+// including the cells a tablix expanded into.
+- (void)testBodyContentStaysInsideTheBody {
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    RDLReport *r = [RDLSamples reportWithId:sampleId];
+    NSMutableSet *bandNames = [NSMutableSet set];
+    for (RDLItem *it in r.pageHeader.items)
+      [bandNames addObject:it.name ?: @""];
+    for (RDLItem *it in r.pageFooter.items)
+      [bandNames addObject:it.name ?: @""];
+    CGFloat bodyTop = r.page.topMargin + r.pageHeader.height;
+    CGFloat bodyBottom = r.page.pageHeight - r.page.bottomMargin - r.pageFooter.height;
+    for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil]) {
+      for (RDLLaidOutItem *item in page.items) {
+        if ([bandNames containsObject:item.name ?: @""])
+          continue;
+        if (item.y < bodyTop - 0.001 || item.y + item.h > bodyBottom + 0.001)
+          XCTFail(@"%@", [NSString stringWithFormat:
+                              @"sample '%@' page %ld: %@ runs from %.3f to %.3f, outside the body's "
+                              @"%.3f–%.3f",
+                              sampleId, (long)page.index, item.name ?: @"an item", item.y,
+                              item.y + item.h, bodyTop, bodyBottom]);
+      }
+    }
+  }
+}
+
+// A table's header belongs with its rows: a page that shows one and none of
+// the other is a table that starts twice.
+- (void)testATableHeaderIsNeverStrandedAtTheFootOfAPage {
+  RDLReport *r = [RDLSamples harborManifest];
+  NSArray<NSString *> *ports = @[ @"Astoria", @"Portland", @"Halifax" ];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil]) {
+    BOOL sawHeader = NO, sawRow = NO;
+    for (RDLLaidOutItem *item in page.items) {
+      if (![item isKindOfClass:[RDLLaidOutTextbox class]])
+        continue;
+      NSString *text = [(RDLLaidOutTextbox *)item text] ?: @"";
+      if ([text isEqualToString:@"Country"])
+        sawHeader = YES;
+      for (NSString *port in ports)
+        if ([text isEqualToString:port])
+          sawRow = YES;
+    }
+    if (sawHeader && !sawRow)
+      XCTFail(@"%@", [NSString stringWithFormat:@"page %ld has the ports header and no ports",
+                                                (long)page.index]);
+  }
+}
+
+
 @end

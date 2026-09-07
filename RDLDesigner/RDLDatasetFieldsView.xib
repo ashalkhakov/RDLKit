@@ -12,7 +12,11 @@
                 <outlet property="addCalculatedButton" destination="addCalculatedButton" id="addCalculatedButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
+                <outlet property="loadButton" destination="loadButton" id="loadButtonOutlet"/>
+                <outlet property="queryField" destination="queryField" id="queryFieldOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="sourcePop" destination="sourcePop" id="sourcePopOutlet"/>
+                <outlet property="statusLabel" destination="statusLabel" id="statusLabelOutlet"/>
                 <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="title" destination="title" id="titleOutlet"/>
             </connections>
@@ -36,14 +40,14 @@
                     </connections>
                 </textField>
                 <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="tableScroll">
-                    <rect key="frame" x="0.0" y="26" width="400" height="244"/>
+                    <rect key="frame" x="0.0" y="26" width="400" height="168"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                     <clipView key="contentView" copiesOnScroll="NO" id="tableClip">
-                        <rect key="frame" x="1" y="1" width="383" height="227"/>
+                        <rect key="frame" x="1" y="1" width="383" height="151"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="table">
-                                <rect key="frame" x="0.0" y="0.0" width="383" height="227"/>
+                                <rect key="frame" x="0.0" y="0.0" width="561" height="151"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="2"/>
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -102,7 +106,7 @@
                         </subviews>
                     </clipView>
                     <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                        <rect key="frame" x="384" y="1" width="15" height="227"/>
+                        <rect key="frame" x="384" y="1" width="15" height="151"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                     </scroller>
                 </scrollView>
@@ -150,6 +154,51 @@
                         <action selector="removeField:" target="-2" id="removeButtonAction"/>
                     </connections>
                 </button>
+                <popUpButton toolTip="Which of the report's data sources this dataset reads from" id="sourcePop">
+                    <rect key="frame" x="8" y="248" width="180" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="sourcePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="sourcePopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="sourceChanged:" target="-2" id="sourcePopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField toolTip="Which part of the document the rows are: a JSONPath, an XPath, or nothing for a flat file" focusRingType="none" id="queryField">
+                    <rect key="frame" x="8" y="222" width="300" height="22"/>
+                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="queryFieldCell">
+                        <font key="font" metaFont="system"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="sourceChanged:" target="-2" id="queryFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="queryFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Read the document now and show what it holds" id="loadButton">
+                    <rect key="frame" x="314" y="222" width="78" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Load" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="loadButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="loadData:" target="-2" id="loadButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="statusLabel">
+                    <rect key="frame" x="8" y="200" width="384" height="16"/>
+                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" id="statusLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
             </subviews>
             <point key="canvasLocation" x="140" y="154"/>
         </customView>

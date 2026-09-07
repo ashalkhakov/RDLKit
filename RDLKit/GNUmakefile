@@ -14,6 +14,8 @@ RDLKit_HEADER_FILES = \
   RDLView.h \
   RDLBackend.h \
   RDLGenerator.h \
+  RDLJSONPath.h \
+  RDLDataProvider.h \
   RDLTextAttributes.h
 RDLKit_OBJC_FILES = \
   RDLReport.m \
@@ -31,6 +33,8 @@ RDLKit_OBJC_FILES = \
   RDLHTMLBackend.m \
   RDLPDFBackend.m \
   RDLGenerator.m \
+  RDLJSONPath.m \
+  RDLDataProvider.m \
   RDLTextAttributes.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever

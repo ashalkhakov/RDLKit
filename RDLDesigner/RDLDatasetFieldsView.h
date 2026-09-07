@@ -27,6 +27,13 @@
 - (void)removeField:(id)sender;
 - (void)renameDataSet:(id)sender;
 - (void)editFilters:(id)sender;
+// The dataset's source: which of the report's data sources it reads from, and
+// which part of that document the rows are. What kind of document it is and
+// where it lives belong to the source, and are edited there.
+- (void)sourceChanged:(id)sender;
+// Read it now, so the fields and the row count are the document's rather than
+// something to find out at render time.
+- (void)loadData:(id)sender;
 // What the two kinds of field are called and what each one is read from, in
 // the words Report Builder uses. Published so the inspector's Kind popup and
 // this table say the same thing, and so a test can ask what a row reads.

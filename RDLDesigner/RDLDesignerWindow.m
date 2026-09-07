@@ -11,6 +11,8 @@
 #import "RDLCompatibility.h"
 #import "RDLTabBadge.h"
 #import "RDLDatasetNavigator.h"
+#import "RDLDataSourceNavigator.h"
+#import "RDLDataSourceView.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLInsertPalette.h"
 #import "RDLPane.h"
@@ -19,7 +21,7 @@
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate>
+@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate>
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -44,6 +46,8 @@
 // goes in it is decided here.
 @property (nonatomic, strong) RDLInspectorView *reportInspector;
 @property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
+@property (nonatomic, strong) RDLDataSourceNavigator *dataSourceNavigator;
+@property (nonatomic, strong) RDLDataSourceView *dataSourceView;
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
 // The centre's Dataset tab shows the dataset being edited or the data view.
 - (void)showDatasetFields:(BOOL)show;
@@ -51,6 +55,9 @@
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
 @property (nonatomic, strong) IBOutlet NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
+// Data sources sit above the datasets, which is the order they are made in: a
+// source says where data comes from, and a dataset then names one.
+@property (nonatomic, strong) IBOutlet NSView *dataSourceNavigatorHost, *dataSourceHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
 // RDLPreviewWindow.xib
@@ -393,6 +400,17 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _datasetNavigator.delegate = self;
   RDLFillHost(_datasetNavigatorHost, _datasetNavigator);
 
+  // The report's data sources, listed above its datasets, and the pane that
+  // configures the one selected -- the centre, where whatever is being edited
+  // goes.
+  _dataSourceNavigator = [[RDLDataSourceNavigator alloc]
+      initWithFrame:[_dataSourceNavigatorHost bounds] context:_context];
+  _dataSourceNavigator.delegate = self;
+  RDLFillHost(_dataSourceNavigatorHost, _dataSourceNavigator);
+  _dataSourceView = [[RDLDataSourceView alloc] initWithFrame:[_dataSourceHost bounds]
+                                                     context:_context];
+  RDLFillHost(_dataSourceHost, _dataSourceView);
+
   // The dataset's attributes table is what the centre shows when a dataset is
   // chosen, the way the Core Data builder shows an entity's attributes; the
   // data view is what it shows when none is. They are siblings in the tab's
@@ -435,6 +453,8 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_reportInspector reload];
   [_datasetNavigator reload];
   [_datasetFields reload];
+  [_dataSourceNavigator reload];
+  [_dataSourceView reload];
   [_palette reload];
   // The source is written when it is being looked at, not on every edit.
   // Serialising the whole report to answer a change nobody can see is waste on
@@ -463,6 +483,27 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)showDatasetFields:(BOOL)show {
   [_datasetFields setHidden:!show];
   [[_dataView enclosingScrollView] setHidden:show];
+}
+
+// A data source selected shows it in the centre. It is the other thing in this
+// report that is edited rather than drawn, and it comes first: a dataset reads
+// from one.
+- (void)dataSourceNavigator:(RDLDataSourceNavigator *)navigator
+        didSelectDataSource:(RDLDataSource *)source {
+  RDL_UNUSED(navigator);
+  _dataSourceView.dataSource = source;
+  if (source == nil) {
+    if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 3)
+      [self centerModeChanged:nil];
+    return;
+  }
+  // One thing at a time: choosing a source is choosing to edit it, so whatever
+  // was selected on the canvas or in the dataset list is no longer what the
+  // centre is about.
+  [_datasetFields setDataSet:nil];
+  [self showDatasetFields:NO];
+  [_context.selection selectReport];
+  [_centerTabView selectTabViewItemAtIndex:3];
 }
 
 // A dataset selected shows it in the centre and puts its fields in the right

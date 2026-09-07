@@ -1010,7 +1010,8 @@ static NSArray *RDLApplyPageRules(NSArray<RDLTablixInst *> *insts, CGFloat bodyA
   if ([insts count] == 0 || bodyAvail <= 0)
     return insts;
   CGFloat y = 0;
-  for (RDLTablixInst *inst in insts) {
+  for (NSUInteger i = 0; i < [insts count]; i++) {
+    RDLTablixInst *inst = insts[i];
     if (inst.pageBreakBefore) {
       CGFloat abs = tablixTop + y;
       CGFloat into = fmod(abs, bodyAvail);
@@ -1030,6 +1031,23 @@ static NSArray *RDLApplyPageRules(NSArray<RDLTablixInst *> *insts, CGFloat bodyA
           y += bodyAvail - into;
       }
     }
+    // A row is not split, and a header is not left at the foot of a page with
+    // nothing under it. So what has to fit in what is left of the page is this
+    // row -- plus the one after it when this row is a header, because a header
+    // alone is a table that starts and then starts again overleaf.
+    //
+    // Without this the row is placed where it lands and drawn across the
+    // boundary, which on paper is over the page footer.
+    CGFloat need = inst.height;
+    if (inst.repeatOnNewPage && i + 1 < [insts count])
+      need += [insts[i + 1] height];
+    CGFloat abs = tablixTop + y;
+    CGFloat into = fmod(abs, bodyAvail);
+    if (into < 0)
+      into += bodyAvail;
+    CGFloat remain = bodyAvail - into;
+    if (into > 0.0001 && need <= bodyAvail + 0.001 && need > remain + 0.001)
+      y += remain;
     inst.yRel = y;
     y += inst.height;
   }

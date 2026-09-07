@@ -16,6 +16,10 @@
 #import "RDLView.h"
 #import "RDLBackend.h"
 #import "RDLGenerator.h"
+// Datasets from documents: JSON, XML and CSV, which is what a local report
+// viewer binds to.
+#import "RDLJSONPath.h"
+#import "RDLDataProvider.h"
 // Style -> AppKit text attributes, shared with the designer canvas and its
 // rich-text codec because RDLView's preview needs the same translation.
 #import "RDLTextAttributes.h"

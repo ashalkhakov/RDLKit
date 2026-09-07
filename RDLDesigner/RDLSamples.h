@@ -12,4 +12,5 @@
 + (RDLReport *)workshopByFinish;
 + (RDLReport *)regionalSales;
 + (RDLReport *)kilnLog;
++ (RDLReport *)harborManifest;
 @end

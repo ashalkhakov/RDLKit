@@ -15,6 +15,8 @@
                 <outlet property="centerTabView" destination="centerTabView" id="centerTabViewOutlet"/>
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
+                <outlet property="dataSourceNavigatorHost" destination="dataSourceNavigatorHost" id="dataSourceNavigatorHostOutlet"/>
+                <outlet property="dataSourceHost" destination="dataSourceHost" id="dataSourceHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
                 <outlet property="inspector" destination="inspector" id="inspectorOutlet"/>
                 <outlet property="inspectorScroll" destination="inspectorScroll" id="inspectorScrollOutlet"/>
@@ -154,8 +156,12 @@
                                                     <rect key="frame" x="0.0" y="0.0" width="220" height="708"/>
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dataSourceNavigatorHost">
+                                                            <rect key="frame" x="0.0" y="468" width="220" height="240"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                                                        </customView>
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorHost">
-                                                            <rect key="frame" x="0.0" y="0.0" width="220" height="708"/>
+                                                            <rect key="frame" x="0.0" y="0.0" width="220" height="460"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                             <subviews>
                                                                 <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorLabel">
@@ -328,6 +334,18 @@
                                                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                             </scroller>
                                                         </scrollView>
+                                                    </subviews>
+                                                </view>
+                                            </tabViewItem>
+                                            <tabViewItem label="Data source" identifier="dataSource" id="centerDataSourceItem">
+                                                <view key="view" id="centerDataSourceItemView">
+                                                    <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
+                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                    <subviews>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dataSourceHost">
+                                                            <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                        </customView>
                                                     </subviews>
                                                 </view>
                                             </tabViewItem>

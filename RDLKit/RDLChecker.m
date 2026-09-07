@@ -804,6 +804,15 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
     RDLScope *dscope = RDLSubScope(root, [NSString stringWithFormat:@"DataSet '%@'",
                                                                       ds.name ?: @"(unnamed)"],
                                      ds);
+    // A dataset names its data source, the way the file does. That link is a
+    // name and not a pointer -- it has to survive a copied item, an undone
+    // removal, and a file naming a source that is not there -- so this is
+    // where a name that resolves to nothing is caught. A dataset that names
+    // none is not an error: that is how one whose rows are supplied in code
+    // reads.
+    if ([ds.dataSourceName length] && [report dataSourceNamed:ds.dataSourceName] == nil)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-data-source", dscope, nil,
+                 [NSString stringWithFormat:@"no data source named '%@'", ds.dataSourceName]);
     for (id f in ds.fields)
       if ([f isKindOfClass:[RDLField class]])
         RDLCheckValue([(RDLField *)f value], dscope, run);

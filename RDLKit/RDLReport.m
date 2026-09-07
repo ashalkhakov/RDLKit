@@ -1469,6 +1469,22 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 @end
 
 @implementation RDLDataSet
+
+// The two halves of the link, kept honest: whichever is set, the other follows
+// or is dropped. Only the setters are written, so the ivars and getters are
+// still synthesised.
+- (void)setDataSourceName:(NSString *)name {
+  _dataSourceName = [name copy];
+  if (_dataSource != nil && ![_dataSource.name isEqualToString:_dataSourceName])
+    _dataSource = nil;
+}
+
+- (void)setDataSource:(RDLDataSource *)source {
+  _dataSource = source;
+  if (source != nil)
+    _dataSourceName = [source.name copy];
+}
+
 - (instancetype)init {
   self = [super init];
   if (self) {
@@ -1550,6 +1566,11 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   }
 }
 
+- (void)resolveDataSources {
+  for (RDLDataSet *ds in self.dataSets)
+    ds.dataSource = [self dataSourceNamed:ds.dataSourceName];
+}
+
 - (void)adoptItems {
   RDLAdoptItems(self.pageHeader.items, self);
   RDLAdoptItems(self.body.items, self);
@@ -1596,6 +1617,15 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
 // and the designer all need it, and each had grown its own copy. Names are
 // matched exactly, the way RDL means them -- a lookup that forgave case would
 // resolve a reference the report itself does not.
+- (RDLDataSource *)dataSourceNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLDataSource *source in self.dataSources)
+    if ([source.name isEqualToString:name])
+      return source;
+  return nil;
+}
+
 - (RDLDataSet *)dataSetNamed:(NSString *)name {
   if ([name length] == 0)
     return nil;

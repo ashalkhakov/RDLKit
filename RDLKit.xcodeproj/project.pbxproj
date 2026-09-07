@@ -17,6 +17,8 @@
 		0F974518B2EF46F9790D99D1 /* RDLTablixEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6CABBF53E00B2DB406D58975 /* RDLTablixEditor.xib */; };
 		0FEF055A10144BEB0846DD94 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5FAFB6AF50417D519888C179 /* Foundation.framework */; };
 		15172DE8214E9EDE7FF97C4C /* RDLGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 27ECA835280D45B396FB5C44 /* RDLGenerator.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		B5BB144242E869EED3F9772D /* RDLDataProvider.h in Headers */ = {isa = PBXBuildFile; fileRef = 25562BAA8166DD7538CC60FA /* RDLDataProvider.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		55796E92979CDE7C67678C07 /* RDLJSONPath.h in Headers */ = {isa = PBXBuildFile; fileRef = 729A5C02BE2CC68CE8FAF40F /* RDLJSONPath.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1724A67DAAA0BDBCB829D7FF /* RDLKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		17354ADEBD0361ECCDD84BF6 /* RDLRichTextCodec.m in Sources */ = {isa = PBXBuildFile; fileRef = BC0759CCB84484DB344078DA /* RDLRichTextCodec.m */; };
 		1AB417A75C1794728E68D04E /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = DC31C18582DB97C5DF6573CD /* main.m */; };
@@ -35,6 +37,8 @@
 		4232151F3F5B6D37A8C2E327 /* RDLInspectorView.m in Sources */ = {isa = PBXBuildFile; fileRef = 7EFA16D79BB10E2489A21CC2 /* RDLInspectorView.m */; };
 		44DAA7FC14DCD3C38A4D90BC /* RDLDesignerWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 88F0BDB43861D06A9D120937 /* RDLDesignerWindow.m */; };
 		4AF1F77A5A32574E3B420A9A /* RDLGenerator.m in Sources */ = {isa = PBXBuildFile; fileRef = E989DF8464B34666FDA8CDAA /* RDLGenerator.m */; };
+		90FD10EC5DB9A474AE37FAAC /* RDLDataProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = C6F9A3A93C9C5CDF1D94F6D4 /* RDLDataProvider.m */; };
+		34F001DAEDD5019F6A314840 /* RDLJSONPath.m in Sources */ = {isa = PBXBuildFile; fileRef = 01A33CEA344E0B715B051B56 /* RDLJSONPath.m */; };
 		4E27950D2900B2B9B96ED0C5 /* RDLDesignerWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = C377F19E69246533DA7EAF09 /* RDLDesignerWindow.xib */; };
 		5250275BE6477B1E840E227E /* RDLPageGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 9524D1B90D804A24421BD61B /* RDLPageGeometry.m */; };
 		591545F14DDDF7A8CDCA8180 /* RDLChartRenderer.m in Sources */ = {isa = PBXBuildFile; fileRef = C8C4A40041B77E07028495EC /* RDLChartRenderer.m */; };
@@ -76,7 +80,11 @@
 		B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */ = {isa = PBXBuildFile; fileRef = CB30BBD185439ABC015B8C91 /* RDLReport.m */; };
 		B0416F86DBD049EB5F33EF82 /* RDLDesignerWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = C377F19E69246533DA7EAF09 /* RDLDesignerWindow.xib */; };
 		5B06298EAABB0591E5897BB8 /* RDLDatasetNavigator.xib in Resources */ = {isa = PBXBuildFile; fileRef = A8D9F55895FF0DB0B637146D /* RDLDatasetNavigator.xib */; };
+		7D0111EC4CE45CB8505F9627 /* RDLDataSourceView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 58A5B47DC168EADFC9BF5B78 /* RDLDataSourceView.xib */; };
+		085AF96465B6396C63D97F14 /* RDLDataSourceNavigator.xib in Resources */ = {isa = PBXBuildFile; fileRef = 27AA17EA6D3280F40BAA6F03 /* RDLDataSourceNavigator.xib */; };
 		984D945362E420DFF5F86FD2 /* RDLDatasetNavigator.xib in Resources */ = {isa = PBXBuildFile; fileRef = A8D9F55895FF0DB0B637146D /* RDLDatasetNavigator.xib */; };
+		D0C7B1507260689A58846AB8 /* RDLDataSourceView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 58A5B47DC168EADFC9BF5B78 /* RDLDataSourceView.xib */; };
+		496AEC0DD87DC0D9415B6388 /* RDLDataSourceNavigator.xib in Resources */ = {isa = PBXBuildFile; fileRef = 27AA17EA6D3280F40BAA6F03 /* RDLDataSourceNavigator.xib */; };
 		234E4262E55A300FC84DBBB6 /* RDLInsertPalette.xib in Resources */ = {isa = PBXBuildFile; fileRef = C0A1D336DB9B621AE3A7E9FB /* RDLInsertPalette.xib */; };
 		26917A9F830C7F79EFDDDC2A /* RDLInsertPalette.xib in Resources */ = {isa = PBXBuildFile; fileRef = C0A1D336DB9B621AE3A7E9FB /* RDLInsertPalette.xib */; };
 		79FA5A9A890E4ADD16D45F94 /* RDLDatasetFieldsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6FB048D39095650DF620148A /* RDLDatasetFieldsView.xib */; };
@@ -123,6 +131,8 @@
 		C76E850AF8CE40F9D17DF932 /* RDLTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */; };
 		AA03DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */; };
 		AA03DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSNAV000000000001 /* RDLDatasetNavigator.m */; };
+		33FE9A5546080B48431A65C1 /* RDLDataSourceView.m in Sources */ = {isa = PBXBuildFile; fileRef = B48F4A25C3D6E4C306BD36A5 /* RDLDataSourceView.m */; };
+		1DBB87E798D24BEE606F5880 /* RDLDataSourceNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B8F1CC7DDCEB43403B01960 /* RDLDataSourceNavigator.m */; };
 		C76E850BF8CE40F9D17DF933 /* RDLRichTextEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52E30473A9E00D62319 /* RDLRichTextEditor.m */; };
 		C81B37A201B3B486F2605ABE /* RDLInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* RDLInspectorFields.m */; };
 		C8A9185493F7171DA48DFF44 /* RDLZipArchive.m in Sources */ = {isa = PBXBuildFile; fileRef = ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */; };
@@ -138,6 +148,8 @@
 		CEBAF52C30470D1500D62319 /* RDLTablixEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52A30470D1500D62319 /* RDLTablixEditor.m */; };
 		AA02DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */; };
 		AA02DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DSNAV000000000001 /* RDLDatasetNavigator.m */; };
+		42403BDFF71103F6A08B019A /* RDLDataSourceView.m in Sources */ = {isa = PBXBuildFile; fileRef = B48F4A25C3D6E4C306BD36A5 /* RDLDataSourceView.m */; };
+		CF54EF53EE5C949CBD11A87D /* RDLDataSourceNavigator.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B8F1CC7DDCEB43403B01960 /* RDLDataSourceNavigator.m */; };
 		AA02DMTABITEM00000001 /* DMTabBarItem.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABITEM00000001 /* DMTabBarItem.m */; };
 		AA02DMTABBAR000000001 /* DMTabBar.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01DMTABBAR000000001 /* DMTabBar.m */; };
 		AA02TABBADGE0000000001 /* RDLTabBadge.m in Sources */ = {isa = PBXBuildFile; fileRef = AA01TABBADGE0000000001 /* RDLTabBadge.m */; };
@@ -161,6 +173,8 @@
 		E1455B7A4E59E9EC65FE8340 /* RDLUpgrader.h in Headers */ = {isa = PBXBuildFile; fileRef = D7D74E030B048EC215609423 /* RDLUpgrader.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B87DD5671D09E88BCFD8DEAC /* RDLTestSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 3EE5DC9DFCDAA942B60A07FB /* RDLTestSupport.m */; };
 		41FA410B37B379901E886678 /* RDLParserTests.m in Sources */ = {isa = PBXBuildFile; fileRef = E84D5E515A0D6818D1F83992 /* RDLParserTests.m */; };
+		AF19853ACFCE33A93DCFF9E7 /* RDLDataSourceTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 1C0EE2DBA4BAC0E2642B56F3 /* RDLDataSourceTests.m */; };
+		02B9151D5D44EECBFC5DB476 /* RDLJSONPathTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 333251B7F24D7019EF41C242 /* RDLJSONPathTests.m */; };
 		0F6BF9792C594A7AE6DF14FE /* RDLExpressionTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 69E0824091C29856C59ED68C /* RDLExpressionTests.m */; };
 		D706B986139C9E752800C2B6 /* RDLLayoutTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 3CA1E80C094C18FA7B47E0D8 /* RDLLayoutTests.m */; };
 		F0840925E35817138B9487ED /* RDLBackendTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 7C9F4863CFEE58C716DC3634 /* RDLBackendTests.m */; };
@@ -245,8 +259,12 @@
 		2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLHTMLBackend.m; sourceTree = "<group>"; };
 		27DB8C5CCBB595290E4B7BBE /* RDLAddElementPanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLAddElementPanel.xib; sourceTree = "<group>"; };
 		27ECA835280D45B396FB5C44 /* RDLGenerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLGenerator.h; sourceTree = "<group>"; };
+		25562BAA8166DD7538CC60FA /* RDLDataProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDataProvider.h; sourceTree = "<group>"; };
+		729A5C02BE2CC68CE8FAF40F /* RDLJSONPath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLJSONPath.h; sourceTree = "<group>"; };
 		3EE5DC9DFCDAA942B60A07FB /* RDLTestSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTestSupport.m; sourceTree = "<group>"; };
 		E84D5E515A0D6818D1F83992 /* RDLParserTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLParserTests.m; sourceTree = "<group>"; };
+		1C0EE2DBA4BAC0E2642B56F3 /* RDLDataSourceTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDataSourceTests.m; sourceTree = "<group>"; };
+		333251B7F24D7019EF41C242 /* RDLJSONPathTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLJSONPathTests.m; sourceTree = "<group>"; };
 		69E0824091C29856C59ED68C /* RDLExpressionTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionTests.m; sourceTree = "<group>"; };
 		3CA1E80C094C18FA7B47E0D8 /* RDLLayoutTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLLayoutTests.m; sourceTree = "<group>"; };
 		7C9F4863CFEE58C716DC3634 /* RDLBackendTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLBackendTests.m; sourceTree = "<group>"; };
@@ -365,8 +383,12 @@
 		AA04TABBADGE000000001 /* RDLTabBadge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTabBadge.h; sourceTree = "<group>"; };
 		AA04DSFIELDS000000001 /* RDLDatasetFieldsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDatasetFieldsView.h; sourceTree = "<group>"; };
 		AA04DSNAV000000000001 /* RDLDatasetNavigator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDatasetNavigator.h; sourceTree = "<group>"; };
+		53FB5D788A4C885392A71316 /* RDLDataSourceView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDataSourceView.h; sourceTree = "<group>"; };
+		B5F1834988180D798B2420E2 /* RDLDataSourceNavigator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDataSourceNavigator.h; sourceTree = "<group>"; };
 		AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDatasetFieldsView.m; sourceTree = "<group>"; };
 		AA01DSNAV000000000001 /* RDLDatasetNavigator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDatasetNavigator.m; sourceTree = "<group>"; };
+		B48F4A25C3D6E4C306BD36A5 /* RDLDataSourceView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDataSourceView.m; sourceTree = "<group>"; };
+		2B8F1CC7DDCEB43403B01960 /* RDLDataSourceNavigator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDataSourceNavigator.m; sourceTree = "<group>"; };
 		AA01DMTABITEM00000001 /* DMTabBarItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = DMTabBarItem.m; path = RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m; sourceTree = SOURCE_ROOT; };
 		6ACAE7E76A550E243C12D974 /* DMTabBar.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DMTabBar.h; path = RDLDesigner/ThirdParty/DMTabBar/DMTabBar.h; sourceTree = SOURCE_ROOT; };
 		2B0BC90A5C36FA8C18794935 /* DMTabBarItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = DMTabBarItem.h; path = RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.h; sourceTree = SOURCE_ROOT; };
@@ -389,6 +411,8 @@
 		E7EE2913922B76161C121E0A /* RDLNewReport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLNewReport.m; sourceTree = "<group>"; };
 		E7F4AAE5DA543577DD26E124 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E989DF8464B34666FDA8CDAA /* RDLGenerator.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLGenerator.m; sourceTree = "<group>"; };
+		C6F9A3A93C9C5CDF1D94F6D4 /* RDLDataProvider.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDataProvider.m; sourceTree = "<group>"; };
+		01A33CEA344E0B715B051B56 /* RDLJSONPath.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLJSONPath.m; sourceTree = "<group>"; };
 		ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLZipArchive.m; sourceTree = "<group>"; };
 		ED8FB43465A94113819D4184 /* RDLEditingContext.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLEditingContext.h; sourceTree = "<group>"; };
 		F1EE0475B7EBC42015D59375 /* RDLView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLView.m; sourceTree = "<group>"; };
@@ -397,6 +421,8 @@
 		F6A6288C68C9B7B336B41990 /* RDLUpgrader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpgrader.m; sourceTree = "<group>"; };
 		F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextAttributes.m; sourceTree = "<group>"; };
 		A8D9F55895FF0DB0B637146D /* RDLDatasetNavigator.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLDatasetNavigator.xib; sourceTree = "<group>"; };
+		58A5B47DC168EADFC9BF5B78 /* RDLDataSourceView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLDataSourceView.xib; sourceTree = "<group>"; };
+		27AA17EA6D3280F40BAA6F03 /* RDLDataSourceNavigator.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLDataSourceNavigator.xib; sourceTree = "<group>"; };
 		C0A1D336DB9B621AE3A7E9FB /* RDLInsertPalette.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLInsertPalette.xib; sourceTree = "<group>"; };
 		6FB048D39095650DF620148A /* RDLDatasetFieldsView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLDatasetFieldsView.xib; sourceTree = "<group>"; };
 		DE122BF05974B7ADC1629D61 /* RDLFieldInspectorView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLFieldInspectorView.xib; sourceTree = "<group>"; };
@@ -497,8 +523,12 @@
 				AA04TABBADGE000000001 /* RDLTabBadge.h */,
 				AA04DSFIELDS000000001 /* RDLDatasetFieldsView.h */,
 				AA04DSNAV000000000001 /* RDLDatasetNavigator.h */,
+				53FB5D788A4C885392A71316 /* RDLDataSourceView.h */,
+				B5F1834988180D798B2420E2 /* RDLDataSourceNavigator.h */,
 				AA01DSFIELDS000000001 /* RDLDatasetFieldsView.m */,
 				AA01DSNAV000000000001 /* RDLDatasetNavigator.m */,
+				B48F4A25C3D6E4C306BD36A5 /* RDLDataSourceView.m */,
+				2B8F1CC7DDCEB43403B01960 /* RDLDataSourceNavigator.m */,
 				AA01DMTABITEM00000001 /* DMTabBarItem.m */,
 				6ACAE7E76A550E243C12D974 /* DMTabBar.h */,
 				2B0BC90A5C36FA8C18794935 /* DMTabBarItem.h */,
@@ -558,6 +588,8 @@
 				27DB8C5CCBB595290E4B7BBE /* RDLAddElementPanel.xib */,
 				39D4A9ED7DAEFDD8C43CA55B /* RDLGeneratorWindow.xib */,
 				A8D9F55895FF0DB0B637146D /* RDLDatasetNavigator.xib */,
+				58A5B47DC168EADFC9BF5B78 /* RDLDataSourceView.xib */,
+				27AA17EA6D3280F40BAA6F03 /* RDLDataSourceNavigator.xib */,
 				C0A1D336DB9B621AE3A7E9FB /* RDLInsertPalette.xib */,
 				6FB048D39095650DF620148A /* RDLDatasetFieldsView.xib */,
 				DE122BF05974B7ADC1629D61 /* RDLFieldInspectorView.xib */,
@@ -585,6 +617,8 @@
 				5287B31A4A81269C168B694D /* RDLView.h */,
 				CAB789E21E4046599AD9FA60 /* RDLBackend.h */,
 				27ECA835280D45B396FB5C44 /* RDLGenerator.h */,
+				25562BAA8166DD7538CC60FA /* RDLDataProvider.h */,
+				729A5C02BE2CC68CE8FAF40F /* RDLJSONPath.h */,
 				CB30BBD185439ABC015B8C91 /* RDLReport.m */,
 				E06BE05A7516B6E7B0D0E2A1 /* RDLParser.m */,
 				7CECB821FFED22DFD87FEE06 /* RDLExpression.m */,
@@ -595,6 +629,8 @@
 				2678A8FD3DE3C6832EB942ED /* RDLHTMLBackend.m */,
 				DAB2A7A5AE6E5BE964549133 /* RDLPDFBackend.m */,
 				E989DF8464B34666FDA8CDAA /* RDLGenerator.m */,
+				C6F9A3A93C9C5CDF1D94F6D4 /* RDLDataProvider.m */,
+				01A33CEA344E0B715B051B56 /* RDLJSONPath.m */,
 				901AB0AC0C53219CCE9B02C9 /* README.md */,
 				3988A14CD9E1B0BA1FAC689B /* GNUmakefile */,
 				3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */,
@@ -676,6 +712,8 @@
 			children = (
 				3EE5DC9DFCDAA942B60A07FB /* RDLTestSupport.m */,
 				E84D5E515A0D6818D1F83992 /* RDLParserTests.m */,
+				1C0EE2DBA4BAC0E2642B56F3 /* RDLDataSourceTests.m */,
+				333251B7F24D7019EF41C242 /* RDLJSONPathTests.m */,
 				69E0824091C29856C59ED68C /* RDLExpressionTests.m */,
 				3CA1E80C094C18FA7B47E0D8 /* RDLLayoutTests.m */,
 				7C9F4863CFEE58C716DC3634 /* RDLBackendTests.m */,
@@ -704,6 +742,8 @@
 				A2F0FA38F5F0CE312118BC0F /* RDLView.h in Headers */,
 				32E8E73DCB0DEF3A0DE88EF1 /* RDLBackend.h in Headers */,
 				15172DE8214E9EDE7FF97C4C /* RDLGenerator.h in Headers */,
+				B5BB144242E869EED3F9772D /* RDLDataProvider.h in Headers */,
+				55796E92979CDE7C67678C07 /* RDLJSONPath.h in Headers */,
 				855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */,
 				E1455B7A4E59E9EC65FE8340 /* RDLUpgrader.h in Headers */,
 				F02041FC1136A1CBE9435FF9 /* RDLChartRenderer.h in Headers */,
@@ -858,6 +898,8 @@
 			files = (
 				B0416F86DBD049EB5F33EF82 /* RDLDesignerWindow.xib in Resources */,
 				5B06298EAABB0591E5897BB8 /* RDLDatasetNavigator.xib in Resources */,
+				7D0111EC4CE45CB8505F9627 /* RDLDataSourceView.xib in Resources */,
+				085AF96465B6396C63D97F14 /* RDLDataSourceNavigator.xib in Resources */,
 				234E4262E55A300FC84DBBB6 /* RDLInsertPalette.xib in Resources */,
 				79FA5A9A890E4ADD16D45F94 /* RDLDatasetFieldsView.xib in Resources */,
 				E51C2764BF96D275091E9750 /* RDLFieldInspectorView.xib in Resources */,
@@ -884,6 +926,8 @@
 				D94080269225683213760055 /* RDLAddElementPanel.xib in Resources */,
 				EBF7165C1B6689C83EFFE827 /* RDLGeneratorWindow.xib in Resources */,
 				984D945362E420DFF5F86FD2 /* RDLDatasetNavigator.xib in Resources */,
+				D0C7B1507260689A58846AB8 /* RDLDataSourceView.xib in Resources */,
+				496AEC0DD87DC0D9415B6388 /* RDLDataSourceNavigator.xib in Resources */,
 				26917A9F830C7F79EFDDDC2A /* RDLInsertPalette.xib in Resources */,
 				A390B838853442DC5B321D9D /* RDLDatasetFieldsView.xib in Resources */,
 				CB32B4CE5DE6D051AD7E4055 /* RDLFieldInspectorView.xib in Resources */,
@@ -910,6 +954,8 @@
 			files = (
 				B87DD5671D09E88BCFD8DEAC /* RDLTestSupport.m in Sources */,
 				41FA410B37B379901E886678 /* RDLParserTests.m in Sources */,
+				AF19853ACFCE33A93DCFF9E7 /* RDLDataSourceTests.m in Sources */,
+				02B9151D5D44EECBFC5DB476 /* RDLJSONPathTests.m in Sources */,
 				0F6BF9792C594A7AE6DF14FE /* RDLExpressionTests.m in Sources */,
 				D706B986139C9E752800C2B6 /* RDLLayoutTests.m in Sources */,
 				F0840925E35817138B9487ED /* RDLBackendTests.m in Sources */,
@@ -945,6 +991,8 @@
 				CEBAF52C30470D1500D62319 /* RDLTablixEditor.m in Sources */,
 				AA02DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */,
 				AA02DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */,
+				42403BDFF71103F6A08B019A /* RDLDataSourceView.m in Sources */,
+				CF54EF53EE5C949CBD11A87D /* RDLDataSourceNavigator.m in Sources */,
 				AA02DMTABITEM00000001 /* DMTabBarItem.m in Sources */,
 				AA02DMTABBAR000000001 /* DMTabBar.m in Sources */,
 				AA02TABBADGE0000000001 /* RDLTabBadge.m in Sources */,
@@ -1016,6 +1064,8 @@
 				C76E850AF8CE40F9D17DF932 /* RDLTablixEditor.m in Sources */,
 				AA03DSFIELDS000000001 /* RDLDatasetFieldsView.m in Sources */,
 				AA03DSNAV000000000001 /* RDLDatasetNavigator.m in Sources */,
+				33FE9A5546080B48431A65C1 /* RDLDataSourceView.m in Sources */,
+				1DBB87E798D24BEE606F5880 /* RDLDataSourceNavigator.m in Sources */,
 				C76E850BF8CE40F9D17DF933 /* RDLRichTextEditor.m in Sources */,
 				0EF8A1B103C3BAC6DA99890B /* RDLRichTextFormatter.m in Sources */,
 				9A0DF837B69B19F10D27BD5E /* RDLNewReport.m in Sources */,
@@ -1036,6 +1086,8 @@
 				2F259D5D4809D39F5BB5823F /* RDLHTMLBackend.m in Sources */,
 				2F55F4B8430F65CA1B7BAA0C /* RDLPDFBackend.m in Sources */,
 				4AF1F77A5A32574E3B420A9A /* RDLGenerator.m in Sources */,
+				90FD10EC5DB9A474AE37FAAC /* RDLDataProvider.m in Sources */,
+				34F001DAEDD5019F6A314840 /* RDLJSONPath.m in Sources */,
 				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
 				7F76015BA9F94F61D881BA25 /* RDLUpgrader.m in Sources */,
 				591545F14DDDF7A8CDCA8180 /* RDLChartRenderer.m in Sources */,

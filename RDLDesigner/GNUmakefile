@@ -43,6 +43,8 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionTextStorage.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \
+  RDLDataSourceNavigator.m \
+  RDLDataSourceView.m \
   RDLFieldInspectorView.m \
   RDLDatasetFieldsView.m \
   ThirdParty/DMTabBar/DMTabBar.m \
@@ -68,6 +70,8 @@ RDLDesigner_RESOURCE_FILES = \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
   RDLDatasetNavigator.xib \
+  RDLDataSourceNavigator.xib \
+  RDLDataSourceView.xib \
   RDLInsertPalette.xib \
   RDLDatasetFieldsView.xib \
   RDLFieldInspectorView.xib \

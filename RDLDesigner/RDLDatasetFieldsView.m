@@ -5,6 +5,7 @@
 #import "RDLKit.h"
 #import "RDLPane.h"
 #import "RDLFilterEditor.h"
+#import "RDLDocument.h"
 #import "RDLToolbarIcons.h"
 
 @interface RDLDatasetFieldsView () <NSTableViewDataSource, NSTableViewDelegate>
@@ -14,6 +15,13 @@
 @property (nonatomic, strong) IBOutlet NSButton *addCalculatedButton;
 @property (nonatomic, strong) IBOutlet NSButton *filtersButton;
 @property (nonatomic, strong) IBOutlet NSButton *removeButton;
+// Where the rows come from. A local report viewer binds to documents, so this
+// is the whole of a data source: what kind, which document, and what to take
+// out of it.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *sourcePop;
+@property (nonatomic, strong) IBOutlet NSTextField *queryField;
+@property (nonatomic, strong) IBOutlet NSButton *loadButton;
+@property (nonatomic, strong) IBOutlet NSTextField *statusLabel;
 // The dataset's own settings. Only its name so far, which is what a report
 // refers to it by and the one thing that was not editable anywhere.
 @property (nonatomic, strong) IBOutlet NSTextField *title;
@@ -42,8 +50,33 @@
   [self reload];
 }
 
+// The data source this dataset reads, or nil when it names none.
+- (RDLDataSource *)dataSource {
+  [_context.report resolveDataSources];
+  return _dataSet.dataSource;
+}
+
 - (void)reload {
   [_title setStringValue:_dataSet.name ?: @""];
+  // The report's sources, by name. A dataset reads from one of them; what that
+  // one is made of is the data source pane's business.
+  RDLDataSource *source = [self dataSource];
+  [_sourcePop removeAllItems];
+  for (RDLDataSource *candidate in _context.report.dataSources)
+    [_sourcePop addItemWithTitle:candidate.name ?: @""];
+  if (source != nil && [_sourcePop itemWithTitle:source.name])
+    [_sourcePop selectItemWithTitle:source.name];
+  else if ([_sourcePop numberOfItems])
+    [_sourcePop selectItemAtIndex:0];
+  [_queryField setStringValue:_dataSet.commandText ?: @""];
+  [_sourcePop setEnabled:_dataSet != nil && [_sourcePop numberOfItems] > 0];
+  for (NSControl *c in @[ _queryField, _loadButton ])
+    [c setEnabled:_dataSet != nil && source != nil];
+  [_statusLabel setStringValue:
+      _dataSet == nil ? @""
+                      : [NSString stringWithFormat:@"%lu row%@",
+                                                   (unsigned long)[_dataSet.rows count],
+                                                   [_dataSet.rows count] == 1 ? @"" : @"s"]];
   NSUInteger filters = [_dataSet.filters count];
   [_filtersButton setTitle:filters ? [NSString stringWithFormat:@"Filters (%lu)…",
                                                                 (unsigned long)filters]
@@ -87,6 +120,43 @@
     return;
   }
   [_context.editor renameDataSet:_dataSet to:name];
+  [self reload];
+}
+
+// Which source, and what to take out of it. Both are the dataset's own
+// properties -- the source's settings are edited where the source is.
+- (void)sourceChanged:(id)sender {
+  (void)sender;
+  if (_dataSet == nil)
+    return;
+  [_context.editor setDataSourceName:[_sourcePop titleOfSelectedItem] ofDataSet:_dataSet];
+  [_context.editor setQuery:[_queryField stringValue] ofDataSet:_dataSet];
+  [self reload];
+}
+
+// Reading the document now is what makes the rest of the designer useful: the
+// fields it discovers are what the expression editor offers and what a tablix
+// is scaffolded from. Errors are shown here rather than thrown away, because
+// "no rows" and "that file is not where you said" look identical otherwise.
+- (void)loadData:(id)sender {
+  (void)sender;
+  if (_dataSet == nil)
+    return;
+  NSURL *base = [_context.document.fileURL URLByDeletingLastPathComponent];
+  RDLDataBinder *binder = [[RDLDataBinder alloc] initWithBaseURL:base];
+  NSError *err = nil;
+  NSArray *before = _dataSet.fields;
+  if (![binder bindDataSet:_dataSet inReport:_context.report error:&err]) {
+    [_statusLabel setStringValue:[err localizedDescription] ?: @"could not read the document"];
+    return;
+  }
+  // -bindDataSet: wrote the rows straight onto the model; hand them through the
+  // editor so the document knows it changed and every pane reloads.
+  NSArray *rows = _dataSet.rows;
+  NSArray *fields = _dataSet.fields;
+  _dataSet.rows = nil;
+  _dataSet.fields = before;
+  [_context.editor setRows:rows fields:fields ofDataSet:_dataSet];
   [self reload];
 }
 
