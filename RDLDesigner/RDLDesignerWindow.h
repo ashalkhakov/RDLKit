@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 
 #import "RDLDataSourceNavigator.h"
+#import "RDLParameterNavigator.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 
@@ -11,6 +12,7 @@
 // in the centre; choosing a dataset also puts its fields in the right pane.
 @interface RDLDesignerWindow : NSWindowController <RDLDataSourceNavigatorDelegate,
                                                   RDLDatasetNavigatorDelegate,
+                                                  RDLParameterNavigatorDelegate,
                                                   RDLDatasetFieldsViewDelegate>
 @property (nonatomic, readonly, strong) RDLEditingContext *context;
 - (instancetype)initWithContext:(RDLEditingContext *)context;
@@ -21,6 +23,10 @@
 - (void)rightTabChanged:(id)sender;
 - (void)zoomChanged:(id)sender;
 - (void)centerModeChanged:(id)sender;
+// Put the inspector on whatever is selected -- an element, a dataset field, or
+// a parameter. Declared because a selection made in code has to be able to ask
+// for the same thing a click does.
+- (void)syncInspectorToSelection;
 - (void)addElement:(id)sender;
 - (void)removeElement:(id)sender;
 @end

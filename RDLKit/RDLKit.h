@@ -20,6 +20,9 @@
 // viewer binds to.
 #import "RDLJSONPath.h"
 #import "RDLDataProvider.h"
+#import "RDLJSONDataProvider.h"
+#import "RDLXMLDataProvider.h"
+#import "RDLCSVDataProvider.h"
 // Style -> AppKit text attributes, shared with the designer canvas and its
 // rich-text codec because RDLView's preview needs the same translation.
 #import "RDLTextAttributes.h"

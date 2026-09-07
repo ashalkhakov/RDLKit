@@ -54,6 +54,11 @@ FOUNDATION_EXPORT NSString *RDLDocumentKeyForProviderKind(RDLDataProviderKind ki
 FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind);
 
 #pragma mark - Providers
+//
+// One protocol here, and one file per document format beside it:
+// RDLJSONDataProvider, RDLXMLDataProvider, RDLCSVDataProvider. They are not
+// imported from here -- they import this -- so include RDLKit.h, or the one
+// you mean.
 
 @protocol RDLDataProvider <NSObject>
 // Matched against the data source's DataProvider, case-insensitively.
@@ -70,28 +75,15 @@ FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind
                    error:(NSError **)error;
 @end
 
-// JSON, via JSONPath. Objects become rows; a selected array is flattened one
-// level, so "$.Movie" and "$.Movie[*]" both give the films rather than one row
-// holding all of them. Values that are themselves objects or arrays stay in the
-// row: that is what a nested data region reads.
-@interface RDLJSONDataProvider : NSObject <RDLDataProvider>
-@end
-
-// XML, via XPath. Each selected element is a row: its attributes and its leaf
-// children are fields, and a child with children of its own stays as rows of
-// its own, for a nested region to bind to.
-@interface RDLXMLDataProvider : NSObject <RDLDataProvider>
-@end
-
-// Delimited or fixed-width text. Options ride in the connect string:
+// The type a column holds, read off the values themselves. JSON says what its
+// values are -- a number is a number and true is a boolean -- so a dataset read
+// from one need not call everything a string. Text formats say nothing about
+// type, and this does not guess for them: a column of "007" is not an integer
+// just because it could be parsed as one.
 //
-//   data.csv;HasHeaders=true;Delimiter=Tab
-//   data.txt;Widths=10,20,8;HasHeaders=false
-//
-// Without headers the fields are Column1, Column2 … , which is also what the
-// designer shows. CSV is flat: there is nothing here for a nested region.
-@interface RDLCSVDataProvider : NSObject <RDLDataProvider>
-@end
+// Mixed columns come back as String, and a column of nothing but nulls as
+// Unknown, which is what "the report did not say" already means.
+FOUNDATION_EXPORT RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field);
 
 #pragma mark - Binding
 

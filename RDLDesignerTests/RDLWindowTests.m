@@ -5,6 +5,10 @@
 // palette lands as.
 #import "RDLDesignerTestSupport.h"
 #import "RDLDataSourceNavigator.h"
+#import "RDLDataView.h"
+#import "RDLParameterInspectorView.h"
+#import "RDLParameterNavigator.h"
+#import "RDLGeneratorWindow.h"
 #import "RDLDataSourceView.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLFieldInspectorView.h"
@@ -79,14 +83,15 @@
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
   // Left: outline, datasets, insert. Centre: preview, source, dataset, data
   // source -- the two things that are edited rather than drawn. Right: report,
-  // attributes -- and inside attributes, element and dataset field.
-  if (items != 11)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 11 panes across the four tab views, got %lu",
+  // attributes -- and inside attributes, element, dataset field and parameter.
+  if (items != 12)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 12 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
   // Both navigators have somewhere to live, and the data source pane has a
   // host of its own: a pane with no host is one nothing can reach.
   for (NSString *host in @[ @"dataSourceNavigatorHost", @"datasetNavigatorHost",
-                            @"dataSourceHost" ])
+                            @"parameterNavigatorHost", @"dataSourceHost",
+                            @"parameterInspectorHost" ])
     if ([xib rangeOfString:[NSString stringWithFormat:@"id=\"%@\"", host]].location == NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing from the window", host]);
 }
@@ -969,6 +974,303 @@ static NSTabView *_centerTabViewOf(id wc) {
   [wc dataSourceNavigator:navigator didSelectDataSource:nil];
   if ([[[centre selectedTabViewItem] identifier] isEqualToString:@"dataSource"])
     XCTFail(@"%@", @"with nothing chosen the centre should not be the data source pane");
+}
+
+// The generator window reads a report's data the way running one does: every
+// data source it names, not the first dataset -- and a document that is not
+// where the report says can be pointed at a file here, because a report
+// authored elsewhere carries paths that mean nothing on this machine.
+- (void)testTheGeneratorReadsEveryDataSource {
+  NSString *dir = NSTemporaryDirectory();
+  NSString *csv = [dir stringByAppendingPathComponent:@"rdlkit-gen-stock.csv"];
+  [@"Item,Qty\nBowl,2\nCup,1\n" writeToFile:csv atomically:YES encoding:NSUTF8StringEncoding
+                                        error:NULL];
+
+  RDLReport *report = [RDLReport emptyReportNamed:@"Two sources"];
+  [report.dataSources removeAllObjects];
+  RDLDataSource *inlineSource = [[RDLDataSource alloc] init];
+  inlineSource.name = @"Inline";
+  inlineSource.dataProvider = @"JSON";
+  inlineSource.connectString = @"jsondata=[{\"A\":1},{\"A\":2},{\"A\":3}]";
+  RDLDataSource *fileSource = [[RDLDataSource alloc] init];
+  fileSource.name = @"Stock";
+  fileSource.dataProvider = @"CSV";
+  fileSource.connectString = @"rdlkit-gen-stock.csv;HasHeaders=true";
+  [report.dataSources addObjectsFromArray:@[ inlineSource, fileSource ]];
+  for (NSString *name in @[ @"Inline", @"Stock" ]) {
+    RDLDataSet *ds = [[RDLDataSet alloc] init];
+    ds.name = name;
+    ds.dataSourceName = name;
+    ds.commandText = [name isEqualToString:@"Inline"] ? @"$[*]" : @"";
+    [report.dataSets addObject:ds];
+  }
+
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  doc.fileURL = [NSURL fileURLWithPath:[dir stringByAppendingPathComponent:@"r.rdl"]];
+  RDLGeneratorWindow *gen = [[RDLGeneratorWindow alloc] initWithDocument:doc];
+  if ([gen window] == nil) {
+    XCTFail(@"%@", @"the generator window did not load");
+    return;
+  }
+
+  // Both sources, in one go.
+  NSString *status = [gen readDataFetchingRemote:NO];
+  if ([[report dataSetNamed:@"Inline"].rows count] != 3 ||
+      [[report dataSetNamed:@"Stock"].rows count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"read %lu and %lu rows (%@)",
+                                              (unsigned long)[[report dataSetNamed:@"Inline"].rows count],
+                                              (unsigned long)[[report dataSetNamed:@"Stock"].rows count],
+                                              status]);
+  if ([status rangeOfString:@"2 datasets"].location == NSNotFound ||
+      [status rangeOfString:@"5 rows"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"status said '%@'", status]);
+  if ([doc.unreadableDataSources count] != 0)
+    XCTFail(@"%@", @"both documents were read, so neither needs finding");
+
+  // A document that is not there is named, and the rest still read.
+  fileSource.connectString = @"somewhere-else.csv;HasHeaders=true";
+  status = [gen readDataFetchingRemote:NO];
+  if ([status rangeOfString:@"Stock"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the missing document should be named: %@",
+                                              status]);
+  if ([[report dataSetNamed:@"Inline"].rows count] != 3)
+    XCTFail(@"%@", @"one source failing should not stop the others");
+  NSArray *missing = [doc unreadableDataSources];
+  if ([missing count] != 1 || [missing firstObject] != fileSource)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected Stock to need finding, got %@", missing]);
+
+  // Pointing it at a file is what the panel does, and it keeps the options.
+  [doc setDocumentPath:csv forDataSourceNamed:@"Stock"];
+  if ([RDLConnectionProperties(fileSource.connectString)[@"hasheaders"] length] == 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the options were lost: %@",
+                                              fileSource.connectString]);
+  [gen readDataFetchingRemote:NO];
+  if ([[report dataSetNamed:@"Stock"].rows count] != 2)
+    XCTFail(@"%@", @"after being told where the file is, it should read");
+
+  // A report pointing at the network is not fetched unless asked.
+  fileSource.connectString = @"https://example.com/stock.csv";
+  status = [gen readDataFetchingRemote:NO];
+  if ([status rangeOfString:@"remote"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a remote document should say so: %@", status]);
+
+  [[NSFileManager defaultManager] removeItemAtPath:csv error:NULL];
+}
+
+// Changing a parameter in the generator shows up in what it renders: the value
+// is applied when it is given, and the preview is laid out again with it.
+- (void)testAParameterAppliesToWhatTheGeneratorRenders {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  RDLGeneratorWindow *gen = [[RDLGeneratorWindow alloc] initWithDocument:doc];
+  if ([gen window] == nil) {
+    XCTFail(@"%@", @"the generator window did not load");
+    return;
+  }
+  RDLDataView *inputs = [gen valueForKey:@"dataView"];
+  NSPopUpButton *season = nil;
+  for (NSView *v in [[[inputs subviews] firstObject] subviews])
+    if ([v isKindOfClass:[NSPopUpButton class]])
+      season = (NSPopUpButton *)v;
+  if (season == nil) {
+    XCTFail(@"%@", @"the manifest asks for a season, so the pane should offer it");
+    return;
+  }
+  [season selectItemWithTitle:@"Autumn 2026"];
+  [inputs paramChanged:season];
+  if (![doc.paramValues[@"Season"] isEqualToString:@"Autumn 2026"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the value did not apply: %@", doc.paramValues]);
+
+  // And it reaches the page: the header prints the season it was given.
+  BOOL printed = NO;
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report
+                                                   paramValues:doc.paramValues])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]] &&
+          [[(RDLLaidOutTextbox *)item text] isEqualToString:@"Autumn 2026"])
+        printed = YES;
+  if (!printed) {
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report
+                                                     paramValues:doc.paramValues])
+      for (RDLLaidOutItem *item in page.items)
+        if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+          [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+    XCTFail(@"%@", [NSString stringWithFormat:@"rendered with %@: %@", doc.paramValues,
+                                              [texts componentsJoinedByString:@" | "]]);
+  }
+}
+
+// A parameter is asked for the way the report asks for it: by its prompt, and
+// from a list when the report says what it accepts.
+- (void)testParametersAreAskedForAsTheReportAsks {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Asked"];
+  RDLParameter *culture = [[RDLParameter alloc] init];
+  culture.name = @"Culture";
+  culture.prompt = @"Which culture?";
+  culture.dataType = RDLParameterDataTypeString;
+  culture.defaultValue = [RDLValue literal:@"en-US"];
+  [culture.validValues addObjectsFromArray:@[ [RDLValue literal:@"en-US"],
+                                              [RDLValue literal:@"de-DE"] ]];
+  [report.parameters addObject:culture];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  RDLDataView *pane = [[RDLDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
+                                                document:doc];
+  [pane reload];
+
+  NSPopUpButton *chooser = nil;
+  BOOL askedByPrompt = NO;
+  NSArray *stack = [[[pane subviews] firstObject] subviews];
+  for (NSView *v in stack) {
+    if ([v isKindOfClass:[NSPopUpButton class]])
+      chooser = (NSPopUpButton *)v;
+    else if ([v isKindOfClass:[NSTextField class]] &&
+             [[(NSTextField *)v stringValue] isEqualToString:@"Which culture?"])
+      askedByPrompt = YES;
+  }
+  if (!askedByPrompt)
+    XCTFail(@"%@", @"a parameter with a prompt should be asked for by it");
+  if (chooser == nil || [chooser numberOfItems] != 2) {
+    XCTFail(@"%@", @"a parameter that lists what it accepts is chosen from, not typed into");
+    return;
+  }
+  // The default is what it starts on, and choosing writes through.
+  if (![[chooser titleOfSelectedItem] isEqualToString:@"en-US"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"started on %@", [chooser titleOfSelectedItem]]);
+  [chooser selectItemWithTitle:@"de-DE"];
+  [pane paramChanged:chooser];
+  if (![doc.paramValues[@"Culture"] isEqualToString:@"de-DE"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"parameter values: %@", doc.paramValues]);
+  // ... and the control the person used is still the one on screen. Writing a
+  // value publishes a data change, and this pane used to rebuild itself on
+  // that -- destroying the popup mid-click, which is why a choice looked as
+  // though it had not taken.
+  BOOL sameChooser = NO;
+  for (NSView *v in [[[pane subviews] firstObject] subviews])
+    if (v == chooser)
+      sameChooser = YES;
+  if (!sameChooser)
+    XCTFail(@"%@", @"the pane rebuilt itself around the control being used");
+  if (![[chooser titleOfSelectedItem] isEqualToString:@"de-DE"])
+    XCTFail(@"%@", @"the choice should still be showing after it was applied");
+
+  // A free-text parameter applies as it is typed, not only on Return.
+  RDLParameter *title = [[RDLParameter alloc] init];
+  title.name = @"Title";
+  title.dataType = RDLParameterDataTypeString;
+  title.defaultValue = [RDLValue literal:@"Untitled"];
+  [report.parameters addObject:title];
+  [pane reload];
+  NSTextField *typed = nil;
+  for (NSView *v in [[[pane subviews] firstObject] subviews])
+    if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable])
+      typed = (NSTextField *)v;
+  if (typed == nil) {
+    XCTFail(@"%@", @"a parameter with no list of values is typed into");
+    return;
+  }
+  [typed setStringValue:@"Harbor"];
+  [pane controlTextDidChange:[NSNotification notificationWithName:NSControlTextDidChangeNotification
+                                                           object:typed]];
+  if (![doc.paramValues[@"Title"] isEqualToString:@"Harbor"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"typing should apply: %@", doc.paramValues]);
+}
+
+// Parameters are the third thing a report defines rather than draws, and they
+// are handled like the other two: a list of their own with add and remove, and
+// the settings of whichever is chosen in the inspector.
+- (void)testParametersAreDefinedInTheirOwnNavigator {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Asks"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLParameterNavigator *nav =
+      [[RDLParameterNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 200) context:ctx];
+  RDLParameterInspectorView *inspector =
+      [[RDLParameterInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+
+  // Adding one is choosing it, as everywhere else.
+  [nav addParameter:nil];
+  RDLParameter *p = nav.selectedParameter;
+  if (p == nil || [report.parameters count] != 1) {
+    XCTFail(@"%@", @"the navigator should have added a parameter and selected it");
+    return;
+  }
+  if (![p.name isEqualToString:@"Parameter1"] || p.dataType != RDLParameterDataTypeString)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a new parameter is %@ (%ld)", p.name,
+                                              (long)p.dataType]);
+
+  // Its settings are edited in the inspector, undoably.
+  [inspector showParameter:p];
+  NSTextField *nameField = [inspector valueForKey:@"nameField"];
+  NSTextField *promptField = [inspector valueForKey:@"promptField"];
+  NSPopUpButton *typePop = [inspector valueForKey:@"typePop"];
+  NSButton *multiCheck = [inspector valueForKey:@"multiCheck"];
+  NSTextField *defaultField = [inspector valueForKey:@"defaultField"];
+  NSTextView *validText = [inspector valueForKey:@"validText"];
+
+  [nameField setStringValue:@"Culture"];
+  [inspector rename:nameField];
+  if (![p.name isEqualToString:@"Culture"])
+    XCTFail(@"%@", @"the parameter should have been renamed");
+
+  [promptField setStringValue:@"Which culture?"];
+  [typePop selectItemWithTitle:@"String"];
+  [multiCheck setState:NSOnState];
+  [defaultField setStringValue:@"=User!Language"];
+  [validText setString:@"en-US\nde-DE"];
+  [inspector changed:promptField];
+
+  if (![p.prompt isEqualToString:@"Which culture?"] || !p.multiValue)
+    XCTFail(@"%@", @"prompt and multi-value should have been written through");
+  if (![p.defaultValue isExpression] ||
+      ![[p.defaultValue source] isEqualToString:@"=User!Language"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"default: %@", [p.defaultValue source]]);
+  if ([p.validValues count] != 2 ||
+      ![[p.validValues[1] source] isEqualToString:@"de-DE"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"accepts: %@", p.validValues]);
+
+  // Undo puts a setting back, which is what makes these edits like every other.
+  [ctx.document.undoManager undo];
+  if ([p.validValues count] != 0)
+    XCTFail(@"%@", @"undo should take back the values it accepts");
+
+  // And removing it takes it out of the report, undoably.
+  [nav removeParameter:nil];
+  if ([report.parameters count] != 0)
+    XCTFail(@"%@", @"the parameter should be gone");
+  [ctx.document.undoManager undo];
+  if ([report.parameters count] != 1)
+    XCTFail(@"%@", @"undo should put it back");
+}
+
+// The window shows a chosen parameter in the inspector, and an element chosen
+// on the canvas takes the inspector back -- one selection at a time.
+- (void)testChoosingAParameterShowsItInTheInspector {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLParameterInspectorView *inspector = [wc valueForKey:@"parameterInspector"];
+  RDLParameterNavigator *nav = [wc valueForKey:@"parameterNavigator"];
+  NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
+  RDLParameter *first = [report.parameters firstObject];
+  if (first == nil) {
+    XCTFail(@"%@", @"the invoice sample should have parameters");
+    return;
+  }
+
+  [wc parameterNavigator:nav didSelectParameter:first];
+  if (inspector.parameter != first)
+    XCTFail(@"%@", @"the inspector should be showing the chosen parameter");
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 2)
+    XCTFail(@"%@", @"the attributes pane should have swapped to the parameter");
+
+  [ctx.selection selectItem:[report.body.items firstObject] inBandWithKey:@"body"];
+  [wc syncInspectorToSelection];
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"an element chosen on the canvas takes the inspector back");
 }
 
 @end

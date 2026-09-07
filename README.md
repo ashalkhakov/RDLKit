@@ -345,6 +345,15 @@ NSDictionary has no member order. `RDLJSONPathTests` checks all of this against
 the store document from Goessner's original article, which is what the
 cross-implementation comparisons use.
 
+Reading a document types its columns: a dataset that declares no fields
+discovers both names and types, and one that names its fields without saying
+what they hold has the missing types filled in — a type the report *did* state
+is its own and is left alone. JSON says what its values are, so: a number is Integer or
+Float, `true` is Boolean, and a string written the ISO way is DateTime. A
+column holding two kinds of thing is String, and one holding only nulls or
+nested rows stays untyped. Text formats carry no types and none are guessed for
+them -- a CSV column of `007` is a string, not seven.
+
 CSV also reads fixed-width files (`stock.txt;Widths=10,20,8`), and without
 headers the columns are `Column1`, `Column2`, … A JSON object or a repeated XML
 element inside a row stays a list of rows, which is what a nested region reads;
@@ -394,11 +403,25 @@ document its rows are, and its **Load** button reads it then and there, so the
 fields it discovers are the ones the expression editor offers. Renaming a
 source carries the datasets that read from it.
 
+Report **parameters** have a navigator of their own beside those two, with add
+and remove; choosing one puts its settings — prompt, type, whether it allows
+blank or takes several values, its default, and what it accepts — in the
+inspector, where the settings of anything selected go.
+
+The generator window reads **every** source the report names with one **Read
+data** button, ticking **Fetch by URL** to allow http(s), and offers to go and
+find any document that is not where the report says -- which is the usual state
+of a report authored on another machine. Parameters are asked for beside it: by
+their prompt, and from a list when the report says what they accept.
+
 The **Harbor Manifest** sample is a worked example of all of it in one report:
 a JSON document carried in the report, read as shipments (`$.Shipment[*]`),
 flattened a level deeper into crates (`$.Shipment[*].Crates[*]`), narrowed by a
 filter in the path (`[?(@.Qty >= 10)]`), an XML document read with `//Port`, and
-totals aggregated over rows the report never wrote down.
+totals aggregated over rows the report never wrote down. Its **Season**
+parameter is the value of a dataset filter, so choosing another season in the
+generator is a different report out of the same documents -- while the port
+register, which has no season, stays as it is.
 
 ## Checking a report without running it
 

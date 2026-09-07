@@ -1,10 +1,15 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDataProvider.h"
+#import "RDLDataProviderInternal.h"
+// The binder hands out the three the kit implements unless a host replaces them.
+#import "RDLCSVDataProvider.h"
+#import "RDLJSONDataProvider.h"
+#import "RDLXMLDataProvider.h"
 #import "RDLCompatibility.h"
 
 static NSString *const kRDLDataErrorDomain = @"RDLKit";
 
-static NSError *RDLDataError(NSInteger code, NSString *message) {
+NSError *RDLDataError(NSInteger code, NSString *message) {
   return [NSError errorWithDomain:kRDLDataErrorDomain
                              code:code
                          userInfo:@{NSLocalizedDescriptionKey : message ?: @"data source error"}];
@@ -98,12 +103,11 @@ NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind) {
   return @"data";
 }
 
-#pragma mark - Rows
 
 // What every provider hands back: an array of dictionaries. A selected value
 // that is an array is flattened, so "$.Movie" and "$.Movie[*]" agree; a scalar
 // becomes a one-field row, because a report can only bind to a named field.
-static NSArray *RDLRowsFromSelection(NSArray *selected) {
+NSArray *RDLRowsFromSelection(NSArray *selected) {
   NSMutableArray *rows = [NSMutableArray array];
   for (id node in selected) {
     if ([node isKindOfClass:[NSArray class]]) {
@@ -117,316 +121,79 @@ static NSArray *RDLRowsFromSelection(NSArray *selected) {
   return rows;
 }
 
-#pragma mark - JSON
+#pragma mark - Reading the types off the values
 
-@implementation RDLJSONDataProvider
-
-- (NSString *)name {
-  return @"JSON";
+// A JSON boolean is an NSNumber like any other, and telling it apart matters:
+// "true" is a Boolean field, 1 is an Integer one.
+static BOOL RDLIsJSONBoolean(id value) {
+  return [value isKindOfClass:[NSNumber class]] &&
+         CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID();
 }
 
-- (NSArray *)rowsFromData:(NSData *)documentData
-                 dataSet:(RDLDataSet *)dataSet
-              properties:(NSDictionary<NSString *, NSString *> *)properties
-                   error:(NSError **)error {
-  RDL_UNUSED(properties);
-  if (documentData == nil) {
-    if (error)
-      *error = RDLDataError(25, @"there is no JSON to read");
-    return nil;
+// A date, only when the text is written the way a date is written -- the ISO
+// forms JSON documents use. Anything looser and a product code or a version
+// number becomes a date, which is worse than calling it a string.
+static BOOL RDLLooksLikeADate(NSString *text) {
+  static NSArray<NSString *> *formats = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    formats = @[ @"yyyy-MM-dd", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd'T'HH:mm:ssZ",
+                 @"yyyy-MM-dd HH:mm:ss" ];
+  });
+  if ([text length] < 10)
+    return NO;
+  NSDateFormatter *f = [[NSDateFormatter alloc] init];
+  f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+  for (NSString *format in formats) {
+    f.dateFormat = format;
+    if ([f dateFromString:text] != nil)
+      return YES;
   }
-  NSError *jsonError = nil;
-  id root = [NSJSONSerialization JSONObjectWithData:documentData options:0 error:&jsonError];
-  if (root == nil) {
-    if (error)
-      *error = jsonError ?: RDLDataError(26, @"the document is not JSON");
-    return nil;
-  }
-  // No query at all means the document itself is the rows, which is what a
-  // plain array of objects is.
-  NSString *query = [dataSet.commandText
-      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  if ([query length] == 0)
-    return RDLRowsFromSelection(@[ root ]);
-  RDLJSONPath *path = [RDLJSONPath pathWithString:query error:error];
-  if (path == nil)
-    return nil;
-  return RDLRowsFromSelection([path selectFrom:root]);
+  return NO;
 }
 
-@end
-
-#pragma mark - XML
-
-@implementation RDLXMLDataProvider
-
-- (NSString *)name {
-  return @"XML";
+static RDLFieldDataType RDLTypeOfValue(id value) {
+  if (value == nil || value == [NSNull null])
+    return RDLFieldDataTypeUnknown;
+  if (RDLIsJSONBoolean(value))
+    return RDLFieldDataTypeBoolean;
+  if ([value isKindOfClass:[NSNumber class]]) {
+    const char *kind = [(NSNumber *)value objCType];
+    BOOL fractional = kind != NULL && (*kind == 'f' || *kind == 'd');
+    return fractional ? RDLFieldDataTypeFloat : RDLFieldDataTypeInteger;
+  }
+  if ([value isKindOfClass:[NSDate class]])
+    return RDLFieldDataTypeDateTime;
+  if ([value isKindOfClass:[NSString class]])
+    return RDLLooksLikeADate(value) ? RDLFieldDataTypeDateTime : RDLFieldDataTypeString;
+  // An object or a list: rows of its own, which RDL has no type name for.
+  return RDLFieldDataTypeUnknown;
 }
 
-// One element as a row. Attributes and leaf children are fields; a child that
-// has children of its own stays as rows, which is how a nested region reads
-// <Order><Lines><Line/><Line/></Lines></Order>.
-static id RDLRowFromElement(NSXMLElement *el) {
-  NSMutableDictionary *row = [NSMutableDictionary dictionary];
-  for (NSXMLNode *attr in [el attributes]) {
-    NSString *name = [attr name];
-    if ([name length])
-      row[name] = [attr stringValue] ?: @"";
-  }
-  NSMutableDictionary<NSString *, NSMutableArray *> *repeated = [NSMutableDictionary dictionary];
-  for (NSXMLNode *child in [el children]) {
-    if (child.kind != NSXMLElementKind)
+RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
+  RDLFieldDataType agreed = RDLFieldDataTypeUnknown;
+  for (id row in rows) {
+    if (![row isKindOfClass:[NSDictionary class]])
       continue;
-    NSXMLElement *ce = (NSXMLElement *)child;
-    NSString *name = [ce localName] ?: [ce name];
-    if ([name length] == 0)
-      continue;
-    BOOL isLeaf = YES;
-    for (NSXMLNode *grand in [ce children])
-      if (grand.kind == NSXMLElementKind)
-        isLeaf = NO;
-    id value = (isLeaf && [[ce attributes] count] == 0) ? (id)([ce stringValue] ?: @"")
-                                                        : (id)RDLRowFromElement(ce);
-    // The same element twice is a list, which is the shape a nested region
-    // wants -- and the shape the file already had.
-    if (row[name] == nil && repeated[name] == nil) {
-      row[name] = value;
-    } else {
-      NSMutableArray *list = repeated[name];
-      if (list == nil) {
-        list = [NSMutableArray arrayWithObject:row[name]];
-        repeated[name] = list;
-      }
-      [list addObject:value];
-      row[name] = list;
-    }
-  }
-  // An element with nothing but text is that text.
-  if ([row count] == 0)
-    return [el stringValue] ?: @"";
-  return row;
-}
-
-- (NSArray *)rowsFromData:(NSData *)documentData
-                 dataSet:(RDLDataSet *)dataSet
-              properties:(NSDictionary<NSString *, NSString *> *)properties
-                   error:(NSError **)error {
-  RDL_UNUSED(properties);
-  if (documentData == nil) {
-    if (error)
-      *error = RDLDataError(27, @"there is no XML to read");
-    return nil;
-  }
-  NSError *xmlError = nil;
-  NSXMLDocument *doc = [[NSXMLDocument alloc] initWithData:documentData
-                                                  options:NSXMLNodePreserveWhitespace
-                                                    error:&xmlError];
-  if (doc == nil) {
-    if (error)
-      *error = xmlError ?: RDLDataError(28, @"the document is not XML");
-    return nil;
-  }
-  NSString *query = [dataSet.commandText
-      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  NSArray *nodes = nil;
-  if ([query length] == 0) {
-    // No XPath: the root's element children are the rows, which is what
-    // <Orders><Order/><Order/></Orders> means without having to say so.
-    NSMutableArray *children = [NSMutableArray array];
-    for (NSXMLNode *child in [[doc rootElement] children])
-      if (child.kind == NSXMLElementKind)
-        [children addObject:child];
-    nodes = children;
-  } else {
-    NSError *pathError = nil;
-    nodes = [doc nodesForXPath:query error:&pathError];
-    if (nodes == nil) {
-      if (error)
-        *error = pathError ?: RDLDataError(29, [NSString stringWithFormat:
-                                                             @"'%@' is not an XPath this "
-                                                             @"document understands",
-                                                             query]);
-      return nil;
-    }
-  }
-  NSMutableArray *rows = [NSMutableArray array];
-  for (NSXMLNode *node in nodes) {
-    if (node.kind == NSXMLElementKind) {
-      id row = RDLRowFromElement((NSXMLElement *)node);
-      [rows addObject:[row isKindOfClass:[NSDictionary class]]
-                          ? row
-                          : @{([node localName] ?: @"Value") : row}];
-    } else if ([[node stringValue] length]) {
-      // An XPath may select attributes or text, and those are rows of one
-      // field named after what was selected.
-      [rows addObject:@{([node name] ?: @"Value") : [node stringValue]}];
-    }
-  }
-  return rows;
-}
-
-@end
-
-#pragma mark - CSV
-
-@implementation RDLCSVDataProvider
-
-- (NSString *)name {
-  return @"CSV";
-}
-
-// The delimiter a connect string names. Written as a character, or by name for
-// the two nobody can type into a properties list.
-static NSString *RDLCSVDelimiter(NSDictionary<NSString *, NSString *> *properties) {
-  NSString *named = properties[@"delimiter"] ?: properties[@"separator"];
-  if ([named length] == 0)
-    return @",";
-  NSString *low = [named lowercaseString];
-  if ([low isEqualToString:@"tab"] || [low isEqualToString:@"\\t"])
-    return @"\t";
-  if ([low isEqualToString:@"space"])
-    return @" ";
-  if ([low isEqualToString:@"semicolon"])
-    return @";";
-  if ([low isEqualToString:@"pipe"])
-    return @"|";
-  return [named substringToIndex:1];
-}
-
-// One line, split on the delimiter, honouring quotes: a quoted field may hold
-// the delimiter, and "" inside one is a quote.
-static NSArray<NSString *> *RDLCSVSplit(NSString *line, NSString *delimiter) {
-  NSMutableArray *out = [NSMutableArray array];
-  NSMutableString *field = [NSMutableString string];
-  unichar delim = [delimiter characterAtIndex:0];
-  BOOL quoted = NO;
-  NSUInteger n = [line length];
-  for (NSUInteger i = 0; i < n; i++) {
-    unichar c = [line characterAtIndex:i];
-    if (quoted) {
-      if (c == '"') {
-        if (i + 1 < n && [line characterAtIndex:i + 1] == '"') {
-          [field appendString:@"\""];
-          i += 1;
-        } else {
-          quoted = NO;
-        }
-      } else {
-        [field appendFormat:@"%C", c];
-      }
+    RDLFieldDataType here = RDLTypeOfValue([(NSDictionary *)row objectForKey:field]);
+    if (here == RDLFieldDataTypeUnknown)
+      continue;  // a null says nothing about the column
+    if (agreed == RDLFieldDataTypeUnknown) {
+      agreed = here;
       continue;
     }
-    if (c == '"') {
-      quoted = YES;
-    } else if (c == delim) {
-      [out addObject:[field copy]];
-      [field setString:@""];
-    } else {
-      [field appendFormat:@"%C", c];
-    }
+    if (agreed == here)
+      continue;
+    // Whole numbers among fractional ones are still numbers; anything else
+    // disagreeing means the column holds more than one kind of thing.
+    BOOL bothNumbers = (agreed == RDLFieldDataTypeInteger || agreed == RDLFieldDataTypeFloat) &&
+                       (here == RDLFieldDataTypeInteger || here == RDLFieldDataTypeFloat);
+    agreed = bothNumbers ? RDLFieldDataTypeFloat : RDLFieldDataTypeString;
+    if (!bothNumbers)
+      break;
   }
-  [out addObject:[field copy]];
-  return out;
+  return agreed;
 }
-
-// Fixed-width: "Widths=10,20,8" says where the columns are. A short line is
-// padded rather than dropped, because a trailing blank column is normal in
-// these files.
-static NSArray<NSString *> *RDLFixedWidthSplit(NSString *line, NSArray<NSNumber *> *widths) {
-  NSMutableArray *out = [NSMutableArray array];
-  NSUInteger at = 0;
-  NSUInteger n = [line length];
-  for (NSNumber *width in widths) {
-    NSUInteger w = (NSUInteger)MAX(0, [width integerValue]);
-    NSString *piece = @"";
-    if (at < n)
-      piece = [line substringWithRange:NSMakeRange(at, MIN(w, n - at))];
-    at += w;
-    [out addObject:[piece stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
-  }
-  return out;
-}
-
-- (NSArray *)rowsFromData:(NSData *)documentData
-                 dataSet:(RDLDataSet *)dataSet
-              properties:(NSDictionary<NSString *, NSString *> *)properties
-                   error:(NSError **)error {
-  RDL_UNUSED(dataSet);
-  if (documentData == nil) {
-    if (error)
-      *error = RDLDataError(30, @"there is no text to read");
-    return nil;
-  }
-  NSString *text = [[NSString alloc] initWithData:documentData encoding:NSUTF8StringEncoding];
-  if (text == nil)
-    text = [[NSString alloc] initWithData:documentData encoding:NSISOLatin1StringEncoding];
-  if (text == nil) {
-    if (error)
-      *error = RDLDataError(31, @"the file is not text this can read");
-    return nil;
-  }
-  NSMutableArray<NSNumber *> *widths = nil;
-  NSString *widthSpec = properties[@"widths"] ?: properties[@"fixedwidth"];
-  if ([widthSpec length]) {
-    widths = [NSMutableArray array];
-    for (NSString *piece in [widthSpec componentsSeparatedByString:@","]) {
-      NSInteger w = [[piece stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]
-          integerValue];
-      if (w > 0)
-        [widths addObject:@(w)];
-    }
-  }
-  NSString *delimiter = RDLCSVDelimiter(properties);
-  // Headers unless the file says otherwise: a first line of column names is
-  // what nearly every one of these files has.
-  NSString *headerSpec = properties[@"hasheaders"] ?: properties[@"headers"];
-  BOOL hasHeaders = headerSpec == nil || [headerSpec boolValue] ||
-                    [[headerSpec lowercaseString] isEqualToString:@"yes"];
-
-  NSMutableArray<NSString *> *lines = [NSMutableArray array];
-  [text enumerateLinesUsingBlock:^(NSString *line, BOOL *stop) {
-    RDL_UNUSED(stop);
-    if ([[line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] length])
-      [lines addObject:line];
-  }];
-  if ([lines count] == 0)
-    return @[];
-
-  NSArray<NSString *> *(^split)(NSString *) = ^NSArray<NSString *> *(NSString *line) {
-    return widths ? RDLFixedWidthSplit(line, widths) : RDLCSVSplit(line, delimiter);
-  };
-
-  NSArray<NSString *> *headers = nil;
-  NSUInteger firstRow = 0;
-  if (hasHeaders) {
-    headers = split(lines[0]);
-    firstRow = 1;
-  } else {
-    NSUInteger count = [split(lines[0]) count];
-    NSMutableArray *made = [NSMutableArray array];
-    for (NSUInteger i = 0; i < count; i++)
-      [made addObject:[NSString stringWithFormat:@"Column%lu", (unsigned long)i + 1]];
-    headers = made;
-  }
-
-  NSMutableArray *rows = [NSMutableArray array];
-  for (NSUInteger i = firstRow; i < [lines count]; i++) {
-    NSArray<NSString *> *values = split(lines[i]);
-    NSMutableDictionary *row = [NSMutableDictionary dictionary];
-    for (NSUInteger c = 0; c < [headers count]; c++) {
-      NSString *name = [headers[c] stringByTrimmingCharactersInSet:
-                                       [NSCharacterSet whitespaceCharacterSet]];
-      if ([name length] == 0)
-        name = [NSString stringWithFormat:@"Column%lu", (unsigned long)c + 1];
-      row[name] = c < [values count] ? values[c] : @"";
-    }
-    [rows addObject:row];
-  }
-  return rows;
-}
-
-@end
 
 #pragma mark - Binding
 
@@ -544,9 +311,29 @@ static NSArray<NSString *> *RDLFixedWidthSplit(NSString *line, NSArray<NSNumber 
   dataSet.rows = rows;
   // Only when the report declares none: allKeys is unordered, so inferring over
   // a declared schema would scramble the columns a report was built around.
+  // What the values are is read off them -- a JSON number is a number -- so a
+  // dataset that discovered its fields knows their types as well as their
+  // names.
   NSDictionary *first = [rows firstObject];
-  if ([dataSet.fields count] == 0 && [first isKindOfClass:[NSDictionary class]])
-    [dataSet setFieldNames:[first allKeys]];
+  if ([dataSet.fields count] == 0 && [first isKindOfClass:[NSDictionary class]]) {
+    NSMutableArray<RDLField *> *fields = [NSMutableArray array];
+    for (NSString *name in [first allKeys]) {
+      RDLField *field = [[RDLField alloc] init];
+      field.name = name;
+      field.dataField = name;
+      field.dataType = RDLInferredFieldType(rows, name);
+      [fields addObject:field];
+    }
+    dataSet.fields = fields;
+  } else {
+    // Names may be declared while the types are not -- a dataset written by
+    // hand, or one whose fields were named before there was a document to read.
+    // A field that says what it holds is left alone; one that says nothing has
+    // nothing to lose by being told.
+    for (RDLField *field in dataSet.fields)
+      if (field.dataType == RDLFieldDataTypeUnknown)
+        field.dataType = RDLInferredFieldType(rows, field.name);
+  }
   return YES;
 }
 

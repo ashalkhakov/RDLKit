@@ -328,4 +328,102 @@
     XCTFail(@"%@", @"and leave it resolved");
 }
 
+// A JSON document says what its values are, so a dataset read from one knows
+// its columns' types rather than calling everything a string. Text formats say
+// nothing about type, and nothing is guessed for them.
+- (void)testFieldTypesAreReadOffTheValues {
+  NSString *json = @"{\"Row\":["
+                    "{\"Name\":\"Bowl\",\"Qty\":12,\"Kg\":38.5,\"Fragile\":true,"
+                    "\"Fired\":\"2026-06-03\",\"Note\":\"first\",\"Code\":\"007\","
+                    "\"Mixed\":1,\"Empty\":null,\"Lines\":[{\"A\":1}]},"
+                    "{\"Name\":\"Cup\",\"Qty\":7,\"Kg\":2,\"Fragile\":false,"
+                    "\"Fired\":\"2026-06-05\",\"Note\":null,\"Code\":\"012\","
+                    "\"Mixed\":\"two\",\"Empty\":null,\"Lines\":[]}]}";
+  RDLReport *r = [self reportWithProvider:@"JSON"
+                                  connect:[NSString stringWithFormat:@"jsondata=%@", json]
+                                    query:@"$.Row[*]"];
+  // The dataset declares no fields, so binding discovers them -- names and
+  // types together.
+  [r dataSetNamed:@"Rows"].fields = @[];
+  if (![[[RDLDataBinder alloc] init] bindReport:r error:NULL]) {
+    XCTFail(@"%@", @"the document should have bound");
+    return;
+  }
+  NSMutableDictionary *types = [NSMutableDictionary dictionary];
+  for (RDLField *f in [r dataSetNamed:@"Rows"].fields)
+    types[f.name] = RDLStringFromFieldDataType(f.dataType) ?: @"";
+
+  NSDictionary *expected = @{
+    @"Name" : @"String",
+    @"Qty" : @"Integer",
+    // A whole number among fractional ones is still a number.
+    @"Kg" : @"Float",
+    @"Fragile" : @"Boolean",
+    // Written the way a date is written, in every row.
+    @"Fired" : @"DateTime",
+    // A null says nothing about its column, so the other row decides.
+    @"Note" : @"String",
+    // Digits in a string are a string: "007" is a code, not seven.
+    @"Code" : @"String",
+    // Two kinds of thing in one column is a string.
+    @"Mixed" : @"String"
+  };
+  for (NSString *name in expected)
+    if (![types[name] isEqualToString:expected[name]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ came out as '%@', expected %@", name,
+                                                types[name], expected[name]]);
+  // A column of nothing but nulls, and one holding rows of its own, have no
+  // type name in RDL -- which is what Unknown already means.
+  if ([types[@"Empty"] length] != 0 || [types[@"Lines"] length] != 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"Empty: '%@', Lines: '%@'", types[@"Empty"],
+                                              types[@"Lines"]]);
+
+  // Text formats carry no types, so their columns are strings -- a CSV of
+  // digits is not silently made numeric, which is where these guesses go wrong.
+  NSString *dir = NSTemporaryDirectory();
+  NSString *file = [dir stringByAppendingPathComponent:@"rdlkit-types.csv"];
+  [@"Item,Qty\nBowl,12\nCup,7\n" writeToFile:file atomically:YES encoding:NSUTF8StringEncoding
+                                          error:NULL];
+  RDLReport *csv = [self reportWithProvider:@"CSV" connect:@"rdlkit-types.csv" query:@""];
+  [csv dataSetNamed:@"Rows"].fields = @[];
+  RDLDataBinder *binder =
+      [[RDLDataBinder alloc] initWithBaseURL:[NSURL fileURLWithPath:dir isDirectory:YES]];
+  [binder bindReport:csv error:NULL];
+  for (RDLField *f in [csv dataSetNamed:@"Rows"].fields)
+    if (f.dataType != RDLFieldDataTypeString)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ in a CSV came out as %@", f.name,
+                                                RDLStringFromFieldDataType(f.dataType)]);
+  [[NSFileManager defaultManager] removeItemAtPath:file error:NULL];
+}
+
+// A dataset may name its fields without saying what they hold -- most do, and
+// every sample built in code does. Reading the document fills in the types it
+// did not state, and leaves alone the ones it did: a report that says a column
+// is a String means it.
+- (void)testReadingFillsInTypesThatWereNotDeclared {
+  RDLReport *r = [self reportWithProvider:@"JSON"
+                                  connect:@"jsondata={\"Row\":[{\"Qty\":12,\"Note\":\"a\"},"
+                                          @"{\"Qty\":7,\"Note\":\"b\"}]}"
+                                    query:@"$.Row[*]"];
+  RDLDataSet *ds = [r dataSetNamed:@"Rows"];
+  [ds setFieldNames:@[ @"Qty", @"Note" ]];
+  // One of them is declared as text on purpose.
+  [[ds fields] lastObject].dataType = RDLFieldDataTypeString;
+
+  if (![[[RDLDataBinder alloc] init] bindReport:r error:NULL]) {
+    XCTFail(@"%@", @"the document should have bound");
+    return;
+  }
+  RDLField *qty = [[ds fields] firstObject];
+  RDLField *note = [[ds fields] lastObject];
+  if (qty.dataType != RDLFieldDataTypeInteger)
+    XCTFail(@"%@", [NSString stringWithFormat:@"Qty came out as %@",
+                                              RDLStringFromFieldDataType(qty.dataType)]);
+  if (note.dataType != RDLFieldDataTypeString)
+    XCTFail(@"%@", @"a declared type is the report's own and stays");
+  // The names and their order are the report's either way.
+  if (![[ds fieldNames] isEqualToArray:@[ @"Qty", @"Note" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"fields: %@", [ds fieldNames]]);
+}
+
 @end

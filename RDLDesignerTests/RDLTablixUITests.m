@@ -3,6 +3,7 @@
 // The tablix as the designer presents it: its editor's group lists, selecting a
 // cell, the brackets that show the group structure, and the crosstab sample.
 #import "RDLDesignerTestSupport.h"
+#import "RDLExpressionCell.h"
 #import "RDLFilterEditor.h"
 
 
@@ -484,6 +485,76 @@
     XCTFail(@"%@", @"a plain parameter reference should read as its parameter");
   if ([RDLFilterEditor parameterNameInExpression:@"=Fields!Finishes.Value"] != nil)
     XCTFail(@"%@", @"a field is not a parameter");
+}
+
+// The filter panel has to show the filter that is there. A row whose field is
+// not found in the popup falls back to the first item, which reads as "this
+// filters on the first column" -- a different report from the one on disk.
+- (void)testTheFilterPanelShowsTheFieldTheFilterUses {
+  RDLReport *r = [RDLSamples harborManifest];
+  RDLDataSet *ds = [r dataSetNamed:@"Shipments"];
+  RDLFilterEditor *editor = [RDLFilterEditor editorForFilters:ds.filters
+                                                        title:ds.name
+                                                       fields:[ds fieldNames]
+                                                       report:r];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the filter panel did not load");
+    return;
+  }
+  NSTableView *table = [editor valueForKey:@"table"];
+  NSTableColumn *column = [table tableColumnWithIdentifier:@"expression"];
+  // The way the table asks: the delegate fills the popup for the row, then
+  // the data source says which of its items is selected.
+  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)editor;
+  id<NSTableViewDelegate> delegate = (id<NSTableViewDelegate>)editor;
+  NSPopUpButtonCell *cell = (NSPopUpButtonCell *)[column dataCell];
+  [delegate tableView:table willDisplayCell:cell forTableColumn:column row:0];
+  id shown = [source tableView:table objectValueForTableColumn:column row:0];
+  NSString *title = [cell numberOfItems] > [shown integerValue]
+                        ? [[cell itemAtIndex:[shown integerValue]] title]
+                        : @"";
+  if (![title isEqualToString:@"Season"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the panel shows '%@' for a filter on "
+                                              @"=Fields!Season.Value", title]);
+
+  // A field the dataset does not list is still the field this filter uses:
+  // the popup has to offer it rather than falling back to the first column,
+  // which would say the filter is on something it has nothing to do with.
+  RDLFilter *elsewhere = [[RDLFilter alloc] init];
+  elsewhere.expression = [RDLValue valueWithSource:@"=Fields!NotDeclared.Value"];
+  elsewhere.oper = RDLFilterOperatorEqual;
+  [elsewhere.values addObject:[RDLValue literal:@"x"]];
+  RDLFilterEditor *odd = [RDLFilterEditor editorForFilters:@[ elsewhere ]
+                                                     title:@"Odd"
+                                                    fields:@[ @"No", @"Port" ]
+                                                    report:r];
+  NSTableView *oddTable = [odd valueForKey:@"table"];
+  NSTableColumn *oddColumn = [oddTable tableColumnWithIdentifier:@"expression"];
+  NSPopUpButtonCell *oddCell = (NSPopUpButtonCell *)[oddColumn dataCell];
+  [(id<NSTableViewDelegate>)odd tableView:oddTable
+                          willDisplayCell:oddCell
+                           forTableColumn:oddColumn
+                                      row:0];
+  id oddShown = [(id<NSTableViewDataSource>)odd tableView:oddTable
+                                objectValueForTableColumn:oddColumn
+                                                      row:0];
+  if (![[[oddCell itemAtIndex:[oddShown integerValue]] title] isEqualToString:@"NotDeclared"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a field the dataset does not list shows as '%@'",
+                                              [[oddCell itemAtIndex:[oddShown integerValue]] title]]);
+
+  // And the value is edited as an expression, not as plain text: the column
+  // carries the same cell the tablix editor's Value column does.
+  NSTableColumn *valueColumn = [table tableColumnWithIdentifier:@"values"];
+  if (![[valueColumn dataCell] isKindOfClass:[RDLExpressionCell class]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the value column uses %@",
+                                              [[valueColumn dataCell] class]]);
+  id<NSTableViewDataSource> valueSource = (id<NSTableViewDataSource>)editor;
+  if (![[valueSource tableView:table objectValueForTableColumn:valueColumn row:0]
+          isEqualToString:@"=Parameters!Season.Value"])
+    XCTFail(@"%@", @"the value cell shows the expression the filter compares against");
+
+  [[odd valueForKey:@"window"] close];
+  [[editor valueForKey:@"window"] close];
 }
 
 @end

@@ -580,24 +580,51 @@ static RDLItem *RDLCaption(NSString *name, NSString *text, CGFloat y) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Harbor Manifest"];
   r.reportDescription = @"Shipments from a JSON document and ports from an XML one.";
   r.author = @"RDLDesigner";
+  // The page header prints this, so the report has to ask for it: a parameter
+  // an expression names and the report never declares renders as nothing, and
+  // the checker calls it unknown-parameter.
+  RDLParameter *season = [[RDLParameter alloc] init];
+  season.name = @"Season";
+  season.prompt = @"Which season?";
+  season.dataType = RDLParameterDataTypeString;
+  season.defaultValue = [RDLValue literal:@"Summer 2026"];
+  for (NSString *one in @[ @"Spring 2026", @"Summer 2026", @"Autumn 2026" ])
+    [season.validValues addObject:[RDLValue literal:one]];
+  [r.parameters addObject:season];
 
   // The manifest. Crates sit inside their shipment, which is how the file
-  // would arrive and what JSONPath is for.
+  // would arrive and what JSONPath is for -- and each crate repeats its
+  // shipment's season, because a flattened row has to carry what it will be
+  // filtered by: the path selects crates, and by then their shipment is no
+  // longer above them.
   NSString *manifest =
       @"jsondata={\"Shipment\":["
-      @"{\"No\":\"S-101\",\"Port\":\"AST\",\"Sailed\":\"2026-06-02\","
-      @"\"Master\":\"A. Merrick\",\"Crates\":["
-      @"{\"Item\":\"Stoneware bowls\",\"Qty\":12,\"Kg\":38},"
-      @"{\"Item\":\"Glaze, cobalt\",\"Qty\":4,\"Kg\":22}]},"
+      @"{\"No\":\"S-101\",\"Port\":\"AST\",\"Sailed\":\"2026-06-03\","
+      @"\"Season\":\"Summer 2026\",\"Master\":\"A. Merrick\",\"Crates\":["
+      @"{\"Item\":\"Stoneware bowls\",\"Qty\":12,\"Kg\":38,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-101\"},"
+      @"{\"Item\":\"Glaze, cobalt\",\"Qty\":4,\"Kg\":22,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-101\"}]},"
       @"{\"No\":\"S-102\",\"Port\":\"PDX\",\"Sailed\":\"2026-06-05\","
-      @"\"Master\":\"L. Vale\",\"Crates\":["
-      @"{\"Item\":\"Kiln shelves\",\"Qty\":18,\"Kg\":96},"
-      @"{\"Item\":\"Firebrick\",\"Qty\":40,\"Kg\":210},"
-      @"{\"Item\":\"Pyrometric cones\",\"Qty\":6,\"Kg\":3}]},"
-      @"{\"No\":\"S-103\",\"Port\":\"AST\",\"Sailed\":\"2026-06-11\","
-      @"\"Master\":\"S. Reed\",\"Crates\":["
-      @"{\"Item\":\"Porcelain clay\",\"Qty\":25,\"Kg\":500},"
-      @"{\"Item\":\"Brushes\",\"Qty\":9,\"Kg\":2}]}]}";
+      @"\"Season\":\"Summer 2026\",\"Master\":\"L. Vale\",\"Crates\":["
+      @"{\"Item\":\"Kiln shelves\",\"Qty\":18,\"Kg\":96,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"},"
+      @"{\"Item\":\"Firebrick\",\"Qty\":40,\"Kg\":210,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"},"
+      @"{\"Item\":\"Pyrometric cones\",\"Qty\":6,\"Kg\":3,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"}]},"
+      @"{\"No\":\"S-103\",\"Port\":\"AST\",\"Sailed\":\"2026-10-11\","
+      @"\"Season\":\"Autumn 2026\",\"Master\":\"S. Reed\",\"Crates\":["
+      @"{\"Item\":\"Porcelain clay\",\"Qty\":25,\"Kg\":500,"
+      @"\"Season\":\"Autumn 2026\",\"Shipment\":\"S-103\"},"
+      @"{\"Item\":\"Brushes\",\"Qty\":9,\"Kg\":2,"
+      @"\"Season\":\"Autumn 2026\",\"Shipment\":\"S-103\"}]},"
+      @"{\"No\":\"S-104\",\"Port\":\"HFX\",\"Sailed\":\"2026-04-02\","
+      @"\"Season\":\"Spring 2026\",\"Master\":\"N. Harbor\",\"Crates\":["
+      @"{\"Item\":\"Kiln bricks\",\"Qty\":30,\"Kg\":420,"
+      @"\"Season\":\"Spring 2026\",\"Shipment\":\"S-104\"},"
+      @"{\"Item\":\"Tongs\",\"Qty\":3,\"Kg\":11,"
+      @"\"Season\":\"Spring 2026\",\"Shipment\":\"S-104\"}]}]}";
   // The port register, which arrives as XML because the harbour authority
   // publishes it that way. An attribute and a child element are both fields.
   NSString *ports =
@@ -612,24 +639,39 @@ static RDLItem *RDLCaption(NSString *name, NSString *text, CGFloat y) {
   [r.dataSources addObject:RDLDocumentSource(@"Register", @"XML", ports)];
 
   [r.dataSets removeAllObjects];
-  [r.dataSets addObject:RDLReading(@"Shipments", @"Manifest", @"$.Shipment[*]",
-                                   @[ @"No", @"Port", @"Sailed", @"Master" ])];
-  [r.dataSets addObject:RDLReading(@"Crates", @"Manifest", @"$.Shipment[*].Crates[*]",
-                                   @[ @"Item", @"Qty", @"Kg" ])];
-  [r.dataSets addObject:RDLReading(@"Heavy", @"Manifest",
-                                   @"$.Shipment[*].Crates[?(@.Qty >= 10)]",
-                                   @[ @"Item", @"Qty", @"Kg" ])];
+  RDLDataSet *shipments = RDLReading(@"Shipments", @"Manifest", @"$.Shipment[*]",
+                                     @[ @"No", @"Port", @"Sailed", @"Season", @"Master" ]);
+  RDLDataSet *crates = RDLReading(@"Crates", @"Manifest", @"$.Shipment[*].Crates[*]",
+                                  @[ @"Shipment", @"Item", @"Qty", @"Kg", @"Season" ]);
+  RDLDataSet *heavy = RDLReading(@"Heavy", @"Manifest", @"$.Shipment[*].Crates[?(@.Qty >= 10)]",
+                                 @[ @"Shipment", @"Item", @"Qty", @"Kg", @"Season" ]);
+  // The season is asked for once and answers three datasets: the parameter is
+  // the filter's value, so choosing another season is a different report from
+  // the same documents -- which is the point of a parameter, and of a filter
+  // that takes an expression rather than a constant.
+  for (RDLDataSet *ds in @[ shipments, crates, heavy ]) {
+    RDLFilter *inSeason = [[RDLFilter alloc] init];
+    inSeason.expression = [RDLValue valueWithSource:@"=Fields!Season.Value"];
+    inSeason.oper = RDLFilterOperatorEqual;
+    [inSeason.values addObject:[RDLValue valueWithSource:@"=Parameters!Season.Value"]];
+    [ds.filters addObject:inSeason];
+    [r.dataSets addObject:ds];
+  }
   [r.dataSets addObject:RDLReading(@"Ports", @"Register", @"//Port",
                                    @[ @"Code", @"Name", @"Country" ])];
 
-  [r.pageHeader.items addObject:RDLTB(@"Title", @"Harbor manifest", 0, 0.04, 5, 0.3, @"Georgia",
+  [r.pageHeader.items addObject:RDLTB(@"Title", @"Harbor manifest", 0, 0.04, 3.5, 0.3, @"Georgia",
                                        [RDLLength points:16], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
-  [r.pageHeader.items addObject:RDLTB(@"When", @"=Globals!ExecutionTime", 5, 0.1, 2.5, 0.22,
+  // The season the report was asked for, printed where the reader can see what
+  // they chose -- the tables below it are the shipments of that season.
+  [r.pageHeader.items addObject:RDLTB(@"Season", @"=Parameters!Season.Value", 3.6, 0.1, 2.0, 0.22,
+                                       @"Helvetica", [RDLLength points:10], RDLFontWeightBold, kInk, RDLTextAlignRight)];
+  [r.pageHeader.items addObject:RDLTB(@"When", @"=Globals!ExecutionTime", 5.6, 0.1, 1.9, 0.22,
                                        @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
   [r.pageHeader.items addObject:RDLMakeLine(@"HRule", 0, 0.46, 7.5)];
 
   r.body.height = 7.0;
-  [r.body.items addObject:RDLCaption(@"ShipLbl", @"Shipments  ·  JSON  ·  $.Shipment[*]", 0.1)];
+  [r.body.items addObject:RDLCaption(@"ShipLbl", @"Shipments  ·  JSON  ·  $.Shipment[*]  ·  filtered to the season above", 0.1)];
   [r.body.items addObject:RDLMakeTablix(@"ShipTable", @"Shipments", 0, 0.35, 7.5, 0.28, 0.26, @[
                  RDLCol(@"Shipment", @"=Fields!No.Value", 1.6, @"Left"),
                  RDLCol(@"Port", @"=Fields!Port.Value", 1.2, @"Left"),
@@ -639,7 +681,7 @@ static RDLItem *RDLCaption(NSString *name, NSString *text, CGFloat y) {
 
   [r.body.items addObject:RDLCaption(@"CrateLbl",
                                      @"Crates  ·  the same document, a level deeper  ·  "
-                                     @"$.Shipment[*].Crates[*]", 1.65)];
+                                     @"$.Shipment[*].Crates[*]  ·  same season", 1.65)];
   [r.body.items addObject:RDLMakeTablix(@"CrateTable", @"Crates", 0, 1.9, 7.5, 0.28, 0.26, @[
                  RDLCol(@"Item", @"=Fields!Item.Value", 3.9, @"Left"),
                  RDLCol(@"Qty", @"=Fields!Qty.Value", 1.6, @"Right"),
@@ -798,12 +840,13 @@ static RDLItem *RDLCaption(NSString *name, NSString *text, CGFloat y) {
   [r.body.items addObject:tab];
   [r.body.items addObject:RDLTB(@"GrandLbl", @"Shop total", 0, 1.2, 4.2, 0.28, @"Georgia", [RDLLength points:12], RDLFontWeightBold,
                                  kInk, RDLTextAlignLeft)];
-  [r.body.items addObject:RDLTB(@"GrandVal", @"=Format(Sum(Fields!Amount.Value), \"C\")", 4.2, 1.2, 3.3, 0.28,
+  [r.body.items addObject:RDLTB(@"GrandVal", @"=Format(Sum(Fields!Amount.Value, \"Jobs\"), \"C\")", 4.2, 1.2, 3.3, 0.28,
                                  @"Georgia", [RDLLength points:12], RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.body.items
       addObject:RDLTB(@"Tally",
-                       @"=IIf(CountRows() = 0, \"No jobs\", CountRows() & \" jobs in \" & "
-                       @"CountDistinct(Fields!Finish.Value) & \" finishes\")",
+                       @"=IIf(CountRows(\"Jobs\") = 0, \"No jobs\", CountRows(\"Jobs\") & "
+                       @"\" jobs in \" & CountDistinct(Fields!Finish.Value, \"Jobs\") & "
+                       @"\" finishes\")",
                        0, 1.55, 7.5, 0.22, @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items

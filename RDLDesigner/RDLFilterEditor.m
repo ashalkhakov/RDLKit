@@ -81,6 +81,12 @@ static NSString *RDLReferenceName(NSString *source, RDLExprNodeKind wanted) {
 - (NSArray<NSString *> *)itemsForRow:(RDLFilterRow *)row {
   NSMutableArray *items = [NSMutableArray arrayWithArray:_fields];
   NSString *field = [[self class] fieldNameInExpression:row.expression];
+  // Whatever the row filters on has to be in the list, or the popup falls back
+  // to the first entry and the panel says the filter is on a column it has
+  // nothing to do with. A field the dataset does not list is still the field
+  // this filter uses -- a report may name one the dataset has not declared.
+  if (field != nil && ![items containsObject:field])
+    [items addObject:field];
   if (field == nil && [row.expression length])
     [items addObject:row.expression];
   [items addObject:kRDLFilterExpressionItem];
@@ -233,6 +239,18 @@ static NSString *RDLReferenceName(NSString *source, RDLExprNodeKind wanted) {
   for (NSNumber *op in [[self class] operators])
     [pop addItemWithTitle:RDLStringFromFilterOperator((RDLFilterOperator)[op integerValue])];
   [[_table tableColumnWithIdentifier:@"operator"] setDataCell:pop];
+
+  // The value a filter compares against is as much an expression as the thing
+  // it filters -- "=Parameters!Season.Value" is the ordinary case -- so it gets
+  // the cell the tablix editor gives its Value column: coloured, with f(x) for
+  // the row. Typing in it still works; the panel is the other way in.
+  NSTableColumn *values = [_table tableColumnWithIdentifier:@"values"];
+  RDLExpressionCell *valueCell = [[RDLExpressionCell alloc] init];
+  [valueCell setEditable:YES];
+  [valueCell setFont:[[values dataCell] font] ?: [NSFont systemFontOfSize:11]];
+  valueCell.buttonTarget = self;
+  valueCell.buttonAction = @selector(editValueExpression:);
+  [values setDataCell:valueCell];
 }
 
 // The popup's items depend on the row, since a row filtering on something
@@ -277,6 +295,26 @@ static NSString *RDLReferenceName(NSString *source, RDLExprNodeKind wanted) {
   NSPopUpButtonCell *pop = cell;
   [pop removeAllItems];
   [pop addItemsWithTitles:[self itemsForRow:_rows[(NSUInteger)row]]];
+}
+
+// f(x) in a value cell: the expression editor for that row's value, written
+// back into the row the table is showing. The cell edit is ended first --
+// running a modal panel while a table is still editing a cell leaves the field
+// editor behind the panel, which is a hang rather than a bug you can see.
+- (void)editValueExpression:(id)sender {
+  (void)sender;
+  NSInteger row = [_table clickedRow];
+  if (row < 0 || row >= (NSInteger)[_rows count])
+    return;
+  [[_table window] makeFirstResponder:_table];
+  RDLFilterRow *r = _rows[(NSUInteger)row];
+  NSString *edited = [RDLExpressionEditor runForSource:r.values ?: @""
+                                               context:RDLExpressionContextText
+                                                report:_report];
+  if (edited == nil)
+    return;
+  r.values = edited;
+  [_table reloadData];
 }
 
 - (void)showHint {

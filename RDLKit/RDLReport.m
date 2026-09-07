@@ -1617,6 +1617,15 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
 // and the designer all need it, and each had grown its own copy. Names are
 // matched exactly, the way RDL means them -- a lookup that forgave case would
 // resolve a reference the report itself does not.
+- (RDLParameter *)parameterNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLParameter *p in self.parameters)
+    if ([p.name isEqualToString:name])
+      return p;
+  return nil;
+}
+
 - (RDLDataSource *)dataSourceNamed:(NSString *)name {
   if ([name length] == 0)
     return nil;

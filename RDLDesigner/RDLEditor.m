@@ -265,6 +265,55 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
 }
 
+- (void)addParameter:(RDLParameter *)parameter {
+  if (parameter == nil)
+    return;
+  [self beginGroup:@"Add Parameter"];
+  [[self undoProxy] removeParameter:parameter];
+  [_document.report.parameters addObject:parameter];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)removeParameter:(RDLParameter *)parameter {
+  NSUInteger index =
+      parameter ? [_document.report.parameters indexOfObject:parameter] : NSNotFound;
+  if (index == NSNotFound)
+    return;
+  [self beginGroup:@"Remove Parameter"];
+  [[self undoProxy] addParameter:parameter];
+  [_document.report.parameters removeObjectAtIndex:index];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+// One setting of one parameter, undoably -- the same shape the inspector uses
+// for an item's properties, because it is the same kind of edit.
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofParameter:(RDLParameter *)parameter {
+  if (parameter == nil || [keyPath length] == 0)
+    return;
+  id old = [parameter valueForKeyPath:keyPath];
+  if (old == value || [old isEqual:value])
+    return;
+  [self beginGroup:@"Edit Parameter"];
+  [[self undoProxy] setValue:old forKeyPath:keyPath ofParameter:parameter];
+  [parameter setValue:value forKeyPath:keyPath];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setValidValues:(NSArray *)values ofParameter:(RDLParameter *)parameter {
+  if (parameter == nil || [parameter.validValues isEqualToArray:values ?: @[]])
+    return;
+  NSArray *old = [parameter.validValues copy];
+  [self beginGroup:@"Edit Parameter"];
+  [[self undoProxy] setValidValues:old ofParameter:parameter];
+  [parameter.validValues removeAllObjects];
+  [parameter.validValues addObjectsFromArray:values ?: @[]];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
 - (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet {
   if (dataSet == nil || [dataSet.commandText isEqualToString:query])
     return;

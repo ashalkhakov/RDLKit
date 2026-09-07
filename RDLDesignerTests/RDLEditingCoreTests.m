@@ -1,4 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
+#import "RDLDataView.h"
+#import "RDLDocument.h"
 #import "RDLDesignerTestSupport.h"
 
 // A grouped-jobs report, mirroring the kit checks' fixture, so the editing
@@ -986,26 +988,85 @@ static RDLReport *RDLGroupedJobs(void) {
 // would check it: the documents in the report become rows, the deeper path
 // flattens the hierarchy, the filter in the path narrows it, the XML one is
 // read too, and the totals are over rows the report never wrote down.
+// Texts of everything laid out, so a page can be asked what it says.
+- (NSArray<NSString *> *)textsOfReport:(RDLReport *)report params:(NSDictionary *)params {
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report paramValues:params])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+  return texts;
+}
+
 - (void)testHarborManifestReadsItsOwnDocuments {
   RDLReport *r = [RDLSamples harborManifest];
 
-  struct {
-    __unsafe_unretained NSString *name;
-    NSUInteger rows;
-  } expected[] = {{@"Shipments", 3}, {@"Crates", 7}, {@"Heavy", 4}, {@"Ports", 3}};
-  for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
-    RDLDataSet *ds = [r dataSetNamed:expected[i].name];
-    if ([ds.rows count] != expected[i].rows)
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@ has %lu rows, expected %lu", expected[i].name,
-                                                (unsigned long)[ds.rows count],
-                                                (unsigned long)expected[i].rows]);
+  // Every shipment is read from the document...
+  if ([[r dataSetNamed:@"Shipments"].rows count] != 4 ||
+      [[r dataSetNamed:@"Crates"].rows count] != 9 ||
+      [[r dataSetNamed:@"Ports"].rows count] != 3)
+    XCTFail(@"%@", [NSString stringWithFormat:@"read %lu shipments, %lu crates, %lu ports",
+                                              (unsigned long)[[r dataSetNamed:@"Shipments"].rows count],
+                                              (unsigned long)[[r dataSetNamed:@"Crates"].rows count],
+                                              (unsigned long)[[r dataSetNamed:@"Ports"].rows count]]);
+  // ... and the season the report is asked for decides which of them appear.
+  NSArray<NSString *> *summer = [self textsOfReport:r params:nil];
+  if (![summer containsObject:@"S-101"] || ![summer containsObject:@"S-102"] ||
+      [summer containsObject:@"S-103"] || [summer containsObject:@"S-104"])
+    XCTFail(@"%@", @"the default season is Summer, so only its shipments should be on the page");
+  if (![summer containsObject:@"Firebrick"] || [summer containsObject:@"Porcelain clay"])
+    XCTFail(@"%@", @"the crates follow the same season");
+  BOOL summerTotal = NO;
+  for (NSString *text in summer)
+    if ([text rangeOfString:@"80 items in 5 crates"].location != NSNotFound &&
+        [text rangeOfString:@"369"].location != NSNotFound)
+      summerTotal = YES;
+  if (!summerTotal)
+    XCTFail(@"%@", [NSString stringWithFormat:@"summer's total is missing: %@",
+                                              [summer componentsJoinedByString:@" | "]]);
+
+  // Another season is another report out of the same documents -- which is
+  // what a parameter feeding a filter is for.
+  NSArray<NSString *> *autumn = [self textsOfReport:r params:@{ @"Season" : @"Autumn 2026" }];
+  if (![autumn containsObject:@"S-103"] || [autumn containsObject:@"S-101"])
+    XCTFail(@"%@", @"choosing Autumn should bring its shipment and drop the summer ones");
+  if (![autumn containsObject:@"Porcelain clay"] || [autumn containsObject:@"Firebrick"])
+    XCTFail(@"%@", @"and its crates with it");
+  BOOL autumnTotal = NO;
+  for (NSString *text in autumn)
+    if ([text rangeOfString:@"34 items in 2 crates"].location != NSNotFound)
+      autumnTotal = YES;
+  if (!autumnTotal)
+    XCTFail(@"%@", [NSString stringWithFormat:@"autumn's total is missing: %@",
+                                              [autumn componentsJoinedByString:@" | "]]);
+  // The ports come from the other document and have no season, so they stay.
+  if (![autumn containsObject:@"Astoria"] || ![autumn containsObject:@"Halifax"])
+    XCTFail(@"%@", @"the port register is not filtered by the season");
+
+  // The sample names its fields but does not say what they hold, so reading
+  // the document is what types them: the JSON says which are numbers and which
+  // are dates.
+  NSDictionary *wanted = @{ @"Qty" : @"Integer", @"Kg" : @"Integer", @"Item" : @"String",
+                            @"Season" : @"String" };
+  for (RDLField *f in [r dataSetNamed:@"Crates"].fields) {
+    NSString *expect = wanted[f.name];
+    if (expect == nil)
+      continue;
+    if (![RDLStringFromFieldDataType(f.dataType) isEqualToString:expect])
+      XCTFail(@"%@", [NSString stringWithFormat:@"crates.%@ is %@, expected %@", f.name,
+                                                RDLStringFromFieldDataType(f.dataType), expect]);
   }
+  for (RDLField *f in [r dataSetNamed:@"Shipments"].fields)
+    if ([f.name isEqualToString:@"Sailed"] && f.dataType != RDLFieldDataTypeDateTime)
+      XCTFail(@"%@", [NSString stringWithFormat:@"a sailing date is %@",
+                                                RDLStringFromFieldDataType(f.dataType)]);
+
   // The crates came out of the shipments, which is the point of the deeper
   // path: a hierarchy a flat table can bind to.
   NSDictionary *firstCrate = [[r dataSetNamed:@"Crates"].rows firstObject];
   if (![firstCrate[@"Item"] isEqualToString:@"Stoneware bowls"])
     XCTFail(@"%@", [NSString stringWithFormat:@"first crate: %@", firstCrate]);
-  // The filter is in the path, so every row of Heavy is one.
+  // The filter in the path is still a path filter: every Heavy row is one.
   for (NSDictionary *crate in [r dataSetNamed:@"Heavy"].rows)
     if ([crate[@"Qty"] integerValue] < 10)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not a heavy crate", crate]);
@@ -1014,40 +1075,18 @@ static RDLReport *RDLGroupedJobs(void) {
   if (![port[@"Code"] isEqualToString:@"AST"] || ![port[@"Name"] isEqualToString:@"Astoria"])
     XCTFail(@"%@", [NSString stringWithFormat:@"first port: %@", port]);
 
-  // And it renders: the totals are aggregates over a dataset that arrived as a
-  // document rather than as rows in the file.
-  NSMutableArray<NSString *> *texts = [NSMutableArray array];
-  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil])
-    for (RDLLaidOutItem *item in page.items)
-      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
-        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
-  BOOL totalled = NO;
-  for (NSString *text in texts)
-    if ([text rangeOfString:@"114"].location != NSNotFound &&
-        [text rangeOfString:@"7 crates"].location != NSNotFound &&
-        [text rangeOfString:@"871"].location != NSNotFound)
-      totalled = YES;
-  if (!totalled)
-    XCTFail(@"%@", [NSString stringWithFormat:@"no manifest total among %@",
-                                              [texts componentsJoinedByString:@" | "]]);
-  // Every crate reached the page, so the tables are bound and not just present.
-  BOOL sawFirebrick = NO;
-  for (NSString *text in texts)
-    if ([text isEqualToString:@"Firebrick"])
-      sawFirebrick = YES;
-  if (!sawFirebrick)
-    XCTFail(@"%@", @"the crates table did not render its rows");
-
-  // Saved and opened again, it still reads: an XML document carried inside an
-  // XML file has to survive being escaped and unescaped, and a JSONPath with
-  // quotes and brackets in it has to come back as the same query.
+  // And it survives being saved: the documents, the queries and the filters.
   RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
   RDLDataSet *heavy = [back dataSetNamed:@"Heavy"];
   if (![heavy.commandText isEqualToString:@"$.Shipment[*].Crates[?(@.Qty >= 10)]"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the query came back as '%@'", heavy.commandText]);
+  if ([heavy.filters count] != 1 ||
+      ![[[heavy.filters firstObject].values.firstObject source]
+          isEqualToString:@"=Parameters!Season.Value"])
+    XCTFail(@"%@", @"the season filter did not survive the file");
   if (![[[RDLDataBinder alloc] init] bindReport:back error:NULL])
     XCTFail(@"%@", @"the saved report could not be bound");
-  if ([[back dataSetNamed:@"Crates"].rows count] != 7 ||
+  if ([[back dataSetNamed:@"Crates"].rows count] != 9 ||
       [[back dataSetNamed:@"Ports"].rows count] != 3)
     XCTFail(@"%@", @"a saved report should read the same documents it did before");
 }
@@ -1109,5 +1148,73 @@ static RDLReport *RDLGroupedJobs(void) {
   }
 }
 
+
+// Every sample has to pass the checker. A sample is what a person opens first
+// and copies from, so a broken reference in one is a lesson in the wrong
+// thing -- and this catches exactly the mistake that was in the manifest: a
+// page header printing =Parameters!Season.Value in a report that never asked
+// for a Season.
+- (void)testEverySamplePassesTheChecker {
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    RDLReport *r = [RDLSamples reportWithId:sampleId];
+    NSMutableArray<NSString *> *complaints = [NSMutableArray array];
+    for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+      if (d.severity == RDLDiagnosticSeverityError)
+        [complaints addObject:[NSString stringWithFormat:@"%@: %@ (%@)", d.path ?: @"", d.message,
+                                                         d.rule]];
+    if ([complaints count])
+      XCTFail(@"%@", [NSString stringWithFormat:@"sample '%@': %@", sampleId,
+                                                [complaints componentsJoinedByString:@"; "]]);
+  }
+}
+
+// A report's parameters are what the generator asks for before it runs, so the
+// pane that asks lists them -- in the order the report declares them, from the
+// top. It used to build them into an unflipped view inside a flipped one,
+// which put the first heading at the bottom and everything above it backwards.
+- (void)testTheRenderInputsPaneReadsFromTheTop {
+  RDLReport *r = [RDLSamples harborManifest];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLDataView *pane = [[RDLDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
+                                                document:doc];
+  [pane reload];
+  NSView *stack = [[pane subviews] firstObject];
+  if (![stack isFlipped])
+    XCTFail(@"%@", @"the pane lays out downwards, so its stack has to be flipped");
+
+  // The headings come in the order they are laid out, top first.
+  NSMutableArray<NSString *> *headings = [NSMutableArray array];
+  for (NSView *v in [stack subviews]) {
+    if (![v isKindOfClass:[NSTextField class]])
+      continue;
+    NSString *text = [(NSTextField *)v stringValue];
+    if ([text isEqualToString:@"Parameters"] || [text isEqualToString:@"Data"])
+      [headings addObject:text];
+  }
+  if (![headings isEqualToArray:@[ @"Parameters", @"Data" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"headings came out as %@", headings]);
+  NSTextField *parametersHeading = nil, *dataHeading = nil;
+  for (NSView *v in [stack subviews]) {
+    if (![v isKindOfClass:[NSTextField class]])
+      continue;
+    if ([[(NSTextField *)v stringValue] isEqualToString:@"Parameters"])
+      parametersHeading = (NSTextField *)v;
+    else if ([[(NSTextField *)v stringValue] isEqualToString:@"Data"])
+      dataHeading = (NSTextField *)v;
+  }
+  if (parametersHeading == nil || dataHeading == nil ||
+      NSMinY(parametersHeading.frame) >= NSMinY(dataHeading.frame))
+    XCTFail(@"%@", @"parameters are asked for above the data they are asked with");
+
+  // And the manifest asks for its season, so the pane offers it.
+  BOOL asked = NO;
+  for (NSView *v in [stack subviews])
+    if ([v isKindOfClass:[NSPopUpButton class]] &&
+        [(NSPopUpButton *)v itemWithTitle:@"Summer 2026"] != nil)
+      asked = YES;
+  if (!asked)
+    XCTFail(@"%@", @"the sample's Season parameter should be offered, with what it accepts");
+}
 
 @end

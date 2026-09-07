@@ -45,6 +45,8 @@ RDLDesigner_OBJC_FILES = \
   RDLDatasetNavigator.m \
   RDLDataSourceNavigator.m \
   RDLDataSourceView.m \
+  RDLParameterNavigator.m \
+  RDLParameterInspectorView.m \
   RDLFieldInspectorView.m \
   RDLDatasetFieldsView.m \
   ThirdParty/DMTabBar/DMTabBar.m \
@@ -72,6 +74,8 @@ RDLDesigner_RESOURCE_FILES = \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \
   RDLDataSourceView.xib \
+  RDLParameterNavigator.xib \
+  RDLParameterInspectorView.xib \
   RDLInsertPalette.xib \
   RDLDatasetFieldsView.xib \
   RDLFieldInspectorView.xib \

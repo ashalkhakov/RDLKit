@@ -12,6 +12,8 @@
 #import "RDLTabBadge.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDataSourceNavigator.h"
+#import "RDLParameterInspectorView.h"
+#import "RDLParameterNavigator.h"
 #import "RDLDataSourceView.h"
 #import "RDLDatasetFieldsView.h"
 #import "RDLInsertPalette.h"
@@ -48,6 +50,8 @@
 @property (nonatomic, strong) RDLDatasetNavigator *datasetNavigator;
 @property (nonatomic, strong) RDLDataSourceNavigator *dataSourceNavigator;
 @property (nonatomic, strong) RDLDataSourceView *dataSourceView;
+@property (nonatomic, strong) RDLParameterNavigator *parameterNavigator;
+@property (nonatomic, strong) RDLParameterInspectorView *parameterInspector;
 @property (nonatomic, strong) RDLDatasetFieldsView *datasetFields;
 // The centre's Dataset tab shows the dataset being edited or the data view.
 - (void)showDatasetFields:(BOOL)show;
@@ -58,6 +62,8 @@
 // Data sources sit above the datasets, which is the order they are made in: a
 // source says where data comes from, and a dataset then names one.
 @property (nonatomic, strong) IBOutlet NSView *dataSourceNavigatorHost, *dataSourceHost;
+// And the parameters: the third thing a report defines rather than draws.
+@property (nonatomic, strong) IBOutlet NSView *parameterNavigatorHost, *parameterInspectorHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
 // RDLPreviewWindow.xib
@@ -411,6 +417,17 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
                                                      context:_context];
   RDLFillHost(_dataSourceHost, _dataSourceView);
 
+  // Parameters: chosen in a list of their own, with their settings in the
+  // inspector -- the same shape as a dataset's fields.
+  _parameterNavigator = [[RDLParameterNavigator alloc]
+      initWithFrame:[_parameterNavigatorHost bounds] context:_context];
+  _parameterNavigator.delegate = self;
+  RDLFillHost(_parameterNavigatorHost, _parameterNavigator);
+  _parameterInspector =
+      [[RDLParameterInspectorView alloc] initWithFrame:[_parameterInspectorHost bounds]
+                                              context:_context];
+  RDLFillHost(_parameterInspectorHost, _parameterInspector);
+
   // The dataset's attributes table is what the centre shows when a dataset is
   // chosen, the way the Core Data builder shows an entity's attributes; the
   // data view is what it shows when none is. They are siblings in the tab's
@@ -455,6 +472,8 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_datasetFields reload];
   [_dataSourceNavigator reload];
   [_dataSourceView reload];
+  [_parameterNavigator reload];
+  [_parameterInspector showParameter:_parameterInspector.parameter];
   [_palette reload];
   // The source is written when it is being looked at, not on every edit.
   // Serialising the whole report to answer a change nobody can see is waste on
@@ -483,6 +502,22 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)showDatasetFields:(BOOL)show {
   [_datasetFields setHidden:!show];
   [[_dataView enclosingScrollView] setHidden:show];
+}
+
+// A parameter selected puts its settings in the inspector, where the settings
+// of whatever is selected always go. It has no centre pane of its own: a
+// parameter is a handful of properties, not a thing with contents.
+- (void)parameterNavigator:(RDLParameterNavigator *)navigator
+        didSelectParameter:(RDLParameter *)parameter {
+  RDL_UNUSED(navigator);
+  [_parameterInspector showParameter:parameter];
+  if (parameter != nil) {
+    [_context.selection selectReport];
+    [_fieldInspector showField:nil ofDataSet:nil];
+    [_rightTabView selectTabViewItemAtIndex:1];
+    [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
+  }
+  [self syncInspectorToSelection];
 }
 
 // A data source selected shows it in the centre. It is the other thing in this
@@ -581,8 +616,16 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)syncInspectorToSelection {
   // An element beats an attribute: selecting something on the canvas is the
   // more recent intent, and the navigator's selection stays where it is.
-  BOOL showField = [_context selectedItem] == nil && _fieldInspector.field != nil;
-  [_attributeTabView selectTabViewItemAtIndex:showField ? 1 : 0];
+  // Element, dataset field, or parameter -- whichever is selected. An element
+  // wins, because clicking the canvas is the loudest thing a person can do.
+  NSInteger which = 0;
+  if ([_context selectedItem] == nil) {
+    if (_fieldInspector.field != nil)
+      which = 1;
+    else if (_parameterInspector.parameter != nil)
+      which = 2;
+  }
+  [_attributeTabView selectTabViewItemAtIndex:which];
 }
 
 - (void)leftTabChanged:(id)sender {

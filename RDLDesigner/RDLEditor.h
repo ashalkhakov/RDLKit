@@ -95,6 +95,16 @@
 - (void)addDataSource:(RDLDataSource *)source;
 - (void)removeDataSource:(RDLDataSource *)source;
 - (void)renameDataSource:(RDLDataSource *)source to:(NSString *)name;
+// A report's parameters: what it asks for before it runs. Renaming one does
+// not chase the expressions that named it -- an expression is the author's
+// text, and the checker is what reports one that no longer resolves.
+- (void)addParameter:(RDLParameter *)parameter;
+- (void)removeParameter:(RDLParameter *)parameter;
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofParameter:(RDLParameter *)parameter;
+// What the parameter accepts. Its own operation because validValues is a
+// mutable array the parameter owns, so it is replaced in place rather than
+// assigned -- and the old contents are what undo puts back.
+- (void)setValidValues:(NSArray *)values ofParameter:(RDLParameter *)parameter;
 // Which source a dataset reads from.
 - (void)setDataSourceName:(NSString *)name ofDataSet:(RDLDataSet *)dataSet;
 // The rows a provider just read. Not undoable as data -- loading again is how

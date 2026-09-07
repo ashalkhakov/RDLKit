@@ -16,6 +16,8 @@
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
                 <outlet property="dataSourceNavigatorHost" destination="dataSourceNavigatorHost" id="dataSourceNavigatorHostOutlet"/>
+                <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
+                <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
                 <outlet property="dataSourceHost" destination="dataSourceHost" id="dataSourceHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
                 <outlet property="inspector" destination="inspector" id="inspectorOutlet"/>
@@ -157,17 +159,33 @@
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dataSourceNavigatorHost">
-                                                            <rect key="frame" x="0.0" y="468" width="220" height="240"/>
+                                                            <rect key="frame" x="0.0" y="508" width="220" height="200"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                                                         </customView>
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorHost">
-                                                            <rect key="frame" x="0.0" y="0.0" width="220" height="460"/>
+                                                            <rect key="frame" x="0.0" y="208" width="220" height="292"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                            <subviews>
+                                                        <subviews>
                                                                 <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorLabel">
                                                                     <rect key="frame" x="8" y="346" width="204" height="17"/>
                                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                                                                     <textFieldCell key="cell" controlSize="small" selectable="YES" alignment="center" title="Dataset navigator" id="datasetNavigatorLabelCell">
+                                                                        <font key="font" metaFont="smallSystem"/>
+                                                                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                                    </textFieldCell>
+                                                                </textField>
+                                                            </subviews>
+                                                        </customView>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterNavigatorHost">
+                                                            <rect key="frame" x="0.0" y="0.0" width="220" height="200"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                            
+                                                        <subviews>
+                                                                <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterNavigatorLabel">
+                                                                    <rect key="frame" x="8" y="346" width="204" height="17"/>
+                                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
+                                                                    <textFieldCell key="cell" controlSize="small" selectable="YES" alignment="center" title="Dataset navigator" id="parameterNavigatorLabelCell">
                                                                         <font key="font" metaFont="smallSystem"/>
                                                                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                         <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
@@ -442,6 +460,29 @@
                                                                                         <rect key="frame" x="8" y="346" width="264" height="17"/>
                                                                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
                                                                                         <textFieldCell key="cell" controlSize="small" selectable="YES" alignment="center" title="Dataset field inspector" id="datasetInspectorLabelCell">
+                                                                                            <font key="font" metaFont="smallSystem"/>
+                                                                                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                                                                                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                                                                                        </textFieldCell>
+                                                                                    </textField>
+                                                                                </subviews>
+                                                                            </customView>
+                                                                        </subviews>
+                                                                    </view>
+                                                                </tabViewItem>
+                                                                <tabViewItem label="Parameter" identifier="parameter" id="rightParameterItem">
+                                                                    <view key="view" id="rightParameterItemView">
+                                                                        <rect key="frame" x="0.0" y="0.0" width="280" height="708"/>
+                                                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                                        <subviews>
+                                                                            <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterInspectorHost">
+                                                                                <rect key="frame" x="0.0" y="0.0" width="280" height="708"/>
+                                                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                                                <subviews>
+                                                                                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterInspectorLabel">
+                                                                                        <rect key="frame" x="8" y="346" width="264" height="17"/>
+                                                                                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
+                                                                                        <textFieldCell key="cell" controlSize="small" selectable="YES" alignment="center" title="Parameter inspector" id="parameterInspectorLabelCell">
                                                                                             <font key="font" metaFont="smallSystem"/>
                                                                                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>

@@ -793,6 +793,8 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 - (RDLDataSet *)dataSetNamed:(NSString *)name;
 // The data source with this name, or nil. Datasets name one of these.
 - (RDLDataSource *)dataSourceNamed:(NSString *)name;
+// The parameter with this name, or nil. Expressions name these.
+- (RDLParameter *)parameterNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
 // Stamp every item in the report with a back-pointer to it. Cheap, idempotent,
 // and called after anything that adds or moves items, because there is no hook
