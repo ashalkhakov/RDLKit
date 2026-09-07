@@ -109,7 +109,7 @@ install_libs_base() {
     # -[GSSAXHandler _initLibXML] hands libxml2 an xmlSAXHandler it never
     # zeroed, and xmlSAX2InitDefaultSAXHandler does nothing when the handler's
     # "initialized" field is not zero. See the patch and the repro beside it.
-    git apply "$WORKSPACE_DIR/Patches/gnustep-base-sax-handler-calloc.patch"
+    #git apply "$WORKSPACE_DIR/Patches/gnustep-base-sax-handler-calloc.patch"
     # Add a fix to the gnustep-base XML namespace added as attribute
     git apply "$WORKSPACE_DIR/Patches/gnustep-patch-repros/gnustep-base-xmlns-attribute.patch"
     # The reference recipe names $PREFIX/etc/GNUstep.conf here. This
