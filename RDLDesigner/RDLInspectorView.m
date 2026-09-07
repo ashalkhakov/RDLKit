@@ -6,6 +6,7 @@
 #import "RDLEditingContext.h"
 #import "RDLKit.h"
 #import "RDLToolbarIcons.h"
+#import "RDLFilterEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
@@ -62,6 +63,7 @@
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
+@property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton;
 @property (nonatomic, strong) IBOutlet NSTextField *titleField, *catField, *valField;
 // Tablix section
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
@@ -127,6 +129,28 @@
                          _imageBox, _chartBox, _tablixBox, _cellBox ])
     [self addSubview:box];
   [self declareBindings];
+}
+
+// A chart is a data region too, and RDL filters it in the same terms. The
+// tablix opens the same panel from its own editor; this is the chart's way in.
+- (void)editChartFilters:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  RDLChart *chart = (RDLChart *)item;
+  RDLDataSet *ds = nil;
+  for (RDLDataSet *candidate in _context.report.dataSets)
+    if ([candidate.name isEqualToString:chart.dataSetName])
+      ds = candidate;
+  NSArray<RDLFilter *> *edited =
+      [RDLFilterEditor runForFilters:chart.filters
+                               title:chart.name
+                              fields:[(ds ?: [_context.report.dataSets firstObject]) fieldNames]
+                              report:_context.report];
+  if (edited == nil)
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"filters" ofItem:chart];
 }
 
 - (void)dealloc {

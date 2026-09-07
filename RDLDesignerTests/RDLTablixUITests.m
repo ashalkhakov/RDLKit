@@ -268,8 +268,10 @@
   existing.oper = RDLFilterOperatorGreaterThan;
   [existing.values addObject:[RDLValue literal:@"100"]];
 
+  RDLDataSet *ds = [report.dataSets firstObject];
   RDLFilterEditor *ed = [RDLFilterEditor editorForFilters:@[ existing ]
                                                     title:@"Items"
+                                                   fields:[ds fieldNames]
                                                    report:report];
   if (ed == nil) {
     XCTFail(@"%@", @"RDLFilterEditor.xib did not load");
@@ -296,8 +298,14 @@
     return;
   }
   id source = [table dataSource];
+  // The field column is a popup over the dataset's own columns, so what is set
+  // is an index into them -- which is the point of the change: nobody has to
+  // know how to spell =Fields!Finish.Value.
+  NSUInteger finishIndex = [[ds fieldNames] indexOfObject:@"Finish"];
+  if (finishIndex == NSNotFound)
+    finishIndex = 0;
   [source tableView:table
-        setObjectValue:@"=Fields!Finish.Value"
+        setObjectValue:@(finishIndex)
         forTableColumn:[table tableColumnWithIdentifier:@"expression"]
                    row:1];
   // The operator column holds an index into the list the popup shows.
@@ -320,6 +328,10 @@
   // In takes a list, so the commas separate values rather than being part of
   // one: this is the difference between filtering on two finishes and on a
   // finish that happens to be called "Oil, Wax".
+  if (![[out[1].expression source]
+          isEqualToString:[NSString stringWithFormat:@"=Fields!%@.Value",
+                                                     [ds fieldNames][finishIndex]]])
+    XCTFail(@"%@", @"choosing a column should filter on that column");
   if (out[1].oper != RDLFilterOperatorIn || [out[1].values count] != 2 ||
       ![[out[1].values[0] source] isEqualToString:@"Oil"] ||
       ![[out[1].values[1] source] isEqualToString:@"Wax"])
@@ -345,5 +357,81 @@
     XCTFail(@"%@", @"Remove did not take the selected filter away");
 }
 
+
+
+// A filter can be set everywhere RDL puts one, and the panel is the same in
+// all four places. What differs is only what it is handed: the filters, the
+// name of the thing being filtered, and the columns of the dataset behind it.
+- (void)testFiltersAtEveryLevel {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report.dataSets firstObject];
+
+  // A dataset filters its own rows, through the editor so it undoes.
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  f.oper = RDLFilterOperatorGreaterThan;
+  [f.values addObject:[RDLValue literal:@"10"]];
+  [ctx.editor setFilters:@[ f ] ofDataSet:ds];
+  if ([ds.filters count] != 1)
+    XCTFail(@"%@", @"the dataset did not take the filter");
+  [ctx.document.undoManager undo];
+  if ([ds.filters count] != 0)
+    XCTFail(@"%@", @"undo should take a dataset filter away again");
+
+  // A group filters the rows inside it, and -- the part that used to be
+  // impossible -- survives the scaffolding being rebuilt under it.
+  RDLTablix *tab = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tab = (RDLTablix *)it;
+  if (tab == nil || [tab.rowGroups count] == 0) {
+    tab = tab ?: [[RDLTablix alloc] init];
+    tab.rowGroups = @[ [[ds fieldNames] firstObject] ?: @"Item" ];
+    [tab rebuildTablix];
+  }
+  NSString *field = [tab.rowGroups firstObject];
+  RDLTablixMember *group = nil;
+  NSMutableArray *pending = [NSMutableArray arrayWithArray:tab.rowHierarchy.members];
+  while ([pending count]) {
+    RDLTablixMember *m = [pending firstObject];
+    [pending removeObjectAtIndex:0];
+    for (RDLValue *e in m.groupExpressions)
+      if ([[e source] isEqualToString:[NSString stringWithFormat:@"=Fields!%@.Value", field]])
+        group = m;
+    [pending addObjectsFromArray:m.members];
+  }
+  if (group == nil) {
+    XCTFail(@"%@", @"the tablix has no member for its own row group");
+    return;
+  }
+  RDLFilter *groupFilter = [[RDLFilter alloc] init];
+  groupFilter.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  groupFilter.oper = RDLFilterOperatorTopN;
+  [groupFilter.values addObject:[RDLValue literal:@"2"]];
+  [group.filters addObject:groupFilter];
+
+  [tab rebuildTablix];  // what every column edit does
+
+  RDLTablixMember *after = nil;
+  pending = [NSMutableArray arrayWithArray:tab.rowHierarchy.members];
+  while ([pending count]) {
+    RDLTablixMember *m = [pending firstObject];
+    [pending removeObjectAtIndex:0];
+    for (RDLValue *e in m.groupExpressions)
+      if ([[e source] isEqualToString:[NSString stringWithFormat:@"=Fields!%@.Value", field]])
+        after = m;
+    [pending addObjectsFromArray:m.members];
+  }
+  if ([after.filters count] != 1 || after.filters[0].oper != RDLFilterOperatorTopN)
+    XCTFail(@"%@", @"a rebuild threw the group's filter away");
+
+  // And the panel names a field rather than making anyone spell it: what it
+  // reads back for a plain field reference is the field.
+  if (![[RDLFilterEditor fieldNameInExpression:@"=Fields!Amount.Value"] isEqualToString:@"Amount"])
+    XCTFail(@"%@", @"a plain field reference should read as its field");
+  if ([RDLFilterEditor fieldNameInExpression:@"=Sum(Fields!Amount.Value)"] != nil)
+    XCTFail(@"%@", @"an expression is not a field and should not pretend to be one");
+}
 
 @end

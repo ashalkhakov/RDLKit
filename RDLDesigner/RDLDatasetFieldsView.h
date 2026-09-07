@@ -25,4 +25,5 @@
 - (void)addField:(id)sender;
 - (void)removeField:(id)sender;
 - (void)renameDataSet:(id)sender;
+- (void)editFilters:(id)sender;
 @end

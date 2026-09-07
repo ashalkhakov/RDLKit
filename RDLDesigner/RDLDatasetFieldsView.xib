@@ -12,6 +12,7 @@
                 <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
                 <outlet property="title" destination="title" id="titleOutlet"/>
             </connections>
         </customObject>
@@ -91,6 +92,17 @@
                     </buttonCell>
                     <connections>
                         <action selector="addField:" target="-2" id="addButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="The rows this dataset keeps" id="filtersButton">
+                    <rect key="frame" x="70" y="1" width="90" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="square" title="Filters…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="filtersButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editFilters:" target="-2" id="filtersButtonAction"/>
                     </connections>
                 </button>
                 <button toolTip="Remove the selected field" id="removeButton">

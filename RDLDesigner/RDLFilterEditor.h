@@ -17,14 +17,25 @@
 
 // The edited filters, or nil if the user cancelled. `title` names what is
 // being filtered, for the panel's own title: "Tablix1", "Sales", "by Region".
+// `fields` are the columns of the dataset being filtered, offered by name so
+// nobody has to remember how to spell =Fields!Amount.Value -- which is the
+// whole difficulty with a filter typed as free text on both sides of an
+// operator.
 + (NSArray<RDLFilter *> *)runForFilters:(NSArray<RDLFilter *> *)filters
                                   title:(NSString *)title
+                                 fields:(NSArray<NSString *> *)fields
                                  report:(RDLReport *)report;
 
 // Built but not shown, for checking what it does without a modal session.
 + (instancetype)editorForFilters:(NSArray<RDLFilter *> *)filters
                            title:(NSString *)title
+                          fields:(NSArray<NSString *> *)fields
                           report:(RDLReport *)report;
+
+// The field a plain "=Fields!X.Value" filters on, or nil for anything else.
+// The panel shows a field by name when it can and the expression itself when
+// it cannot, which is how a hand-written expression survives being looked at.
++ (NSString *)fieldNameInExpression:(NSString *)source;
 
 // The operators the panel offers, in the order it shows them. Published
 // because the operator column holds an index into this list, and a test

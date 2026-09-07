@@ -27,7 +27,40 @@
 
 @implementation RDLFilterEditor {
   NSMutableArray<RDLFilterRow *> *_rows;
+  NSArray<NSString *> *_fields;
   RDLReport *_report;
+}
+
+// The last entry in the field popup, which is how a filter escapes the list of
+// columns and becomes an arbitrary expression.
+static NSString * const kRDLFilterExpressionItem = @"Expression…";
+
++ (NSString *)fieldNameInExpression:(NSString *)source {
+  NSString *text =
+      [source stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  if (![text hasPrefix:@"=Fields!"] || ![text hasSuffix:@".Value"])
+    return nil;
+  NSRange name = NSMakeRange(8, [text length] - 8 - [@".Value" length]);
+  NSString *field = [text substringWithRange:name];
+  // A field name, not an expression that merely starts with one: anything with
+  // an operator or a bracket in it is the user's own writing.
+  NSCharacterSet *plain = [NSCharacterSet characterSetWithCharactersInString:
+      @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ "];
+  if ([field length] == 0 ||
+      [field rangeOfCharacterFromSet:[plain invertedSet]].location != NSNotFound)
+    return nil;
+  return field;
+}
+
+// What the popup shows for one row: every field, then the row's own expression
+// when that is not one of them, then the way out to the expression editor.
+- (NSArray<NSString *> *)itemsForRow:(RDLFilterRow *)row {
+  NSMutableArray *items = [NSMutableArray arrayWithArray:_fields];
+  NSString *field = [[self class] fieldNameInExpression:row.expression];
+  if (field == nil && [row.expression length])
+    [items addObject:row.expression];
+  [items addObject:kRDLFilterExpressionItem];
+  return items;
 }
 
 // The operators a filter can use, in the order the picker shows them: the
@@ -111,9 +144,11 @@
 
 + (instancetype)editorForFilters:(NSArray<RDLFilter *> *)filters
                            title:(NSString *)title
+                          fields:(NSArray<NSString *> *)fields
                           report:(RDLReport *)report {
   RDLFilterEditor *ed = [[RDLFilterEditor alloc] init];
   ed->_report = report;
+  ed->_fields = [fields copy] ?: @[];
   ed->_rows = [NSMutableArray array];
   for (RDLFilter *f in filters) {
     RDLFilterRow *row = [[RDLFilterRow alloc] init];
@@ -137,8 +172,9 @@
 
 + (NSArray<RDLFilter *> *)runForFilters:(NSArray<RDLFilter *> *)filters
                                   title:(NSString *)title
+                                 fields:(NSArray<NSString *> *)fields
                                  report:(RDLReport *)report {
-  RDLFilterEditor *ed = [self editorForFilters:filters title:title report:report];
+  RDLFilterEditor *ed = [self editorForFilters:filters title:title fields:fields report:report];
   if (ed == nil)
     return nil;
   [ed.window center];
@@ -150,14 +186,12 @@
 }
 
 - (void)prepareTable {
-  // The expression column opens the expression editor from its own button, the
-  // way every other place an expression is edited does.
-  NSTableColumn *expr = [_table tableColumnWithIdentifier:@"expression"];
-  RDLExpressionCell *cell = [[RDLExpressionCell alloc] initTextCell:@""];
-  [cell setEditable:YES];
-  [cell setButtonTarget:self];
-  [cell setButtonAction:@selector(editExpression:)];
-  [expr setDataCell:cell];
+  // The columns of the dataset, by name. Typing "=Fields!Amount.Value" into a
+  // text cell with no labels anywhere was the confusing part; picking Amount
+  // from a list is not.
+  NSPopUpButtonCell *fieldPop = [[NSPopUpButtonCell alloc] initTextCell:@"" pullsDown:NO];
+  [fieldPop setBordered:NO];
+  [[_table tableColumnWithIdentifier:@"expression"] setDataCell:fieldPop];
 
   // The operators, from the enumeration rather than from a list typed twice.
   NSPopUpButtonCell *pop = [[NSPopUpButtonCell alloc] initTextCell:@"" pullsDown:NO];
@@ -165,6 +199,22 @@
   for (NSNumber *op in [[self class] operators])
     [pop addItemWithTitle:RDLStringFromFilterOperator((RDLFilterOperator)[op integerValue])];
   [[_table tableColumnWithIdentifier:@"operator"] setDataCell:pop];
+}
+
+// The popup's items depend on the row, since a row filtering on something
+// that is not a plain field shows that expression among them.
+- (void)tableView:(NSTableView *)tableView
+    willDisplayCell:(id)cell
+     forTableColumn:(NSTableColumn *)column
+                row:(NSInteger)row {
+  (void)tableView;
+  if (![[column identifier] isEqualToString:@"expression"] ||
+      ![cell isKindOfClass:[NSPopUpButtonCell class]] || row < 0 ||
+      row >= (NSInteger)[_rows count])
+    return;
+  NSPopUpButtonCell *pop = cell;
+  [pop removeAllItems];
+  [pop addItemsWithTitles:[self itemsForRow:_rows[(NSUInteger)row]]];
 }
 
 - (void)showHint {
@@ -241,8 +291,12 @@
     return @"";
   RDLFilterRow *r = _rows[(NSUInteger)row];
   NSString *identifier = [column identifier];
-  if ([identifier isEqualToString:@"expression"])
-    return r.expression ?: @"";
+  if ([identifier isEqualToString:@"expression"]) {
+    NSArray<NSString *> *items = [self itemsForRow:r];
+    NSString *field = [[self class] fieldNameInExpression:r.expression];
+    NSUInteger at = [items indexOfObject:field ?: (r.expression ?: @"")];
+    return @(at == NSNotFound ? 0 : (NSInteger)at);
+  }
   if ([identifier isEqualToString:@"operator"])
     return @([[[self class] operators] indexOfObject:@(r.oper)] == NSNotFound
                  ? 0
@@ -260,7 +314,21 @@
   RDLFilterRow *r = _rows[(NSUInteger)row];
   NSString *identifier = [column identifier];
   if ([identifier isEqualToString:@"expression"]) {
-    r.expression = [value description];
+    NSArray<NSString *> *items = [self itemsForRow:r];
+    NSInteger index = [value integerValue];
+    NSString *chosen = (index >= 0 && index < (NSInteger)[items count])
+                           ? items[(NSUInteger)index]
+                           : nil;
+    if ([chosen isEqualToString:kRDLFilterExpressionItem]) {
+      // The way out of the list: write the expression itself.
+      [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+          byExtendingSelection:NO];
+      [self editExpression:nil];
+    } else if ([_fields containsObject:chosen]) {
+      r.expression = [NSString stringWithFormat:@"=Fields!%@.Value", chosen];
+    } else if (chosen != nil) {
+      r.expression = chosen;  // its own expression, chosen again
+    }
   } else if ([identifier isEqualToString:@"operator"]) {
     NSInteger index = [value integerValue];
     NSArray *ops = [[self class] operators];

@@ -212,6 +212,20 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
 }
+- (void)setFilters:(NSArray<RDLFilter *> *)filters ofDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil)
+    return;
+  NSArray *old = [dataSet.filters copy];
+  [self beginGroup:@"Filter Dataset"];
+  [[self undoProxy] setFilters:old ofDataSet:dataSet];
+  [dataSet.filters removeAllObjects];
+  [dataSet.filters addObjectsFromArray:filters ?: @[]];
+  [self endGroup];
+  // Structure, because what a dataset keeps changes what every region bound to
+  // it renders.
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
 
 - (void)renameDataSet:(RDLDataSet *)dataSet to:(NSString *)name {
   RDLReport *report = _document.report;
