@@ -115,11 +115,8 @@ static NSString *RDLFieldOfValue(NSString *value) {
 
   _rowGroups = [(tab.rowGroups ?: @[]) mutableCopy];
   _colGroups = [(tab.columnGroups ?: @[]) mutableCopy];
-  for (NSTableView *t in @[ _rowGroupTable, _colGroupTable, _table ]) {
-    [t setHeaderView:[[NSTableHeaderView alloc]
-                         initWithFrame:NSMakeRect(0, 0, NSWidth([t frame]), 23)]];
+  for (NSTableView *t in @[ _rowGroupTable, _colGroupTable, _table ])
     [t registerForDraggedTypes:@[ RDLTablixFieldDragType ]];
-  }
   [_rowGroupTable reloadData];
   [_colGroupTable reloadData];
 

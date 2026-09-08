@@ -79,8 +79,8 @@
                             <rect key="frame" x="1" y="1" width="191" height="59"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="rowGroupTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="191" height="59"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLTablixEditorHeader1" id="rowGroupTable">
+                                    <rect key="frame" x="0.0" y="0.0" width="191" height="36"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -105,10 +105,14 @@
                                 </tableView>
                             </subviews>
                         </clipView>
-                        <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="rowGroupTableV">
-                            <rect key="frame" x="192" y="1" width="15" height="59"/>
+                        <scroller key="verticalScroller" verticalHuggingPriority="750" doubleValue="1" horizontal="NO" id="rowGroupTableV">
+                            <rect key="frame" x="192" y="24" width="15" height="36"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLTablixEditorHeader1">
+                            <rect key="frame" x="0.0" y="0.0" width="191" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
                     <textField focusRingType="none" verticalHuggingPriority="750" id="colGroupTableLabel">
                         <rect key="frame" x="418" y="448" width="208" height="14"/>
@@ -126,8 +130,8 @@
                             <rect key="frame" x="1" y="1" width="191" height="59"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="colGroupTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="191" height="59"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLTablixEditorHeader2" id="colGroupTable">
+                                    <rect key="frame" x="0.0" y="0.0" width="191" height="36"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -152,10 +156,14 @@
                                 </tableView>
                             </subviews>
                         </clipView>
-                        <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="colGroupTableV">
-                            <rect key="frame" x="192" y="1" width="15" height="59"/>
+                        <scroller key="verticalScroller" verticalHuggingPriority="750" doubleValue="1" horizontal="NO" id="colGroupTableV">
+                            <rect key="frame" x="192" y="24" width="15" height="36"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLTablixEditorHeader2">
+                            <rect key="frame" x="0.0" y="0.0" width="191" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
                     <textField focusRingType="none" verticalHuggingPriority="750" id="columnsLabel">
                         <rect key="frame" x="14" y="350" width="560" height="14"/>
@@ -172,8 +180,8 @@
                             <rect key="frame" x="1" y="1" width="595" height="205"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" rowHeight="16" id="table">
-                                    <rect key="frame" x="0.0" y="0.0" width="595" height="205"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" rowHeight="16" headerView="RDLTablixEditorHeader3" id="table">
+                                    <rect key="frame" x="0.0" y="0.0" width="595" height="182"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -262,9 +270,13 @@
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableVScroller">
-                            <rect key="frame" x="596" y="1" width="15" height="205"/>
+                            <rect key="frame" x="596" y="24" width="15" height="182"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLTablixEditorHeader3">
+                            <rect key="frame" x="0.0" y="0.0" width="595" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
                     <button id="addColumnButton">
                         <rect key="frame" x="14" y="86" width="80" height="24"/>

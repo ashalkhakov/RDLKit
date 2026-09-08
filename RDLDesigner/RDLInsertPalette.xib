@@ -16,16 +16,17 @@
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
         <customView id="content">
             <rect key="frame" x="0.0" y="0.0" width="240" height="400"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" hasVerticalScroller="YES" id="tableScroll">
-                    <rect key="frame" x="0" y="0" width="240" height="400"/>
+                <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="tableScroll">
+                    <rect key="frame" x="0.0" y="0.0" width="240" height="400"/>
                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                     <clipView key="contentView" copiesOnScroll="NO" id="tableClip">
-                        <rect key="frame" x="1" y="1" width="223" height="398"/>
+                        <rect key="frame" x="1" y="1" width="223" height="383"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="table">
-                                <rect key="frame" x="0.0" y="0.0" width="223" height="398"/>
+                            <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLInsertPaletteHeader1" id="table">
+                                <rect key="frame" x="0.0" y="0.0" width="232" height="360"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="2"/>
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -51,11 +52,16 @@
                         </subviews>
                     </clipView>
                     <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                        <rect key="frame" x="224" y="1" width="15" height="398"/>
+                        <rect key="frame" x="224" y="24" width="15" height="360"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                     </scroller>
+                    <tableHeaderView key="headerView" wantsLayer="YES" id="RDLInsertPaletteHeader1">
+                        <rect key="frame" x="0.0" y="0.0" width="232" height="23"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                    </tableHeaderView>
                 </scrollView>
             </subviews>
+            <point key="canvasLocation" x="140" y="154"/>
         </customView>
     </objects>
 </document>

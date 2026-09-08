@@ -7,5 +7,5 @@ should say what was expected, what happened, and what the workaround costs.
 
 | File | Tool | Summary |
 | --- | --- | --- |
-| `ibtool-silent-aborts.md` | Xcode 26 `ibtool` | Two pieces of slightly-wrong XIB markup abort the compiler with no diagnostics at all |
+| `ibtool-silent-aborts.md` | Xcode 26 `ibtool` | Three pieces of slightly-wrong XIB markup abort the compiler with no diagnostics at all |
 | `nsxml-drops-whitespace-only-text.md` | Foundation `NSXMLDocument` | An element containing only whitespace reads back empty; `xml:space` does not help |

@@ -7,6 +7,9 @@
 #import "RDLDataSourceNavigator.h"
 #import "RDLAppDelegate.h"
 #import "RDLDataView.h"
+#import "RDLInsertPalette.h"
+#import "RDLFilterEditor.h"
+#import "RDLDatasetNavigator.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLParameterNavigator.h"
@@ -1401,6 +1404,80 @@ static NSTabView *_centerTabViewOf(id wc) {
                                               [[centre selectedTabViewItem] identifier]]);
   if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
     XCTFail(@"%@", @"and the inspector shows the item");
+}
+
+// Every table in the designer says what its columns are. A hand-written XIB
+// gives each column a header cell with a title in it, but no header view for
+// those titles to appear in -- so a table of four columns is four columns of
+// unexplained text until someone puts one there.
+- (void)testTablesShowTheirColumnHeadings {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
+
+  NSMutableDictionary<NSString *, NSTableView *> *tables = [NSMutableDictionary dictionary];
+  RDLDatasetFieldsView *fields =
+      [[RDLDatasetFieldsView alloc] initWithFrame:NSMakeRect(0, 0, 400, 300) context:ctx];
+  tables[@"the dataset's fields"] = [fields valueForKey:@"table"];
+  tables[@"the data sources"] =
+      [[[RDLDataSourceNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 200) context:ctx]
+          valueForKey:@"table"];
+  tables[@"the datasets"] =
+      [[[RDLDatasetNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 300) context:ctx]
+          valueForKey:@"table"];
+  tables[@"the parameters"] =
+      [[[RDLParameterNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 200) context:ctx]
+          valueForKey:@"table"];
+  tables[@"the insert palette"] =
+      [[[RDLInsertPalette alloc] initWithFrame:NSMakeRect(0, 0, 220, 300) context:ctx]
+          valueForKey:@"table"];
+  RDLFilterEditor *filters = [RDLFilterEditor editorForFilters:ds.filters
+                                                         title:ds.name
+                                                        fields:[ds fieldNames]
+                                                        report:report];
+  tables[@"the filters"] = [filters valueForKey:@"table"];
+
+  for (NSString *what in tables) {
+    NSTableView *table = tables[what];
+    if ([table headerView] == nil) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ has no column headings", what]);
+      continue;
+    }
+    for (NSTableColumn *column in [table tableColumns])
+      if ([[[column headerCell] stringValue] length] == 0)
+        XCTFail(@"%@", [NSString stringWithFormat:@"a column of %@ is unnamed", what]);
+  }
+  [[filters valueForKey:@"window"] close];
+}
+
+// A field that names no column of its own reads the one named after it -- what
+// the writer writes, and what the dataset table shows in its Source column.
+// The inspector says so too, rather than showing an empty box beside a table
+// that shows a value.
+- (void)testAFieldWithNoColumnOfItsOwnSaysWhichItReads {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
+  RDLField *item = nil;
+  for (RDLField *f in [ds fields])
+    if ([f.name isEqualToString:@"Item"])
+      item = f;
+  if (item == nil || [item.dataField length]) {
+    XCTFail(@"%@", @"the sample declares its fields by name, with no DataField");
+    return;
+  }
+  RDLFieldInspectorView *inspector =
+      [[RDLFieldInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400) context:ctx];
+  [inspector showField:item ofDataSet:ds];
+  NSTextField *dataField = [inspector valueForKey:@"dataFieldField"];
+  if ([[dataField stringValue] length] != 0)
+    XCTFail(@"%@", @"nothing was declared, so nothing is shown as declared");
+  if (![[[dataField cell] placeholderString] isEqualToString:@"Item"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the box should say it reads Item; it says '%@'",
+                                              [[dataField cell] placeholderString]]);
+  // And the table beside it agrees.
+  if (![[RDLDatasetFieldsView sourceOfField:item] isEqualToString:@"Item"])
+    XCTFail(@"%@", @"the dataset table shows the same column");
 }
 
 @end

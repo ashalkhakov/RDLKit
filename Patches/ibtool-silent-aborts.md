@@ -3,7 +3,7 @@
 **Tool.** Xcode 26.0 (17A324), `ibtool` bundle version 24127, macOS 15
 (Darwin 24.6.0).
 
-**Symptom.** Two pieces of hand-written XIB markup make `ibtoold` abort with
+**Symptom.** Three pieces of hand-written XIB markup make `ibtoold` abort with
 `SIGABRT`. Exit status is 255 and **nothing is written to stdout or stderr** —
 the errors, warnings and notices dictionaries all come back empty — so Xcode
 reports only:
@@ -16,8 +16,8 @@ Nothing names the offending element, so the failure is very hard to attribute.
 The same input also aborts `ibtool --upgrade`, and opening the file in Xcode
 crashes the IDE.
 
-Both cases are markup that Interface Builder itself would never write, but
-neither is rejected as an error — they abort the process instead. A diagnostic
+Each case is markup that Interface Builder itself would never write, but none of
+them is rejected as an error — they abort the process instead. A diagnostic
 naming the element would have turned each of these from an afternoon into a
 minute.
 
@@ -56,6 +56,30 @@ A split view with one or more panes aborts unless it also carries a
 
 An empty `<splitView>` compiles either way. Repro:
 `repro-splitview-holdingpriorities.xib`.
+
+## 3. A `<tableHeaderView>` nothing points at
+
+A table's header view lives inside the scroll view, and the table must also
+name it:
+
+```xml
+<scrollView id="scroll">
+    <clipView key="contentView" id="clip">
+        <subviews>
+            <!-- omitting headerView="header" here aborts ibtool -->
+            <tableView headerView="header" id="table">…</tableView>
+        </subviews>
+    </clipView>
+    <tableHeaderView key="headerView" id="header">
+        <rect key="frame" x="0.0" y="0.0" width="378" height="23"/>
+        <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+    </tableHeaderView>
+</scrollView>
+```
+
+The element alone aborts; with the back-reference the file compiles and the
+column headings appear. `outlineView` behaves the same way. Repro:
+`repro-tableheaderview-noreference.xib`.
 
 ## Where the abort happens
 
@@ -102,9 +126,6 @@ nothing, and the property is simply absent at runtime:
 - `<attributedString key="attributedTitle">` on an `NSButtonCell`. Every
   spelling tried was ignored, so `RDLWelcomeWindow.xib` lays the card text out
   as labels over the button instead.
-- `<tableHeaderView key="headerView">` on an `NSTableView`, in any position
-  tried and under the element names `tableHeaderView`, `customView` and `view`.
-  `RDLTablixEditor` sets the header view in code.
 - `<subviews>` nested inside a `<button>`, which is not a container view.
 
 ## Related: characters XML cannot carry

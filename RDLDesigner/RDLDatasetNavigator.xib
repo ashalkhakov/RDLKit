@@ -27,8 +27,8 @@
                         <rect key="frame" x="1" y="1" width="243" height="257"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="table">
-                                <rect key="frame" x="0.0" y="0.0" width="252" height="257"/>
+                            <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="0Ly-Qq-6eT" id="table">
+                                <rect key="frame" x="0.0" y="0.0" width="252" height="229"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                 <size key="intercellSpacing" width="3" height="2"/>
                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -55,9 +55,13 @@
                         </subviews>
                     </clipView>
                     <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                        <rect key="frame" x="244" y="1" width="15" height="257"/>
+                        <rect key="frame" x="244" y="29" width="15" height="229"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                     </scroller>
+                    <tableHeaderView key="headerView" wantsLayer="YES" id="0Ly-Qq-6eT">
+                        <rect key="frame" x="0.0" y="0.0" width="252" height="28"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                    </tableHeaderView>
                 </scrollView>
                 <button toolTip="Add a dataset" id="addButton">
                     <rect key="frame" x="0.0" y="1" width="32" height="24"/>

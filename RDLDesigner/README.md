@@ -75,16 +75,24 @@ in the source.
 Two things a XIB cannot carry here, each set in code with a comment where it
 happens:
 
-- A table's `headerView`, and `attributedTitle` on a button — silently dropped
-  by `ibtool`, which reports nothing.
+- `attributedTitle` on a button — silently dropped by `ibtool`, which reports
+  nothing.
 - Escape as a key equivalent: XML forbids U+001B outright, so Cancel buttons get
   theirs in code. (Return is fine, but only written as `&#13;`.)
 
-Two further pieces of markup abort `ibtool` with no diagnostics at all, and
-crash Xcode when the file is opened. Neither needs working around — both are
+Column headings do come from the XIB, but only when it says so twice: a
+`<tableHeaderView key="headerView">` as the last child of the `<scrollView>`,
+**and** a matching `headerView="<id>"` on the table or outline view. With the
+element alone `ibtool` aborts; with neither, the columns' header cells have
+nowhere to be drawn and a table of four columns is four columns of unexplained
+text.
+
+Three further pieces of markup abort `ibtool` with no diagnostics at all, and
+crash Xcode when the file is opened. None of them needs working around — each is
 simply markup Interface Builder would never write, and these XIBs avoid them:
-a `<tableHeaderCell>` must carry **no `id`**, and a `<splitView>` must carry a
-`<holdingPriorities>` with one `<real>` per pane. Written up with reproductions
+a `<tableHeaderCell>` must carry **no `id`**, a `<splitView>` must carry a
+`<holdingPriorities>` with one `<real>` per pane, and a `<tableHeaderView>` must
+be pointed at by its table. Written up with reproductions
 in `../Patches`.
 
 `ibtool --upgrade file.xib --write out.xib` round-trips a document through

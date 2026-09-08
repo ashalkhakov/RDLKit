@@ -13,12 +13,10 @@
                 <outlet property="canvasScroll" destination="canvasScroll" id="canvasScrollOutlet"/>
                 <outlet property="centerMode" destination="centerMode" id="centerModeOutlet"/>
                 <outlet property="centerTabView" destination="centerTabView" id="centerTabViewOutlet"/>
+                <outlet property="dataSourceHost" destination="dataSourceHost" id="dataSourceHostOutlet"/>
+                <outlet property="dataSourceNavigatorHost" destination="dataSourceNavigatorHost" id="dataSourceNavigatorHostOutlet"/>
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="datasetInspectorHost" destination="datasetInspectorHost" id="datasetInspectorHostOutlet"/>
-                <outlet property="dataSourceNavigatorHost" destination="dataSourceNavigatorHost" id="dataSourceNavigatorHostOutlet"/>
-                <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
-                <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
-                <outlet property="dataSourceHost" destination="dataSourceHost" id="dataSourceHostOutlet"/>
                 <outlet property="datasetNavigatorHost" destination="datasetNavigatorHost" id="datasetNavigatorHostOutlet"/>
                 <outlet property="inspector" destination="inspector" id="inspectorOutlet"/>
                 <outlet property="inspectorScroll" destination="inspectorScroll" id="inspectorScrollOutlet"/>
@@ -26,6 +24,8 @@
                 <outlet property="leftTabView" destination="leftTabView" id="leftTabViewOutlet"/>
                 <outlet property="outline" destination="outline" id="outlineOutlet"/>
                 <outlet property="paletteHost" destination="paletteHost" id="paletteHostOutlet"/>
+                <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
+                <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
                 <outlet property="reportInspectorHost" destination="reportInspectorHost" id="reportInspectorHostOutlet"/>
                 <outlet property="rightTabBar" destination="rightTabBar" id="rightTabBarOutlet"/>
                 <outlet property="rightTabView" destination="rightTabView" id="rightTabViewOutlet"/>
@@ -97,8 +97,8 @@
                                                                 <rect key="frame" x="1" y="1" width="203" height="663"/>
                                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                                 <subviews>
-                                                                    <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" indentationPerLevel="12" outlineTableColumn="outlineNameColumn" id="outline">
-                                                                        <rect key="frame" x="0.0" y="0.0" width="208" height="663"/>
+                                                                    <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLDesignerWindowHeader1" indentationPerLevel="12" outlineTableColumn="outlineNameColumn" id="outline">
+                                                                        <rect key="frame" x="0.0" y="0.0" width="208" height="640"/>
                                                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                                         <size key="intercellSpacing" width="3" height="2"/>
                                                                         <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -124,9 +124,13 @@
                                                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                             </scroller>
                                                             <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="outlineScrollVScroller">
-                                                                <rect key="frame" x="204" y="1" width="15" height="663"/>
+                                                                <rect key="frame" x="204" y="24" width="15" height="640"/>
                                                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                                             </scroller>
+                                                            <tableHeaderView key="headerView" wantsLayer="YES" id="RDLDesignerWindowHeader1">
+                                                                <rect key="frame" x="0.0" y="0.0" width="208" height="23"/>
+                                                                <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                                                            </tableHeaderView>
                                                         </scrollView>
                                                         <button toolTip="Add element…" id="addElementButton">
                                                             <rect key="frame" x="0.0" y="2" width="32" height="24"/>
@@ -165,7 +169,7 @@
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorHost">
                                                             <rect key="frame" x="0.0" y="208" width="220" height="292"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                        <subviews>
+                                                            <subviews>
                                                                 <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="datasetNavigatorLabel">
                                                                     <rect key="frame" x="8" y="346" width="204" height="17"/>
                                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
@@ -180,8 +184,7 @@
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterNavigatorHost">
                                                             <rect key="frame" x="0.0" y="0.0" width="220" height="200"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                            
-                                                        <subviews>
+                                                            <subviews>
                                                                 <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="parameterNavigatorLabel">
                                                                     <rect key="frame" x="8" y="346" width="204" height="17"/>
                                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES" flexibleMaxY="YES"/>
