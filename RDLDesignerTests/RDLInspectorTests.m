@@ -482,4 +482,48 @@
     XCTFail(@"%@", @"choosing Inches should set the report's unit");
 }
 
+
+// One selection, one set of sections. A section that stays visible under the
+// next selection draws over it -- two inspectors at once, which is what a
+// section missing from the hide list looked like on screen.
+- (void)testOnlyTheSectionsForWhatIsSelectedAreVisible {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Sections"];
+  RDLSubreport *sub = [[RDLSubreport alloc] init];
+  sub.name = @"Detail";
+  sub.reportName = @"Crates";
+  sub.width = 3;
+  sub.height = 1;
+  [report.body.items addObject:sub];
+  RDLTextbox *text = [[RDLTextbox alloc] init];
+  text.name = @"Kind";
+  text.value = @"Hello";
+  text.width = 2;
+  text.height = 0.24;
+  [report.body.items addObject:text];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 600)
+                                                                context:ctx];
+  // The subreport first, so its section is the one on screen...
+  [ctx.selection selectItem:sub inBandWithKey:@"body"];
+  NSView *subreportBox = [inspector valueForKey:@"subreportBox"];
+  if ([subreportBox isHidden]) {
+    XCTFail(@"%@", @"a subreport should show the subreport section");
+    return;
+  }
+  // ... and then a text box, which must put it away rather than draw over it.
+  [ctx.selection selectItem:text inBandWithKey:@"body"];
+  if (![subreportBox isHidden])
+    XCTFail(@"%@", @"the subreport section is still on screen under the text box's");
+
+  NSArray<NSString *> *others = @[ @"docBox", @"bandBox", @"lineBox", @"rectBox", @"imageBox",
+                                   @"chartBox", @"tablixBox", @"cellBox" ];
+  for (NSString *name in others)
+    if (![[inspector valueForKey:name] isHidden])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should not be shown for a text box", name]);
+  // What a text box does show: its geometry and its own settings.
+  if ([[inspector valueForKey:@"geoBox"] isHidden] || [[inspector valueForKey:@"textBox"] isHidden])
+    XCTFail(@"%@", @"a text box shows the geometry and text sections");
+}
+
 @end

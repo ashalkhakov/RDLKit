@@ -63,12 +63,12 @@
                             </menuItem>
                             <menuItem title="Save" keyEquivalent="s" id="saveItem">
                                 <connections>
-                                    <action selector="saveDocument:" target="-2" id="saveAction"/>
+                                    <action selector="saveDocument:" target="-1" id="saveAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Save As…" keyEquivalent="S" id="saveAsItem">
                                 <connections>
-                                    <action selector="saveDocumentAs:" target="-2" id="saveAsAction"/>
+                                    <action selector="saveDocumentAs:" target="-1" id="saveAsAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="fileSep2"/>

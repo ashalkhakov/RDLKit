@@ -847,14 +847,21 @@ static NSString *RDLPrint(RDLExprNode *a) {
 
 static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope);
 
+// Which rows an aggregate is over: the group's, when it is in one, and the
+// dataset's otherwise.
+//
+// "In a group" is `groupRows != nil`, not `groupRows.count`. A group with no
+// rows in it is still a group -- a crosstab cell where a row group and a
+// column group do not meet has nothing to add up, and used to fall through to
+// this test and show the total of the whole dataset in every empty cell.
 static NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName) {
-  if ([dsName length] == 0 && [scope.groupRows count])
+  if ([dsName length] == 0 && scope.groupRows != nil)
     return scope.groupRows;
   RDLDataSet *ds = scope.dataSet;
   if ([dsName length]) {
     ds = [scope.report dataSetNamed:dsName];
     // Not a dataset name: treat as a group scope name → current group rows.
-    if (ds == nil && [scope.groupRows count])
+    if (ds == nil && scope.groupRows != nil)
       return scope.groupRows;
   } else if (ds == nil && [scope.report.dataSets count])
     ds = scope.report.dataSets[0];

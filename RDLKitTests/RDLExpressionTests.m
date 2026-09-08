@@ -24,6 +24,10 @@ static RDLReport *RDLCheckableReport(void) {
   region.dataType = RDLFieldDataTypeString;
   ds.fields = @[ amount, region ];
   [r.dataSets addObject:ds];
+  // A dataset reads from a source, and the checker now says so, so the fixture
+  // has one -- otherwise every expression checked here would come back with a
+  // complaint about the report rather than about the expression.
+  RDLAttachInlineSource(r, ds, @"Demo");
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = @"Year";
   p.dataType = RDLParameterDataTypeInteger;
@@ -74,6 +78,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   RDLReport *r = RDLCheckableReport();
   RDLDataSet *other = [[RDLDataSet alloc] init];
   other.name = @"Costs";
+  other.dataSourceName = @"Demo";  // every dataset reads from a source
   [other setFieldNames:@[ @"Amount" ]];
   [r.dataSets addObject:other];
   RDLTextbox *tb = [[RDLTextbox alloc] init];

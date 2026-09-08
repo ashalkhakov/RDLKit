@@ -13,7 +13,10 @@ RDLKitTests_OBJC_FILES = \
   RDLExpressionTests.m \
   RDLLayoutTests.m \
   RDLBackendTests.m \
-  RDLImportTests.m
+  RDLImportTests.m \
+  RDLDataSourceTests.m \
+  RDLJSONPathTests.m \
+  RDLSubreportTests.m
 RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 RDLKitTests_INCLUDE_DIRS = -I../RDLKit
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)

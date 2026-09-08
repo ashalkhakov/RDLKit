@@ -7,7 +7,13 @@
 typedef NS_ENUM(NSInteger, RDLNodeKind) {
   RDLNodeReport = 0,
   RDLNodeBand,
-  RDLNodeItem
+  RDLNodeItem,
+  // A tablix is a grid, so the outline shows the grid: one node per row of the
+  // TablixBody, and under it one per column -- the cell, named by what it
+  // holds. That is where an item inside a tablix lives, and the outline used
+  // to stop at the tablix and say nothing about any of it.
+  RDLNodeTablixRow,
+  RDLNodeTablixCell
 };
 
 @interface RDLOutlineNode : NSObject
@@ -15,14 +21,21 @@ typedef NS_ENUM(NSInteger, RDLNodeKind) {
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, copy) NSString *bandKey;
 @property (nonatomic, strong) RDLItem *item;
+// Where in a tablix's grid, for the row and cell nodes. -1 elsewhere.
+@property (nonatomic, strong) RDLTablix *tablix;
+@property (nonatomic, assign) NSInteger row;
+@property (nonatomic, assign) NSInteger column;
 @property (nonatomic, strong) NSMutableArray<RDLOutlineNode *> *children;
 @end
 
 @implementation RDLOutlineNode
 - (instancetype)init {
   self = [super init];
-  if (self)
+  if (self) {
     _children = [NSMutableArray array];
+    _row = -1;
+    _column = -1;
+  }
   return self;
 }
 @end
@@ -119,6 +132,52 @@ static id RDLNodeKeyForItem(RDLItem *item) {
     [parent.children addObject:n];
     if ([it.childItems count])
       [self addNodesForItems:it.childItems to:n bandKey:key];
+    if ([it isKindOfClass:[RDLTablix class]])
+      [self addNodesForGridOf:(RDLTablix *)it to:n bandKey:key];
+  }
+}
+
+// The grid under a tablix: a row per TablixRow, a cell per column of it, named
+// by what the cell holds. An empty cell is a node too -- it is a place things
+// go, and the outline is where you find one you cannot see on the canvas.
+- (void)addNodesForGridOf:(RDLTablix *)tablix
+                       to:(RDLOutlineNode *)parent
+                  bandKey:(NSString *)key {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  for (NSUInteger r = 0; r < [rows count]; r++) {
+    NSString *rowKey = [NSString stringWithFormat:@"row:%p:%lu", (void *)tablix, (unsigned long)r];
+    RDLOutlineNode *rowNode = [self nodeForKey:rowKey kind:RDLNodeTablixRow];
+    rowNode.title = [NSString stringWithFormat:@"Row %lu", (unsigned long)r + 1];
+    rowNode.bandKey = key;
+    rowNode.item = tablix;
+    rowNode.tablix = tablix;
+    rowNode.row = (NSInteger)r;
+    [parent.children addObject:rowNode];
+
+    NSArray<RDLTablixCell *> *cells = rows[r].cells;
+    for (NSUInteger c = 0; c < [cells count]; c++) {
+      NSString *cellKey =
+          [NSString stringWithFormat:@"cell:%p:%lu:%lu", (void *)tablix, (unsigned long)r,
+                                     (unsigned long)c];
+      RDLOutlineNode *cellNode = [self nodeForKey:cellKey kind:RDLNodeTablixCell];
+      RDLItem *content = cells[c].item;
+      cellNode.title = content != nil
+                           ? [NSString stringWithFormat:@"Column %lu  ·  %@  %@",
+                                                        (unsigned long)c + 1,
+                                                        content.rdlElementName, content.name ?: @""]
+                           : [NSString stringWithFormat:@"Column %lu  ·  empty",
+                                                        (unsigned long)c + 1];
+      cellNode.bandKey = key;
+      cellNode.item = content;
+      cellNode.tablix = tablix;
+      cellNode.row = (NSInteger)r;
+      cellNode.column = (NSInteger)c;
+      [rowNode.children addObject:cellNode];
+      // Whatever the cell's item contains -- a Rectangle's items -- hangs
+      // under the cell, the way it does anywhere else.
+      if ([content.childItems count])
+        [self addNodesForItems:content.childItems to:cellNode bandKey:key];
+    }
   }
 }
 
@@ -151,6 +210,13 @@ static id RDLNodeKeyForItem(RDLItem *item) {
     return node;
   if (sel.scope == RDLSelectionScopeItem && node.kind == RDLNodeItem &&
       node.item == sel.item)
+    return node;
+  // An item that is a cell's contents is shown as that cell.
+  if (sel.scope == RDLSelectionScopeItem && node.kind == RDLNodeTablixCell &&
+      node.item != nil && node.item == sel.item)
+    return node;
+  if (sel.scope == RDLSelectionScopeTablixCell && node.kind == RDLNodeTablixCell &&
+      node.tablix == sel.tablix && node.row == sel.cellRow && node.column == sel.cellColumn)
     return node;
   for (RDLOutlineNode *child in node.children) {
     RDLOutlineNode *f = [self findSelectedNodeIn:child];
@@ -203,7 +269,8 @@ static id RDLNodeKeyForItem(RDLItem *item) {
   (void)column;
   RDLOutlineNode *node = item;
   if ([cell isKindOfClass:[NSTextFieldCell class]]) {
-    BOOL structural = node.kind != RDLNodeItem;
+    BOOL structural = node.kind != RDLNodeItem &&
+                      !(node.kind == RDLNodeTablixCell && node.item != nil);
     [cell setFont:structural ? [NSFont boldSystemFontOfSize:11] : [NSFont systemFontOfSize:11]];
   }
 }
@@ -223,6 +290,13 @@ static id RDLNodeKeyForItem(RDLItem *item) {
     [sel selectReport];
   else if (node.kind == RDLNodeBand)
     [sel selectBandWithKey:node.bandKey];
+  else if (node.kind == RDLNodeTablixCell && node.item == nil)
+    // An empty cell: there is nothing in it to select, and the cell is still
+    // where the next element goes.
+    [sel selectCellOfTablix:node.tablix
+                        row:node.row
+                     column:node.column
+              inBandWithKey:node.bandKey];
   else
     [sel selectItem:node.item inBandWithKey:node.bandKey];
 }

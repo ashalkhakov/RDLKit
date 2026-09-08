@@ -99,7 +99,9 @@
   NSInteger i = [sender indexOfSelectedItem] - 1;
   NSArray *catalog = [RDLSamples catalog];
   if (i >= 0 && i < (NSInteger)[catalog count]) {
-    [_reportDocument loadReport:[RDLSamples reportWithId:catalog[(NSUInteger)i][@"id"]]];
+    NSString *sampleId = catalog[(NSUInteger)i][@"id"];
+    [_reportDocument loadReport:[RDLSamples reportWithId:sampleId]
+                      originURL:[RDLSamples URLForSampleWithId:sampleId]];
     [self updateForDocument];
   }
   [sender selectItemAtIndex:0];

@@ -69,6 +69,11 @@
                 <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
                 <outlet property="sizeExprButton" destination="sizeExprButton" id="sizeExprButtonOutlet"/>
                 <outlet property="sizeField" destination="sizeField" id="sizeFieldOutlet"/>
+                <outlet property="subreportBox" destination="subreportBox" id="subreportBoxOutlet"/>
+                <outlet property="subreportEditButton" destination="subreportEditButton" id="subreportEditButtonOutlet"/>
+                <outlet property="subreportNameField" destination="subreportNameField" id="subreportNameFieldOutlet"/>
+                <outlet property="subreportParametersButton" destination="subreportParametersButton" id="subreportParametersButtonOutlet"/>
+                <outlet property="subreportStatusLabel" destination="subreportStatusLabel" id="subreportStatusLabelOutlet"/>
                 <outlet property="tablixBox" destination="tablixBox" id="tablixBoxOutlet"/>
                 <outlet property="tablixDatasetPop" destination="tablixDatasetPop" id="tablixDatasetPopOutlet"/>
                 <outlet property="tablixHeaderHField" destination="tablixHeaderHField" id="tablixHeaderHFieldOutlet"/>
@@ -973,6 +978,63 @@
                         <action selector="changed:" target="-2" id="bgColorWellAction"/>
                     </connections>
                 </colorWell>
+            </subviews>
+        </customView>
+        <customView id="subreportBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="subreportStatusLabel">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" lineBreakMode="truncatingMiddle" title="" id="subreportStatusLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <button toolTip="Open this subreport in a window of its own" id="subreportEditButton">
+                    <rect key="frame" x="10" y="22" width="114" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Edit Subreport…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="subreportEditButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="openSubreportDocument:" target="-2" id="subreportEditButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="What this report hands to the subreport" id="subreportParametersButton">
+                    <rect key="frame" x="136" y="22" width="114" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Parameters…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="subreportParametersButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editSubreportParameters:" target="-2" id="subreportParametersButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl90">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Report (a file beside this one)" id="lbl90Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="subreportNameField">
+                    <rect key="frame" x="10" y="64" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" placeholderString="Crates" id="subreportNameFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="subreportNameFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="subreportNameFieldDelegate"/>
+                    </connections>
+                </textField>
             </subviews>
         </customView>
         <customView id="imageBox">

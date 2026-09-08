@@ -64,6 +64,12 @@
       [self beginEditingTablix:tablixHit col:col part:part];
     return;
   }
+  if ([hit isKindOfClass:[RDLSubreport class]]) {
+    // A subreport's contents belong to another file: double-clicking opens
+    // that file's own window rather than editing anything in this one.
+    [NSApp sendAction:@selector(editSubreport:) to:nil from:nil];
+    return;
+  }
   if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]])
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);

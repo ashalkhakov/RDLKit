@@ -477,6 +477,40 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) RDLImageSizing sizing;
 @end
 
+// One value handed to a subreport. `name` is a report parameter of the
+// *subreport*, and `value` is evaluated where the Subreport sits -- in a
+// detail row of a tablix, that is what makes the pair master and detail.
+@interface RDLSubreportParameter : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, strong) RDLValue *value;
+// Omit: when this evaluates true the parameter is not passed at all and the
+// subreport falls back to its own default. nil means it is always passed.
+@property (nonatomic, strong) RDLValue *omit;
+@end
+
+// A report rendered inside this one, at this item's box. MS-RDL says the
+// subreport is a separate report definition named by `reportName`, and that a
+// relative name resolves beside the report that names it -- so nothing here
+// reads a file: RDLSubreportLoader finds the definition and puts it in
+// `definition`, the way RDLDataBinder puts rows in a dataset.
+@interface RDLSubreport : RDLItem
+// The definition to render, as MS-RDL writes it: "Crates", "detail/Crates" or
+// "/detail/Crates". Required by the spec; a subreport without one cannot be
+// shown.
+@property (nonatomic, copy) NSString *reportName;
+@property (nonatomic, strong) NSMutableArray<RDLSubreportParameter *> *parameters;
+// What to show instead of the subreport when its data has no rows.
+@property (nonatomic, copy) NSString *noRowsMessage;
+// Carried so a document round-trips. Neither means anything to a local viewer:
+// there are no transactions to merge, and nothing draws a border twice.
+@property (nonatomic, assign) BOOL mergeTransactions;
+@property (nonatomic, assign) BOOL omitBorderOnPageBreak;
+// The report `reportName` names, once something has loaded it. Not part of the
+// document and never written; nil until then, and nil is what makes a
+// subreport render as the spec's "Error: Subreport could not be shown".
+@property (nonatomic, strong) RDLReport *definition;
+@end
+
 // What a Tablix and a Chart have in common: they are bound to a dataset and
 // may filter and sort it.
 @interface RDLDataRegion : RDLItem
@@ -584,6 +618,20 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, copy) NSArray<NSString *> *rowGroups;
 @property (nonatomic, copy) NSArray<NSString *> *columnGroups;
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
+// The row-header columns this tablix renders to the left of its body: one per
+// level of dynamic row grouping, each as wide as that level's TablixHeader
+// says. Zero for an ungrouped table. Published because the designer draws the
+// same table the layout engine does, and a grouped one starts 1.2in to the
+// right of where its body columns would otherwise put it.
+- (NSArray<NSNumber *> *)rowHeaderColumnWidths;
+// The header item of the row group at `level`, outermost first -- what is
+// written in that header column.
+- (RDLItem *)rowHeaderItemAtLevel:(NSUInteger)level;
+// The same along the other axis: a crosstab's column groups render a heading
+// row each, above the body and to the right of the corner. A table has none --
+// its headings are the first row of the body.
+- (NSArray<NSNumber *> *)columnHeaderRowHeights;
+- (RDLItem *)columnHeaderItemAtLevel:(NSUInteger)level;
 // Rebuild the Tablix structures from columnSpecs (falling back to the spec
 // derived from the current tablixBody when none is stored, e.g. an RDL 2005
 // List). Destroys any hand-made edits to tablixBody/hierarchies/cornerRows.
@@ -817,6 +865,18 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand;
 - (NSString *)nextNameWithPrefix:(NSString *)prefix;
 - (NSArray<RDLItem *> *)allItems;
+// The same, plus everything nested inside those items: rectangle contents and
+// the items in tablix cells. -allItems is the band-level list, which is what
+// naming and hit-testing want; this is what anything asking "does this report
+// contain one of these anywhere" wants, and a subreport in a detail row is
+// exactly that.
+- (NSArray<RDLItem *> *)allItemsIncludingNested;
+// The tablix cell whose contents are this item, and the tablix it belongs to.
+// A cell holds its item rather than listing it among -childItems, so this is
+// how anything holding an item finds out that it lives in one -- which decides
+// whether it can be moved (it cannot: the cell places it) and what deleting it
+// means (the cell is emptied, not the tablix).
+- (RDLTablixCell *)cellContainingItem:(RDLItem *)item tablix:(RDLTablix **)outTablix;
 @end
 
 // Layout IR. Tablix is gone; backends consume these elements only.

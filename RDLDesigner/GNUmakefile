@@ -37,6 +37,7 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionCell.m \
   RDLExpressionField.m \
   RDLFilterEditor.m \
+  RDLSubreportParametersEditor.m \
   RDLToolbarIcons.m \
   RDLPane.m \
   RDLExpressionTheme.m \
@@ -63,6 +64,11 @@ RDLDesigner_APPLICATION_ICON =
 # are copied in as they are, and gnustep-gui reads the XIB directly (GSXib5).
 # Both are found by the same -initWithNibNamed:, which is why no path or
 # extension appears anywhere in the source.
+# The sample reports are files, not code: they ship as a directory so that the
+# master-detail pair and the JSON document they read stay beside each other,
+# which is what a Subreport's relative ReportName resolves against.
+RDLDesigner_RESOURCE_DIRS = Samples
+
 RDLDesigner_RESOURCE_FILES = \
   RDLExpressionEditor.xib \
   MainMenu.xib \
@@ -71,6 +77,7 @@ RDLDesigner_RESOURCE_FILES = \
   RDLGeneratorWindow.xib \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
+  RDLSubreportParametersEditor.xib \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \
   RDLDataSourceView.xib \

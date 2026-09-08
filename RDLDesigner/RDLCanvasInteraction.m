@@ -11,9 +11,17 @@
   // original rather than accumulating rounding error.
   NSString *_dragKind; // move, se, e, s, tabcol
   NSPoint _dragStart;
-  BOOL _dragActive; // past the slop threshold, so the gesture is real
+  BOOL _dragActive;    // past the slop threshold, so the gesture is real
+  BOOL _dragGroupOpen; // an undo group this drag opened and must close
+  BOOL _notAllowed;    // the press landed on a handle nothing can be done with
   CGFloat _origLeft, _origTop, _origW, _origH;
   NSUInteger _dragColIndex;
+  // The tablix whose column is being dragged, its rect at the moment the drag
+  // started -- where the drop lands is worked out against the grid it was
+  // lifted from -- and the grid column the drop is currently over.
+  RDLTablix *_dragTablix;
+  NSInteger _dragColumnTarget;
+  NSRect _dragTablixRect;
   CGFloat _origColW;
   // Arrow-key burst, coalesced into one undo step.
   BOOL _nudging;
@@ -31,6 +39,7 @@
   if (self) {
     _ctx = context;
     _hostView = hostView;
+    _dragColumnTarget = -1;
   }
   return self;
 }
@@ -64,6 +73,24 @@
     // table. A click elsewhere in it selects the tablix with no cell.
     NSUInteger cellCol = 0;
     RDLTablixPart cellPart = RDLTablixPartNone;
+    NSUInteger gridRow = 0, gridCol = 0;
+    if ([hit isKindOfClass:[RDLTablix class]] &&
+        [RDLTablixGeometry tablix:(RDLTablix *)hit
+                         itemRect:itemRect
+                            point:p
+                              row:&gridRow
+                           column:&gridCol
+                             zoom:_ctx.zoom] &&
+        [RDLTablixGeometry itemOf:(RDLTablix *)hit inRow:gridRow column:gridCol] == nil) {
+      // An empty cell: nothing in it to select, so the cell is what is
+      // selected -- and what the next thing inserted goes into.
+      [_ctx.selection selectCellOfTablix:(RDLTablix *)hit
+                                     row:(NSInteger)gridRow
+                                  column:(NSInteger)gridCol
+                           inBandWithKey:bandKey];
+      _dragKind = nil;
+      return;
+    }
     if ([hit isKindOfClass:[RDLTablix class]] &&
         [RDLTablixGeometry tablix:(RDLTablix *)hit
                          itemRect:itemRect
@@ -86,6 +113,41 @@
       return;
     }
     _pendingEditItem = nil;
+    // An item in a tablix cell is selected, not dragged: the cell decides
+    // where it is and how big it is, and MS-RDL ignores the item's own box.
+    if ([kind isEqualToString:RDLHandleCell]) {
+      _dragKind = nil;
+      return;
+    }
+    // In the band directly above a column: dragging it sideways moves the
+    // column, the way Report Builder's column handles do. The band along the
+    // left, and the corner, move the whole region instead.
+    NSUInteger handleColumn = 0;
+    if ([hit isKindOfClass:[RDLTablix class]] &&
+        [RDLTablixGeometry tablix:(RDLTablix *)hit
+                         itemRect:itemRect
+              handleColumnAtPoint:p
+                           column:&handleColumn
+                             zoom:_ctx.zoom]) {
+      if ([RDLTablixGeometry tablix:(RDLTablix *)hit columnIsMovable:handleColumn]) {
+        _dragKind = @"tabmove";
+        _dragActive = NO;
+        _dragStart = p;
+        _dragColIndex =
+            (NSUInteger)[RDLTablixGeometry bodyColumnOf:(RDLTablix *)hit
+                                          forGridColumn:handleColumn];
+        _dragTablixRect = itemRect;
+        _dragTablix = (RDLTablix *)hit;
+        return;
+      }
+      // A handle that is not a movable column: a group's, or the only column
+      // there is. The region is selected, nothing is dragged, and the cursor
+      // says so for as long as the button is down.
+      _dragKind = nil;
+      _notAllowed = YES;
+      [[NSCursor operationNotAllowedCursor] push];
+      return;
+    }
     NSUInteger borderCol = 0;
     if ([hit isKindOfClass:[RDLTablix class]] &&
         [RDLTablixGeometry tablix:(RDLTablix *)hit
@@ -132,7 +194,13 @@
       return;
     _dragActive = YES;
     _pendingEditItem = nil;
-    [_ctx.editor beginGroup:@"Move"]; // the whole drag is one undo step
+    // Moving a column changes nothing until the drop, so it opens no group;
+    // everything else mutates as the mouse moves and the whole drag is one
+    // undo step. A group opened here and not closed leaves the undo manager
+    // nested, and the next Cmd+Z throws "too many nested undo groups".
+    _dragGroupOpen = ![_dragKind isEqualToString:@"tabmove"];
+    if (_dragGroupOpen)
+      [_ctx.editor beginGroup:@"Move"];
   }
   CGFloat z = _ctx.zoom;
   CGFloat dx = (p.x - _dragStart.x) / (RDLPointsPerInch * z);
@@ -145,15 +213,57 @@
     [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW + dx height:_origH];
   else if ([_dragKind isEqualToString:@"s"])
     [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW height:_origH + dy];
-  else if ([_dragKind isEqualToString:@"tabcol"])
+  else if ([_dragKind isEqualToString:@"tabmove"]) {
+    // Nothing is committed while the mouse is down: the drop decides where the
+    // column goes, and a half-way rearrangement of every other column on the
+    // way is neither useful nor undoable as one step. What is shown meanwhile
+    // is where it would land.
+    NSUInteger target = 0;
+    _dragColumnTarget = [RDLTablixGeometry tablix:_dragTablix
+                                         itemRect:_dragTablixRect
+                                dropColumnAtPoint:p
+                                           column:&target
+                                             zoom:z]
+                            ? (NSInteger)target
+                            : -1;
+    [_host interactionNeedsRedraw];
+  } else if ([_dragKind isEqualToString:@"tabcol"])
     [_ctx.editor setTablixColumn:_dragColIndex
                            width:_origColW + dx
                         ofTablix:(RDLTablix *)[_ctx selectedItem]];
 }
 
 - (void)mouseUp:(NSEvent *)event {
-  if (_dragActive)
+  if (_notAllowed) {
+    [NSCursor pop];
+    _notAllowed = NO;
+  }
+  _dragColumnTarget = -1;
+  if (_dragGroupOpen) {
     [_ctx.editor endGroup];
+    _dragGroupOpen = NO;
+  }
+  if ([_dragKind isEqualToString:@"tabmove"] && _dragActive) {
+    NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
+    RDLTablix *tablix = (RDLTablix *)[_ctx selectedItem];
+    NSUInteger target = 0;
+    if ([tablix isKindOfClass:[RDLTablix class]] &&
+        [RDLTablixGeometry tablix:tablix
+                         itemRect:_dragTablixRect
+                 dropColumnAtPoint:p
+                           column:&target
+                             zoom:_ctx.zoom]) {
+      NSInteger body = [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:target];
+      if (body >= 0)
+        [_ctx.editor moveTablixColumnAtIndex:_dragColIndex
+                                     toIndex:(NSUInteger)body
+                                    ofTablix:tablix];
+    }
+    _dragKind = nil;
+    _dragActive = NO;
+    [_host interactionNeedsRedraw];
+    return;
+  }
   _dragKind = nil;
   _dragActive = NO;
   if (_pendingEditItem && [event clickCount] >= 2) {

@@ -18,6 +18,12 @@
 // The resolved answer to "where would a new element land right now?"
 @interface RDLInsertionPoint : NSObject
 @property (nonatomic, readonly, copy) NSString *bandKey;
+// The tablix cell the new element goes in, and the tablix it belongs to. A
+// cell holds one report item (MS-RDL's CellContents holds 0 or 1), so a cell
+// that already holds something is where a Rectangle appears to hold both --
+// which is what Report Builder does when a second item is put in a cell.
+@property (nonatomic, readonly, strong) RDLTablixCell *cell;
+@property (nonatomic, readonly, strong) RDLTablix *cellTablix;
 // The Rectangle that will hold the new item, or nil to insert at band level.
 @property (nonatomic, readonly, strong) RDLItem *container;
 // The selected item the new one should follow, when there is one.

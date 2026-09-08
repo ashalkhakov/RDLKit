@@ -78,6 +78,14 @@ int main(int argc, const char *argv[]) {
         printf("%s\n", [[RDLDataContract JSONContractForReport:report] UTF8String]);
         return 0;
       }
+      // The subreports too, without their data: whether a subreport is passed
+      // the parameters it declares is something the checker can only say once
+      // it has the definition in front of it.
+      RDLSubreportLoader *loader = [[RDLSubreportLoader alloc]
+          initWithBaseURL:[[NSURL fileURLWithPath:rdlPath] URLByDeletingLastPathComponent]];
+      [loader loadSubreportsInReport:report error:NULL];
+      for (NSString *note in loader.notes)
+        fprintf(stderr, "subreport: %s\n", note.UTF8String);
       NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:report];
       NSUInteger errors = 0;
       for (RDLDiagnostic *d in ds) {
@@ -120,6 +128,15 @@ int main(int argc, const char *argv[]) {
     [binder bindReport:report error:NULL];
     for (NSString *note in binder.notes)
       fprintf(stderr, "data source: %s\n", note.UTF8String);
+
+    // The reports this one shows inside itself, found beside it, each with its
+    // own data -- under the same policy about what may be fetched.
+    RDLSubreportLoader *subreports = [[RDLSubreportLoader alloc]
+        initWithBaseURL:[[NSURL fileURLWithPath:rdlPath] URLByDeletingLastPathComponent]];
+    subreports.binder = binder;
+    [subreports loadSubreportsInReport:report error:NULL];
+    for (NSString *note in subreports.notes)
+      fprintf(stderr, "subreport: %s\n", note.UTF8String);
 
     for (NSString *bind in binds) {
       NSRange eq = [bind rangeOfString:@"="];

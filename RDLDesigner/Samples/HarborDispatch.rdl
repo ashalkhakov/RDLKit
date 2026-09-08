@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+    <rd:ReportUnitType>Inch</rd:ReportUnitType>
+    <Name>Harbor Dispatch</Name>
+    <Description>A shipment list whose detail is a second report: each row shows Dispatch Crates for that shipment, with the shipment number handed over as a parameter.</Description>
+    <Author>RDLDesigner</Author>
+    <Width>7.50000in</Width>
+    <DataSources>
+        <DataSource Name="Manifest">
+            <ConnectionProperties>
+                <DataProvider>JSON</DataProvider>
+                <ConnectString>jsondoc=harbor-dispatch.json</ConnectString>
+            </ConnectionProperties>
+        </DataSource>
+    </DataSources>
+    <DataSets>
+        <DataSet Name="Shipments">
+            <Query>
+                <DataSourceName>Manifest</DataSourceName>
+                <CommandText>$.Shipment[*]</CommandText>
+            </Query>
+            <Fields>
+                <Field Name="No"><DataField>No</DataField><TypeName>String</TypeName></Field>
+                <Field Name="Vessel"><DataField>Vessel</DataField><TypeName>String</TypeName></Field>
+                <Field Name="Port"><DataField>Port</DataField><TypeName>String</TypeName></Field>
+                <Field Name="Season"><DataField>Season</DataField><TypeName>String</TypeName></Field>
+            </Fields>
+            <Filters>
+                <Filter>
+                    <FilterExpression>=Fields!Season.Value</FilterExpression>
+                    <Operator>Equal</Operator>
+                    <FilterValues>
+                        <FilterValue>=Parameters!Season.Value</FilterValue>
+                    </FilterValues>
+                </Filter>
+            </Filters>
+        </DataSet>
+    </DataSets>
+    <ReportParameters>
+        <ReportParameter Name="Season">
+            <DataType>String</DataType>
+            <Prompt>Which season?</Prompt>
+            <DefaultValue><Values><Value>Summer 2026</Value></Values></DefaultValue>
+            <ValidValues><ParameterValues>
+                <ParameterValue><Value>Summer 2026</Value></ParameterValue>
+                <ParameterValue><Value>Autumn 2026</Value></ParameterValue>
+            </ParameterValues></ValidValues>
+        </ReportParameter>
+    </ReportParameters>
+    <PageHeader>
+        <Height>0.70000in</Height>
+        <PrintOnFirstPage>true</PrintOnFirstPage>
+        <PrintOnLastPage>true</PrintOnLastPage>
+        <ReportItems>
+            <Textbox Name="Title"><Top>0.08in</Top><Left>0in</Left><Width>4.0in</Width><Height>0.28in</Height><Style><FontFamily>Georgia</FontFamily><FontSize>16pt</FontSize><FontWeight>Bold</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Harbor Dispatch</Value><Style><FontFamily>Georgia</FontFamily><FontSize>16pt</FontSize><FontWeight>Bold</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>
+            <Textbox Name="SeasonLine"><Top>0.14in</Top><Left>4.0in</Left><Width>3.5in</Width><Height>0.22in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Right</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Parameters!Season.Value</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Right</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>
+            <Textbox Name="Note"><Top>0.42in</Top><Left>0in</Left><Width>7.5in</Width><Height>0.2in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>8pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Each shipment&apos;s crates come from a second report, shown inside this one.</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>8pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>
+        </ReportItems>
+    </PageHeader>
+    <Body>
+        <Height>6.00000in</Height>
+        <ReportItems>
+            <Tablix Name="Shipments">
+                <Top>0.10000in</Top><Left>0in</Left><Width>6.90000in</Width><Height>0.88000in</Height>
+                <DataSetName>Shipments</DataSetName>
+                <NoRowsMessage>No shipments in this season.</NoRowsMessage>
+                <TablixBody>
+                    <TablixColumns>
+                        <TablixColumn><Width>1.10000in</Width></TablixColumn>
+                        <TablixColumn><Width>1.00000in</Width></TablixColumn>
+                        <TablixColumn><Width>1.10000in</Width></TablixColumn>
+                        <TablixColumn><Width>3.70000in</Width></TablixColumn>
+                    </TablixColumns>
+                    <TablixRows>
+                        <TablixRow><Height>0.24000in</Height><TablixCells><TablixCell><CellContents><Textbox Name="ShipHeadNo"><Width>1.1in</Width><Height>0.24in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Shipment</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Textbox Name="ShipHeadVessel"><Width>1.0in</Width><Height>0.24in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Vessel</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Textbox Name="ShipHeadPort"><Width>1.1in</Width><Height>0.24in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Port</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Textbox Name="ShipHeadCrates"><Width>3.7in</Width><Height>0.24in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>Crates</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Bold</FontWeight><Color>#6b6357</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell></TablixCells></TablixRow>
+                        <TablixRow><Height>0.64000in</Height><TablixCells><TablixCell><CellContents><Textbox Name="ShipNo"><Width>1.1in</Width><Height>0.64in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!No.Value</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Textbox Name="ShipVessel"><Width>1.0in</Width><Height>0.64in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Vessel.Value</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Textbox Name="ShipPort"><Width>1.1in</Width><Height>0.64in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>=Fields!Port.Value</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>9pt</FontSize><FontWeight>Normal</FontWeight><Color>#1a1916</Color><TextAlign>Left</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox></CellContents></TablixCell><TablixCell><CellContents><Subreport Name="CratesFor"><Width>3.70000in</Width><Height>0.64000in</Height><ReportName>DispatchCrates</ReportName><Parameters><Parameter Name="Shipment"><Value>=Fields!No.Value</Value></Parameter></Parameters><NoRowsMessage>Nothing loaded for this shipment.</NoRowsMessage></Subreport></CellContents></TablixCell></TablixCells></TablixRow>
+                    </TablixRows>
+                </TablixBody>
+                <TablixRowHierarchy>
+                    <TablixMembers>
+                        <TablixMember><KeepWithGroup>After</KeepWithGroup><RepeatOnNewPage>true</RepeatOnNewPage></TablixMember>
+                        <TablixMember><Group Name="ShipmentDetails" /></TablixMember>
+                    </TablixMembers>
+                </TablixRowHierarchy>
+            </Tablix>
+        </ReportItems>
+    </Body>
+    <PageFooter>
+        <Height>0.35000in</Height>
+        <PrintOnFirstPage>true</PrintOnFirstPage>
+        <PrintOnLastPage>true</PrintOnLastPage>
+        <ReportItems>
+            <Textbox Name="Folio"><Top>0.1in</Top><Left>0in</Left><Width>7.5in</Width><Height>0.22in</Height><Style><FontFamily>Helvetica</FontFamily><FontSize>8pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Center</TextAlign><VerticalAlign>Middle</VerticalAlign></Style><Paragraphs><Paragraph><TextRuns><TextRun><Value>=&quot;Page &quot; &amp; Globals!PageNumber &amp; &quot; of &quot; &amp; Globals!TotalPages</Value><Style><FontFamily>Helvetica</FontFamily><FontSize>8pt</FontSize><FontWeight>Normal</FontWeight><Color>#6b6357</Color><TextAlign>Center</TextAlign><VerticalAlign>Middle</VerticalAlign></Style></TextRun></TextRuns></Paragraph></Paragraphs></Textbox>
+        </ReportItems>
+    </PageFooter>
+    <Page>
+        <PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth>
+        <LeftMargin>0.50000in</LeftMargin><RightMargin>0.50000in</RightMargin>
+        <TopMargin>0.50000in</TopMargin><BottomMargin>0.50000in</BottomMargin>
+    </Page>
+</Report>

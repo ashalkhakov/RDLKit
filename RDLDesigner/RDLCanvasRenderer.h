@@ -18,6 +18,11 @@
 @property (nonatomic, strong) RDLItem *hoverTablix;
 @property (nonatomic, assign) NSUInteger hoverColumn;
 @property (nonatomic, assign) RDLTablixPart hoverPart;
+// A column being dragged by its handle, and the grid column it would land in.
+// Drawn as an insertion line, so a legal drop is something you can see before
+// you let go.
+@property (nonatomic, strong) RDLItem *dragTablix;
+@property (nonatomic, assign) NSInteger dragColumnTarget;  // -1 when none
 // An open in-place editor covers the text it is editing; drawing it underneath
 // shows through the field on GNUstep and doubles it on Cocoa.
 @property (nonatomic, strong) RDLItem *editingItem;

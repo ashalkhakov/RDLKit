@@ -259,6 +259,8 @@
   _overlay.hoverTablix = _interaction.hoverTablix;
   _overlay.hoverColumn = _interaction.hoverColumn;
   _overlay.hoverPart = _interaction.hoverPart;
+  _overlay.dragTablix = _interaction.dragTablix;
+  _overlay.dragColumnTarget = _interaction.dragColumnTarget;
   _overlay.editingItem = _inPlaceEditor.editingItem;
   _overlay.editingCell = _inPlaceEditor.editingCell;
   [_renderer drawGeometry:[self geometry] overlay:_overlay bounds:self.bounds];

@@ -1,4 +1,5 @@
 #import "RDLEditingContext.h"
+#import "RDLPageGeometry.h"
 #import "RDLDocument.h"
 #import "RDLEditor.h"
 #import "RDLItemFactory.h"
@@ -9,16 +10,25 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 
 @implementation RDLEditingContext
 
-- (instancetype)initWithReport:(RDLReport *)report {
+- (instancetype)initWithDocument:(RDLDocument *)document {
   self = [super init];
   if (self) {
-    _document = [[RDLDocument alloc] initWithReport:report ?: [RDLSamples blankLetter]];
+    _document = document ?: [[RDLDocument alloc] initWithReport:[RDLSamples blankLetter]];
     _selection = [[RDLSelection alloc] init];
     _editor = [[RDLEditor alloc] initWithDocument:_document];
     _zoom = 1.0;
     _showsGrid = YES;
+    // So a document can be asked what is selected in it -- what the menu, the
+    // generator and "edit this subreport" all need. Weak on that side: the
+    // window controller holding this context is what decides its lifetime.
+    _document.context = self;
   }
   return self;
+}
+
+- (instancetype)initWithReport:(RDLReport *)report {
+  return [self initWithDocument:[[RDLDocument alloc]
+                                    initWithReport:report ?: [RDLSamples blankLetter]]];
 }
 
 - (instancetype)init {
@@ -48,7 +58,14 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 }
 
 - (void)loadSampleWithId:(NSString *)sampleId {
-  [self loadReport:[RDLSamples reportWithId:sampleId]];
+  RDLReport *report = [RDLSamples reportWithId:sampleId];
+  if (report == nil)
+    return;
+  // With the folder the sample came from, so its data documents and its
+  // subreports are found where they actually are.
+  [_document loadReport:report originURL:[RDLSamples URLForSampleWithId:sampleId]];
+  // The old report's items are gone, so any held reference must go with them.
+  [_selection reset];
 }
 
 #pragma mark - View state
@@ -107,6 +124,10 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
   RDLItem *item = [RDLItemFactory itemOfKind:kind atPoint:point inReport:self.report];
   if (item == nil)
     return;
+  if (point.cell != nil) {
+    [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+    return;
+  }
   // Insert directly after the selection when there is one, so the new element
   // appears where the user is looking rather than at the end of the band.
   NSUInteger index = [point.items count];
@@ -119,10 +140,71 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
   [_selection selectItem:item inBandWithKey:point.bandKey];
 }
 
+// A cell holds one report item, so putting a second thing in one means the
+// cell holds a Rectangle and both things go in that -- which is what Report
+// Builder does when you drop another item into a cell that already has a text
+// box in it. An empty cell just takes what it is given.
+- (void)addItem:(RDLItem *)item
+         toCell:(RDLTablixCell *)cell
+       ofTablix:(RDLTablix *)tablix
+        bandKey:(NSString *)bandKey {
+  RDLItem *existing = cell.item;
+  if (existing == nil) {
+    [_editor setItem:item inCell:cell ofTablix:tablix];
+    [_selection selectItem:item inBandWithKey:bandKey];
+    return;
+  }
+  RDLRectangle *box = [existing isKindOfClass:[RDLRectangle class]] ? (RDLRectangle *)existing : nil;
+  [_editor beginGroup:@"Add to Cell"];
+  if (box == nil) {
+    // Wrap what is there. The rectangle takes the cell, and the item that was
+    // in the cell goes to the top of it -- its own position means nothing in a
+    // cell, and inside a rectangle it does.
+    box = [[RDLRectangle alloc] init];
+    box.name = [RDLItemFactory uniqueNameWithPrefix:@"Rectangle" inReport:self.report];
+    box.width = existing.width > 0 ? existing.width : 1.6;
+    box.height = existing.height > 0 ? existing.height : 0.28;
+    existing.left = 0;
+    existing.top = 0;
+    [box.items addObject:existing];
+    [_editor setItem:box inCell:cell ofTablix:tablix];
+  }
+  // Below whatever is already in the box, so nothing lands on top of anything.
+  CGFloat top = 0;
+  for (RDLItem *sibling in box.items)
+    top = MAX(top, sibling.top + sibling.height);
+  item.left = 0;
+  item.top = top;
+  [_editor addItem:item into:box.items bandKey:bandKey];
+  [_editor endGroup];
+  [_selection selectItem:item inBandWithKey:bandKey];
+}
+
 - (void)deleteSelectedItem {
   RDLItem *item = [self selectedItem];
   if (item == nil)
     return;
+  // An item that is a cell's contents is not in any band's item list: deleting
+  // it empties the cell, and the cell stays where it is.
+  RDLTablix *tablix = nil;
+  RDLTablixCell *cell = [self.report cellContainingItem:item tablix:&tablix];
+  if (cell != nil) {
+    NSInteger row = -1, column = -1;
+    NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+    for (NSUInteger r = 0; r < [rows count]; r++) {
+      NSUInteger at = [rows[r].cells indexOfObjectIdenticalTo:cell];
+      if (at != NSNotFound) {
+        // In grid terms, which is what a selection holds: a crosstab's
+        // column-heading rows and a grouped tablix's row-header columns come
+        // before the body's own.
+        row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:r];
+        column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:at];
+      }
+    }
+    [_editor setItem:nil inCell:cell ofTablix:tablix];
+    [_selection selectCellOfTablix:tablix row:row column:column inBandWithKey:_selection.bandKey];
+    return;
+  }
   NSString *bandKey = nil;
   [_editor containerOfItem:item bandKey:&bandKey];
   if ([_editor removeItem:item])

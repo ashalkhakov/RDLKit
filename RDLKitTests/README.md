@@ -11,7 +11,7 @@ arrays of failure strings. A failure reads as a sentence, and several failures r
 
 ## What is covered
 
-One XCTest per check function — 65 of them, grouped into seven cases. A failure
+One XCTest per check function — 83 of them, grouped into eight cases. A failure
 names the area it came from, and any one can be run on its own.
 
 | Case | Tests | Covers |
@@ -22,6 +22,7 @@ names the area it came from, and any one can be run on its own.
 | `RDLBackendTests` | BackendRegistry, HTMLBackend, PDFBackend, RDLSubset, RDLSubset2 | The registry, and **HTML** and **PDF** through `renderPages:title:` over the supported subset |
 | `RDLDataSourceTests` | JSONPath, providers, binding | JSON / XML / CSV documents becoming rows; connection strings read and written; binding a whole report, including what it refuses to fetch; column types read off the values; and a dataset's link to its source as both a name and a resolved pointer |
 | `RDLJSONPathTests` | The path language | Goessner's store document, the one the cross-implementation comparisons quote: the article's own queries, every form a step can take, indexes and slices, unions, descent, filters, and the paths that are refused with a reason |
+| `RDLSubreportTests` | The element, the loader, rendering, checking | A `Subreport` through the writer and back; `ReportName` resolved beside the report that names it, including MS-RDL's absolute form and a report that shows itself; each master row showing only its own detail; the spec's error text when the definition is missing; `NoRowsMessage`; the detail row growing to fit; and the checker on parameters the subreport does not declare or was not given |
 | `RDLImportTests` | Zip, Docx, StyleSheet, Tab, Drawing, TableBinding, Importer, Fixture | The `.docx` container; paragraphs, runs, tables, sections, headers and footers, `MERGEFIELD` and `{placeholder}`; Word's style cascade; tabs as positions; pictures, rules and shapes left out; tables as data regions and how their columns are named; and the three fixtures imported end to end |
 
 `Fixtures/` holds three synthetic `.docx` files. They are real Word documents —

@@ -8,8 +8,21 @@
 // checks have a tablix with a row group to work on.
 // A textbox in the body, plus a rectangle holding one child, so the checks can
 // exercise nesting, ordering and container policy.
+// The data source a fixture's datasets read from. A report no longer comes
+// with one, and a dataset that names none is a fault the checker reports, so a
+// fixture that has datasets declares a source the way a real report does.
+static RDLDataSource *RDLDemoSource(RDLReport *report) {
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Demo";
+  source.dataProvider = @"JSON";
+  source.connectString = @"jsondata=[]";
+  [report.dataSources addObject:source];
+  return source;
+}
+
 static RDLReport *RDLEditableReport(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Editable"];
+  RDLDemoSource(r);
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Rows";
   ds.dataSourceName = @"Demo";
@@ -42,6 +55,7 @@ static RDLReport *RDLEditableReport(void) {
 
 static RDLReport *RDLGroupedJobs(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Grouped Jobs"];
+  RDLDemoSource(r);
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   ds.name = @"Jobs";
   ds.dataSourceName = @"Demo";
@@ -467,8 +481,9 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"report selection should insert into the body at top level");
   if (p.items != r.body.items)
     XCTFail(@"%@", @"insertion point should target the body items array");
-  if ([[RDLItemFactory elementKindsAllowedAt:p] count] != 6)
-    XCTFail(@"%@", @"band level should allow all six element kinds");
+  // Textbox, Line, Rectangle, Image, Tablix, Chart and Subreport.
+  if ([[RDLItemFactory elementKindsAllowedAt:p] count] != 7)
+    XCTFail(@"%@", @"band level should allow every element kind");
   if (![[p localizedDescription] isEqualToString:@"into Body"])
     XCTFail(@"%@", [NSString stringWithFormat:@"description %@", [p localizedDescription]]);
 
@@ -645,8 +660,8 @@ static RDLReport *RDLGroupedJobs(void) {
 
   // 3. Insertion honours policy and selects what it made.
   [ctx.selection selectReport];
-  if (!([[ctx allowedElementKinds] count] == 6))
-    XCTFail(@"%@", @"context: band level allows six kinds");
+  if (!([[ctx allowedElementKinds] count] == 7))
+    XCTFail(@"%@", @"context: band level allows every kind");
   [ctx addItemOfKind:@"Textbox"];
   RDLItem *added = [ctx selectedItem];
   if (!(added != nil))
@@ -665,8 +680,10 @@ static RDLReport *RDLGroupedJobs(void) {
   RDLRectangle *rect = (RDLRectangle *)[ctx selectedItem];
   if (!([rect isKindOfClass:[RDLRectangle class]]))
     XCTFail(@"%@", @"context: added a Rectangle");
-  if (!([[ctx allowedElementKinds] count] == 4))
-    XCTFail(@"%@", @"context: a Rectangle allows four kinds");
+  // Everything but the data regions: a Rectangle may hold a subreport, which
+  // is a reference to another report rather than a region bound to data.
+  if (!([[ctx allowedElementKinds] count] == 5))
+    XCTFail(@"%@", @"context: a Rectangle allows the simple kinds and a subreport");
   NSUInteger before = [ctx.report.body.items count];
   [ctx addItemOfKind:@"Tablix"];
   if (!([ctx.report.body.items count] == before))
@@ -1149,6 +1166,79 @@ static RDLReport *RDLGroupedJobs(void) {
   }
 }
 
+
+// The samples are files in the application's Resources, and the catalogue is a
+// file beside them. Either can be renamed without the other, and the result --
+// a menu item that opens nothing -- is exactly what this catches.
+- (void)testEverySampleInTheCatalogueIsAFileThatParses {
+  if ([[RDLSamples catalog] count] == 0) {
+    XCTFail(@"%@", @"the sample catalogue is empty: Samples/Samples.plist is not in the bundle");
+    return;
+  }
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    NSURL *url = [RDLSamples URLForSampleWithId:sampleId];
+    if (url == nil || ![[NSFileManager defaultManager] fileExistsAtPath:[url path]]) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' names %@.rdl, which is not in the bundle",
+                                                sampleId, entry[@"file"]]);
+      continue;
+    }
+    RDLReport *r = [RDLSamples reportWithId:sampleId];
+    if (r == nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' did not parse", sampleId]);
+    else if (![r.name isEqualToString:entry[@"title"]] && ![sampleId isEqualToString:@"letter"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' is called %@ in the catalogue and %@ in "
+                                                @"the file", sampleId, entry[@"title"], r.name]);
+  }
+}
+
+// The master-detail sample: one report showing another, once per row. It is
+// the reason the samples are files at all -- a Subreport names a report beside
+// it, and there is no "beside" for a report built in memory.
+- (void)testTheDispatchSampleShowsEachShipmentsCrates {
+  RDLReport *r = [RDLSamples harborDispatch];
+  if (r == nil) {
+    XCTFail(@"%@", @"the dispatch sample did not load");
+    return;
+  }
+  // Its detail report was found beside it and bound, or nothing below can pass.
+  RDLSubreport *sub = nil;
+  for (RDLItem *item in [r allItemsIncludingNested])
+    if ([item isKindOfClass:[RDLSubreport class]])
+      sub = (RDLSubreport *)item;
+  if (sub == nil || sub.definition == nil) {
+    XCTFail(@"%@", @"the sample's subreport should arrive with its definition loaded");
+    return;
+  }
+  NSMutableDictionary<NSString *, NSNumber *> *where = [NSMutableDictionary dictionary];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]]) {
+        NSString *text = [(RDLLaidOutTextbox *)item text] ?: @"";
+        if ([text length] && where[text] == nil)
+          where[text] = @(item.y);
+      }
+  // Summer is the default season, so the autumn shipment is not on the page,
+  // and neither is its cargo.
+  if (where[@"S-2026-13"] != nil || where[@"Salt-glazed jars"] != nil)
+    XCTFail(@"%@", @"the season parameter filters the shipments, and their crates with them");
+  if (where[@"Stoneware bowls"] == nil || where[@"Porcelain cups"] == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the crates are missing: %@", [where allKeys]]);
+    return;
+  }
+  // Each shipment's crates are drawn in its own row: the first shipment's
+  // above the second shipment, the second's below it.
+  double firstShipment = [where[@"S-2026-11"] doubleValue];
+  double secondShipment = [where[@"S-2026-12"] doubleValue];
+  if ([where[@"Stoneware bowls"] doubleValue] < firstShipment - 0.01 ||
+      [where[@"Stoneware bowls"] doubleValue] > secondShipment - 0.01)
+    XCTFail(@"%@", @"S-2026-11's crates belong in S-2026-11's row");
+  if ([where[@"Porcelain cups"] doubleValue] < secondShipment - 0.01)
+    XCTFail(@"%@", @"S-2026-12's crates belong in S-2026-12's row");
+  // And the shipment with nothing loaded says so, which is NoRowsMessage.
+  if (where[@"Nothing loaded for this shipment."] == nil)
+    XCTFail(@"%@", @"a shipment with no crates should say so rather than sit empty");
+}
 
 // Every sample has to pass the checker. A sample is what a person opens first
 // and copies from, so a broken reference in one is a lesson in the wrong

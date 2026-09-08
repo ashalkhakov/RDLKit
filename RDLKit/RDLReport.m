@@ -595,6 +595,11 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 
 @interface RDLColSpec : NSObject
 @property (nonatomic, copy) NSString *header, *value, *align, *aggregate, *field;
+// What the details cell holds: nil or "Textbox" for the ordinary column, and
+// the RDL element name otherwise -- "Subreport" for a column that shows
+// another report, which is what a master-detail table's last column is.
+@property (nonatomic, copy) NSString *kind;
+@property (nonatomic, copy) NSString *report;  // Subreport: the report it names
 @property (nonatomic, assign) CGFloat width;
 @end
 @implementation RDLColSpec
@@ -668,6 +673,24 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 - (NSString *)rdlElementName {
   return @"Image";
 }
+@end
+
+@implementation RDLSubreportParameter
+@end
+
+@implementation RDLSubreport
+
+- (instancetype)init {
+  self = [super init];
+  if (self)
+    _parameters = [NSMutableArray array];
+  return self;
+}
+
+- (NSString *)rdlElementName {
+  return @"Subreport";
+}
+
 @end
 
 @implementation RDLDataRegion
@@ -947,6 +970,15 @@ static NSString *RDLAggregateOfValue(NSString *value) {
         col[@"value"] = RDLCellValue(detail.cells[i]);
       if (dItem.style.textAlign != RDLTextAlignUnspecified)
         col[@"align"] = RDLStringFromTextAlign(dItem.style.textAlign);
+      // What the cell holds, when it is not the text box a column spec
+      // describes. A subreport is the one this designer can also build, so it
+      // names the report as well; anything else is recorded by kind alone, so
+      // that a rebuild knows to leave it where it is.
+      if (![dItem isKindOfClass:[RDLTextbox class]] && dItem != nil) {
+        col[@"kind"] = [dItem rdlElementName] ?: @"";
+        if ([dItem isKindOfClass:[RDLSubreport class]])
+          col[@"report"] = [(RDLSubreport *)dItem reportName] ?: @"";
+      }
     }
     if (aggRow && i < [aggRow.cells count]) {
       NSString *agg = RDLAggregateOfValue(RDLCellValue(aggRow.cells[i]) ?: @"");
@@ -1045,6 +1077,57 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
   return out;
 }
 
+
+// The members that render a header of their own, outermost first: one per
+// level of a hierarchy that carries a TablixHeader with a size. This mirrors
+// the layout engine's RDLHeaderWidth, which sums exactly those -- a details
+// member has no header and takes up no room, and a static total member has
+// none either.
+static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *members) {
+  NSMutableArray *chain = [NSMutableArray array];
+  NSArray<RDLTablixMember *> *level = members;
+  while ([level count]) {
+    RDLTablixMember *widest = nil;
+    for (RDLTablixMember *m in level)
+      if (m.header.size > 0 && (widest == nil || m.header.size > widest.header.size))
+        widest = m;
+    if (widest != nil) {
+      [chain addObject:widest];
+      level = widest.members;
+      continue;
+    }
+    // Nothing at this level renders a header; the levels inside it may.
+    NSMutableArray *next = [NSMutableArray array];
+    for (RDLTablixMember *m in level)
+      [next addObjectsFromArray:m.members];
+    level = next;
+  }
+  return chain;
+}
+
+- (NSArray<NSNumber *> *)rowHeaderColumnWidths {
+  NSMutableArray *widths = [NSMutableArray array];
+  for (RDLTablixMember *m in RDLHeaderMembers(self.rowHierarchy.members))
+    [widths addObject:@(m.header.size)];
+  return widths;
+}
+
+- (RDLItem *)rowHeaderItemAtLevel:(NSUInteger)level {
+  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.rowHierarchy.members);
+  return level < [members count] ? members[level].header.item : nil;
+}
+
+- (NSArray<NSNumber *> *)columnHeaderRowHeights {
+  NSMutableArray *heights = [NSMutableArray array];
+  for (RDLTablixMember *m in RDLHeaderMembers(self.columnHierarchy.members))
+    [heights addObject:@(m.header.size)];
+  return heights;
+}
+
+- (RDLItem *)columnHeaderItemAtLevel:(NSUInteger)level {
+  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.columnHierarchy.members);
+  return level < [members count] ? members[level].header.item : nil;
+}
 
 - (void)rebuildTablix {
   NSArray *specs = _columnSpecs ?: [self rdlDerivedColumns];
@@ -1293,6 +1376,18 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
     [self rdlBuildMatrix:cols headerHeight:hh rowHeight:rh];
     return;
   }
+  // What the current body holds that a spec cannot describe, by column, so it
+  // survives the rebuild. Only the details row: header and subtotal cells are
+  // scaffolding this builds, and a person editing those edits the spec.
+  NSMutableDictionary<NSNumber *, RDLItem *> *kepts = [NSMutableDictionary dictionary];
+  RDLTablixRow *wasDetail =
+      [_tablixBody.rows count] > 1 ? _tablixBody.rows[1] : _tablixBody.rows.firstObject;
+  for (NSUInteger k = 0; k < [wasDetail.cells count]; k++) {
+    RDLItem *was = wasDetail.cells[k].item;
+    if (was != nil && ![was isKindOfClass:[RDLTextbox class]])
+      kepts[@(k)] = was;
+  }
+
   RDLTablixBody *body = [[RDLTablixBody alloc] init];
   RDLTablixRow *header = [[RDLTablixRow alloc] init];
   header.height = hh;
@@ -1321,13 +1416,30 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
     hc.item = ht;
     [header.cells addObject:hc];
 
-    RDLTextbox *dt = [[RDLTextbox alloc] init];
-    dt.name = [NSString stringWithFormat:@"%@D%ld", self.name ?: @"T", (long)i];
-    dt.value = [c[@"value"] description] ?: @"";
-    if ([align length])
-      dt.style.textAlign = RDLTextAlignFromString(align);
     RDLTablixCell *dc = [[RDLTablixCell alloc] init];
-    dc.item = dt;
+    // A cell holding something a column spec has no words for -- a subreport, an
+    // image, a rectangle of items -- is not scaffolding: somebody put it there.
+    // Rebuilding the columns must carry it across rather than replace it with an
+    // empty text box, which is what this used to do.
+    RDLItem *kept = kepts[@(i)];
+    NSString *kind = [c[@"kind"] description];
+    if (kept != nil) {
+      dc.item = kept;
+    } else if ([kind isEqualToString:@"Subreport"]) {
+      // Asked for by the column rather than found in it: a column may be turned
+      // into a subreport column, and this is where that becomes a real cell.
+      RDLSubreport *sub = [[RDLSubreport alloc] init];
+      sub.name = [NSString stringWithFormat:@"%@S%ld", self.name ?: @"T", (long)i];
+      sub.reportName = [c[@"report"] description] ?: @"";
+      dc.item = sub;
+    } else {
+      RDLTextbox *dt = [[RDLTextbox alloc] init];
+      dt.name = [NSString stringWithFormat:@"%@D%ld", self.name ?: @"T", (long)i];
+      dt.value = [c[@"value"] description] ?: @"";
+      if ([align length])
+        dt.style.textAlign = RDLTextAlignFromString(align);
+      dc.item = dt;
+    }
     [detail.cells addObject:dc];
 
     NSString *val = [c[@"value"] description] ?: @"";
@@ -1341,6 +1453,8 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
     }
     RDLColSpec *spec = [[RDLColSpec alloc] init];
     spec.header = [c[@"header"] description] ?: @"";
+    spec.kind = kind;
+    spec.report = [c[@"report"] description];
     spec.value = val;
     spec.align = align;
     spec.aggregate = c[@"aggregate"];
@@ -1590,12 +1704,11 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.body.height = 4.0;
   r.pageFooter = [[RDLBand alloc] init];
   r.pageFooter.height = 0.4;
+  // No data sources and no datasets: a new report has no data, and a source
+  // that names no document is one nobody asked for. A dataset is a query into
+  // a source, so the source comes first -- which is the order Report Builder
+  // works in and what the designer now requires.
   r.dataSources = [NSMutableArray array];
-  RDLDataSource *dsrc = [[RDLDataSource alloc] init];
-  dsrc.name = @"Demo";
-  dsrc.dataProvider = @"JSON";
-  dsrc.connectString = @"";
-  [r.dataSources addObject:dsrc];
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
   r.embeddedImages = [NSMutableArray array];
@@ -1682,6 +1795,67 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   [a addObjectsFromArray:self.body.items];
   [a addObjectsFromArray:self.pageFooter.items];
   return a;
+}
+
+// Rectangle contents come back as -childItems; tablix cells do not, because a
+// cell's item is held by the cell rather than by the tablix, and the walks that
+// use -childItems (adoption, the designer outline) want the items a person can
+// see and move. So the tablix is opened here, once, rather than at every call
+// site that needs the whole tree.
+static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
+
+static void RDLCollectHeaderItems(NSArray<RDLTablixMember *> *members, NSMutableArray *into) {
+  for (RDLTablixMember *m in members) {
+    if (m.header.item)
+      RDLCollectNested(@[ m.header.item ], into);
+    RDLCollectHeaderItems(m.members, into);
+  }
+}
+
+static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
+  for (RDLItem *it in items) {
+    [into addObject:it];
+    RDLCollectNested([it childItems], into);
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      RDLTablix *tab = (RDLTablix *)it;
+      for (RDLTablixRow *row in tab.tablixBody.rows)
+        for (RDLTablixCell *cell in row.cells)
+          if (cell.item)
+            RDLCollectNested(@[ cell.item ], into);
+      for (NSArray<RDLTablixCell *> *cornerRow in tab.cornerRows)
+        for (RDLTablixCell *cell in cornerRow)
+          if (cell.item)
+            RDLCollectNested(@[ cell.item ], into);
+      RDLCollectHeaderItems(tab.rowHierarchy.members, into);
+      RDLCollectHeaderItems(tab.columnHierarchy.members, into);
+    }
+  }
+}
+
+- (NSArray<RDLItem *> *)allItemsIncludingNested {
+  NSMutableArray *a = [NSMutableArray array];
+  RDLCollectNested([self allItems], a);
+  return a;
+}
+
+- (RDLTablixCell *)cellContainingItem:(RDLItem *)item tablix:(RDLTablix **)outTablix {
+  if (item == nil)
+    return nil;
+  for (RDLItem *candidate in [self allItemsIncludingNested]) {
+    if (![candidate isKindOfClass:[RDLTablix class]])
+      continue;
+    RDLTablix *tablix = (RDLTablix *)candidate;
+    for (RDLTablixRow *row in tablix.tablixBody.rows)
+      for (RDLTablixCell *cell in row.cells)
+        if (cell.item == item) {
+          if (outTablix)
+            *outTablix = tablix;
+          return cell;
+        }
+  }
+  if (outTablix)
+    *outTablix = nil;
+  return nil;
 }
 
 - (RDLItem *)itemNamed:(NSString *)name inBand:(RDLBand **)outBand {

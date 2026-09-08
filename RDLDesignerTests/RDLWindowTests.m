@@ -18,8 +18,29 @@
 #import "RDLDatasetFieldsView.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLDesignerWindow.h"
+#import "RDLCanvasRenderer.h"
+#import "RDLInspectorView.h"
+#import "RDLSubreportParametersEditor.h"
 
 
+
+
+// A mouse event at a point in a view, which is what the canvas's interaction
+// converts back out of the window. Synthesised because the gestures worth
+// checking here are the ones nobody can check by reading the code.
+static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType type,
+                                    NSInteger clicks) {
+  NSPoint inWindow = [view convertPoint:point toView:nil];
+  return [NSEvent mouseEventWithType:type
+                            location:inWindow
+                       modifierFlags:0
+                           timestamp:0
+                        windowNumber:[[view window] windowNumber]
+                             context:nil
+                         eventNumber:0
+                          clickCount:clicks
+                            pressure:1];
+}
 
 @interface RDLWindowTests : RDLDesignerTestCase
 @end
@@ -196,6 +217,13 @@ static NSTabView *_centerTabViewOf(id wc) {
 
 - (void)testDatasetPanes {
   RDLReport *report = [RDLSamples blankLetter];
+  // A dataset reads from a data source, so the report needs one before it can
+  // have datasets -- the order the designer now requires.
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Files";
+  source.dataProvider = @"JSON";
+  source.connectString = @"jsondata=[]";
+  [report.dataSources addObject:source];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   NSUInteger before = [report.dataSets count];
 
@@ -283,6 +311,37 @@ static NSTabView *_centerTabViewOf(id wc) {
                                                [err localizedDescription]]);
     return;
   }
+  // Everything the menu sends to File's Owner has to exist on the app
+  // delegate. Cocoa reports a missing one as "Could not connect action" when
+  // the nib loads and then does nothing at all -- which is how Save and Save
+  // As came to be dead after they moved to the document architecture.
+  NSError *scanError = nil;
+  NSRegularExpression *actions =
+      [NSRegularExpression regularExpressionWithPattern:
+                               @"<action selector=\"([^\"]+)\" target=\"-2\""
+                                                options:0
+                                                  error:&scanError];
+  NSUInteger checked = 0;
+  for (NSTextCheckingResult *match in
+       [actions matchesInString:xib options:0 range:NSMakeRange(0, [xib length])]) {
+    NSString *name = [xib substringWithRange:[match rangeAtIndex:1]];
+    checked += 1;
+    if (![RDLAppDelegate instancesRespondToSelector:NSSelectorFromString(name)])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the menu sends -%@ to the app delegate, which "
+                                                @"does not implement it", name]);
+  }
+  if (checked == 0)
+    XCTFail(@"%@", @"no menu item targets File's Owner, which cannot be right");
+
+  // Save and Save As belong to the document in front, not to the delegate.
+  for (NSString *documentAction in @[ @"saveDocument:", @"saveDocumentAs:", @"openDocument:" ]) {
+    NSString *toOwner = [NSString stringWithFormat:@"<action selector=\"%@\" target=\"-2\"",
+                                                   documentAction];
+    if ([xib rangeOfString:toOwner].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"-%@ should go to the responder chain, so the "
+                                                @"open document answers it", documentAction]);
+  }
+
   if ([xib rangeOfString:@"title=\"New Report…\""].location == NSNotFound)
     XCTFail(@"%@", @"the File menu should offer New Report…, which opens the wizard");
   // The item and its action, in that order and close together, so this does
@@ -1301,12 +1360,11 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"with the dataset field pane in front");
 }
 
-// Opening a sample opens it for editing. It used to run it as well -- the
-// generator was brought to the front and laid the whole report out -- which is
-// a different thing to ask for, and the slower one.
-- (void)testOpeningASampleDoesNotRunIt {
+// Opening a sample opens it for editing, in a document of its own. It used to
+// run it as well -- the generator was brought to the front and laid the whole
+// report out -- which is a different thing to ask for, and the slower one.
+- (void)testOpeningASampleOpensADocumentAndDoesNotRunIt {
   RDLAppDelegate *app = [[RDLAppDelegate alloc] init];
-  app.context = [[RDLEditingContext alloc] init];
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"A sample" action:NULL keyEquivalent:@""];
   NSUInteger which = [[RDLSamples catalog] indexOfObjectPassingTest:
       ^BOOL(NSDictionary *entry, NSUInteger idx, BOOL *stop) {
@@ -1317,12 +1375,898 @@ static NSTabView *_centerTabViewOf(id wc) {
   [item setTag:(NSInteger)which];
 
   [app openSample:item];
-  if (![app.context.report.name isEqualToString:@"Harbor Manifest"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"loaded %@", app.context.report.name]);
+  RDLDocument *doc = (RDLDocument *)
+      [[[NSDocumentController sharedDocumentController] documents] lastObject];
+  if (![doc isKindOfClass:[RDLDocument class]]) {
+    XCTFail(@"%@", @"a sample opens as a document");
+    return;
+  }
+  if (![doc.report.name isEqualToString:@"Harbor Manifest"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"loaded %@", doc.report.name]);
   if (app.generator != nil)
     XCTFail(@"%@", @"opening a sample should not start the generator");
-  if (app.designer == nil)
+  BOOL edits = NO;
+  for (NSWindowController *wc in [doc windowControllers])
+    if ([wc isKindOfClass:[RDLDesignerWindow class]])
+      edits = YES;
+  if (!edits)
     XCTFail(@"%@", @"a sample opens where reports are edited");
+  // A document added to the shared controller outlives the test unless it is
+  // closed, and the next test would then find it in front.
+  [doc close];
+}
+
+
+
+
+// A dataset is a query into a data source, so there has to be a source first --
+// the order Report Builder works in, and what MS-RDL means by requiring
+// Query/DataSourceName. The navigator says so rather than making a dataset with
+// nowhere to read from.
+- (void)testADatasetNeedsADataSourceToReadFrom {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:
+                                                          [RDLReport emptyReportNamed:@"Empty"]];
+  RDLDatasetNavigator *nav = [[RDLDatasetNavigator alloc] initWithFrame:NSMakeRect(0, 0, 260, 300)
+                                                                context:ctx];
+  if ([nav canAddDataSet])
+    XCTFail(@"%@", @"a report with no data source cannot have a dataset yet");
+
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Files";
+  source.dataProvider = @"JSON";
+  source.connectString = @"jsondata=[]";
+  [ctx.report.dataSources addObject:source];
+  if (![nav canAddDataSet]) {
+    XCTFail(@"%@", @"with a source in the report, a dataset can be added");
+    return;
+  }
+  [nav addDataSet:nil];
+  RDLDataSet *added = [ctx.report.dataSets firstObject];
+  if (added == nil) {
+    XCTFail(@"%@", @"adding should make a dataset");
+    return;
+  }
+  // And it arrives pointed at that source, with the query that takes all of
+  // it: a dataset that reads nothing is the thing being prevented here.
+  if (![added.dataSourceName isEqualToString:@"Files"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"reads from %@", added.dataSourceName]);
+  if (![added.commandText isEqualToString:@"$[*]"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"query is %@", added.commandText]);
+}
+
+
+
+
+
+
+
+
+// The band has to be *visible*, not merely drawn: the first version painted it
+// as a 28%-grey wash on light paper, which is the same as not drawing it. Read
+// off the pixels, because that is the part nobody can check by reading code.
+- (void)testTheTablixHandleBandIsActuallyVisible {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                            zoom:1.0
+                                                     paperOrigin:NSMakePoint(0, 0)];
+  NSRect rect = NSZeroRect;
+  if (![geometry findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the tablix should have a rect");
+    return;
+  }
+  NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
+  NSBitmapImageRep *bitmap =
+      [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
+                                              pixelsWide:(NSInteger)size.width
+                                              pixelsHigh:(NSInteger)size.height
+                                           bitsPerSample:8
+                                         samplesPerPixel:4
+                                                hasAlpha:YES
+                                                isPlanar:NO
+                                          colorSpaceName:NSCalibratedRGBColorSpace
+                                             bytesPerRow:0
+                                            bitsPerPixel:0];
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap]];
+  // The canvas is a flipped view and a bitmap is not, so the drawing is turned
+  // over to match -- otherwise every pixel read here is from somewhere else.
+  NSAffineTransform *flip = [NSAffineTransform transform];
+  [flip translateXBy:0 yBy:size.height];
+  [flip scaleXBy:1 yBy:-1];
+  [flip concat];
+  RDLCanvasRenderer *renderer = [[RDLCanvasRenderer alloc] initWithContext:ctx];
+  [renderer drawGeometry:geometry
+                 overlay:[[RDLCanvasOverlay alloc] init]
+                  bounds:NSMakeRect(0, 0, size.width, size.height)];
+  [NSGraphicsContext restoreGraphicsState];
+
+  // The band runs the whole width above the grid, so what it is compared
+  // against is the page itself: the canvas paints paper #f6f1e8, and a band
+  // that cannot be told apart from it is a band nobody can see.
+  NSColor *paper = [[NSColor colorWithCalibratedRed:0.965 green:0.945 blue:0.910 alpha:1]
+      colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *band = [[bitmap colorAtX:(NSInteger)(NSMinX(rect) + 20)
+                                  y:(NSInteger)(NSMinY(rect) - 6)]
+      colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *left = [[bitmap colorAtX:(NSInteger)(NSMinX(rect) - 6)
+                                  y:(NSInteger)(NSMidY(rect))]
+      colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (band == nil || left == nil) {
+    XCTFail(@"%@", @"nothing was drawn where the band belongs");
+    return;
+  }
+  for (NSColor *sample in @[ band, left ]) {
+    CGFloat difference = fabs([sample redComponent] - [paper redComponent]) +
+                         fabs([sample greenComponent] - [paper greenComponent]) +
+                         fabs([sample blueComponent] - [paper blueComponent]);
+    if (difference < 0.15)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the band is invisible against the page: %@",
+                                                sample]);
+  }
+
+  // And it reads as one handle per column rather than as a single bar: the
+  // boundary between two of them is drawn, so there is something to aim at.
+  CGFloat boundary = NSMinX(rect) + [RDLTablixGeometry widthOfBodyColumn:0 of:tablix zoom:1.0];
+  NSColor *seam = [[bitmap colorAtX:(NSInteger)boundary y:(NSInteger)(NSMinY(rect) - 6)]
+      colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  CGFloat fromFill = fabs([seam redComponent] - [band redComponent]) +
+                     fabs([seam greenComponent] - [band greenComponent]) +
+                     fabs([seam blueComponent] - [band blueComponent]);
+  if (fromFill < 0.1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the handles are not separated from each other: "
+                                              @"%@ at the seam, %@ in the middle", seam, band]);
+}
+
+// A drag that changes nothing until the drop must not open an undo group it
+// never closes: the group stayed open, and the next Cmd+Z threw "undo was
+// called with too many nested undo groups".
+- (void)testDraggingAColumnLeavesTheUndoStackBalanced {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  NSString *first = tablix.columnSpecs[0][@"header"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:tablix rect:&rect];
+  CGFloat x = NSMinX(rect);
+  for (NSUInteger i = 0; i < 2; i++)
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:ctx.zoom];
+
+  [canvas mouseDown:RDLMouseEventInView(canvas, NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 6),
+                                        NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
+                                           NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
+                                      NSEventTypeLeftMouseUp, 1)];
+
+  if ([ctx.document.undoManager groupingLevel] != 0) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the drag left %ld undo groups open",
+                                              (long)[ctx.document.undoManager groupingLevel]]);
+    return;
+  }
+  // And undo works, which is what the open group broke.
+  [ctx.document.undoManager undo];
+  if (![tablix.columnSpecs[0][@"header"] isEqualToString:first])
+    XCTFail(@"%@", @"undo should put the column back where it was");
+}
+
+
+
+// Groups are re-nested by dragging one above another in its list -- the order
+// of the list is the order of the groups, outermost first -- which is what
+// Report Builder's Grouping pane does and the only place it can be done: a
+// group's handle on the canvas is a bracket, not something you drag.
+- (void)testGroupsCanBeReNestedByDraggingInTheList {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *matrix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      matrix = (RDLTablix *)item;
+  RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:matrix context:ctx];
+  if (editor == nil || [editor.rowGroups count] < 2) {
+    XCTFail(@"%@", @"the crosstab nests two row groups, which is what re-nesting needs");
+    return;
+  }
+  NSString *outer = editor.rowGroups[0];
+  NSString *inner = editor.rowGroups[1];
+
+  // Drop the inner one above the outer one: they swap.
+  if (![editor moveRowGroup:inner toIndex:0])
+    XCTFail(@"%@", @"the inner group should move");
+  if (![editor.rowGroups[0] isEqualToString:inner] ||
+      ![editor.rowGroups[1] isEqualToString:outer])
+    XCTFail(@"%@", [NSString stringWithFormat:@"re-nesting did not take: %@", editor.rowGroups]);
+
+  // And back the other way: dropping below has to account for the place the
+  // group vacates, or it lands one short of where it was let go.
+  if (![editor moveRowGroup:inner toIndex:2])
+    XCTFail(@"%@", @"and back again");
+  if (![editor.rowGroups[0] isEqualToString:outer] ||
+      ![editor.rowGroups[1] isEqualToString:inner])
+    XCTFail(@"%@", [NSString stringWithFormat:@"dragging downwards landed wrong: %@",
+                                              editor.rowGroups]);
+
+  // Column groups are the same list in the other direction.
+  if ([editor.colGroups count] >= 2) {
+    NSString *secondColumn = editor.colGroups[1];
+    [editor moveColumnGroup:secondColumn toIndex:0];
+    if (![editor.colGroups[0] isEqualToString:secondColumn])
+      XCTFail(@"%@", @"column groups re-nest the same way");
+  }
+  [[editor valueForKey:@"window"] close];
+}
+
+// A crosstab's columns are its groups: the row-header columns belong to the row
+// groups and the single body column is the measure, so there is nothing to
+// reorder. Report Builder answers this with the handle itself -- a group is
+// drawn as a bracket, a movable column as a grip -- and refuses the drag
+// rather than doing nothing silently.
+- (void)testAGroupsHandleCannotBeDraggedAndSaysSo {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *matrix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      matrix = (RDLTablix *)item;
+  if ([RDLTablixGeometry headerColumnCountOf:matrix] == 0) {
+    XCTFail(@"%@", @"the crosstab groups its rows, which is the point of it");
+    return;
+  }
+  // A row-header column belongs to a group: not movable.
+  if ([RDLTablixGeometry tablix:matrix columnIsMovable:0])
+    XCTFail(@"%@", @"a group's header column is not a column you can reorder");
+  // Neither is the one body column: there is nowhere for it to go.
+  NSUInteger onlyBody = [RDLTablixGeometry headerColumnCountOf:matrix];
+  if ([RDLTablixGeometry tablix:matrix columnIsMovable:onlyBody])
+    XCTFail(@"%@", @"a table with one column has nothing to move it past");
+
+  // Where there are several, they move.
+  RDLReport *invoice = [RDLSamples atelierInvoice];
+  RDLTablix *table = nil;
+  for (RDLItem *item in invoice.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      table = (RDLTablix *)item;
+  if (![RDLTablixGeometry tablix:table columnIsMovable:0])
+    XCTFail(@"%@", @"a table with several columns can have them reordered");
+
+  // And the gesture on the crosstab changes nothing: the press selects the
+  // region, and the drag never starts.
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:matrix rect:&rect];
+  NSArray *before = matrix.columnSpecs;
+  CGFloat x = NSMinX(rect);
+  for (NSUInteger i = 0; i < 2; i++)
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:matrix zoom:ctx.zoom];
+  [canvas mouseDown:RDLMouseEventInView(canvas, NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 6),
+                                        NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
+                                           NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
+                                      NSEventTypeLeftMouseUp, 1)];
+  if (![matrix.columnSpecs isEqualToArray:before])
+    XCTFail(@"%@", @"dragging a group handle must not rearrange anything");
+  if ([ctx.document.undoManager groupingLevel] != 0)
+    XCTFail(@"%@", @"and it must not leave an undo group open");
+  if (ctx.selection.item != matrix)
+    XCTFail(@"%@", @"the press still selects the region, which is what a handle is for");
+}
+
+// The whole gesture, the way a hand does it: press in the band above a column,
+// drag sideways past the slop threshold, let go over another column. Checked
+// end to end because the geometry being right is not the same as the drag
+// being wired -- the first version of this drew a band nobody could grab.
+- (void)testDraggingAColumnHandleMovesTheColumn {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  NSString *first = tablix.columnSpecs[0][@"header"];
+
+  RDLPageGeometry *geometry = [canvas geometry];
+  NSRect rect = NSZeroRect;
+  if (![geometry findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the canvas has no rect for the tablix");
+    return;
+  }
+  // Where to take hold of the first column, and where to drop it: over the
+  // third one.
+  NSPoint grab = NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 4);
+  CGFloat x = NSMinX(rect);
+  for (NSUInteger i = 0; i < 2; i++)
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:ctx.zoom];
+  NSPoint drop = NSMakePoint(x + 6, NSMinY(rect) - 4);
+
+  [canvas mouseDown:RDLMouseEventInView(canvas, grab, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, drop, NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, drop, NSEventTypeLeftMouseUp, 1)];
+
+  if ([tablix.columnSpecs[0][@"header"] isEqualToString:first]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"dragging the handle did not move the column: %@",
+                                              [tablix.columnSpecs valueForKey:@"header"]]);
+    return;
+  }
+  if (![tablix.columnSpecs[2][@"header"] isEqualToString:first])
+    XCTFail(@"%@", [NSString stringWithFormat:@"it landed in the wrong place: %@",
+                                              [tablix.columnSpecs valueForKey:@"header"]]);
+}
+
+// A grouped tablix renders a header column per level of grouping to the left
+// of its body, and the canvas draws the table the layout engine draws: without
+// them the whole grid sat 1.2in left of where it prints, and the subtotal row
+// lined up with the wrong column.
+- (void)testAGroupedTablixDrawsItsRowHeaderColumn {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  if ([tablix.rowGroups count] == 0) {
+    XCTFail(@"%@", @"the sample groups its rows, which is the point of it");
+    return;
+  }
+  NSUInteger headers = [RDLTablixGeometry headerColumnCountOf:tablix];
+  if (headers != [tablix.rowGroups count]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu header columns for %lu groups",
+                                              (unsigned long)headers,
+                                              (unsigned long)[tablix.rowGroups count]]);
+    return;
+  }
+  // The grid is the header columns and then the body's own.
+  if ([RDLTablixGeometry columnCountOf:tablix] !=
+      headers + [tablix.tablixBody.columns count])
+    XCTFail(@"%@", @"the grid counts both");
+  // What is in a header column: the group's own header against the details
+  // row, and nothing under it -- the subtotal rows belong to the group.
+  if ([RDLTablixGeometry itemOf:tablix inRow:1 column:0] == nil)
+    XCTFail(@"%@", @"the group's header belongs in its header column");
+  // And the body cells are still reachable, one column further right.
+  if ([RDLTablixGeometry cellOf:tablix inRow:1 column:0] != nil)
+    XCTFail(@"%@", @"a header column is not a body cell");
+  if ([RDLTablixGeometry cellOf:tablix inRow:1 column:headers] !=
+      [tablix.tablixBody.rows[1].cells firstObject])
+    XCTFail(@"%@", @"the first body cell sits after the header columns");
+}
+
+// Columns are dragged by their handles in the band above the grid, the way
+// Report Builder moves them. Picking one up and dropping it on another takes
+// its heading, its value and its width with it, as one undoable step.
+- (void)testAColumnCanBeDraggedToAnotherPlace {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  NSArray *before = tablix.columnSpecs;
+  if ([before count] < 3) {
+    XCTFail(@"%@", @"the invoice has several columns");
+    return;
+  }
+  NSString *movedHeader = before[0][@"header"];
+
+  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                            zoom:1.0
+                                                     paperOrigin:NSMakePoint(0, 0)];
+  NSRect rect = NSZeroRect;
+  [geometry findRectOfItem:tablix rect:&rect];
+  // The handle of the first column: in the band, above the grid.
+  NSUInteger column = 99;
+  if (![RDLTablixGeometry tablix:tablix
+                        itemRect:rect
+             handleColumnAtPoint:NSMakePoint(NSMinX(rect) + 4, NSMinY(rect) - 4)
+                          column:&column
+                            zoom:1.0] ||
+      column != 0) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the first column's handle is above it: %lu",
+                                              (unsigned long)column]);
+    return;
+  }
+  // Nothing above the band, and nothing in the corner to the left of it.
+  NSUInteger ignored = 0;
+  if ([RDLTablixGeometry tablix:tablix
+                       itemRect:rect
+            handleColumnAtPoint:NSMakePoint(NSMinX(rect) - 4, NSMinY(rect) - 4)
+                         column:&ignored
+                           zoom:1.0])
+    XCTFail(@"%@", @"the corner moves the region, not a column");
+
+  // Dropped on the third column.
+  CGFloat x = NSMinX(rect);
+  for (NSUInteger i = 0; i < 2; i++)
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:1.0];
+  NSUInteger target = 0;
+  if (![RDLTablixGeometry tablix:tablix
+                        itemRect:rect
+               dropColumnAtPoint:NSMakePoint(x + 4, NSMinY(rect) - 4)
+                          column:&target
+                            zoom:1.0]) {
+    XCTFail(@"%@", @"the drop should land in a column");
+    return;
+  }
+  [ctx.editor moveTablixColumnAtIndex:0
+                              toIndex:(NSUInteger)[RDLTablixGeometry bodyColumnOf:tablix
+                                                                    forGridColumn:target]
+                             ofTablix:tablix];
+  if (![tablix.columnSpecs[2][@"header"] isEqualToString:movedHeader])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the column should have moved: %@",
+                                              [tablix.columnSpecs valueForKey:@"header"]]);
+  [ctx.document.undoManager undo];
+  if (![tablix.columnSpecs[0][@"header"] isEqualToString:movedHeader])
+    XCTFail(@"%@", @"and one undo should put it back");
+}
+
+// A tablix's cells take every click inside it, so the region itself is pointed
+// at by the band above and to the left of its grid -- Report Builder's row and
+// column handles, in the same place, and where the group brackets are drawn.
+- (void)testTheTablixHandleBandSelectsTheWholeRegion {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                            zoom:1.0
+                                                     paperOrigin:NSMakePoint(0, 0)];
+  NSRect rect = NSZeroRect;
+  if (![geometry findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the tablix should have a rect");
+    return;
+  }
+  // Inside the grid: a cell, or what is in it -- never the tablix.
+  NSString *kind = nil, *bandKey = nil;
+  NSRect hitRect = NSZeroRect;
+  RDLItem *inside = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) + 4)
+                                     kind:&kind
+                                  bandKey:&bandKey
+                                     rect:&hitRect];
+  if (inside == tablix)
+    XCTFail(@"%@", @"a click inside the grid lands in a cell");
+
+  // In the band above it: the region itself, and draggable by it.
+  RDLItem *band = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) - 4)
+                                   kind:&kind
+                                bandKey:&bandKey
+                                   rect:&hitRect];
+  if (band != tablix) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the handle band should select the tablix: %@",
+                                              band]);
+    return;
+  }
+  if (![kind isEqualToString:RDLHandleMove])
+    XCTFail(@"%@", @"and the region can be dragged by its band");
+  // The band to its left says the same.
+  if ([geometry itemAtPoint:NSMakePoint(NSMinX(rect) - 4, NSMidY(rect))
+                       kind:&kind
+                    bandKey:&bandKey
+                       rect:&hitRect] != tablix)
+    XCTFail(@"%@", @"the band down the left selects it too");
+  (void)ctx;
+}
+
+// The Edit Tablix dialog's group lists were readable and nothing else: the
+// only way to group by a field was to drag a column into them, and there was
+// no way at all to stop grouping. They now add, rename and remove.
+- (void)testTheTablixDialogEditsTheGroups {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:tablix context:ctx];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the tablix editor did not load");
+    return;
+  }
+  NSUInteger before = [editor.rowGroups count];
+  [editor addRowGroup:nil];
+  if ([editor.rowGroups count] != before + 1) {
+    XCTFail(@"%@", @"the + beside the row groups should add one");
+    return;
+  }
+  // It starts on a field of the dataset, and can be typed over.
+  NSTableView *rowTable = [editor valueForKey:@"rowGroupTable"];
+  // Through the data source protocol, which is how the table itself writes a
+  // typed-in value back.
+  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)editor;
+  [source tableView:rowTable
+       setObjectValue:@"Port"
+       forTableColumn:[[rowTable tableColumns] firstObject]
+                  row:(NSInteger)before];
+  if (![[editor.rowGroups lastObject] isEqualToString:@"Port"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"typing a field into the list should group by it: "
+                                              @"%@", editor.rowGroups]);
+  [rowTable selectRowIndexes:[NSIndexSet indexSetWithIndex:before] byExtendingSelection:NO];
+  [editor removeRowGroup:nil];
+  if ([editor.rowGroups count] != before)
+    XCTFail(@"%@", @"the − should stop grouping by the selected field");
+
+  // Column groups, the same way -- that is what makes a crosstab.
+  NSUInteger columns = [editor.colGroups count];
+  [editor addColumnGroup:nil];
+  if ([editor.colGroups count] != columns + 1)
+    XCTFail(@"%@", @"the + beside the column groups should add one");
+  NSTableView *colTable = [editor valueForKey:@"colGroupTable"];
+  [colTable selectRowIndexes:[NSIndexSet indexSetWithIndex:columns] byExtendingSelection:NO];
+  [editor removeColumnGroup:nil];
+  if ([editor.colGroups count] != columns)
+    XCTFail(@"%@", @"and the − should take it away again");
+  [[editor valueForKey:@"window"] close];
+}
+
+// Selecting something is asking to see its settings. The right pane is two
+// tabs -- the report, and the attributes of what is selected -- and only a
+// dataset and a parameter used to bring the attributes forward, so clicking an
+// element while the Report tab was showing looked as though nothing happened.
+- (void)testSelectingAnythingBringsTheAttributesForward {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSTabView *right = [wc valueForKey:@"rightTabView"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+
+  // The Report tab, as if the person had clicked R to set the page size...
+  [right selectTabViewItemAtIndex:0];
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  if ([right indexOfTabViewItem:[right selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"selecting an element should show its attributes");
+  RDLInspectorView *inspector = [wc valueForKey:@"inspector"];
+  if ([[inspector valueForKey:@"tablixBox"] isHidden])
+    XCTFail(@"%@", @"and the attributes shown should be the tablix's");
+
+  // ... and again for an empty cell, which is also something with settings.
+  [right selectTabViewItemAtIndex:0];
+  [ctx.selection selectCellOfTablix:tablix row:1 column:0 inBandWithKey:@"body"];
+  if ([right indexOfTabViewItem:[right selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"selecting a cell should show its attributes too");
+
+  // Selecting the report itself is the exception: the Report tab is where its
+  // own settings are, so nothing is yanked away from under the person.
+  [right selectTabViewItemAtIndex:0];
+  [ctx.selection selectReport];
+  if ([right indexOfTabViewItem:[right selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"selecting the report should leave the Report tab showing");
+}
+
+// The Insert panel is as tall as what it has to show: a caption, one button per
+// allowed element kind, and Cancel. It was laid out to a formula that did not
+// match where the caption and Cancel actually sat, so with every kind allowed
+// the first buttons ended up under the caption.
+- (void)testTheInsertPanelIsTallEnoughForEveryKind {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  if (![wc loadAddElementPanel]) {
+    XCTFail(@"%@", @"the Add Element panel did not load");
+    return;
+  }
+  [ctx.selection selectBandWithKey:@"body"];
+  NSArray<NSString *> *kinds = [ctx allowedElementKinds];
+  [wc layOutAddElementPanelForKinds:kinds];
+
+  NSWindow *panel = [wc valueForKey:@"palettePanel"];
+  NSView *content = [panel contentView];
+  NSTextField *caption = [wc valueForKey:@"paletteInfoLabel"];
+  NSButton *cancel = [wc valueForKey:@"paletteCancelButton"];
+  NSMutableArray<NSValue *> *rows = [NSMutableArray array];
+  for (NSView *view in [content subviews])
+    if (view != caption && view != cancel)
+      [rows addObject:[NSValue valueWithRect:[view frame]]];
+  if ([rows count] != [kinds count]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu buttons for %lu kinds",
+                                              (unsigned long)[rows count],
+                                              (unsigned long)[kinds count]]);
+    return;
+  }
+  for (NSValue *value in rows) {
+    NSRect r = [value rectValue];
+    if (!NSContainsRect([content bounds], r))
+      XCTFail(@"%@", [NSString stringWithFormat:@"a button at %@ is outside the panel %@",
+                                                NSStringFromRect(r),
+                                                NSStringFromRect([content bounds])]);
+    if (NSIntersectsRect(r, [caption frame]))
+      XCTFail(@"%@", @"a button is under the caption");
+    if (NSIntersectsRect(r, [cancel frame]))
+      XCTFail(@"%@", @"a button is under Cancel");
+  }
+}
+
+// The outline is the report's tree, and a tablix is a grid: its rows and the
+// cells in them belong in it, or an item inside a cell is somewhere the
+// outline says nothing about.
+- (void)testTheOutlineShowsATablixsRowsAndCells {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSOutlineView *outline = [wc valueForKey:@"outline"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLItem *cellItem = [tablix.tablixBody.rows[1].cells firstObject].item;
+
+  NSMutableArray<NSString *> *titles = [NSMutableArray array];
+  for (NSInteger row = 0; row < [outline numberOfRows]; row++)
+    [titles addObject:[[outline dataSource] outlineView:outline
+                              objectValueForTableColumn:[[outline tableColumns] firstObject]
+                                                 byItem:[outline itemAtRow:row]] ?: @""];
+  BOOL sawRow = NO, sawCell = NO;
+  for (NSString *title in titles) {
+    if ([title hasPrefix:@"Row "])
+      sawRow = YES;
+    if ([title hasPrefix:@"Column "] &&
+        [title rangeOfString:cellItem.name ?: @"?"].location != NSNotFound)
+      sawCell = YES;
+  }
+  if (!sawRow || !sawCell)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the outline should show the grid: %@", titles]);
+
+  // Selecting an item in a cell highlights that cell's row in the outline.
+  [ctx.selection selectItem:cellItem inBandWithKey:@"body"];
+  NSInteger selected = [outline selectedRow];
+  if (selected < 0) {
+    XCTFail(@"%@", @"selecting a cell's item should highlight it in the outline");
+    return;
+  }
+  NSString *title = [[outline dataSource] outlineView:outline
+                            objectValueForTableColumn:[[outline tableColumns] firstObject]
+                                               byItem:[outline itemAtRow:selected]];
+  if ([title rangeOfString:cellItem.name ?: @"?"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the highlighted row is %@", title]);
+}
+
+#pragma mark - A tablix is a container
+
+// Each cell of a tablix holds one report item -- MS-RDL's CellContents holds 0
+// or 1 -- so a second thing put in a cell means the cell holds a Rectangle and
+// both things go in that. Report Builder does the same, and this is that
+// behaviour, undoable in one step.
+- (void)testASecondItemInACellWrapsWhatIsThereInARectangle {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  if (tablix == nil || [tablix.tablixBody.rows count] < 2) {
+    XCTFail(@"%@", @"the invoice sample has a table with a details row");
+    return;
+  }
+  RDLTablixCell *cell = [tablix.tablixBody.rows[1].cells firstObject];
+  RDLItem *was = cell.item;
+  if (![was isKindOfClass:[RDLTextbox class]]) {
+    XCTFail(@"%@", @"the details cell starts as a text box");
+    return;
+  }
+
+  [ctx.selection selectItem:was inBandWithKey:@"body"];
+  [ctx addItemOfKind:@"Subreport"];
+  if (![cell.item isKindOfClass:[RDLRectangle class]]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the cell should now hold a Rectangle: %@",
+                                              cell.item]);
+    return;
+  }
+  RDLRectangle *box = (RDLRectangle *)cell.item;
+  if ([box.items count] != 2 || box.items[0] != was ||
+      ![box.items[1] isKindOfClass:[RDLSubreport class]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"with both things in it: %@", box.items]);
+  // One undoable step: the wrap and the insert go back together.
+  [ctx.document.undoManager undo];
+  if (cell.item != was)
+    XCTFail(@"%@", @"undo should put the cell back as it was");
+}
+
+// Deleting a cell's contents empties the cell rather than removing anything
+// from the report's bands -- and the cell is then what is selected, so the next
+// thing inserted goes into it.
+- (void)testEmptyingACellLeavesTheCellSelected {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLTablixCell *cell = [tablix.tablixBody.rows[1].cells firstObject];
+  [ctx.selection selectItem:cell.item inBandWithKey:@"body"];
+  [ctx deleteSelectedItem];
+  if (cell.item != nil) {
+    XCTFail(@"%@", @"deleting a cell's contents should empty the cell");
+    return;
+  }
+  if (ctx.selection.scope != RDLSelectionScopeTablixCell || ctx.selection.tablix != tablix ||
+      ctx.selection.cellRow != 1 || ctx.selection.cellColumn != 0)
+    XCTFail(@"%@", @"and the empty cell is what stays selected");
+
+  // Which is where the next element goes, with nothing to wrap.
+  [ctx addItemOfKind:@"Textbox"];
+  if (![cell.item isKindOfClass:[RDLTextbox class]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"an empty cell takes what it is given: %@",
+                                              cell.item]);
+}
+
+// The canvas finds items inside cells, which is what makes them selectable at
+// all: a click resolves to the item, and its rect is the cell's.
+- (void)testTheCanvasFindsItemsInsideCells {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLItem *cellItem = [tablix.tablixBody.rows[1].cells firstObject].item;
+  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                            zoom:1.0
+                                                     paperOrigin:NSMakePoint(0, 0)];
+  NSRect cellRect = NSZeroRect;
+  if (![geometry findRectOfItem:cellItem rect:&cellRect]) {
+    XCTFail(@"%@", @"an item in a cell has a rect of its own -- the cell's");
+    return;
+  }
+  NSString *kind = nil;
+  NSString *bandKey = nil;
+  NSRect hitRect = NSZeroRect;
+  RDLItem *hit = [geometry itemAtPoint:NSMakePoint(NSMidX(cellRect), NSMidY(cellRect))
+                                  kind:&kind
+                               bandKey:&bandKey
+                                  rect:&hitRect];
+  if (hit != cellItem)
+    XCTFail(@"%@", [NSString stringWithFormat:@"clicking a cell should hit what is in it: %@",
+                                              hit]);
+  // And it is select-only: a cell decides where its contents are.
+  if (![kind isEqualToString:RDLHandleCell])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a cell's item is not draggable: %@", kind]);
+}
+
+#pragma mark - Subreports
+
+// A subreport is a reference to another report file. What the designer has to
+// do with one is show which report, let its parameters be given values, and
+// open that report as its own document -- not edit its contents in place.
+- (void)testASubreportCanBeAddedAndTheInspectorShowsIt {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:
+                                                          [RDLReport emptyReportNamed:@"Master"]];
+  [ctx.selection selectReport];
+  [ctx addItemOfKind:@"Subreport"];
+  RDLItem *added = [ctx selectedItem];
+  if (![added isKindOfClass:[RDLSubreport class]]) {
+    XCTFail(@"%@", @"a Subreport should be one of the elements that can be added");
+    return;
+  }
+  if (![added.name isEqualToString:@"Subreport1"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"named %@", added.name]);
+
+  RDLSubreport *sub = (RDLSubreport *)added;
+  sub.reportName = @"Crates";
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 600)
+                                                                context:ctx];
+  [inspector reload];
+  NSTextField *nameField = [inspector valueForKey:@"subreportNameField"];
+  NSView *box = [inspector valueForKey:@"subreportBox"];
+  if (nameField == nil || box == nil) {
+    XCTFail(@"%@", @"the inspector has no subreport section");
+    return;
+  }
+  if ([box isHidden])
+    XCTFail(@"%@", @"selecting a subreport should show its section");
+  if (![[nameField stringValue] isEqualToString:@"Crates"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the section shows %@", [nameField stringValue]]);
+  // Why a subreport is blank is the question this label exists to answer.
+  NSTextField *status = [inspector valueForKey:@"subreportStatusLabel"];
+  if ([[status stringValue] length] == 0)
+    XCTFail(@"%@", @"the section should say whether the report has been found");
+}
+
+// MS-RDL resolves a subreport's name against the folder of the report that
+// names it -- not the subreport's own folder, and not the working directory.
+- (void)testASubreportResolvesBesideTheReportThatNamesIt {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:
+                                                          [RDLReport emptyReportNamed:@"Master"]];
+  RDLSubreport *sub = [[RDLSubreport alloc] init];
+  sub.name = @"Detail";
+  sub.reportName = @"Crates";
+  [ctx.report.body.items addObject:sub];
+  [ctx.selection selectItem:sub inBandWithKey:@"body"];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  // With no file of its own there is nothing to resolve against, and the
+  // designer says so rather than guessing at the working directory.
+  if ([wc URLForSubreport:sub] != nil)
+    XCTFail(@"%@", @"an unsaved report cannot resolve a subreport name");
+
+  NSString *dir = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                            withIntermediateDirectories:YES
+                                             attributes:nil
+                                                  error:NULL];
+  NSURL *master = [NSURL fileURLWithPath:[dir stringByAppendingPathComponent:@"Master.rdl"]];
+  NSError *err = nil;
+  if (![ctx.document saveToURL:master error:&err]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"could not save: %@", err.localizedDescription]);
+    return;
+  }
+  NSURL *resolved = [wc URLForSubreport:sub];
+  NSString *want = [dir stringByAppendingPathComponent:@"Crates.rdl"];
+  if (![[resolved path] isEqualToString:[[NSURL fileURLWithPath:want] path]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"resolved to %@, wanted %@", [resolved path], want]);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
+}
+
+// The parameters panel is the one place the two reports meet: the names come
+// from the subreport's own definition, and the values are expressions in the
+// master's scope.
+- (void)testTheParametersPanelOffersTheSubreportsOwnParameters {
+  RDLReport *master = [RDLReport emptyReportNamed:@"Master"];
+  RDLSubreport *sub = [[RDLSubreport alloc] init];
+  sub.name = @"Detail";
+  sub.reportName = @"Crates";
+  RDLReport *definition = [RDLReport emptyReportNamed:@"Crates"];
+  RDLParameter *shipment = [[RDLParameter alloc] init];
+  shipment.name = @"Shipment";
+  [definition.parameters addObject:shipment];
+  sub.definition = definition;
+  [master.body.items addObject:sub];
+
+  RDLSubreportParametersEditor *editor =
+      [RDLSubreportParametersEditor editorForSubreport:sub inReport:master];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the parameters panel did not load");
+    return;
+  }
+  [editor addParameter:nil];
+  NSArray<RDLSubreportParameter *> *edited = [editor parameters];
+  if ([edited count] != 1 || ![[edited firstObject].name isEqualToString:@"Shipment"])
+    XCTFail(@"%@", [NSString stringWithFormat:
+                                 @"adding a row should start on the parameter the subreport "
+                                 @"declares and has not been given: %@", edited]);
+  [[editor valueForKey:@"window"] close];
 }
 
 // Clicking in the outline selects that report item, whatever was selected
@@ -1455,15 +2399,18 @@ static NSTabView *_centerTabViewOf(id wc) {
 // The inspector says so too, rather than showing an empty box beside a table
 // that shows a value.
 - (void)testAFieldWithNoColumnOfItsOwnSaysWhichItReads {
-  RDLReport *report = [RDLSamples harborManifest];
+  // Built here rather than taken from a sample: the samples are files now, and
+  // the writer spells every field's DataField out. A field with none is what a
+  // hand-written report looks like, and it is still what this has to explain.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Crates"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Crates";
+  [ds setFieldNames:@[ @"Item", @"Qty" ]];
+  [report.dataSets addObject:ds];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
-  RDLField *item = nil;
-  for (RDLField *f in [ds fields])
-    if ([f.name isEqualToString:@"Item"])
-      item = f;
+  RDLField *item = [[ds fields] firstObject];
   if (item == nil || [item.dataField length]) {
-    XCTFail(@"%@", @"the sample declares its fields by name, with no DataField");
+    XCTFail(@"%@", @"a field declared by name alone has no DataField");
     return;
   }
   RDLFieldInspectorView *inspector =

@@ -29,7 +29,8 @@ typedef NS_ENUM(NSInteger, RDLDiagnosticSeverity) {
 // The expression the complaint is about, as it was written.
 @property (nonatomic, copy) NSString *source;
 // "unknown-field", "unknown-function", "arity", "type", "scope", "syntax",
-// so a caller can filter or suppress by kind rather than by message text.
+// "no-data-source", so a caller can filter or suppress by kind rather than by
+// message text.
 @property (nonatomic, copy) NSString *rule;
 - (NSString *)oneLineDescription;
 @end

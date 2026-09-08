@@ -30,7 +30,11 @@ typedef NS_ENUM(NSInteger, RDLSelectionScope) {
   RDLSelectionScopeDataSet,
   RDLSelectionScopeDatasetField,
   RDLSelectionScopeDataSource,
-  RDLSelectionScopeParameter
+  RDLSelectionScopeParameter,
+  // A cell of a tablix with nothing in it. A cell that holds an item is
+  // pointed at by selecting that item; an empty one has no item to select, and
+  // is still where the next thing inserted will go.
+  RDLSelectionScopeTablixCell
 };
 
 extern NSString * const RDLSelectionDidChangeNotification;
@@ -73,6 +77,15 @@ extern NSString * const RDLSelectionDidChangeNotification;
     inBandWithKey:(NSString *)bandKey
            column:(NSInteger)column
              part:(RDLTablixPart)part;
+
+// An empty cell of a tablix: which tablix, and where in its grid.
+@property (nonatomic, readonly, strong) RDLTablix *tablix;
+@property (nonatomic, readonly, assign) NSInteger cellRow;     // -1 when none
+@property (nonatomic, readonly, assign) NSInteger cellColumn;  // -1 when none
+- (void)selectCellOfTablix:(RDLTablix *)tablix
+                       row:(NSInteger)row
+                    column:(NSInteger)column
+             inBandWithKey:(NSString *)bandKey;
 
 // The selected item was removed from the report: fall back to its band.
 - (void)itemWasRemoved:(RDLItem *)item;

@@ -33,6 +33,9 @@ extern NSString * const RDLViewStateDidChangeNotification;
 @property (nonatomic, assign) BOOL showsGrid;
 
 - (instancetype)initWithReport:(RDLReport *)report;
+// The session for a document that already exists -- what -[RDLDocument
+// makeWindowControllers] builds when the document architecture opens a file.
+- (instancetype)initWithDocument:(RDLDocument *)document;
 
 // Shorthands, because "the current report" and "the selected item" are read
 // constantly and going through .document.report everywhere reads badly.

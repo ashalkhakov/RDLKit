@@ -91,7 +91,7 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * XML documents, selected with an XPath
   * CSV and fixed-width text, with or without headers, any delimiter
   * documents beside the report (`jsondoc=`, `xmldoc=`, `data.csv`) or carried in it (`jsondata=`, `xmldata=`)
-  * datasets from `CommandText` JSON or `bindJSONString:`
+  * a dataset is a query into a data source -- MS-RDL's `Query/CommandText` holds the query and never the data
   * calculated fields (`Field/Value`)
   * dataset-level `Filters`
   * group/sort/filter on tablix members
@@ -118,9 +118,9 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * `Globals!` (incl. sectioned `PageNumber`/`TotalPages`, `OverallPageNumber`/`OverallTotalPages`, `PageName`)
   * `User!`
   * `Parameters!`
+* **Subreports**: `Subreport` with `Parameters` (`Value`, `Omit`) and `NoRowsMessage` — one report rendered inside another, its `ReportName` resolved beside the report that names it (`RDLSubreportLoader`), which is how master-detail is written in RDL
 
 Not supported yet:
-* Subreport
 * Gauge/Map
 * Toggle/InteractiveSort/DocumentMap
 * Drillthrough/BookmarkLink actions
@@ -305,6 +305,21 @@ the report, or content the report carries. There are no database providers and
 no shared data source references here -- those belong to a report server, which
 is a different application.
 
+The split is MS-RDL's, and it is worth stating plainly because it decides where
+everything lives: **the data belongs to the data source** -- the document it
+names, or the one carried in its connect string -- and **the dataset holds only
+the query into it**. `Query/CommandText` is "the query to execute to obtain data
+for a DataSet"; a dataset with no data source is a table that will be empty
+wherever the report is opened, so `RDLChecker` reports one (`no-data-source`)
+and the designer will not make one. Rows handed to a dataset in code
+(`bindJSONString:`, `rdlgen -d`) are a run-time binding: they render, and they
+are not written to the file.
+
+So the order of work is Report Builder's: a data source, then the datasets that
+query it. A new report starts with neither, and nothing is invented on its
+behalf -- a report that declares no source has none, in the model and in the
+file.
+
 ```xml
 <DataSource Name="Files">
   <ConnectionProperties>
@@ -425,6 +440,13 @@ totals aggregated over rows the report never wrote down. Its **Season**
 parameter is the value of a dataset filter, so choosing another season in the
 generator is a different report out of the same documents -- while the port
 register, which has no season, stays as it is.
+
+The **Harbor Dispatch** sample is the master-detail one: a shipment list whose
+detail is a *second report*, `DispatchCrates.rdl`, shown once per row and handed
+that row's shipment number as a parameter. Both read the same JSON document
+beside them. The samples ship as `.rdl` files in the designer's Resources rather
+than as code, which is what makes a pair like this possible: a `Subreport` names
+a report beside it, and a report built in memory has no beside.
 
 ## Checking a report without running it
 

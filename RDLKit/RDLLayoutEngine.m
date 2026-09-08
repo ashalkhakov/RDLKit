@@ -335,6 +335,18 @@ static CGFloat RDLTextboxGrownHeight(RDLTextbox *item, CGFloat width, RDLEvalSco
   return MAX(item.height, needed);
 }
 
+static CGFloat RDLSubreportContentHeight(RDLSubreport *sub, RDLEvalScope *outer, CGFloat bodyAvail);
+
+// How tall a cell's contents want to be. A text box grows to its text, and a
+// subreport to the report inside it: a detail row that shows one is as tall as
+// what it shows, which is the whole point of putting one there.
+static CGFloat RDLCellContentHeight(RDLItem *item, CGFloat width, RDLEvalScope *scope,
+                                    CGFloat bodyAvail) {
+  if ([item isKindOfClass:[RDLSubreport class]])
+    return MAX(item.height, RDLSubreportContentHeight((RDLSubreport *)item, scope, bodyAvail));
+  return RDLTextboxGrownHeight((RDLTextbox *)item, width, scope);
+}
+
 static double RDLAsN(id v) {
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
@@ -1235,7 +1247,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
           scope.groupRows = inter;
           scope.row = [inter firstObject];
         }
-          CGFloat need = RDLTextboxGrownHeight((RDLTextbox *)cell.item, cell.width, scope);
+          CGFloat need = RDLCellContentHeight(cell.item, cell.width, scope, bodyAvail);
         scope.row = cSavedRow;
         scope.groupRows = cSavedGroup;
         if (need > grown)
@@ -1286,6 +1298,90 @@ static CGFloat RDLTablixHeight(RDLTablix *item, RDLReport *report, RDLEvalScope 
   return last.yRel + last.height;
 }
 
+// Dataset-level filters apply to every consumer of a dataset -- details and
+// aggregates alike -- so they are applied once, into the model's rows, and put
+// back afterwards. Two callers need exactly this: the report being laid out,
+// and each subreport, whose filters see the parameter values it was handed and
+// so answer differently in every detail row.
+static NSMapTable *RDLApplyDataSetFilters(RDLReport *report, RDLEvalScope *scope) {
+  NSMapTable *saved = [NSMapTable strongToStrongObjectsMapTable];
+  for (RDLDataSet *ds in report.dataSets) {
+    if ([ds.filters count] == 0 || [ds.rows count] == 0)
+      continue;
+    RDLDataSet *was = scope.dataSet;
+    scope.dataSet = ds;
+    [saved setObject:ds.rows forKey:ds];
+    ds.rows = RDLApplyFilters(ds.rows, ds.filters, scope);
+    scope.dataSet = was;
+  }
+  return saved;
+}
+
+static void RDLRestoreDataSetRows(NSMapTable *saved) {
+  for (RDLDataSet *ds in saved)
+    ds.rows = [saved objectForKey:ds];
+}
+
+// The scope a subreport's contents are evaluated in. A subreport is a report:
+// it sees its own datasets and its own parameters, and nothing of the row it
+// was placed in -- what crosses the boundary is exactly the values the
+// Subreport element hands over, which is what makes the pair master and
+// detail. Globals about the page carry through, because the page is the
+// parent's.
+static RDLEvalScope *RDLSubreportScope(RDLSubreport *sub, RDLEvalScope *outer) {
+  RDLEvalScope *inner = [[RDLEvalScope alloc] init];
+  inner.report = sub.definition;
+  inner.executionTime = outer.executionTime;
+  inner.userID = outer.userID;
+  inner.userLanguage = outer.userLanguage;
+  inner.pageNumber = outer.pageNumber;
+  inner.totalPages = outer.totalPages;
+  inner.overallPageNumber = outer.overallPageNumber;
+  inner.overallTotalPages = outer.overallTotalPages;
+  inner.pageName = outer.pageName;
+  // The culture in force where the subreport sits, unless the definition names
+  // one of its own -- the same inheritance an item's Language gets.
+  inner.language = outer.language;
+  NSMutableDictionary *values = [NSMutableDictionary dictionary];
+  for (RDLSubreportParameter *p in sub.parameters) {
+    if ([p.name length] == 0)
+      continue;
+    // Omit says "do not pass this one at all", which is not the same as
+    // passing nothing: the subreport falls back to its own default.
+    if (p.omit != nil && [p.omit evaluateBoolInScope:outer])
+      continue;
+    id v = [p.value evaluateInScope:outer];
+    if (v != nil)
+      values[p.name] = v;
+  }
+  inner.paramValues = values;
+  RDLApplyReportLanguage(inner, sub.definition);
+  if ([sub.definition.dataSets count])
+    inner.dataSet = sub.definition.dataSets[0];
+  return inner;
+}
+
+// How tall a subreport's contents are once expanded, in the space available.
+// The definition's Body is what renders; its page header, footer and page size
+// do not apply to a report used as a subreport.
+static CGFloat RDLSubreportContentHeight(RDLSubreport *sub, RDLEvalScope *outer, CGFloat bodyAvail) {
+  if (sub.definition == nil)
+    return 0;
+  RDLEvalScope *inner = RDLSubreportScope(sub, outer);
+  NSMapTable *saved = RDLApplyDataSetFilters(sub.definition, inner);
+  CGFloat bottom = 0;
+  for (RDLItem *it in sub.definition.body.items) {
+    CGFloat h = it.height;
+    if ([it isKindOfClass:[RDLTablix class]])
+      h = RDLTablixHeight((RDLTablix *)it, sub.definition, inner, bodyAvail, it.top);
+    else if ([it isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)it canGrow])
+      h = MAX(h, RDLTextboxGrownHeight((RDLTextbox *)it, it.width, inner));
+    bottom = MAX(bottom, it.top + h);
+  }
+  RDLRestoreDataSetRows(saved);
+  return MAX(bottom, sub.definition.body.height);
+}
+
 // Design-height delta for an item once expanded/grown (tablix rows, CanGrow text).
 static CGFloat RDLGrownDelta(RDLItem *t, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail) {
   if ([t isKindOfClass:[RDLTablix class]]) {
@@ -1293,6 +1389,8 @@ static CGFloat RDLGrownDelta(RDLItem *t, RDLReport *report, RDLEvalScope *scope,
     CGFloat design = t.height > 0 ? t.height : (tb.headerHeight + tb.rowHeight);
     return RDLTablixHeight(tb, report, scope, bodyAvail, t.top) - design;
   }
+  if ([t isKindOfClass:[RDLSubreport class]])
+    return MAX(RDLSubreportContentHeight((RDLSubreport *)t, scope, bodyAvail) - t.height, 0);
   if ([t isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)t canGrow])
     return RDLTextboxGrownHeight((RDLTextbox *)t, t.width, scope) - t.height;
   return 0;
@@ -1301,7 +1399,7 @@ static CGFloat RDLGrownDelta(RDLItem *t, RDLReport *report, RDLEvalScope *scope,
 static CGFloat RDLExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport *report,
                               RDLEvalScope *scope, CGFloat bodyAvail) {
   CGFloat extra = 0;
-  for (RDLTablix *t in growers) {
+  for (RDLItem *t in growers) {
     if (t.top < y) {
       CGFloat grown = RDLGrownDelta(t, report, scope, bodyAvail);
       if (grown > 0)
@@ -1605,6 +1703,19 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     }
   } else if ([item isKindOfClass:[RDLChart class]]) {
     RDLLayOutChart((RDLChart *)item, (RDLLaidOutChart *)li, scope);
+  } else if ([item isKindOfClass:[RDLSubreport class]]) {
+    // The box itself is drawn -- a subreport may have a border and a
+    // background like any other item -- and its report is rendered inside it.
+    [page.items addObject:li];
+    [self placeSubreport:(RDLSubreport *)item
+                 originX:x
+                 originY:y
+                   scope:scope
+                  onPage:page
+                 clipTop:clipTop
+              clipBottom:clipBottom];
+    scope.language = savedLanguage;
+    return;
   } else if ([item isKindOfClass:[RDLRectangle class]]) {
     [page.items addObject:li];
     for (RDLItem *child in item.childItems)
@@ -1614,6 +1725,105 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   }
   [page.items addObject:li];
   scope.language = savedLanguage;
+}
+
+// A line of text where the subreport would have been: the spec's error text
+// when the definition could not be processed, and the report's own
+// NoRowsMessage when it could but has nothing to say.
++ (void)placeMessage:(NSString *)text
+             forItem:(RDLItem *)item
+                   x:(CGFloat)x
+                   y:(CGFloat)y
+              onPage:(RDLLaidOutPage *)page
+               scope:(RDLEvalScope *)scope {
+  RDLLaidOutTextbox *lt = [[RDLLaidOutTextbox alloc] init];
+  lt.name = item.name;
+  lt.x = x;
+  lt.y = y;
+  lt.w = item.width;
+  lt.h = item.height;
+  lt.zIndex = item.zIndex;
+  lt.style = RDLResolveStyle(item.style, scope);
+  lt.text = text;
+  [page.items addObject:lt];
+}
+
+// Whether a subreport has any data at all, which is what NoRowsMessage asks.
+// A definition with no datasets is not empty -- a cover page made of text
+// boxes has nothing to have rows -- so only one that has datasets and no rows
+// in any of them counts.
+static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
+  if ([definition.dataSets count] == 0)
+    return NO;
+  for (RDLDataSet *ds in definition.dataSets)
+    if ([ds.rows count])
+      return NO;
+  return YES;
+}
+
+// A report rendered inside another one. MS-RDL: the definition's Body is what
+// renders -- its page header, page footer and page size do not apply -- and
+// the parameters the Subreport element names are evaluated out here, in the
+// scope the item sits in, and handed over as that report's parameter values.
+//
+// Pagination stays the parent's: contents are placed at the subreport's own
+// origin and clipped to the band being filled, so a subreport that runs past
+// the bottom of the page continues on the next one, where the parent places it
+// again with the origin moved up by a page.
++ (void)placeSubreport:(RDLSubreport *)sub
+               originX:(CGFloat)x
+               originY:(CGFloat)y
+                 scope:(RDLEvalScope *)outer
+                onPage:(RDLLaidOutPage *)page
+               clipTop:(CGFloat)clipTop
+            clipBottom:(CGFloat)clipBottom {
+  if (sub.definition == nil) {
+    // The spec's own wording, so a report that fails here reads the same as it
+    // would in the viewer people are coming from.
+    [self placeMessage:@"Error: Subreport could not be shown"
+               forItem:sub
+                     x:x
+                     y:y
+                onPage:page
+                 scope:outer];
+    return;
+  }
+  RDLEvalScope *inner = RDLSubreportScope(sub, outer);
+  NSMapTable *saved = RDLApplyDataSetFilters(sub.definition, inner);
+  if (RDLSubreportHasNoRows(sub.definition)) {
+    if ([sub.noRowsMessage length])
+      [self placeMessage:sub.noRowsMessage forItem:sub x:x y:y onPage:page scope:inner];
+    RDLRestoreDataSetRows(saved);
+    return;
+  }
+  for (RDLItem *it in sub.definition.body.items) {
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      // Placed on the page the parent is filling: the tablix's own top is
+      // measured from the top of that band, which is what makes its rows land
+      // where the subreport is and its page rules answer for this page.
+      [self placeTablix:it
+                originX:x
+              tablixTop:(y + it.top - clipTop)
+               sliceTop:0
+                bodyTop:clipTop
+             bodyBottom:clipBottom
+                  scope:inner
+                 onPage:page
+              firstPage:YES
+                chunkX0:0
+                chunkX1:0
+                  hLead:0];
+      continue;
+    }
+    [self placeItem:it
+            originX:x
+            originY:y
+              scope:inner
+             onPage:page
+            clipTop:clipTop
+         clipBottom:clipBottom];
+  }
+  RDLRestoreDataSetRows(saved);
 }
 
 + (void)placeTablixInst:(RDLTablixInst *)inst
@@ -1873,22 +2083,18 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
 
   // Dataset-level filters apply to every consumer (details and aggregates).
   // Filter into locals; the report model's rows are restored before returning.
-  NSMapTable *savedRows = [NSMapTable strongToStrongObjectsMapTable];
-  for (RDLDataSet *ds in report.dataSets) {
-    if ([ds.filters count] && [ds.rows count]) {
-      RDLDataSet *saved = measure.dataSet;
-      measure.dataSet = ds;
-      [savedRows setObject:ds.rows forKey:ds];
-      ds.rows = RDLApplyFilters(ds.rows, ds.filters, measure);
-      measure.dataSet = saved;
-    }
-  }
+  NSMapTable *savedRows = RDLApplyDataSetFilters(report, measure);
 
   NSMutableArray *tablixes = [NSMutableArray array];
   NSMutableArray *growers = [NSMutableArray array];
   for (RDLItem *it in report.body.items) {
     if ([it isKindOfClass:[RDLTablix class]]) {
       [tablixes addObject:it];
+      [growers addObject:it];
+    } else if ([it isKindOfClass:[RDLSubreport class]]) {
+      // A subreport is as tall as the report inside it, which is not known
+      // until that report has been filtered and expanded -- so it pushes what
+      // is below it down, the same way a tablix does.
       [growers addObject:it];
     } else if ([it isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)it canGrow]) {
       [growers addObject:it];
@@ -2111,8 +2317,7 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
     }
     [pages addObject:page];
   }
-  for (RDLDataSet *ds in savedRows)
-    ds.rows = [savedRows objectForKey:ds];
+  RDLRestoreDataSetRows(savedRows);
   return pages;
 }
 

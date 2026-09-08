@@ -23,6 +23,8 @@
 #import "RDLJSONDataProvider.h"
 #import "RDLXMLDataProvider.h"
 #import "RDLCSVDataProvider.h"
+// Subreports: the report definitions a report names, found and loaded.
+#import "RDLSubreportLoader.h"
 // Style -> AppKit text attributes, shared with the designer canvas and its
 // rich-text codec because RDLView's preview needs the same translation.
 #import "RDLTextAttributes.h"

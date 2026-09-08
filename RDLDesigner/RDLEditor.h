@@ -117,6 +117,13 @@
 // simply the previous spec, and the ordering hazard of the old implicit
 // rebuild-on-set does not arise.
 - (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix;
+// What one cell of a tablix holds: an item, or nil to empty it. MS-RDL's
+// CellContents holds 0 or 1 report items, so this is the whole of a cell's
+// contents -- a cell that has to hold more holds a Rectangle, and the items go
+// in that.
+- (void)setItem:(RDLItem *)item
+         inCell:(RDLTablixCell *)cell
+       ofTablix:(RDLTablix *)tablix;
 // Apply several tablix properties and rebuild ONCE, as a single inverse.
 // Necessary rather than convenient: the rebuild reads columnSpecs, rowGroups,
 // columnGroups, showGrandTotal and the heights together, so setting them
@@ -126,6 +133,11 @@
 - (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix;
 - (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+// Reorder: the column at `from` ends up at `to`, taking its heading, its value
+// and its width with it. What dragging a column's handle on the canvas does.
+- (void)moveTablixColumnAtIndex:(NSUInteger)from
+                        toIndex:(NSUInteger)to
+                       ofTablix:(RDLTablix *)tablix;
 - (void)toggleGrandTotalOfTablix:(RDLTablix *)tablix;
 
 // --- Rich text ------------------------------------------------------------

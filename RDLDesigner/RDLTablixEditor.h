@@ -23,4 +23,16 @@
 @property (nonatomic, readonly, strong) NSMutableArray<NSString *> *rowGroups, *colGroups;
 - (NSArray *)columnSpecsForSaving;
 - (NSMutableDictionary *)specForField:(NSString *)field;
+// Grouping, by the buttons beside each list. A group is a field of the
+// dataset: adding one takes the first field the report has that is not
+// grouped by already, and the name can then be typed over in the list.
+- (void)addRowGroup:(id)sender;
+- (void)removeRowGroup:(id)sender;
+- (void)addColumnGroup:(id)sender;
+- (void)removeColumnGroup:(id)sender;
+// Re-nesting, which is what dragging one group above another in its list does:
+// the order of a list is the order of the groups, outermost first. `index` is
+// the row it was dropped above.
+- (BOOL)moveRowGroup:(NSString *)field toIndex:(NSUInteger)index;
+- (BOOL)moveColumnGroup:(NSString *)field toIndex:(NSUInteger)index;
 @end
