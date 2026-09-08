@@ -14,7 +14,7 @@ RDLKitTests_OBJC_FILES = \
   RDLLayoutTests.m \
   RDLBackendTests.m \
   RDLImportTests.m
-RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall
+RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 RDLKitTests_INCLUDE_DIRS = -I../RDLKit
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch

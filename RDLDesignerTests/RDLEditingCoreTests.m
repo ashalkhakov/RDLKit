@@ -1,4 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
+#import "RDLDataView.h"
+#import "RDLSelection.h"
+#import "RDLDocument.h"
 #import "RDLDesignerTestSupport.h"
 
 // A grouped-jobs report, mirroring the kit checks' fixture, so the editing
@@ -980,6 +983,308 @@ static RDLReport *RDLGroupedJobs(void) {
       bwatch = (RDLTablix *)it;
   if ([bwatch.filters count] != 1)
     XCTFail(@"%@", @"the watch table's own filter did not survive the file");
+}
+
+// The data-source sample earns its place by being checked the way a reader
+// would check it: the documents in the report become rows, the deeper path
+// flattens the hierarchy, the filter in the path narrows it, the XML one is
+// read too, and the totals are over rows the report never wrote down.
+// Texts of everything laid out, so a page can be asked what it says.
+- (NSArray<NSString *> *)textsOfReport:(RDLReport *)report params:(NSDictionary *)params {
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report paramValues:params])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+  return texts;
+}
+
+- (void)testHarborManifestReadsItsOwnDocuments {
+  RDLReport *r = [RDLSamples harborManifest];
+
+  // Every shipment is read from the document...
+  if ([[r dataSetNamed:@"Shipments"].rows count] != 4 ||
+      [[r dataSetNamed:@"Crates"].rows count] != 9 ||
+      [[r dataSetNamed:@"Ports"].rows count] != 3)
+    XCTFail(@"%@", [NSString stringWithFormat:@"read %lu shipments, %lu crates, %lu ports",
+                                              (unsigned long)[[r dataSetNamed:@"Shipments"].rows count],
+                                              (unsigned long)[[r dataSetNamed:@"Crates"].rows count],
+                                              (unsigned long)[[r dataSetNamed:@"Ports"].rows count]]);
+  // ... and the season the report is asked for decides which of them appear.
+  NSArray<NSString *> *summer = [self textsOfReport:r params:nil];
+  if (![summer containsObject:@"S-101"] || ![summer containsObject:@"S-102"] ||
+      [summer containsObject:@"S-103"] || [summer containsObject:@"S-104"])
+    XCTFail(@"%@", @"the default season is Summer, so only its shipments should be on the page");
+  if (![summer containsObject:@"Firebrick"] || [summer containsObject:@"Porcelain clay"])
+    XCTFail(@"%@", @"the crates follow the same season");
+  BOOL summerTotal = NO;
+  for (NSString *text in summer)
+    if ([text rangeOfString:@"80 items in 5 crates"].location != NSNotFound &&
+        [text rangeOfString:@"369"].location != NSNotFound)
+      summerTotal = YES;
+  if (!summerTotal)
+    XCTFail(@"%@", [NSString stringWithFormat:@"summer's total is missing: %@",
+                                              [summer componentsJoinedByString:@" | "]]);
+
+  // Another season is another report out of the same documents -- which is
+  // what a parameter feeding a filter is for.
+  NSArray<NSString *> *autumn = [self textsOfReport:r params:@{ @"Season" : @"Autumn 2026" }];
+  if (![autumn containsObject:@"S-103"] || [autumn containsObject:@"S-101"])
+    XCTFail(@"%@", @"choosing Autumn should bring its shipment and drop the summer ones");
+  if (![autumn containsObject:@"Porcelain clay"] || [autumn containsObject:@"Firebrick"])
+    XCTFail(@"%@", @"and its crates with it");
+  BOOL autumnTotal = NO;
+  for (NSString *text in autumn)
+    if ([text rangeOfString:@"34 items in 2 crates"].location != NSNotFound)
+      autumnTotal = YES;
+  if (!autumnTotal)
+    XCTFail(@"%@", [NSString stringWithFormat:@"autumn's total is missing: %@",
+                                              [autumn componentsJoinedByString:@" | "]]);
+  // The ports come from the other document and have no season, so they stay.
+  if (![autumn containsObject:@"Astoria"] || ![autumn containsObject:@"Halifax"])
+    XCTFail(@"%@", @"the port register is not filtered by the season");
+
+  // The sample names its fields but does not say what they hold, so reading
+  // the document is what types them: the JSON says which are numbers and which
+  // are dates.
+  NSDictionary *wanted = @{ @"Qty" : @"Integer", @"Kg" : @"Integer", @"Item" : @"String",
+                            @"Season" : @"String" };
+  for (RDLField *f in [r dataSetNamed:@"Crates"].fields) {
+    NSString *expect = wanted[f.name];
+    if (expect == nil)
+      continue;
+    if (![RDLStringFromFieldDataType(f.dataType) isEqualToString:expect])
+      XCTFail(@"%@", [NSString stringWithFormat:@"crates.%@ is %@, expected %@", f.name,
+                                                RDLStringFromFieldDataType(f.dataType), expect]);
+  }
+  for (RDLField *f in [r dataSetNamed:@"Shipments"].fields)
+    if ([f.name isEqualToString:@"Sailed"] && f.dataType != RDLFieldDataTypeDateTime)
+      XCTFail(@"%@", [NSString stringWithFormat:@"a sailing date is %@",
+                                                RDLStringFromFieldDataType(f.dataType)]);
+
+  // The crates came out of the shipments, which is the point of the deeper
+  // path: a hierarchy a flat table can bind to.
+  NSDictionary *firstCrate = [[r dataSetNamed:@"Crates"].rows firstObject];
+  if (![firstCrate[@"Item"] isEqualToString:@"Stoneware bowls"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"first crate: %@", firstCrate]);
+  // The filter in the path is still a path filter: every Heavy row is one.
+  for (NSDictionary *crate in [r dataSetNamed:@"Heavy"].rows)
+    if ([crate[@"Qty"] integerValue] < 10)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not a heavy crate", crate]);
+  // XML: an attribute and a child element are both fields.
+  NSDictionary *port = [[r dataSetNamed:@"Ports"].rows firstObject];
+  if (![port[@"Code"] isEqualToString:@"AST"] || ![port[@"Name"] isEqualToString:@"Astoria"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"first port: %@", port]);
+
+  // And it survives being saved: the documents, the queries and the filters.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  RDLDataSet *heavy = [back dataSetNamed:@"Heavy"];
+  if (![heavy.commandText isEqualToString:@"$.Shipment[*].Crates[?(@.Qty >= 10)]"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the query came back as '%@'", heavy.commandText]);
+  if ([heavy.filters count] != 1 ||
+      ![[[heavy.filters firstObject].values.firstObject source]
+          isEqualToString:@"=Parameters!Season.Value"])
+    XCTFail(@"%@", @"the season filter did not survive the file");
+  if (![[[RDLDataBinder alloc] init] bindReport:back error:NULL])
+    XCTFail(@"%@", @"the saved report could not be bound");
+  if ([[back dataSetNamed:@"Crates"].rows count] != 9 ||
+      [[back dataSetNamed:@"Ports"].rows count] != 3)
+    XCTFail(@"%@", @"a saved report should read the same documents it did before");
+}
+
+// Nothing in the body may run into the footer, and no table may begin at the
+// foot of a page with nothing under it. Both are the same mistake seen from
+// two sides: an item that does not fit in what is left of a page belongs on
+// the next one, not drawn over what comes after it.
+//
+// Body content is told from the bands by name -- the header's and the footer's
+// items are known, and everything else on the page came out of the body,
+// including the cells a tablix expanded into.
+- (void)testBodyContentStaysInsideTheBody {
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    RDLReport *r = [RDLSamples reportWithId:sampleId];
+    NSMutableSet *bandNames = [NSMutableSet set];
+    for (RDLItem *it in r.pageHeader.items)
+      [bandNames addObject:it.name ?: @""];
+    for (RDLItem *it in r.pageFooter.items)
+      [bandNames addObject:it.name ?: @""];
+    CGFloat bodyTop = r.page.topMargin + r.pageHeader.height;
+    CGFloat bodyBottom = r.page.pageHeight - r.page.bottomMargin - r.pageFooter.height;
+    for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil]) {
+      for (RDLLaidOutItem *item in page.items) {
+        if ([bandNames containsObject:item.name ?: @""])
+          continue;
+        if (item.y < bodyTop - 0.001 || item.y + item.h > bodyBottom + 0.001)
+          XCTFail(@"%@", [NSString stringWithFormat:
+                              @"sample '%@' page %ld: %@ runs from %.3f to %.3f, outside the body's "
+                              @"%.3f–%.3f",
+                              sampleId, (long)page.index, item.name ?: @"an item", item.y,
+                              item.y + item.h, bodyTop, bodyBottom]);
+      }
+    }
+  }
+}
+
+// A table's header belongs with its rows: a page that shows one and none of
+// the other is a table that starts twice.
+- (void)testATableHeaderIsNeverStrandedAtTheFootOfAPage {
+  RDLReport *r = [RDLSamples harborManifest];
+  NSArray<NSString *> *ports = @[ @"Astoria", @"Portland", @"Halifax" ];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:r paramValues:nil]) {
+    BOOL sawHeader = NO, sawRow = NO;
+    for (RDLLaidOutItem *item in page.items) {
+      if (![item isKindOfClass:[RDLLaidOutTextbox class]])
+        continue;
+      NSString *text = [(RDLLaidOutTextbox *)item text] ?: @"";
+      if ([text isEqualToString:@"Country"])
+        sawHeader = YES;
+      for (NSString *port in ports)
+        if ([text isEqualToString:port])
+          sawRow = YES;
+    }
+    if (sawHeader && !sawRow)
+      XCTFail(@"%@", [NSString stringWithFormat:@"page %ld has the ports header and no ports",
+                                                (long)page.index]);
+  }
+}
+
+
+// Every sample has to pass the checker. A sample is what a person opens first
+// and copies from, so a broken reference in one is a lesson in the wrong
+// thing -- and this catches exactly the mistake that was in the manifest: a
+// page header printing =Parameters!Season.Value in a report that never asked
+// for a Season.
+- (void)testEverySamplePassesTheChecker {
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    NSString *sampleId = entry[@"id"];
+    RDLReport *r = [RDLSamples reportWithId:sampleId];
+    NSMutableArray<NSString *> *complaints = [NSMutableArray array];
+    for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+      if (d.severity == RDLDiagnosticSeverityError)
+        [complaints addObject:[NSString stringWithFormat:@"%@: %@ (%@)", d.path ?: @"", d.message,
+                                                         d.rule]];
+    if ([complaints count])
+      XCTFail(@"%@", [NSString stringWithFormat:@"sample '%@': %@", sampleId,
+                                                [complaints componentsJoinedByString:@"; "]]);
+  }
+}
+
+// A report's parameters are what the generator asks for before it runs, so the
+// pane that asks lists them -- in the order the report declares them, from the
+// top. It used to build them into an unflipped view inside a flipped one,
+// which put the first heading at the bottom and everything above it backwards.
+- (void)testTheRenderInputsPaneReadsFromTheTop {
+  RDLReport *r = [RDLSamples harborManifest];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLDataView *pane = [[RDLDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400)
+                                                document:doc];
+  [pane reload];
+  NSView *stack = [[pane subviews] firstObject];
+  if (![stack isFlipped])
+    XCTFail(@"%@", @"the pane lays out downwards, so its stack has to be flipped");
+
+  // The headings come in the order they are laid out, top first.
+  NSMutableArray<NSString *> *headings = [NSMutableArray array];
+  for (NSView *v in [stack subviews]) {
+    if (![v isKindOfClass:[NSTextField class]])
+      continue;
+    NSString *text = [(NSTextField *)v stringValue];
+    if ([text isEqualToString:@"Parameters"] || [text isEqualToString:@"Data"])
+      [headings addObject:text];
+  }
+  if (![headings isEqualToArray:@[ @"Parameters", @"Data" ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"headings came out as %@", headings]);
+  NSTextField *parametersHeading = nil, *dataHeading = nil;
+  for (NSView *v in [stack subviews]) {
+    if (![v isKindOfClass:[NSTextField class]])
+      continue;
+    if ([[(NSTextField *)v stringValue] isEqualToString:@"Parameters"])
+      parametersHeading = (NSTextField *)v;
+    else if ([[(NSTextField *)v stringValue] isEqualToString:@"Data"])
+      dataHeading = (NSTextField *)v;
+  }
+  if (parametersHeading == nil || dataHeading == nil ||
+      NSMinY(parametersHeading.frame) >= NSMinY(dataHeading.frame))
+    XCTFail(@"%@", @"parameters are asked for above the data they are asked with");
+
+  // And the manifest asks for its season, so the pane offers it.
+  BOOL asked = NO;
+  for (NSView *v in [stack subviews])
+    if ([v isKindOfClass:[NSPopUpButton class]] &&
+        [(NSPopUpButton *)v itemWithTitle:@"Summer 2026"] != nil)
+      asked = YES;
+  if (!asked)
+    XCTFail(@"%@", @"the sample's Season parameter should be offered, with what it accepts");
+}
+
+// A report holds things that are drawn and things that are defined, and the
+// selection holds one of them -- never two. Panes used to keep that straight
+// between themselves, which is how two inspectors ended up live at once.
+- (void)testTheSelectionHoldsOneThingAtATime {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLSelection *sel = ctx.selection;
+  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
+  RDLField *field = [[ds fields] firstObject];
+  RDLParameter *parameter = [report.parameters firstObject];
+  RDLItem *item = [report.body.items firstObject];
+
+  [sel selectDatasetField:field inDataSet:ds];
+  if (sel.scope != RDLSelectionScopeDatasetField || sel.datasetField != field ||
+      sel.dataSet != ds || sel.item != nil || sel.parameter != nil)
+    XCTFail(@"%@", @"selecting a dataset field selects it and nothing else");
+
+  // A dataset and a data source are selectable in their own right -- they have
+  // panes in the centre -- and each replaces whatever was selected.
+  [sel selectDataSet:ds];
+  if (sel.scope != RDLSelectionScopeDataSet || sel.dataSet != ds || sel.datasetField != nil)
+    XCTFail(@"%@", @"selecting a dataset keeps the dataset and drops the field");
+  RDLDataSource *source = [report.dataSources firstObject];
+  [sel selectDataSource:source];
+  if (sel.scope != RDLSelectionScopeDataSource || sel.dataSource != source ||
+      sel.dataSet != nil)
+    XCTFail(@"%@", @"selecting a data source replaces the dataset selection");
+
+  [sel selectParameter:parameter];
+  if (sel.scope != RDLSelectionScopeParameter || sel.parameter != parameter ||
+      sel.datasetField != nil || sel.dataSet != nil)
+    XCTFail(@"%@", @"selecting a parameter replaces the field selection");
+
+  [sel selectItem:item inBandWithKey:@"body"];
+  if (sel.scope != RDLSelectionScopeItem || sel.item != item || sel.parameter != nil ||
+      sel.datasetField != nil)
+    XCTFail(@"%@", @"selecting an element replaces the parameter selection");
+
+  [sel selectParameter:parameter];
+  [sel selectReport];
+  if (sel.scope != RDLSelectionScopeReport || sel.parameter != nil || sel.datasetField != nil ||
+      sel.item != nil)
+    XCTFail(@"%@", @"selecting the report clears whatever was selected");
+
+  // nil means "nothing in particular", which is the report -- the same answer
+  // every other setter here gives.
+  [sel selectDatasetField:nil inDataSet:ds];
+  if (sel.scope != RDLSelectionScopeReport)
+    XCTFail(@"%@", @"selecting no field is selecting the report");
+
+  // And each change is announced once, so the panes that follow it are told.
+  __block NSUInteger announced = 0;
+  id watch = [[NSNotificationCenter defaultCenter]
+      addObserverForName:RDLSelectionDidChangeNotification
+                  object:sel
+                   queue:nil
+              usingBlock:^(NSNotification *note) {
+                RDL_UNUSED(note);
+                announced += 1;
+              }];
+  [sel selectParameter:parameter];
+  [sel selectParameter:parameter];  // the same thing again is not a change
+  [sel selectDatasetField:field inDataSet:ds];
+  [[NSNotificationCenter defaultCenter] removeObserver:watch];
+  if (announced != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu announcements, expected 2",
+                                              (unsigned long)announced]);
 }
 
 @end

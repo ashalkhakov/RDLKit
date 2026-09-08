@@ -15,6 +15,9 @@
 // come from the sample catalog, is filled in at launch.
 @property (nonatomic, strong) IBOutlet NSMenu *mainMenu;
 @property (nonatomic, strong) IBOutlet NSMenu *samplesMenu;
+// Load one of the catalog's samples, by the menu item's tag. Declared so what
+// opening a sample does can be checked without a menu.
+- (void)openSample:(NSMenuItem *)sender;
 - (void)showDesigner:(id)sender;
 - (void)showGenerator:(id)sender;
 - (void)showLibrary:(id)sender;

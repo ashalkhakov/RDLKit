@@ -338,6 +338,10 @@ static NSSet *RDLKnownGlobals(void) {
 @property (nonatomic, strong) RDLDataSet *dataSet;
 @property (nonatomic, strong) RDLType *table; // table of the row record
 @property (nonatomic, copy) NSString *path;
+// The body, rather than a page header or footer. RDL lets an expression in the
+// body read the report's dataset when there is only one of them; a page header
+// or footer may not read dataset fields at all, whatever the count.
+@property (nonatomic, assign) BOOL insideBody;
 @end
 @implementation RDLScope
 - (RDLType *)record {
@@ -360,6 +364,28 @@ static void RDLReportDiagnostic(RDLCheckRun *run, RDLDiagnosticSeverity sev, NSS
   d.source = source;
   d.message = message;
   [run.out addObject:d];
+}
+
+// One dataset seen as a scope, which is what an aggregate summarises and what
+// Fields! reads from.
+static RDLScope *RDLScopeOfDataSet(RDLDataSet *dataSet, RDLScope *outer) {
+  RDLScope *s = [[RDLScope alloc] init];
+  s.report = outer.report;
+  s.dataSet = dataSet;
+  s.table = RDLTableType(RDLRecordOfDataSet(dataSet));
+  s.path = outer.path;
+  s.insideBody = outer.insideBody;
+  return s;
+}
+
+// The default scope RDL gives an expression that names none: the report's only
+// dataset, and only in the body. A page header or footer is rendered per page
+// rather than per row, so a field there has nothing to read whatever the
+// report holds -- which is why this asks where it is as well as how many.
+static RDLDataSet *RDLDefaultDataSet(RDLScope *scope) {
+  if (!scope.insideBody || [scope.report.dataSets count] != 1)
+    return nil;
+  return [scope.report.dataSets firstObject];
 }
 
 static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *source,
@@ -466,30 +492,53 @@ static RDLType *RDLCheckCall(RDLExprNode *node, RDLScope *scope, NSString *sourc
   // that is legal wherever it appears, including a page header. Resolve it and
   // use it for the arguments, or a perfectly good expression reads as an error.
   RDLScope *inner = scope;
-  if (entry.aggregate && given >= 2) {
+  // Any argument that names a dataset is the scope, however many there are:
+  // CountRows("Jobs") is the whole call, and RowNumber("Group") likewise.
+  if (entry.aggregate && given >= 1) {
     for (RDLExprNode *arg in node.args) {
       if (arg.kind != RDLExprNodeKindLiteral || ![arg.value isKindOfClass:[NSString class]])
         continue;
       RDLDataSet *named = [scope.report dataSetNamed:arg.value];
       if (named == nil)
         continue;
-      inner = [[RDLScope alloc] init];
-      inner.report = scope.report;
-      inner.dataSet = named;
-      inner.table = RDLTableType(RDLRecordOfDataSet(named));
-      inner.path = scope.path;
+      inner = RDLScopeOfDataSet(named, scope);
       break;
     }
   }
+  // A report with one dataset needs no scope named: that dataset is the scope,
+  // which is what RDL means by the default and what every report with a total
+  // in its body relies on. With two datasets there is nothing to default to,
+  // and the aggregate has to say which -- that is the error worth reporting.
+  RDLDataSet *fallback = RDLDefaultDataSet(scope);
+  if (entry.aggregate && inner.table == nil && fallback != nil)
+    inner = RDLScopeOfDataSet(fallback, scope);
   if (entry.aggregate && inner.table == nil)
     RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"scope", scope, source,
                [NSString stringWithFormat:@"%@ summarises rows, but no dataset is in scope here",
                                           node.name]);
 
+  // Lookup(source, destination, result, "DataSet") reads its third expression
+  // in the dataset it looks into, not in the one the report is standing in --
+  // that is the whole point of a lookup, and checking it here means a correct
+  // one is not reported as a field the current dataset does not have.
+  RDLScope *lookupScope = nil;
+  NSString *called = [node.name lowercaseString];
+  if (([called isEqualToString:@"lookup"] || [called isEqualToString:@"lookupset"] ||
+       [called isEqualToString:@"multilookup"]) &&
+      given >= 4) {
+    RDLExprNode *target = node.args[3];
+    if (target.kind == RDLExprNodeKindLiteral && [target.value isKindOfClass:[NSString class]]) {
+      RDLDataSet *into = [scope.report dataSetNamed:target.value];
+      if (into != nil)
+        lookupScope = RDLScopeOfDataSet(into, scope);
+    }
+  }
+
   // Each argument against the parameter it fills. The last parameter repeats
   // for a variadic function.
   for (NSInteger i = 0; i < given; i++) {
-    RDLType *actual = RDLCheckNode(node.args[(NSUInteger)i], inner, source, run);
+    RDLScope *argScope = (lookupScope != nil && i == 2) ? lookupScope : inner;
+    RDLType *actual = RDLCheckNode(node.args[(NSUInteger)i], argScope, source, run);
     if ([type.params count] == 0)
       continue;
     NSInteger slot = i < (NSInteger)[type.params count] ? i
@@ -525,6 +574,14 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
 
   case RDLExprNodeKindField: {
     RDLType *record = [scope record];
+    // The same default an aggregate gets: with one dataset in the report,
+    // Fields! reads from it wherever it is written -- a total in the body of a
+    // single-dataset report is ordinary RDL, not a mistake.
+    RDLDataSet *only = record == nil ? RDLDefaultDataSet(scope) : nil;
+    if (only != nil) {
+      scope = RDLScopeOfDataSet(only, scope);
+      record = [scope record];
+    }
     if (record == nil) {
       RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"scope", scope, source,
                  [NSString stringWithFormat:@"Fields!%@ used where no dataset is in scope",
@@ -643,6 +700,7 @@ static RDLScope *RDLSubScope(RDLScope *outer, NSString *step, RDLDataSet *ds) {
   s.dataSet = ds ?: outer.dataSet;
   s.table = ds ? RDLTableType(RDLRecordOfDataSet(ds)) : outer.table;
   s.path = [outer.path length] ? [NSString stringWithFormat:@"%@ / %@", outer.path, step] : step;
+  s.insideBody = outer.insideBody;
   return s;
 }
 
@@ -804,6 +862,15 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
     RDLScope *dscope = RDLSubScope(root, [NSString stringWithFormat:@"DataSet '%@'",
                                                                       ds.name ?: @"(unnamed)"],
                                      ds);
+    // A dataset names its data source, the way the file does. That link is a
+    // name and not a pointer -- it has to survive a copied item, an undone
+    // removal, and a file naming a source that is not there -- so this is
+    // where a name that resolves to nothing is caught. A dataset that names
+    // none is not an error: that is how one whose rows are supplied in code
+    // reads.
+    if ([ds.dataSourceName length] && [report dataSourceNamed:ds.dataSourceName] == nil)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-data-source", dscope, nil,
+                 [NSString stringWithFormat:@"no data source named '%@'", ds.dataSourceName]);
     for (id f in ds.fields)
       if ([f isKindOfClass:[RDLField class]])
         RDLCheckValue([(RDLField *)f value], dscope, run);
@@ -833,6 +900,7 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
     if (pair[1] == [NSNull null])
       continue;
     RDLScope *bscope = RDLSubScope(root, pair[0], nil);
+    bscope.insideBody = [pair[0] isEqualToString:@"Body"];
     for (RDLItem *item in [(RDLBand *)pair[1] items])
       RDLCheckItem(item, bscope, run);
   }

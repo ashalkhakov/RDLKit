@@ -107,10 +107,13 @@
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[cat count])
     return;
-  // One document, so the sample lands wherever the user is looking.
+  // One document, so the sample lands wherever the user is looking -- and if
+  // that is nowhere yet, in the designer. Opening a sample used to run it,
+  // which is a different thing to ask for: the generator is one window away
+  // when the answer is wanted.
   [_context loadSampleWithId:cat[i][@"id"]];
   if (![[_generator window] isKeyWindow])
-    [self showGenerator:nil];
+    [self showDesigner:nil];
 }
 
 // File > New Report. It used to make a blank Letter report and open the

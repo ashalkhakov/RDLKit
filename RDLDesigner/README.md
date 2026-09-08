@@ -1,8 +1,7 @@
 # RDLDesigner Designer
 
-**Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. One source tree for **Cocoa** (macOS) and **GNUstep** — the GNUstep build is
-being brought up in CI now, and until it goes green that is an intention rather
-than a fact. No Swift, no UIKit. Every window, panel and the menu bar is a plain **XIB**; only the parts that depend on the open report stay in code.
+**Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. One source tree for **Cocoa** (macOS) and **GNUstep** — both are CI jobs, and
+the Linux build ships as an AppImage. No Swift, no UIKit. Every window, panel and the menu bar is a plain **XIB**; only the parts that depend on the open report stay in code.
 
 `../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columnSpecs` + `-rebuildTablix`, with `rowGroups` / `columnGroups` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. A column group alongside a row group builds a crosstab (matrix): a dynamic `TablixColumnHierarchy` group with the first column as the aggregated measure. The spec is stored plainly and projected onto the MS-RDL structures on demand, so the order in which the properties are set no longer matters. Grouping prepends a 1.2in row-header column that no column spec budgeted for, so `-rebuildTablix` takes that width back out of the columns in proportion rather than growing the tablix past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. The "Edit Tablix…" inspector button opens the modal editor.
 
@@ -20,7 +19,7 @@ the same wizard.
 | `RDLDocument` | The open report, its file identity, dirty flag, undo manager, parameter bindings, and export (generic over the kit's backends). Both windows share one |
 | `RDLChange` | What changed — report / band / item / structure / data, plus the key paths — so views refresh what they must instead of everything |
 | `RDLEditor` | The only place the model is mutated. Each edit records its own inverse before applying, so redo comes free; a drag or key-repeat burst collapses into one undo step |
-| `RDLSelection` | The selected item as a resolved reference, plus its band |
+| `RDLSelection` | What is being edited, as a resolved reference: the report, a band, an item (with its tablix cell), a dataset, one of its fields, a data source, or a parameter — one at a time, announced once, and the only place that knows |
 | `RDLItemFactory` | Insertion policy (a Rectangle may hold simple items but not a data region), insertion location from the selection, new-item defaults, and unique naming |
 | `RDLEditingContext` | The editing session the views share: document, selection, editor, plus canvas zoom/grid on their own notification. Injected, not global |
 | **Canvas** | |
@@ -33,8 +32,8 @@ the same wizard.
 | `RDLWelcomeWindow` | Chooser: Generator or Designer |
 | `RDLNewReport` | What a new report is made of — blank, or scaffolded from a `.docx` — plus the import's notes and the checker's verdict. No window, so checks drive all of it |
 | `RDLNewReportPanel` | The wizard itself: the choice, the file, and what the import found. Wiring only |
-| `RDLDesignerWindow` | Split: report outline (+/− bar, Add Element palette) · canvas · inspector · data. Vends the expression field editor and the document's undo manager |
-| `RDLGeneratorWindow` | Open RDL, bind parameters/JSON, read the pages, export. Shares the designer's document |
+| `RDLDesignerWindow` | Split: navigators (outline, or data sources · datasets · parameters) · centre (canvas, source, or whichever of a dataset and a data source is selected) · inspector. Every pane derives what it shows from `RDLSelection`; nothing coordinates with anything else |
+| `RDLGeneratorWindow` | Give a report its parameter values and read its data — every source it names, fetching `http(s)` only if asked and offering to find a document that has moved — then read the pages and export. Shares the designer's document |
 | `RDLOutlineDataSource` | The report outline: node tree, data source, delegate, and selection mirroring both ways |
 | `RDLInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `RDLInspectorFields` | One binding declaration per field — control, key path, scope, kind — driving both the fill and the write-back |
@@ -42,7 +41,12 @@ the same wizard.
 | `RDLRichTextEditor` | Modal rich-text editor (right-click → Edit Rich Text…): a formatting bar over an NSTextView. Wiring only |
 | `RDLRichTextFormatter` | What the formatting bar does — read the state of a selection (on / off / mixed) and change font, size, colour, bold, italic, underline, strikethrough and paragraph alignment. No window, so checks drive it directly |
 | `RDLRichTextCodec` | Attributed string ⇄ RDL `Paragraphs`/`TextRuns` with sparse per-run styles. Plain text — multi-line included — stays a plain `value` |
-| `RDLDataView` | Parameters and dataset JSON, for either window |
+| `RDLDataView` | What a render needs from a person: the report's parameter values, asked for by prompt and offered as a list when the report says what it accepts, plus a summary of the data it will read. Applies as it is typed |
+| `RDLDataSourceNavigator` / `RDLDataSourceView` | The report's data sources, and the one selected: what kind of document, whether it is a file beside the report or content carried in it, and the questions that kind has (a header row, a delimiter). The connect string is written from the answers, never typed |
+| `RDLDatasetNavigator` / `RDLDatasetFieldsView` | The report's datasets, and the one selected: which source it reads, the query into it, **Load**, and its fields — Query or Calculated, with what each is read from |
+| `RDLParameterNavigator` / `RDLParameterInspectorView` | The report's parameters, and the settings of the one selected: prompt, type, blank and multi-value, default, and what it accepts |
+| `RDLFieldInspectorView` | A dataset field's settings: its kind, the column it reads or the expression it computes, and its type |
+| `RDLFilterEditor` | Filters at any level — dataset, data region or group: the field, the operator, and the value as an expression |
 | `RDLExpressionHelper` | Expression completion: typing `!` after `Fields`/`Parameters`/`Globals`/`User` pops the member list; function names complete elsewhere. Also the field editor, which carries its own typing undo so Cmd+Z in a field does not reach the document |
 | `RDLSamples` | Native sample factories |
 | `RDLView` (kit) | Paginated preview from laid-out pages + `PDFData` |
@@ -71,16 +75,24 @@ in the source.
 Two things a XIB cannot carry here, each set in code with a comment where it
 happens:
 
-- A table's `headerView`, and `attributedTitle` on a button — silently dropped
-  by `ibtool`, which reports nothing.
+- `attributedTitle` on a button — silently dropped by `ibtool`, which reports
+  nothing.
 - Escape as a key equivalent: XML forbids U+001B outright, so Cancel buttons get
   theirs in code. (Return is fine, but only written as `&#13;`.)
 
-Two further pieces of markup abort `ibtool` with no diagnostics at all, and
-crash Xcode when the file is opened. Neither needs working around — both are
+Column headings do come from the XIB, but only when it says so twice: a
+`<tableHeaderView key="headerView">` as the last child of the `<scrollView>`,
+**and** a matching `headerView="<id>"` on the table or outline view. With the
+element alone `ibtool` aborts; with neither, the columns' header cells have
+nowhere to be drawn and a table of four columns is four columns of unexplained
+text.
+
+Three further pieces of markup abort `ibtool` with no diagnostics at all, and
+crash Xcode when the file is opened. None of them needs working around — each is
 simply markup Interface Builder would never write, and these XIBs avoid them:
-a `<tableHeaderCell>` must carry **no `id`**, and a `<splitView>` must carry a
-`<holdingPriorities>` with one `<real>` per pane. Written up with reproductions
+a `<tableHeaderCell>` must carry **no `id`**, a `<splitView>` must carry a
+`<holdingPriorities>` with one `<real>` per pane, and a `<tableHeaderView>` must
+be pointed at by its table. Written up with reproductions
 in `../Patches`.
 
 `ibtool --upgrade file.xib --write out.xib` round-trips a document through

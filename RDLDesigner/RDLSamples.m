@@ -133,6 +133,12 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
       @"blurb" : @"Column chart of receipts with a monthly tablix and quarter total."
     },
     @{
+      @"id" : @"manifest",
+      @"title" : @"Harbor Manifest",
+      @"kicker" : @"Data sources",
+      @"blurb" : @"One report reading a JSON document with JSONPath — nested crates flattened, a filter for the heavy ones — and a second table from XML with an XPath."
+    },
+    @{
       @"id" : @"kiln",
       @"title" : @"Kiln Log",
       @"kicker" : @"Fields & filters",
@@ -168,6 +174,8 @@ static RDLItem *RDLMakeTablix(NSString *name, NSString *ds, CGFloat x, CGFloat y
     return [self regionalSales];
   if ([sampleId isEqualToString:@"kiln"])
     return [self kilnLog];
+  if ([sampleId isEqualToString:@"manifest"])
+    return [self harborManifest];
   return [self blankLetter];
 }
 
@@ -527,6 +535,196 @@ static RDLFilter *RDLKeep(NSString *expression, RDLFilterOperator oper, NSString
   return r;
 }
 
+// A dataset that reads a document rather than carrying its rows: the source
+// says where and what kind, the query says which part of it. Fields are
+// declared rather than discovered, because a discovered order is whatever
+// -allKeys happens to give and a report's columns should not depend on that.
+static RDLDataSet *RDLReading(NSString *name, NSString *source, NSString *query,
+                              NSArray<NSString *> *fields) {
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = name;
+  ds.dataSourceName = source;
+  ds.commandText = query;
+  [ds setFieldNames:fields];
+  return ds;
+}
+
+static RDLDataSource *RDLDocumentSource(NSString *name, NSString *provider, NSString *connect) {
+  RDLDataSource *src = [[RDLDataSource alloc] init];
+  src.name = name;
+  src.dataProvider = provider;
+  src.connectString = connect;
+  return src;
+}
+
+// A caption above a table, naming the query that produced what is under it.
+// The sample is a demonstration, so it says what it is doing.
+static RDLItem *RDLCaption(NSString *name, NSString *text, CGFloat y) {
+  return RDLTB(name, text, 0, y, 7.5, 0.2, @"Helvetica", [RDLLength points:9],
+               RDLFontWeightBold, kMuted, RDLTextAlignLeft);
+}
+
+// The data-source sample: one report, three datasets, two documents, and no
+// files to go missing -- the documents are carried in the report itself, the
+// way jsondata= and xmldata= are meant to be used for content that belongs
+// with it.
+//
+// What it demonstrates, in the order it appears:
+//   * a JSON document read with a JSONPath ($.Shipment[*]),
+//   * the same document flattened a level deeper ($.Shipment[*].Crates[*]),
+//     which is how a hierarchy becomes rows a flat table can bind to,
+//   * a filter in the path ([?(@.Qty >= 10)]) rather than in the report,
+//   * an XML document read with an XPath (//Port),
+//   * and aggregates over a dataset the report never declared rows for.
++ (RDLReport *)harborManifest {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Harbor Manifest"];
+  r.reportDescription = @"Shipments from a JSON document and ports from an XML one.";
+  r.author = @"RDLDesigner";
+  // The page header prints this, so the report has to ask for it: a parameter
+  // an expression names and the report never declares renders as nothing, and
+  // the checker calls it unknown-parameter.
+  RDLParameter *season = [[RDLParameter alloc] init];
+  season.name = @"Season";
+  season.prompt = @"Which season?";
+  season.dataType = RDLParameterDataTypeString;
+  season.defaultValue = [RDLValue literal:@"Summer 2026"];
+  for (NSString *one in @[ @"Spring 2026", @"Summer 2026", @"Autumn 2026" ])
+    [season.validValues addObject:[RDLValue literal:one]];
+  [r.parameters addObject:season];
+
+  // The manifest. Crates sit inside their shipment, which is how the file
+  // would arrive and what JSONPath is for -- and each crate repeats its
+  // shipment's season, because a flattened row has to carry what it will be
+  // filtered by: the path selects crates, and by then their shipment is no
+  // longer above them.
+  NSString *manifest =
+      @"jsondata={\"Shipment\":["
+      @"{\"No\":\"S-101\",\"Port\":\"AST\",\"Sailed\":\"2026-06-03\","
+      @"\"Season\":\"Summer 2026\",\"Master\":\"A. Merrick\",\"Crates\":["
+      @"{\"Item\":\"Stoneware bowls\",\"Qty\":12,\"Kg\":38,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-101\"},"
+      @"{\"Item\":\"Glaze, cobalt\",\"Qty\":4,\"Kg\":22,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-101\"}]},"
+      @"{\"No\":\"S-102\",\"Port\":\"PDX\",\"Sailed\":\"2026-06-05\","
+      @"\"Season\":\"Summer 2026\",\"Master\":\"L. Vale\",\"Crates\":["
+      @"{\"Item\":\"Kiln shelves\",\"Qty\":18,\"Kg\":96,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"},"
+      @"{\"Item\":\"Firebrick\",\"Qty\":40,\"Kg\":210,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"},"
+      @"{\"Item\":\"Pyrometric cones\",\"Qty\":6,\"Kg\":3,"
+      @"\"Season\":\"Summer 2026\",\"Shipment\":\"S-102\"}]},"
+      @"{\"No\":\"S-103\",\"Port\":\"AST\",\"Sailed\":\"2026-10-11\","
+      @"\"Season\":\"Autumn 2026\",\"Master\":\"S. Reed\",\"Crates\":["
+      @"{\"Item\":\"Porcelain clay\",\"Qty\":25,\"Kg\":500,"
+      @"\"Season\":\"Autumn 2026\",\"Shipment\":\"S-103\"},"
+      @"{\"Item\":\"Brushes\",\"Qty\":9,\"Kg\":2,"
+      @"\"Season\":\"Autumn 2026\",\"Shipment\":\"S-103\"}]},"
+      @"{\"No\":\"S-104\",\"Port\":\"HFX\",\"Sailed\":\"2026-04-02\","
+      @"\"Season\":\"Spring 2026\",\"Master\":\"N. Harbor\",\"Crates\":["
+      @"{\"Item\":\"Kiln bricks\",\"Qty\":30,\"Kg\":420,"
+      @"\"Season\":\"Spring 2026\",\"Shipment\":\"S-104\"},"
+      @"{\"Item\":\"Tongs\",\"Qty\":3,\"Kg\":11,"
+      @"\"Season\":\"Spring 2026\",\"Shipment\":\"S-104\"}]}]}";
+  // The port register, which arrives as XML because the harbour authority
+  // publishes it that way. An attribute and a child element are both fields.
+  NSString *ports =
+      @"xmldata=<Ports>"
+      @"<Port Code=\"AST\"><Name>Astoria</Name><Country>United States</Country></Port>"
+      @"<Port Code=\"PDX\"><Name>Portland</Name><Country>United States</Country></Port>"
+      @"<Port Code=\"HFX\"><Name>Halifax</Name><Country>Canada</Country></Port>"
+      @"</Ports>";
+
+  [r.dataSources removeAllObjects];
+  [r.dataSources addObject:RDLDocumentSource(@"Manifest", @"JSON", manifest)];
+  [r.dataSources addObject:RDLDocumentSource(@"Register", @"XML", ports)];
+
+  [r.dataSets removeAllObjects];
+  RDLDataSet *shipments = RDLReading(@"Shipments", @"Manifest", @"$.Shipment[*]",
+                                     @[ @"No", @"Port", @"Sailed", @"Season", @"Master" ]);
+  RDLDataSet *crates = RDLReading(@"Crates", @"Manifest", @"$.Shipment[*].Crates[*]",
+                                  @[ @"Shipment", @"Item", @"Qty", @"Kg", @"Season" ]);
+  RDLDataSet *heavy = RDLReading(@"Heavy", @"Manifest", @"$.Shipment[*].Crates[?(@.Qty >= 10)]",
+                                 @[ @"Shipment", @"Item", @"Qty", @"Kg", @"Season" ]);
+  // The season is asked for once and answers three datasets: the parameter is
+  // the filter's value, so choosing another season is a different report from
+  // the same documents -- which is the point of a parameter, and of a filter
+  // that takes an expression rather than a constant.
+  for (RDLDataSet *ds in @[ shipments, crates, heavy ]) {
+    RDLFilter *inSeason = [[RDLFilter alloc] init];
+    inSeason.expression = [RDLValue valueWithSource:@"=Fields!Season.Value"];
+    inSeason.oper = RDLFilterOperatorEqual;
+    [inSeason.values addObject:[RDLValue valueWithSource:@"=Parameters!Season.Value"]];
+    [ds.filters addObject:inSeason];
+    [r.dataSets addObject:ds];
+  }
+  [r.dataSets addObject:RDLReading(@"Ports", @"Register", @"//Port",
+                                   @[ @"Code", @"Name", @"Country" ])];
+
+  [r.pageHeader.items addObject:RDLTB(@"Title", @"Harbor manifest", 0, 0.04, 3.5, 0.3, @"Georgia",
+                                       [RDLLength points:16], RDLFontWeightNormal, kInk, RDLTextAlignLeft)];
+  // The season the report was asked for, printed where the reader can see what
+  // they chose -- the tables below it are the shipments of that season.
+  [r.pageHeader.items addObject:RDLTB(@"Season", @"=Parameters!Season.Value", 3.6, 0.1, 2.0, 0.22,
+                                       @"Helvetica", [RDLLength points:10], RDLFontWeightBold, kInk, RDLTextAlignRight)];
+  [r.pageHeader.items addObject:RDLTB(@"When", @"=Globals!ExecutionTime", 5.6, 0.1, 1.9, 0.22,
+                                       @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignRight)];
+  [r.pageHeader.items addObject:RDLMakeLine(@"HRule", 0, 0.46, 7.5)];
+
+  r.body.height = 7.0;
+  [r.body.items addObject:RDLCaption(@"ShipLbl", @"Shipments  ·  JSON  ·  $.Shipment[*]  ·  filtered to the season above", 0.1)];
+  [r.body.items addObject:RDLMakeTablix(@"ShipTable", @"Shipments", 0, 0.35, 7.5, 0.28, 0.26, @[
+                 RDLCol(@"Shipment", @"=Fields!No.Value", 1.6, @"Left"),
+                 RDLCol(@"Port", @"=Fields!Port.Value", 1.2, @"Left"),
+                 RDLCol(@"Sailed", @"=Fields!Sailed.Value", 2.1, @"Left"),
+                 RDLCol(@"Master", @"=Fields!Master.Value", 2.6, @"Left")
+               ])];
+
+  [r.body.items addObject:RDLCaption(@"CrateLbl",
+                                     @"Crates  ·  the same document, a level deeper  ·  "
+                                     @"$.Shipment[*].Crates[*]  ·  same season", 1.65)];
+  [r.body.items addObject:RDLMakeTablix(@"CrateTable", @"Crates", 0, 1.9, 7.5, 0.28, 0.26, @[
+                 RDLCol(@"Item", @"=Fields!Item.Value", 3.9, @"Left"),
+                 RDLCol(@"Qty", @"=Fields!Qty.Value", 1.6, @"Right"),
+                 RDLCol(@"Kg", @"=Fields!Kg.Value", 2.0, @"Right")
+               ])];
+
+  [r.body.items addObject:RDLCaption(@"HeavyLbl",
+                                     @"Ten or more to a crate  ·  the filter is in the path  ·  "
+                                     @"[?(@.Qty >= 10)]", 4.15)];
+  [r.body.items addObject:RDLMakeTablix(@"HeavyTable", @"Heavy", 0, 4.4, 7.5, 0.28, 0.26, @[
+                 RDLCol(@"Item", @"=Fields!Item.Value", 3.9, @"Left"),
+                 RDLCol(@"Qty", @"=Fields!Qty.Value", 1.6, @"Right"),
+                 RDLCol(@"Kg", @"=Fields!Kg.Value", 2.0, @"Right")
+               ])];
+
+  [r.body.items addObject:RDLCaption(@"PortLbl", @"Ports  ·  XML  ·  //Port", 5.75)];
+  [r.body.items addObject:RDLMakeTablix(@"PortTable", @"Ports", 0, 6.0, 7.5, 0.28, 0.26, @[
+                 RDLCol(@"Code", @"=Fields!Code.Value", 1.4, @"Left"),
+                 RDLCol(@"Port", @"=Fields!Name.Value", 3.1, @"Left"),
+                 RDLCol(@"Country", @"=Fields!Country.Value", 3.0, @"Left")
+               ])];
+
+  // Aggregates over a dataset whose rows the report never wrote down.
+  [r.body.items addObject:RDLTB(@"TotalLbl", @"Manifest total", 0, 6.9, 3.5, 0.26, @"Georgia",
+                                 [RDLLength points:11], RDLFontWeightBold, kInk, RDLTextAlignLeft)];
+  [r.body.items addObject:RDLTB(@"TotalVal",
+                                 @"=Sum(Fields!Qty.Value, \"Crates\") & \" items in \" & "
+                                 @"Count(Fields!Item.Value, \"Crates\") & \" crates, \" & "
+                                 @"Sum(Fields!Kg.Value, \"Crates\") & \" kg\"",
+                                 3.5, 6.9, 4.0, 0.26, @"Georgia", [RDLLength points:11],
+                                 RDLFontWeightBold, kInk, RDLTextAlignRight)];
+
+  [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.04, 7.5)];
+  [r.pageFooter.items addObject:RDLTB(@"F", @"=\"Page \" & Globals!PageNumber", 0, 0.12, 7.5, 0.2,
+                                       @"Helvetica", [RDLLength points:8], RDLFontWeightNormal, kMuted, RDLTextAlignCenter)];
+
+  // Read now, so the sample opens with its rows in it. The documents are in
+  // the report, so this touches no files and asks nobody's permission -- a
+  // sample that opened empty would demonstrate nothing.
+  [[[RDLDataBinder alloc] init] bindReport:r error:NULL];
+  return r;
+}
+
 // A crosstab: two row groups against two column groups, with one measure at
 // their intersection. It is here to show the shape the tablix editor's two
 // lists produce -- and because a matrix is the one arrangement where every
@@ -642,12 +840,13 @@ static RDLFilter *RDLKeep(NSString *expression, RDLFilterOperator oper, NSString
   [r.body.items addObject:tab];
   [r.body.items addObject:RDLTB(@"GrandLbl", @"Shop total", 0, 1.2, 4.2, 0.28, @"Georgia", [RDLLength points:12], RDLFontWeightBold,
                                  kInk, RDLTextAlignLeft)];
-  [r.body.items addObject:RDLTB(@"GrandVal", @"=Format(Sum(Fields!Amount.Value), \"C\")", 4.2, 1.2, 3.3, 0.28,
+  [r.body.items addObject:RDLTB(@"GrandVal", @"=Format(Sum(Fields!Amount.Value, \"Jobs\"), \"C\")", 4.2, 1.2, 3.3, 0.28,
                                  @"Georgia", [RDLLength points:12], RDLFontWeightBold, kInk, RDLTextAlignRight)];
   [r.body.items
       addObject:RDLTB(@"Tally",
-                       @"=IIf(CountRows() = 0, \"No jobs\", CountRows() & \" jobs in \" & "
-                       @"CountDistinct(Fields!Finish.Value) & \" finishes\")",
+                       @"=IIf(CountRows(\"Jobs\") = 0, \"No jobs\", CountRows(\"Jobs\") & "
+                       @"\" jobs in \" & CountDistinct(Fields!Finish.Value, \"Jobs\") & "
+                       @"\" finishes\")",
                        0, 1.55, 7.5, 0.22, @"Helvetica", [RDLLength points:9], RDLFontWeightNormal, kMuted, RDLTextAlignLeft)];
   [r.pageFooter.items addObject:RDLMakeLine(@"FRule", 0, 0.04, 7.5)];
   [r.pageFooter.items

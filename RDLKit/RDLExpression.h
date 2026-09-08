@@ -213,6 +213,13 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 // The locale a culture code names -- "en-US", "de_DE", nil for the machine's
 // own. RDL writes these with a hyphen and NSLocale with an underscore, which
 // is the whole of the difference this papers over.
+// Whether a number is a boolean rather than 1 or 0. Foundation only: GNUstep
+// has no CFBooleanGetTypeID, and the two runtimes disagree about which class a
+// boolean is, so this asks the object instead of the runtime. Published
+// because anything reading typed data -- a JSON document, an expression --
+// needs the same answer.
+FOUNDATION_EXPORT BOOL RDLNumberIsBoolean(id value);
+
 FOUNDATION_EXPORT NSLocale *RDLLocaleForLanguage(NSString *language);
 // This machine's own culture, as RDL writes one: "en-US". The fallback for a
 // report that names no Language, and the default for User!Language.

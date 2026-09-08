@@ -1187,6 +1187,9 @@ static RDLItem *RDLItemForElementName(NSString *name) {
         @"upgraded from RDL %@ to the 2010 grammar",
         wasVersion == RDLSchemaVersionUnknown ? @"(no namespace)"
                                               : @((long)wasVersion).stringValue] atIndex:0];
+  // Both lists are read by now, so the datasets can be pointed at the sources
+  // they name.
+  [r resolveDataSources];
   [r.warnings setArray:self.notes];
   self.notes = nil;
   if (self.failure) {
@@ -1882,14 +1885,22 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
 
   NSXMLElement *sets = RDLEl(@"DataSets");
   for (RDLDataSet *ds in report.dataSets) {
+    // A dataset that reads a document says which part of it to take, and that
+    // is what CommandText is for -- it is written back as it was written.
+    // Only a dataset with no query of its own carries its rows there instead,
+    // which is this kit's way of keeping a hand-made dataset in the file.
+    //
     // Sorted, because NSDictionary hands its keys back in no particular order
     // and an unsorted dump makes the same report write differently every time
     // -- which shows up as spurious diffs in version control and breaks the
     // write/read/write round trip.
-    NSData *json = [NSJSONSerialization dataWithJSONObject:(ds.rows ?: @[])
-                                                   options:NSJSONWritingSortedKeys
-                                                     error:nil];
-    NSString *cmd = json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"[]";
+    NSString *cmd = ds.commandText;
+    if ([cmd length] == 0) {
+      NSData *json = [NSJSONSerialization dataWithJSONObject:(ds.rows ?: @[])
+                                                     options:NSJSONWritingSortedKeys
+                                                       error:nil];
+      cmd = json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"[]";
+    }
     NSXMLElement *de = RDLEl(@"DataSet");
     RDLAddAttr(de, @"Name", ds.name);
     NSXMLElement *query = RDLEl(@"Query");

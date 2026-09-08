@@ -8,11 +8,11 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLFilterEditor">
             <connections>
-                <outlet property="window" destination="filterPanel" id="windowOutlet"/>
-                <outlet property="table" destination="table" id="tableOutlet"/>
-                <outlet property="titleLabel" destination="titleLabel" id="titleLabelOutlet"/>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="table" destination="table" id="tableOutlet"/>
+                <outlet property="titleLabel" destination="titleLabel" id="titleLabelOutlet"/>
+                <outlet property="window" destination="filterPanel" id="windowOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -25,7 +25,7 @@
                 <rect key="frame" x="0.0" y="0.0" width="600" height="360"/>
                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
-                    <textField verticalHuggingPriority="750" id="headingLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="headingLabel">
                         <rect key="frame" x="14" y="336" width="540" height="14"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Rows are kept when every filter is true of them. Numbers use a dot; dates are yyyy-mm-dd." id="headingLabelCell">
@@ -34,22 +34,22 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" hasVerticalScroller="YES" id="tableScroll">
+                    <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="tableScroll">
                         <rect key="frame" x="14" y="96" width="572" height="232"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="tableClip">
-                            <rect key="frame" x="1" y="1" width="555" height="230"/>
+                            <rect key="frame" x="1" y="1" width="555" height="215"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="table">
-                                    <rect key="frame" x="0.0" y="0.0" width="555" height="230"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLFilterEditorHeader1" id="table">
+                                    <rect key="frame" x="0.0" y="0.0" width="555" height="192"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                     <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                     <tableColumns>
-                                        <tableColumn identifier="expression" editable="YES" width="250" minWidth="40" maxWidth="1000" id="exprCol">
-                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Expression">
+                                        <tableColumn identifier="expression" width="250" minWidth="40" maxWidth="1000" id="exprCol">
+                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Field">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                             </tableHeaderCell>
@@ -59,7 +59,7 @@
                                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                             </textFieldCell>
                                         </tableColumn>
-                                        <tableColumn identifier="operator" editable="YES" width="130" minWidth="40" maxWidth="1000" id="opCol">
+                                        <tableColumn identifier="operator" width="130" minWidth="40" maxWidth="1000" id="opCol">
                                             <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Operator">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
@@ -70,7 +70,7 @@
                                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
                                             </textFieldCell>
                                         </tableColumn>
-                                        <tableColumn identifier="values" editable="YES" width="150" minWidth="40" maxWidth="1000" id="valCol">
+                                        <tableColumn identifier="values" width="150" minWidth="40" maxWidth="1000" id="valCol">
                                             <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Value">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
@@ -90,11 +90,15 @@
                             </subviews>
                         </clipView>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                            <rect key="frame" x="556" y="1" width="15" height="230"/>
+                            <rect key="frame" x="556" y="24" width="15" height="192"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLFilterEditorHeader1">
+                            <rect key="frame" x="0.0" y="0.0" width="555" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
-                    <textField verticalHuggingPriority="750" id="titleLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="titleLabel">
                         <rect key="frame" x="14" y="74" width="400" height="14"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Value: the value to compare against." id="titleLabelCell">
@@ -149,6 +153,7 @@
                     </button>
                 </subviews>
             </view>
+            <point key="canvasLocation" x="140" y="144"/>
         </window>
     </objects>
 </document>

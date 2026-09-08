@@ -3,7 +3,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 LIBRARY_NAME = RDLKit
 RDLKit_NEEDS_GUI = yes
 RDLKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
-RDLKit_OBJCFLAGS += -fobjc-arc -Wall
+RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \
@@ -14,6 +14,11 @@ RDLKit_HEADER_FILES = \
   RDLView.h \
   RDLBackend.h \
   RDLGenerator.h \
+  RDLJSONPath.h \
+  RDLDataProvider.h \
+  RDLJSONDataProvider.h \
+  RDLXMLDataProvider.h \
+  RDLCSVDataProvider.h \
   RDLTextAttributes.h
 RDLKit_OBJC_FILES = \
   RDLReport.m \
@@ -31,6 +36,11 @@ RDLKit_OBJC_FILES = \
   RDLHTMLBackend.m \
   RDLPDFBackend.m \
   RDLGenerator.m \
+  RDLJSONPath.m \
+  RDLDataProvider.m \
+  RDLJSONDataProvider.m \
+  RDLXMLDataProvider.m \
+  RDLCSVDataProvider.m \
   RDLTextAttributes.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever

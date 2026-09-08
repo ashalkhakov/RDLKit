@@ -55,6 +55,36 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
   return [RDLChecker checkReport:r];
 }
 
+
+// The same, in the body rather than a page header: the body is where RDL's
+// single-dataset default applies.
+static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBody(NSString *expr) {
+  RDLReport *r = RDLCheckableReport();
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = expr;
+  [r.body.items addObject:tb];
+  return [RDLChecker checkReport:r];
+}
+
+// And with a second dataset, where there is no default to fall back on.
+static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSString *expr) {
+  RDLReport *r = RDLCheckableReport();
+  RDLDataSet *other = [[RDLDataSet alloc] init];
+  other.name = @"Costs";
+  [other setFieldNames:@[ @"Amount" ]];
+  [r.dataSets addObject:other];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = expr;
+  [r.body.items addObject:tb];
+  return [RDLChecker checkReport:r];
+}
+
 @interface RDLExpressionTests : RDLKitTestCase
 @end
 @implementation RDLExpressionTests
@@ -334,9 +364,17 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpression(NSString *expr, BOOL insideR
     if ([RDLCheckExpression(expr, YES) count] != 0)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ should check clean", expr]);
 
-  // Scope: aggregates and fields need a dataset, unless one is named.
+  // Scope: aggregates and fields need a dataset, unless one is named -- or the
+  // report has exactly one and the expression is in the body, which is the
+  // default RDL gives. A page header gets no such default: it is rendered per
+  // page rather than per row, so a field there has nothing to read.
   if (!RDLSawDiagnostic(RDLCheckExpression(@"=Sum(Fields!Amount.Value)", NO), @"scope", @"Sum"))
     XCTFail(@"%@", @"an aggregate in a page header has nothing to summarise");
+  if ([RDLCheckExpressionInBody(@"=Sum(Fields!Amount.Value)") count] != 0)
+    XCTFail(@"%@", @"a total in the body of a one-dataset report is ordinary RDL");
+  if (!RDLSawDiagnostic(RDLCheckExpressionInBodyOfTwoDatasetReport(@"=Sum(Fields!Amount.Value)"),
+                        @"scope", @"Sum"))
+    XCTFail(@"%@", @"with two datasets there is nothing to default to, so it must say which");
   if (RDLSawDiagnostic(RDLCheckExpression(@"=Sum(Fields!Amount.Value, \"Sales\")", NO), @"scope",
                         nil))
     XCTFail(@"%@", @"an aggregate that names its dataset is fine anywhere");

@@ -694,9 +694,23 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) NSData *imageData;
 @end
 
+@class RDLDataSource;
+
 @interface RDLDataSet : NSObject
 @property (nonatomic, copy) NSString *name;
+// Which data source this reads from, by name -- which is how RDL writes the
+// link, and what survives a dataset copied into another document, a removal
+// that is then undone, and a file naming a source it does not have.
 @property (nonatomic, copy) NSString *dataSourceName;
+// The same link, resolved: the source object itself, or nil when nothing has
+// resolved it yet or the name names nothing. Weak, because the report's
+// `dataSources` array owns them.
+//
+// The name is the record and this is the convenience. Setting this sets the
+// name to match; setting the name to something else drops this, because a
+// pointer that disagreed with the name would be a lie. -resolveDataSources
+// fills them in, the way -adoptItems stamps items with their report.
+@property (nonatomic, weak) RDLDataSource *dataSource;
 @property (nonatomic, copy) NSString *commandText;
 // Always RDLField objects, never bare names.
 //
@@ -777,11 +791,19 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 // The dataset with this name, or nil. Exact match, as RDL names are.
 - (RDLDataSet *)dataSetNamed:(NSString *)name;
+// The data source with this name, or nil. Datasets name one of these.
+- (RDLDataSource *)dataSourceNamed:(NSString *)name;
+// The parameter with this name, or nil. Expressions name these.
+- (RDLParameter *)parameterNamed:(NSString *)name;
 + (instancetype)emptyReportNamed:(NSString *)name;
 // Stamp every item in the report with a back-pointer to it. Cheap, idempotent,
 // and called after anything that adds or moves items, because there is no hook
 // on the plain arrays the bands hold.
 - (void)adoptItems;
+// Point every dataset at the data source it names. Cheap and idempotent, and
+// called after anything that adds, removes or renames a source -- there is no
+// hook on the plain arrays these live in.
+- (void)resolveDataSources;
 // Canonical band identity, in render order: page header, body, page footer.
 // Layout, hit-testing and the designer all depend on that order. Iterate
 // -bandKeys with -bandWithKey: when you need the key alongside the band.

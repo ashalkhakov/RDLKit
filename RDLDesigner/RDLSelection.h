@@ -1,22 +1,36 @@
-// RDLSelection — what the editor is pointing at.
+// RDLSelection — what the editor is pointing at, and the only place that
+// knows. Panes read it and announce nothing of their own; whoever is clicked
+// says what is now selected and stops there.
 //
-// Selection used to be a (scope, name, bandKey) string triple, so every
-// consumer re-resolved the item by name on every use and every mutation path
-// had to revalidate that the name still existed. That indirection only earned
-// its keep because undo replaced the whole report (parsed back from XML), which
-// invalidated any held pointer. With granular undo the report object survives
-// an edit, so a resolved reference is both simpler and cheaper.
+// Selections are held as resolved references rather than names. That is safe
+// because every edit records its own inverse (see RDLEditor) instead of
+// replacing the report, so the objects a selection points at survive an edit
+// and an undo. Opening a document is the one thing that does replace them, and
+// -reset / -validateAgainstReport: are how a selection is told.
 #import <Foundation/Foundation.h>
 #import "RDLPageGeometry.h"
 #import "RDLKit.h"
 
 @class RDLItem;
 @class RDLReport;
+@class RDLDataSet;
+@class RDLField;
+@class RDLParameter;
+@class RDLDataSource;
 
+// What is selected -- one of these, never two. A report holds things that are
+// drawn and things that are defined, and both are selected the same way: an
+// element on the canvas, a field of a dataset, or a parameter. Keeping all of
+// them here is what makes "one at a time" a fact rather than something each
+// pane has to remember to enforce.
 typedef NS_ENUM(NSInteger, RDLSelectionScope) {
   RDLSelectionScopeReport = 0,
   RDLSelectionScopeBand,
-  RDLSelectionScopeItem
+  RDLSelectionScopeItem,
+  RDLSelectionScopeDataSet,
+  RDLSelectionScopeDatasetField,
+  RDLSelectionScopeDataSource,
+  RDLSelectionScopeParameter
 };
 
 extern NSString * const RDLSelectionDidChangeNotification;
@@ -25,6 +39,16 @@ extern NSString * const RDLSelectionDidChangeNotification;
 @property (nonatomic, readonly, assign) RDLSelectionScope scope;
 // The selected item, or nil unless scope is RDLSelectionScopeItem.
 @property (nonatomic, readonly, strong) RDLItem *item;
+// The dataset being edited, or the one the selected field belongs to; nil
+// unless the scope is RDLSelectionScopeDataSet or RDLSelectionScopeDatasetField.
+@property (nonatomic, readonly, strong) RDLDataSet *dataSet;
+// The field of that dataset; nil unless scope is RDLSelectionScopeDatasetField.
+@property (nonatomic, readonly, strong) RDLField *datasetField;
+// The data source being edited; nil unless scope is RDLSelectionScopeDataSource.
+@property (nonatomic, readonly, strong) RDLDataSource *dataSource;
+// The report parameter being edited; nil unless scope is
+// RDLSelectionScopeParameter.
+@property (nonatomic, readonly, strong) RDLParameter *parameter;
 // The band the selection sits in. Never nil — defaults to "body" — because
 // insertion needs somewhere to put things even with nothing selected.
 @property (nonatomic, readonly, copy) NSString *bandKey;
@@ -32,6 +56,12 @@ extern NSString * const RDLSelectionDidChangeNotification;
 - (void)selectReport;
 - (void)selectBandWithKey:(NSString *)bandKey;
 - (void)selectItem:(RDLItem *)item inBandWithKey:(NSString *)bandKey;
+// A dataset's field, or a report parameter. Passing nil selects the report,
+// which is what "nothing in particular" means everywhere else here.
+- (void)selectDataSet:(RDLDataSet *)dataSet;
+- (void)selectDatasetField:(RDLField *)field inDataSet:(RDLDataSet *)dataSet;
+- (void)selectDataSource:(RDLDataSource *)source;
+- (void)selectParameter:(RDLParameter *)parameter;
 
 // A cell of a scaffolded tablix: the tablix is the selected item, and these say
 // which of its columns and which row of the preview was clicked. A cell is not

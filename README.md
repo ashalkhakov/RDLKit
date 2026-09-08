@@ -9,12 +9,12 @@ The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
 accepted as current.
 
-**Platform status.** macOS builds and passes its tests on every change. The
-GNUstep build is being brought up in CI now. The sources were *written* for
-GNUstep but had never been compiled there, and doing so is turning up real
-breakage — a CoreGraphics import, Cocoa-only attributed-string enumerators,
-libraries that were never linked. Until that job is green, treat GNUstep as
-work in progress rather than as supported.
+**Platform status.** Both platforms build and run their tests on every change:
+macOS through Xcode, and Linux through GNUstep with clang and gnustep-2.0. The
+Linux build is packaged as an AppImage by the release workflow and smoke-tested
+there. Anything Cocoa-only that creeps in is caught by the GNUstep job -- and by
+a portability check over the XIBs and sources, since the two toolkits disagree
+about named colours, fonts and a handful of APIs.
 
 Output format support:
 
@@ -34,16 +34,19 @@ Report generation is a pipeline:
 | Path | Component | Role |
 | --- | --- | --- |
 | `RDLKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
-| `RDLKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. One XCTest per area; the GNUstep bundle build is not green yet. |
+| `RDLKitTests` | XCTest (Mac and GNUstep) | Parser, expressions, layout, tablix pagination, both backends, the checker, data sources and JSONPath, the `.docx` importer. One XCTest per area |
 | `RDLGen` | Generator CLI | command-line tool to generate reports |
 | `RDLDesigner` | Designer app | WYSIWYG report designer |
-| `RDLDesignerTests` | Designer app | Tests for the report designer |
+| `RDLDesignerTests` | XCTest (Mac) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
 
 Written in Objective-C with ARC. UI is built via XIBs.
 
 ## Generator API
 
 ```
+// The documents the report itself names -- see Data sources below.
+[[[RDLDataBinder alloc] initWithBaseURL:folder] bindReport:report error:&err];
+// Or rows the host has in hand:
 [RDLGenerator bindJSONString:json toDataSet:@"Items" inReport:report error:&err];
 NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{ @"InvoiceNo": @"A-1042" }];
 NSData *pdf = [RDLGenerator PDFForReport:report parameters:params];
@@ -84,6 +87,10 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * crosstab pivot via dynamic `TablixColumnHierarchy` groups (nested groups render tiered, spanning column headers)
   * horizontal pagination of wide tablixes with `RepeatRowHeaders`
 * **Data**
+  * JSON documents, selected with a JSONPath subset (`$.Movie[*]`, `$..Order`, `$['a'][0]`)
+  * XML documents, selected with an XPath
+  * CSV and fixed-width text, with or without headers, any delimiter
+  * documents beside the report (`jsondoc=`, `xmldoc=`, `data.csv`) or carried in it (`jsondata=`, `xmldata=`)
   * datasets from `CommandText` JSON or `bindJSONString:`
   * calculated fields (`Field/Value`)
   * dataset-level `Filters`
@@ -290,6 +297,134 @@ checker (`unknown-language`) rather than silently formatting as English.
 Not supported: `Calendar`, `NumeralLanguage` and `NumeralVariant`; and
 localized *labels*, which RDL has no native form for -- SSRS reports do it with
 a custom assembly or a lookup table, and so would a report here.
+
+## Data sources
+
+RDLKit is a local report viewer, so a data source is a document: a file beside
+the report, or content the report carries. There are no database providers and
+no shared data source references here -- those belong to a report server, which
+is a different application.
+
+```xml
+<DataSource Name="Files">
+  <ConnectionProperties>
+    <DataProvider>JSON</DataProvider>
+    <ConnectString>jsondoc=orders.json</ConnectString>
+  </ConnectionProperties>
+</DataSource>
+<DataSet Name="Orders">
+  <Query><DataSourceName>Files</DataSourceName>
+         <CommandText>$.Order[*]</CommandText></Query>
+</DataSet>
+```
+
+| Provider | Connect string | Query |
+| --- | --- | --- |
+| `JSON` | `jsondoc=orders.json`, `jsondata={…}` | JSONPath: `$.Order[*]`, `$..Line`, `$['a'][0]` |
+
+| `XML` | `xmldoc=orders.xml`, `xmldata=<Orders>…` | XPath: `//Order` |
+| `CSV` | `stock.csv;HasHeaders=true;Delimiter=Tab` | — (the file is the rows) |
+
+`RDLJSONPath` is a module of its own, with the set the mainstream
+implementations agree on:
+
+| | |
+| --- | --- |
+| `$` | the document |
+| `.name` `['name']` | a member, quoted when it has dots or spaces |
+| `[2]` `[-1]` | an element, counted from the end when negative |
+| `[*]` `.*` | every element or member |
+| `[1:3]` `[:2]` `[::2]` `[::-1]` | a slice, with an optional step |
+| `[0,2]` `['a','b']` | a union |
+| `..name` `..*` | every match at any depth |
+| `[?(@.isbn)]` | the ones that have it |
+| `[?(@.price < 10 && @.category == 'fiction')]` | comparisons, `&&`, `\|\|`, `!` |
+
+Script expressions (`[(@.length-1)]`) and functions are not supported, and a
+path using one is refused with a reason rather than silently selecting the
+wrong nodes -- the failure that matters here, because the report still renders.
+Selections that cross object members come back in an unspecified order: an
+NSDictionary has no member order. `RDLJSONPathTests` checks all of this against
+the store document from Goessner's original article, which is what the
+cross-implementation comparisons use.
+
+Reading a document types its columns: a dataset that declares no fields
+discovers both names and types, and one that names its fields without saying
+what they hold has the missing types filled in — a type the report *did* state
+is its own and is left alone. JSON says what its values are, so: a number is Integer or
+Float, `true` is Boolean, and a string written the ISO way is DateTime. A
+column holding two kinds of thing is String, and one holding only nulls or
+nested rows stays untyped. Text formats carry no types and none are guessed for
+them -- a CSV column of `007` is a string, not seven.
+
+CSV also reads fixed-width files (`stock.txt;Widths=10,20,8`), and without
+headers the columns are `Column1`, `Column2`, … A JSON object or a repeated XML
+element inside a row stays a list of rows, which is what a nested region reads;
+CSV is flat and has nothing of the kind.
+
+A dataset links to its source the way the file does -- by name -- with the
+resolved object beside it:
+
+```objc
+ds.dataSourceName          // "Manifest", what the file carries
+ds.dataSource              // the RDLDataSource itself, weak, or nil
+[report resolveDataSources];   // fills the pointers in; parsing and binding do it for you
+```
+
+The name is the record and the pointer is the convenience: setting the pointer
+sets the name, and setting the name to something else drops the pointer, so
+nothing ever holds one that disagrees with what will be written. That is also
+what lets a dataset survive being copied into another document, a removal that
+is undone, and a file naming a source it does not have -- the checker reports
+that last one as `unknown-data-source`.
+
+Binding happens through `RDLDataBinder`, one per bind:
+
+```objc
+RDLDataBinder *binder = [[RDLDataBinder alloc] initWithBaseURL:reportDirectory];
+[binder bindReport:report error:&err];   // every dataset whose source it can read
+for (NSString *note in binder.notes)     // and what it could not, with the reason
+  NSLog(@"%@", note);
+```
+
+Relative documents resolve against `baseURL` -- the report's own folder. A
+document at `http(s)://` is **not** fetched unless the host sets
+`allowsRemoteDocuments`, because a report is a document that may have arrived
+from anywhere; `rdlgen --allow-remote` is how the command line says so. Rows
+supplied in code, and datasets whose provider this kit does not implement, are
+left untouched.
+
+The designer keeps the two apart, the way RDL does. **Data sources** are listed
+above the datasets, and choosing one shows it in the centre: what kind of
+document it is, whether it is a file beside the report or content carried in
+it, and whatever that kind needs -- for delimited text, whether the first row
+names the columns and what separates them. The connect string is written from
+those answers rather than typed; the pane shows the line it will write.
+
+A **dataset** then names one of those sources and says which part of the
+document its rows are, and its **Load** button reads it then and there, so the
+fields it discovers are the ones the expression editor offers. Renaming a
+source carries the datasets that read from it.
+
+Report **parameters** have a navigator of their own beside those two, with add
+and remove; choosing one puts its settings — prompt, type, whether it allows
+blank or takes several values, its default, and what it accepts — in the
+inspector, where the settings of anything selected go.
+
+The generator window reads **every** source the report names with one **Read
+data** button, ticking **Fetch by URL** to allow http(s), and offers to go and
+find any document that is not where the report says -- which is the usual state
+of a report authored on another machine. Parameters are asked for beside it: by
+their prompt, and from a list when the report says what they accept.
+
+The **Harbor Manifest** sample is a worked example of all of it in one report:
+a JSON document carried in the report, read as shipments (`$.Shipment[*]`),
+flattened a level deeper into crates (`$.Shipment[*].Crates[*]`), narrowed by a
+filter in the path (`[?(@.Qty >= 10)]`), an XML document read with `//Port`, and
+totals aggregated over rows the report never wrote down. Its **Season**
+parameter is the value of a dataset filter, so choosing another season in the
+generator is a different report out of the same documents -- while the port
+register, which has no season, stays as it is.
 
 ## Checking a report without running it
 

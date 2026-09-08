@@ -130,6 +130,63 @@
   return YES;
 }
 
+- (BOOL)bindDataSourcesFetchingRemote:(BOOL)fetchRemote
+                                notes:(NSArray<NSString *> **)notes
+                                error:(NSError **)error {
+  RDLDataBinder *binder = [[RDLDataBinder alloc]
+      initWithBaseURL:[_fileURL URLByDeletingLastPathComponent]];
+  binder.allowsRemoteDocuments = fetchRemote;
+  BOOL ok = [binder bindReport:_report error:error];
+  if (notes)
+    *notes = binder.notes;
+  // Rows are what a render reads, so this is a data change whether it went
+  // well or badly -- a dataset that came back empty is news too.
+  [self noteChange:[RDLChange dataChange]];
+  return ok;
+}
+
+- (void)setDocumentPath:(NSString *)path forDataSourceNamed:(NSString *)name {
+  RDLDataSource *source = [_report dataSourceNamed:name];
+  if (source == nil || [path length] == 0)
+    return;
+  RDLDataProviderKind kind = RDLDataProviderKindFromString(source.dataProvider);
+  NSMutableDictionary *properties =
+      [RDLConnectionProperties(source.connectString) mutableCopy];
+  // The document moves; the options -- a header row, a delimiter -- stay.
+  [properties removeObjectForKey:RDLDocumentKeyForProviderKind(kind)];
+  [properties removeObjectForKey:RDLInlineKeyForProviderKind(kind)];
+  properties[RDLDocumentKeyForProviderKind(kind)] = path;
+  source.connectString = RDLConnectionString(properties);
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (NSArray<RDLDataSource *> *)unreadableDataSources {
+  RDLDataBinder *binder = [[RDLDataBinder alloc]
+      initWithBaseURL:[_fileURL URLByDeletingLastPathComponent]];
+  NSMutableArray *out = [NSMutableArray array];
+  [_report resolveDataSources];
+  for (RDLDataSource *source in _report.dataSources) {
+    // Only the ones something actually reads: a source no dataset names is
+    // not a problem to put in front of anyone.
+    BOOL used = NO;
+    for (RDLDataSet *ds in _report.dataSets)
+      if (ds.dataSource == source)
+        used = YES;
+    if (!used || [source.connectString length] == 0)
+      continue;
+    RDLDataSet *probe = nil;
+    for (RDLDataSet *ds in _report.dataSets)
+      if (ds.dataSource == source && probe == nil)
+        probe = ds;
+    NSError *why = nil;
+    NSArray *saved = probe.rows;
+    if (![binder bindDataSet:probe inReport:_report error:&why])
+      [out addObject:source];
+    probe.rows = saved ?: probe.rows;
+  }
+  return out;
+}
+
 #pragma mark - Export
 
 - (NSArray<id<RDLBackend>> *)exportBackends {

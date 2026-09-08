@@ -11,6 +11,8 @@
 @property (nonatomic, strong) IBOutlet RDLView *preview;
 @property (nonatomic, strong) IBOutlet RDLDataView *dataView;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *samplePopup;
+@property (nonatomic, strong) IBOutlet NSButton *remoteCheck;
+@property (nonatomic, strong) IBOutlet NSTextField *dataStatus;
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
 @end
 
@@ -125,27 +127,52 @@
   [self updateForDocument];
 }
 
-- (void)bindJSONFile:(id)sender {
-  RDL_UNUSED(sender);
-  NSOpenPanel *p = [NSOpenPanel openPanel];
-  [p setAllowedFileTypes:@[ @"json" ]];
-  [p setCanChooseFiles:YES];
-  [p setCanChooseDirectories:NO];
-  if ([p runModal] != NSOKButton)
-    return;
+// Every data source the report names, not the first dataset: a report with
+// three datasets needs three documents, and one that cannot be read should not
+// stop the others.
+- (NSString *)readDataFetchingRemote:(BOOL)fetchRemote {
+  NSArray<NSString *> *notes = nil;
   NSError *err = nil;
-  NSString *json = [NSString stringWithContentsOfURL:[p URL]
-                                            encoding:NSUTF8StringEncoding
-                                               error:&err];
-  if (json == nil) {
-    [self presentError:err title:@"Could not read JSON"];
-    return;
+  [_reportDocument bindDataSourcesFetchingRemote:fetchRemote notes:&notes error:&err];
+  NSUInteger rows = 0, bound = 0;
+  for (RDLDataSet *ds in _reportDocument.report.dataSets) {
+    if ([ds.rows count]) {
+      bound += 1;
+      rows += [ds.rows count];
+    }
   }
-  // Bind to the first dataset, creating one if the report has none.
-  RDLDataSet *first = [_reportDocument.report.dataSets firstObject];
-  NSString *name = first.name ?: @"Data";
-  if (![_reportDocument bindJSON:json toDataSetNamed:name error:&err])
-    [self presentError:err title:@"Could not bind JSON"];
+  NSString *summary =
+      [NSString stringWithFormat:@"%lu dataset%@ read, %lu row%@", (unsigned long)bound,
+                                 bound == 1 ? @"" : @"s", (unsigned long)rows,
+                                 rows == 1 ? @"" : @"s"];
+  if ([notes count])
+    summary = [summary stringByAppendingFormat:@" — %@",
+                                               [notes componentsJoinedByString:@"; "]];
+  [_dataStatus setStringValue:summary];
+  [self updateForDocument];
+  return summary;
+}
+
+- (void)bindData:(id)sender {
+  RDL_UNUSED(sender);
+  [self readDataFetchingRemote:[_remoteCheck state] == NSOnState];
+  // A report written elsewhere names documents by paths that mean nothing
+  // here, so rather than reporting that and stopping, offer to go and find
+  // each one. Answering the panel is what tells the report where its data is.
+  for (RDLDataSource *source in [_reportDocument unreadableDataSources]) {
+    NSOpenPanel *p = [NSOpenPanel openPanel];
+    [p setCanChooseFiles:YES];
+    [p setCanChooseDirectories:NO];
+    [p setTitle:[NSString stringWithFormat:@"Find the document for '%@'", source.name ?: @""]];
+    [p setMessage:[NSString stringWithFormat:@"'%@' reads %@, which is not where the report "
+                                             @"says it is.",
+                                             source.name ?: @"",
+                                             source.connectString ?: @""]];
+    if ([p runModal] != NSOKButton)
+      continue;
+    [_reportDocument setDocumentPath:[[p URL] path] forDataSourceNamed:source.name];
+    [self readDataFetchingRemote:[_remoteCheck state] == NSOnState];
+  }
 }
 
 #pragma mark - Export

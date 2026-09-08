@@ -86,8 +86,8 @@
                             <rect key="frame" x="1" y="1" width="143" height="167"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="categoryTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="143" height="167"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLExpressionEditorHeader1" id="categoryTable">
+                                    <rect key="frame" x="0.0" y="0.0" width="143" height="144"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -117,9 +117,13 @@
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="categoryScrollV">
-                            <rect key="frame" x="144" y="1" width="15" height="167"/>
+                            <rect key="frame" x="144" y="24" width="15" height="144"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLExpressionEditorHeader1">
+                            <rect key="frame" x="0.0" y="0.0" width="143" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
                     <scrollView horizontalLineScroll="19" horizontalPageScroll="10" verticalLineScroll="19" verticalPageScroll="10" id="itemScroll">
                         <rect key="frame" x="184" y="92" width="504" height="184"/>
@@ -128,8 +132,8 @@
                             <rect key="frame" x="1" y="1" width="487" height="167"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" id="itemTable">
-                                    <rect key="frame" x="0.0" y="0.0" width="487" height="167"/>
+                                <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLExpressionEditorHeader2" id="itemTable">
+                                    <rect key="frame" x="0.0" y="0.0" width="487" height="144"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -159,9 +163,13 @@
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="itemScrollV">
-                            <rect key="frame" x="488" y="1" width="15" height="167"/>
+                            <rect key="frame" x="488" y="24" width="15" height="144"/>
                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         </scroller>
+                        <tableHeaderView key="headerView" wantsLayer="YES" id="RDLExpressionEditorHeader2">
+                            <rect key="frame" x="0.0" y="0.0" width="487" height="23"/>
+                            <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
+                        </tableHeaderView>
                     </scrollView>
                     <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="summaryLabel">
                         <rect key="frame" x="12" y="68" width="676" height="16"/>

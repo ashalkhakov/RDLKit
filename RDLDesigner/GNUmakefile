@@ -2,7 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = RDLDesigner
 RDLDesigner_NEEDS_GUI = yes
-RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit
+RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -Werror=logical-not-parentheses
 RDLDesigner_OBJC_FILES = \
   main.m \
   RDLEditingContext.m \
@@ -43,6 +43,10 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionTextStorage.m \
   RDLTabBadge.m \
   RDLDatasetNavigator.m \
+  RDLDataSourceNavigator.m \
+  RDLDataSourceView.m \
+  RDLParameterNavigator.m \
+  RDLParameterInspectorView.m \
   RDLFieldInspectorView.m \
   RDLDatasetFieldsView.m \
   ThirdParty/DMTabBar/DMTabBar.m \
@@ -68,6 +72,10 @@ RDLDesigner_RESOURCE_FILES = \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
   RDLDatasetNavigator.xib \
+  RDLDataSourceNavigator.xib \
+  RDLDataSourceView.xib \
+  RDLParameterNavigator.xib \
+  RDLParameterInspectorView.xib \
   RDLInsertPalette.xib \
   RDLDatasetFieldsView.xib \
   RDLFieldInspectorView.xib \

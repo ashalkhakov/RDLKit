@@ -212,6 +212,145 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
 }
+- (void)addDataSource:(RDLDataSource *)source {
+  if (source == nil)
+    return;
+  [self beginGroup:@"Add Data Source"];
+  [[self undoProxy] removeDataSource:source];
+  [_document.report.dataSources addObject:source];
+  [_document.report resolveDataSources];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)removeDataSource:(RDLDataSource *)source {
+  RDLReport *report = _document.report;
+  NSUInteger index = source ? [report.dataSources indexOfObject:source] : NSNotFound;
+  if (index == NSNotFound)
+    return;
+  [self beginGroup:@"Remove Data Source"];
+  [[self undoProxy] addDataSource:source];
+  [report.dataSources removeObjectAtIndex:index];
+  [_document.report resolveDataSources];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)renameDataSource:(RDLDataSource *)source to:(NSString *)name {
+  if (source == nil || [name length] == 0 || [source.name isEqualToString:name])
+    return;
+  NSString *was = source.name;
+  [self beginGroup:@"Rename Data Source"];
+  [[self undoProxy] renameDataSource:source to:was];
+  source.name = name;
+  // Every dataset that named it. A rename that left them pointing at nothing
+  // would empty the report the next time it was bound.
+  for (RDLDataSet *ds in _document.report.dataSets)
+    if ([ds.dataSourceName isEqualToString:was])
+      ds.dataSourceName = name;
+  [_document.report resolveDataSources];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setDataSourceName:(NSString *)name ofDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil || [dataSet.dataSourceName isEqualToString:name])
+    return;
+  NSString *was = dataSet.dataSourceName;
+  [self beginGroup:@"Choose Data Source"];
+  [[self undoProxy] setDataSourceName:was ofDataSet:dataSet];
+  dataSet.dataSourceName = name;
+  [_document.report resolveDataSources];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)addParameter:(RDLParameter *)parameter {
+  if (parameter == nil)
+    return;
+  [self beginGroup:@"Add Parameter"];
+  [[self undoProxy] removeParameter:parameter];
+  [_document.report.parameters addObject:parameter];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)removeParameter:(RDLParameter *)parameter {
+  NSUInteger index =
+      parameter ? [_document.report.parameters indexOfObject:parameter] : NSNotFound;
+  if (index == NSNotFound)
+    return;
+  [self beginGroup:@"Remove Parameter"];
+  [[self undoProxy] addParameter:parameter];
+  [_document.report.parameters removeObjectAtIndex:index];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+// One setting of one parameter, undoably -- the same shape the inspector uses
+// for an item's properties, because it is the same kind of edit.
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofParameter:(RDLParameter *)parameter {
+  if (parameter == nil || [keyPath length] == 0)
+    return;
+  id old = [parameter valueForKeyPath:keyPath];
+  if (old == value || [old isEqual:value])
+    return;
+  [self beginGroup:@"Edit Parameter"];
+  [[self undoProxy] setValue:old forKeyPath:keyPath ofParameter:parameter];
+  [parameter setValue:value forKeyPath:keyPath];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setValidValues:(NSArray *)values ofParameter:(RDLParameter *)parameter {
+  if (parameter == nil || [parameter.validValues isEqualToArray:values ?: @[]])
+    return;
+  NSArray *old = [parameter.validValues copy];
+  [self beginGroup:@"Edit Parameter"];
+  [[self undoProxy] setValidValues:old ofParameter:parameter];
+  [parameter.validValues removeAllObjects];
+  [parameter.validValues addObjectsFromArray:values ?: @[]];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil || [dataSet.commandText isEqualToString:query])
+    return;
+  NSString *old = dataSet.commandText;
+  [self beginGroup:@"Edit Query"];
+  [[self undoProxy] setQuery:old ofDataSet:dataSet];
+  dataSet.commandText = query;
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)setProvider:(NSString *)provider
+      connectString:(NSString *)connectString
+       ofDataSource:(RDLDataSource *)source {
+  if (source == nil)
+    return;
+  NSString *oldProvider = source.dataProvider;
+  NSString *oldConnect = source.connectString;
+  if ([oldProvider isEqualToString:provider] && [oldConnect isEqualToString:connectString])
+    return;
+  [self beginGroup:@"Edit Data Source"];
+  [[self undoProxy] setProvider:oldProvider connectString:oldConnect ofDataSource:source];
+  source.dataProvider = provider;
+  source.connectString = connectString;
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+- (void)setRows:(NSArray *)rows fields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil)
+    return;
+  dataSet.rows = rows;
+  if (fields != nil)
+    dataSet.fields = fields;
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeData]];
+}
+
 - (void)setFilters:(NSArray<RDLFilter *> *)filters ofDataSet:(RDLDataSet *)dataSet {
   if (dataSet == nil)
     return;

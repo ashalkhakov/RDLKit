@@ -27,6 +27,21 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
   return self;
 }
 
+// The three references are exclusive: whatever is being selected clears the
+// others, so nothing downstream has to work out which of them is stale.
+- (void)clearReferencesExcept:(RDLSelectionScope)scope {
+  if (scope != RDLSelectionScopeItem)
+    _item = nil;
+  if (scope != RDLSelectionScopeDatasetField)
+    _datasetField = nil;
+  if (scope != RDLSelectionScopeDatasetField && scope != RDLSelectionScopeDataSet)
+    _dataSet = nil;
+  if (scope != RDLSelectionScopeDataSource)
+    _dataSource = nil;
+  if (scope != RDLSelectionScopeParameter)
+    _parameter = nil;
+}
+
 - (void)post {
   [[NSNotificationCenter defaultCenter] postNotificationName:RDLSelectionDidChangeNotification
                                                       object:self];
@@ -35,10 +50,72 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
 - (void)selectReport {
   _tablixColumn = -1;
   _tablixPart = RDLTablixPartNone;
-  if (_scope == RDLSelectionScopeReport && _item == nil)
+  if (_scope == RDLSelectionScopeReport && _item == nil && _datasetField == nil &&
+      _dataSet == nil && _dataSource == nil && _parameter == nil)
     return;
   _scope = RDLSelectionScopeReport;
-  _item = nil;
+  [self clearReferencesExcept:RDLSelectionScopeReport];
+  [self post];
+}
+
+- (void)selectDataSet:(RDLDataSet *)dataSet {
+  if (dataSet == nil) {
+    [self selectReport];
+    return;
+  }
+  if (_scope == RDLSelectionScopeDataSet && _dataSet == dataSet)
+    return;
+  _scope = RDLSelectionScopeDataSet;
+  _tablixColumn = -1;
+  _tablixPart = RDLTablixPartNone;
+  [self clearReferencesExcept:RDLSelectionScopeDataSet];
+  _dataSet = dataSet;
+  [self post];
+}
+
+- (void)selectDataSource:(RDLDataSource *)source {
+  if (source == nil) {
+    [self selectReport];
+    return;
+  }
+  if (_scope == RDLSelectionScopeDataSource && _dataSource == source)
+    return;
+  _scope = RDLSelectionScopeDataSource;
+  _tablixColumn = -1;
+  _tablixPart = RDLTablixPartNone;
+  [self clearReferencesExcept:RDLSelectionScopeDataSource];
+  _dataSource = source;
+  [self post];
+}
+
+- (void)selectDatasetField:(RDLField *)field inDataSet:(RDLDataSet *)dataSet {
+  if (field == nil) {
+    [self selectReport];
+    return;
+  }
+  if (_scope == RDLSelectionScopeDatasetField && _datasetField == field && _dataSet == dataSet)
+    return;
+  _scope = RDLSelectionScopeDatasetField;
+  _tablixColumn = -1;
+  _tablixPart = RDLTablixPartNone;
+  [self clearReferencesExcept:RDLSelectionScopeDatasetField];
+  _datasetField = field;
+  _dataSet = dataSet;
+  [self post];
+}
+
+- (void)selectParameter:(RDLParameter *)parameter {
+  if (parameter == nil) {
+    [self selectReport];
+    return;
+  }
+  if (_scope == RDLSelectionScopeParameter && _parameter == parameter)
+    return;
+  _scope = RDLSelectionScopeParameter;
+  _tablixColumn = -1;
+  _tablixPart = RDLTablixPartNone;
+  [self clearReferencesExcept:RDLSelectionScopeParameter];
+  _parameter = parameter;
   [self post];
 }
 
@@ -49,7 +126,7 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
   if (_scope == RDLSelectionScopeBand && _item == nil && [_bandKey isEqualToString:key])
     return;
   _scope = RDLSelectionScopeBand;
-  _item = nil;
+  [self clearReferencesExcept:RDLSelectionScopeBand];
   _bandKey = [key copy];
   [self post];
 }
@@ -73,6 +150,7 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
       _tablixColumn == column && _tablixPart == part)
     return;
   _scope = RDLSelectionScopeItem;
+  [self clearReferencesExcept:RDLSelectionScopeItem];
   _item = item;
   _bandKey = [key copy];
   _tablixColumn = column;
@@ -88,7 +166,7 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
 
 - (void)reset {
   _scope = RDLSelectionScopeReport;
-  _item = nil;
+  [self clearReferencesExcept:RDLSelectionScopeReport];
   _bandKey = @"body";
   [self post];
 }

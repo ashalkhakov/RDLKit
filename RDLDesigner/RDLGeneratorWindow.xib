@@ -8,8 +8,10 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLGeneratorWindow">
             <connections>
+                <outlet property="dataStatus" destination="dataStatus" id="dataStatusOutlet"/>
                 <outlet property="dataView" destination="dataView" id="dataViewOutlet"/>
                 <outlet property="preview" destination="preview" id="previewOutlet"/>
+                <outlet property="remoteCheck" destination="remoteCheck" id="remoteCheckOutlet"/>
                 <outlet property="samplePopup" destination="samplePopup" id="samplePopupOutlet"/>
                 <outlet property="split" destination="split" id="splitOutlet"/>
                 <outlet property="window" destination="generatorWindow" id="generatorWindowOutlet"/>
@@ -52,17 +54,34 @@
                             <action selector="samplePicked:" target="-2" id="samplePickedAction"/>
                         </connections>
                     </popUpButton>
-                    <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bindJSONButton">
+                    <button toolTip="Read every data source this report names" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="bindDataButton">
                         <rect key="frame" x="316" y="704" width="100" height="26"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinY="YES"/>
-                        <buttonCell key="cell" type="push" title="Bind JSON" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="bindJSONButtonCell">
+                        <buttonCell key="cell" type="push" title="Read data" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="bindDataButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
                         </buttonCell>
                         <connections>
-                            <action selector="bindJSONFile:" target="-2" id="bindJSONButtonAction"/>
+                            <action selector="bindData:" target="-2" id="bindDataButtonAction"/>
                         </connections>
                     </button>
+                    <button toolTip="Fetch documents this report points at by http(s). Off unless you ask: a report may have come from anywhere." fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="remoteCheck">
+                        <rect key="frame" x="424" y="706" width="150" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Fetch by URL" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="remoteCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="dataStatus">
+                        <rect key="frame" x="584" y="708" width="400" height="16"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" id="dataStatusCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
                     <splitView fixedFrame="YES" arrangesAllSubviews="NO" dividerStyle="thin" vertical="YES" translatesAutoresizingMaskIntoConstraints="NO" id="split">
                         <rect key="frame" x="0.0" y="0.0" width="1100" height="696"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>

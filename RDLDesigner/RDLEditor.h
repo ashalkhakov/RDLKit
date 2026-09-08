@@ -81,6 +81,36 @@
 // this dataset is pointed at the new name in the same step, because a region
 // naming a dataset that is not there is not a state to pass through.
 - (void)renameDataSet:(RDLDataSet *)dataSet to:(NSString *)name;
+// Where a dataset's rows come from: the query that selects them (a JSONPath,
+// an XPath, or nothing for a flat file) and the document its data source
+// points at. Undoable like every other edit, and a structure change, because
+// what a dataset holds is what every region bound to it renders.
+- (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet;
+- (void)setProvider:(NSString *)provider
+      connectString:(NSString *)connectString
+       ofDataSource:(RDLDataSource *)source;
+// A report's data sources are a list of their own, the way RDL keeps them: a
+// dataset names one rather than carrying one. Renaming carries the datasets
+// that referred to it, the way renaming a dataset carries its regions.
+- (void)addDataSource:(RDLDataSource *)source;
+- (void)removeDataSource:(RDLDataSource *)source;
+- (void)renameDataSource:(RDLDataSource *)source to:(NSString *)name;
+// A report's parameters: what it asks for before it runs. Renaming one does
+// not chase the expressions that named it -- an expression is the author's
+// text, and the checker is what reports one that no longer resolves.
+- (void)addParameter:(RDLParameter *)parameter;
+- (void)removeParameter:(RDLParameter *)parameter;
+- (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofParameter:(RDLParameter *)parameter;
+// What the parameter accepts. Its own operation because validValues is a
+// mutable array the parameter owns, so it is replaced in place rather than
+// assigned -- and the old contents are what undo puts back.
+- (void)setValidValues:(NSArray *)values ofParameter:(RDLParameter *)parameter;
+// Which source a dataset reads from.
+- (void)setDataSourceName:(NSString *)name ofDataSet:(RDLDataSet *)dataSet;
+// The rows a provider just read. Not undoable as data -- loading again is how
+// it is undone -- but the report is dirty afterwards, because a report carries
+// the fields it discovered.
+- (void)setRows:(NSArray *)rows fields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet;
 
 // --- Tablix ---------------------------------------------------------------
 // All of these go through columnSpecs + -rebuildTablix, so the inverse is

@@ -70,6 +70,12 @@
   if (any) {
     [_nameField setStringValue:field.name ?: @""];
     [_dataFieldField setStringValue:field.dataField ?: @""];
+    // A field that names no column reads the one named after it -- which is
+    // what the writer writes and what the dataset table shows in its Source
+    // column. Saying so here stops the box looking empty when it is not
+    // undecided.
+    if ([[_dataFieldField cell] respondsToSelector:@selector(setPlaceholderString:)])
+      [[_dataFieldField cell] setPlaceholderString:field.name ?: @""];
     NSString *type = RDLStringFromFieldDataType(field.dataType) ?: @"String";
     if ([_typePop itemWithTitle:type])
       [_typePop selectItemWithTitle:type];
