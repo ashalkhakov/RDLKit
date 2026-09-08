@@ -83,6 +83,7 @@
 		A3334DF23B268F3151A81276 /* RDLLayoutEngine.h in Headers */ = {isa = PBXBuildFile; fileRef = 388AD53F1764907577168AE8 /* RDLLayoutEngine.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		AA17E816AF371EBB10F5333E /* RDLEditingContext.m in Sources */ = {isa = PBXBuildFile; fileRef = DD7B50C6479576FE6C9A5F4D /* RDLEditingContext.m */; };
 		ABBF3C3472A41DED23D94B9B /* RDLWelcomeWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 0A1BF161B8F9CBBC60FC1A1A /* RDLWelcomeWindow.xib */; };
+		3F8CDCB5EC79185C07BA25C5 /* RDLWelcomeWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 0A1BF161B8F9CBBC60FC1A1A /* RDLWelcomeWindow.xib */; };
 		B165DBE8251A8B763F003AC8 /* RDLPreviewWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = F3D38A29DDBE8ADCC484A10E /* RDLPreviewWindow.xib */; };
 		B26A7C3A723BEC23D0FF517E /* RDLReport.m in Sources */ = {isa = PBXBuildFile; fileRef = CB30BBD185439ABC015B8C91 /* RDLReport.m */; };
 		B0416F86DBD049EB5F33EF82 /* RDLDesignerWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = C377F19E69246533DA7EAF09 /* RDLDesignerWindow.xib */; };
@@ -109,6 +110,7 @@
 		C00014D4136BD4D999A82A59 /* RDLNewReportPanel.m in Sources */ = {isa = PBXBuildFile; fileRef = BE41C653CA556AECA4C3DDC7 /* RDLNewReportPanel.m */; };
 		C3EB649CC42680C456B883E3 /* RDLParser.h in Headers */ = {isa = PBXBuildFile; fileRef = BB224C8B29C878CC6C92E994 /* RDLParser.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C64526DBC3B8898C885ECA7F /* RDLWelcomeWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C05560EE328D33A16E4611F9 /* RDLWelcomeWindow.m */; };
+		E8E6C84B72990AA762EE5AC8 /* RDLWelcomeWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = C05560EE328D33A16E4611F9 /* RDLWelcomeWindow.m */; };
 		C6A2B39DFB62F224DEAF1976 /* RDLSelection.m in Sources */ = {isa = PBXBuildFile; fileRef = 34F661B42A6228C31982DF99 /* RDLSelection.m */; };
 		C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */ = {isa = PBXBuildFile; fileRef = F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */; };
 		E228D4FC67E5EEF1D368CD48 /* RDLDesignerWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 88F0BDB43861D06A9D120937 /* RDLDesignerWindow.m */; };
@@ -150,6 +152,7 @@
 		C81B37A201B3B486F2605ABE /* RDLInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* RDLInspectorFields.m */; };
 		C8A9185493F7171DA48DFF44 /* RDLZipArchive.m in Sources */ = {isa = PBXBuildFile; fileRef = ECA7AA14CCC8D0BD7254F3A8 /* RDLZipArchive.m */; };
 		CD16E8E89FDBE601591035CC /* RDLAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B76A829D5C13583285D1B6F4 /* RDLAppDelegate.m */; };
+		76BEDFEA7B22EEA9CF6A0700 /* RDLAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = B76A829D5C13583285D1B6F4 /* RDLAppDelegate.m */; };
 		CE1FE97227D9FE5C9ED36D5E /* RDLPageGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 9524D1B90D804A24421BD61B /* RDLPageGeometry.m */; };
 		CE65B5EED5EC5A3A470E38EE /* RDLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; };
 		CEBAF52B30470D1500D62319 /* RDLExpressionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = CEBAF52830470D1500D62319 /* RDLExpressionHelper.m */; };
@@ -978,6 +981,7 @@
 				6EBF981EF5B4E5B61D762262 /* RDLParameterInspectorView.xib in Resources */,
 				A9A83AD3D49D380E08DF96CC /* RDLParameterNavigator.xib in Resources */,
 				496AEC0DD87DC0D9415B6388 /* RDLDataSourceNavigator.xib in Resources */,
+				3F8CDCB5EC79185C07BA25C5 /* RDLWelcomeWindow.xib in Resources */,
 				26917A9F830C7F79EFDDDC2A /* RDLInsertPalette.xib in Resources */,
 				A390B838853442DC5B321D9D /* RDLDatasetFieldsView.xib in Resources */,
 				CB32B4CE5DE6D051AD7E4055 /* RDLFieldInspectorView.xib in Resources */,
@@ -1099,6 +1103,8 @@
 				5183FFD88DA6E026AAE53D6A /* RDLInPlaceEditor.m in Sources */,
 				6B6DAF647A6EE58446C09711 /* RDLInspectorView.m in Sources */,
 				85BB04C24AF971B0EF307C2D /* RDLDataView.m in Sources */,
+				76BEDFEA7B22EEA9CF6A0700 /* RDLAppDelegate.m in Sources */,
+				E8E6C84B72990AA762EE5AC8 /* RDLWelcomeWindow.m in Sources */,
 				59247E18A4005D01BBB871C2 /* RDLGeneratorWindow.m in Sources */,
 				3CFA4C175AF1D740B6DCFE09 /* RDLOutlineDataSource.m in Sources */,
 				26AF4F929B7D09D4537E8693 /* RDLTabBadge.m in Sources */,

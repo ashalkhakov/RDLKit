@@ -181,16 +181,31 @@
 - (void)selectionDidChange:(NSNotification *)note {
   RDL_UNUSED(note);
   [_outlineSource syncSelection];
-  // Selecting something on the canvas or in the outline ends the dataset's
-  // turn -- in the Attributes tab, and in the centre, which was showing the
-  // dataset and has nothing to do with the element now selected.
-  if ([_context selectedItem] != nil) {
-    _datasetFields.dataSet = nil;
-    [self showDatasetFields:NO];
-    if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2)
-      [self centerModeChanged:nil];
-  }
+  [self syncCentreToSelection];
   [self syncInspectorToSelection];
+}
+
+// The centre shows whatever is being edited rather than drawn -- a dataset or
+// a data source -- and otherwise the report itself. Which one is the
+// selection's answer, so selecting an element in the outline or on the canvas
+// hands the centre back without anyone having to remember to.
+- (void)syncCentreToSelection {
+  RDLSelection *selection = _context.selection;
+  BOOL dataset = selection.scope == RDLSelectionScopeDataSet ||
+                 selection.scope == RDLSelectionScopeDatasetField;
+  BOOL source = selection.scope == RDLSelectionScopeDataSource;
+
+  _datasetFields.dataSet = dataset ? selection.dataSet : nil;
+  [self showDatasetFields:dataset];
+  _dataSourceView.dataSource = source ? selection.dataSource : nil;
+
+  NSString *showing = [[_centerTabView selectedTabViewItem] identifier];
+  if (dataset)
+    [_centerTabView selectTabViewItemAtIndex:2];
+  else if (source)
+    [_centerTabView selectTabViewItemAtIndex:3];
+  else if ([showing isEqualToString:@"dataset"] || [showing isEqualToString:@"dataSource"])
+    [self centerModeChanged:nil];  // back to whatever Preview/Source says
 }
 
 - (void)dealloc {
@@ -510,14 +525,13 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)parameterNavigator:(RDLParameterNavigator *)navigator
         didSelectParameter:(RDLParameter *)parameter {
   RDL_UNUSED(navigator);
-  [_parameterInspector showParameter:parameter];
+  [_context.selection selectParameter:parameter];
   if (parameter != nil) {
-    [_context.selection selectReport];
-    [_fieldInspector showField:nil ofDataSet:nil];
+    // The attributes tab is where the settings of anything selected go, so
+    // bring the right pane to it.
     [_rightTabView selectTabViewItemAtIndex:1];
     [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
   }
-  [self syncInspectorToSelection];
 }
 
 // A data source selected shows it in the centre. It is the other thing in this
@@ -526,51 +540,32 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)dataSourceNavigator:(RDLDataSourceNavigator *)navigator
         didSelectDataSource:(RDLDataSource *)source {
   RDL_UNUSED(navigator);
-  _dataSourceView.dataSource = source;
-  if (source == nil) {
-    if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 3)
-      [self centerModeChanged:nil];
-    return;
-  }
-  // One thing at a time: choosing a source is choosing to edit it, so whatever
-  // was selected on the canvas or in the dataset list is no longer what the
-  // centre is about.
-  [_datasetFields setDataSet:nil];
-  [self showDatasetFields:NO];
-  [_context.selection selectReport];
-  [_centerTabView selectTabViewItemAtIndex:3];
+  [_context.selection selectDataSource:source];
 }
+
 
 // A dataset selected shows it in the centre and puts its fields in the right
 // pane; deselecting hands both back to the report and the selected element.
 - (void)datasetNavigator:(RDLDatasetNavigator *)navigator
         didSelectDataSet:(RDLDataSet *)dataSet {
   RDL_UNUSED(navigator);
-  _datasetFields.dataSet = dataSet;
-  [self showDatasetFields:dataSet != nil];
-  [_fieldInspector showField:nil ofDataSet:dataSet];
+  [_context.selection selectDataSet:dataSet];
   if (dataSet != nil) {
-    // One selection at a time. Choosing a dataset is choosing to edit it, so
-    // whatever was selected on the canvas is no longer what the inspector is
-    // about -- and leaving it selected would keep the element inspector in
-    // front of the fields the user just asked for.
-    [_context.selection selectReport];
-    [_centerTabView selectTabViewItemAtIndex:2];
+    // The right pane goes to the attributes, which is where the settings of
+    // whatever is selected are shown.
     [_rightTabView selectTabViewItemAtIndex:1];
     [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
-  } else if ([_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 2) {
-    [self centerModeChanged:nil];
   }
-  [self syncInspectorToSelection];
 }
+
 
 // An attribute selected in the centre puts its settings in the inspector,
 // which is the same swap an element makes.
 - (void)datasetFieldsView:(RDLDatasetFieldsView *)view didSelectField:(RDLField *)field {
-  [_fieldInspector showField:field ofDataSet:view.dataSet];
-  if (field != nil)
-    [_context.selection selectReport];  // one selection at a time
-  [self syncInspectorToSelection];
+  // Say what is selected; the panes follow from that. Selecting one thing
+  // unselects the others because the selection holds one at a time, not
+  // because each pane remembers to put the others away.
+  [_context.selection selectDatasetField:field inDataSet:view.dataSet];
 }
 
 - (void)buildTabBars {
@@ -614,19 +609,25 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // selected means the element inspector, a dataset field means the field
 // inspector. The tab itself stays where the user left it.
 - (void)syncInspectorToSelection {
-  // An element beats an attribute: selecting something on the canvas is the
-  // more recent intent, and the navigator's selection stays where it is.
-  // Element, dataset field, or parameter -- whichever is selected. An element
-  // wins, because clicking the canvas is the loudest thing a person can do.
-  NSInteger which = 0;
-  if ([_context selectedItem] == nil) {
-    if (_fieldInspector.field != nil)
-      which = 1;
-    else if (_parameterInspector.parameter != nil)
-      which = 2;
-  }
+  // One question asked once: what is selected? Each pane then shows that or
+  // nothing. Nothing here decides precedence, because there is none to decide
+  // -- the selection holds one thing, and choosing another replaced it.
+  RDLSelection *selection = _context.selection;
+  RDLField *field = selection.scope == RDLSelectionScopeDatasetField ? selection.datasetField : nil;
+  RDLParameter *parameter =
+      selection.scope == RDLSelectionScopeParameter ? selection.parameter : nil;
+
+  [_fieldInspector showField:field ofDataSet:selection.dataSet];
+  [_parameterInspector showParameter:parameter];
+  // Emptied is not enough on GNUstep, where a pane the tab view is not showing
+  // can still draw over the one it is; hidden as well, so only one is ever on
+  // screen.
+  [_fieldInspector setHidden:field == nil];
+  [_parameterInspector setHidden:parameter == nil];
+  NSInteger which = field != nil ? 1 : (parameter != nil ? 2 : 0);
   [_attributeTabView selectTabViewItemAtIndex:which];
 }
+
 
 - (void)leftTabChanged:(id)sender {
   RDLSelectTab(sender, _leftTabView);

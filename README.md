@@ -9,12 +9,12 @@ The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
 accepted as current.
 
-**Platform status.** macOS builds and passes its tests on every change. The
-GNUstep build is being brought up in CI now. The sources were *written* for
-GNUstep but had never been compiled there, and doing so is turning up real
-breakage — a CoreGraphics import, Cocoa-only attributed-string enumerators,
-libraries that were never linked. Until that job is green, treat GNUstep as
-work in progress rather than as supported.
+**Platform status.** Both platforms build and run their tests on every change:
+macOS through Xcode, and Linux through GNUstep with clang and gnustep-2.0. The
+Linux build is packaged as an AppImage by the release workflow and smoke-tested
+there. Anything Cocoa-only that creeps in is caught by the GNUstep job -- and by
+a portability check over the XIBs and sources, since the two toolkits disagree
+about named colours, fonts and a handful of APIs.
 
 Output format support:
 
@@ -34,16 +34,19 @@ Report generation is a pipeline:
 | Path | Component | Role |
 | --- | --- | --- |
 | `RDLKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
-| `RDLKitTests` | XCTest (Mac) | Parser, expressions, layout, tablix pagination, both backends, the checker, the `.docx` importer. One XCTest per area; the GNUstep bundle build is not green yet. |
+| `RDLKitTests` | XCTest (Mac and GNUstep) | Parser, expressions, layout, tablix pagination, both backends, the checker, data sources and JSONPath, the `.docx` importer. One XCTest per area |
 | `RDLGen` | Generator CLI | command-line tool to generate reports |
 | `RDLDesigner` | Designer app | WYSIWYG report designer |
-| `RDLDesignerTests` | Designer app | Tests for the report designer |
+| `RDLDesignerTests` | XCTest (Mac) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
 
 Written in Objective-C with ARC. UI is built via XIBs.
 
 ## Generator API
 
 ```
+// The documents the report itself names -- see Data sources below.
+[[[RDLDataBinder alloc] initWithBaseURL:folder] bindReport:report error:&err];
+// Or rows the host has in hand:
 [RDLGenerator bindJSONString:json toDataSet:@"Items" inReport:report error:&err];
 NSArray *pages = [RDLGenerator pagesForReport:report parameters:@{ @"InvoiceNo": @"A-1042" }];
 NSData *pdf = [RDLGenerator PDFForReport:report parameters:params];

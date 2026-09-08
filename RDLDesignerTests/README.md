@@ -6,12 +6,20 @@ codec, expression completion, the modal panel runner, and the New Report wizard 
 both what it decides (`RDLNewReport`, headless) and that its XIB loads and its
 buttons end the modal session.
 
-Two checks guard wiring the compiler cannot see: that File > New Report still
-sends `-newDocument:` in `MainMenu.xib`, and that the tablix editor opens on a
+Several checks guard wiring the compiler cannot see: that File > New Report
+still sends `-newDocument:` in `MainMenu.xib`; that the tablix editor opens on a
 scaffolded report — the path where it once raised, having assumed a dataset's
-fields were strings.
+fields were strings; that every pane the window promises has a host to live in;
+that opening a sample does not start the generator; and that each sample lays
+out inside its body, passes the checker, and renders what it claims.
 
-One `XCTestCase` method per area — 21 of them — with the fixtures and helpers
+The selection is checked as a model rather than through the panes: one thing at
+a time, whichever kind, announced once. Clicking in the outline is driven the
+way a click drives it, from each starting point a person can be in — a dataset
+field, a parameter, a data source — because that is where the panes used to
+disagree.
+
+One `XCTestCase` method per area — 76 of them — with the fixtures and helpers
 file-static beside them. There is no separate check layer: `XCTFail` records a
 failure and lets the method carry on, so a case still reports everything it
 found instead of stopping at the first, which is the only thing collecting

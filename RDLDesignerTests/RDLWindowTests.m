@@ -5,7 +5,9 @@
 // palette lands as.
 #import "RDLDesignerTestSupport.h"
 #import "RDLDataSourceNavigator.h"
+#import "RDLAppDelegate.h"
 #import "RDLDataView.h"
+#import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLParameterNavigator.h"
 #import "RDLGeneratorWindow.h"
@@ -1262,6 +1264,8 @@ static NSTabView *_centerTabViewOf(id wc) {
   }
 
   [wc parameterNavigator:nav didSelectParameter:first];
+  if (ctx.selection.scope != RDLSelectionScopeParameter || ctx.selection.parameter != first)
+    XCTFail(@"%@", @"choosing a parameter in the navigator is what selects it");
   if (inspector.parameter != first)
     XCTFail(@"%@", @"the inspector should be showing the chosen parameter");
   if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 2)
@@ -1271,6 +1275,132 @@ static NSTabView *_centerTabViewOf(id wc) {
   [wc syncInspectorToSelection];
   if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
     XCTFail(@"%@", @"an element chosen on the canvas takes the inspector back");
+
+  // The inspector shows one thing and holds nothing for the others. A pane
+  // still holding something is a pane something may still draw -- on GNUstep
+  // the parameter inspector's text view appeared over the dataset field's
+  // settings, because both were live and only the tab view disagreed.
+  RDLFieldInspectorView *fields = [wc valueForKey:@"fieldInspector"];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  [wc parameterNavigator:nav didSelectParameter:first];
+  if (fields.field != nil || ![fields isHidden])
+    XCTFail(@"%@", @"choosing a parameter should empty and hide the field inspector");
+
+  [wc datasetFieldsView:[wc valueForKey:@"datasetFields"] didSelectField:[[ds fields] firstObject]];
+  if (ctx.selection.scope != RDLSelectionScopeDatasetField ||
+      ctx.selection.datasetField != [[ds fields] firstObject])
+    XCTFail(@"%@", @"choosing a field in the pane is what selects it");
+  if (inspector.parameter != nil || ![inspector isHidden])
+    XCTFail(@"%@", @"choosing a dataset field should empty and hide the parameter inspector");
+  if ([fields isHidden] || fields.field == nil)
+    XCTFail(@"%@", @"and show the field's own settings");
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"with the dataset field pane in front");
+}
+
+// Opening a sample opens it for editing. It used to run it as well -- the
+// generator was brought to the front and laid the whole report out -- which is
+// a different thing to ask for, and the slower one.
+- (void)testOpeningASampleDoesNotRunIt {
+  RDLAppDelegate *app = [[RDLAppDelegate alloc] init];
+  app.context = [[RDLEditingContext alloc] init];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"A sample" action:NULL keyEquivalent:@""];
+  NSUInteger which = [[RDLSamples catalog] indexOfObjectPassingTest:
+      ^BOOL(NSDictionary *entry, NSUInteger idx, BOOL *stop) {
+        RDL_UNUSED(idx);
+        RDL_UNUSED(stop);
+        return [entry[@"id"] isEqualToString:@"manifest"];
+      }];
+  [item setTag:(NSInteger)which];
+
+  [app openSample:item];
+  if (![app.context.report.name isEqualToString:@"Harbor Manifest"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"loaded %@", app.context.report.name]);
+  if (app.generator != nil)
+    XCTFail(@"%@", @"opening a sample should not start the generator");
+  if (app.designer == nil)
+    XCTFail(@"%@", @"a sample opens where reports are edited");
+}
+
+// Clicking in the outline selects that report item, whatever was selected
+// before: the centre goes back to the preview and the inspector to the item's
+// own settings. A dataset field or a parameter selected in one of the
+// navigators must not survive it.
+- (void)testTheOutlineTakesTheSelectionBackFromADatasetField {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSTabView *centre = [wc valueForKey:@"centerTabView"];
+  NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
+  RDLDatasetFieldsView *pane = [wc valueForKey:@"datasetFields"];
+  NSOutlineView *outline = [wc valueForKey:@"outline"];
+  id outlineSource = [wc valueForKey:@"outlineSource"];
+  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
+
+  // A dataset, then one of its fields: the centre is the dataset pane and the
+  // inspector is the field's.
+  [wc datasetNavigator:[wc valueForKey:@"datasetNavigator"] didSelectDataSet:ds];
+  [wc datasetFieldsView:pane didSelectField:[[ds fields] firstObject]];
+  if (![[[centre selectedTabViewItem] identifier] isEqualToString:@"dataset"] ||
+      [attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"a dataset field should be showing before the outline is touched");
+
+  // Now the outline, through the row a person would click.
+  NSInteger itemRow = -1;
+  for (NSInteger row = 0; row < [outline numberOfRows] && itemRow < 0; row++) {
+    id node = [outline itemAtRow:row];
+    // RDLNodeItem is 2 in the outline's own kinds: report, band, item.
+    if ([[node valueForKey:@"kind"] integerValue] == 2)
+      itemRow = row;
+  }
+  if (itemRow < 0) {
+    XCTFail(@"%@", @"the outline should list the report's items");
+    return;
+  }
+  [outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)itemRow]
+       byExtendingSelection:NO];
+  [outlineSource outlineViewSelectionDidChange:nil];
+
+  if (ctx.selection.scope != RDLSelectionScopeItem || ctx.selection.item == nil)
+    XCTFail(@"%@", @"clicking an item in the outline selects it");
+  if (ctx.selection.datasetField != nil)
+    XCTFail(@"%@", @"and lets go of the dataset field");
+  if (![[[centre selectedTabViewItem] identifier] isEqualToString:@"preview"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the centre is showing %@",
+                                              [[centre selectedTabViewItem] identifier]]);
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"the inspector should be showing the item's own settings");
+  if (![pane isHidden])
+    XCTFail(@"%@", @"the dataset pane has nothing to do with the item now selected");
+
+  // The same from the other two starting points: a parameter, and a data
+  // source -- which has a centre pane of its own.
+  [wc parameterNavigator:[wc valueForKey:@"parameterNavigator"]
+      didSelectParameter:[report.parameters firstObject]];
+  [outline deselectAll:nil];
+  [outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)itemRow]
+       byExtendingSelection:NO];
+  [outlineSource outlineViewSelectionDidChange:nil];
+  if (ctx.selection.scope != RDLSelectionScopeItem || ctx.selection.parameter != nil)
+    XCTFail(@"%@", @"the outline takes the selection back from a parameter");
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"and the inspector shows the item");
+
+  [wc dataSourceNavigator:[wc valueForKey:@"dataSourceNavigator"]
+      didSelectDataSource:[report.dataSources firstObject]];
+  [outline deselectAll:nil];
+  [outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)itemRow]
+       byExtendingSelection:NO];
+  [outlineSource outlineViewSelectionDidChange:nil];
+  if (![[[centre selectedTabViewItem] identifier] isEqualToString:@"preview"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"after a data source, the centre is showing %@",
+                                              [[centre selectedTabViewItem] identifier]]);
+  if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 0)
+    XCTFail(@"%@", @"and the inspector shows the item");
 }
 
 @end

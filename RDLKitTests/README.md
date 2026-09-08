@@ -11,7 +11,7 @@ arrays of failure strings. A failure reads as a sentence, and several failures r
 
 ## What is covered
 
-One XCTest per check function — 36 of them, grouped into five cases. A failure
+One XCTest per check function — 65 of them, grouped into seven cases. A failure
 names the area it came from, and any one can be run on its own.
 
 | Case | Tests | Covers |
@@ -20,6 +20,8 @@ names the area it came from, and any one can be run on its own.
 | `RDLExpressionTests` | Expression, ExpressionLang, ExpressionRoundTrip, Checker | Fields / Parameters / Globals / User; the operators, `IIf`/`Switch`, `Like`, string, maths and date functions; `Lookup`/`Join`/`Previous`; the aggregates and their scopes; printing an AST back; and the checker's name resolution, arity and record / table / set / function types |
 | `RDLLayoutTests` | Layout, BandEnumeration, Tablix, TablixAdvanced, TablixGroup, TablixEditing, TablixRebuild, TablixFit, RecursiveGroup, RichText, Chart | Banded pages; tablix expansion, pagination with `RepeatOnNewPage`, groups with `TablixHeader`, filters, `NoRowsMessage`, page breaks; the crosstab pivot; recursive hierarchies (`Group/Parent`, `Level()`, `Recursive` aggregates); rich text; and the chart geometry plan shared by both backends and the canvas |
 | `RDLBackendTests` | BackendRegistry, HTMLBackend, PDFBackend, RDLSubset, RDLSubset2 | The registry, and **HTML** and **PDF** through `renderPages:title:` over the supported subset |
+| `RDLDataSourceTests` | JSONPath, providers, binding | JSON / XML / CSV documents becoming rows; connection strings read and written; binding a whole report, including what it refuses to fetch; column types read off the values; and a dataset's link to its source as both a name and a resolved pointer |
+| `RDLJSONPathTests` | The path language | Goessner's store document, the one the cross-implementation comparisons quote: the article's own queries, every form a step can take, indexes and slices, unions, descent, filters, and the paths that are refused with a reason |
 | `RDLImportTests` | Zip, Docx, StyleSheet, Tab, Drawing, TableBinding, Importer, Fixture | The `.docx` container; paragraphs, runs, tables, sections, headers and footers, `MERGEFIELD` and `{placeholder}`; Word's style cascade; tabs as positions; pictures, rules and shapes left out; tables as data regions and how their columns are named; and the three fixtures imported end to end |
 
 `Fixtures/` holds three synthetic `.docx` files. They are real Word documents —

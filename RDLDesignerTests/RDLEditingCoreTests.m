@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDataView.h"
+#import "RDLSelection.h"
 #import "RDLDocument.h"
 #import "RDLDesignerTestSupport.h"
 
@@ -1215,6 +1216,75 @@ static RDLReport *RDLGroupedJobs(void) {
       asked = YES;
   if (!asked)
     XCTFail(@"%@", @"the sample's Season parameter should be offered, with what it accepts");
+}
+
+// A report holds things that are drawn and things that are defined, and the
+// selection holds one of them -- never two. Panes used to keep that straight
+// between themselves, which is how two inspectors ended up live at once.
+- (void)testTheSelectionHoldsOneThingAtATime {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLSelection *sel = ctx.selection;
+  RDLDataSet *ds = [report dataSetNamed:@"Crates"];
+  RDLField *field = [[ds fields] firstObject];
+  RDLParameter *parameter = [report.parameters firstObject];
+  RDLItem *item = [report.body.items firstObject];
+
+  [sel selectDatasetField:field inDataSet:ds];
+  if (sel.scope != RDLSelectionScopeDatasetField || sel.datasetField != field ||
+      sel.dataSet != ds || sel.item != nil || sel.parameter != nil)
+    XCTFail(@"%@", @"selecting a dataset field selects it and nothing else");
+
+  // A dataset and a data source are selectable in their own right -- they have
+  // panes in the centre -- and each replaces whatever was selected.
+  [sel selectDataSet:ds];
+  if (sel.scope != RDLSelectionScopeDataSet || sel.dataSet != ds || sel.datasetField != nil)
+    XCTFail(@"%@", @"selecting a dataset keeps the dataset and drops the field");
+  RDLDataSource *source = [report.dataSources firstObject];
+  [sel selectDataSource:source];
+  if (sel.scope != RDLSelectionScopeDataSource || sel.dataSource != source ||
+      sel.dataSet != nil)
+    XCTFail(@"%@", @"selecting a data source replaces the dataset selection");
+
+  [sel selectParameter:parameter];
+  if (sel.scope != RDLSelectionScopeParameter || sel.parameter != parameter ||
+      sel.datasetField != nil || sel.dataSet != nil)
+    XCTFail(@"%@", @"selecting a parameter replaces the field selection");
+
+  [sel selectItem:item inBandWithKey:@"body"];
+  if (sel.scope != RDLSelectionScopeItem || sel.item != item || sel.parameter != nil ||
+      sel.datasetField != nil)
+    XCTFail(@"%@", @"selecting an element replaces the parameter selection");
+
+  [sel selectParameter:parameter];
+  [sel selectReport];
+  if (sel.scope != RDLSelectionScopeReport || sel.parameter != nil || sel.datasetField != nil ||
+      sel.item != nil)
+    XCTFail(@"%@", @"selecting the report clears whatever was selected");
+
+  // nil means "nothing in particular", which is the report -- the same answer
+  // every other setter here gives.
+  [sel selectDatasetField:nil inDataSet:ds];
+  if (sel.scope != RDLSelectionScopeReport)
+    XCTFail(@"%@", @"selecting no field is selecting the report");
+
+  // And each change is announced once, so the panes that follow it are told.
+  __block NSUInteger announced = 0;
+  id watch = [[NSNotificationCenter defaultCenter]
+      addObserverForName:RDLSelectionDidChangeNotification
+                  object:sel
+                   queue:nil
+              usingBlock:^(NSNotification *note) {
+                RDL_UNUSED(note);
+                announced += 1;
+              }];
+  [sel selectParameter:parameter];
+  [sel selectParameter:parameter];  // the same thing again is not a change
+  [sel selectDatasetField:field inDataSet:ds];
+  [[NSNotificationCenter defaultCenter] removeObserver:watch];
+  if (announced != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu announcements, expected 2",
+                                              (unsigned long)announced]);
 }
 
 @end
