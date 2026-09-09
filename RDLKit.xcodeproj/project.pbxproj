@@ -222,6 +222,7 @@
 		F8724BD64637BEC16321612C /* RDLItemFactory.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B5800982DB92CA9D51B03CC /* RDLItemFactory.m */; };
 		F8EA04B9F8175CF7FCE6FEAD /* RDLInspectorFields.m in Sources */ = {isa = PBXBuildFile; fileRef = 91729268250D3DF7575FC73D /* RDLInspectorFields.m */; };
 		B2118CE5F9C4BC6478D55FEA /* RDLAddElementPanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 27DB8C5CCBB595290E4B7BBE /* RDLAddElementPanel.xib */; };
+		72801F4D5A77D7B30B27500A /* RDLDesigner.icns in Resources */ = {isa = PBXBuildFile; fileRef = DB2FCE4459F00F9B28626BD8 /* RDLDesigner.icns */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -477,6 +478,7 @@
 		DE122BF05974B7ADC1629D61 /* RDLFieldInspectorView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLFieldInspectorView.xib; sourceTree = "<group>"; };
 		FD2BA757C61D0F567D92D2C8 /* RDLInspectorSections.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLInspectorSections.xib; sourceTree = "<group>"; };
 		FD46A1AE98C8CBB1F8B7FD5C /* RDLCanvasRenderer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCanvasRenderer.m; sourceTree = "<group>"; };
+		DB2FCE4459F00F9B28626BD8 /* RDLDesigner.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = RDLDesigner.icns; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -660,6 +662,7 @@
 				3F5A5B18A1D85BFC4675D077 /* RDLNewReportPanel.h */,
 				BE41C653CA556AECA4C3DDC7 /* RDLNewReportPanel.m */,
 				8399CC90B6584EEB8751BAD3 /* RDLNewReportPanel.xib */,
+				DB2FCE4459F00F9B28626BD8 /* RDLDesigner.icns */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1018,6 +1021,7 @@
 				5B10000000000000000003C2 /* RDLSubreportParametersEditor.xib in Resources */,
 				E57B48BECBA27CF5473E355C /* RDLInspectorSections.xib in Resources */,
 				93DDFA3148BCE38AF05CC8AA /* RDLNewReportPanel.xib in Resources */,
+				72801F4D5A77D7B30B27500A /* RDLDesigner.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1222,7 +1226,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RDLDesigner/RDLDesigner-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -1231,7 +1235,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1247,13 +1251,13 @@
 		1E82542BCCC099F129EC2C05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1271,7 +1275,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLDesignerTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1279,7 +1283,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1299,7 +1303,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1312,7 +1316,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1332,7 +1336,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLDesignerTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1340,7 +1344,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1360,7 +1364,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLKitTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1368,7 +1372,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1389,7 +1393,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RDLDesigner/RDLDesigner-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -1398,7 +1402,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1415,7 +1419,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLKitTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1423,7 +1427,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1442,13 +1446,13 @@
 		6C24AE4171CCECDC2D082869 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1505,7 +1509,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 0.0.0-dev;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1518,7 +1522,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.0.0-dev;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",

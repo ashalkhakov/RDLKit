@@ -11,6 +11,9 @@ install -m 0755 "$workspace_dir/Scripts/appimage/AppRun" "$appdir/AppRun"
 install -m 0644 "$workspace_dir/Scripts/appimage/RDLDesigner.desktop" "$appdir/rdldesigner.desktop"
 install -m 0644 "$workspace_dir/Scripts/appimage/RDLDesigner.desktop" \
         "$appdir/usr/share/applications/rdldesigner.desktop"
-install -m 0644 "$workspace_dir/Scripts/appimage/rdldesigner.png" "$appdir/rdldesigner.png"
-install -m 0644 "$workspace_dir/Scripts/appimage/rdldesigner.png" \
+# The app's own icon, under the name the desktop entry asks for. One file: the
+# icon in the About panel, on GNUstep's windows and in the launcher is the same
+# picture, and cannot drift from itself.
+install -m 0644 "$workspace_dir/RDLDesigner/RDLDesigner.png" "$appdir/rdldesigner.png"
+install -m 0644 "$workspace_dir/RDLDesigner/RDLDesigner.png" \
         "$appdir/usr/share/icons/hicolor/256x256/apps/rdldesigner.png"

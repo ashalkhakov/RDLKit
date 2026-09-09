@@ -1,8 +1,8 @@
 {
   ApplicationName = "RDLDesigner";
   ApplicationDescription = "Native RDL report designer for GNUstep and Cocoa";
-  ApplicationRelease = "1.0";
-  FullVersionID = "1.0.0";
+  ApplicationRelease = "0.0.0-dev";
+  FullVersionID = "0.0.0-dev";
   NSExecutable = "RDLDesigner";
   NSPrincipalClass = "NSApplication";
   NSRole = "Editor";

@@ -202,4 +202,71 @@
     XCTFail(@"%@", @"no windows were found to check");
 }
 
+// Packaging: what the About panel shows and what the window manager draws.
+// Both are plist and makefile lines that nothing else exercises, so a rename
+// or a dropped resource would only be found by launching the app -- and on the
+// platform that shipped without them, only by launching it there.
+- (void)testTheAppIsPackagedWithAnIconAndAVersion {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *(^read)(NSString *) = ^NSString *(NSString *relative) {
+    return [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:relative]
+                                     encoding:NSUTF8StringEncoding
+                                        error:NULL];
+  };
+  NSString *gnustepPlist = read(@"RDLDesigner/Info-gnustep.plist");
+  NSString *cocoaPlist = read(@"RDLDesigner/RDLDesigner-Info.plist");
+  NSString *makefile = read(@"RDLDesigner/GNUmakefile");
+  NSString *project = read(@"RDLKit.xcodeproj/project.pbxproj");
+  if (gnustepPlist == nil || cocoaPlist == nil || makefile == nil || project == nil) {
+    XCTFail(@"%@", @"could not read the packaging files");
+    return;
+  }
+
+  // The icon: named by the makefile for GNUstep, by the plist for Cocoa, and
+  // present in the bundle either way.
+  if ([makefile rangeOfString:@"RDLDesigner_APPLICATION_ICON = RDLDesigner.png"].location ==
+      NSNotFound)
+    XCTFail(@"%@", @"the GNUstep build should name the application icon");
+  if ([makefile rangeOfString:@"\n  RDLDesigner.png"].location == NSNotFound)
+    XCTFail(@"%@", @"and install it as a resource, or there is nothing to show");
+  if ([cocoaPlist rangeOfString:@"CFBundleIconFile"].location == NSNotFound)
+    XCTFail(@"%@", @"the Cocoa bundle should name its icon file");
+  for (NSString *icon in @[ @"RDLDesigner/RDLDesigner.png", @"RDLDesigner/RDLDesigner.icns" ])
+    if (![[NSFileManager defaultManager]
+            fileExistsAtPath:[dir stringByAppendingPathComponent:icon]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing", icon]);
+  // Registered in the project, or Xcode builds an app with no icon in it. The
+  // test bundle is not the app -- the designer's classes are linked into this
+  // one -- so what can be checked here is the project file that puts it there.
+  if ([project rangeOfString:@"RDLDesigner.icns"].location == NSNotFound)
+    XCTFail(@"%@", @"the Xcode project should build the icon into the app");
+
+  // The version: one value, in the three places that are read, none of them
+  // still saying 1.0. Scripts/stamp-version.sh is what writes them.
+  NSString *release = nil;
+  NSTextCheckingResult *match = [[NSRegularExpression
+      regularExpressionWithPattern:@"ApplicationRelease = \"([^\"]+)\";"
+                           options:0
+                             error:NULL] firstMatchInString:gnustepPlist
+                                                    options:0
+                                                      range:NSMakeRange(0, [gnustepPlist length])];
+  if (match)
+    release = [gnustepPlist substringWithRange:[match rangeAtIndex:1]];
+  if ([release length] == 0) {
+    XCTFail(@"%@", @"Info-gnustep.plist should carry an ApplicationRelease");
+    return;
+  }
+  if ([gnustepPlist rangeOfString:[NSString stringWithFormat:@"FullVersionID = \"%@\";",
+                                                             release]].location == NSNotFound)
+    XCTFail(@"%@", @"FullVersionID should say the same as ApplicationRelease");
+  if ([cocoaPlist rangeOfString:[NSString stringWithFormat:@"<string>%@</string>", release]]
+          .location == NSNotFound)
+    XCTFail(@"%@", @"the Cocoa plist should carry the same version");
+  // Xcode generates the bundle's plist from these, so a stamp that missed them
+  // would ship a bundle still claiming whatever the project file says.
+  if ([project rangeOfString:[NSString stringWithFormat:@"MARKETING_VERSION = %@;", release]]
+          .location == NSNotFound)
+    XCTFail(@"%@", @"the Xcode project should carry the same version");
+}
+
 @end

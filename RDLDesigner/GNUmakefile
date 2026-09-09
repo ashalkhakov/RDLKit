@@ -58,7 +58,10 @@ RDLDesigner_OBJC_FILES = \
 # instance type is.
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesigner_OBJC_LIBS += -lRDLKit -ldispatch
-RDLDesigner_APPLICATION_ICON =
+# The bundle's icon: GNUstep puts it in the About panel, on the application's
+# window and miniwindow icons, and in the dock tile. The same PNG the AppImage
+# installs as the desktop icon.
+RDLDesigner_APPLICATION_ICON = RDLDesigner.png
 
 # The windows and the menu bar are XIBs. Xcode compiles them to .nib; here they
 # are copied in as they are, and gnustep-gui reads the XIB directly (GSXib5).
@@ -77,6 +80,7 @@ RDLDesigner_RESOURCE_FILES = \
   Samples
 
 RDLDesigner_RESOURCE_FILES += \
+  RDLDesigner.png \
   RDLExpressionEditor.xib \
   MainMenu.xib \
   RDLWelcomeWindow.xib \

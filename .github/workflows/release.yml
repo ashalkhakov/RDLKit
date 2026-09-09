@@ -80,6 +80,9 @@ jobs:
       - name: Fetch linuxdeploy and the AppImage runtime
         run: ./Scripts/install-linuxdeploy.sh
 
+      - name: Stamp the version
+        run: ./Scripts/stamp-version.sh "$APP_VERSION"
+
       - name: Assemble AppDir
         run: GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
 
@@ -123,6 +126,9 @@ jobs:
           else
             echo "APP_VERSION=0.0.0-build${{ github.run_number }}" >> "$GITHUB_ENV"
           fi
+
+      - name: Stamp the version
+        run: ./Scripts/stamp-version.sh "$APP_VERSION"
 
       - name: Build
         run: |

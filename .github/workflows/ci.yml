@@ -278,6 +278,7 @@ jobs:
         run: |
           sudo apt-get -q -y install desktop-file-utils fonts-dejavu fonts-liberation
           echo "packages installed"
+          ./Scripts/stamp-version.sh "$APP_VERSION"
           GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
           echo "AppDir assembled"
           GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/package-appimage.sh
