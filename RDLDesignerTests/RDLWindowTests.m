@@ -116,6 +116,71 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 // restoring the frames the XIB recorded. The widths are set in code now, so
 // both platforms open the same, and neither side is narrower than what it has
 // to show.
+// A designer window narrower than its panes need had one of them collapse to
+// nothing -- the canvas here, the inspector on GNUstep -- with no way to get
+// it back, since a zero-width pane has no divider to drag. The window has a
+// minimum size now, so that state cannot be reached.
+- (void)testTheWindowWillNotShrinkAPaneAway {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  NSWindow *window = [wc window];
+  NSSplitView *split = [wc valueForKey:@"split"];
+  if ([window minSize].width < 600 || [window minSize].height < 400) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the window's minimum size is %@",
+                                              NSStringFromSize([window minSize])]);
+    return;
+  }
+  // The minimum is what a person dragging the frame runs into. A frame set in
+  // code goes under it regardless -- a window server placing a window on a
+  // small screen does exactly that -- so the panes have to survive it too:
+  // below the minimum every pane gives way instead of the centre alone taking
+  // the whole shortfall.
+  for (NSNumber *width in @[ @480, @360, @320 ]) {
+    [window setFrame:NSMakeRect(0, 0, [width doubleValue], 400) display:YES];
+    for (NSView *pane in [split subviews])
+      if (NSWidth([pane frame]) < 1)
+        XCTFail(@"%@", [NSString stringWithFormat:@"a pane is squeezed out of existence in a "
+                                                  @"%@-point window", width]);
+  }
+}
+
+// A subreport opens in a window of its own beside its parent. When there is no
+// room beside it -- a maximised parent, a laptop screen -- it used to be
+// squeezed into whatever sliver was left, or left wherever it happened to
+// open, half of it off the screen and its inspector with it. It goes to the
+// middle of the screen instead, whole.
+- (void)testASecondWindowLandsSomewhereItFits {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples harborDispatch]];
+  RDLDesignerWindow *parent = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLEditingContext *childCtx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples harborManifest]];
+  RDLDesignerWindow *child = [[RDLDesignerWindow alloc] initWithContext:childCtx];
+
+  NSRect visible = [[[parent window] screen] visibleFrame];
+  if (NSIsEmptyRect(visible))
+    visible = [[NSScreen mainScreen] visibleFrame];
+  // The parent takes the whole screen, so there is no room on either side.
+  [[parent window] setFrame:visible display:YES];
+  [parent placeBesideMe:[child window]];
+
+  NSRect placed = [[child window] frame];
+  if (!NSContainsRect(visible, placed))
+    XCTFail(@"%@", [NSString stringWithFormat:@"the second window landed at %@, "
+                                              @"outside the screen's %@",
+                                              NSStringFromRect(placed),
+                                              NSStringFromRect(visible)]);
+  if (NSWidth(placed) < [[child window] minSize].width)
+    XCTFail(@"%@", @"and it should not have been squeezed below its minimum width");
+  // Centred, near enough: the same margin either side.
+  CGFloat left = NSMinX(placed) - NSMinX(visible);
+  CGFloat right = NSMaxX(visible) - NSMaxX(placed);
+  if (fabs(left - right) > 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"it is not centred: %g points of screen on the "
+                                              @"left, %g on the right", left, right]);
+}
+
 - (void)testTheSidePanesOpenWideEnoughToReadThem {
   RDLEditingContext *ctx =
       [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];

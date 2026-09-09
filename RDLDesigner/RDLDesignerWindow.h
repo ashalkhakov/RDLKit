@@ -44,4 +44,9 @@
 // this report has no file yet to resolve against. Published so what "beside
 // this one" means can be checked without opening anything.
 - (NSURL *)URLForSubreport:(RDLSubreport *)subreport;
+// Puts `other` beside this window when a whole one fits there, and in the
+// middle of the screen when it does not -- a squeezed designer window loses a
+// pane, and one placed half off the screen loses whatever hangs over the edge.
+// Published so where a second window lands can be checked without a screen.
+- (void)placeBesideMe:(NSWindow *)other;
 @end

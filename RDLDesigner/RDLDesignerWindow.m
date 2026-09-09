@@ -32,6 +32,17 @@ static const CGFloat kRDLSidePaneMinimum = 160.0;
 // sections, which are 260 points wide with a scroller beside them.
 static const CGFloat kRDLLeftPaneWidth = 220.0;
 static const CGFloat kRDLRightPaneWidth = 300.0;
+// Below this the split has nothing left to take the difference from and a pane
+// collapses to nothing -- on this platform the canvas, on GNUstep the
+// inspector, either way a window with a piece of itself missing and no way to
+// get it back. So the window is not allowed to be smaller.
+static const CGFloat kRDLCentrePaneMinimum = 320.0;
+static const CGFloat kRDLWindowMinimumHeight = 480.0;
+
+static NSSize RDLDesignerWindowMinimumSize(void) {
+  return NSMakeSize(kRDLLeftPaneWidth + kRDLCentrePaneMinimum + kRDLRightPaneWidth,
+                    kRDLWindowMinimumHeight);
+}
 
 @interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate,
                                  NSSplitViewDelegate>
@@ -173,6 +184,12 @@ static const CGFloat kRDLRightPaneWidth = 300.0;
 // all do with their side panes.
 - (BOOL)splitView:(NSSplitView *)splitView shouldAdjustSizeOfSubview:(NSView *)subview {
   NSArray<NSView *> *panes = [splitView subviews];
+  // Once there is not enough width for all three, holding the sides at their
+  // size means the centre absorbs the whole shortfall and collapses to
+  // nothing. Below that everyone gives way together, so a window that is too
+  // small is merely cramped rather than missing a pane.
+  if (NSWidth([splitView bounds]) < RDLDesignerWindowMinimumSize().width)
+    return YES;
   return subview != [panes firstObject] && subview != [panes lastObject];
 }
 
@@ -210,6 +227,7 @@ static const CGFloat kRDLRightPaneWidth = 300.0;
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
   [self buildPanes];
+  [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
   [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
 }
@@ -391,19 +409,34 @@ static const CGFloat kRDLRightPaneWidth = 300.0;
     visible = [[NSScreen mainScreen] visibleFrame];
   NSRect me = [mine frame];
   NSRect theirs = [other frame];
-  CGFloat width = MIN(NSWidth(theirs), NSMaxX(visible) - NSMaxX(me));
-  if (width < 320) {
-    // No room on the right: put it on the left of this window instead.
-    width = MIN(NSWidth(theirs), NSMinX(me) - NSMinX(visible));
-    if (width < 320)
-      return;  // no room either side; leave it where it opened
-    theirs.origin.x = NSMinX(me) - width;
-  } else {
+  // Never wider or taller than the screen it has to appear on: a window put
+  // where it does not fit is one whose far side cannot be reached, and its
+  // tab bars and inspector go with it.
+  theirs.size.width = MIN(NSWidth(theirs), NSWidth(visible));
+  theirs.size.height = MIN(NSHeight(theirs), NSHeight(visible));
+
+  // Beside this window if a whole designer fits there. Squeezing one into
+  // whatever sliver is left is worse than not placing it at all: under the
+  // minimum the split view drops a pane, which is the window arriving broken.
+  CGFloat need = RDLDesignerWindowMinimumSize().width;
+  CGFloat rightRoom = NSMaxX(visible) - NSMaxX(me);
+  CGFloat leftRoom = NSMinX(me) - NSMinX(visible);
+  if (rightRoom >= need) {
+    theirs.size.width = MIN(NSWidth(theirs), rightRoom);
     theirs.origin.x = NSMaxX(me);
+  } else if (leftRoom >= need) {
+    theirs.size.width = MIN(NSWidth(theirs), leftRoom);
+    theirs.origin.x = NSMinX(me) - NSWidth(theirs);
+  } else {
+    // No room either side -- a full-screen parent, or simply a small screen.
+    // The middle of the screen, whole, which is where a window nobody has
+    // placed belongs.
+    [other setFrame:theirs display:YES];
+    [other center];
+    return;
   }
-  theirs.size.width = width;
-  theirs.origin.y = NSMinY(me);
-  theirs.size.height = MIN(NSHeight(me), NSHeight(visible));
+  theirs.origin.y = MIN(NSMinY(me), NSMaxY(visible) - NSHeight(theirs));
+  theirs.origin.y = MAX(theirs.origin.y, NSMinY(visible));
   [other setFrame:theirs display:YES];
 }
 
