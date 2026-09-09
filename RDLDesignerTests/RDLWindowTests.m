@@ -111,6 +111,73 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 // loads were pinned with a flexible min-Y margin -- which in a flipped parent
 // means "keep the bottom, let the top grow", i.e. drift down by however much
 // the pane gained. An inspector reads from the top down and has to stay there.
+// The inspector pane opened at about half the width its sections need on
+// GNUstep, because GSXib5 lays a split view's subviews out itself instead of
+// restoring the frames the XIB recorded. The widths are set in code now, so
+// both platforms open the same, and neither side is narrower than what it has
+// to show.
+- (void)testTheSidePanesOpenWideEnoughToReadThem {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  NSSplitView *split = [wc valueForKey:@"split"];
+  NSArray<NSView *> *panes = [split subviews];
+  if ([panes count] != 3) {
+    XCTFail(@"%@", @"the window is three panes");
+    return;
+  }
+  // The inspector's sections come out of RDLInspectorSections.xib at a fixed
+  // width; a pane narrower than that clips them however the window is sized.
+  RDLInspectorView *inspector = [wc valueForKey:@"inspector"];
+  CGFloat widest = 0;
+  for (NSView *section in [inspector subviews])
+    widest = MAX(widest, NSWidth([section frame]));
+  if (NSWidth([panes[2] frame]) < widest)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the inspector pane opens at %g, "
+                                              @"narrower than its %g-point sections",
+                                              NSWidth([panes[2] frame]), widest]);
+  // And it is the pane a person reads settings in, so it is not the thinnest
+  // thing on screen either.
+  if (NSWidth([panes[2] frame]) < NSWidth([panes[0] frame]))
+    XCTFail(@"%@", @"the inspector pane should be at least as wide as the navigator");
+}
+
+// gnustep-make copies every resource file flat into Resources/, so the samples
+// can only keep their directory by being named as a directory: listing them
+// one by one as Samples/X.rdl scatters them beside the XIBs and leaves an
+// empty Samples directory in the installed app, which is what shipped once.
+- (void)testTheSamplesShipAsADirectory {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *makefile =
+      [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:
+                                                  @"RDLDesigner/GNUmakefile"]
+                                encoding:NSUTF8StringEncoding
+                                   error:NULL];
+  if (makefile == nil) {
+    XCTFail(@"%@", @"could not read the designer's GNUmakefile");
+    return;
+  }
+  // The directory itself, on a line of its own in the resource list.
+  if ([makefile rangeOfString:@"\n  Samples\n"].location == NSNotFound)
+    XCTFail(@"%@", @"RDLDesigner/GNUmakefile should list the Samples directory as a resource");
+  // And no file inside it named separately, which would land in the wrong place.
+  NSString *samples = [dir stringByAppendingPathComponent:@"RDLDesigner/Samples"];
+  for (NSString *file in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:samples
+                                                                            error:NULL]) {
+    if ([file hasPrefix:@"."])
+      continue;
+    NSString *entry = [@"Samples/" stringByAppendingString:file];
+    if ([makefile rangeOfString:entry].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is named on its own in the GNUmakefile; "
+                                                @"it would install flat, outside Samples",
+                                                entry]);
+  }
+  // The catalogue the loader asks for, so a rename cannot pass unnoticed.
+  if (![[NSFileManager defaultManager]
+          fileExistsAtPath:[samples stringByAppendingPathComponent:@"Samples.plist"]])
+    XCTFail(@"%@", @"the samples need a Samples.plist beside them");
+}
+
 - (void)testTheInspectorsStayAtTheTopOfTheirPanes {
   RDLEditingContext *ctx =
       [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];

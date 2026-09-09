@@ -28,6 +28,10 @@
 // How narrow a side pane may be dragged. Named because two delegate methods
 // have to agree on it.
 static const CGFloat kRDLSidePaneMinimum = 160.0;
+// What the two side panes open at. The right one has to clear the inspector's
+// sections, which are 260 points wide with a scroller beside them.
+static const CGFloat kRDLLeftPaneWidth = 220.0;
+static const CGFloat kRDLRightPaneWidth = 300.0;
 
 @interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate,
                                  NSSplitViewDelegate>
@@ -145,6 +149,22 @@ static const CGFloat kRDLSidePaneMinimum = 160.0;
 
 #pragma mark - The split
 
+// The width each side pane opens at, set here rather than left to the frames
+// in the XIB. GSXib5 lays the split's subviews out itself rather than
+// restoring the frames Interface Builder recorded, which on GNUstep opened
+// the inspector at about half the width its sections need; saying it in code
+// is one answer that both platforms give the same.
+- (void)setDefaultPaneWidths {
+  CGFloat width = NSWidth([_split bounds]);
+  CGFloat divider = [_split dividerThickness];
+  // A window too narrow to give both sides their width keeps whatever the
+  // split worked out: better a squeezed pane than a centre of nothing.
+  if (width < kRDLLeftPaneWidth + kRDLRightPaneWidth + 2 * divider + kRDLSidePaneMinimum)
+    return;
+  [_split setPosition:kRDLLeftPaneWidth ofDividerAtIndex:0];
+  [_split setPosition:width - kRDLRightPaneWidth - divider ofDividerAtIndex:1];
+}
+
 // What a wider window is for is a wider page, not a wider list of elements or
 // a wider column of inspector fields: both side panes hold controls that are
 // laid out at their own width and would only gather empty space. So the
@@ -190,6 +210,7 @@ static const CGFloat kRDLSidePaneMinimum = 160.0;
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
   [self buildPanes];
+  [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
 }
 

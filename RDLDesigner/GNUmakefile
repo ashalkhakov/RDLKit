@@ -67,9 +67,16 @@ RDLDesigner_APPLICATION_ICON =
 # The sample reports are files, not code: they ship as a directory so that the
 # master-detail pair and the JSON document they read stay beside each other,
 # which is what a Subreport's relative ReportName resolves against.
-RDLDesigner_RESOURCE_DIRS = Samples
-
+# gnustep-make copies each resource file flat into Resources/ (bundle.make:
+# `cp -fr $(RESOURCE_FILES_DIR)/$$f .../Resources/`), so naming the files one
+# by one as Samples/X.rdl would drop them all beside the XIBs and leave the
+# Samples directory empty -- which is what shipped. A resource file may be a
+# directory, which is copied recursively and lands where its name says, so the
+# directory is what gets named. It also means a new sample needs no edit here.
 RDLDesigner_RESOURCE_FILES = \
+  Samples
+
+RDLDesigner_RESOURCE_FILES += \
   RDLExpressionEditor.xib \
   MainMenu.xib \
   RDLWelcomeWindow.xib \
