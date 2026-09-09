@@ -25,7 +25,12 @@
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate>
+// How narrow a side pane may be dragged. Named because two delegate methods
+// have to agree on it.
+static const CGFloat kRDLSidePaneMinimum = 160.0;
+
+@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate,
+                                 NSSplitViewDelegate>
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -136,6 +141,39 @@
     [self reloadUI];
   }
   return self;
+}
+
+#pragma mark - The split
+
+// What a wider window is for is a wider page, not a wider list of elements or
+// a wider column of inspector fields: both side panes hold controls that are
+// laid out at their own width and would only gather empty space. So the
+// window's growth goes to the centre, and the sides keep whatever width they
+// were dragged to -- which is what Report Builder, Xcode and Interface Builder
+// all do with their side panes.
+- (BOOL)splitView:(NSSplitView *)splitView shouldAdjustSizeOfSubview:(NSView *)subview {
+  NSArray<NSView *> *panes = [splitView subviews];
+  return subview != [panes firstObject] && subview != [panes lastObject];
+}
+
+// A pane dragged down to nothing is a pane nobody can get back without knowing
+// the divider is still there, so each side has a floor. They are the widths
+// the XIB opens at, less what a pane can lose and still read.
+- (CGFloat)splitView:(NSSplitView *)splitView
+    constrainMinCoordinate:(CGFloat)proposed
+               ofSubviewAt:(NSInteger)index {
+  RDL_UNUSED(splitView);
+  return index == 0 ? MAX(proposed, kRDLSidePaneMinimum) : proposed;
+}
+
+- (CGFloat)splitView:(NSSplitView *)splitView
+    constrainMaxCoordinate:(CGFloat)proposed
+               ofSubviewAt:(NSInteger)index {
+  NSArray<NSView *> *panes = [splitView subviews];
+  if (index != (NSInteger)[panes count] - 2)
+    return proposed;
+  return MIN(proposed, NSWidth([splitView bounds]) - kRDLSidePaneMinimum -
+                           [splitView dividerThickness]);
 }
 
 // The split panes, the scroll views, the outline column and the +/- bar are

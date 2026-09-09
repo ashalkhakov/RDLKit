@@ -46,6 +46,116 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 @end
 @implementation RDLWindowTests
 
+// A maximised window used to leave the whole designer sitting at the top of
+// the frame with a band of empty window beneath it: the content view's
+// autoresizing mask in the XIB said "fixed size, flexible margins", so the
+// window grew and the view it holds did not. What a wider window buys should
+// go to the page, not to the two side panes, which lay their controls out at
+// their own width and would only gather empty space.
+- (void)testTheWindowsPanesFollowTheWindow {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  NSWindow *window = [wc window];
+  NSSplitView *split = [wc valueForKey:@"split"];
+  NSView *content = [window contentView];
+
+  [window setFrame:NSMakeRect(0, 0, 1200, 800) display:YES];
+  NSArray<NSView *> *panes = [split subviews];
+  if ([panes count] != 3) {
+    XCTFail(@"%@", @"the window is three panes: outline, canvas, inspector");
+    return;
+  }
+  CGFloat leftWas = NSWidth([panes[0] frame]);
+  CGFloat centreWas = NSWidth([panes[1] frame]);
+  CGFloat rightWas = NSWidth([panes[2] frame]);
+
+  [window setFrame:NSMakeRect(0, 0, 1800, 1100) display:YES];
+
+  // The content view fills the window it is in -- no offset, no band of unused
+  // window under it.
+  if (fabs(NSMinX([content frame])) > 0.01 || fabs(NSMinY([content frame])) > 0.01)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the content view floats at %@",
+                                              NSStringFromPoint([content frame].origin)]);
+  if (fabs(NSWidth([content frame]) - NSWidth([content bounds])) > 0.01)
+    XCTFail(@"%@", @"the content view should be as wide as the window");
+  if (fabs(NSWidth([split frame]) - NSWidth([content frame])) > 0.01)
+    XCTFail(@"%@", @"the split should span the content view");
+  if (NSHeight([split frame]) < NSHeight([content frame]) - 60)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the split is %g tall in a %g content view",
+                                              NSHeight([split frame]),
+                                              NSHeight([content frame])]);
+
+  // The sides keep their width; the centre takes what the window gained.
+  if (fabs(NSWidth([panes[0] frame]) - leftWas) > 0.01)
+    XCTFail(@"%@", @"the outline pane should keep its width");
+  if (fabs(NSWidth([panes[2] frame]) - rightWas) > 0.01)
+    XCTFail(@"%@", @"the inspector pane should keep its width");
+  if (NSWidth([panes[1] frame]) < centreWas + 590)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the canvas gained %g of the 600 points",
+                                              NSWidth([panes[1] frame]) - centreWas]);
+
+  // And what is in a pane fills it, all the way down.
+  NSScrollView *canvasScroll = [wc valueForKey:@"canvasScroll"];
+  if (NSHeight([canvasScroll frame]) < NSHeight([panes[1] frame]) - 40)
+    XCTFail(@"%@", @"the canvas scroll view should fill the centre pane");
+  if (fabs(NSWidth([canvasScroll frame]) - NSWidth([panes[1] frame])) > 0.01)
+    XCTFail(@"%@", @"and be as wide as it");
+  NSOutlineView *outline = [wc valueForKey:@"outline"];
+  if (NSHeight([[outline enclosingScrollView] frame]) < NSHeight([panes[0] frame]) - 80)
+    XCTFail(@"%@", @"the outline should fill its pane's height");
+}
+
+// Both inspectors sank towards the middle of their pane as the window grew.
+// RDLInspectorView is flipped, so min-Y is its top edge, and the sections it
+// loads were pinned with a flexible min-Y margin -- which in a flipped parent
+// means "keep the bottom, let the top grow", i.e. drift down by however much
+// the pane gained. An inspector reads from the top down and has to stay there.
+- (void)testTheInspectorsStayAtTheTopOfTheirPanes {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  NSWindow *window = [wc window];
+  [window setFrame:NSMakeRect(0, 0, 1200, 700) display:YES];
+
+  // The Report inspector fills its pane, so it grows with the window. Nothing
+  // reloads on a resize: what holds its contents at the top is the mask.
+  [window setFrame:NSMakeRect(0, 0, 1200, 1100) display:YES];
+  [self checkInspector:[wc valueForKey:@"reportInspector"] named:@"the Report inspector"];
+
+  // The Attributes inspector grows in -stackBoxes:, which sizes it to the
+  // scroll view it sits in -- the same growth, arriving by another route.
+  [ctx.selection selectItem:[ctx.report.body.items firstObject] inBandWithKey:@"body"];
+  [self checkInspector:[wc valueForKey:@"inspector"] named:@"the Attributes inspector"];
+}
+
+// Every section is re-placed whenever the inspector reloads, so the piece that
+// shows a drift on its own is the one placed once: the label naming what is
+// being inspected. The sections are checked too, for the case where nothing
+// reloaded after the growth.
+- (void)checkInspector:(RDLInspectorView *)view named:(NSString *)name {
+  NSView *label = [view valueForKey:@"kindLabel"];
+  if (NSMinY([label frame]) > 12)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%@'s title has drifted %g points down its pane",
+                                              name, NSMinY([label frame])]);
+  CGFloat top = CGFLOAT_MAX;
+  NSUInteger shown = 0;
+  for (NSView *sub in [view subviews]) {
+    if ([sub isHidden] || sub == label)
+      continue;
+    shown++;
+    top = MIN(top, NSMinY([sub frame]));
+  }
+  if (shown == 0) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"%@ shows nothing at all", name]);
+    return;
+  }
+  // The first section sits at 28; anything much past that has sunk down the
+  // pane, which is what "the inspector centres itself" looked like.
+  if (top > 40)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%@ starts %g points down its pane", name, top]);
+}
+
 - (void)testDesignerWindowShell {
   NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
   NSString *xibPath = [dir stringByAppendingPathComponent:@"RDLDesigner/RDLDesignerWindow.xib"];
