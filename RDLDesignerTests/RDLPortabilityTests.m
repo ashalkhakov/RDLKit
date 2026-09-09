@@ -213,11 +213,14 @@
                                      encoding:NSUTF8StringEncoding
                                         error:NULL];
   };
-  NSString *gnustepPlist = read(@"RDLDesigner/Info-gnustep.plist");
-  NSString *cocoaPlist = read(@"RDLDesigner/RDLDesigner-Info.plist");
+  // One plist for both platforms: gnustep-make reads <App>-Info.plist and
+  // generates Info-gnustep.plist from it, so a second file of that name in
+  // the source directory is never read -- which is how the About panel came
+  // to be missing everything below.
+  NSString *plist = read(@"RDLDesigner/RDLDesigner-Info.plist");
   NSString *makefile = read(@"RDLDesigner/GNUmakefile");
   NSString *project = read(@"RDLKit.xcodeproj/project.pbxproj");
-  if (gnustepPlist == nil || cocoaPlist == nil || makefile == nil || project == nil) {
+  if (plist == nil || makefile == nil || project == nil) {
     XCTFail(@"%@", @"could not read the packaging files");
     return;
   }
@@ -229,7 +232,7 @@
     XCTFail(@"%@", @"the GNUstep build should name the application icon");
   if ([makefile rangeOfString:@"\n  RDLDesigner.png"].location == NSNotFound)
     XCTFail(@"%@", @"and install it as a resource, or there is nothing to show");
-  if ([cocoaPlist rangeOfString:@"CFBundleIconFile"].location == NSNotFound)
+  if ([plist rangeOfString:@"CFBundleIconFile"].location == NSNotFound)
     XCTFail(@"%@", @"the Cocoa bundle should name its icon file");
   for (NSString *icon in @[ @"RDLDesigner/RDLDesigner.png", @"RDLDesigner/RDLDesigner.icns" ])
     if (![[NSFileManager defaultManager]
@@ -246,12 +249,12 @@
   // which is what the GNUstep About panel showed; the Cocoa panel reads
   // NSHumanReadableCopyright, which the project generates into the bundle.
   for (NSString *key in @[ @"Authors", @"Copyright", @"CopyrightDescription", @"URL" ])
-    if ([gnustepPlist rangeOfString:key].location == NSNotFound)
+    if ([plist rangeOfString:key].location == NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"the About panel needs %@ in "
-                                                @"Info-gnustep.plist", key]);
+                                                @"RDLDesigner-Info.plist", key]);
   // The licence is the one the repository is under, said in the panel rather
   // than only in a file nobody opens from the app.
-  if ([gnustepPlist rangeOfString:@"Lesser General Public License"].location == NSNotFound)
+  if ([plist rangeOfString:@"Lesser General Public License"].location == NSNotFound)
     XCTFail(@"%@", @"CopyrightDescription should name the licence");
   if ([project rangeOfString:@"INFOPLIST_KEY_NSHumanReadableCopyright = \"\";"].location !=
       NSNotFound)
@@ -261,23 +264,32 @@
   // still saying 1.0. Scripts/stamp-version.sh is what writes them.
   NSString *release = nil;
   NSTextCheckingResult *match = [[NSRegularExpression
-      regularExpressionWithPattern:@"ApplicationRelease = \"([^\"]+)\";"
+      regularExpressionWithPattern:@"<key>ApplicationRelease</key>\\s*<string>([^<]+)</string>"
                            options:0
-                             error:NULL] firstMatchInString:gnustepPlist
+                             error:NULL] firstMatchInString:plist
                                                     options:0
-                                                      range:NSMakeRange(0, [gnustepPlist length])];
+                                                      range:NSMakeRange(0, [plist length])];
   if (match)
-    release = [gnustepPlist substringWithRange:[match rangeAtIndex:1]];
+    release = [plist substringWithRange:[match rangeAtIndex:1]];
   if ([release length] == 0) {
-    XCTFail(@"%@", @"Info-gnustep.plist should carry an ApplicationRelease");
+    XCTFail(@"%@", @"the plist should carry an ApplicationRelease");
     return;
   }
-  if ([gnustepPlist rangeOfString:[NSString stringWithFormat:@"FullVersionID = \"%@\";",
+  if ([plist rangeOfString:[NSString stringWithFormat:@"<key>FullVersionID</key>\n  <string>%@</string>",
                                                              release]].location == NSNotFound)
     XCTFail(@"%@", @"FullVersionID should say the same as ApplicationRelease");
-  if ([cocoaPlist rangeOfString:[NSString stringWithFormat:@"<string>%@</string>", release]]
-          .location == NSNotFound)
-    XCTFail(@"%@", @"the Cocoa plist should carry the same version");
+  if ([plist rangeOfString:[NSString stringWithFormat:
+                               @"<key>CFBundleShortVersionString</key>\n  <string>%@</string>",
+                               release]].location == NSNotFound)
+    XCTFail(@"%@", @"the bundle version should say the same as the About panel's");
+  // And nothing named Info-gnustep.plist beside it: gnustep-make generates a
+  // file of that name into the bundle, so one in the source directory is read
+  // by nobody and silently disagrees with what ships.
+  if ([[NSFileManager defaultManager]
+          fileExistsAtPath:[dir stringByAppendingPathComponent:
+                                    @"RDLDesigner/Info-gnustep.plist"]])
+    XCTFail(@"%@", @"RDLDesigner/Info-gnustep.plist is not read by anything -- "
+                   @"gnustep-make generates that file from RDLDesigner-Info.plist");
   // Xcode generates the bundle's plist from these, so a stamp that missed them
   // would ship a bundle still claiming whatever the project file says.
   if ([project rangeOfString:[NSString stringWithFormat:@"MARKETING_VERSION = %@;", release]]
