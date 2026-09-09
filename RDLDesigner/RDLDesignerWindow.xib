@@ -247,6 +247,8 @@
                                                     <menuItem title="125%" id="zoom125"/>
                                                     <menuItem title="150%" id="zoom150"/>
                                                     <menuItem title="200%" id="zoom200"/>
+                                                    <menuItem title="300%" id="zoom300"/>
+                                                    <menuItem title="400%" id="zoom400"/>
                                                 </items>
                                             </menu>
                                         </popUpButtonCell>

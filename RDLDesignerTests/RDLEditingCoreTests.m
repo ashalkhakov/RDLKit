@@ -646,12 +646,12 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"context: zoom must not dirty the document");
   if (!(!ctx.document.undoManager.canUndo))
     XCTFail(@"%@", @"context: zoom must not be undoable");
-  for (int i = 0; i < 20; i++) [ctx zoomIn];
-  if (!(ctx.zoom <= 2.0))
-    XCTFail(@"%@", @"context: zoom clamps at 2.0");
-  for (int i = 0; i < 40; i++) [ctx zoomOut];
-  if (!(ctx.zoom >= 0.4))
-    XCTFail(@"%@", @"context: zoom clamps at 0.4");
+  for (int i = 0; i < 40; i++) [ctx zoomIn];
+  if (!(ctx.zoom <= RDLMaximumZoom))
+    XCTFail(@"%@", @"context: zoom clamps at the maximum");
+  for (int i = 0; i < 60; i++) [ctx zoomOut];
+  if (!(ctx.zoom >= RDLMinimumZoom))
+    XCTFail(@"%@", @"context: zoom clamps at the minimum");
   [ctx toggleGrid];
   if (!(!ctx.showsGrid))
     XCTFail(@"%@", @"context: grid toggles");

@@ -181,8 +181,8 @@
 
 - (void)testGroupBracketGeometry {
   NSRect region = NSMakeRect(120, 80, 400, 200);
-  NSArray<NSValue *> *rows = [RDLPageGeometry rowGroupBracketsForCount:3 inRect:region];
-  NSArray<NSValue *> *cols = [RDLPageGeometry columnGroupBracketsForCount:2 inRect:region];
+  NSArray<NSValue *> *rows = [RDLPageGeometry rowGroupBracketsForCount:3 inRect:region zoom:1.0];
+  NSArray<NSValue *> *cols = [RDLPageGeometry columnGroupBracketsForCount:2 inRect:region zoom:1.0];
   if ([rows count] != 3 || [cols count] != 2) {
     XCTFail(@"%@", @"one bracket per group, on each axis");
     return;
@@ -214,7 +214,7 @@
     XCTFail(@"%@", @"the outermost column group should be the furthest from the region");
 
   // A tablix with no groups gets no brackets, rather than an empty one drawn.
-  if ([[RDLPageGeometry rowGroupBracketsForCount:0 inRect:region] count] != 0)
+  if ([[RDLPageGeometry rowGroupBracketsForCount:0 inRect:region zoom:1.0] count] != 0)
     XCTFail(@"%@", @"no groups should mean no brackets");
 }
 

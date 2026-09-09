@@ -68,6 +68,16 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
   [_selection reset];
 }
 
+// How far the canvas zooms, and by how much a step of the keyboard or the
+// toolbar moves it. 400% is there because a tablix's handle band and group
+// brackets scale with the zoom, so reading a deeply nested group is a matter
+// of zooming in far enough.
+const CGFloat RDLMinimumZoom = 0.4;
+const CGFloat RDLMaximumZoom = 4.0;
+static const CGFloat kRDLZoomFineStep = 0.1;
+static const CGFloat kRDLZoomCoarseStep = 0.25;
+static const CGFloat kRDLZoomCoarseAbove = 2.0;
+
 #pragma mark - View state
 
 - (void)postViewStateChange {
@@ -77,7 +87,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 }
 
 - (void)setZoom:(CGFloat)zoom {
-  CGFloat clamped = MIN(2.0, MAX(0.4, zoom));
+  CGFloat clamped = MIN(RDLMaximumZoom, MAX(RDLMinimumZoom, zoom));
   if (clamped == _zoom)
     return;
   _zoom = clamped;
@@ -91,12 +101,19 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
   [self postViewStateChange];
 }
 
+// Above 200% a tenth of the paper is a small step and there is a lot of range
+// left, so the step grows with the zoom rather than making the keyboard press
+// the same key twenty times to cross it.
+static CGFloat RDLZoomStepFrom(CGFloat zoom) {
+  return zoom >= kRDLZoomCoarseAbove ? kRDLZoomCoarseStep : kRDLZoomFineStep;
+}
+
 - (void)zoomIn {
-  self.zoom = _zoom + 0.1;
+  self.zoom = _zoom + RDLZoomStepFrom(_zoom);
 }
 
 - (void)zoomOut {
-  self.zoom = _zoom - 0.1;
+  self.zoom = _zoom - RDLZoomStepFrom(_zoom - kRDLZoomFineStep / 2);
 }
 
 - (void)toggleGrid {

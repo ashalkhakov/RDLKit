@@ -1872,6 +1872,95 @@ static NSTabView *_centerTabViewOf(id wc) {
   (void)ctx;
 }
 
+// The band, the brackets and the grips are part of the drawing, so they scale
+// with the zoom -- otherwise the one thing a person zooms in to read, the
+// group structure of a tablix, stays the same handful of points however far
+// they zoom. Hit-testing has to agree with the drawing, which is what this
+// checks: a point 18 points above the grid is outside the band at 100% and
+// inside it at 200%.
+- (void)testTheTablixHandleBandScalesWithTheZoom {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+
+  CGFloat outside = RDLTablixHandleBand + 6;  // beyond the band at 100%
+  for (NSNumber *z in @[ @1.0, @2.0 ]) {
+    CGFloat zoom = [z doubleValue];
+    RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                              zoom:zoom
+                                                       paperOrigin:NSMakePoint(0, 0)];
+    NSRect rect = NSZeroRect;
+    if (![geometry findRectOfItem:tablix rect:&rect]) {
+      XCTFail(@"%@", @"the tablix should have a rect");
+      return;
+    }
+    NSRect band = RDLTablixHandleRect(rect, zoom);
+    if (fabs((NSMinY(rect) - NSMinY(band)) - RDLTablixHandleBand * zoom) > 0.01)
+      XCTFail(@"%@", @"the band should be as many times thicker as the zoom");
+
+    NSString *kind = nil, *bandKey = nil;
+    NSRect hit = NSZeroRect;
+    RDLItem *at = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) - outside)
+                                   kind:&kind
+                                bandKey:&bandKey
+                                   rect:&hit];
+    if (zoom == 1.0 && at == tablix)
+      XCTFail(@"%@", @"at 100% that point is above the band, not in it");
+    if (zoom == 2.0 && at != tablix)
+      XCTFail(@"%@", @"at 200% the band reaches that far and should be hit");
+  }
+
+  // The group brackets step out from the region by the same factor, so they
+  // stay clear of the band that grew with them.
+  NSRect region = NSMakeRect(120, 80, 400, 200);
+  NSRect one = [[RDLPageGeometry rowGroupBracketsForCount:2 inRect:region zoom:1.0][0] rectValue];
+  NSRect two = [[RDLPageGeometry rowGroupBracketsForCount:2 inRect:region zoom:2.0][0] rectValue];
+  if (fabs((NSMinX(region) - NSMinX(two)) - 2 * (NSMinX(region) - NSMinX(one))) > 0.01)
+    XCTFail(@"%@", @"a row bracket should stand twice as far out at twice the zoom");
+  if (fabs(NSWidth(two) - 2 * NSWidth(one)) > 0.01)
+    XCTFail(@"%@", @"and its turned-in ends should be twice as long");
+}
+
+// 400%, because that is what makes a nested group structure readable. The
+// bounds are the context's, so the popup and the keyboard cannot disagree.
+- (void)testTheCanvasZoomsToFourHundredPercent {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  ctx.zoom = 4.0;
+  if (fabs(ctx.zoom - 4.0) > 0.001)
+    XCTFail(@"%@", @"400% should be reachable");
+  ctx.zoom = 9.0;
+  if (fabs(ctx.zoom - RDLMaximumZoom) > 0.001)
+    XCTFail(@"%@", @"and anything past the maximum clamps to it");
+  ctx.zoom = 0.01;
+  if (fabs(ctx.zoom - RDLMinimumZoom) > 0.001)
+    XCTFail(@"%@", @"as does anything below the minimum");
+
+  // Zooming in from 100% must actually reach the top, without twenty presses
+  // of the same key once past 200%.
+  ctx.zoom = 1.0;
+  NSUInteger presses = 0;
+  while (ctx.zoom < RDLMaximumZoom && presses < 100) {
+    [ctx zoomIn];
+    presses++;
+  }
+  if (fabs(ctx.zoom - RDLMaximumZoom) > 0.001)
+    XCTFail(@"%@", @"zoom in should reach the maximum");
+  if (presses > 20)
+    XCTFail(@"%@", [NSString stringWithFormat:@"%lu presses to zoom from 100%% to 400%%",
+                                              (unsigned long)presses]);
+  // And back down again.
+  presses = 0;
+  while (ctx.zoom > RDLMinimumZoom && presses < 100) {
+    [ctx zoomOut];
+    presses++;
+  }
+  if (fabs(ctx.zoom - RDLMinimumZoom) > 0.001)
+    XCTFail(@"%@", @"zoom out should reach the minimum again");
+}
+
 // The Edit Tablix dialog's group lists were readable and nothing else: the
 // only way to group by a field was to drag a column into them, and there was
 // no way at all to stop grouping. They now add, rename and remove.

@@ -23,6 +23,12 @@
 // resetting `dirty` immediately afterwards. They now have their own channel.
 extern NSString * const RDLViewStateDidChangeNotification;
 
+// What the canvas will zoom to. Everything the canvas draws scales with it,
+// the tablix handle band and group brackets included, so zooming in is how a
+// nested group structure is read rather than squinted at.
+FOUNDATION_EXPORT const CGFloat RDLMinimumZoom;
+FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
+
 @interface RDLEditingContext : NSObject
 @property (nonatomic, readonly, strong) RDLDocument *document;
 @property (nonatomic, readonly, strong) RDLSelection *selection;

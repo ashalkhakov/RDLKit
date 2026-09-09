@@ -77,8 +77,14 @@ typedef NS_ENUM(NSInteger, RDLTablixPart) {
 // the grid, so without this there is nowhere on the canvas to point at the
 // tablix itself. Outside the item's own rect, the way Report Builder's row and
 // column handles are, and the same place the group brackets are drawn.
+// The band is part of the drawing, not chrome laid over it: it scales with the
+// zoom, so that a tablix whose group brackets are unreadable at 100% can be
+// read by zooming in, and so that the handles stay over the rows and columns
+// they belong to. RDLTablixHandleBand is the thickness at 100%; every other
+// caller wants RDLTablixHandleBandForZoom.
 FOUNDATION_EXPORT const CGFloat RDLTablixHandleBand;
-FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect);
+FOUNDATION_EXPORT CGFloat RDLTablixHandleBandForZoom(CGFloat zoom);
+FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
 
 // The item's rect anywhere in the report, including inside nested Rectangles.
 // NO when the item is not in this report.
@@ -97,8 +103,12 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect);
 // nesting reads outwards. Each rect is the bracket's extent, including its
 // turned-in ends. Geometry rather than drawing, so where they land can be
 // checked without rendering anything.
-+ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
-+ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect;
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count
+                                          inRect:(NSRect)rect
+                                            zoom:(CGFloat)zoom;
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count
+                                             inRect:(NSRect)rect
+                                               zoom:(CGFloat)zoom;
 
 // The band whose frame contains `point`, or nil.
 - (NSString *)bandKeyAtPoint:(NSPoint)point;

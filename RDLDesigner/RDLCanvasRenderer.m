@@ -14,6 +14,17 @@
 }
 @end
 
+// The marks inside a tablix handle, at 100%: how far a bracket or a grip is
+// inset from the handle's edge, how far a bracket's ends turn in, and the gap
+// between one grip stroke and the next. Named rather than written into the
+// drawing, because each is multiplied by the zoom in two places.
+static const CGFloat kRDLHandleInset = 3.0;
+static const CGFloat kRDLHandleTick = 4.0;
+static const CGFloat kRDLHandleGripStep = 3.0;
+// A group bracket's label, at 100%, and how far it sits off the bracket.
+static const CGFloat kRDLBracketLabelSize = 8.0;
+static const CGFloat kRDLBracketLabelGap = 2.0;
+
 // The canvas is the one place that draws text at a scale other than 1: its
 // zoom. Everything else about the translation is shared (RDLTextAttributes).
 static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CGFloat zoom) {
@@ -72,9 +83,17 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
                       inRect:(NSRect)r
                       active:(BOOL)active
                     selected:(BOOL)selected {
-  NSRect band = RDLTablixHandleRect(r);
-  CGFloat z = _ctx.zoom;
-  CGFloat thickness = RDLTablixHandleBand;
+  CGFloat z = _ctx.zoom > 0 ? _ctx.zoom : 1.0;
+  NSRect band = RDLTablixHandleRect(r, z);
+  CGFloat thickness = RDLTablixHandleBandForZoom(z);
+  // The marks inside a handle are written at 100% and scaled with everything
+  // else, so a band that is twice as thick gets brackets and grips twice as
+  // big rather than the same hairlines lost in more grey. `line` keeps a
+  // stroke at least a point wide, since a half-point line zoomed out is a
+  // line nobody can see.
+  CGFloat inset = kRDLHandleInset * z;
+  CGFloat tick = kRDLHandleTick * z;
+  CGFloat line = MAX(1.0, z);
   NSColor *fill = selected ? [NSColor colorWithCalibratedRed:0.55 green:0.66 blue:0.85 alpha:1.0]
                            : (active ? [NSColor colorWithCalibratedWhite:0.74 alpha:1.0]
                                      : [NSColor colorWithCalibratedWhite:0.84 alpha:1.0]);
@@ -88,9 +107,9 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
     [fill set];
     NSRectFill(box);
     [highlight set];
-    NSRectFill(NSMakeRect(NSMinX(box), NSMinY(box), NSWidth(box), 1));
+    NSRectFill(NSMakeRect(NSMinX(box), NSMinY(box), NSWidth(box), line));
     [edge set];
-    NSFrameRect(box);
+    NSFrameRectWithWidth(box, line);
   };
 
   // The corner: takes hold of the whole region, and nothing else.
@@ -102,23 +121,25 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   // -- so that what cannot be dragged does not look draggable.
   void (^bracket)(NSRect, BOOL) = ^(NSRect box, BOOL horizontal) {
     [edge set];
-    NSRect line = horizontal ? NSMakeRect(NSMinX(box) + 3, NSMidY(box) - 1,
-                                          MAX(NSWidth(box) - 6, 1), 1)
-                             : NSMakeRect(NSMidX(box) - 1, NSMinY(box) + 3, 1,
-                                          MAX(NSHeight(box) - 6, 1));
-    NSRectFill(line);
-    NSRectFill(horizontal ? NSMakeRect(NSMinX(line), NSMinY(box) + 3, 1, 4)
-                          : NSMakeRect(NSMinX(box) + 3, NSMinY(line), 4, 1));
-    NSRectFill(horizontal ? NSMakeRect(NSMaxX(line) - 1, NSMinY(box) + 3, 1, 4)
-                          : NSMakeRect(NSMinX(box) + 3, NSMaxY(line) - 1, 4, 1));
+    NSRect bar = horizontal ? NSMakeRect(NSMinX(box) + inset, NSMidY(box) - line,
+                                         MAX(NSWidth(box) - 2 * inset, line), line)
+                            : NSMakeRect(NSMidX(box) - line, NSMinY(box) + inset, line,
+                                         MAX(NSHeight(box) - 2 * inset, line));
+    NSRectFill(bar);
+    NSRectFill(horizontal ? NSMakeRect(NSMinX(bar), NSMinY(box) + inset, line, tick)
+                          : NSMakeRect(NSMinX(box) + inset, NSMinY(bar), tick, line));
+    NSRectFill(horizontal ? NSMakeRect(NSMaxX(bar) - line, NSMinY(box) + inset, line, tick)
+                          : NSMakeRect(NSMinX(box) + inset, NSMaxY(bar) - line, tick, line));
   };
   // A grip, for a column that can be picked up: three short strokes, which is
   // what says "drag me" without a word.
   void (^grip)(NSRect) = ^(NSRect box) {
     [edge set];
     CGFloat mid = NSMidX(box);
-    for (CGFloat g = -3; g <= 3; g += 3)
-      NSRectFill(NSMakeRect(mid + g, NSMinY(box) + 3, 1, NSHeight(box) - 6));
+    CGFloat step = kRDLHandleGripStep * z;
+    for (CGFloat g = -step; g <= step; g += step)
+      NSRectFill(NSMakeRect(mid + g, NSMinY(box) + inset, line,
+                            MAX(NSHeight(box) - 2 * inset, line)));
   };
 
   CGFloat x = NSMinX(r);
@@ -153,7 +174,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
     for (NSInteger c = 0; c < _overlay.dragColumnTarget; c++)
       marker += [RDLTablixGeometry widthOfBodyColumn:(NSUInteger)c of:tablix zoom:z];
     [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:1.0] set];
-    NSRectFill(NSMakeRect(marker - 1, NSMinY(band), 2, NSHeight(band)));
+    NSRectFill(NSMakeRect(marker - line, NSMinY(band), 2 * line, NSHeight(band)));
   }
 }
 
@@ -295,21 +316,25 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
 // axes it is. Drawn only for the selected tablix -- it is orientation, not
 // decoration, and on every region at once it would be noise. Where each bracket
 // goes is RDLPageGeometry's, so it can be checked without drawing.
-static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
+static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
   NSArray<NSString *> *rows = tablix.rowGroups ?: @[];
   NSArray<NSString *> *cols = tablix.columnGroups ?: @[];
   if ([rows count] == 0 && [cols count] == 0)
     return;
 
+  CGFloat z = zoom > 0 ? zoom : 1.0;
+  CGFloat line = MAX(1.0, z);
+  CGFloat gap = kRDLBracketLabelGap * z;
   NSColor *ink = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.85];
   NSDictionary *attrs = @{
-    NSFontAttributeName : [NSFont boldSystemFontOfSize:8],
+    NSFontAttributeName : [NSFont boldSystemFontOfSize:kRDLBracketLabelSize * z],
     NSForegroundColorAttributeName : ink,
   };
   [ink set];
 
   NSArray<NSValue *> *rowBrackets = [RDLPageGeometry rowGroupBracketsForCount:[rows count]
-                                                                       inRect:r];
+                                                                       inRect:r
+                                                                         zoom:z];
   for (NSUInteger i = 0; i < [rows count]; i++) {
     NSRect b = [rowBrackets[i] rectValue];
     NSBezierPath *path = [NSBezierPath bezierPath];
@@ -317,14 +342,14 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
     [path lineToPoint:NSMakePoint(NSMinX(b), NSMinY(b))];
     [path lineToPoint:NSMakePoint(NSMinX(b), NSMaxY(b))];
     [path lineToPoint:NSMakePoint(NSMaxX(b), NSMaxY(b))];
-    [path setLineWidth:1];
+    [path setLineWidth:line];
     [path stroke];
     // Along the bracket, turned to read with it.
     NSString *label = rows[i];
     NSSize size = [label sizeWithAttributes:attrs];
     NSAffineTransform *turn = [NSAffineTransform transform];
     [NSGraphicsContext saveGraphicsState];
-    [turn translateXBy:NSMinX(b) - 2 yBy:NSMidY(b) + size.width / 2];
+    [turn translateXBy:NSMinX(b) - gap yBy:NSMidY(b) + size.width / 2];
     [turn rotateByDegrees:-90];
     [turn concat];
     [label drawAtPoint:NSZeroPoint withAttributes:attrs];
@@ -332,7 +357,8 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
   }
 
   NSArray<NSValue *> *colBrackets = [RDLPageGeometry columnGroupBracketsForCount:[cols count]
-                                                                          inRect:r];
+                                                                          inRect:r
+                                                                            zoom:z];
   for (NSUInteger i = 0; i < [cols count]; i++) {
     NSRect b = [colBrackets[i] rectValue];
     NSBezierPath *path = [NSBezierPath bezierPath];
@@ -340,11 +366,12 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
     [path lineToPoint:NSMakePoint(NSMinX(b), NSMinY(b))];
     [path lineToPoint:NSMakePoint(NSMaxX(b), NSMinY(b))];
     [path lineToPoint:NSMakePoint(NSMaxX(b), NSMaxY(b))];
-    [path setLineWidth:1];
+    [path setLineWidth:line];
     [path stroke];
     NSString *label = cols[i];
     NSSize size = [label sizeWithAttributes:attrs];
-    [label drawAtPoint:NSMakePoint(NSMidX(b) - size.width / 2, NSMinY(b) - size.height - 1)
+    [label drawAtPoint:NSMakePoint(NSMidX(b) - size.width / 2,
+                                   NSMinY(b) - size.height - gap / 2)
         withAttributes:attrs];
   }
 }
@@ -409,7 +436,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
     [self drawTablixHandleBand:(RDLTablix *)it inRect:r active:active selected:sel];
     [self drawTablix:(RDLTablix *)it inRect:r];
     if (active)
-      RDLDrawGroupBrackets((RDLTablix *)it, r);
+      RDLDrawGroupBrackets((RDLTablix *)it, r, _ctx.zoom);
   } else if ([it isKindOfClass:[RDLSubreport class]]) {
     [self drawSubreport:(RDLSubreport *)it inRect:r];
   } else if ([it isKindOfClass:[RDLChart class]]) {

@@ -6,11 +6,14 @@ const CGFloat RDLPointsPerInch = 72.0;
 NSString * const RDLHandleMove = @"move";
 const CGFloat RDLTablixHandleBand = 12.0;
 
-NSRect RDLTablixHandleRect(NSRect itemRect) {
-  return NSMakeRect(NSMinX(itemRect) - RDLTablixHandleBand,
-                    NSMinY(itemRect) - RDLTablixHandleBand,
-                    NSWidth(itemRect) + RDLTablixHandleBand,
-                    NSHeight(itemRect) + RDLTablixHandleBand);
+CGFloat RDLTablixHandleBandForZoom(CGFloat zoom) {
+  return RDLTablixHandleBand * (zoom > 0 ? zoom : 1.0);
+}
+
+NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom) {
+  CGFloat band = RDLTablixHandleBandForZoom(zoom);
+  return NSMakeRect(NSMinX(itemRect) - band, NSMinY(itemRect) - band,
+                    NSWidth(itemRect) + band, NSHeight(itemRect) + band);
 }
 
 NSString * const RDLHandleCell = @"cell";
@@ -86,22 +89,28 @@ static const CGFloat kRDLBracketStep = 9;
 static const CGFloat kRDLBracketTick = 4;
 static const CGFloat kRDLBracketGap = 3;
 
-+ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
++ (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count
+                                          inRect:(NSRect)rect
+                                            zoom:(CGFloat)zoom {
+  CGFloat z = zoom > 0 ? zoom : 1.0;
   NSMutableArray *out = [NSMutableArray array];
   for (NSUInteger i = 0; i < count; i++) {
-    CGFloat x = NSMinX(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
-    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick,
+    CGFloat x = NSMinX(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i)) * z;
+    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick * z,
                                                      NSHeight(rect))]];
   }
   return out;
 }
 
-+ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count inRect:(NSRect)rect {
++ (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count
+                                             inRect:(NSRect)rect
+                                               zoom:(CGFloat)zoom {
+  CGFloat z = zoom > 0 ? zoom : 1.0;
   NSMutableArray *out = [NSMutableArray array];
   for (NSUInteger i = 0; i < count; i++) {
-    CGFloat y = NSMinY(rect) - kRDLBracketGap - kRDLBracketStep * (CGFloat)(count - i);
+    CGFloat y = NSMinY(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i)) * z;
     [out addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(rect), y, NSWidth(rect),
-                                                     kRDLBracketTick)]];
+                                                     kRDLBracketTick * z)]];
   }
   return out;
 }
@@ -234,7 +243,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
     // The handle band: outside the grid, so it is not a cell, and it is what
     // selects and drags the whole region.
     if ([it isKindOfClass:[RDLTablix class]] && !NSPointInRect(point, r) &&
-        NSPointInRect(point, RDLTablixHandleRect(r))) {
+        NSPointInRect(point, RDLTablixHandleRect(r, self.zoom))) {
       if (outKind)
         *outKind = RDLHandleMove;
       if (outRect)
@@ -626,7 +635,7 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
     handleColumnAtPoint:(NSPoint)point
                  column:(NSUInteger *)outColumn
                    zoom:(CGFloat)zoom {
-  NSRect band = RDLTablixHandleRect(itemRect);
+  NSRect band = RDLTablixHandleRect(itemRect, zoom);
   // The strip above the grid only, and not the corner square to its left.
   if (point.y < NSMinY(band) || point.y >= NSMinY(itemRect) || point.x < NSMinX(itemRect))
     return NO;
