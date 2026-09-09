@@ -62,6 +62,24 @@ if [ -n "$DEFAULTS_TOOL" ]; then
     # the Website line in the About panel, for one. Ours, in the bundle's Tools
     # directory, which is where [NSTask launchPathForTool:] looks first.
     "$DEFAULTS_TOOL" write org.rdl.designer GSUnknownFileTool open
+
+    # Ctrl, not Alt. GNUstep's default modifier map is NeXT's -- Alt_L is
+    # COMMAND and both Control keys are CONTROL -- so on a Linux desktop this
+    # app answered Alt+C where every other window answers Ctrl+C. The keys are
+    # X keysym names, read once at startup, and documented in gnustep-gui's
+    # KeyboardSetup. NoSymbol disables one.
+    #
+    # The left Control becomes COMMAND, which is what a menu key equivalent
+    # fires on, and stops being CONTROL as well: one key acting as both fires a
+    # menu item and a text-view binding from the same press, which the same
+    # document warns about. The right Control stays a real CONTROL, so the
+    # emacs-style text bindings are still reachable, and Alt -- freed from
+    # being COMMAND -- goes back to being ALTERNATE.
+    "$DEFAULTS_TOOL" write org.rdl.designer GSFirstCommandKey Control_L
+    "$DEFAULTS_TOOL" write org.rdl.designer GSFirstControlKey NoSymbol
+    "$DEFAULTS_TOOL" write org.rdl.designer GSSecondControlKey Control_R
+    "$DEFAULTS_TOOL" write org.rdl.designer GSFirstAlternateKey Alt_L
+    "$DEFAULTS_TOOL" write org.rdl.designer GSSecondAlternateKey Alt_R
 fi
 
 # ADDITION: the image carries two programs. Invoked as rdlgen, or with rdlgen

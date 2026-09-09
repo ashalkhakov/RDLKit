@@ -342,4 +342,36 @@
   }
 }
 
+// Ctrl, not Alt. GNUstep's default modifier map is NeXT's -- Alt_L is COMMAND
+// and both Control keys are CONTROL -- so on a Linux desktop the app answered
+// Alt+C where every other window answers Ctrl+C. AppRun writes the map with
+// the defaults tool at launch, beside the theme and the fonts.
+- (void)testAppRunPutsCommandOnTheControlKey {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *appRun =
+      [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:
+                                                  @"Scripts/appimage/AppRun"]
+                                encoding:NSUTF8StringEncoding
+                                   error:NULL];
+  if (appRun == nil) {
+    XCTFail(@"%@", @"could not read AppRun");
+    return;
+  }
+  // The whole map, since half of it is worse than none: a key that is COMMAND
+  // and CONTROL at once fires a menu item and a text binding from one press,
+  // which gnustep-gui's KeyboardSetup warns about.
+  NSDictionary<NSString *, NSString *> *map = @{
+    @"GSFirstCommandKey" : @"Control_L",   // what menu key equivalents fire on
+    @"GSFirstControlKey" : @"NoSymbol",    // ... and no longer CONTROL as well
+    @"GSSecondControlKey" : @"Control_R",  // the right one stays a real CONTROL
+    @"GSFirstAlternateKey" : @"Alt_L",     // Alt, freed from COMMAND
+    @"GSSecondAlternateKey" : @"Alt_R",
+  };
+  for (NSString *key in map) {
+    NSString *line = [NSString stringWithFormat:@"write org.rdl.designer %@ %@", key, map[key]];
+    if ([appRun rangeOfString:line].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should write: %@", line]);
+  }
+}
+
 @end
