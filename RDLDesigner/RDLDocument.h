@@ -56,12 +56,6 @@
 - (void)syncParamValuesFromReport;
 - (void)setParamValue:(NSString *)value forName:(NSString *)name;
 
-// Give a dataset a JSON document: it is written into the data source the
-// dataset names -- which is where a report keeps data it carries -- and the
-// rows are read back from it, using the generator's binder so the designer and
-// the headless path agree on field inference. Fails when the dataset names no
-// source, because there is then nowhere for the data to live.
-- (BOOL)bindJSON:(NSString *)json toDataSetNamed:(NSString *)name error:(NSError **)error;
 
 // Read every data source the report names -- all of them, not the first: a
 // report with three datasets needs three, and one that fails should not stop

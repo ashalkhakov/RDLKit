@@ -197,42 +197,6 @@ NSString *const RDLReportDocumentType = @"rdl";
   [self postChange:[RDLChange dataChange]];
 }
 
-// JSON handed to a dataset becomes that dataset's document: it goes into the
-// data source's connect string, where a report keeps the data it carries, and
-// the rows follow from reading it back. Written rather than kept in memory
-// because a document edit has to survive the save -- rows on their own do not,
-// now that CommandText is the query and nothing else.
-- (BOOL)bindJSON:(NSString *)json toDataSetNamed:(NSString *)name error:(NSError **)error {
-  if ([name length] == 0)
-    return NO;
-  RDLDataSet *dataSet = [_report dataSetNamed:name];
-  RDLDataSource *source = [_report dataSourceNamed:dataSet.dataSourceName];
-  if (dataSet == nil || source == nil) {
-    if (error)
-      *error = [NSError errorWithDomain:@"RDLDocument" code:3 userInfo:@{
-        NSLocalizedDescriptionKey :
-            dataSet == nil
-                ? [NSString stringWithFormat:@"There is no dataset called '%@'.", name]
-                : [NSString stringWithFormat:@"'%@' does not name a data source to put the "
-                                             @"data in.", name]
-      }];
-    return NO;
-  }
-  // Refused before anything is written: a report should not end up carrying a
-  // document that cannot be read back.
-  if (![RDLGenerator bindJSONString:json toDataSet:name inReport:_report error:error])
-    return NO;
-  RDLDataProviderKind kind = RDLDataProviderKindJSON;
-  NSMutableDictionary *properties = [RDLConnectionProperties(source.connectString) mutableCopy];
-  [properties removeObjectForKey:RDLDocumentKeyForProviderKind(kind)];
-  properties[RDLInlineKeyForProviderKind(kind)] = json ?: @"[]";
-  source.dataProvider = RDLStringFromDataProviderKind(kind);
-  source.connectString = RDLConnectionString(properties);
-  if ([dataSet.commandText length] == 0)
-    dataSet.commandText = @"$[*]";
-  [self noteChange:[RDLChange dataChange]];
-  return YES;
-}
 
 - (BOOL)bindDataSourcesFetchingRemote:(BOOL)fetchRemote
                                 notes:(NSArray<NSString *> **)notes

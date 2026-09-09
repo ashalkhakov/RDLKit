@@ -168,20 +168,6 @@ static RDLReport *RDLGroupedJobs(void) {
   if (doc.isDirty)
     XCTFail(@"%@", @"loading a report should clear dirty");
 
-  // The JSON binder must not clobber a declared schema (allKeys is unordered).
-  RDLDocument *bindDoc = [[RDLDocument alloc] initWithReport:RDLEditableReport()];
-  NSArray *declared = [bindDoc.report.dataSets.firstObject fields];
-  if (![bindDoc bindJSON:@"[{\"Amount\":5,\"Sku\":\"Z\"}]" toDataSetNamed:@"Rows" error:&err])
-    XCTFail(@"%@", [NSString stringWithFormat:@"bindJSON failed: %@",
-                                               err.localizedDescription]);
-  if (![[bindDoc.report.dataSets.firstObject fields] isEqualToArray:declared])
-    XCTFail(@"%@", @"binding JSON must not reorder a declared field list");
-  if ([[bindDoc.report.dataSets.firstObject rows] count] != 1)
-    XCTFail(@"%@", @"binding JSON should replace the rows");
-  if (![bindDoc isDirty])
-    XCTFail(@"%@", @"binding data is a document edit and should dirty it");
-  if ([bindDoc bindJSON:@"{\"not\":\"an array\"}" toDataSetNamed:@"Rows" error:NULL])
-    XCTFail(@"%@", @"binding a JSON object rather than an array should fail");
 }
 
 - (void)testUndo {
@@ -876,9 +862,10 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"the document should hold the parameter bindings");
 
   NSError *err = nil;
-  if (![doc bindJSON:@"[{\"Job\":\"Bench\",\"Finish\":\"Oil\",\"Amount\":11}]"
-      toDataSetNamed:@"Jobs"
-               error:&err])
+  if (![RDLGenerator bindJSONString:@"[{\"Job\":\"Bench\",\"Finish\":\"Oil\",\"Amount\":11}]"
+                          toDataSet:@"Jobs"
+                           inReport:doc.report
+                              error:&err])
     XCTFail(@"%@", [NSString stringWithFormat:@"bind failed: %@", err.localizedDescription]);
   if ([[doc.report.dataSets.firstObject rows] count] != 1)
     XCTFail(@"%@", @"binding through the document should reach the report");

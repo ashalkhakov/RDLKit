@@ -219,6 +219,35 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     XCTFail(@"%@", @"bindJSONString did not reach layout");
 }
 
+// What the binder does to a dataset that already declares its fields. This
+// used to be checked through a designer document method that wrapped this
+// call; the wrapper is gone, and the behaviour it was really testing is the
+// kit's.
+- (void)testBindingJSONKeepsADeclaredSchema {
+  RDLReport *r = RDLMiniInvoice();
+  RDLDataSet *items = [r dataSetNamed:@"Items"];
+  NSArray *declared = [items fields];
+  NSError *err = nil;
+  // Keys in the other order from the declaration, since a JSON object's keys
+  // are unordered and inferring the schema from them would reorder the columns.
+  if (![RDLGenerator bindJSONString:@"[{\"Amount\":5,\"Sku\":\"Z\"}]"
+                          toDataSet:@"Items"
+                           inReport:r
+                              error:&err])
+    XCTFail(@"%@", [NSString stringWithFormat:@"binding failed: %@", err.localizedDescription]);
+  if (![[items fields] isEqualToArray:declared])
+    XCTFail(@"%@", @"binding JSON must not reorder a declared field list");
+  if ([[items rows] count] != 1)
+    XCTFail(@"%@", @"binding JSON should replace the rows");
+  // A JSON object is not a list of rows, and is refused rather than bound as
+  // one row of something.
+  if ([RDLGenerator bindJSONString:@"{\"not\":\"an array\"}"
+                         toDataSet:@"Items"
+                          inReport:r
+                             error:NULL])
+    XCTFail(@"%@", @"binding a JSON object rather than an array should fail");
+}
+
 - (void)testBandEnumeration {
   RDLReport *r = [RDLReport emptyReportNamed:@"Bands"];
 
