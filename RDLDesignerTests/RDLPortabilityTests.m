@@ -254,7 +254,7 @@
                                                 @"RDLDesigner-Info.plist", key]);
   // The licence is the one the repository is under, said in the panel rather
   // than only in a file nobody opens from the app.
-  if ([plist rangeOfString:@"Lesser General Public License"].location == NSNotFound)
+  if ([plist rangeOfString:@"LGPL"].location == NSNotFound)
     XCTFail(@"%@", @"CopyrightDescription should name the licence");
   if ([project rangeOfString:@"INFOPLIST_KEY_NSHumanReadableCopyright = \"\";"].location !=
       NSNotFound)
