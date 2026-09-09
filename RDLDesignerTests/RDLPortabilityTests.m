@@ -241,6 +241,22 @@
   if ([project rangeOfString:@"RDLDesigner.icns"].location == NSNotFound)
     XCTFail(@"%@", @"the Xcode project should build the icon into the app");
 
+  // Who wrote it and under what terms. GSInfoPanel reads exactly these keys
+  // and says "Copyright Information Not Available" when they are missing,
+  // which is what the GNUstep About panel showed; the Cocoa panel reads
+  // NSHumanReadableCopyright, which the project generates into the bundle.
+  for (NSString *key in @[ @"Authors", @"Copyright", @"CopyrightDescription", @"URL" ])
+    if ([gnustepPlist rangeOfString:key].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the About panel needs %@ in "
+                                                @"Info-gnustep.plist", key]);
+  // The licence is the one the repository is under, said in the panel rather
+  // than only in a file nobody opens from the app.
+  if ([gnustepPlist rangeOfString:@"Lesser General Public License"].location == NSNotFound)
+    XCTFail(@"%@", @"CopyrightDescription should name the licence");
+  if ([project rangeOfString:@"INFOPLIST_KEY_NSHumanReadableCopyright = \"\";"].location !=
+      NSNotFound)
+    XCTFail(@"%@", @"the Cocoa bundle should carry a copyright line too");
+
   // The version: one value, in the three places that are read, none of them
   // still saying 1.0. Scripts/stamp-version.sh is what writes them.
   NSString *release = nil;
