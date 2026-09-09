@@ -47,6 +47,13 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 // constantly and going through .document.report everywhere reads badly.
 - (RDLReport *)report;
 - (RDLItem *)selectedItem;
+// The tablix the selection is inside, or nil when it is somewhere else. A
+// tablix is a region first and a grid second, the way Report Builder has it:
+// until it is the thing being worked in it draws as plain cells and takes a
+// click as a whole, and only then does it show its handles and let a cell or a
+// column be picked out. Drawing, hit-testing and the canvas all have to agree
+// on which one that is, so they ask here rather than each deciding.
+- (RDLTablix *)engagedTablix;
 
 // Loading. These live here rather than on RDLDocument because RDLSamples is
 // part of the designer, not the kit.

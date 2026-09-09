@@ -1701,6 +1701,10 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"the tablix should have a rect");
     return;
   }
+  // The band belongs to the region being worked in, so the region is selected
+  // before anything is drawn -- an unselected tablix draws its cells and
+  // nothing else.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
   NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
   NSBitmapImageRep *bitmap =
       [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
@@ -1762,6 +1766,46 @@ static NSTabView *_centerTabViewOf(id wc) {
   if (fromFill < 0.1)
     XCTFail(@"%@", [NSString stringWithFormat:@"the handles are not separated from each other: "
                                               @"%@ at the seam, %@ in the middle", seam, band]);
+}
+
+// Report Builder's two steps, through the canvas: the first click on a tablix
+// selects the region as a whole -- whatever is under the pointer -- and only
+// then do its cells become separately selectable. Before that it draws no
+// handle band, so nothing of it hangs over the items beside it.
+- (void)testATablixIsSelectedWholeBeforeItsCellsAre {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  NSRect rect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the canvas has no rect for the tablix");
+    return;
+  }
+  if ([ctx engagedTablix] != nil)
+    XCTFail(@"%@", @"nothing is selected to begin with");
+
+  // A click in a cell of a region nobody is working in.
+  NSPoint inCell = NSMakePoint(NSMidX(rect), NSMinY(rect) + 4);
+  [canvas mouseDown:RDLMouseEventInView(canvas, inCell, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, inCell, NSEventTypeLeftMouseUp, 1)];
+  if (ctx.selection.item != tablix)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the first click selects the region, not %@",
+                                              ctx.selection.item]);
+  if ([ctx engagedTablix] != tablix)
+    XCTFail(@"%@", @"and that makes it the region being worked in");
+
+  // The second click, same place, reaches what is in the cell.
+  [canvas mouseDown:RDLMouseEventInView(canvas, inCell, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, inCell, NSEventTypeLeftMouseUp, 1)];
+  if (ctx.selection.item == nil || ctx.selection.item == tablix)
+    XCTFail(@"%@", @"the second click picks out the cell's contents");
+  if ([ctx engagedTablix] != tablix)
+    XCTFail(@"%@", @"which is still inside the same region");
 }
 
 // A drag that changes nothing until the drop must not open an undo group it
@@ -1893,6 +1937,8 @@ static NSTabView *_centerTabViewOf(id wc) {
     return;
   }
   RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  // Handles are there to be used once the region is the one being worked in.
+  [ctx.selection selectItem:matrix inBandWithKey:@"body"];
   NSRect rect = NSZeroRect;
   [[canvas geometry] findRectOfItem:matrix rect:&rect];
   NSArray *before = matrix.columnSpecs;
@@ -1931,6 +1977,8 @@ static NSTabView *_centerTabViewOf(id wc) {
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
   NSString *first = tablix.columnSpecs[0][@"header"];
+  // A column handle is only there once the region has been selected.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
 
   RDLPageGeometry *geometry = [canvas geometry];
   NSRect rect = NSZeroRect;
@@ -2083,9 +2131,32 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"the tablix should have a rect");
     return;
   }
-  // Inside the grid: a cell, or what is in it -- never the tablix.
   NSString *kind = nil, *bandKey = nil;
   NSRect hitRect = NSZeroRect;
+
+  // Step one, with nothing selected: the tablix is one object. A click
+  // anywhere on it is a click on the region, and the strip outside its rect
+  // takes nothing -- there is no band drawn there to take it, and an
+  // invisible target over a neighbouring item is what this avoids.
+  RDLItem *first = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) + 4)
+                                    kind:&kind
+                                 bandKey:&bandKey
+                                    rect:&hitRect];
+  if (first != tablix)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a click on an unselected tablix should select "
+                                              @"the region, not %@", first]);
+  if ([geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) - 4)
+                       kind:&kind
+                    bandKey:&bandKey
+                       rect:&hitRect] != nil)
+    XCTFail(@"%@", @"an unselected tablix has no handle band, so it catches nothing outside it");
+
+  // Step two: with the region selected, the band appears and the cells become
+  // separately selectable.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  geometry.engagedTablix = [ctx engagedTablix];
+
+  // Inside the grid: a cell, or what is in it -- never the tablix.
   RDLItem *inside = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) + 4)
                                      kind:&kind
                                   bandKey:&bandKey
@@ -2138,6 +2209,7 @@ static NSTabView *_centerTabViewOf(id wc) {
       XCTFail(@"%@", @"the tablix should have a rect");
       return;
     }
+    geometry.engagedTablix = tablix;  // the band belongs to the engaged region
     NSRect band = RDLTablixHandleRect(rect, zoom);
     if (fabs((NSMinY(rect) - NSMinY(band)) - RDLTablixHandleBand * zoom) > 0.01)
       XCTFail(@"%@", @"the band should be as many times thicker as the zoom");
@@ -2480,6 +2552,10 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSString *kind = nil;
   NSString *bandKey = nil;
   NSRect hitRect = NSZeroRect;
+  // Cells are picked out of the region being worked in. Until then the whole
+  // tablix is one object, which is what the two-step selection means.
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  geometry.engagedTablix = [ctx engagedTablix];
   RDLItem *hit = [geometry itemAtPoint:NSMakePoint(NSMidX(cellRect), NSMidY(cellRect))
                                   kind:&kind
                                bandKey:&bandKey

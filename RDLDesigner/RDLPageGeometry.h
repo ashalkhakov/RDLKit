@@ -58,6 +58,12 @@ typedef NS_ENUM(NSInteger, RDLTablixPart) {
                       paperOrigin:(NSPoint)origin;
 
 @property (nonatomic, readonly, assign) CGFloat zoom;
+// The tablix being worked in, from the editing session. Every other tablix is
+// a single object to this geometry: a click anywhere on it is a click on the
+// region, not on one of its cells, and its handle band takes nothing -- it is
+// not drawn, and an invisible target over a neighbouring item is exactly what
+// this avoids.
+@property (nonatomic, strong) RDLTablix *engagedTablix;
 @property (nonatomic, readonly, assign) NSRect paperRect;
 // Paper plus the surrounding margin the canvas leaves around it.
 @property (nonatomic, readonly, assign) NSSize canvasSize;

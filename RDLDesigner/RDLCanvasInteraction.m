@@ -74,7 +74,7 @@
     NSUInteger cellCol = 0;
     RDLTablixPart cellPart = RDLTablixPartNone;
     NSUInteger gridRow = 0, gridCol = 0;
-    if ([hit isKindOfClass:[RDLTablix class]] &&
+    if (hit == [_ctx engagedTablix] &&
         [RDLTablixGeometry tablix:(RDLTablix *)hit
                          itemRect:itemRect
                             point:p
@@ -357,13 +357,16 @@
   RDLTablixPart hoverPart = RDLTablixPartNone;
   BOOL onBorder = NO;
 
-  // Every tablix in the report, nested ones included. The old per-band scan
-  // only looked at top-level items, so a tablix inside a Rectangle got
-  // neither the hover highlight nor the resize cursor.
+  // Only the region being worked in. A cell highlight or a column-resize
+  // cursor over a tablix nobody has selected offers something that clicking
+  // will not do -- the first click there selects the region as a whole.
+  RDLTablix *engaged = [_ctx engagedTablix];
   NSArray *rects = nil;
   NSArray *tablixes = [[_host interactionGeometry] tablixItemsWithRects:&rects];
   for (NSUInteger i = 0; i < [tablixes count]; i++) {
     RDLTablix *it = tablixes[i];
+    if (it != engaged)
+      continue;
     NSRect ir = [rects[i] rectValue];
     NSUInteger bc = 0;
     if ([RDLTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {

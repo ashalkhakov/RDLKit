@@ -231,7 +231,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
       if (child)
         return child;
     }
-    if ([it isKindOfClass:[RDLTablix class]] && NSPointInRect(point, r)) {
+    if (it == _engagedTablix && NSPointInRect(point, r)) {
       RDLItem *inCell = [self itemInTablix:(RDLTablix *)it
                                   itemRect:r
                                      point:point
@@ -241,8 +241,10 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
         return inCell;
     }
     // The handle band: outside the grid, so it is not a cell, and it is what
-    // selects and drags the whole region.
-    if ([it isKindOfClass:[RDLTablix class]] && !NSPointInRect(point, r) &&
+    // selects and drags the whole region. Only the engaged tablix has one --
+    // an unselected region has no band drawn, and a target nobody can see is
+    // a click stolen from whatever is really there.
+    if (it == _engagedTablix && !NSPointInRect(point, r) &&
         NSPointInRect(point, RDLTablixHandleRect(r, self.zoom))) {
       if (outKind)
         *outKind = RDLHandleMove;

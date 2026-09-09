@@ -78,6 +78,30 @@ static const CGFloat kRDLZoomFineStep = 0.1;
 static const CGFloat kRDLZoomCoarseStep = 0.25;
 static const CGFloat kRDLZoomCoarseAbove = 2.0;
 
+- (RDLTablix *)engagedTablix {
+  RDLSelection *selection = self.selection;
+  if (selection.scope == RDLSelectionScopeTablixCell)
+    return selection.tablix;
+  if (selection.scope != RDLSelectionScopeItem || selection.item == nil)
+    return nil;
+  if ([selection.item isKindOfClass:[RDLTablix class]])
+    return (RDLTablix *)selection.item;
+  RDLTablix *owner = nil;
+  if ([self.report cellContainingItem:selection.item tablix:&owner] != nil)
+    return owner;
+  // Something inside a Rectangle that is a cell's contents.
+  for (RDLItem *item in [self.report allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLTablix class]])
+      continue;
+    RDLTablix *tablix = (RDLTablix *)item;
+    for (RDLTablixRow *row in tablix.tablixBody.rows)
+      for (RDLTablixCell *cell in row.cells)
+        if ([cell.item.childItems containsObject:selection.item])
+          return tablix;
+  }
+  return nil;
+}
+
 #pragma mark - View state
 
 - (void)postViewStateChange {

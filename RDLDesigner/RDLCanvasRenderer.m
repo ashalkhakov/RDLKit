@@ -53,23 +53,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
 // of its cells is, or something inside one of them. That is when its handle
 // band and its group brackets are worth the ink.
 - (BOOL)tablixIsActive:(RDLTablix *)tablix {
-  RDLSelection *selection = _ctx.selection;
-  if (selection.scope == RDLSelectionScopeTablixCell)
-    return selection.tablix == tablix;
-  if (selection.scope != RDLSelectionScopeItem || selection.item == nil)
-    return NO;
-  if (selection.item == tablix)
-    return YES;
-  RDLTablix *owner = nil;
-  [_ctx.report cellContainingItem:selection.item tablix:&owner];
-  if (owner == tablix)
-    return YES;
-  // Something inside a Rectangle that is a cell's contents.
-  for (RDLTablixRow *row in tablix.tablixBody.rows)
-    for (RDLTablixCell *cell in row.cells)
-      if ([cell.item.childItems containsObject:selection.item])
-        return YES;
-  return NO;
+  return tablix != nil && tablix == [_ctx engagedTablix];
 }
 
 // The strip above and to the left of the grid: what you point at to select the
@@ -426,14 +410,17 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     for (RDLItem *child in it.childItems)
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it isKindOfClass:[RDLTablix class]]) {
-    // The handle band first, under the grid's own lines, then the region, then
-    // the group brackets over both -- the brackets say what the region is
-    // grouped by, and they belong on top of the band they run along.
-    // The band is always drawn: it is the only place on the canvas that selects
-    // the region as a whole, and an affordance nobody can see is not one. It
-    // darkens when the region is what is being worked in.
+    // A tablix nobody is working in is just its cells: no band, no brackets,
+    // nothing hanging outside its own rect over whatever is next to it. One
+    // click makes it the region being worked in, and then the handle band
+    // comes out -- Report Builder's two steps, and the reason its handles do
+    // not cover the report while you are looking at it.
     BOOL active = [self tablixIsActive:(RDLTablix *)it];
-    [self drawTablixHandleBand:(RDLTablix *)it inRect:r active:active selected:sel];
+    // The band first, under the grid's own lines, then the region, then the
+    // group brackets over both -- the brackets say what the region is grouped
+    // by, and they belong on top of the band they run along.
+    if (active)
+      [self drawTablixHandleBand:(RDLTablix *)it inRect:r active:YES selected:sel];
     [self drawTablix:(RDLTablix *)it inRect:r];
     if (active)
       RDLDrawGroupBrackets((RDLTablix *)it, r, _ctx.zoom);

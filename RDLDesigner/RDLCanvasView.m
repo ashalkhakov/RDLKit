@@ -187,6 +187,10 @@
     _geometry = [RDLPageGeometry geometryForReport:_context.report
                                               zoom:_context.zoom
                                        paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
+  // Set on the way out rather than at build time: which tablix is being worked
+  // in changes with the selection, which does not invalidate the geometry --
+  // nothing about the page has moved.
+  _geometry.engagedTablix = [_context engagedTablix];
   return _geometry;
 }
 
