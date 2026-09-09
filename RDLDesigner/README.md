@@ -21,12 +21,12 @@ the same wizard.
 | `RDLEditor` | The only place the model is mutated. Each edit records its own inverse before applying, so redo comes free; a drag or key-repeat burst collapses into one undo step |
 | `RDLSelection` | What is being edited, as a resolved reference: the report, a band, an item, an empty tablix cell, a dataset, one of its fields, a data source, or a parameter — one at a time, announced once, and the only place that knows |
 | `RDLItemFactory` | Insertion policy (a Rectangle may hold simple items but not a data region), insertion location from the selection, new-item defaults, and unique naming |
-| `RDLEditingContext` | The editing session the views share: document, selection, editor, plus canvas zoom/grid on their own notification. Injected, not global |
+| `RDLEditingContext` | The editing session the views share: document, selection, editor, plus canvas zoom (40–400%) and grid on their own notification. Also `engagedTablix` — which data region the selection is inside — because drawing, hit testing and the canvas all have to agree on that and used to each decide for themselves. Injected, not global |
 | **Canvas** | |
-| `RDLPageGeometry` | Inches↔points, paper rect, band placement, item rects (including inside nested Rectangles **and inside tablix cells**), hit testing with resize handles; `RDLTablixGeometry` for the tablix grid — every `TablixBody` row by every column |
+| `RDLPageGeometry` | Inches↔points, paper rect, band placement, item rects (including inside nested Rectangles **and inside tablix cells**), hit testing with resize handles; `RDLTablixGeometry` for the tablix grid — every `TablixBody` row by every column. Cells and the handle band are only hit for its `engagedTablix`: every other data region is one object, and catches nothing outside its own rect |
 | `RDLCanvasView` | The view: NSView plumbing, change notifications, the geometry cache, responder-chain Edit actions, the tablix context menu, hover tracking rect |
 | `RDLCanvasRenderer` | Everything painted: paper, margins, grid, bands, per-type item drawing, the tablix grid with each cell's own item drawn in it, chart preview |
-| `RDLCanvasInteraction` | The gesture state machine: drag kinds with a 3 px slop threshold, arrow-key nudge coalesced into one undo step, hover |
+| `RDLCanvasInteraction` | The gesture state machine: drag kinds with a 3 px slop threshold, arrow-key nudge coalesced into one undo step, hover. Cell highlights and the column-resize cursor are offered for the engaged tablix only — over any other, the click they promise would select the whole region instead |
 | `RDLInPlaceEditor` | Double-click editing of a textbox value or a tablix header/value cell, Tab/Backtab across cells, and the Cocoa workarounds it needs (edit begins on mouse-up, never `selectText:`) |
 | **Windows and panels** | |
 | `RDLWelcomeWindow` | Chooser: Generator or Designer |
@@ -84,10 +84,22 @@ otherwise.
 A tablix is not one item on the canvas: it is a grid of cells, and each cell
 holds a report item of its own. So the canvas draws the real design-time grid
 — every `TablixBody` row by every column, with whatever each cell holds drawn
-inside it — and a click selects the item in the cell it landed on, or the cell
-itself when it is empty. An item that *is* a cell's contents cannot be dragged
-or resized: MS-RDL ignores `Top`/`Left`/`Height`/`Width` inside `CellContents`,
-so the cell places it, and the inspector leaves the geometry boxes out for it.
+inside it.
+
+Getting *at* those cells takes two steps, the way it does in Report Builder. A
+tablix nobody is working in is one object: it draws its cells and nothing else,
+and a click anywhere on it selects the whole region. That click makes it the
+session's **engaged tablix** (`-[RDLEditingContext engagedTablix]`), and only
+then does it show its handle band and let a cell, a column or an item inside a
+cell be picked out. The alternative — every cell selectable at all times — meant
+every tablix on the page wore its management furniture permanently, hanging
+outside its own rect over whatever was next to it, and taking clicks there that
+belonged to its neighbours. One region is engaged at a time: the one holding the
+selection, whether that is the tablix, one of its cells, or an item in one.
+
+An item that *is* a cell's contents cannot be dragged or resized: MS-RDL ignores
+`Top`/`Left`/`Height`/`Width` inside `CellContents`, so the cell places it, and
+the inspector leaves the geometry boxes out for it.
 
 `CellContents` holds **0 or 1** report items. So a cell that has to hold more
 holds a `Rectangle`, and the items go in that — which is what Report Builder
@@ -114,14 +126,20 @@ left of where it prints and the subtotals lined up with the wrong column.
 `bodyColumnOf:forGridColumn:`), and everything that edits a column spec counts
 the body's own.
 
-Because the cells take every click inside the region, the tablix itself is
-pointed at by the **handle band**: the strip above and to the left of the grid,
-outside its own rect, where Report Builder puts its row and column handles.
-It is always drawn — 12 points wide — as one handle per column across the top,
-one per row down the left and a corner where they meet, each with its own edge
-and the columns with a grip, because an affordance nobody can see is not one.
-Grey at rest, darker when the region is being worked in, blue when it is
-selected.
+Because the cells take every click inside an engaged region, the tablix itself
+is pointed at by the **handle band**: the strip above and to the left of the
+grid, outside its own rect, where Report Builder puts its row and column
+handles. It is drawn for the engaged region only — one handle per column across
+the top, one per row down the left and a corner where they meet, each with its
+own edge and the columns with a grip. Grey while the region is being worked in,
+blue when the region itself is what is selected. Hit testing draws the same
+line: an unengaged tablix has no band, so the strip beside it catches nothing,
+because an invisible target over a neighbouring item is a click stolen from it.
+
+The band is 12 points thick at 100% and scales with the zoom, along with the
+marks inside its handles and the group brackets — it is part of the drawing
+rather than chrome laid over it, so a group structure too small to read is read
+by zooming in (the canvas goes to 400%).
 
 What each handle *is* is drawn on it, which is how Report Builder answers the
 same question: "the row and column handle graphics indicate the purpose of each
@@ -136,15 +154,13 @@ cursor becomes "not allowed" for as long as the button is down, and nothing is
 rearranged. While a column is being dragged, an insertion line shows where it
 would land. (It was first a 28%-grey wash, then a plain bar; a check now renders
 the canvas to a bitmap and reads the pixels — that the band is not the page,
-and that one handle is separated from the next.) Clicking it
-selects the whole region and dragging it moves the region; dragging
-the part of it directly above a column picks that **column** up and drops it
-somewhere else in the table, heading, value and width together, as one undoable
-step — Report Builder's column handles, in the same place; it is
-drawn whenever the tablix or anything in it is selected, with the row and
-column **group brackets** over it — those say what the region is grouped by,
-and they now appear while a cell is being edited rather than only when the
-tablix itself is selected.
+and that one handle is separated from the next.) Clicking the band selects the
+whole region and dragging it moves the region; dragging the part directly above
+a column picks that **column** up and drops it somewhere else in the table,
+heading, value and width together, as one undoable step — Report Builder's
+column handles, in the same place. The row and column **group brackets** are
+drawn over the band, for the engaged region and no other: they say what the
+region is grouped by, and they stay up while one of its cells is being edited.
 
 The outline opens a tablix into that grid — `Row 1`, and under it `Column 1 ·
 Textbox LinesH0`, `Column 2 · empty` — so a cell is reachable from the tree as
