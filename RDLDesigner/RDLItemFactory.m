@@ -32,6 +32,8 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 
 // The point is immutable to its consumers; the factory is what fills it in.
 @interface RDLInsertionPoint ()
+@property (nonatomic, strong) RDLTablixCell *cell;
+@property (nonatomic, strong) RDLTablix *cellTablix;
 @property (nonatomic, copy) NSString *bandKey;
 @property (nonatomic, strong) RDLItem *container;
 @property (nonatomic, strong) RDLItem *sibling;
@@ -40,6 +42,8 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 
 @implementation RDLInsertionPoint
 - (NSString *)localizedDescription {
+  if (_cell != nil)
+    return [NSString stringWithFormat:@"into a cell of %@", _cellTablix.name ?: @"the table"];
   if (_container)
     return [NSString stringWithFormat:@"inside %@", _container.name ?: @"the rectangle"];
   if (_sibling)
@@ -65,6 +69,37 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
                                     selection:(RDLSelection *)selection {
   RDLInsertionPoint *p = [[RDLInsertionPoint alloc] init];
   NSString *key = [selection.bandKey length] ? selection.bandKey : @"body";
+
+  // An empty cell of a tablix: the new element becomes its contents.
+  if (selection.scope == RDLSelectionScopeTablixCell && selection.tablix != nil &&
+      selection.cellRow >= 0 && selection.cellColumn >= 0) {
+    // The selection holds where in the grid the person clicked; the body cell
+    // is that, less the row-header columns a grouped tablix draws first.
+    RDLTablixCell *cell = [RDLTablixGeometry cellOf:selection.tablix
+                                              inRow:(NSUInteger)selection.cellRow
+                                             column:(NSUInteger)selection.cellColumn];
+    if (cell != nil) {
+      p.bandKey = key;
+      p.cell = cell;
+      p.cellTablix = selection.tablix;
+      p.items = [report bandWithKey:key].items;  // never nil; unused for a cell
+      return p;
+    }
+  }
+
+  // An item that is itself the contents of a cell: what goes in beside it goes
+  // in the same cell, which means the cell becomes a Rectangle holding both.
+  if (selection.scope == RDLSelectionScopeItem && selection.item != nil) {
+    RDLTablix *tablix = nil;
+    RDLTablixCell *cell = [report cellContainingItem:selection.item tablix:&tablix];
+    if (cell != nil) {
+      p.bandKey = key;
+      p.cell = cell;
+      p.cellTablix = tablix;
+      p.items = [report bandWithKey:key].items;
+      return p;
+    }
+  }
 
   if (selection.scope == RDLSelectionScopeItem && selection.item != nil) {
     RDLItem *parent = nil;
@@ -104,9 +139,11 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 #pragma mark - Policy
 
 + (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point {
-  if (point.container != nil)
-    return @[ @"Textbox", @"Line", @"Rectangle", @"Image" ];
-  return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart" ];
+  // A subreport goes wherever a simple item goes -- MS-RDL allows one in a
+  // Rectangle and in a tablix cell, which is where master-detail puts it.
+  if (point.cell != nil || point.container != nil)
+    return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Subreport" ];
+  return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart", @"Subreport" ];
 }
 
 + (BOOL)kind:(NSString *)kind isAllowedAt:(RDLInsertionPoint *)point {
@@ -186,6 +223,7 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
       @"Image" : [RDLImage class],
       @"Chart" : [RDLChart class],
       @"Tablix" : [RDLTablix class],
+      @"Subreport" : [RDLSubreport class],
     };
   });
   Class cls = classes[elementName ?: @""];
@@ -208,6 +246,12 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
   } else if ([it isKindOfClass:[RDLImage class]]) {
     it.width = 1.2;
     it.height = 1.2;
+  } else if ([it isKindOfClass:[RDLSubreport class]]) {
+    // Big enough to see, and empty: which report it shows is the one thing
+    // nobody can guess, so it is asked for in the inspector rather than
+    // pointed at a file that happens to be next door.
+    it.width = 3.0;
+    it.height = 1.0;
   } else if ([it isKindOfClass:[RDLChart class]]) {
     RDLChart *chart = (RDLChart *)it;
     it.width = 5.0;

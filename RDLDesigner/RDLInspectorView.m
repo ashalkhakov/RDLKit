@@ -7,6 +7,7 @@
 #import "RDLKit.h"
 #import "RDLToolbarIcons.h"
 #import "RDLFilterEditor.h"
+#import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
@@ -74,6 +75,12 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
 @property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton;
 @property (nonatomic, strong) IBOutlet NSTextField *titleField, *catField, *valField;
+// Subreport section. Which report it shows, and the two things a person does
+// with it: pass values to it, and open it -- because its contents belong to
+// another file and are edited in that file's own window.
+@property (nonatomic, strong) IBOutlet NSView *subreportBox;
+@property (nonatomic, strong) IBOutlet NSTextField *subreportNameField, *subreportStatusLabel;
+@property (nonatomic, strong) IBOutlet NSButton *subreportEditButton, *subreportParametersButton;
 // Tablix section
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
@@ -81,6 +88,9 @@
 @end
 
 @implementation RDLInspectorView {
+  // Every section the XIB carries, in the order -buildSections added them.
+  // What -stackBoxes: hides before showing the ones that apply.
+  NSArray<NSView *> *_sections;
   BOOL _reloading;
   BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
 }
@@ -137,8 +147,13 @@
                          _languageExprButton, _docLanguageExprButton,
                          _rectBGExprButton, _sizeExprButton, _cellExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
-  for (NSView *box in @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox,
-                         _imageBox, _chartBox, _tablixBox, _cellBox ])
+  // One list, kept once: -stackBoxes: hides everything in it and then shows
+  // the sections the selection calls for. It used to be written out twice, and
+  // a section missing from the second copy stayed on screen under the next
+  // selection -- two inspectors drawn over each other.
+  _sections = @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
+                 _subreportBox, _chartBox, _tablixBox, _cellBox ];
+  for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
 }
@@ -160,6 +175,50 @@
   if (edited == nil)
     return;
   [_context.editor setValue:[edited mutableCopy] forKeyPath:@"filters" ofItem:chart];
+}
+
+// Whether the report this names has actually been found, said in the one place
+// a person is looking when it has not: a subreport whose file is missing draws
+// as "Error: Subreport could not be shown", and this is why.
+- (void)fillSubreportStatus:(RDLSubreport *)sub {
+  if ([sub.reportName length] == 0) {
+    [_subreportStatusLabel setStringValue:@"No report named yet."];
+    return;
+  }
+  if (sub.definition != nil) {
+    NSUInteger declared = [sub.definition.parameters count];
+    [_subreportStatusLabel
+        setStringValue:[NSString stringWithFormat:@"Found. %lu parameter%s declared, %lu passed.",
+                                                  (unsigned long)declared, declared == 1 ? "" : "s",
+                                                  (unsigned long)[sub.parameters count]]];
+    return;
+  }
+  [_subreportStatusLabel setStringValue:@"Not loaded yet — save this report, then Edit Subreport."];
+}
+
+// The subreport's contents belong to another file, so this asks whoever owns
+// windows to open it. Sent up the responder chain rather than done here: an
+// inspector has no business opening documents, and the window that does is
+// what knows where to put the second one.
+- (void)openSubreportDocument:(id)sender {
+  (void)sender;
+  [NSApp sendAction:@selector(editSubreport:) to:nil from:self];
+}
+
+// What this report hands to the subreport. One undoable step, like the filter
+// panel: the whole array goes back at once.
+- (void)editSubreportParameters:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLSubreport class]])
+    return;
+  RDLSubreport *sub = (RDLSubreport *)item;
+  NSArray<RDLSubreportParameter *> *edited =
+      [RDLSubreportParametersEditor runForSubreport:sub inReport:_context.report];
+  if (edited == nil)
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"parameters" ofItem:sub];
+  [self reload];
 }
 
 - (void)dealloc {
@@ -263,6 +322,11 @@
                      @(RDLImageSizingClip), @(RDLImageSizingAutoSize) ]
       placeholder:nil];
 
+  // Subreport. The name is a file beside this report, written the way MS-RDL
+  // writes it: without the .rdl.
+  [_bindings bind:_subreportNameField keyPath:@"reportName" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText];
+
   // Chart.
   [_bindings bind:_chartDatasetPop keyPath:@"dataSetName" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpTitle];
@@ -317,11 +381,7 @@
 #pragma mark - Fill (model → UI)
 
 - (void)stackBoxes:(NSArray *)boxes {
-  NSArray *all = @[
-    _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox, _chartBox, _tablixBox,
-    _cellBox
-  ];
-  for (NSView *v in all)
+  for (NSView *v in _sections)
     [v setHidden:YES];
   CGFloat y = 28;
   for (NSView *v in boxes) {
@@ -385,11 +445,21 @@
   }
 
   if (it != nil) {
-      [_kindLabel setStringValue:[NSString stringWithFormat:@"%@ · %@",
-                                                           it.rdlElementName,
-                                                           it.name]];
+    // An item that is the contents of a tablix cell has no geometry of its
+    // own: MS-RDL ignores Top/Left/Height/Width inside CellContents, and the
+    // cell decides both. Offering the boxes would be offering to change
+    // numbers nothing reads.
+    RDLTablix *cellTablix = nil;
+    BOOL inCell = [report cellContainingItem:it tablix:&cellTablix] != nil;
+    [_kindLabel setStringValue:inCell
+                                   ? [NSString stringWithFormat:@"%@ · %@ · in %@",
+                                                                it.rdlElementName, it.name,
+                                                                cellTablix.name ?: @"a table"]
+                                   : [NSString stringWithFormat:@"%@ · %@", it.rdlElementName,
+                                                                it.name]];
     [_nameField setStringValue:it.name ?: @""];
-    NSMutableArray *boxes = [NSMutableArray arrayWithObject:_geoBox];
+    NSMutableArray *boxes = inCell ? [NSMutableArray array]
+                                   : [NSMutableArray arrayWithObject:_geoBox];
     // The dataset popups are populated from the report before filling, since
     // their contents depend on it rather than being fixed at build time.
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -401,6 +471,9 @@
       [boxes addObject:_rectBox];
     } else if ([it isKindOfClass:[RDLImage class]]) {
       [boxes addObject:_imageBox];
+    } else if ([it isKindOfClass:[RDLSubreport class]]) {
+      [boxes addObject:_subreportBox];
+      [self fillSubreportStatus:(RDLSubreport *)it];
     } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
         [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
@@ -410,6 +483,20 @@
         [boxes addObject:_cellBox];
         [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
     }
+    [self stackBoxes:boxes];
+  } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && !_showsReportOnly) {
+    // An empty cell: nothing in it to describe, so what is shown is the column
+    // it belongs to -- its width, its heading, what its cells show -- and the
+    // label says where in the table it is.
+    [_kindLabel setStringValue:[NSString stringWithFormat:@"Empty cell · %@ · row %ld, column %ld",
+                                                          sel.tablix.name ?: @"table",
+                                                          (long)sel.cellRow + 1,
+                                                          (long)sel.cellColumn + 1]];
+    NSMutableArray *boxes = [NSMutableArray array];
+    NSInteger bodyColumn = [RDLTablixGeometry bodyColumnOf:sel.tablix
+                                             forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+    if (bodyColumn >= 0 && [self fillCellFromTablix:sel.tablix column:bodyColumn])
+      [boxes addObject:_cellBox];
     [self stackBoxes:boxes];
   } else if (band != nil) {
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
@@ -457,17 +544,25 @@
 // -rebuildTablix reads and the unit the inverse restores.
 - (BOOL)applyCellControl:(id)sender {
   RDLSelection *sel = _context.selection;
+  // The column is named either by a tablix selection (a click in its preview)
+  // or by an empty-cell selection; both edit the same column spec.
   RDLItem *it = [_context selectedItem];
-  if (![it isKindOfClass:[RDLTablix class]] || sel.tablixColumn < 0)
+  NSInteger column = sel.tablixColumn;
+  if (![it isKindOfClass:[RDLTablix class]] && sel.scope == RDLSelectionScopeTablixCell) {
+    it = sel.tablix;
+    column = [RDLTablixGeometry bodyColumnOf:sel.tablix
+                               forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+  }
+  if (![it isKindOfClass:[RDLTablix class]] || column < 0)
     return NO;
   if (sender != _cellHeaderField && sender != _cellValueField && sender != _cellWidthField &&
       sender != _cellAlignPop && sender != _cellAggPop)
     return NO;
   RDLTablix *tablix = (RDLTablix *)it;
   NSMutableArray *specs = [(tablix.columnSpecs ?: @[]) mutableCopy];
-  if (sel.tablixColumn >= (NSInteger)[specs count])
+  if (column >= (NSInteger)[specs count])
     return NO;
-  NSMutableDictionary *spec = [specs[(NSUInteger)sel.tablixColumn] mutableCopy];
+  NSMutableDictionary *spec = [specs[(NSUInteger)column] mutableCopy];
   spec[@"header"] = [_cellHeaderField stringValue];
   spec[@"value"] = [_cellValueField stringValue];
   CGFloat width = [[_cellWidthField stringValue] doubleValue];
@@ -483,7 +578,7 @@
     [spec removeObjectForKey:@"aggregate"];
   else
     spec[@"aggregate"] = agg;
-  specs[(NSUInteger)sel.tablixColumn] = spec;
+  specs[(NSUInteger)column] = spec;
   [_context.editor setColumnSpecs:specs ofTablix:tablix];
   return YES;
 }

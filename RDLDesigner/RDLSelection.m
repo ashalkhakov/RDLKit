@@ -23,6 +23,8 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
     _scope = RDLSelectionScopeReport;
     _bandKey = @"body";
     _tablixColumn = -1;
+    _cellRow = -1;
+    _cellColumn = -1;
   }
   return self;
 }
@@ -40,6 +42,11 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
     _dataSource = nil;
   if (scope != RDLSelectionScopeParameter)
     _parameter = nil;
+  if (scope != RDLSelectionScopeTablixCell) {
+    _tablix = nil;
+    _cellRow = -1;
+    _cellColumn = -1;
+  }
 }
 
 - (void)post {
@@ -155,6 +162,30 @@ static BOOL RDLItemsContain(NSArray *items, RDLItem *target) {
   _bandKey = [key copy];
   _tablixColumn = column;
   _tablixPart = part;
+  [self post];
+}
+
+// An empty cell: there is no item to point at, and it is still where the next
+// thing inserted goes. Report Builder shows the same thing -- a cell you have
+// emptied is a cell you can put something else in.
+- (void)selectCellOfTablix:(RDLTablix *)tablix
+                       row:(NSInteger)row
+                    column:(NSInteger)column
+             inBandWithKey:(NSString *)bandKey {
+  if (tablix == nil) {
+    [self selectBandWithKey:bandKey];
+    return;
+  }
+  NSString *key = [bandKey length] ? bandKey : _bandKey;
+  if (_scope == RDLSelectionScopeTablixCell && _tablix == tablix && _cellRow == row &&
+      _cellColumn == column && [_bandKey isEqualToString:key])
+    return;
+  _scope = RDLSelectionScopeTablixCell;
+  [self clearReferencesExcept:RDLSelectionScopeTablixCell];
+  _tablix = tablix;
+  _cellRow = row;
+  _cellColumn = column;
+  _bandKey = [key copy];
   [self post];
 }
 

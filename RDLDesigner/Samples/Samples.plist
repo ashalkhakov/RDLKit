@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>blurb</key>
+		<string>Region and city against year and quarter — two groups on each axis, one total where they meet.</string>
+		<key>file</key>
+		<string>RegionalSales</string>
+		<key>id</key>
+		<string>crosstab</string>
+		<key>kicker</key>
+		<string>Crosstab</string>
+		<key>title</key>
+		<string>Regional Sales</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Tablix grouped by finish — Lookup catalog rate, row header, details, and a subtotal.</string>
+		<key>file</key>
+		<string>WorkshopByFinish</string>
+		<key>id</key>
+		<string>finish</string>
+		<key>kicker</key>
+		<string>Groups</string>
+		<key>title</key>
+		<string>Workshop by Finish</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Workshop invoice with bound line items, tax, and a running folio.</string>
+		<key>file</key>
+		<string>AtelierInvoice</string>
+		<key>id</key>
+		<string>invoice</string>
+		<key>kicker</key>
+		<string>Accounts</string>
+		<key>title</key>
+		<string>Atelier Invoice</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Ship-to block, carton list, and bindery notes on letter stock.</string>
+		<key>file</key>
+		<string>HarborPackingSlip</string>
+		<key>id</key>
+		<string>packing</string>
+		<key>kicker</key>
+		<string>Fulfillment</string>
+		<key>title</key>
+		<string>Harbor Packing Slip</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Column chart of receipts with a monthly tablix and quarter total.</string>
+		<key>file</key>
+		<string>QuarterlyLedger</string>
+		<key>id</key>
+		<string>ledger</string>
+		<key>kicker</key>
+		<string>Figures</string>
+		<key>title</key>
+		<string>Quarterly Ledger</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>One report reading a JSON document with JSONPath — nested crates flattened, a filter for the heavy ones — and a second table from XML with an XPath.</string>
+		<key>file</key>
+		<string>HarborManifest</string>
+		<key>id</key>
+		<string>manifest</string>
+		<key>kicker</key>
+		<string>Data sources</string>
+		<key>title</key>
+		<string>Harbor Manifest</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>A shipment list whose detail is a second report: each row shows the crates for that shipment, handed the shipment number as a parameter. Open DispatchCrates from the inspector to edit the detail beside the master.</string>
+		<key>file</key>
+		<string>HarborDispatch</string>
+		<key>id</key>
+		<string>dispatch</string>
+		<key>kicker</key>
+		<string>Subreports</string>
+		<key>title</key>
+		<string>Harbor Dispatch</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Calculated fields worked out per firing, a dataset filter that drops the empty runs, and a second table filtered to the batches worth a look.</string>
+		<key>file</key>
+		<string>KilnLog</string>
+		<key>id</key>
+		<string>kiln</string>
+		<key>kicker</key>
+		<string>Fields &amp; filters</string>
+		<key>title</key>
+		<string>Kiln Log</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Names, desks, and extensions — a clean personnel listing.</string>
+		<key>file</key>
+		<string>StudioRoster</string>
+		<key>id</key>
+		<string>roster</string>
+		<key>kicker</key>
+		<string>Directory</string>
+		<key>title</key>
+		<string>Studio Roster</string>
+	</dict>
+	<dict>
+		<key>blurb</key>
+		<string>Empty letter with a named header, body, and centered folio.</string>
+		<key>file</key>
+		<string>Letter</string>
+		<key>id</key>
+		<string>letter</string>
+		<key>kicker</key>
+		<string>Stationery</string>
+		<key>title</key>
+		<string>Blank Letter</string>
+	</dict>
+</array>
+</plist>

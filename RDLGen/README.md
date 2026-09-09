@@ -21,6 +21,14 @@ names, resolved against the report's folder — and `-d` then overrides whicheve
 dataset the caller wants to supply itself. JSON files given with `-d` must be
 arrays of objects. Repeat `-p` and `-d` as needed.
 
+The reports a report shows inside itself are loaded the same way: a `Subreport`'s
+`ReportName` is resolved beside the report that names it, and each definition is
+read and bound under the same policy about what may be fetched. A subreport that
+cannot be found is reported on stderr and renders as "Error: Subreport could not
+be shown", so a page is still produced. `--check` loads them too, without their
+data, since whether a subreport is passed the parameters it declares can only be
+said with its definition at hand.
+
 A document named by `http(s)` is only fetched with `--allow-remote`: a report is
 a document that may have arrived from anywhere. `--language` says which culture
 the report is being rendered for — what `User!Language` answers, and so what a

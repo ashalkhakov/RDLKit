@@ -19,7 +19,7 @@ way a click drives it, from each starting point a person can be in — a dataset
 field, a parameter, a data source — because that is where the panes used to
 disagree.
 
-One `XCTestCase` method per area — 76 of them — with the fixtures and helpers
+One `XCTestCase` method per area — 100 of them — with the fixtures and helpers
 file-static beside them. There is no separate check layer: `XCTFail` records a
 failure and lets the method carry on, so a case still reports everything it
 found instead of stopping at the first, which is the only thing collecting

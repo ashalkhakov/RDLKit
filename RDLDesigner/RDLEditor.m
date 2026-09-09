@@ -513,6 +513,23 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self noteChange:[RDLChange itemChange:tablix keys:@[ @"columnSpecs" ] bandKey:nil]];
 }
 
+- (void)setItem:(RDLItem *)item inCell:(RDLTablixCell *)cell ofTablix:(RDLTablix *)tablix {
+  if (cell == nil || ![tablix isKindOfClass:[RDLTablix class]] || cell.item == item)
+    return;
+  RDLItem *old = cell.item;
+  [self beginGroup:item ? @"Put in Cell" : @"Empty Cell"];
+  [[self undoProxy] setItem:old inCell:cell ofTablix:tablix];
+  cell.item = item;
+  // The spec the designer edits describes the columns, so it is recovered from
+  // the body rather than left saying what the cell used to hold.
+  [tablix inferColumnSpecsFromTablixBody];
+  [_document.report adoptItems];
+  [self endGroup];
+  // A structural change: the item is somewhere it was not, which the outline
+  // and the canvas both have to rebuild for.
+  [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
+}
+
 - (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix {
   if (![tablix isKindOfClass:[RDLTablix class]] || [values count] == 0)
     return;
@@ -568,6 +585,21 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self beginGroup:@"Insert Column"];
   [self setColumnSpecs:next ofTablix:tablix];
   [self setValue:@(tablix.width + 1.2) forKeyPath:@"width" ofItem:tablix];
+  [self endGroup];
+}
+
+- (void)moveTablixColumnAtIndex:(NSUInteger)from
+                        toIndex:(NSUInteger)to
+                       ofTablix:(RDLTablix *)tablix {
+  NSArray *specs = tablix.columnSpecs;
+  if (![tablix isKindOfClass:[RDLTablix class]] || from >= [specs count] || from == to)
+    return;
+  NSMutableArray *next = [specs mutableCopy];
+  id spec = next[from];
+  [next removeObjectAtIndex:from];
+  [next insertObject:spec atIndex:MIN(to, [next count])];
+  [self beginGroup:@"Move Column"];
+  [self setColumnSpecs:next ofTablix:tablix];
   [self endGroup];
 }
 

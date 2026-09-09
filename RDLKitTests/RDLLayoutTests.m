@@ -98,6 +98,9 @@ static RDLReport *RDLOrgChart(NSString *cellExpr) {
     @{ @"Id" : @"5", @"Boss" : @"99", @"Name" : @"Eve", @"Pay" : @20 },
   ];
   [r.dataSets addObject:ds];
+  // Its rows come from a source, so the report still has them after being
+  // written out and read back.
+  RDLAttachInlineSource(r, ds, @"Staff");
 
   RDLTablix *t = [[RDLTablix alloc] init];
   t.name = @"Tree";
@@ -214,6 +217,35 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   }
   if (!sawZZ)
     XCTFail(@"%@", @"bindJSONString did not reach layout");
+}
+
+// What the binder does to a dataset that already declares its fields. This
+// used to be checked through a designer document method that wrapped this
+// call; the wrapper is gone, and the behaviour it was really testing is the
+// kit's.
+- (void)testBindingJSONKeepsADeclaredSchema {
+  RDLReport *r = RDLMiniInvoice();
+  RDLDataSet *items = [r dataSetNamed:@"Items"];
+  NSArray *declared = [items fields];
+  NSError *err = nil;
+  // Keys in the other order from the declaration, since a JSON object's keys
+  // are unordered and inferring the schema from them would reorder the columns.
+  if (![RDLGenerator bindJSONString:@"[{\"Amount\":5,\"Sku\":\"Z\"}]"
+                          toDataSet:@"Items"
+                           inReport:r
+                              error:&err])
+    XCTFail(@"%@", [NSString stringWithFormat:@"binding failed: %@", err.localizedDescription]);
+  if (![[items fields] isEqualToArray:declared])
+    XCTFail(@"%@", @"binding JSON must not reorder a declared field list");
+  if ([[items rows] count] != 1)
+    XCTFail(@"%@", @"binding JSON should replace the rows");
+  // A JSON object is not a list of rows, and is refused rather than bound as
+  // one row of something.
+  if ([RDLGenerator bindJSONString:@"{\"not\":\"an array\"}"
+                         toDataSet:@"Items"
+                          inReport:r
+                             error:NULL])
+    XCTFail(@"%@", @"binding a JSON object rather than an array should fail");
 }
 
 - (void)testBandEnumeration {
@@ -1242,6 +1274,9 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
     if ([xml rangeOfString:@"<Parent>"].location == NSNotFound)
       XCTFail(@"%@", @"Group/Parent should be written");
     RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+    // A report read from a file has no rows until something binds it, which is
+    // what a host does before rendering.
+    [[[RDLDataBinder alloc] init] bindReport:back error:NULL];
     RDLTablix *bt = (RDLTablix *)[back.body.items firstObject];
     RDLTablixMember *bm = [bt.rowHierarchy.members firstObject];
     if (![[bm.parentExpression source] isEqualToString:@"=Fields!Boss.Value"])
@@ -1818,6 +1853,47 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
       if ([item isKindOfClass:[RDLLaidOutTextbox class]])
         out[item.name ?: @""] = [(RDLLaidOutTextbox *)item text] ?: @"";
   return out;
+}
+
+
+// A crosstab cell where a row group and a column group do not meet has nothing
+// to add up. It used to show the total of the whole dataset there -- every
+// empty cell in the Regional Sales sample read 15295 -- because an empty group
+// scope fell through to "no scope at all".
+- (void)testAnEmptyCrosstabCellDoesNotShowTheWholeDatasetsTotal {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Pivot"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  [ds setFieldNames:@[ @"Region", @"Quarter", @"Amount" ]];
+  ds.rows = @[
+    @{@"Region" : @"North", @"Quarter" : @"Q1", @"Amount" : @10},
+    @{@"Region" : @"South", @"Quarter" : @"Q2", @"Amount" : @40},
+  ];
+  [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Demo");
+
+  RDLTablix *t = [[RDLTablix alloc] init];
+  t.name = @"Pivot";
+  t.dataSetName = @"Sales";
+  t.width = 6;
+  t.headerHeight = 0.3;
+  t.rowHeight = 0.28;
+  t.rowGroups = @[ @"Region" ];
+  t.columnGroups = @[ @"Quarter" ];
+  t.columnSpecs = @[ @{@"width" : @1.5, @"header" : @"Amount",
+                       @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum"} ];
+  [t rebuildTablix];
+  [r.body.items addObject:t];
+  [r adoptItems];
+
+  // North has no Q2 and South has no Q1: those cells are empty, not 50.
+  NSArray<NSString *> *texts = RDLTextsOf(r);
+  if ([texts containsObject:@"50"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"an empty cell showed the dataset's total: %@",
+                                              texts]);
+  if (![texts containsObject:@"10"] || ![texts containsObject:@"40"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the cells that do have rows still add up: %@",
+                                              texts]);
 }
 
 @end

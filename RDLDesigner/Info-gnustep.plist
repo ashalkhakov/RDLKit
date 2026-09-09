@@ -12,6 +12,7 @@
       NSHumanReadableName = "Report Definition";
       NSUnixExtensions = ( "rdl", "rdlc" );
       NSRole = Editor;
+      NSDocumentClass = RDLDocument;
     }
   );
 }

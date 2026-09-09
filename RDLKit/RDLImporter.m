@@ -1,4 +1,5 @@
 #import "RDLImporter.h"
+#import "RDLDataProvider.h"
 #import "RDLDocxReader.h"
 #import "RDLTextAttributes.h"
 #import <AppKit/AppKit.h>
@@ -6,6 +7,9 @@
 // The dataset the placeholders become fields of. One dataset, because the
 // document says nothing about where its data comes from -- only what it needs.
 static NSString *const kRDLImportDataSetName = @"Data";
+// The one data source a scaffolded report gets. Every dataset the import
+// declares reads from it, because a dataset has to read from something.
+static NSString *const kRDLImportDataSourceName = @"Source";
 
 #pragma mark - Units and tuning
 
@@ -410,6 +414,8 @@ static void RDLGiveTableADataSet(RDLTablix *tablix, RDLImportBlock *block,
                                   RDLPlacement *placement, CGFloat *outHeight) {
   RDLDataSet *dataSet = [[RDLDataSet alloc] init];
   dataSet.name = [NSString stringWithFormat:@"%@Data", tablix.name];
+  dataSet.dataSourceName = kRDLImportDataSourceName;
+  dataSet.commandText = @"$[*]";
   tablix.dataSetName = dataSet.name;
   [placement.dataSets addObject:dataSet];
 
@@ -775,6 +781,17 @@ static CGFloat RDLPlaceBlocks(NSArray<RDLImportBlock *> *blocks, NSMutableArray<
 
   RDLStyle *base = report.body.style ?: [RDLStyle defaultStyle];
 
+  // A dataset reads from a data source, so a scaffolded report gets one: an
+  // empty JSON document, which reads as no rows and is where the person then
+  // points at the file they actually have. A dataset naming no source is not a
+  // report anyone can run -- MS-RDL requires Query/DataSourceName, and Report
+  // Builder will not let you make one.
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = kRDLImportDataSourceName;
+  source.dataProvider = RDLStringFromDataProviderKind(RDLDataProviderKindJSON);
+  source.connectString = @"jsondata=[]";
+  [report.dataSources addObject:source];
+
   RDLPlacement *placement = [[RDLPlacement alloc] init];
   placement.namer = namer;
   placement.base = base;
@@ -787,6 +804,8 @@ static CGFloat RDLPlaceBlocks(NSArray<RDLImportBlock *> *blocks, NSMutableArray<
   if ([document.fieldNames count]) {
     RDLDataSet *dataSet = [[RDLDataSet alloc] init];
     dataSet.name = kRDLImportDataSetName;
+    dataSet.dataSourceName = kRDLImportDataSourceName;
+    dataSet.commandText = @"$[*]";
     NSMutableArray *fields = [NSMutableArray array];
     for (NSString *name in document.fieldNames) {
       RDLField *field = [[RDLField alloc] init];

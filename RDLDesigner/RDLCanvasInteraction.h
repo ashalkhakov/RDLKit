@@ -32,6 +32,10 @@
 @property (nonatomic, readonly, strong) RDLItem *hoverTablix;
 @property (nonatomic, readonly, assign) NSUInteger hoverColumn;
 @property (nonatomic, readonly, assign) RDLTablixPart hoverPart;
+// A column being dragged by its handle: which tablix, and the grid column the
+// drop would land in. -1 when no column is being dragged.
+@property (nonatomic, readonly, strong) RDLTablix *dragTablix;
+@property (nonatomic, readonly, assign) NSInteger dragColumnTarget;
 
 - (void)mouseDown:(NSEvent *)event;
 - (void)mouseDragged:(NSEvent *)event;

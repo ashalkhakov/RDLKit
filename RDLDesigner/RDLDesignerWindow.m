@@ -8,6 +8,8 @@
 #import "RDLExpressionHelper.h"
 #import "RDLOutlineDataSource.h"
 #import "RDLKit.h"
+#import "RDLDocument.h"
+#import "RDLSamples.h"
 #import "RDLCompatibility.h"
 #import "RDLTabBadge.h"
 #import "RDLDatasetNavigator.h"
@@ -23,7 +25,27 @@
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
 
-@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate>
+// How narrow a side pane may be dragged. Named because two delegate methods
+// have to agree on it.
+static const CGFloat kRDLSidePaneMinimum = 160.0;
+// What the two side panes open at. The right one has to clear the inspector's
+// sections, which are 260 points wide with a scroller beside them.
+static const CGFloat kRDLLeftPaneWidth = 220.0;
+static const CGFloat kRDLRightPaneWidth = 300.0;
+// Below this the split has nothing left to take the difference from and a pane
+// collapses to nothing -- on this platform the canvas, on GNUstep the
+// inspector, either way a window with a piece of itself missing and no way to
+// get it back. So the window is not allowed to be smaller.
+static const CGFloat kRDLCentrePaneMinimum = 320.0;
+static const CGFloat kRDLWindowMinimumHeight = 480.0;
+
+static NSSize RDLDesignerWindowMinimumSize(void) {
+  return NSMakeSize(kRDLLeftPaneWidth + kRDLCentrePaneMinimum + kRDLRightPaneWidth,
+                    kRDLWindowMinimumHeight);
+}
+
+@interface RDLDesignerWindow () <RDLDatasetFieldsViewDelegate, RDLDataSourceNavigatorDelegate,
+                                 NSSplitViewDelegate>
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
@@ -136,6 +158,61 @@
   return self;
 }
 
+#pragma mark - The split
+
+// The width each side pane opens at, set here rather than left to the frames
+// in the XIB. GSXib5 lays the split's subviews out itself rather than
+// restoring the frames Interface Builder recorded, which on GNUstep opened
+// the inspector at about half the width its sections need; saying it in code
+// is one answer that both platforms give the same.
+- (void)setDefaultPaneWidths {
+  CGFloat width = NSWidth([_split bounds]);
+  CGFloat divider = [_split dividerThickness];
+  // A window too narrow to give both sides their width keeps whatever the
+  // split worked out: better a squeezed pane than a centre of nothing.
+  if (width < kRDLLeftPaneWidth + kRDLRightPaneWidth + 2 * divider + kRDLSidePaneMinimum)
+    return;
+  [_split setPosition:kRDLLeftPaneWidth ofDividerAtIndex:0];
+  [_split setPosition:width - kRDLRightPaneWidth - divider ofDividerAtIndex:1];
+}
+
+// What a wider window is for is a wider page, not a wider list of elements or
+// a wider column of inspector fields: both side panes hold controls that are
+// laid out at their own width and would only gather empty space. So the
+// window's growth goes to the centre, and the sides keep whatever width they
+// were dragged to -- which is what Report Builder, Xcode and Interface Builder
+// all do with their side panes.
+- (BOOL)splitView:(NSSplitView *)splitView shouldAdjustSizeOfSubview:(NSView *)subview {
+  NSArray<NSView *> *panes = [splitView subviews];
+  // Once there is not enough width for all three, holding the sides at their
+  // size means the centre absorbs the whole shortfall and collapses to
+  // nothing. Below that everyone gives way together, so a window that is too
+  // small is merely cramped rather than missing a pane.
+  if (NSWidth([splitView bounds]) < RDLDesignerWindowMinimumSize().width)
+    return YES;
+  return subview != [panes firstObject] && subview != [panes lastObject];
+}
+
+// A pane dragged down to nothing is a pane nobody can get back without knowing
+// the divider is still there, so each side has a floor. They are the widths
+// the XIB opens at, less what a pane can lose and still read.
+- (CGFloat)splitView:(NSSplitView *)splitView
+    constrainMinCoordinate:(CGFloat)proposed
+               ofSubviewAt:(NSInteger)index {
+  RDL_UNUSED(splitView);
+  return index == 0 ? MAX(proposed, kRDLSidePaneMinimum) : proposed;
+}
+
+- (CGFloat)splitView:(NSSplitView *)splitView
+    constrainMaxCoordinate:(CGFloat)proposed
+               ofSubviewAt:(NSInteger)index {
+  NSArray<NSView *> *panes = [splitView subviews];
+  if (index != (NSInteger)[panes count] - 2)
+    return proposed;
+  return MIN(proposed, NSWidth([splitView bounds]) - kRDLSidePaneMinimum -
+                           [splitView dividerThickness]);
+}
+
 // The split panes, the scroll views, the outline column and the +/- bar are
 // all in RDLDesignerWindow.xib. The custom views come out of it built but
 // empty, so this is where the editing session reaches them.
@@ -150,6 +227,8 @@
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
   [self buildPanes];
+  [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
+  [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
 }
 
@@ -217,7 +296,166 @@
   [self updateWindowTitle];
 }
 
+#pragma mark - Subreports
+
+- (NSURL *)URLForSubreport:(RDLSubreport *)subreport {
+  // Against the report's own file, or -- for a sample, which opens untitled --
+  // the folder it was read from. Both are "beside the report that names it",
+  // which is what MS-RDL resolves against.
+  NSURL *base = [_context.document baseURL];
+  if (base == nil || [subreport.reportName length] == 0)
+    return nil;
+  RDLSubreportLoader *loader = [[RDLSubreportLoader alloc] initWithBaseURL:base];
+  return [loader URLForReportName:subreport.reportName];
+}
+
+// A subreport is another .rdl. Opening one is opening that document -- its own
+// window, its own undo stack, its own save -- placed beside this one so the
+// master and the detail can be seen together, which is the whole reason to
+// have two windows rather than an editor inside an editor.
+- (void)editSubreport:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLSubreport class]])
+    return;
+  RDLSubreport *sub = (RDLSubreport *)item;
+  if ([sub.reportName length] == 0) {
+    [self complain:@"This subreport does not name a report yet"
+              detail:@"Type the name of a report file beside this one — \"Crates\" for "
+                     @"Crates.rdl — and try again."];
+    return;
+  }
+  // Resolution needs a folder to be relative to: the report's own file, or the
+  // one a sample was read from.
+  NSURL *url = [self URLForSubreport:sub];
+  if (url == nil) {
+    [self complain:@"Save this report first"
+              detail:@"A subreport is named relative to the report that shows it, so this "
+                     @"report needs a file of its own before the other one can be found."];
+    return;
+  }
+  if (![[NSFileManager defaultManager] fileExistsAtPath:[url path]]) {
+    // Creating one needs somewhere to put it, and that is this report's own
+    // folder -- not the folder a sample was read out of, which is inside the
+    // application.
+    if (_context.document.fileURL == nil) {
+      [self complain:@"Save this report first"
+                detail:[NSString stringWithFormat:@"There is no report called \"%@\" beside this "
+                                                  @"one yet, and this report has no file of its "
+                                                  @"own to put one next to.", sub.reportName]];
+      return;
+    }
+    if (![self offerToCreateSubreportAt:url named:sub.reportName])
+      return;
+  }
+  NSError *err = nil;
+  // The synchronous opener, deprecated on macOS since 10.7 and the only one
+  // GNUstep has. The asynchronous replacement would also mean placing the
+  // window from a completion block, for a document that is being read from a
+  // local file either way.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+  NSDocument *opened = [[NSDocumentController sharedDocumentController]
+      openDocumentWithContentsOfURL:url
+                            display:YES
+                              error:&err];
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
+  if (opened == nil) {
+    [self complain:@"Could not open the subreport" detail:err.localizedDescription ?: @""];
+    return;
+  }
+  for (NSWindowController *wc in [opened windowControllers])
+    [self placeBesideMe:[wc window]];
+}
+
+// A subreport that has been named but not written yet. Offering to make it is
+// the difference between naming one and having one: the alternative is leaving
+// the designer and creating an empty file by hand.
+- (BOOL)offerToCreateSubreportAt:(NSURL *)url named:(NSString *)name {
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:[NSString stringWithFormat:@"There is no report called \"%@\" here yet",
+                                                   name]];
+  [alert setInformativeText:[NSString stringWithFormat:@"Create %@ beside this report?",
+                                                       [url lastPathComponent]]];
+  [alert addButtonWithTitle:@"Create"];
+  [alert addButtonWithTitle:@"Cancel"];
+  if ([alert runModal] != NSAlertFirstButtonReturn)
+    return NO;
+  RDLReport *blank = [RDLSamples blankLetter];
+  blank.name = [[url lastPathComponent] stringByDeletingPathExtension];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:blank];
+  NSError *err = nil;
+  if (![doc saveToURL:url error:&err]) {
+    [self complain:@"Could not create the subreport" detail:err.localizedDescription ?: @""];
+    return NO;
+  }
+  return YES;
+}
+
+// Side by side: the new window takes the space to the right of this one, or
+// the space to its left when there is no room, and matches its height. Nothing
+// is moved that the person has already arranged -- only the window being
+// opened is placed.
+- (void)placeBesideMe:(NSWindow *)other {
+  NSWindow *mine = [self window];
+  if (mine == nil || other == nil || other == mine)
+    return;
+  NSRect visible = [[mine screen] visibleFrame];
+  if (NSIsEmptyRect(visible))
+    visible = [[NSScreen mainScreen] visibleFrame];
+  NSRect me = [mine frame];
+  NSRect theirs = [other frame];
+  // Never wider or taller than the screen it has to appear on: a window put
+  // where it does not fit is one whose far side cannot be reached, and its
+  // tab bars and inspector go with it.
+  theirs.size.width = MIN(NSWidth(theirs), NSWidth(visible));
+  theirs.size.height = MIN(NSHeight(theirs), NSHeight(visible));
+
+  // Beside this window if a whole designer fits there. Squeezing one into
+  // whatever sliver is left is worse than not placing it at all: under the
+  // minimum the split view drops a pane, which is the window arriving broken.
+  CGFloat need = RDLDesignerWindowMinimumSize().width;
+  CGFloat rightRoom = NSMaxX(visible) - NSMaxX(me);
+  CGFloat leftRoom = NSMinX(me) - NSMinX(visible);
+  if (rightRoom >= need) {
+    theirs.size.width = MIN(NSWidth(theirs), rightRoom);
+    theirs.origin.x = NSMaxX(me);
+  } else if (leftRoom >= need) {
+    theirs.size.width = MIN(NSWidth(theirs), leftRoom);
+    theirs.origin.x = NSMinX(me) - NSWidth(theirs);
+  } else {
+    // No room either side -- a full-screen parent, or simply a small screen.
+    // The middle of the screen, whole, which is where a window nobody has
+    // placed belongs.
+    [other setFrame:theirs display:YES];
+    [other center];
+    return;
+  }
+  theirs.origin.y = MIN(NSMinY(me), NSMaxY(visible) - NSHeight(theirs));
+  theirs.origin.y = MAX(theirs.origin.y, NSMinY(visible));
+  [other setFrame:theirs display:YES];
+}
+
+- (void)complain:(NSString *)message detail:(NSString *)detail {
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:message];
+  [alert setInformativeText:detail ?: @""];
+  [alert runModal];
+}
+
 - (void)updateWindowTitle {
+  // A window belonging to a document is titled by the document architecture,
+  // which also draws the edited mark and the proxy icon. Only a window built
+  // without one -- a check, a preview of a report that has no file -- has to
+  // write its own title.
+  if ([self document] != nil) {
+    [self synchronizeWindowTitleWithDocumentName];
+    return;
+  }
   NSString *title = _context.report.name ?: @"RDLDesigner";
   if (_context.document.isDirty)
     title = [title stringByAppendingString:@" — edited"];
@@ -232,34 +470,12 @@
 - (void)addElement:(id)sender {
   (void)sender;
   NSArray *kinds = [_context allowedElementKinds];
-  NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLAddElementPanel"
-                                        bundle:[NSBundle bundleForClass:[self class]]];
-  if (![nib instantiateWithOwner:self topLevelObjects:NULL])
+  if (![self loadAddElementPanel])
     return;
-  RDLOwnWindow(_palettePanel);
   [_paletteCancelButton setTag:0];
-
-  CGFloat height = 92 + 30 * (CGFloat)[kinds count];
-  [_palettePanel setContentSize:NSMakeSize(260, height)];
-  NSView *content = [_palettePanel contentView];
   [_paletteInfoLabel setStringValue:[NSString stringWithFormat:@"Insert %@",
                                                                [_context insertionDescription]]];
-
-  CGFloat y = height - 64;
-  NSInteger tag = 1;
-  for (NSString *kind in kinds) {
-    NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(14, y, 232, 26)];
-    [b setTitle:kind];
-    [b setBezelStyle:NSShadowlessSquareBezelStyle];
-    [b setTag:tag];
-    [b setTarget:self];
-    [b setAction:@selector(paletteChoose:)];
-    [b setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-    [content addSubview:b];
-    y -= 30;
-    tag += 1;
-  }
-
+  [self layOutAddElementPanelForKinds:kinds];
   [_palettePanel center];
   NSInteger code = [NSApp runModalForWindow:_palettePanel];
   [_palettePanel orderOut:nil];
@@ -271,6 +487,60 @@
   // again and the outlet's old panel goes then, well clear of all that.
   if (code >= 1 && code <= (NSInteger)[kinds count])
     [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
+}
+
+// The panel itself, from its XIB. Its own method because a check needs the
+// panel without the modal session that -addElement: runs, and because the nib
+// has to be looked for in the bundle this class was loaded from.
+- (BOOL)loadAddElementPanel {
+  NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLAddElementPanel"
+                                        bundle:[NSBundle bundleForClass:[self class]]];
+  if (![nib instantiateWithOwner:self topLevelObjects:NULL])
+    return NO;
+  RDLOwnWindow(_palettePanel);
+  return YES;
+}
+
+// The panel is one button per allowed kind, between the caption and Cancel, so
+// its height depends on how many kinds there are. Everything is placed here
+// rather than left to the XIB's springs: the caption and the Cancel button
+// have to move with the window, and a panel that grows by seven rows while its
+// caption stays where it was is a panel whose first buttons are underneath it.
+//
+// Published so the arithmetic can be checked without a modal session -- which
+// is the only way to check it at all, since the panel runs one.
+- (void)layOutAddElementPanelForKinds:(NSArray<NSString *> *)kinds {
+  const CGFloat margin = 12, captionHeight = 20, buttonHeight = 26, gap = 4, width = 260;
+  NSUInteger count = [kinds count];
+  CGFloat buttons = count ? count * buttonHeight + (count - 1) * gap : 0;
+  CGFloat height = margin + captionHeight + gap + buttons + margin + buttonHeight + margin;
+  [_palettePanel setContentSize:NSMakeSize(width, height)];
+  NSView *content = [_palettePanel contentView];
+
+  // Anything left over from the last time this panel was laid out: the nib is
+  // instantiated afresh each time, but a check may drive this twice.
+  for (NSView *view in [[content subviews] copy])
+    if (view != _paletteInfoLabel && view != _paletteCancelButton)
+      [view removeFromSuperview];
+
+  [_paletteInfoLabel setFrame:NSMakeRect(14, height - margin - captionHeight, width - 28,
+                                         captionHeight)];
+  [_paletteCancelButton setFrame:NSMakeRect(14, margin, width - 28, buttonHeight)];
+
+  CGFloat y = height - margin - captionHeight - gap - buttonHeight;
+  NSInteger tag = 1;
+  for (NSString *kind in kinds) {
+    NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(14, y, width - 28, buttonHeight)];
+    [b setTitle:kind];
+    [b setBezelStyle:NSShadowlessSquareBezelStyle];
+    [b setTag:tag];
+    [b setTarget:self];
+    [b setAction:@selector(paletteChoose:)];
+    [b setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+    [content addSubview:b];
+    y -= buttonHeight + gap;
+    tag += 1;
+  }
 }
 
 - (void)paletteChoose:(NSButton *)sender {
@@ -525,13 +795,8 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)parameterNavigator:(RDLParameterNavigator *)navigator
         didSelectParameter:(RDLParameter *)parameter {
   RDL_UNUSED(navigator);
+  // The right pane follows from the selection, in -syncInspectorToSelection.
   [_context.selection selectParameter:parameter];
-  if (parameter != nil) {
-    // The attributes tab is where the settings of anything selected go, so
-    // bring the right pane to it.
-    [_rightTabView selectTabViewItemAtIndex:1];
-    [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
-  }
 }
 
 // A data source selected shows it in the centre. It is the other thing in this
@@ -544,18 +809,31 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 }
 
 
+// Adding a dataset when the report has no source to read from: the data-source
+// navigator makes one and selects it, which also puts the person in the pane
+// where its document is chosen.
+- (void)datasetNavigatorNeedsDataSource:(RDLDatasetNavigator *)navigator {
+  RDL_UNUSED(navigator);
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:@"Add a data source first"];
+  [alert setInformativeText:@"A dataset is a query into a data source — a JSON, XML or "
+                            @"delimited-text document — so this report needs one before it can "
+                            @"have datasets."];
+  [alert addButtonWithTitle:@"Add Data Source"];
+  [alert addButtonWithTitle:@"Cancel"];
+  if ([alert runModal] != NSAlertFirstButtonReturn)
+    return;
+  // Added and selected, which also puts the person in the pane where its
+  // document is chosen.
+  [_dataSourceNavigator addDataSource:nil];
+}
+
 // A dataset selected shows it in the centre and puts its fields in the right
 // pane; deselecting hands both back to the report and the selected element.
 - (void)datasetNavigator:(RDLDatasetNavigator *)navigator
         didSelectDataSet:(RDLDataSet *)dataSet {
   RDL_UNUSED(navigator);
   [_context.selection selectDataSet:dataSet];
-  if (dataSet != nil) {
-    // The right pane goes to the attributes, which is where the settings of
-    // whatever is selected are shown.
-    [_rightTabView selectTabViewItemAtIndex:1];
-    [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
-  }
 }
 
 
@@ -608,11 +886,27 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // function of what is selected, not something the user picks: an element
 // selected means the element inspector, a dataset field means the field
 // inspector. The tab itself stays where the user left it.
+// The right pane is two tabs: the report itself, and the attributes of
+// whatever is selected. Selecting something is asking to see its settings, so
+// it brings the Attributes tab forward -- selecting a dataset and a parameter
+// each used to do that for themselves, and an element did not, so clicking a
+// tablix while the Report tab was showing appeared to do nothing at all.
+//
+// Selecting the report is the exception: its settings are what the Report tab
+// shows, so there is nothing to bring forward.
+- (void)showAttributesForSelection {
+  if (_context.selection.scope == RDLSelectionScopeReport)
+    return;
+  [_rightTabView selectTabViewItemAtIndex:1];
+  [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
+}
+
 - (void)syncInspectorToSelection {
   // One question asked once: what is selected? Each pane then shows that or
   // nothing. Nothing here decides precedence, because there is none to decide
   // -- the selection holds one thing, and choosing another replaced it.
   RDLSelection *selection = _context.selection;
+  [self showAttributesForSelection];
   RDLField *field = selection.scope == RDLSelectionScopeDatasetField ? selection.datasetField : nil;
   RDLParameter *parameter =
       selection.scope == RDLSelectionScopeParameter ? selection.parameter : nil;

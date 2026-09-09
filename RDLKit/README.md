@@ -79,7 +79,9 @@ Tablix follows the spec:
 
 Designer convenience: `columnSpecs` / `headerHeight` / `rowHeight` / `groupBy` describe a header + details table plainly, and `-rebuildTablix` projects them onto those structures (header + optional group header + details + subtotal footer). Assigning the spec has no side effect, so the order the properties are set in does not matter.
 
-Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Subreport, Gauge, Map, …) are collected into `report.warnings` by the parser.
+Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Gauge, Map, CustomReportItem, …) are collected into `report.warnings` by the parser.
+
+A `Subreport` renders another report inside this one. The element carries a `ReportName`, the `Parameters` handed over (each a `Value` expression, optionally `Omit`ted) and a `NoRowsMessage`; nothing in the model reads a file, so [RDLSubreportLoader](RDLSubreportLoader.h) is what finds the definition a name points at — beside the report that names it, as MS-RDL specifies — parses it, binds its data and hands it to the item. The parameter expressions are evaluated where the `Subreport` sits, so one in a tablix detail row reads that row's fields: that is master-detail. A subreport whose definition was never loaded renders as the spec's "Error: Subreport could not be shown", and the detail row grows to fit what the subreport shows.
 
 ## Public entry
 
@@ -110,7 +112,7 @@ Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`)
 | `RDLUpgrader` | 2003 / 2005 / 2008 → the 2010 grammar, in place on read, the way SSRS upgrades an older report — so the model only knows one shape |
 | `RDLChecker` / `RDLDataContract` | Static checking with no data bound, and the data shape a report needs, described in Objective-C terms |
 | `RDLChartRenderer` | A chart as plain shapes, shared by both backends and the designer canvas |
-| `RDLDataProvider` | The provider protocol, connect strings read and written, column-type inference, and `RDLDataBinder` |
+| `RDLDataProvider` | The provider protocol, connect strings read and written, column-type inference, and `RDLDataBinder`. The document is the source's (`jsondoc=` / `jsondata=` …) and the query is the dataset's (`CommandText`); rows are never written into a dataset |
 | `RDLJSONDataProvider` / `RDLXMLDataProvider` / `RDLCSVDataProvider` | One document format each |
 | `RDLJSONPath` | JSONPath: names, indexes, wildcards, slices, unions, descent and filters, parsed into steps |
 | `RDLZipArchive` | Minimal ZIP reader (central directory, raw inflate; refuses Zip64 and encryption) — the `.docx` container |

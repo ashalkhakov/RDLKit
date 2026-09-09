@@ -18,7 +18,7 @@ Score it yourself:
 ## Where we stand
 
 ```
-86 files: 79 ok, 0 silently empty, 7 refused
+86 files: 80 ok, 0 silently empty, 6 refused
 ```
 
 Three outcomes, and the middle one is the one that matters:
@@ -33,10 +33,11 @@ It started at **18 ok, 46 silently empty, 22 refused**. The 46 were the serious
 ones: files we accepted, reported no error for, and handed back as a blank
 report. `RDLUpgrader` closed that column, and took Matrix out of the refusals.
 
-The seven that remain are honest refusals, each naming a report item that is
+The six that remain are honest refusals, each naming a report item that is
 genuinely not implemented: `CustomReportItem` (4 — their barcode and QR
-plug-ins), `Grid` (2 — an fyiReporting extension, not MS-RDL) and `Subreport`
-(1).
+plug-ins) and `Grid` (2 — an fyiReporting extension, not MS-RDL). `Subreport`
+was the seventh until subreports were implemented; the file that used it,
+`NullableParameterTest.rdl`, now parses and lays out.
 
 Note that "ok" is deliberately a layout claim, not a parse claim. An earlier
 version of this harness only checked parsing, and reported 79 ok while every
@@ -137,17 +138,16 @@ that same plan — so the canvas shows what gets exported rather than a
 stand-in. What is *not* implemented: `ThreeDProperties` (2 files), `PointWidth`
 (3), and per-element chart styling beyond the palette.
 
-### Report items we refuse — 7 files
+### Report items we refuse — 6 files
 
 ```
  4  CustomReportItem   barcodes and QR codes (their CRI plug-ins)
  2  Grid               an fyiReporting extension, not MS-RDL
- 1  Subreport
 ```
 
 `Grid` is theirs rather than Microsoft's, so refusing it is arguably correct;
 it only needs to stop being a hard failure if we want their two map examples to
-load. `Subreport` and `CustomReportItem` are real MS-RDL.
+load. `CustomReportItem` is real MS-RDL.
 
 ### Layout
 
@@ -210,8 +210,10 @@ prefix of what was written.
 
 ## Suggested order
 
-1. **Subreport**, then `CustomReportItem` — both real MS-RDL, both currently
-   hard refusals, and between them the whole of the remaining 7.
+1. **`CustomReportItem`** — real MS-RDL, still a hard refusal, and four of the
+   remaining six files. (`Subreport` stood here until it was implemented: the
+   element, `RDLSubreportLoader` for finding the definition a `ReportName`
+   points at, and rendering it inside the parent's page.)
 2. **`Columns`** for multi-column layout, which already survives the upgrade
    and only needs reading.
 3. `Code` blocks, `ToggleItem`, `CanShrink`, `HideDuplicates`.

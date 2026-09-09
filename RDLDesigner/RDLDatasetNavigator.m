@@ -68,14 +68,36 @@
 // A dataset with no fields is still a dataset: a tablix has to name one, and
 // the fields are filled in afterwards. That is the same rule scaffolding
 // follows when it imports a table.
+// A dataset reads from a data source, so there has to be one first -- the same
+// order Report Builder makes you work in, and what MS-RDL means by
+// Query/DataSourceName. A dataset naming nothing has nowhere to read from and
+// nothing to say about what it holds.
+- (BOOL)canAddDataSet {
+  return [_context.report.dataSources count] > 0;
+}
+
 - (void)addDataSet:(id)sender {
   (void)sender;
+  if (![self canAddDataSet]) {
+    // Asking rather than telling: the window is what puts the question to the
+    // person and what owns the data-source navigator that answers it. A pane
+    // that ran its own modal would also be a pane no check could drive.
+    if ([_delegate respondsToSelector:@selector(datasetNavigatorNeedsDataSource:)])
+      [_delegate datasetNavigatorNeedsDataSource:self];
+    if (![self canAddDataSet])
+      return;
+  }
+  RDLDataSource *source = [_context.report.dataSources firstObject];
   RDLDataSet *ds = [[RDLDataSet alloc] init];
   NSUInteger n = 1;
   NSString *name = @"DataSet1";
   while ([_context.report dataSetNamed:name])
     name = [NSString stringWithFormat:@"DataSet%lu", (unsigned long)++n];
   ds.name = name;
+  // The source it reads, and the query that takes everything in it: a starting
+  // point that renders, rather than one that silently reads nothing.
+  ds.dataSourceName = source.name;
+  ds.commandText = @"$[*]";
   [_context.editor addDataSet:ds];
   [self reload];
   NSUInteger i = [_context.report.dataSets indexOfObject:ds];

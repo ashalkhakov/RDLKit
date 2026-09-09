@@ -40,6 +40,8 @@
       </array>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
+      <key>NSDocumentClass</key>
+      <string>RDLDocument</string>
     </dict>
   </array>
 </dict>

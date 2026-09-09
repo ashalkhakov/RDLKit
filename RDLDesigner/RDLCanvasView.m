@@ -187,6 +187,10 @@
     _geometry = [RDLPageGeometry geometryForReport:_context.report
                                               zoom:_context.zoom
                                        paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
+  // Set on the way out rather than at build time: which tablix is being worked
+  // in changes with the selection, which does not invalidate the geometry --
+  // nothing about the page has moved.
+  _geometry.engagedTablix = [_context engagedTablix];
   return _geometry;
 }
 
@@ -259,6 +263,8 @@
   _overlay.hoverTablix = _interaction.hoverTablix;
   _overlay.hoverColumn = _interaction.hoverColumn;
   _overlay.hoverPart = _interaction.hoverPart;
+  _overlay.dragTablix = _interaction.dragTablix;
+  _overlay.dragColumnTarget = _interaction.dragColumnTarget;
   _overlay.editingItem = _inPlaceEditor.editingItem;
   _overlay.editingCell = _inPlaceEditor.editingCell;
   [_renderer drawGeometry:[self geometry] overlay:_overlay bounds:self.bounds];

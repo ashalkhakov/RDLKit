@@ -44,7 +44,12 @@
             <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
             <view key="contentView" id="designerContent">
                 <rect key="frame" x="0.0" y="0.0" width="1280" height="780"/>
-                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                <!-- A window's content view grows with the window. The mask
+                     it had said the opposite: fixed size, flexible margins,
+                     which left the whole designer pinned to the top of the
+                     frame with a band of empty window under it whenever the
+                     window was made larger. -->
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
                     <button id="previewButton">
                         <rect key="frame" x="1100" y="744" width="80" height="26"/>
@@ -247,6 +252,8 @@
                                                     <menuItem title="125%" id="zoom125"/>
                                                     <menuItem title="150%" id="zoom150"/>
                                                     <menuItem title="200%" id="zoom200"/>
+                                                    <menuItem title="300%" id="zoom300"/>
+                                                    <menuItem title="400%" id="zoom400"/>
                                                 </items>
                                             </menu>
                                         </popUpButtonCell>
@@ -506,11 +513,18 @@
                                 </subviews>
                             </customView>
                         </subviews>
+                        <!-- The sides hold their width; the centre gives. The
+                             delegate says the same thing for the springs and
+                             struts path, since these priorities are only read
+                             where the split lays out with constraints. -->
                         <holdingPriorities>
+                            <real value="260"/>
                             <real value="250"/>
-                            <real value="250"/>
-                            <real value="250"/>
+                            <real value="260"/>
                         </holdingPriorities>
+                        <connections>
+                            <outlet property="delegate" destination="-2" id="splitDelegate"/>
+                        </connections>
                     </splitView>
                 </subviews>
             </view>

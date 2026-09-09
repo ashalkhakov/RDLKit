@@ -83,6 +83,9 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"writer omitted details Group");
 
   RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
+  // Rows are not in the file: the data source is, and binding is what turns
+  // one into the other. CommandText carries the query and nothing else.
+  [[[RDLDataBinder alloc] init] bindReport:parsed error:NULL];
   if (parsed == nil)
     XCTFail(@"%@", [NSString stringWithFormat:@"parse failed: %@", err.localizedDescription]);
   else {
@@ -93,7 +96,12 @@ static NSString *RDLLegacyTableRDL(void) {
     if ([parsed.dataSets count] != 1)
       XCTFail(@"%@", @"expected 1 dataset");
     else if ([parsed.dataSets[0].rows count] != 2)
-      XCTFail(@"%@", @"dataset rows not restored from CommandText JSON");
+      XCTFail(@"%@", @"the dataset should read its rows from the source it names");
+    if (![parsed.dataSets[0].commandText isEqualToString:@"$[*]"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"CommandText is the query: %@",
+                                                parsed.dataSets[0].commandText]);
+    if ([xml rangeOfString:@"jsondata="].location == NSNotFound)
+      XCTFail(@"%@", @"the data belongs to the data source, in its connect string");
     RDLTablix *tab = (RDLTablix *)nil;
     for (RDLItem *it in parsed.body.items) {
       if ([it isKindOfClass:[RDLTablix class]] || [it.name isEqualToString:@"Lines"])
@@ -890,6 +898,42 @@ static NSString *RDLLegacyTableRDL(void) {
                                                 (unsigned long)i,
                                                 (unsigned long)[got.warnings count]]);
   });
+}
+
+
+// The data belongs to the data source, and the dataset holds the query into
+// it. MS-RDL is explicit that CommandText is "the query to execute to obtain
+// data for a DataSet", and this kit used to write a dataset's rows there when
+// it had no query -- which round-tripped, and was data in the place a query
+// goes. Nothing does that now.
+- (void)testRowsAreNeverWrittenIntoTheDataset {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Rows"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Items";
+  [ds setFieldNames:@[ @"Sku" ]];
+  ds.rows = @[ @{@"Sku" : @"W1"} ];
+  [r.dataSets addObject:ds];
+
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"W1"].location != NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"rows bound in code are not part of the "
+                                              @"document: %@", xml]);
+  if ([xml rangeOfString:@"<DataSources>"].location != NSNotFound)
+    XCTFail(@"%@", @"a report that declares no data source should not be given one");
+
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if ([[back.dataSets firstObject] rows] != nil && [[[back.dataSets firstObject] rows] count])
+    XCTFail(@"%@", @"a dataset read from a file has no rows until something binds it");
+
+  // And the checker says what is wrong with that report: a dataset with no
+  // source has nowhere to read from, wherever it is opened.
+  BOOL said = NO;
+  for (RDLDiagnostic *d in [RDLChecker checkReport:back])
+    if ([d.rule isEqualToString:@"no-data-source"])
+      said = YES;
+  if (!said)
+    XCTFail(@"%@", @"a dataset that names no data source should be an error");
 }
 
 @end

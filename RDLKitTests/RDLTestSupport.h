@@ -29,6 +29,11 @@ RDLReport *RDLMiniInvoice(void);
 double RDLAsNum(id v);
 NSString *RDLLaidText(RDLLaidOutItem *it);
 RDLReport *RDLGroupedJobs(void);
+// Give a dataset built in code the data source a report on disk would have:
+// its rows as an inline JSON document on the source, and the query that
+// selects them. Fixtures used to rely on rows surviving a write inside
+// CommandText, which is the query, not the data.
+void RDLAttachInlineSource(RDLReport *report, RDLDataSet *dataSet, NSString *sourceName);
 NSString *RDLSourceDirectory(void);
 NSString *RDLFixturesDirectory(void);
 

@@ -51,6 +51,9 @@ RDLReport *RDLMiniInvoice(void) {
     @{@"Sku" : @"W2", @"Amount" : @5},
   ];
   [r.dataSets addObject:ds];
+  // With somewhere for those rows to come from, so the fixture survives being
+  // written out and read back the way a real report does.
+  RDLAttachInlineSource(r, ds, @"Demo");
 
   RDLTextbox *title = [[RDLTextbox alloc] init];
   title.name = @"Title";
@@ -130,6 +133,27 @@ NSString *RDLLaidText(RDLLaidOutItem *it) {
   return [it isKindOfClass:[RDLLaidOutTextbox class]] ? [(RDLLaidOutTextbox *)it text] : nil;
 }
 
+void RDLAttachInlineSource(RDLReport *report, RDLDataSet *dataSet, NSString *sourceName) {
+  if (report == nil || dataSet == nil)
+    return;
+  NSData *json = [NSJSONSerialization dataWithJSONObject:(dataSet.rows ?: @[])
+                                                 options:NSJSONWritingSortedKeys
+                                                   error:NULL];
+  NSString *document = json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]
+                            : @"[]";
+  NSString *name = [sourceName length] ? sourceName : @"Demo";
+  RDLDataSource *source = [report dataSourceNamed:name];
+  if (source == nil) {
+    source = [[RDLDataSource alloc] init];
+    source.name = name;
+    [report.dataSources addObject:source];
+  }
+  source.dataProvider = RDLStringFromDataProviderKind(RDLDataProviderKindJSON);
+  source.connectString = [@"jsondata=" stringByAppendingString:document];
+  dataSet.dataSourceName = name;
+  dataSet.commandText = @"$[*]";
+}
+
 RDLReport *RDLGroupedJobs(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Grouped Jobs"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];
@@ -146,6 +170,7 @@ RDLReport *RDLGroupedJobs(void) {
     @{@"Job" : @"Frame", @"Finish" : @"Oil", @"Amount" : @95},
   ];
   [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Demo");
   RDLTablix *tab = [[RDLTablix alloc] init];
   tab.name = @"JobsByFinish";
   tab.dataSetName = @"Jobs";

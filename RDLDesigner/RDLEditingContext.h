@@ -23,6 +23,12 @@
 // resetting `dirty` immediately afterwards. They now have their own channel.
 extern NSString * const RDLViewStateDidChangeNotification;
 
+// What the canvas will zoom to. Everything the canvas draws scales with it,
+// the tablix handle band and group brackets included, so zooming in is how a
+// nested group structure is read rather than squinted at.
+FOUNDATION_EXPORT const CGFloat RDLMinimumZoom;
+FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
+
 @interface RDLEditingContext : NSObject
 @property (nonatomic, readonly, strong) RDLDocument *document;
 @property (nonatomic, readonly, strong) RDLSelection *selection;
@@ -33,11 +39,21 @@ extern NSString * const RDLViewStateDidChangeNotification;
 @property (nonatomic, assign) BOOL showsGrid;
 
 - (instancetype)initWithReport:(RDLReport *)report;
+// The session for a document that already exists -- what -[RDLDocument
+// makeWindowControllers] builds when the document architecture opens a file.
+- (instancetype)initWithDocument:(RDLDocument *)document;
 
 // Shorthands, because "the current report" and "the selected item" are read
 // constantly and going through .document.report everywhere reads badly.
 - (RDLReport *)report;
 - (RDLItem *)selectedItem;
+// The tablix the selection is inside, or nil when it is somewhere else. A
+// tablix is a region first and a grid second, the way Report Builder has it:
+// until it is the thing being worked in it draws as plain cells and takes a
+// click as a whole, and only then does it show its handles and let a cell or a
+// column be picked out. Drawing, hit-testing and the canvas all have to agree
+// on which one that is, so they ask here rather than each deciding.
+- (RDLTablix *)engagedTablix;
 
 // Loading. These live here rather than on RDLDocument because RDLSamples is
 // part of the designer, not the kit.

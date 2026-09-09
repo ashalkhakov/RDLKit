@@ -1,0 +1,71 @@
+{
+  "Shipment": [
+    {
+      "No": "S-2026-11",
+      "Vessel": "Kestrel",
+      "Port": "Bergen",
+      "Season": "Summer 2026",
+      "Crates": [
+        {
+          "Shipment": "S-2026-11",
+          "Item": "Stoneware bowls",
+          "Qty": 24,
+          "Weight": 61.5
+        },
+        {
+          "Shipment": "S-2026-11",
+          "Item": "Glaze, celadon",
+          "Qty": 6,
+          "Weight": 18.0
+        },
+        {
+          "Shipment": "S-2026-11",
+          "Item": "Kiln shelves",
+          "Qty": 8,
+          "Weight": 96.4
+        }
+      ]
+    },
+    {
+      "No": "S-2026-12",
+      "Vessel": "Auk",
+      "Port": "Aberdeen",
+      "Season": "Summer 2026",
+      "Crates": [
+        {
+          "Shipment": "S-2026-12",
+          "Item": "Porcelain cups",
+          "Qty": 60,
+          "Weight": 42.0
+        },
+        {
+          "Shipment": "S-2026-12",
+          "Item": "Packing straw",
+          "Qty": 12,
+          "Weight": 9.6
+        }
+      ]
+    },
+    {
+      "No": "S-2026-13",
+      "Vessel": "Tern",
+      "Port": "Reykjavik",
+      "Season": "Autumn 2026",
+      "Crates": [
+        {
+          "Shipment": "S-2026-13",
+          "Item": "Salt-glazed jars",
+          "Qty": 18,
+          "Weight": 77.2
+        }
+      ]
+    },
+    {
+      "No": "S-2026-14",
+      "Vessel": "Petrel",
+      "Port": "Bergen",
+      "Season": "Summer 2026",
+      "Crates": []
+    }
+  ]
+}

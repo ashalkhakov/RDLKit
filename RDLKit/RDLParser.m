@@ -765,6 +765,7 @@ static RDLItem *RDLItemForElementName(NSString *name) {
       @"Tablix" : [RDLTablix class],
       @"Table" : [RDLTablix class],
       @"List" : [RDLTablix class],
+      @"Subreport" : [RDLSubreport class],
     };
   });
   Class cls = classes[name ?: @""];
@@ -981,6 +982,25 @@ static RDLItem *RDLItemForElementName(NSString *name) {
       else if ([nm isEqualToString:@"RDLDesigner.Title"])
         chart.title = val;
     }
+  } else if ([el.localName isEqualToString:@"Subreport"]) {
+    RDLSubreport *sub = (RDLSubreport *)item;
+    sub.reportName = RDLText(RDLChild(el, @"ReportName"));
+    sub.noRowsMessage = RDLText(RDLChild(el, @"NoRowsMessage"));
+    NSString *mt = RDLText(RDLChild(el, @"MergeTransactions"));
+    sub.mergeTransactions = [mt caseInsensitiveCompare:@"true"] == NSOrderedSame;
+    NSString *ob = RDLText(RDLChild(el, @"OmitBorderOnPageBreak"));
+    sub.omitBorderOnPageBreak = [ob caseInsensitiveCompare:@"true"] == NSOrderedSame;
+    for (NSXMLNode *n in [RDLChild(el, @"Parameters") children]) {
+      if (n.kind != NSXMLElementKind)
+        continue;
+      NSXMLElement *pe = (NSXMLElement *)n;
+      RDLSubreportParameter *sp = [[RDLSubreportParameter alloc] init];
+      sp.name = [pe attributeForName:@"Name"].stringValue;
+      sp.value = RDLValueFromElement(RDLChild(pe, @"Value"));
+      sp.omit = RDLValueFromElement(RDLChild(pe, @"Omit"));
+      if ([sp.name length])
+        [sub.parameters addObject:sp];
+    }
   } else if ([el.localName isEqualToString:@"Rectangle"]) {
     RDLRectangle *rect = (RDLRectangle *)item;
     NSXMLElement *ri = RDLChild(el, @"ReportItems");
@@ -1093,12 +1113,9 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     src.connectString = RDLText(RDLChild(cp, @"ConnectString"));
     [r.dataSources addObject:src];
   }
-  if ([r.dataSources count] == 0) {
-    RDLDataSource *src = [[RDLDataSource alloc] init];
-    src.name = @"Demo";
-    src.dataProvider = @"JSON";
-    [r.dataSources addObject:src];
-  }
+  // A report that declares no data source has none. One used to be invented
+  // here, which made every report look as though it had somewhere to read from
+  // and hid the datasets that had not.
 
   [r.dataSets removeAllObjects];
   NSXMLElement *sets = RDLChild(root, @"DataSets");
@@ -1109,13 +1126,11 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     RDLDataSet *ds = [[RDLDataSet alloc] init];
     ds.name = [dsEl attributeForName:@"Name"].stringValue ?: @"DataSet";
     ds.dataSourceName = RDLText(RDLChild(RDLChild(dsEl, @"Query"), @"DataSourceName"));
+    // The query, as written. A JSON array here used to be read back as the
+    // dataset's rows; it is not any more. Data comes from the data source the
+    // dataset names, which is what MS-RDL says and what every other reader of
+    // these files expects.
     ds.commandText = RDLText(RDLChild(RDLChild(dsEl, @"Query"), @"CommandText"));
-    NSData *data = [ds.commandText dataUsingEncoding:NSUTF8StringEncoding];
-    if (data) {
-      id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-      if ([json isKindOfClass:[NSArray class]])
-        ds.rows = json;
-    }
     NSMutableArray *fields = [NSMutableArray array];
     for (NSXMLNode *f in [RDLChild(dsEl, @"Fields") children]) {
       if (f.kind != NSXMLElementKind)
@@ -1778,6 +1793,34 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     [parent addChild:el];
     return;
   }
+  if ([it isKindOfClass:[RDLSubreport class]]) {
+    RDLSubreport *sub = (RDLSubreport *)it;
+    NSXMLElement *el = RDLEl(@"Subreport");
+    RDLAddAttr(el, @"Name", it.name);
+    [self addBox:it to:el];
+    RDLAddVisibility(el, it.hidden, it.toggleItem);
+    RDLAddItemPagination(el, it);
+    RDLAdd(el, @"ReportName", sub.reportName ?: @"");
+    if ([sub.parameters count]) {
+      NSXMLElement *ps = RDLEl(@"Parameters");
+      for (RDLSubreportParameter *sp in sub.parameters) {
+        NSXMLElement *pe = RDLEl(@"Parameter");
+        RDLAddAttr(pe, @"Name", sp.name);
+        RDLAddValue(pe, @"Value", sp.value);
+        RDLAddValue(pe, @"Omit", sp.omit);
+        [ps addChild:pe];
+      }
+      [el addChild:ps];
+    }
+    RDLAddIf(el, @"NoRowsMessage", sub.noRowsMessage);
+    if (sub.mergeTransactions)
+      RDLAdd(el, @"MergeTransactions", @"true");
+    if (sub.omitBorderOnPageBreak)
+      RDLAdd(el, @"OmitBorderOnPageBreak", @"true");
+    RDLAddStyle(el, it.style);
+    [parent addChild:el];
+    return;
+  }
   if ([it isKindOfClass:[RDLChart class]]) {
     [self addChart:(RDLChart *)it to:parent];
     return;
@@ -1869,42 +1912,41 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   RDLAddValue(root, @"Language", report.language);
   RDLAdd(root, @"Width", [self measurement:report.width]);
 
-  NSXMLElement *sources = RDLEl(@"DataSources");
-  NSArray *srcs = [report.dataSources count] ? report.dataSources : @[ [NSNull null] ];
-  for (id obj in srcs) {
-    RDLDataSource *src = obj == [NSNull null] ? nil : obj;
-    NSXMLElement *se = RDLEl(@"DataSource");
-    RDLAddAttr(se, @"Name", src.name ?: @"Demo");
-    NSXMLElement *conn = RDLEl(@"ConnectionProperties");
-    RDLAdd(conn, @"DataProvider", src.dataProvider ?: @"JSON");
-    RDLAdd(conn, @"ConnectString", src.connectString);
-    [se addChild:conn];
-    [sources addChild:se];
+  // The sources the report has, and no others. A "Demo" source used to be
+  // invented for a report that declared none, which wrote a data source nobody
+  // had asked for and hid the real problem: a dataset with nowhere to read
+  // from.
+  if ([report.dataSources count]) {
+    NSXMLElement *sources = RDLEl(@"DataSources");
+    for (RDLDataSource *src in report.dataSources) {
+      NSXMLElement *se = RDLEl(@"DataSource");
+      RDLAddAttr(se, @"Name", src.name);
+      NSXMLElement *conn = RDLEl(@"ConnectionProperties");
+      RDLAdd(conn, @"DataProvider", src.dataProvider ?: @"JSON");
+      RDLAdd(conn, @"ConnectString", src.connectString);
+      [se addChild:conn];
+      [sources addChild:se];
+    }
+    [root addChild:sources];
   }
-  [root addChild:sources];
 
   NSXMLElement *sets = RDLEl(@"DataSets");
   for (RDLDataSet *ds in report.dataSets) {
-    // A dataset that reads a document says which part of it to take, and that
-    // is what CommandText is for -- it is written back as it was written.
-    // Only a dataset with no query of its own carries its rows there instead,
-    // which is this kit's way of keeping a hand-made dataset in the file.
-    //
-    // Sorted, because NSDictionary hands its keys back in no particular order
-    // and an unsorted dump makes the same report write differently every time
-    // -- which shows up as spurious diffs in version control and breaks the
-    // write/read/write round trip.
+    // CommandText is the query and nothing else: MS-RDL calls it "the query to
+    // execute to obtain data for a DataSet", and a data provider is what
+    // executes it. The data itself belongs to the data source -- a document it
+    // names, or one carried in its connect string -- so rows are never written
+    // here. They used to be, for a dataset someone had typed rows into with no
+    // source behind it; a dataset now names a source, the way Report Builder
+    // requires, and rows bound at run time stay at run time.
     NSString *cmd = ds.commandText;
-    if ([cmd length] == 0) {
-      NSData *json = [NSJSONSerialization dataWithJSONObject:(ds.rows ?: @[])
-                                                     options:NSJSONWritingSortedKeys
-                                                       error:nil];
-      cmd = json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"[]";
-    }
     NSXMLElement *de = RDLEl(@"DataSet");
     RDLAddAttr(de, @"Name", ds.name);
     NSXMLElement *query = RDLEl(@"Query");
-    RDLAdd(query, @"DataSourceName", ds.dataSourceName ?: @"Demo");
+    // As it stands, empty included: a dataset that names no source is a fault
+    // the checker reports, and inventing a name here would hide it in the file
+    // and point the reader at a source that does not exist.
+    RDLAdd(query, @"DataSourceName", ds.dataSourceName);
     RDLAdd(query, @"CommandText", cmd);
     [de addChild:query];
     NSXMLElement *fields = RDLEl(@"Fields");

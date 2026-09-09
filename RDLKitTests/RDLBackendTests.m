@@ -109,8 +109,13 @@ static NSString *RDLEnt(NSString *name) {
                    "<Width>8in</Width>"
                    "<EmbeddedImages><EmbeddedImage Name=\"Logo\"><MIMEType>image/png</MIMEType>"
                    "<ImageData>iVBORw0KGgo=</ImageData></EmbeddedImage></EmbeddedImages>"
+                   "<DataSources><DataSource Name=\"Demo\"><ConnectionProperties>"
+                   "<DataProvider>JSON</DataProvider>"
+                   "<ConnectString>jsondata=[{\"Sku\":\"W1\",\"Amount\":10},"
+                   "{\"Sku\":\"W2\",\"Amount\":5}]</ConnectString>"
+                   "</ConnectionProperties></DataSource></DataSources>"
                    "<DataSets><DataSet Name=\"Items\"><Query><DataSourceName>Demo</DataSourceName>"
-                   "<CommandText>[{\"Sku\":\"W1\",\"Amount\":10},{\"Sku\":\"W2\",\"Amount\":5}]</CommandText></Query>"
+                   "<CommandText>$[*]</CommandText></Query>"
                    "<Fields><Field Name=\"Sku\"><DataField>Sku</DataField></Field>"
                    "<Field Name=\"Amount\"><DataField>Amount</DataField></Field>"
                    "<Field Name=\"Double\"><Value>=Fields!Amount.Value * 2</Value></Field></Fields>"
@@ -148,6 +153,10 @@ static NSString *RDLEnt(NSString *name) {
                    "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
                    "</Report>";
   RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  // The document the report names is in its connect string, so binding is what
+  // gives the datasets their rows -- the same step a host takes before it
+  // renders anything.
+  [[[RDLDataBinder alloc] init] bindReport:r error:NULL];
   if (r == nil) {
     XCTFail(@"%@", [NSString stringWithFormat:@"subset parse failed: %@", err.localizedDescription]);
     return;
@@ -425,6 +434,10 @@ static NSString *RDLEnt(NSString *name) {
        "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
        "</Report>";
   RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  // The document the report names is in its connect string, so binding is what
+  // gives the datasets their rows -- the same step a host takes before it
+  // renders anything.
+  [[[RDLDataBinder alloc] init] bindReport:r error:NULL];
   if (r == nil) {
     XCTFail(@"%@", [NSString stringWithFormat:@"subset2 parse failed: %@", err.localizedDescription]);
     return;
@@ -448,19 +461,21 @@ static NSString *RDLEnt(NSString *name) {
     XCTFail(@"%@", @"Nullable not parsed");
   // An element this kit does not model fails the parse rather than being
   // skipped, so the report that comes back is always the report on disk.
-  NSString *withSubreport = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
-                                                          withString:
-      @"<Subreport Name=\"Sub1\"><Top>1in</Top><Left>0in</Left><Width>2in</Width>"
-      @"<Height>1in</Height><ReportName>Other</ReportName></Subreport>"
+  // CustomReportItem is the example because it is real MS-RDL and genuinely
+  // not implemented -- Subreport used to stand here, and now renders.
+  NSString *withCRI = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
+                                                     withString:
+      @"<CustomReportItem Name=\"Cri1\"><Type>Barcode</Type><Top>1in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>1in</Height></CustomReportItem>"
       @"</ReportItems></Body>"];
   NSError *subErr = nil;
-  RDLReport *rejected = [RDLParser reportFromXMLString:withSubreport error:&subErr];
+  RDLReport *rejected = [RDLParser reportFromXMLString:withCRI error:&subErr];
   if (rejected != nil)
-    XCTFail(@"%@", @"a Subreport should be rejected, not skipped");
-  else if ([subErr.localizedDescription rangeOfString:@"Subreport"].location == NSNotFound ||
-           [subErr.localizedDescription rangeOfString:@"Sub1"].location == NSNotFound ||
+    XCTFail(@"%@", @"a CustomReportItem should be rejected, not skipped");
+  else if ([subErr.localizedDescription rangeOfString:@"CustomReportItem"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"Cri1"].location == NSNotFound ||
            [subErr.localizedDescription rangeOfString:@"/Report"].location == NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for Subreport: %@",
+    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for CustomReportItem: %@",
                                                subErr.localizedDescription]);
   if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
     XCTFail(@"%@", @"Body Style not parsed");
@@ -520,11 +535,15 @@ static NSString *RDLEnt(NSString *name) {
   NSString *cxml =
       @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
        "<Width>8in</Width>"
-       "<DataSets><DataSet Name=\"Sales\"><Query><DataSourceName>Demo</DataSourceName>"
-       "<CommandText>[{\"Region\":\"North\",\"Quarter\":\"Q1\",\"Amount\":10},"
+       "<DataSources><DataSource Name=\"Demo\"><ConnectionProperties>"
+       "<DataProvider>JSON</DataProvider>"
+       "<ConnectString>jsondata=[{\"Region\":\"North\",\"Quarter\":\"Q1\",\"Amount\":10},"
        "{\"Region\":\"North\",\"Quarter\":\"Q2\",\"Amount\":20},"
        "{\"Region\":\"South\",\"Quarter\":\"Q1\",\"Amount\":30},"
-       "{\"Region\":\"South\",\"Quarter\":\"Q2\",\"Amount\":40}]</CommandText></Query>"
+       "{\"Region\":\"South\",\"Quarter\":\"Q2\",\"Amount\":40}]</ConnectString>"
+       "</ConnectionProperties></DataSource></DataSources>"
+       "<DataSets><DataSet Name=\"Sales\"><Query><DataSourceName>Demo</DataSourceName>"
+       "<CommandText>$[*]</CommandText></Query>"
        "<Fields><Field Name=\"Region\"><DataField>Region</DataField></Field>"
        "<Field Name=\"Quarter\"><DataField>Quarter</DataField></Field>"
        "<Field Name=\"Amount\"><DataField>Amount</DataField></Field></Fields></DataSet></DataSets>"
@@ -554,6 +573,7 @@ static NSString *RDLEnt(NSString *name) {
        "<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth></Page>"
        "</Report>";
   RDLReport *cr = [RDLParser reportFromXMLString:cxml error:&err];
+  [[[RDLDataBinder alloc] init] bindReport:cr error:NULL];
   if (cr == nil) {
     XCTFail(@"%@", [NSString stringWithFormat:@"crosstab parse failed: %@", err.localizedDescription]);
     return;

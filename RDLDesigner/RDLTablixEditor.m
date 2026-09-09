@@ -29,6 +29,8 @@ static NSString *RDLFieldOfValue(NSString *value) {
 // field is in the row groups, in the column groups, or it is one of the columns
 // that are left. Dragging is how it moves between them.
 @property (nonatomic, strong) IBOutlet NSTableView *rowGroupTable, *colGroupTable;
+@property (nonatomic, strong) IBOutlet NSButton *rowGroupAddButton, *rowGroupRemoveButton;
+@property (nonatomic, strong) IBOutlet NSButton *colGroupAddButton, *colGroupRemoveButton;
 @property (nonatomic, strong) NSMutableArray<NSString *> *rowGroups, *colGroups;
 @property (nonatomic, strong) IBOutlet NSButton *grandTotalCheck;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHField, *rowHField;
@@ -187,12 +189,20 @@ static NSString *RDLFieldOfValue(NSString *value) {
                 validateDrop:(id<NSDraggingInfo>)info
                  proposedRow:(NSInteger)row
        proposedDropOperation:(NSTableViewDropOperation)op {
-  (void)row;
+  (void)op;
+  // Within a group list, a drop lands *between* two rows: the order of the
+  // list is the nesting of the groups -- outermost first -- so dragging one
+  // above another re-nests them, which is what Report Builder's Grouping pane
+  // is for. Groups cannot be re-nested by dragging anything on the canvas, so
+  // this is the only place it can be done.
+  if ([self listForTable:tv] != nil) {
+    [tv setDropRow:row dropOperation:NSTableViewDropAbove];
+    return NSDragOperationMove;
+  }
   if ([[info draggingSource] isKindOfClass:[NSTableView class]] &&
       [info draggingSource] == tv)
-    return NSDragOperationNone;  // reordering within a list is the buttons' job
+    return NSDragOperationNone;  // the columns list is reordered by its buttons
   [tv setDropRow:-1 dropOperation:NSTableViewDropOn];
-  (void)op;
   return NSDragOperationMove;
 }
 
@@ -206,11 +216,25 @@ static NSString *RDLFieldOfValue(NSString *value) {
   if ([field length] == 0)
     return NO;
   NSTableView *from = [info draggingSource];
-  if (![from isKindOfClass:[NSTableView class]] || from == tv)
+  if (![from isKindOfClass:[NSTableView class]])
     return NO;
 
-  // Out of wherever it was ...
   NSMutableArray *fromList = [self listForTable:from];
+  NSMutableArray *toList = [self listForTable:tv];
+
+  // Re-nesting inside one list: out of where it was and in above the row it
+  // was dropped on. The index is taken before the removal and corrected after,
+  // or a group dragged downwards lands one place short.
+  if (from == tv) {
+    if (toList == nil || ![self moveGroup:field inList:toList toRow:row])
+      return NO;
+    NSUInteger landed = [toList indexOfObject:field];
+    if (landed != NSNotFound)
+      [tv selectRowIndexes:[NSIndexSet indexSetWithIndex:landed] byExtendingSelection:NO];
+    return YES;
+  }
+
+  // Out of wherever it was ...
   if (fromList) {
     [fromList removeObject:field];
   } else {
@@ -221,19 +245,101 @@ static NSString *RDLFieldOfValue(NSString *value) {
       }
   }
 
-  // ... and into where it was dropped.
-  NSMutableArray *toList = [self listForTable:tv];
+  // ... and into where it was dropped: at the row it landed on when that list
+  // is ordered, which a group list is.
   if (toList) {
-    if (![toList containsObject:field])
-      [toList addObject:field];
+    if (![toList containsObject:field]) {
+      NSUInteger to = row < 0 ? [toList count] : MIN((NSUInteger)row, [toList count]);
+      [toList insertObject:field atIndex:to];
+    }
   } else {
     [_cols addObject:[self specForField:field]];
   }
 
-  [_table reloadData];
+  [self reloadGroups];
+  return YES;
+}
+
+// Grouping by another field. The first field of the dataset that is not
+// already a group, so the button always does something; which field it is is
+// then typed over in the list, or dragged in from the columns.
+- (NSString *)fieldToGroupBy {
+  RDLDataSet *ds = [_report dataSetNamed:[_datasetPop titleOfSelectedItem]]
+                       ?: [_report.dataSets firstObject];
+  for (NSString *name in [ds fieldNames])
+    if (![_rowGroups containsObject:name] && ![_colGroups containsObject:name])
+      return name;
+  // A dataset that has run out of fields, or one this report never declared:
+  // a name the person is expected to replace beats a button that does nothing.
+  return @"Field";
+}
+
+- (void)reloadGroups {
   [_rowGroupTable reloadData];
   [_colGroupTable reloadData];
+  [_table reloadData];
+  [self syncFiltersButton];
+}
+
+- (void)addRowGroup:(id)sender {
+  RDL_UNUSED(sender);
+  [_rowGroups addObject:[self fieldToGroupBy]];
+  [self reloadGroups];
+  [_rowGroupTable selectRowIndexes:[NSIndexSet indexSetWithIndex:[_rowGroups count] - 1]
+              byExtendingSelection:NO];
+}
+
+- (void)removeRowGroup:(id)sender {
+  RDL_UNUSED(sender);
+  NSInteger row = [_rowGroupTable selectedRow];
+  if (row < 0 || row >= (NSInteger)[_rowGroups count])
+    return;
+  [_rowGroups removeObjectAtIndex:(NSUInteger)row];
+  [self reloadGroups];
+}
+
+- (void)addColumnGroup:(id)sender {
+  RDL_UNUSED(sender);
+  [_colGroups addObject:[self fieldToGroupBy]];
+  [self reloadGroups];
+  [_colGroupTable selectRowIndexes:[NSIndexSet indexSetWithIndex:[_colGroups count] - 1]
+              byExtendingSelection:NO];
+}
+
+- (void)removeColumnGroup:(id)sender {
+  RDL_UNUSED(sender);
+  NSInteger row = [_colGroupTable selectedRow];
+  if (row < 0 || row >= (NSInteger)[_colGroups count])
+    return;
+  [_colGroups removeObjectAtIndex:(NSUInteger)row];
+  [self reloadGroups];
+}
+
+// Re-nesting: the order of a group list is the order of the groups, outermost
+// first, so moving one up or down changes what is nested inside what. Its own
+// method because it is the whole of what dragging inside a list does, and
+// because a check can drive it without synthesising a drag.
+- (BOOL)moveGroup:(NSString *)field inList:(NSMutableArray *)list toRow:(NSInteger)row {
+  NSUInteger was = [list indexOfObject:field ?: @""];
+  if (was == NSNotFound)
+    return NO;
+  NSUInteger to = row < 0 ? [list count] : (NSUInteger)row;
+  // The row is where it would go *before* it is taken out, so dragging one
+  // downwards has to lose the place it vacated or it lands one short.
+  if (to > was)
+    to -= 1;
+  [list removeObjectAtIndex:was];
+  [list insertObject:field atIndex:MIN(to, [list count])];
+  [self reloadGroups];
   return YES;
+}
+
+- (BOOL)moveRowGroup:(NSString *)field toIndex:(NSUInteger)index {
+  return [self moveGroup:field inList:_rowGroups toRow:(NSInteger)index];
+}
+
+- (BOOL)moveColumnGroup:(NSString *)field toIndex:(NSUInteger)index {
+  return [self moveGroup:field inList:_colGroups toRow:(NSInteger)index];
 }
 
 // A column made by dragging a field in. It aggregates when the tablix has
@@ -438,6 +544,10 @@ static NSString *RDLFieldOfValue(NSString *value) {
   NSString *ident = [col identifier];
   if ([ident isEqualToString:@"width"])
     return [NSString stringWithFormat:@"%.2f", [c[@"width"] doubleValue]];
+  // An ordinary column shows text and says nothing about it; the word is here
+  // so the person can see what the choice is and change it.
+  if ([ident isEqualToString:@"kind"])
+    return [c[@"kind"] length] ? c[@"kind"] : @"Text";
   return [c[ident] description] ?: @"";
 }
 
@@ -445,7 +555,22 @@ static NSString *RDLFieldOfValue(NSString *value) {
     setObjectValue:(id)value
     forTableColumn:(NSTableColumn *)col
                row:(NSInteger)row {
-  (void)tv;
+  // A group list holds field names, and typing one in is how a group is
+  // changed -- the lists used to be readable and nothing else, so the only way
+  // to group by anything was to drag a column into them.
+  NSMutableArray *list = [self listForTable:tv];
+  if (list) {
+    if (row < 0 || row >= (NSInteger)[list count])
+      return;
+    NSString *field = [[value description]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if ([field length] == 0)
+      [list removeObjectAtIndex:(NSUInteger)row];
+    else
+      list[(NSUInteger)row] = field;
+    [self reloadGroups];
+    return;
+  }
   if (row < 0 || row >= (NSInteger)[_cols count])
     return;
   NSMutableDictionary *c = _cols[(NSUInteger)row];
@@ -454,8 +579,23 @@ static NSString *RDLFieldOfValue(NSString *value) {
   if ([ident isEqualToString:@"width"]) {
     double w = [s doubleValue];
     c[@"width"] = @(w > 0 ? w : 1.6);
+  } else if ([ident isEqualToString:@"kind"]) {
+    // Text is the absence of a kind, so choosing it takes the column back to
+    // an ordinary one -- and with it the report it named, which would
+    // otherwise sit in the file meaning nothing.
+    if ([s length] == 0 || [s caseInsensitiveCompare:@"Text"] == NSOrderedSame) {
+      [c removeObjectForKey:@"kind"];
+      [c removeObjectForKey:@"report"];
+    } else {
+      c[@"kind"] = s;
+      // A subreport column shows a report, not an expression: the value would
+      // be read by nothing and shown by nothing.
+      if ([s isEqualToString:@"Subreport"])
+        c[@"value"] = @"";
+    }
   } else if ([s length] == 0 &&
-             ([ident isEqualToString:@"align"] || [ident isEqualToString:@"aggregate"])) {
+             ([ident isEqualToString:@"align"] || [ident isEqualToString:@"aggregate"] ||
+              [ident isEqualToString:@"report"])) {
     [c removeObjectForKey:ident];
   } else {
     c[ident] = s;

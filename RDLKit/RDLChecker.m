@@ -818,6 +818,53 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
       RDLCheckValue(s.value, RDLSubScope(scope, @"Series value", nil), run);
       RDLCheckValue(s.x, RDLSubScope(scope, @"Series X", nil), run);
     }
+  } else if ([item isKindOfClass:[RDLSubreport class]]) {
+    RDLSubreport *sub = (RDLSubreport *)item;
+    // A page section is drawn once per page, out of any data scope, and SSRS
+    // refuses a subreport there outright -- the schema allows one, the product
+    // does not, and a report written that way will not open in Report Builder.
+    // A warning rather than an error: this kit will render it.
+    if (!outer.insideBody)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"subreport-in-page-section", scope,
+                 nil,
+                 @"a subreport in a page header or footer is not supported by Report Builder");
+    if ([[sub.reportName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]
+            length] == 0)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"subreport-report-name", scope, nil,
+                 @"a subreport must name the report to show");
+    for (RDLSubreportParameter *p in sub.parameters) {
+      // Evaluated out here, where the item is: a subreport in a detail row
+      // reads the row's fields, and that is the whole of master-detail.
+      RDLScope *ps = RDLSubScope(scope, [NSString stringWithFormat:@"Parameter '%@'",
+                                                                     p.name ?: @"(unnamed)"],
+                                   nil);
+      RDLCheckValue(p.value, ps, run);
+      RDLCheckValue(p.omit, ps, run);
+      // Only when the definition is at hand. Whether a name is a parameter of
+      // the subreport is a fact about a file this checker did not open, and
+      // guessing at it would be the false accusation this checker avoids.
+      if (sub.definition != nil && [sub.definition parameterNamed:p.name] == nil)
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-subreport-parameter", ps, nil,
+                   [NSString stringWithFormat:@"'%@' declares no parameter '%@'",
+                                              sub.reportName ?: @"the subreport",
+                                              p.name ?: @"(unnamed)"]);
+    }
+    if (sub.definition != nil) {
+      NSMutableSet *passed = [NSMutableSet set];
+      for (RDLSubreportParameter *p in sub.parameters)
+        if ([p.name length])
+          [passed addObject:p.name];
+      for (RDLParameter *needed in sub.definition.parameters) {
+        if ([passed containsObject:needed.name] || needed.nullable)
+          continue;
+        if (needed.defaultValue != nil || [needed.defaultValues count])
+          continue;
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"missing-subreport-parameter", scope,
+                   nil,
+                   [NSString stringWithFormat:@"'%@' needs a value for '%@'",
+                                              sub.reportName ?: @"the subreport", needed.name]);
+      }
+    }
   } else if ([item isKindOfClass:[RDLTablix class]]) {
     RDLTablix *tab = (RDLTablix *)item;
     RDLCheckTablixMembers(tab.rowHierarchy.members, scope, run);
@@ -865,10 +912,16 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
     // A dataset names its data source, the way the file does. That link is a
     // name and not a pointer -- it has to survive a copied item, an undone
     // removal, and a file naming a source that is not there -- so this is
-    // where a name that resolves to nothing is caught. A dataset that names
-    // none is not an error: that is how one whose rows are supplied in code
-    // reads.
-    if ([ds.dataSourceName length] && [report dataSourceNamed:ds.dataSourceName] == nil)
+    // where a name that resolves to nothing is caught.
+    //
+    // Naming none at all is an error too: MS-RDL requires Query/DataSourceName,
+    // and a dataset with nowhere to read from is a table that will be empty
+    // wherever this report is opened. Rows handed to a dataset in code are a
+    // run-time binding and do not change that.
+    if ([ds.dataSourceName length] == 0)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"no-data-source", dscope, nil,
+                 @"a dataset must name the data source it reads from");
+    else if ([report dataSourceNamed:ds.dataSourceName] == nil)
       RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-data-source", dscope, nil,
                  [NSString stringWithFormat:@"no data source named '%@'", ds.dataSourceName]);
     for (id f in ds.fields)

@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDesignerTestSupport.h"
+#import "RDLDataSourceNavigator.h"
 #import "DMTabBar.h"
 #import "DMTabBarItem.h"
 #import "RDLToolbarIcons.h"
@@ -92,6 +93,15 @@
   RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
   if ([wc window] == nil) {
     XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+
+  // A data source first, with its own +: a dataset is a query into one, so a
+  // fresh report cannot have datasets until it has somewhere to read from.
+  RDLDataSourceNavigator *sources = [wc valueForKey:@"dataSourceNavigator"];
+  [sources addDataSource:nil];
+  if ([report.dataSources count] == 0) {
+    XCTFail(@"%@", @"the + added no data source");
     return;
   }
 
