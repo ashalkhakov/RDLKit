@@ -36,6 +36,12 @@ export GNUSTEP_LOCAL_LIBRARY="$HERE/usr/Local/Library"
 export GNUSTEP_LOCAL_TOOLS="$HERE/usr/Local/Tools"
 export GNUSTEP_LOCAL_APPS="$HERE/usr/Local/Applications"
 
+# Saved before they are pointed at the image: Scripts/appimage/open puts these
+# back before handing a URL to the host's browser, which cannot run against the
+# libraries this image carries.
+export RDL_HOST_LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+export RDL_HOST_PATH="$PATH"
+
 export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
 export PATH="$HERE/usr/local/bin:$HERE/usr/bin:$PATH"
 
@@ -52,6 +58,10 @@ if [ -n "$DEFAULTS_TOOL" ]; then
     "$DEFAULTS_TOOL" write org.rdl.designer NSBoldFont LiberationSans-Bold
     "$DEFAULTS_TOOL" write org.rdl.designer NSUserFont LiberationSans
     "$DEFAULTS_TOOL" write org.rdl.designer NSUserFixedPitchFont LiberationMono
+    # What NSWorkspace runs for a URL or a file it has no application for --
+    # the Website line in the About panel, for one. Ours, in the bundle's Tools
+    # directory, which is where [NSTask launchPathForTool:] looks first.
+    "$DEFAULTS_TOOL" write org.rdl.designer GSUnknownFileTool open
 fi
 
 # ADDITION: the image carries two programs. Invoked as rdlgen, or with rdlgen

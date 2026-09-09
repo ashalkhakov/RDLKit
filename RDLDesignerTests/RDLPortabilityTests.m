@@ -297,4 +297,49 @@
     XCTFail(@"%@", @"the Xcode project should carry the same version");
 }
 
+// The AppImage's opener. NSWorkspace hands a URL to whatever
+// [NSTask launchPathForTool:] finds, and that searches GNUstep's tool
+// directories before $PATH -- inside the image those are in the bundle, where
+// nothing opens anything, so the Website line in the About panel did nothing.
+// The wiring is three files that have to agree, and none of them is exercised
+// by building the app.
+- (void)testTheAppImageCarriesAnOpener {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *(^read)(NSString *) = ^NSString *(NSString *relative) {
+    return [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:relative]
+                                     encoding:NSUTF8StringEncoding
+                                        error:NULL];
+  };
+  NSString *shim = read(@"Scripts/appimage/open");
+  NSString *assets = read(@"Scripts/appimage/install-assets.sh");
+  NSString *appRun = read(@"Scripts/appimage/AppRun");
+  if (shim == nil || assets == nil || appRun == nil) {
+    XCTFail(@"%@", @"could not read the AppImage scripts");
+    return;
+  }
+  if (![[NSFileManager defaultManager]
+          isExecutableFileAtPath:[dir stringByAppendingPathComponent:@"Scripts/appimage/open"]])
+    XCTFail(@"%@", @"the opener has to be executable in the tree, since it is installed as-is");
+
+  // Installed where the tool lookup looks first, under both names GNUstep
+  // asks for: the GSUnknownFileTool default, and NSWorkspace's own fallback.
+  if ([assets rangeOfString:@"usr/System/Tools"].location == NSNotFound)
+    XCTFail(@"%@", @"the opener belongs in the bundle's GNUstep tools directory");
+  for (NSString *name in @[ @"open", @"xdg-open" ])
+    if ([assets rangeOfString:name].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should be installed as %@", name]);
+  if ([appRun rangeOfString:@"GSUnknownFileTool open"].location == NSNotFound)
+    XCTFail(@"%@", @"AppRun should point GSUnknownFileTool at it");
+
+  // And the host's environment has to survive the trip, or the browser it
+  // starts inherits the image's libraries and dies on a symbol.
+  for (NSString *saved in @[ @"RDL_HOST_LD_LIBRARY_PATH", @"RDL_HOST_PATH" ]) {
+    if ([appRun rangeOfString:saved].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should save %@ before overriding it",
+                                                saved]);
+    if ([shim rangeOfString:saved].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should restore %@", saved]);
+  }
+}
+
 @end
