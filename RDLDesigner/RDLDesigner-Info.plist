@@ -53,7 +53,7 @@
   <key>ApplicationName</key>
   <string>RDLDesigner</string>
   <key>ApplicationDescription</key>
-  <string>Native RDL report designer for GNUstep and Cocoa</string>
+  <string>Report designer compatible with MS RDL</string>
   <!-- GSInfoPanel, the About panel, shows these five. -->
   <key>ApplicationRelease</key>
   <string>0.0.0-dev</string>
@@ -68,7 +68,7 @@
   <key>Copyright</key>
   <string>Copyright (C) 2026 the RDLKit contributors</string>
   <key>CopyrightDescription</key>
-  <string>Released under the GNU Lesser General Public License, version 2.1. Linking RDLKit into a program does not impose the GPL on that program.</string>
+  <string>GNU LGPL 2.1</string>
   <!-- Document types in GNUstep's own form. NSDocumentController reads NSTypes
        first and CFBundleDocumentTypes after, so both are here, the way the
        document-based GNUstep apps this was ported from carry both. -->
