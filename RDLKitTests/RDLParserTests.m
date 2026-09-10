@@ -129,6 +129,134 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"parser accepted a non-Report root");
 }
 
+// The 2010 and 2016 schemas put Body, Width and Page under
+// ReportSections/ReportSection, and that is what Report Builder, SSDT and
+// Power BI Report Builder write. This kit read them at the root -- the 2008
+// shape -- so a current file parsed into a report with no items, zero width
+// and a default page, without a word of complaint.
+- (void)testAReportSectionIsWhereTheLayoutIs {
+  NSString *xml =
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection>"
+      @"    <Body>"
+      @"      <Height>3.5in</Height>"
+      @"      <ReportItems>"
+      @"        <Textbox Name=\"Title\"><Value>Hello</Value>"
+      @"          <Top>0.25in</Top><Left>0.5in</Left>"
+      @"          <Height>0.3in</Height><Width>2in</Width></Textbox>"
+      @"      </ReportItems>"
+      @"    </Body>"
+      @"    <Width>6.5in</Width>"
+      @"    <Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth>"
+      @"      <LeftMargin>1in</LeftMargin></Page>"
+      @"  </ReportSection></ReportSections>"
+      @"</Report>";
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"parse failed: %@", err.localizedDescription]);
+    return;
+  }
+  if ([r.body.items count] != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the section's body has %lu items, not 1",
+                                              (unsigned long)[r.body.items count]]);
+  if (fabs(r.body.height - 3.5) > 0.001)
+    XCTFail(@"%@", @"the body height comes from the section");
+  if (fabs(r.width - 6.5) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the width comes from the section, not %g",
+                                              r.width]);
+  if (fabs(r.page.leftMargin - 1.0) > 0.001)
+    XCTFail(@"%@", @"the page comes from the section");
+}
+
+// The schema allows several sections; SSRS writes one. Reading the first is
+// the practical answer, but silently is not -- half a document would go
+// missing the way the whole of one used to.
+- (void)testASecondReportSectionIsAnnounced {
+  NSString *(^section)(NSString *) = ^NSString *(NSString *name) {
+    return [NSString stringWithFormat:
+        @"<ReportSection><Body><Height>1in</Height><ReportItems>"
+        @"<Textbox Name=\"%@\"><Value>%@</Value></Textbox>"
+        @"</ReportItems></Body><Width>5in</Width><Page/></ReportSection>", name, name];
+  };
+  NSString *xml = [NSString stringWithFormat:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\"><ReportSections>%@%@</ReportSections></Report>",
+      section(@"First"), section(@"Second")];
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"a two-section report should still open");
+    return;
+  }
+  if ([[[r.body.items firstObject] name] isEqualToString:@"First"] == NO)
+    XCTFail(@"%@", @"the first section is the one that is read");
+  BOOL warned = NO;
+  for (NSString *note in r.warnings)
+    if ([note rangeOfString:@"sections"].location != NSNotFound)
+      warned = YES;
+  if (!warned)
+    XCTFail(@"%@", [NSString stringWithFormat:@"no warning about the second section: %@",
+                                              r.warnings]);
+}
+
+// What the writer produces has to be a file Report Builder accepts. It used to
+// declare the 2010 namespace and then write the 2008 shape, which fails schema
+// validation at the first child: "The element 'Report' has invalid child
+// element 'Body'".
+- (void)testTheWriterEmitsTheTwentyTenShape {
+  RDLReport *source = RDLMiniInvoice();
+  // A field with a declared type, so there is a TypeName to look for at all.
+  [[[[source.dataSets firstObject] fields] firstObject] setDataType:RDLFieldDataTypeString];
+  NSString *xml = [RDLWriter XMLStringFromReport:source];
+
+  for (NSString *element in @[ @"<ReportSections>", @"<ReportSection>", @"<Body>",
+                              @"<Width>", @"<Page>" ])
+    if ([xml rangeOfString:element].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the writer omitted %@", element]);
+  // Order tells the nesting apart: Body, Width and Page after the section
+  // rather than under Report.
+  NSRange sections = [xml rangeOfString:@"<ReportSections>"];
+  for (NSString *element in @[ @"<Body>", @"<Width>", @"<Page>" ])
+    if ([xml rangeOfString:element].location < sections.location)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is written outside the section", element]);
+
+  // Children the 2010 Report and Body types do not have.
+  if ([xml rangeOfString:@"<Name>"].location != NSNotFound)
+    XCTFail(@"%@", @"Report has no Name child in 2010; the kit's name goes in rd:");
+  if ([xml rangeOfString:@"rd:ReportName"].location == NSNotFound)
+    XCTFail(@"%@", @"and it should still be written, so it survives a round trip");
+  NSRange body = [xml rangeOfString:@"<Body>"];
+  NSRange width = [xml rangeOfString:@"<Width>"];
+  NSString *bodyText = [xml substringWithRange:NSMakeRange(body.location,
+                                                           width.location - body.location)];
+  if ([bodyText rangeOfString:@"PrintOnFirstPage"].location != NSNotFound)
+    XCTFail(@"%@", @"PrintOnFirstPage/LastPage belong to a PageSection, not the body");
+  // TypeName is the designer's note about a field, and is prefixed everywhere
+  // a real file writes it.
+  if ([xml rangeOfString:@"<TypeName>"].location != NSNotFound)
+    XCTFail(@"%@", @"Field/TypeName should be written as rd:TypeName");
+
+  // And the whole thing still comes back.
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if (back == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"re-reading the output failed: %@",
+                                              err.localizedDescription]);
+    return;
+  }
+  if (![back.name isEqualToString:@"Mini Invoice"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the name did not survive: %@", back.name]);
+  if ([back.body.items count] != [source.body.items count])
+    XCTFail(@"%@", @"the body did not survive the round trip");
+  if (fabs(back.width - source.width) > 0.001)
+    XCTFail(@"%@", @"the width did not survive the round trip");
+  RDLField *field = [[[back.dataSets firstObject] fields] firstObject];
+  if (field.dataType != RDLFieldDataTypeString)
+    XCTFail(@"%@", @"rd:TypeName should be read back by local name");
+}
+
 - (void)testUpgrader {
   NSError *err = nil;
 

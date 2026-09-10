@@ -1049,6 +1049,29 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   return [[[self alloc] init] reportFromXMLString:xml error:error];
 }
 
+// The element whose Body, Width and Page describe the report: the first
+// ReportSection when the file has them, and the Report element itself for the
+// 2008 shape the upgrader produces. The schema allows several sections and
+// SSRS only ever writes one; the rest are announced rather than rendered,
+// because dropping half a document in silence is the failure this whole
+// change is about.
+- (NSXMLElement *)layoutSectionOf:(NSXMLElement *)root {
+  NSXMLElement *sections = RDLChild(root, @"ReportSections");
+  if (sections == nil)
+    return root;
+  NSMutableArray<NSXMLElement *> *found = [NSMutableArray array];
+  for (NSXMLNode *n in [sections children])
+    if (n.kind == NSXMLElementKind && [n.localName isEqualToString:@"ReportSection"])
+      [found addObject:(NSXMLElement *)n];
+  if ([found count] == 0)
+    return root;
+  if ([found count] > 1)
+    [self.notes addObject:[NSString stringWithFormat:
+        @"the report has %lu sections; only the first is read",
+        (unsigned long)[found count]]];
+  return [found firstObject];
+}
+
 - (RDLReport *)reportFromXMLString:(NSString *)xml error:(NSError **)error {
   // PreserveWhitespace, or a TextRun holding a single space arrives empty --
   // see RDLElementText.
@@ -1082,11 +1105,18 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   // "=User!Language" are both Language, and RDLValue is the one shape that
   // holds either.
   r.language = [RDLValue valueWithSource:RDLText(RDLChild(root, @"Language"))];
-  r.width = RDLInchesFromString(RDLText(RDLChild(root, @"Width")));
+  // Where Body, Width and Page live. The 2010 and 2016 schemas put them under
+  // ReportSections/ReportSection -- which is what Report Builder, SSDT and
+  // Power BI Report Builder write, and what this kit was blind to: such a file
+  // parsed into a report with no items, zero width and a default page, and
+  // said nothing. 2008 and earlier put them directly under Report, and the
+  // upgrader leaves them there, so both shapes are read.
+  NSXMLElement *layout = [self layoutSectionOf:root];
+  r.width = RDLInchesFromString(RDLText(RDLChild(layout, @"Width")));
   // rd:ReportUnitType -- the unit the author works in. Not a measurement: it
   // says how the ones in the file were written and how to show them.
   r.unit = RDLReportUnitFromString(RDLText(RDLChild(root, @"ReportUnitType")));
-  NSXMLElement *pageEl = RDLChild(root, @"Page");
+  NSXMLElement *pageEl = RDLChild(layout, @"Page");
   // An element that is not there must leave RDLPage's default alone -- RDL
   // says an absent PageWidth means Letter, and reading it as zero produces a
   // report that lays out onto nothing.
@@ -1096,9 +1126,18 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   RDL_PAGE_INCHES(r.page.rightMargin, pageEl, @"RightMargin");
   RDL_PAGE_INCHES(r.page.topMargin, pageEl, @"TopMargin");
   RDL_PAGE_INCHES(r.page.bottomMargin, pageEl, @"BottomMargin");
-  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader") ?: RDLChild(root, @"PageHeader") fallbackHeight:0.5];
-  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter") ?: RDLChild(root, @"PageFooter") fallbackHeight:0.4];
-  r.body = [self parseBand:RDLChild(root, @"Body") fallbackHeight:4.0];
+  // Under Page is the spec's place; 2003 files put them at the root, and a
+  // file that has grown a ReportSection but kept its bands at the root would
+  // otherwise lose them -- the section is searched, then the report.
+  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader")
+                              ?: RDLChild(layout, @"PageHeader")
+                              ?: RDLChild(root, @"PageHeader")
+                  fallbackHeight:0.5];
+  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter")
+                              ?: RDLChild(layout, @"PageFooter")
+                              ?: RDLChild(root, @"PageFooter")
+                  fallbackHeight:0.4];
+  r.body = [self parseBand:RDLChild(layout, @"Body") fallbackHeight:4.0];
 
   [r.dataSources removeAllObjects];
   NSXMLElement *sources = RDLChild(root, @"DataSources");
@@ -1868,16 +1907,22 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   [parent addChild:el];
 }
 
-- (void)addBand:(RDLBand *)b to:(NSXMLElement *)parent {
+// What a Body and a PageSection have in common: a height, a style and the
+// items. Everything a body may carry, and nothing it may not.
+- (void)addBandItems:(RDLBand *)b to:(NSXMLElement *)parent {
   RDLAdd(parent, @"Height", [self measurement:b.height]);
-  RDLAdd(parent, @"PrintOnFirstPage", b.printOnFirstPage ? @"true" : @"false");
-  RDLAdd(parent, @"PrintOnLastPage", b.printOnLastPage ? @"true" : @"false");
   if (b.style)
     RDLAddStyle(parent, b.style);
   NSXMLElement *items = RDLEl(@"ReportItems");
   for (RDLItem *it in b.items)
     [self addItem:it to:items];
   [parent addChild:items];
+}
+
+- (void)addBand:(RDLBand *)b to:(NSXMLElement *)parent {
+  [self addBandItems:b to:parent];
+  RDLAdd(parent, @"PrintOnFirstPage", b.printOnFirstPage ? @"true" : @"false");
+  RDLAdd(parent, @"PrintOnLastPage", b.printOnLastPage ? @"true" : @"false");
 }
 
 - (instancetype)initWithUnit:(RDLReportUnit)unit {
@@ -1906,11 +1951,14 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   RDLAddAttr(root, @"xmlns:rd",
               @"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner");
   RDLAdd(root, @"rd:ReportUnitType", RDLStringFromReportUnit(report.unit));
-  RDLAdd(root, @"Name", report.name);
+  // The 2010 Report has no Name child. The name is this kit's own, so it goes
+  // in the designer namespace the schema leaves open (xsd:any ##other), where
+  // it validates and still round-trips: the reader matches local names, the
+  // way it already does for rd:ReportUnitType.
+  RDLAdd(root, @"rd:ReportName", report.name);
   RDLAdd(root, @"Description", report.reportDescription);
   RDLAdd(root, @"Author", report.author);
   RDLAddValue(root, @"Language", report.language);
-  RDLAdd(root, @"Width", [self measurement:report.width]);
 
   // The sources the report has, and no others. A "Demo" source used to be
   // invented for a report that declared none, which wrote a data source nobody
@@ -1958,8 +2006,11 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
         RDLAddValue(fe, @"Value", fld.value);
       else
         RDLAdd(fe, @"DataField", [fld.dataField length] ? fld.dataField : fld.name);
+      // FieldType has no TypeName of its own: the field's data type is the
+      // designer's note about it, and every real file writes it prefixed. The
+      // reader matches local names, so this is read back either way.
       if (fld.dataType != RDLFieldDataTypeUnknown)
-        RDLAdd(fe, @"TypeName", RDLStringFromFieldDataType(fld.dataType));
+        RDLAdd(fe, @"rd:TypeName", RDLStringFromFieldDataType(fld.dataType));
       [fields addChild:fe];
     }
     [de addChild:fields];
@@ -2013,9 +2064,22 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     [root addChild:imgs];
   }
 
+  // Body, Width and Page belong to a ReportSection in 2010 and 2016. Written
+  // at the root -- which is what this wrote while declaring the 2010
+  // namespace -- Report Builder rejects the file: "The element 'Report' has
+  // invalid child element 'Body'".
+  NSXMLElement *sections = RDLEl(@"ReportSections");
+  NSXMLElement *section = RDLEl(@"ReportSection");
+  [sections addChild:section];
+  [root addChild:sections];
+
   NSXMLElement *body = RDLEl(@"Body");
-  [self addBand:report.body to:body];
-  [root addChild:body];
+  // A band's PrintOnFirstPage/PrintOnLastPage belong to a PageSection. BodyType
+  // has no such children, so the body gets the band writer without them.
+  [self addBandItems:report.body to:body];
+  [section addChild:body];
+
+  RDLAdd(section, @"Width", [self measurement:report.width]);
 
   NSXMLElement *page = RDLEl(@"Page");
   RDLAdd(page, @"PageHeight", [self measurement:report.page.pageHeight]);
@@ -2030,7 +2094,7 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   NSXMLElement *footer = RDLEl(@"PageFooter");
   [self addBand:report.pageFooter to:footer];
   [page addChild:footer];
-  [root addChild:page];
+  [section addChild:page];
 
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithRootElement:root];
   [doc setVersion:@"1.0"];

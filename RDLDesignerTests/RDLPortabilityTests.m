@@ -390,4 +390,47 @@
   }
 }
 
+// The samples are the only RDL files this project ships, so they are the ones
+// someone will open in Report Builder. They used to declare the 2010 namespace
+// and carry the 2008 shape -- Body, Width and Page at the root -- which is
+// exactly the file that tool refuses.
+- (void)testTheSamplesAreInTheTwentyTenShape {
+  NSString *dir = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"RDLDesigner/Samples"];
+  NSArray<NSString *> *files =
+      [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:NULL];
+  NSUInteger checked = 0;
+  for (NSString *file in files) {
+    if (![[file pathExtension] isEqualToString:@"rdl"])
+      continue;
+    checked++;
+    NSString *xml = [NSString stringWithContentsOfFile:
+                                  [dir stringByAppendingPathComponent:file]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    if (xml == nil) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"could not read %@", file]);
+      continue;
+    }
+    if ([xml rangeOfString:@"<ReportSections>"].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ has no ReportSection", file]);
+    // Children the 2010 Report type does not have. Body, Width and Page are
+    // matched at the root only -- with four spaces of indent, which is where
+    // the writer puts a child of Report -- since they are legitimate inside
+    // the section.
+    for (NSString *stray in @[ @"\n    <Body>", @"\n    <Width>", @"\n    <Page>",
+                              @"\n    <PageHeader>", @"\n    <PageFooter>",
+                              @"\n    <Name>" ])
+      if ([xml rangeOfString:stray].location != NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ still has %@ under Report", file,
+                                                  [stray stringByTrimmingCharactersInSet:
+                                                      [NSCharacterSet whitespaceAndNewlineCharacterSet]]]);
+    if ([xml rangeOfString:@"<TypeName>"].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ writes TypeName unprefixed", file]);
+  }
+  if (checked < 11)
+    XCTFail(@"%@", [NSString stringWithFormat:@"only %lu samples were checked",
+                                              (unsigned long)checked]);
+}
+
 @end
