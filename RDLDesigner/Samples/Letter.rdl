@@ -4,6 +4,7 @@
     <rd:ReportName>Letter</rd:ReportName>
     <Description>Blank letter with running header and folio.</Description>
     <Author>RDLDesigner</Author>
+    <DataSets></DataSets>
     <ReportParameters>
         <ReportParameter Name="Title">
             <DataType>String</DataType>
@@ -29,14 +30,10 @@
                         <Style>
                             <FontFamily>Georgia</FontFamily>
                             <FontSize>12pt</FontSize>
-                            <FontWeight>Normal</FontWeight>
                             <Color>#1a1916</Color>
-                            <TextAlign>Left</TextAlign>
                             <VerticalAlign>Top</VerticalAlign>
                             <PaddingLeft>4pt</PaddingLeft>
                             <PaddingRight>4pt</PaddingRight>
-                            <PaddingTop>2pt</PaddingTop>
-                            <PaddingBottom>2pt</PaddingBottom>
                         </Style>
                         <Paragraphs>
                             <Paragraph>
@@ -46,14 +43,10 @@
                                         <Style>
                                             <FontFamily>Georgia</FontFamily>
                                             <FontSize>12pt</FontSize>
-                                            <FontWeight>Normal</FontWeight>
                                             <Color>#1a1916</Color>
-                                            <TextAlign>Left</TextAlign>
                                             <VerticalAlign>Top</VerticalAlign>
                                             <PaddingLeft>4pt</PaddingLeft>
                                             <PaddingRight>4pt</PaddingRight>
-                                            <PaddingTop>2pt</PaddingTop>
-                                            <PaddingBottom>2pt</PaddingBottom>
                                         </Style>
                                     </TextRun>
                                 </TextRuns>
@@ -69,14 +62,10 @@
                         <Style>
                             <FontFamily>Georgia</FontFamily>
                             <FontSize>11pt</FontSize>
-                            <FontWeight>Normal</FontWeight>
                             <Color>#1a1916</Color>
-                            <TextAlign>Left</TextAlign>
                             <VerticalAlign>Top</VerticalAlign>
                             <PaddingLeft>4pt</PaddingLeft>
                             <PaddingRight>4pt</PaddingRight>
-                            <PaddingTop>2pt</PaddingTop>
-                            <PaddingBottom>2pt</PaddingBottom>
                         </Style>
                         <Paragraphs>
                             <Paragraph>
@@ -86,14 +75,10 @@
                                         <Style>
                                             <FontFamily>Georgia</FontFamily>
                                             <FontSize>11pt</FontSize>
-                                            <FontWeight>Normal</FontWeight>
                                             <Color>#1a1916</Color>
-                                            <TextAlign>Left</TextAlign>
                                             <VerticalAlign>Top</VerticalAlign>
                                             <PaddingLeft>4pt</PaddingLeft>
                                             <PaddingRight>4pt</PaddingRight>
-                                            <PaddingTop>2pt</PaddingTop>
-                                            <PaddingBottom>2pt</PaddingBottom>
                                         </Style>
                                     </TextRun>
                                 </TextRuns>
@@ -112,8 +97,6 @@
                 <BottomMargin>0.50000in</BottomMargin>
                 <PageHeader>
                     <Height>0.55000in</Height>
-                    <PrintOnFirstPage>true</PrintOnFirstPage>
-                    <PrintOnLastPage>true</PrintOnLastPage>
                     <ReportItems>
                         <Textbox Name="Brand">
                             <Top>0.08000in</Top>
@@ -126,12 +109,9 @@
                                 <FontSize>11pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -143,12 +123,9 @@
                                                 <FontSize>11pt</FontSize>
                                                 <FontWeight>Bold</FontWeight>
                                                 <Color>#1a1916</Color>
-                                                <TextAlign>Left</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -164,14 +141,11 @@
                             <Style>
                                 <FontFamily>Helvetica</FontFamily>
                                 <FontSize>9pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#5c574e</Color>
                                 <TextAlign>Right</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -181,14 +155,11 @@
                                             <Style>
                                                 <FontFamily>Helvetica</FontFamily>
                                                 <FontSize>9pt</FontSize>
-                                                <FontWeight>Normal</FontWeight>
                                                 <Color>#5c574e</Color>
                                                 <TextAlign>Right</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -202,23 +173,18 @@
                             <Height>0.02000in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                         </Line>
                     </ReportItems>
+                    <PrintOnFirstPage>true</PrintOnFirstPage>
+                    <PrintOnLastPage>true</PrintOnLastPage>
                 </PageHeader>
                 <PageFooter>
                     <Height>0.40000in</Height>
-                    <PrintOnFirstPage>true</PrintOnFirstPage>
-                    <PrintOnLastPage>true</PrintOnLastPage>
                     <ReportItems>
                         <Line Name="FRule">
                             <Top>0.02000in</Top>
@@ -227,15 +193,10 @@
                             <Height>0.02000in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                         </Line>
                         <Textbox Name="Folio">
@@ -247,14 +208,11 @@
                             <Style>
                                 <FontFamily>Helvetica</FontFamily>
                                 <FontSize>8pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#5c574e</Color>
                                 <TextAlign>Center</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -264,14 +222,11 @@
                                             <Style>
                                                 <FontFamily>Helvetica</FontFamily>
                                                 <FontSize>8pt</FontSize>
-                                                <FontWeight>Normal</FontWeight>
                                                 <Color>#5c574e</Color>
                                                 <TextAlign>Center</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -279,6 +234,8 @@
                             </Paragraphs>
                         </Textbox>
                     </ReportItems>
+                    <PrintOnFirstPage>true</PrintOnFirstPage>
+                    <PrintOnLastPage>true</PrintOnLastPage>
                 </PageFooter>
             </Page>
         </ReportSection>

@@ -440,7 +440,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) RDLPageBreakLocation pageBreak;
 @property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
-@property (nonatomic, strong) RDLValue *pageName;   // PageBreak/PageName → Globals!PageName
+// PageName: a child of the data region itself (Tablix, Rectangle, Chart), not
+// of PageBreak. Names the pages this region lands on, which is what
+// Globals!PageName reads and what the Excel renderer makes sheet names from.
+@property (nonatomic, strong) RDLValue *pageName;
 // The RDL element this item is written as. There is no kind enum: the class
 // *is* the kind, so callers test with -isKindOfClass: and this is only for
 // messages and for the writer.
@@ -699,7 +702,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLTablixHeader *header;
 @property (nonatomic, assign) RDLPageBreakLocation pageBreak;
 @property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
-@property (nonatomic, strong) RDLValue *pageName;   // PageBreak/PageName → Globals!PageName
+// PageName: a child of the data region itself (Tablix, Rectangle, Chart), not
+// of PageBreak. Names the pages this region lands on, which is what
+// Globals!PageName reads and what the Excel renderer makes sheet names from.
+@property (nonatomic, strong) RDLValue *pageName;
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) BOOL repeatOnNewPage;
 // FixedData: keep this member's cells in view while the region is scrolled.
@@ -825,6 +831,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // Nothing set means the machine's own locale, which is what SSRS falls back
 // to as well.
 @property (nonatomic, strong) RDLValue *language;
+// The name the first page has until a data region or a group renames it --
+// Report/InitialPageName, and what Globals!PageName reads before anything
+// else has happened.
+@property (nonatomic, strong) RDLValue *initialPageName;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, strong) RDLPage *page;
 @property (nonatomic, strong) RDLBand *pageHeader;

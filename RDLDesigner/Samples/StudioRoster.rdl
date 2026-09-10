@@ -48,15 +48,10 @@
                         <DataSetName>People</DataSetName>
                         <Style>
                             <FontFamily>Georgia</FontFamily>
-                            <FontSize>10pt</FontSize>
-                            <FontWeight>Normal</FontWeight>
                             <Color>#1a1916</Color>
-                            <TextAlign>Left</TextAlign>
                             <VerticalAlign>Top</VerticalAlign>
                             <PaddingLeft>4pt</PaddingLeft>
                             <PaddingRight>4pt</PaddingRight>
-                            <PaddingTop>2pt</PaddingTop>
-                            <PaddingBottom>2pt</PaddingBottom>
                         </Style>
                         <TablixBody>
                             <TablixColumns>
@@ -87,15 +82,11 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -104,15 +95,11 @@
                                                                     <Value>Name</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
                                                                         <FontWeight>Bold</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -131,15 +118,11 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -148,15 +131,11 @@
                                                                     <Value>Desk</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
                                                                         <FontWeight>Bold</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -175,15 +154,12 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#1a1916</Color>
                                                         <TextAlign>Right</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -192,15 +168,12 @@
                                                                     <Value>Ext</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
                                                                         <FontWeight>Bold</FontWeight>
                                                                         <Color>#1a1916</Color>
                                                                         <TextAlign>Right</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -219,15 +192,11 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -236,15 +205,11 @@
                                                                     <Value>City</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
                                                                         <FontWeight>Bold</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -268,15 +233,10 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
-                                                        <FontWeight>Normal</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -285,15 +245,10 @@
                                                                     <Value>=Fields!Name.Value</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
-                                                                        <FontWeight>Normal</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -312,15 +267,10 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
-                                                        <FontWeight>Normal</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -329,15 +279,10 @@
                                                                     <Value>=Fields!Desk.Value</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
-                                                                        <FontWeight>Normal</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -356,15 +301,11 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
-                                                        <FontWeight>Normal</FontWeight>
                                                         <Color>#1a1916</Color>
                                                         <TextAlign>Right</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -373,15 +314,11 @@
                                                                     <Value>=Fields!Ext.Value</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
-                                                                        <FontWeight>Normal</FontWeight>
                                                                         <Color>#1a1916</Color>
                                                                         <TextAlign>Right</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -400,15 +337,10 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
-                                                        <FontSize>10pt</FontSize>
-                                                        <FontWeight>Normal</FontWeight>
                                                         <Color>#1a1916</Color>
-                                                        <TextAlign>Left</TextAlign>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
-                                                        <PaddingTop>2pt</PaddingTop>
-                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -417,15 +349,10 @@
                                                                     <Value>=Fields!City.Value</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
-                                                                        <FontSize>10pt</FontSize>
-                                                                        <FontWeight>Normal</FontWeight>
                                                                         <Color>#1a1916</Color>
-                                                                        <TextAlign>Left</TextAlign>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>
                                                                         <PaddingRight>4pt</PaddingRight>
-                                                                        <PaddingTop>2pt</PaddingTop>
-                                                                        <PaddingBottom>2pt</PaddingBottom>
                                                                     </Style>
                                                                 </TextRun>
                                                             </TextRuns>
@@ -466,15 +393,10 @@
                         <CanGrow>true</CanGrow>
                         <Style>
                             <FontFamily>Georgia</FontFamily>
-                            <FontSize>10pt</FontSize>
-                            <FontWeight>Normal</FontWeight>
                             <Color>#5c574e</Color>
-                            <TextAlign>Left</TextAlign>
                             <VerticalAlign>Top</VerticalAlign>
                             <PaddingLeft>4pt</PaddingLeft>
                             <PaddingRight>4pt</PaddingRight>
-                            <PaddingTop>2pt</PaddingTop>
-                            <PaddingBottom>2pt</PaddingBottom>
                         </Style>
                         <Paragraphs>
                             <Paragraph>
@@ -483,15 +405,10 @@
                                         <Value>=Count(Fields!Name.Value) &amp; " names on the floor"</Value>
                                         <Style>
                                             <FontFamily>Georgia</FontFamily>
-                                            <FontSize>10pt</FontSize>
-                                            <FontWeight>Normal</FontWeight>
                                             <Color>#5c574e</Color>
-                                            <TextAlign>Left</TextAlign>
                                             <VerticalAlign>Top</VerticalAlign>
                                             <PaddingLeft>4pt</PaddingLeft>
                                             <PaddingRight>4pt</PaddingRight>
-                                            <PaddingTop>2pt</PaddingTop>
-                                            <PaddingBottom>2pt</PaddingBottom>
                                         </Style>
                                     </TextRun>
                                 </TextRuns>
@@ -510,8 +427,6 @@
                 <BottomMargin>0.50000in</BottomMargin>
                 <PageHeader>
                     <Height>0.55000in</Height>
-                    <PrintOnFirstPage>true</PrintOnFirstPage>
-                    <PrintOnLastPage>true</PrintOnLastPage>
                     <ReportItems>
                         <Textbox Name="Title">
                             <Top>0.04000in</Top>
@@ -522,14 +437,10 @@
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
                                 <FontSize>16pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -539,14 +450,10 @@
                                             <Style>
                                                 <FontFamily>Georgia</FontFamily>
                                                 <FontSize>16pt</FontSize>
-                                                <FontWeight>Normal</FontWeight>
                                                 <Color>#1a1916</Color>
-                                                <TextAlign>Left</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -562,14 +469,11 @@
                             <Style>
                                 <FontFamily>Helvetica</FontFamily>
                                 <FontSize>9pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#5c574e</Color>
                                 <TextAlign>Right</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -579,14 +483,11 @@
                                             <Style>
                                                 <FontFamily>Helvetica</FontFamily>
                                                 <FontSize>9pt</FontSize>
-                                                <FontWeight>Normal</FontWeight>
                                                 <Color>#5c574e</Color>
                                                 <TextAlign>Right</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -600,23 +501,18 @@
                             <Height>0.02000in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                         </Line>
                     </ReportItems>
+                    <PrintOnFirstPage>true</PrintOnFirstPage>
+                    <PrintOnLastPage>true</PrintOnLastPage>
                 </PageHeader>
                 <PageFooter>
                     <Height>0.40000in</Height>
-                    <PrintOnFirstPage>true</PrintOnFirstPage>
-                    <PrintOnLastPage>true</PrintOnLastPage>
                     <ReportItems>
                         <Line Name="FRule">
                             <Top>0.04000in</Top>
@@ -625,15 +521,10 @@
                             <Height>0.02000in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#1a1916</Color>
-                                <TextAlign>Left</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                         </Line>
                         <Textbox Name="F">
@@ -645,14 +536,11 @@
                             <Style>
                                 <FontFamily>Helvetica</FontFamily>
                                 <FontSize>8pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
                                 <Color>#5c574e</Color>
                                 <TextAlign>Center</TextAlign>
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
-                                <PaddingTop>2pt</PaddingTop>
-                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -662,14 +550,11 @@
                                             <Style>
                                                 <FontFamily>Helvetica</FontFamily>
                                                 <FontSize>8pt</FontSize>
-                                                <FontWeight>Normal</FontWeight>
                                                 <Color>#5c574e</Color>
                                                 <TextAlign>Center</TextAlign>
                                                 <VerticalAlign>Top</VerticalAlign>
                                                 <PaddingLeft>4pt</PaddingLeft>
                                                 <PaddingRight>4pt</PaddingRight>
-                                                <PaddingTop>2pt</PaddingTop>
-                                                <PaddingBottom>2pt</PaddingBottom>
                                             </Style>
                                         </TextRun>
                                     </TextRuns>
@@ -677,6 +562,8 @@
                             </Paragraphs>
                         </Textbox>
                     </ReportItems>
+                    <PrintOnFirstPage>true</PrintOnFirstPage>
+                    <PrintOnLastPage>true</PrintOnLastPage>
                 </PageFooter>
             </Page>
         </ReportSection>

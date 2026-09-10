@@ -2180,14 +2180,17 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
         }];
       }
     } else if (it.resetPageNumber || it.pageName != nil) {
+      // Evaluated here, the way the tablix path does it. Stored raw, the
+      // RDLValue reached -[NSString length] further down and threw.
       CGFloat gh = it.height + MAX(RDLGrownDelta(it, report, measure, bodyAvail), 0);
       CGFloat y0 = it.top + RDLExtraBelow(it.top, growers, report, measure, bodyAvail);
       y0 += RDLBodyItemShift(it, y0, gh, bodyAvail);
       NSInteger slice = (NSInteger)floor(y0 / bodyAvail + 0.0001);
+      NSString *named = it.pageName ? RDLAsStr(RDLEvalRow(it.pageName, nil, measure)) : @"";
       [marks addObject:@{
         @"slice" : @(slice),
         @"reset" : @(it.resetPageNumber),
-        @"name" : it.pageName ?: @""
+        @"name" : named ?: @""
       }];
     }
   }
@@ -2227,6 +2230,11 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
         nextSect = s;
       if (s <= sliceIdx && [mk[@"name"] length])
         pname = mk[@"name"];
+    }
+    if ([pname length] == 0 && report.initialPageName != nil) {
+      // What the report calls its pages before a region or a group says
+      // otherwise.
+      pname = RDLAsStr(RDLEvalRow(report.initialPageName, nil, measure));
     }
 
     RDLEvalScope *scope = [[RDLEvalScope alloc] init];

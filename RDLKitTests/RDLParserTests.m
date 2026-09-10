@@ -600,6 +600,25 @@ static NSString *RDLLegacyTableRDL(void) {
     if (![[padding stringValue] isEqualToString:@"2pt"])
       XCTFail(@"%@", [NSString stringWithFormat:@"padding defaults to 2pt, not %@",
                                                 [padding stringValue]]);
+  // Each side on its own: a file that states one padding keeps the default on
+  // the other three. Assigning every side from the parse overwrote the ones
+  // the file did not mention with nothing, and an item with a stated left
+  // padding lost its top and bottom.
+  RDLReport *partly = [RDLParser reportFromXMLString:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\"><ReportSections><ReportSection><Body><Height>1in</Height>"
+      @"<ReportItems><Textbox Name=\"T\"><Value>x</Value>"
+      @"<Style><PaddingLeft>6pt</PaddingLeft></Style></Textbox></ReportItems></Body>"
+      @"<Width>5in</Width><Page/></ReportSection></ReportSections></Report>"
+                                                error:NULL];
+  RDLStyle *style = [[partly.body.items firstObject] style];
+  if (![[style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"%@", @"a stated padding should be read");
+  if (![[style.paddingTop stringValue] isEqualToString:@"2pt"] ||
+      ![[style.paddingRight stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the other sides keep the default, not %@/%@",
+                                              [style.paddingTop stringValue],
+                                              [style.paddingRight stringValue]]);
   if (box.canGrow)
     XCTFail(@"%@", @"a textbox that says nothing does not grow");
   RDLImage *image = (RDLImage *)r.body.items[1];
@@ -683,6 +702,108 @@ static NSString *RDLLegacyTableRDL(void) {
   }
   if (!sawNumberRight || !sawTextLeft)
     XCTFail(@"%@", @"the layout should have produced both a number and a word to align");
+}
+
+// PageName belongs to the data region or the group, and Report/InitialPageName
+// names the pages before either has spoken. This kit read PageName only inside
+// PageBreak -- a place no schema allows -- so a spec file's page names were
+// invisible and the kit's own files were invalid. A body item with one used to
+// throw -[RDLValue length] outright.
+- (void)testPageNamesAreReadWhereTheSpecPutsThem {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <InitialPageName>Cover</InitialPageName>"
+      @"  <ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+      @"    <Rectangle Name=\"Panel\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageName>Panel Pages</PageName>"
+      @"      <PageBreak><BreakLocation>Start</BreakLocation></PageBreak>"
+      @"      <ReportItems/>"
+      @"    </Rectangle>"
+      @"    <Tablix Name=\"Grid\">"
+      @"      <Top>1.5in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageName>Grid Pages</PageName>"
+      @"      <TablixBody><TablixColumns><TablixColumn><Width>3in</Width></TablixColumn>"
+      @"      </TablixColumns><TablixRows><TablixRow><Height>0.25in</Height><TablixCells>"
+      @"      <TablixCell><CellContents><Textbox Name=\"C\"><Value>x</Value></Textbox>"
+      @"      </CellContents></TablixCell></TablixCells></TablixRow></TablixRows></TablixBody>"
+      @"      <TablixColumnHierarchy><TablixMembers><TablixMember/></TablixMembers>"
+      @"      </TablixColumnHierarchy>"
+      @"      <TablixRowHierarchy><TablixMembers><TablixMember>"
+      @"        <Group Name=\"g\"><PageName>Group Pages</PageName>"
+      @"          <GroupExpressions><GroupExpression>=Fields!Sku.Value</GroupExpression>"
+      @"          </GroupExpressions></Group>"
+      @"      </TablixMember></TablixMembers></TablixRowHierarchy>"
+      @"    </Tablix>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"the report should parse");
+    return;
+  }
+  if (![[r.initialPageName source] isEqualToString:@"Cover"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"InitialPageName: %@",
+                                              [r.initialPageName source]]);
+  RDLItem *panel = [r.body.items firstObject];
+  if (![[panel.pageName source] isEqualToString:@"Panel Pages"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a Rectangle's own PageName: %@",
+                                              [panel.pageName source]]);
+  RDLTablix *grid = (RDLTablix *)r.body.items[1];
+  if (![[grid.pageName source] isEqualToString:@"Grid Pages"])
+    XCTFail(@"%@", @"a Tablix's own PageName");
+  RDLTablixMember *member = [grid.rowHierarchy.members firstObject];
+  if (![[member.pageName source] isEqualToString:@"Group Pages"])
+    XCTFail(@"%@", @"a Group's PageName");
+
+  // And written back where they were read, never inside PageBreak.
+  NSString *out = [RDLWriter XMLStringFromReport:r];
+  if ([out rangeOfString:@"<InitialPageName>Cover</InitialPageName>"].location == NSNotFound)
+    XCTFail(@"%@", @"InitialPageName should be written");
+  NSRange breakRange = [out rangeOfString:@"<PageBreak>"];
+  while (breakRange.location != NSNotFound) {
+    NSRange rest = NSMakeRange(NSMaxRange(breakRange), [out length] - NSMaxRange(breakRange));
+    NSRange end = [out rangeOfString:@"</PageBreak>" options:0 range:rest];
+    if (end.location == NSNotFound)
+      break;
+    NSString *inside = [out substringWithRange:NSMakeRange(NSMaxRange(breakRange),
+                                                           end.location - NSMaxRange(breakRange))];
+    if ([inside rangeOfString:@"PageName"].location != NSNotFound)
+      XCTFail(@"%@", @"PageName is not a child of PageBreak in any schema");
+    breakRange = [out rangeOfString:@"<PageBreak>" options:0
+                              range:NSMakeRange(NSMaxRange(end), [out length] - NSMaxRange(end))];
+  }
+  RDLReport *back = [RDLParser reportFromXMLString:out error:NULL];
+  if (![[[[back.body.items firstObject] pageName] source] isEqualToString:@"Panel Pages"])
+    XCTFail(@"%@", @"and they should come back");
+}
+
+// The old placement, in files this kit wrote: the migrator lifts it to the
+// item that owns the break, so the reader never has to know about it.
+- (void)testAPageNameInsideAPageBreakIsMigrated {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+      @"    <Rectangle Name=\"Panel\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageBreak><BreakLocation>Start</BreakLocation>"
+      @"        <PageName>Old Placement</PageName></PageBreak>"
+      @"      <ReportItems/>"
+      @"    </Rectangle>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLItem *panel = [r.body.items firstObject];
+  if (![[panel.pageName source] isEqualToString:@"Old Placement"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the migrator should lift it: %@",
+                                              [panel.pageName source]]);
+  // It used to reach the layout as an unevaluated RDLValue and throw
+  // -[RDLValue length] while collecting page marks.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if ([pages count] == 0)
+    XCTFail(@"%@", @"a body item with a page name should still lay out");
 }
 
 - (void)testValue {

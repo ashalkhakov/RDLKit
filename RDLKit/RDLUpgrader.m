@@ -794,6 +794,24 @@ static void RDLUpgradePage(NSXMLElement *root) {
 
 #pragma mark - The root shape
 
+// PageName inside PageBreak is RDLKit's own invention -- no schema has it
+// there -- and files this kit wrote carry it. It belongs to the region or the
+// group that owns the break, so that is where it goes.
+static void RDLUpgradePageNames(NSXMLElement *el) {
+  for (NSXMLElement *child in RDLElems(el))
+    RDLUpgradePageNames(child);
+  if (![RDLLN(el) isEqualToString:@"PageBreak"])
+    return;
+  NSXMLElement *name = RDLKid(el, @"PageName");
+  NSXMLElement *owner = (NSXMLElement *)[el parent];
+  if (name == nil || owner == nil)
+    return;
+  if (RDLKid(owner, @"PageName") == nil)
+    [owner addChild:RDLTake(name)];
+  else
+    [name detach];
+}
+
 // Every List in the document, whatever version the file claims to be: List is
 // a 2005 element, and a file that carries one is a 2005-shaped file however it
 // is labelled.
@@ -987,6 +1005,7 @@ static void RDLUpgradeElement(NSXMLElement *el) {
   // plenty of files in the wild. The parser reads one grammar, so anything
   // else has to become that grammar here.
   RDLUpgradeLists(root);
+  RDLUpgradePageNames(root);
   RDLUpgradeRootShape(root);
   return version;
 }

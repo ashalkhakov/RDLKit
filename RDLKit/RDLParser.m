@@ -185,18 +185,34 @@ static void RDLSetStyleString(RDLStyle *s, NSString *raw, NSString *key) {
   RDLSetStyleString(s, RDLText(RDLChild(el, @"Language")), @"language");
   RDLSetStyleString(s, RDLText(RDLChild(el, @"BackgroundColor")), @"backgroundColor");
   {
+    // Padding that is not in the file keeps the default the style started
+    // with. Assigning the result of the parse unconditionally overwrote 2pt
+    // with nil, so an item that said nothing about its padding got none --
+    // invisible until the writer stopped writing the default out.
     RDLExpr *pe = nil;
-    s.paddingLeft = RDLParseLength(el, @"PaddingLeft", &pe);
-    RDLStyleExprs(s).paddingLeft = pe;
+    RDLLength *len = RDLParseLength(el, @"PaddingLeft", &pe);
+    if (len || pe) {
+      s.paddingLeft = len;
+      RDLStyleExprs(s).paddingLeft = pe;
+    }
     pe = nil;
-    s.paddingRight = RDLParseLength(el, @"PaddingRight", &pe);
-    RDLStyleExprs(s).paddingRight = pe;
+    len = RDLParseLength(el, @"PaddingRight", &pe);
+    if (len || pe) {
+      s.paddingRight = len;
+      RDLStyleExprs(s).paddingRight = pe;
+    }
     pe = nil;
-    s.paddingTop = RDLParseLength(el, @"PaddingTop", &pe);
-    RDLStyleExprs(s).paddingTop = pe;
+    len = RDLParseLength(el, @"PaddingTop", &pe);
+    if (len || pe) {
+      s.paddingTop = len;
+      RDLStyleExprs(s).paddingTop = pe;
+    }
     pe = nil;
-    s.paddingBottom = RDLParseLength(el, @"PaddingBottom", &pe);
-    RDLStyleExprs(s).paddingBottom = pe;
+    len = RDLParseLength(el, @"PaddingBottom", &pe);
+    if (len || pe) {
+      s.paddingBottom = len;
+      RDLStyleExprs(s).paddingBottom = pe;
+    }
   }
   if ([s.expressions isEmpty])
     s.expressions = nil;
@@ -275,7 +291,10 @@ static BOOL RDLParsePageBreakReset(NSXMLElement *el) {
   return [r caseInsensitiveCompare:@"true"] == NSOrderedSame;
 }
 
-static RDLValue *RDLParsePageBreakName(NSXMLElement *el) {
+// PageName is a child of the data region or of the Group -- never of
+// PageBreak, which is where this kit used to write it and the only place it
+// used to look. RDLUpgrader moves an old one up to its parent.
+static RDLValue *RDLParsePageName(NSXMLElement *el) {
   return RDLValueFromElement(RDLChild(el, @"PageName"));
 }
 
@@ -518,7 +537,7 @@ static NSString *RDLElementPath(NSXMLElement *el) {
     if (pb != RDLPageBreakLocationUnspecified)
       m.pageBreak = pb;
     m.resetPageNumber = RDLParsePageBreakReset(RDLChild(group, @"PageBreak"));
-    RDLValue *pn = RDLParsePageBreakName(RDLChild(group, @"PageBreak"));
+    RDLValue *pn = RDLParsePageName(group);
     if (pn)
       m.pageName = pn;
     NSArray *gf = [self parseFilters:RDLChild(group, @"Filters")];
@@ -555,9 +574,6 @@ static NSString *RDLElementPath(NSXMLElement *el) {
     m.pageBreak = mb;
   if (RDLParsePageBreakReset(RDLChild(el, @"PageBreak")))
     m.resetPageNumber = YES;
-  RDLValue *mpn = RDLParsePageBreakName(RDLChild(el, @"PageBreak"));
-  if (mpn)
-    m.pageName = mpn;
   NSXMLElement *kids = RDLChild(el, @"TablixMembers");
   for (NSXMLNode *n in [kids children]) {
     if (n.kind == NSXMLElementKind && [[(NSXMLElement *)n localName] isEqualToString:@"TablixMember"])
@@ -795,10 +811,10 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     if (pb != RDLPageBreakLocationUnspecified)
       item.pageBreak = pb;
     item.resetPageNumber = RDLParsePageBreakReset(pbEl);
-    RDLValue *pn = RDLParsePageBreakName(pbEl);
-    if (pn)
-      item.pageName = pn;
   }
+  RDLValue *pn = RDLParsePageName(el);
+  if (pn)
+    item.pageName = pn;
   NSString *ktc = RDLText(RDLChild(el, @"KeepTogether"));
   if ([ktc length])
     item.keepTogether = [ktc caseInsensitiveCompare:@"true"] == NSOrderedSame;
@@ -1058,6 +1074,7 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   // "=User!Language" are both Language, and RDLValue is the one shape that
   // holds either.
   r.language = [RDLValue valueWithSource:RDLText(RDLChild(root, @"Language"))];
+  r.initialPageName = RDLValueFromElement(RDLChild(root, @"InitialPageName"));
   NSXMLElement *layout = [self layoutSectionOf:root];
   r.width = RDLInchesFromString(RDLText(RDLChild(layout, @"Width")));
   // rd:ReportUnitType -- the unit the author works in. Not a measurement: it
@@ -1440,18 +1457,23 @@ static void RDLAddSorts(NSXMLElement *parent, NSArray<RDLSortExpression *> *sort
   [parent addChild:ss];
 }
 
-static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, BOOL reset,
-                             RDLValue *pageName) {
+// PageBreak holds a BreakLocation and ResetPageNumber. PageName is not one of
+// its children in any schema -- it belongs to the region or the group, and is
+// written there by RDLAddPageName.
+static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, BOOL reset) {
   BOOL hasLocation = loc != RDLPageBreakLocationUnspecified && loc != RDLPageBreakLocationNone;
-  if (!hasLocation && !reset && pageName == nil)
+  if (!hasLocation && !reset)
     return;
   NSXMLElement *pb = RDLEl(@"PageBreak");
   if (hasLocation)
     RDLAdd(pb, @"BreakLocation", RDLStringFromPageBreakLocation(loc));
   if (reset)
     RDLAdd(pb, @"ResetPageNumber", @"true");
-  RDLAddValue(pb, @"PageName", pageName);
   [parent addChild:pb];
+}
+
+static void RDLAddPageName(NSXMLElement *parent, RDLValue *pageName) {
+  RDLAddValue(parent, @"PageName", pageName);
 }
 
 static void RDLAddVisibility(NSXMLElement *parent, RDLValue *hidden, NSString *toggleItem) {
@@ -1479,7 +1501,8 @@ static void RDLAddHyperlink(NSXMLElement *parent, RDLItem *it) {
 static void RDLAddItemPagination(NSXMLElement *parent, RDLItem *it) {
   if (it.keepTogether)
     RDLAdd(parent, @"KeepTogether", @"true");
-  RDLAddPageBreak(parent, it.pageBreak, it.resetPageNumber, it.pageName);
+  RDLAddPageBreak(parent, it.pageBreak, it.resetPageNumber);
+  RDLAddPageName(parent, it.pageName);
 }
 
 - (void)addMember:(RDLTablixMember *)m to:(NSXMLElement *)parent {
@@ -1495,7 +1518,8 @@ static void RDLAddItemPagination(NSXMLElement *parent, RDLItem *it) {
     }
     if (m.parentExpression)
       RDLAddValue(group, @"Parent", m.parentExpression);
-    RDLAddPageBreak(group, m.pageBreak, m.resetPageNumber, m.pageName);
+    RDLAddPageBreak(group, m.pageBreak, m.resetPageNumber);
+    RDLAddPageName(group, m.pageName);
     RDLAddFilters(group, m.filters);
     [me addChild:group];
   }
@@ -1678,7 +1702,8 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     RDLAdd(tx, @"FixedRowHeaders", @"true");
   if (it.keepTogether)
     RDLAdd(tx, @"KeepTogether", @"true");
-  RDLAddPageBreak(tx, it.pageBreak, it.resetPageNumber, it.pageName);
+  RDLAddPageBreak(tx, it.pageBreak, it.resetPageNumber);
+  RDLAddPageName(tx, it.pageName);
   RDLAddFilters(tx, it.filters);
   RDLAddSorts(tx, it.sortExpressions);
   RDLAddStyle(tx, it.style);
@@ -1936,6 +1961,7 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   RDLAdd(root, @"Description", report.reportDescription);
   RDLAdd(root, @"Author", report.author);
   RDLAddValue(root, @"Language", report.language);
+  RDLAddValue(root, @"InitialPageName", report.initialPageName);
 
   // The sources the report has, and no others. A "Demo" source used to be
   // invented for a report that declared none, which wrote a data source nobody
