@@ -278,10 +278,25 @@
   if ([plist rangeOfString:[NSString stringWithFormat:@"<key>FullVersionID</key>\n  <string>%@</string>",
                                                              release]].location == NSNotFound)
     XCTFail(@"%@", @"FullVersionID should say the same as ApplicationRelease");
+  // Apple's keys carry the leading dotted number of it and nothing more:
+  // CURRENT_PROJECT_VERSION is compiled into a generated <Target>_vers.c as a
+  // double, so a tag like v0.1.0 there stops the framework building at all,
+  // and CFBundleShortVersionString is documented as integers and periods.
+  NSString *numeric = release;
+  NSCharacterSet *digitsAndDots =
+      [NSCharacterSet characterSetWithCharactersInString:@"0123456789."];
+  NSRange notNumeric = [release rangeOfCharacterFromSet:[digitsAndDots invertedSet]];
+  if (notNumeric.location != NSNotFound)
+    numeric = [release substringToIndex:notNumeric.location];
+  while ([numeric hasSuffix:@"."])
+    numeric = [numeric substringToIndex:[numeric length] - 1];
+  if ([numeric length] == 0)
+    numeric = @"0.0.0";
   if ([plist rangeOfString:[NSString stringWithFormat:
                                @"<key>CFBundleShortVersionString</key>\n  <string>%@</string>",
-                               release]].location == NSNotFound)
-    XCTFail(@"%@", @"the bundle version should say the same as the About panel's");
+                               numeric]].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"CFBundleShortVersionString should be %@, the "
+                                              @"number in %@", numeric, release]);
   // And nothing named Info-gnustep.plist beside it: gnustep-make generates a
   // file of that name into the bundle, so one in the source directory is read
   // by nobody and silently disagrees with what ships.
@@ -292,9 +307,10 @@
                    @"gnustep-make generates that file from RDLDesigner-Info.plist");
   // Xcode generates the bundle's plist from these, so a stamp that missed them
   // would ship a bundle still claiming whatever the project file says.
-  if ([project rangeOfString:[NSString stringWithFormat:@"MARKETING_VERSION = %@;", release]]
-          .location == NSNotFound)
-    XCTFail(@"%@", @"the Xcode project should carry the same version");
+  for (NSString *key in @[ @"MARKETING_VERSION", @"CURRENT_PROJECT_VERSION" ])
+    if ([project rangeOfString:[NSString stringWithFormat:@"%@ = %@;", key, numeric]].location ==
+        NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be %@", key, numeric]);
 }
 
 // The AppImage's opener. NSWorkspace hands a URL to whatever

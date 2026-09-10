@@ -1226,7 +1226,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RDLDesigner/RDLDesigner-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (C) 2026 the RDLKit contributors. LGPL 2.1.";
@@ -1235,7 +1235,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1251,13 +1251,13 @@
 		1E82542BCCC099F129EC2C05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1275,7 +1275,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLDesignerTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1283,7 +1283,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1303,7 +1303,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1316,7 +1316,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1336,7 +1336,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLDesignerTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1344,7 +1344,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1364,7 +1364,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLKitTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1372,7 +1372,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1393,7 +1393,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "RDLDesigner/RDLDesigner-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright (C) 2026 the RDLKit contributors. LGPL 2.1.";
@@ -1402,7 +1402,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1419,7 +1419,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RDLKitTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1427,7 +1427,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1446,13 +1446,13 @@
 		6C24AE4171CCECDC2D082869 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
@@ -1509,7 +1509,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 0.0.0-dev;
+				CURRENT_PROJECT_VERSION = 0.0.0;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
@@ -1522,7 +1522,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.0-dev;
+				MARKETING_VERSION = 0.0.0;
 				OTHER_CFLAGS = (
 					"-Werror=int-conversion",
 					"-Werror=incompatible-pointer-types",
