@@ -171,6 +171,45 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"the page comes from the section");
 }
 
+// Everything that is not the current grammar is the migrator's problem, so
+// that the parser reads one shape. The case that proves it is this kit's own
+// older output: it declared the 2010 namespace -- so no version-based upgrade
+// would touch it -- while carrying the 2008 root shape and a Name child no
+// schema has.
+- (void)testAnOlderFileIsBroughtToTheCurrentShapeBeforeParsing {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <Name>Old Output</Name>"
+      @"  <Width>7in</Width>"
+      @"  <Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Hello\"><Value>Hello</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"    </Textbox>"
+      @"  </ReportItems></Body>"
+      @"  <PageHeader><Height>0.6in</Height><ReportItems/></PageHeader>"
+      @"  <Page><PageWidth>8.5in</PageWidth><LeftMargin>0.75in</LeftMargin></Page>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"the file should still open");
+    return;
+  }
+  if (![r.name isEqualToString:@"Old Output"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the Name child should be migrated: %@", r.name]);
+  if ([r.body.items count] != 1)
+    XCTFail(@"%@", @"the body should be found in the section the migrator made");
+  if (fabs(r.width - 7.0) > 0.001)
+    XCTFail(@"%@", @"and the width with it");
+  if (fabs(r.page.leftMargin - 0.75) > 0.001)
+    XCTFail(@"%@", @"and the page");
+  // The root-level band is the one the parser no longer looks for: the
+  // migrator has to have put it under Page.
+  if (fabs(r.pageHeader.height - 0.6) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the page header did not move: %g",
+                                              r.pageHeader.height]);
+}
+
 // The schema allows several sections; SSRS writes one. Reading the first is
 // the practical answer, but silently is not -- half a document would go
 // missing the way the whole of one used to.
@@ -403,6 +442,123 @@ static NSString *RDLLegacyTableRDL(void) {
       XCTFail(@"%@", @"a 2010 document should not be upgraded");
   if (![[RDLWriter XMLStringFromReport:back] isEqualToString:modernXML])
     XCTFail(@"%@", @"a current document should round trip untouched");
+}
+
+// The upgrade runs for every document older than 2010, and 2008 is one of
+// those -- but a 2008 chart is already in the shape the rewrite produces. It
+// looked for series one level too shallow (the 2005 ChartData/ChartSeries
+// path), found none, and then detached the real ChartData and put its own
+// empty collection there. Every 2008 chart drew an empty plot.
+- (void)testATwentyEightChartKeepsItsSeries {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2008/01/"
+      @"reportdefinition\">"
+      @"  <Body><Height>4in</Height><ReportItems>"
+      @"    <Chart Name=\"Sales\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>5in</Width><Height>3in</Height>"
+      @"      <DataSetName>Rows</DataSetName>"
+      @"      <ChartCategoryHierarchy><ChartMembers><ChartMember>"
+      @"        <Group Name=\"cat\"><GroupExpressions>"
+      @"          <GroupExpression>=Fields!Month.Value</GroupExpression>"
+      @"        </GroupExpressions></Group>"
+      @"      </ChartMember></ChartMembers></ChartCategoryHierarchy>"
+      @"      <ChartData><ChartSeriesCollection>"
+      @"        <ChartSeries Name=\"Amount\"><ChartDataPoints><ChartDataPoint>"
+      @"          <ChartDataPointValues><Y>=Sum(Fields!Amount.Value)</Y>"
+      @"          </ChartDataPointValues>"
+      @"        </ChartDataPoint></ChartDataPoints><Type>Column</Type></ChartSeries>"
+      @"      </ChartSeriesCollection></ChartData>"
+      @"      <ChartAreas><ChartArea Name=\"Default\"/></ChartAreas>"
+      @"    </Chart>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLChart *chart = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      chart = (RDLChart *)it;
+  if (chart == nil) {
+    XCTFail(@"%@", @"the 2008 chart did not survive the upgrade at all");
+    return;
+  }
+  if ([chart.series count] != 1) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the chart has %lu series, not 1",
+                                              (unsigned long)[chart.series count]]);
+    return;
+  }
+  if ([[chart.series[0].value source] rangeOfString:@"Amount"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the series lost its expression: %@",
+                                              [chart.series[0].value source]]);
+  if ([chart.categoryMembers count] != 1)
+    XCTFail(@"%@", @"and its category grouping should still be there");
+}
+
+// 2005 allowed <Action> directly on an item; 2008 moved it under
+// <ActionInfo><Actions>, which is the only place the parser looks. An
+// unlifted 2005 link is a link that quietly does not exist.
+- (void)testATwentyFiveActionIsLifted {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/"
+      @"reportdefinition\" Name=\"Links\">"
+      @"  <Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Home\"><Value>Home</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"      <Action><Hyperlink>https://example.org/</Hyperlink></Action>"
+      @"    </Textbox>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLItem *box = [r.body.items firstObject];
+  if (box == nil) {
+    XCTFail(@"%@", @"the textbox did not survive");
+    return;
+  }
+  if (![[box.hyperlink source] isEqualToString:@"https://example.org/"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the 2005 Action was not lifted: %@",
+                                              [box.hyperlink source]]);
+}
+
+// A List sorts as a whole, and its <Sorting> sits beside the grouping rather
+// than inside it, so the group upgrade never saw it: a sorted 2005 list came
+// back unsorted.
+- (void)testATwentyFiveListKeepsItsSort {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/"
+      @"reportdefinition\" Name=\"Listing\">"
+      @"  <Body><Height>3in</Height><ReportItems>"
+      @"    <List Name=\"Rows\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>5in</Width><Height>1in</Height>"
+      @"      <DataSetName>Rows</DataSetName>"
+      @"      <Sorting><SortBy>"
+      @"        <SortExpression>=Fields!Name.Value</SortExpression>"
+      @"        <Direction>Descending</Direction>"
+      @"      </SortBy></Sorting>"
+      @"      <ReportItems><Textbox Name=\"Cell\"><Value>=Fields!Name.Value</Value>"
+      @"        <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"      </Textbox></ReportItems>"
+      @"    </List>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTablix *list = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      list = (RDLTablix *)it;
+  if (list == nil) {
+    XCTFail(@"%@", @"the list did not survive the upgrade");
+    return;
+  }
+  if ([list.sortExpressions count] != 1) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the list has %lu sorts, not 1",
+                                              (unsigned long)[list.sortExpressions count]]);
+    return;
+  }
+  RDLSortExpression *sort = list.sortExpressions[0];
+  if ([[sort.expression source] rangeOfString:@"Name"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the sort lost its expression: %@",
+                                              [sort.expression source]]);
+  if (sort.direction != RDLSortDirectionDescending)
+    XCTFail(@"%@", @"and its direction");
 }
 
 - (void)testValue {

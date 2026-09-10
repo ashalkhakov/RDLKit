@@ -735,10 +735,8 @@ static RDLValue *RDLParseHyperlink(NSXMLElement *el) {
   return h;
 }
 
-// The element name picks the class. A List is an RDL 2005 data region that
-// this parser treats as a Tablix, and a Rectangle carrying RDLDesigner.* custom
-// properties is re-made as a Chart further down.
-// A Rectangle that carries RDLDesigner.ChartType is this app's chart, not a rectangle.
+// A Rectangle that carries RDLDesigner.ChartType is this app's chart, not a
+// rectangle.
 // The class is fixed when the item is created, so this has to be known first.
 static BOOL RDLRectangleIsChart(NSXMLElement *el) {
   for (NSXMLNode *n in [RDLChild(el, @"CustomProperties") children]) {
@@ -750,8 +748,9 @@ static BOOL RDLRectangleIsChart(NSXMLElement *el) {
   return NO;
 }
 
-// The element name picks the class, and nothing else is accepted. `List` and
-// `Table` are the RDL 2005 spellings of a Tablix.
+// The element name picks the class, and nothing else is accepted. The names
+// here are the current schema's: a 2005 List or Table has been rewritten into
+// a Tablix by RDLUpgrader before the reader sees it.
 static RDLItem *RDLItemForElementName(NSString *name) {
   static NSDictionary *classes = nil;
   static dispatch_once_t once;
@@ -763,8 +762,6 @@ static RDLItem *RDLItemForElementName(NSString *name) {
       @"Image" : [RDLImage class],
       @"Chart" : [RDLChart class],
       @"Tablix" : [RDLTablix class],
-      @"Table" : [RDLTablix class],
-      @"List" : [RDLTablix class],
       @"Subreport" : [RDLSubreport class],
     };
   });
@@ -819,51 +816,7 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     img.hyperlink = RDLParseHyperlink(el);
   } else if ([el.localName isEqualToString:@"Chart"]) {
     [self parseChart:el into:(RDLChart *)item];
-  } else if ([el.localName isEqualToString:@"List"]) {
-    RDLTablix *tablix = (RDLTablix *)item;
-    // RDL 2005 List: single-column, single-details-row Tablix whose cell holds
-    // a Rectangle with the list contents; repeats once per data row/group.
-
-    tablix.dataSetName = RDLText(RDLChild(el, @"DataSetName"));
-    RDLRectangle *cellRect = [[RDLRectangle alloc] init];
-    cellRect.name = [NSString stringWithFormat:@"%@_Contents", item.name];
-    cellRect.width = item.width;
-    cellRect.height = item.height;
-    NSXMLElement *ri = RDLChild(el, @"ReportItems");
-    for (NSXMLNode *n in [ri children]) {
-      if (n.kind != NSXMLElementKind)
-        continue;
-      RDLItem *parsed = [self parseItem:(NSXMLElement *)n];
-      if (parsed)
-        [cellRect.items addObject:parsed];
-    }
-    RDLTablixBody *body = [[RDLTablixBody alloc] init];
-    RDLTablixColumn *col = [[RDLTablixColumn alloc] init];
-    col.width = item.width;
-    [body.columns addObject:col];
-    RDLTablixRow *row = [[RDLTablixRow alloc] init];
-    row.height = item.height > 0 ? item.height : 0.28;
-    RDLTablixCell *cell = [[RDLTablixCell alloc] init];
-    cell.item = cellRect;
-    [row.cells addObject:cell];
-    [body.rows addObject:row];
-    tablix.tablixBody = body;
-    RDLTablixHierarchy *rh = [[RDLTablixHierarchy alloc] init];
-    RDLTablixMember *dm = [[RDLTablixMember alloc] init];
-    dm.groupName = [NSString stringWithFormat:@"%@_Details", item.name];
-    NSXMLElement *grouping = RDLChild(el, @"Grouping");
-    if (grouping) {
-      dm.groupName = [grouping attributeForName:@"Name"].stringValue ?: dm.groupName;
-      for (NSXMLNode *n in [RDLChild(grouping, @"GroupExpressions") children]) {
-        if (n.kind == NSXMLElementKind)
-          [dm.groupExpressions addObject:[RDLValue valueWithSource:RDLText((NSXMLElement *)n)] ?: [RDLValue literal:@""]];
-      }
-    }
-    [rh.members addObject:dm];
-    tablix.rowHierarchy = rh;
-    [tablix.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"Sorting")]];
-    [tablix.filters addObjectsFromArray:[self parseFilters:RDLChild(el, @"Filters")]];
-  } else if ([el.localName isEqualToString:@"Tablix"] || [el.localName isEqualToString:@"Table"]) {
+  } else if ([el.localName isEqualToString:@"Tablix"]) {
     RDLTablix *tablix = (RDLTablix *)item;
 
     tablix.dataSetName = RDLText(RDLChild(el, @"DataSetName"));
@@ -1049,22 +1002,18 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   return [[[self alloc] init] reportFromXMLString:xml error:error];
 }
 
-// The element whose Body, Width and Page describe the report: the first
-// ReportSection when the file has them, and the Report element itself for the
-// 2008 shape the upgrader produces. The schema allows several sections and
-// SSRS only ever writes one; the rest are announced rather than rendered,
-// because dropping half a document in silence is the failure this whole
-// change is about.
+// The report's layout section. 2010 and later put Body, Width and Page under
+// ReportSections/ReportSection, and that is the only shape read here: an older
+// file has already been rewritten into it by RDLUpgrader, which is where every
+// version difference lives. The schema allows several sections and SSRS writes
+// one; the rest are announced rather than rendered, because dropping half a
+// document in silence is the failure this kit had for the whole of it.
 - (NSXMLElement *)layoutSectionOf:(NSXMLElement *)root {
   NSXMLElement *sections = RDLChild(root, @"ReportSections");
-  if (sections == nil)
-    return root;
   NSMutableArray<NSXMLElement *> *found = [NSMutableArray array];
   for (NSXMLNode *n in [sections children])
     if (n.kind == NSXMLElementKind && [n.localName isEqualToString:@"ReportSection"])
       [found addObject:(NSXMLElement *)n];
-  if ([found count] == 0)
-    return root;
   if ([found count] > 1)
     [self.notes addObject:[NSString stringWithFormat:
         @"the report has %lu sections; only the first is read",
@@ -1094,9 +1043,9 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Report"];
   self.notes = [NSMutableArray array];
   self.failure = nil;
-  NSString *nm = RDLText(RDLChild(root, @"Name"));
-  if ([nm length] == 0)
-    nm = RDLText(RDLChild(root, @"ReportName"));
+  // rd:ReportName -- matched by local name, as every rd: element is. No schema
+  // has a Name child; RDLUpgrader renames the one this kit used to write.
+  NSString *nm = RDLText(RDLChild(root, @"ReportName"));
   if ([nm length])
     r.name = nm;
   r.author = RDLText(RDLChild(root, @"Author"));
@@ -1105,12 +1054,6 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   // "=User!Language" are both Language, and RDLValue is the one shape that
   // holds either.
   r.language = [RDLValue valueWithSource:RDLText(RDLChild(root, @"Language"))];
-  // Where Body, Width and Page live. The 2010 and 2016 schemas put them under
-  // ReportSections/ReportSection -- which is what Report Builder, SSDT and
-  // Power BI Report Builder write, and what this kit was blind to: such a file
-  // parsed into a report with no items, zero width and a default page, and
-  // said nothing. 2008 and earlier put them directly under Report, and the
-  // upgrader leaves them there, so both shapes are read.
   NSXMLElement *layout = [self layoutSectionOf:root];
   r.width = RDLInchesFromString(RDLText(RDLChild(layout, @"Width")));
   // rd:ReportUnitType -- the unit the author works in. Not a measurement: it
@@ -1126,17 +1069,8 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   RDL_PAGE_INCHES(r.page.rightMargin, pageEl, @"RightMargin");
   RDL_PAGE_INCHES(r.page.topMargin, pageEl, @"TopMargin");
   RDL_PAGE_INCHES(r.page.bottomMargin, pageEl, @"BottomMargin");
-  // Under Page is the spec's place; 2003 files put them at the root, and a
-  // file that has grown a ReportSection but kept its bands at the root would
-  // otherwise lose them -- the section is searched, then the report.
-  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader")
-                              ?: RDLChild(layout, @"PageHeader")
-                              ?: RDLChild(root, @"PageHeader")
-                  fallbackHeight:0.5];
-  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter")
-                              ?: RDLChild(layout, @"PageFooter")
-                              ?: RDLChild(root, @"PageFooter")
-                  fallbackHeight:0.4];
+  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader") fallbackHeight:0.5];
+  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter") fallbackHeight:0.4];
   r.body = [self parseBand:RDLChild(layout, @"Body") fallbackHeight:4.0];
 
   [r.dataSources removeAllObjects];
