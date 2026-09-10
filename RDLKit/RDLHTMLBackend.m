@@ -299,7 +299,8 @@ static NSString *RDLChartSVG(RDLLaidOutChart *it) {
         [html appendFormat:@"<div class=\"rdl-item\" data-kind=\"Image\" style=\"%@\">", RDLHTMLEsc(st)];
         if (src) {
           NSString *fit = @"contain";
-          RDLImageSizing sizing = img.sizing != RDLImageSizingUnspecified ? img.sizing : RDLImageSizingFit;
+          RDLImageSizing sizing =
+              img.sizing != RDLImageSizingUnspecified ? img.sizing : RDLImageSizingAutoSize;
           if (sizing == RDLImageSizingFit)
             fit = @"fill";
           else if (sizing == RDLImageSizingClip)

@@ -129,6 +129,173 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"parser accepted a non-Report root");
 }
 
+// The 2010 and 2016 schemas put Body, Width and Page under
+// ReportSections/ReportSection, and that is what Report Builder, SSDT and
+// Power BI Report Builder write. This kit read them at the root -- the 2008
+// shape -- so a current file parsed into a report with no items, zero width
+// and a default page, without a word of complaint.
+- (void)testAReportSectionIsWhereTheLayoutIs {
+  NSString *xml =
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection>"
+      @"    <Body>"
+      @"      <Height>3.5in</Height>"
+      @"      <ReportItems>"
+      @"        <Textbox Name=\"Title\"><Value>Hello</Value>"
+      @"          <Top>0.25in</Top><Left>0.5in</Left>"
+      @"          <Height>0.3in</Height><Width>2in</Width></Textbox>"
+      @"      </ReportItems>"
+      @"    </Body>"
+      @"    <Width>6.5in</Width>"
+      @"    <Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth>"
+      @"      <LeftMargin>1in</LeftMargin></Page>"
+      @"  </ReportSection></ReportSections>"
+      @"</Report>";
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"parse failed: %@", err.localizedDescription]);
+    return;
+  }
+  if ([r.body.items count] != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the section's body has %lu items, not 1",
+                                              (unsigned long)[r.body.items count]]);
+  if (fabs(r.body.height - 3.5) > 0.001)
+    XCTFail(@"%@", @"the body height comes from the section");
+  if (fabs(r.width - 6.5) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the width comes from the section, not %g",
+                                              r.width]);
+  if (fabs(r.page.leftMargin - 1.0) > 0.001)
+    XCTFail(@"%@", @"the page comes from the section");
+}
+
+// Everything that is not the current grammar is the migrator's problem, so
+// that the parser reads one shape. The case that proves it is this kit's own
+// older output: it declared the 2010 namespace -- so no version-based upgrade
+// would touch it -- while carrying the 2008 root shape and a Name child no
+// schema has.
+- (void)testAnOlderFileIsBroughtToTheCurrentShapeBeforeParsing {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <Name>Old Output</Name>"
+      @"  <Width>7in</Width>"
+      @"  <Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Hello\"><Value>Hello</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"    </Textbox>"
+      @"  </ReportItems></Body>"
+      @"  <PageHeader><Height>0.6in</Height><ReportItems/></PageHeader>"
+      @"  <Page><PageWidth>8.5in</PageWidth><LeftMargin>0.75in</LeftMargin></Page>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"the file should still open");
+    return;
+  }
+  if (![r.name isEqualToString:@"Old Output"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the Name child should be migrated: %@", r.name]);
+  if ([r.body.items count] != 1)
+    XCTFail(@"%@", @"the body should be found in the section the migrator made");
+  if (fabs(r.width - 7.0) > 0.001)
+    XCTFail(@"%@", @"and the width with it");
+  if (fabs(r.page.leftMargin - 0.75) > 0.001)
+    XCTFail(@"%@", @"and the page");
+  // The root-level band is the one the parser no longer looks for: the
+  // migrator has to have put it under Page.
+  if (fabs(r.pageHeader.height - 0.6) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the page header did not move: %g",
+                                              r.pageHeader.height]);
+}
+
+// The schema allows several sections; SSRS writes one. Reading the first is
+// the practical answer, but silently is not -- half a document would go
+// missing the way the whole of one used to.
+- (void)testASecondReportSectionIsAnnounced {
+  NSString *(^section)(NSString *) = ^NSString *(NSString *name) {
+    return [NSString stringWithFormat:
+        @"<ReportSection><Body><Height>1in</Height><ReportItems>"
+        @"<Textbox Name=\"%@\"><Value>%@</Value></Textbox>"
+        @"</ReportItems></Body><Width>5in</Width><Page/></ReportSection>", name, name];
+  };
+  NSString *xml = [NSString stringWithFormat:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\"><ReportSections>%@%@</ReportSections></Report>",
+      section(@"First"), section(@"Second")];
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"a two-section report should still open");
+    return;
+  }
+  if ([[[r.body.items firstObject] name] isEqualToString:@"First"] == NO)
+    XCTFail(@"%@", @"the first section is the one that is read");
+  BOOL warned = NO;
+  for (NSString *note in r.warnings)
+    if ([note rangeOfString:@"sections"].location != NSNotFound)
+      warned = YES;
+  if (!warned)
+    XCTFail(@"%@", [NSString stringWithFormat:@"no warning about the second section: %@",
+                                              r.warnings]);
+}
+
+// What the writer produces has to be a file Report Builder accepts. It used to
+// declare the 2010 namespace and then write the 2008 shape, which fails schema
+// validation at the first child: "The element 'Report' has invalid child
+// element 'Body'".
+- (void)testTheWriterEmitsTheTwentyTenShape {
+  RDLReport *source = RDLMiniInvoice();
+  // A field with a declared type, so there is a TypeName to look for at all.
+  [[[[source.dataSets firstObject] fields] firstObject] setDataType:RDLFieldDataTypeString];
+  NSString *xml = [RDLWriter XMLStringFromReport:source];
+
+  for (NSString *element in @[ @"<ReportSections>", @"<ReportSection>", @"<Body>",
+                              @"<Width>", @"<Page>" ])
+    if ([xml rangeOfString:element].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the writer omitted %@", element]);
+  // Order tells the nesting apart: Body, Width and Page after the section
+  // rather than under Report.
+  NSRange sections = [xml rangeOfString:@"<ReportSections>"];
+  for (NSString *element in @[ @"<Body>", @"<Width>", @"<Page>" ])
+    if ([xml rangeOfString:element].location < sections.location)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is written outside the section", element]);
+
+  // Children the 2010 Report and Body types do not have.
+  if ([xml rangeOfString:@"<Name>"].location != NSNotFound)
+    XCTFail(@"%@", @"Report has no Name child in 2010; the kit's name goes in rd:");
+  if ([xml rangeOfString:@"rd:ReportName"].location == NSNotFound)
+    XCTFail(@"%@", @"and it should still be written, so it survives a round trip");
+  NSRange body = [xml rangeOfString:@"<Body>"];
+  NSRange width = [xml rangeOfString:@"<Width>"];
+  NSString *bodyText = [xml substringWithRange:NSMakeRange(body.location,
+                                                           width.location - body.location)];
+  if ([bodyText rangeOfString:@"PrintOnFirstPage"].location != NSNotFound)
+    XCTFail(@"%@", @"PrintOnFirstPage/LastPage belong to a PageSection, not the body");
+  // TypeName is the designer's note about a field, and is prefixed everywhere
+  // a real file writes it.
+  if ([xml rangeOfString:@"<TypeName>"].location != NSNotFound)
+    XCTFail(@"%@", @"Field/TypeName should be written as rd:TypeName");
+
+  // And the whole thing still comes back.
+  NSError *err = nil;
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if (back == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"re-reading the output failed: %@",
+                                              err.localizedDescription]);
+    return;
+  }
+  if (![back.name isEqualToString:@"Mini Invoice"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the name did not survive: %@", back.name]);
+  if ([back.body.items count] != [source.body.items count])
+    XCTFail(@"%@", @"the body did not survive the round trip");
+  if (fabs(back.width - source.width) > 0.001)
+    XCTFail(@"%@", @"the width did not survive the round trip");
+  RDLField *field = [[[back.dataSets firstObject] fields] firstObject];
+  if (field.dataType != RDLFieldDataTypeString)
+    XCTFail(@"%@", @"rd:TypeName should be read back by local name");
+}
+
 - (void)testUpgrader {
   NSError *err = nil;
 
@@ -275,6 +442,368 @@ static NSString *RDLLegacyTableRDL(void) {
       XCTFail(@"%@", @"a 2010 document should not be upgraded");
   if (![[RDLWriter XMLStringFromReport:back] isEqualToString:modernXML])
     XCTFail(@"%@", @"a current document should round trip untouched");
+}
+
+// The upgrade runs for every document older than 2010, and 2008 is one of
+// those -- but a 2008 chart is already in the shape the rewrite produces. It
+// looked for series one level too shallow (the 2005 ChartData/ChartSeries
+// path), found none, and then detached the real ChartData and put its own
+// empty collection there. Every 2008 chart drew an empty plot.
+- (void)testATwentyEightChartKeepsItsSeries {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2008/01/"
+      @"reportdefinition\">"
+      @"  <Body><Height>4in</Height><ReportItems>"
+      @"    <Chart Name=\"Sales\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>5in</Width><Height>3in</Height>"
+      @"      <DataSetName>Rows</DataSetName>"
+      @"      <ChartCategoryHierarchy><ChartMembers><ChartMember>"
+      @"        <Group Name=\"cat\"><GroupExpressions>"
+      @"          <GroupExpression>=Fields!Month.Value</GroupExpression>"
+      @"        </GroupExpressions></Group>"
+      @"      </ChartMember></ChartMembers></ChartCategoryHierarchy>"
+      @"      <ChartData><ChartSeriesCollection>"
+      @"        <ChartSeries Name=\"Amount\"><ChartDataPoints><ChartDataPoint>"
+      @"          <ChartDataPointValues><Y>=Sum(Fields!Amount.Value)</Y>"
+      @"          </ChartDataPointValues>"
+      @"        </ChartDataPoint></ChartDataPoints><Type>Column</Type></ChartSeries>"
+      @"      </ChartSeriesCollection></ChartData>"
+      @"      <ChartAreas><ChartArea Name=\"Default\"/></ChartAreas>"
+      @"    </Chart>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLChart *chart = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      chart = (RDLChart *)it;
+  if (chart == nil) {
+    XCTFail(@"%@", @"the 2008 chart did not survive the upgrade at all");
+    return;
+  }
+  if ([chart.series count] != 1) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the chart has %lu series, not 1",
+                                              (unsigned long)[chart.series count]]);
+    return;
+  }
+  if ([[chart.series[0].value source] rangeOfString:@"Amount"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the series lost its expression: %@",
+                                              [chart.series[0].value source]]);
+  if ([chart.categoryMembers count] != 1)
+    XCTFail(@"%@", @"and its category grouping should still be there");
+}
+
+// 2005 allowed <Action> directly on an item; 2008 moved it under
+// <ActionInfo><Actions>, which is the only place the parser looks. An
+// unlifted 2005 link is a link that quietly does not exist.
+- (void)testATwentyFiveActionIsLifted {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/"
+      @"reportdefinition\" Name=\"Links\">"
+      @"  <Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Home\"><Value>Home</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"      <Action><Hyperlink>https://example.org/</Hyperlink></Action>"
+      @"    </Textbox>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLItem *box = [r.body.items firstObject];
+  if (box == nil) {
+    XCTFail(@"%@", @"the textbox did not survive");
+    return;
+  }
+  if (![[box.hyperlink source] isEqualToString:@"https://example.org/"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the 2005 Action was not lifted: %@",
+                                              [box.hyperlink source]]);
+}
+
+// A List sorts as a whole, and its <Sorting> sits beside the grouping rather
+// than inside it, so the group upgrade never saw it: a sorted 2005 list came
+// back unsorted.
+- (void)testATwentyFiveListKeepsItsSort {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/"
+      @"reportdefinition\" Name=\"Listing\">"
+      @"  <Body><Height>3in</Height><ReportItems>"
+      @"    <List Name=\"Rows\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>5in</Width><Height>1in</Height>"
+      @"      <DataSetName>Rows</DataSetName>"
+      @"      <Sorting><SortBy>"
+      @"        <SortExpression>=Fields!Name.Value</SortExpression>"
+      @"        <Direction>Descending</Direction>"
+      @"      </SortBy></Sorting>"
+      @"      <ReportItems><Textbox Name=\"Cell\"><Value>=Fields!Name.Value</Value>"
+      @"        <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"      </Textbox></ReportItems>"
+      @"    </List>"
+      @"  </ReportItems></Body><Width>6in</Width>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTablix *list = nil;
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      list = (RDLTablix *)it;
+  if (list == nil) {
+    XCTFail(@"%@", @"the list did not survive the upgrade");
+    return;
+  }
+  if ([list.sortExpressions count] != 1) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the list has %lu sorts, not 1",
+                                              (unsigned long)[list.sortExpressions count]]);
+    return;
+  }
+  RDLSortExpression *sort = list.sortExpressions[0];
+  if ([[sort.expression source] rangeOfString:@"Name"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the sort lost its expression: %@",
+                                              [sort.expression source]]);
+  if (sort.direction != RDLSortDirectionDescending)
+    XCTFail(@"%@", @"and its direction");
+}
+
+// What a report that says nothing gets. These are MS-RDL's defaults, and the
+// kit's used to be its own: Georgia at #1a1916, left-aligned, 4pt of side
+// padding, textboxes that grow, page sections on every page. A file rendered
+// one way under SSRS and another here, and nobody could see why from the file.
+- (void)testAnUnstyledReportGetsTheSpecsDefaults {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Plain\"><Value>Hello</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"    </Textbox>"
+      @"    <Image Name=\"Picture\"><Source>External</Source><Value>logo.png</Value>"
+      @"      <Top>0.5in</Top><Left>0in</Left><Width>1in</Width><Height>1in</Height>"
+      @"    </Image>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTextbox *box = (RDLTextbox *)[r.body.items firstObject];
+  if (box == nil) {
+    XCTFail(@"%@", @"the textbox did not parse");
+    return;
+  }
+  if (![box.style.fontFamily isEqualToString:@"Arial"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"FontFamily defaults to Arial, not %@",
+                                              box.style.fontFamily]);
+  if (![[box.style.fontSize stringValue] isEqualToString:@"10pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"FontSize defaults to 10pt, not %@",
+                                              [box.style.fontSize stringValue]]);
+  if (![box.style.color isEqualToString:@"#000000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Color defaults to black, not %@",
+                                              box.style.color]);
+  if (box.style.textAlign != RDLTextAlignGeneral)
+    XCTFail(@"%@", @"TextAlign defaults to General");
+  for (RDLLength *padding in @[ box.style.paddingLeft, box.style.paddingRight,
+                                box.style.paddingTop, box.style.paddingBottom ])
+    if (![[padding stringValue] isEqualToString:@"2pt"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"padding defaults to 2pt, not %@",
+                                                [padding stringValue]]);
+  // Each side on its own: a file that states one padding keeps the default on
+  // the other three. Assigning every side from the parse overwrote the ones
+  // the file did not mention with nothing, and an item with a stated left
+  // padding lost its top and bottom.
+  RDLReport *partly = [RDLParser reportFromXMLString:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\"><ReportSections><ReportSection><Body><Height>1in</Height>"
+      @"<ReportItems><Textbox Name=\"T\"><Value>x</Value>"
+      @"<Style><PaddingLeft>6pt</PaddingLeft></Style></Textbox></ReportItems></Body>"
+      @"<Width>5in</Width><Page/></ReportSection></ReportSections></Report>"
+                                                error:NULL];
+  RDLStyle *style = [[partly.body.items firstObject] style];
+  if (![[style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"%@", @"a stated padding should be read");
+  if (![[style.paddingTop stringValue] isEqualToString:@"2pt"] ||
+      ![[style.paddingRight stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the other sides keep the default, not %@/%@",
+                                              [style.paddingTop stringValue],
+                                              [style.paddingRight stringValue]]);
+  if (box.canGrow)
+    XCTFail(@"%@", @"a textbox that says nothing does not grow");
+  RDLImage *image = (RDLImage *)r.body.items[1];
+  if (image.sizing != RDLImageSizingUnspecified && image.sizing != RDLImageSizingAutoSize)
+    XCTFail(@"%@", @"an image that says nothing is AutoSize");
+  // No page sections in the file means none on the paper: half an inch of
+  // blank header used to be invented for every report.
+  if (r.pageHeader.height > 0 || r.pageFooter.height > 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"phantom bands: header %g, footer %g",
+                                              r.pageHeader.height, r.pageFooter.height]);
+  if (r.pageHeader.printOnFirstPage || r.pageFooter.printOnLastPage)
+    XCTFail(@"%@", @"and a page section prints on neither end unless it says so");
+}
+
+// The other half of the same problem: what a round trip must not add. A report
+// that named no font came back naming one, and rendered in that font ever
+// after.
+- (void)testWritingDoesNotMaterialiseDefaults {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Bare"];
+  // +emptyReportNamed: is the designer's template for a new report, and it
+  // does have opinions -- a running head on every page, for one. They are
+  // written into the file, which is right; this test is about the ones nobody
+  // asked for, so the template's are cleared first.
+  for (RDLBand *band in @[ r.pageHeader, r.pageFooter ]) {
+    band.printOnFirstPage = NO;
+    band.printOnLastPage = NO;
+    band.height = 0;
+  }
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Plain";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  [r.body.items addObject:box];
+
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  for (NSString *invented in @[ @"<FontFamily>", @"<FontSize>", @"<FontWeight>", @"<Color>",
+                                @"<TextAlign>", @"<PaddingLeft>", @"<PaddingRight>",
+                                @"<PaddingTop>", @"<PaddingBottom>", @"<CanGrow>",
+                                @"<PrintOnFirstPage>", @"<PrintOnLastPage>", @"<Sizing>" ])
+    if ([xml rangeOfString:invented].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ was written into a report that never "
+                                                @"mentioned it", invented]);
+
+  // And what the file does say still survives.
+  box.style.fontFamily = @"Helvetica";
+  box.canGrow = YES;
+  xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<FontFamily>Helvetica</FontFamily>"].location == NSNotFound)
+    XCTFail(@"%@", @"a font that was asked for should be written");
+  if ([xml rangeOfString:@"<CanGrow>true</CanGrow>"].location == NSNotFound)
+    XCTFail(@"%@", @"and so should CanGrow when it is true");
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTextbox *readBack = (RDLTextbox *)[back.body.items firstObject];
+  if (![readBack.style.fontFamily isEqualToString:@"Helvetica"] || !readBack.canGrow)
+    XCTFail(@"%@", @"and both should come back");
+}
+
+// General is the default alignment, and it is not Left: a number goes right.
+// The value decides, which is why it is settled while the value still has a
+// type rather than by reading the formatted string.
+- (void)testGeneralAlignmentFollowsTheValue {
+  RDLReport *r = RDLMiniInvoice();
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{ @"InvoiceNo" : @"B-2" }];
+  BOOL sawNumberRight = NO, sawTextLeft = NO;
+  for (RDLLaidOutItem *it in [[pages firstObject] items]) {
+    NSString *text = RDLLaidText(it);
+    if ([text isEqualToString:@"10"] || [text isEqualToString:@"5"]) {
+      if (it.style.textAlign == RDLTextAlignRight)
+        sawNumberRight = YES;
+      else
+        XCTFail(@"%@", [NSString stringWithFormat:@"a number under General goes right, not %ld",
+                                                  (long)it.style.textAlign]);
+    }
+    if ([text isEqualToString:@"W1"]) {
+      if (it.style.textAlign == RDLTextAlignLeft)
+        sawTextLeft = YES;
+      else
+        XCTFail(@"%@", @"and text goes left");
+    }
+  }
+  if (!sawNumberRight || !sawTextLeft)
+    XCTFail(@"%@", @"the layout should have produced both a number and a word to align");
+}
+
+// PageName belongs to the data region or the group, and Report/InitialPageName
+// names the pages before either has spoken. This kit read PageName only inside
+// PageBreak -- a place no schema allows -- so a spec file's page names were
+// invisible and the kit's own files were invalid. A body item with one used to
+// throw -[RDLValue length] outright.
+- (void)testPageNamesAreReadWhereTheSpecPutsThem {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <InitialPageName>Cover</InitialPageName>"
+      @"  <ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+      @"    <Rectangle Name=\"Panel\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageName>Panel Pages</PageName>"
+      @"      <PageBreak><BreakLocation>Start</BreakLocation></PageBreak>"
+      @"      <ReportItems/>"
+      @"    </Rectangle>"
+      @"    <Tablix Name=\"Grid\">"
+      @"      <Top>1.5in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageName>Grid Pages</PageName>"
+      @"      <TablixBody><TablixColumns><TablixColumn><Width>3in</Width></TablixColumn>"
+      @"      </TablixColumns><TablixRows><TablixRow><Height>0.25in</Height><TablixCells>"
+      @"      <TablixCell><CellContents><Textbox Name=\"C\"><Value>x</Value></Textbox>"
+      @"      </CellContents></TablixCell></TablixCells></TablixRow></TablixRows></TablixBody>"
+      @"      <TablixColumnHierarchy><TablixMembers><TablixMember/></TablixMembers>"
+      @"      </TablixColumnHierarchy>"
+      @"      <TablixRowHierarchy><TablixMembers><TablixMember>"
+      @"        <Group Name=\"g\"><PageName>Group Pages</PageName>"
+      @"          <GroupExpressions><GroupExpression>=Fields!Sku.Value</GroupExpression>"
+      @"          </GroupExpressions></Group>"
+      @"      </TablixMember></TablixMembers></TablixRowHierarchy>"
+      @"    </Tablix>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  if (r == nil) {
+    XCTFail(@"%@", @"the report should parse");
+    return;
+  }
+  if (![[r.initialPageName source] isEqualToString:@"Cover"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"InitialPageName: %@",
+                                              [r.initialPageName source]]);
+  RDLItem *panel = [r.body.items firstObject];
+  if (![[panel.pageName source] isEqualToString:@"Panel Pages"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a Rectangle's own PageName: %@",
+                                              [panel.pageName source]]);
+  RDLTablix *grid = (RDLTablix *)r.body.items[1];
+  if (![[grid.pageName source] isEqualToString:@"Grid Pages"])
+    XCTFail(@"%@", @"a Tablix's own PageName");
+  RDLTablixMember *member = [grid.rowHierarchy.members firstObject];
+  if (![[member.pageName source] isEqualToString:@"Group Pages"])
+    XCTFail(@"%@", @"a Group's PageName");
+
+  // And written back where they were read, never inside PageBreak.
+  NSString *out = [RDLWriter XMLStringFromReport:r];
+  if ([out rangeOfString:@"<InitialPageName>Cover</InitialPageName>"].location == NSNotFound)
+    XCTFail(@"%@", @"InitialPageName should be written");
+  NSRange breakRange = [out rangeOfString:@"<PageBreak>"];
+  while (breakRange.location != NSNotFound) {
+    NSRange rest = NSMakeRange(NSMaxRange(breakRange), [out length] - NSMaxRange(breakRange));
+    NSRange end = [out rangeOfString:@"</PageBreak>" options:0 range:rest];
+    if (end.location == NSNotFound)
+      break;
+    NSString *inside = [out substringWithRange:NSMakeRange(NSMaxRange(breakRange),
+                                                           end.location - NSMaxRange(breakRange))];
+    if ([inside rangeOfString:@"PageName"].location != NSNotFound)
+      XCTFail(@"%@", @"PageName is not a child of PageBreak in any schema");
+    breakRange = [out rangeOfString:@"<PageBreak>" options:0
+                              range:NSMakeRange(NSMaxRange(end), [out length] - NSMaxRange(end))];
+  }
+  RDLReport *back = [RDLParser reportFromXMLString:out error:NULL];
+  if (![[[[back.body.items firstObject] pageName] source] isEqualToString:@"Panel Pages"])
+    XCTFail(@"%@", @"and they should come back");
+}
+
+// The old placement, in files this kit wrote: the migrator lifts it to the
+// item that owns the break, so the reader never has to know about it.
+- (void)testAPageNameInsideAPageBreakIsMigrated {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+      @"    <Rectangle Name=\"Panel\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageBreak><BreakLocation>Start</BreakLocation>"
+      @"        <PageName>Old Placement</PageName></PageBreak>"
+      @"      <ReportItems/>"
+      @"    </Rectangle>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLItem *panel = [r.body.items firstObject];
+  if (![[panel.pageName source] isEqualToString:@"Old Placement"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the migrator should lift it: %@",
+                                              [panel.pageName source]]);
+  // It used to reach the layout as an unevaluated RDLValue and throw
+  // -[RDLValue length] while collecting page marks.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if ([pages count] == 0)
+    XCTFail(@"%@", @"a body item with a page name should still lay out");
 }
 
 - (void)testValue {

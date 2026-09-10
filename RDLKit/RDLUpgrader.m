@@ -239,6 +239,26 @@ static NSXMLElement *RDLStaticMember(BOOL repeatOnNewPage, NSString *keepWithGro
   return m;
 }
 
+// 2005: <Sorting><SortBy><SortExpression>…</SortExpression><Direction>…
+// 2010: <SortExpressions><SortExpression><Value>…</Value><Direction>…
+// Returns nil when there is nothing to sort by. Its own function because a
+// List sorts as a whole, beside its grouping rather than inside it.
+static NSXMLElement *RDLSortExpressionsFrom(NSXMLElement *sorting) {
+  if (sorting == nil)
+    return nil;
+  NSXMLElement *out = RDLNew(@"SortExpressions");
+  for (NSXMLElement *by in RDLKids(sorting, @"SortBy")) {
+    NSXMLElement *se = RDLNew(@"SortExpression");
+    NSXMLElement *expr = RDLKid(by, @"SortExpression");
+    [se addChild:RDLNewText(@"Value", expr ? RDLTrimmed(expr) : @"")];
+    NSXMLElement *dir = RDLKid(by, @"Direction");
+    if (dir)
+      [se addChild:RDLNewText(@"Direction", RDLTrimmed(dir))];
+    [out addChild:se];
+  }
+  return [RDLElems(out) count] ? out : nil;
+}
+
 // <Grouping Name="g"><GroupExpressions>… plus the 2005 Sorting that sits
 // beside it, into the 2010 <Group> / <SortExpressions> pair.
 static void RDLAddGroup(NSXMLElement *member, NSXMLElement *grouping, NSXMLElement *sorting) {
@@ -258,22 +278,9 @@ static void RDLAddGroup(NSXMLElement *member, NSXMLElement *grouping, NSXMLEleme
       [group addChild:RDLTake(pageBreak)];
     [member addChild:group];
   }
-  // 2005: <Sorting><SortBy><SortExpression>…</SortExpression><Direction>…
-  // 2010: <SortExpressions><SortExpression><Value>…</Value><Direction>…
-  if (sorting != nil) {
-    NSXMLElement *out = RDLNew(@"SortExpressions");
-    for (NSXMLElement *by in RDLKids(sorting, @"SortBy")) {
-      NSXMLElement *se = RDLNew(@"SortExpression");
-      NSXMLElement *expr = RDLKid(by, @"SortExpression");
-      [se addChild:RDLNewText(@"Value", expr ? RDLTrimmed(expr) : @"")];
-      NSXMLElement *dir = RDLKid(by, @"Direction");
-      if (dir)
-        [se addChild:RDLNewText(@"Direction", RDLTrimmed(dir))];
-      [out addChild:se];
-    }
-    if ([RDLElems(out) count])
-      [member addChild:out];
-  }
+  NSXMLElement *sorts = RDLSortExpressionsFrom(sorting);
+  if (sorts)
+    [member addChild:sorts];
 }
 
 #pragma mark - Table
@@ -592,7 +599,27 @@ static NSXMLElement *RDLChartAxisFrom(NSXMLElement *chart, NSString *outerName) 
   return out;
 }
 
+// Whether a chart is already in the 2008-and-later shape. The upgrade runs for
+// every document older than 2010, and 2008 is one of those -- but its charts
+// need nothing done to them. Run anyway, the rewrite found no 2005 series
+// (they are one level deeper, under ChartSeriesCollection), detached the real
+// ChartData and installed an empty collection in its place: every 2008 chart
+// drew an empty plot. Shape rather than version, because a file with no
+// namespace at all is upgraded too and can carry either.
+static BOOL RDLChartIsAlreadyUpgraded(NSXMLElement *chart) {
+  return RDLKid(RDLKid(chart, @"ChartData"), @"ChartSeriesCollection") != nil ||
+         RDLKid(chart, @"ChartAreas") != nil ||
+         RDLKid(chart, @"ChartCategoryHierarchy") != nil ||
+         RDLKid(chart, @"ChartSeriesHierarchy") != nil;
+}
+
 static void RDLUpgradeChart(NSXMLElement *chart) {
+  if (RDLChartIsAlreadyUpgraded(chart)) {
+    // Still worth naming the dataset: a 2008 chart that omitted DataSetName in
+    // a one-dataset report is as ambiguous as a 2005 one.
+    RDLFillDataSetName(chart, RDLRootOf(chart));
+    return;
+  }
   NSString *type = RDLTrimmed(RDLKid(chart, @"Type"));
   NSString *subtype = RDLTrimmed(RDLKid(chart, @"Subtype"));
 
@@ -765,7 +792,178 @@ static void RDLUpgradePage(NSXMLElement *root) {
     [page addChild:RDLTake(e)];
 }
 
+#pragma mark - The root shape
+
+// PageName inside PageBreak is RDLKit's own invention -- no schema has it
+// there -- and files this kit wrote carry it. It belongs to the region or the
+// group that owns the break, so that is where it goes.
+static void RDLUpgradePageNames(NSXMLElement *el) {
+  for (NSXMLElement *child in RDLElems(el))
+    RDLUpgradePageNames(child);
+  if (![RDLLN(el) isEqualToString:@"PageBreak"])
+    return;
+  NSXMLElement *name = RDLKid(el, @"PageName");
+  NSXMLElement *owner = (NSXMLElement *)[el parent];
+  if (name == nil || owner == nil)
+    return;
+  if (RDLKid(owner, @"PageName") == nil)
+    [owner addChild:RDLTake(name)];
+  else
+    [name detach];
+}
+
+// Every List in the document, whatever version the file claims to be: List is
+// a 2005 element, and a file that carries one is a 2005-shaped file however it
+// is labelled.
+static void RDLUpgradeLists(NSXMLElement *el) {
+  for (NSXMLElement *child in RDLElems(el))
+    RDLUpgradeLists(child);
+  if ([RDLLN(el) isEqualToString:@"List"])
+    RDLUpgradeList(el);
+}
+
+// Body, Width and Page belong to a ReportSection in 2010 and later; 2008 and
+// earlier put them straight under Report, as did this kit's own writer. The
+// page bands go under Page, where 2008 already put them and 2003 did not.
+// Everything is moved rather than copied, so nothing is read twice.
+static void RDLUpgradeRootShape(NSXMLElement *root) {
+  // A <Name> child is not in any schema: RDLKit wrote one for years, and the
+  // reader wants the name where the current writer puts it.
+  NSXMLElement *legacyName = RDLKid(root, @"Name");
+  if (legacyName && RDLKid(root, @"ReportName") == nil)
+    [legacyName setName:@"ReportName"];
+
+  if (RDLKid(root, @"ReportSections") != nil)
+    return;
+
+  NSXMLElement *body = RDLKid(root, @"Body");
+  NSXMLElement *width = RDLKid(root, @"Width");
+  NSXMLElement *page = RDLKid(root, @"Page");
+  NSXMLElement *header = RDLKid(root, @"PageHeader");
+  NSXMLElement *footer = RDLKid(root, @"PageFooter");
+  if (body == nil && width == nil && page == nil)
+    return;  // nothing that belongs in a section; leave the file as it is
+
+  if ((header || footer) && page == nil)
+    page = RDLNew(@"Page");
+  else if (page)
+    page = RDLTake(page);
+  if (header)
+    [page addChild:RDLTake(header)];
+  if (footer)
+    [page addChild:RDLTake(footer)];
+
+  NSXMLElement *section = RDLNew(@"ReportSection");
+  if (body)
+    [section addChild:RDLTake(body)];
+  if (width)
+    [section addChild:RDLTake(width)];
+  if (page)
+    [section addChild:page];
+  NSXMLElement *sections = RDLNew(@"ReportSections");
+  [sections addChild:section];
+  [root addChild:sections];
+}
+
 #pragma mark - The walk
+
+// 2005 allowed <Action> directly on an item; 2008 wraps it in
+// <ActionInfo><Actions>. Left alone, a 2005 hyperlink is simply not there:
+// the parser looks under ActionInfo and finds nothing.
+static void RDLUpgradeAction(NSXMLElement *el) {
+  if ([RDLLN(el) isEqualToString:@"Actions"])
+    return;  // an Action here is already where it belongs
+  NSXMLElement *action = RDLKid(el, @"Action");
+  if (action == nil || RDLKid(el, @"ActionInfo") != nil)
+    return;
+  NSXMLElement *info = RDLNew(@"ActionInfo");
+  NSXMLElement *actions = RDLNew(@"Actions");
+  [actions addChild:RDLTake(action)];
+  [info addChild:actions];
+  [el addChild:info];
+}
+
+// A List is a Tablix with one column and one details row, whose single cell
+// holds a Rectangle with the list's contents -- which is exactly what SSRS
+// makes of one, and what the reader used to build by hand from a List element.
+// Doing it here instead keeps the reader on one grammar.
+//
+// Its <Sorting> is its own, beside the grouping rather than inside it, which
+// is why the group upgrade never saw it and a sorted 2005 list arrived
+// unsorted.
+static void RDLUpgradeList(NSXMLElement *list) {
+  NSString *name = [[list attributeForName:@"Name"] stringValue] ?: @"List";
+  NSString *width = RDLTrimmed(RDLKid(list, @"Width"));
+  NSString *height = RDLTrimmed(RDLKid(list, @"Height"));
+
+  NSXMLElement *rect = RDLNew(@"Rectangle");
+  [rect addAttribute:[NSXMLNode attributeWithName:@"Name"
+                                      stringValue:[name stringByAppendingString:@"_Contents"]]];
+  NSXMLElement *items = RDLKid(list, @"ReportItems");
+  [rect addChild:items ? RDLTake(items) : RDLNew(@"ReportItems")];
+  if ([width length])
+    [rect addChild:RDLNewText(@"Width", width)];
+  if ([height length])
+    [rect addChild:RDLNewText(@"Height", height)];
+
+  NSXMLElement *contents = RDLNew(@"CellContents");
+  [contents addChild:rect];
+  NSXMLElement *cell = RDLNew(@"TablixCell");
+  [cell addChild:contents];
+  NSXMLElement *cells = RDLNew(@"TablixCells");
+  [cells addChild:cell];
+  NSXMLElement *row = RDLNew(@"TablixRow");
+  // A row of nothing is a list that renders nothing, so an unstated height
+  // falls back to one line rather than to zero.
+  [row addChild:RDLNewText(@"Height", [height length] ? height : @"0.28in")];
+  [row addChild:cells];
+  NSXMLElement *rows = RDLNew(@"TablixRows");
+  [rows addChild:row];
+
+  NSXMLElement *column = RDLNew(@"TablixColumn");
+  [column addChild:RDLNewText(@"Width", [width length] ? width : @"1in")];
+  NSXMLElement *columns = RDLNew(@"TablixColumns");
+  [columns addChild:column];
+
+  NSXMLElement *body = RDLNew(@"TablixBody");
+  [body addChild:columns];
+  [body addChild:rows];
+
+  // The list's own Grouping is the details group: one instance of the
+  // rectangle per group, or per row when it groups by nothing.
+  NSXMLElement *grouping = RDLKid(list, @"Grouping");
+  NSXMLElement *group = RDLNew(@"Group");
+  NSString *groupName = [[grouping attributeForName:@"Name"] stringValue];
+  [group addAttribute:[NSXMLNode attributeWithName:@"Name"
+                                       stringValue:[groupName length]
+                                                       ? groupName
+                                                       : [name stringByAppendingString:@"_Details"]]];
+  NSXMLElement *exprs = RDLKid(grouping, @"GroupExpressions");
+  if (exprs)
+    [group addChild:RDLTake(exprs)];
+  NSXMLElement *member = RDLNew(@"TablixMember");
+  [member addChild:group];
+  NSXMLElement *rowMembers = RDLNew(@"TablixMembers");
+  [rowMembers addChild:member];
+  NSXMLElement *rowHierarchy = RDLNew(@"TablixRowHierarchy");
+  [rowHierarchy addChild:rowMembers];
+
+  NSXMLElement *colMembers = RDLNew(@"TablixMembers");
+  [colMembers addChild:RDLNew(@"TablixMember")];
+  NSXMLElement *colHierarchy = RDLNew(@"TablixColumnHierarchy");
+  [colHierarchy addChild:colMembers];
+
+  NSXMLElement *sorts = RDLSortExpressionsFrom(RDLKid(list, @"Sorting"));
+  for (NSString *gone in @[ @"Grouping", @"Sorting" ])
+    [RDLKid(list, gone) detach];
+  RDLFillDataSetName(list, RDLRootOf(list));
+  [list addChild:body];
+  [list addChild:colHierarchy];
+  [list addChild:rowHierarchy];
+  if (sorts)
+    [list addChild:sorts];
+  [list setName:@"Tablix"];
+}
 
 static void RDLUpgradeElement(NSXMLElement *el) {
   // Depth first: an inner Table inside a Rectangle is converted before the
@@ -773,6 +971,7 @@ static void RDLUpgradeElement(NSXMLElement *el) {
   for (NSXMLElement *child in RDLElems(el))
     RDLUpgradeElement(child);
 
+  RDLUpgradeAction(el);
   NSString *name = RDLLN(el);
   if ([name isEqualToString:@"Style"])
     RDLUpgradeBorders(el);
@@ -788,18 +987,26 @@ static void RDLUpgradeElement(NSXMLElement *el) {
 
 + (RDLSchemaVersion)upgradeDocument:(NSXMLDocument *)document {
   RDLSchemaVersion version = [self versionOfDocument:document];
-  if (version >= RDLSchemaVersion2010)
-    return version;
   NSXMLElement *root = [document rootElement];
   if (root == nil)
     return version;
-  RDLUpgradeElement(root);
-  RDLUpgradePage(root);
-  // 2003 and 2005 put the report's name in an attribute on <Report>; later
-  // schemas have no such attribute, and RDLKit reads a <Name> child.
-  NSString *name = [[root attributeForName:@"Name"] stringValue];
-  if ([name length] && RDLKid(root, @"Name") == nil)
-    [root insertChild:RDLNewText(@"Name", name) atIndex:0];
+  if (version < RDLSchemaVersion2010) {
+    RDLUpgradeElement(root);
+    RDLUpgradePage(root);
+    // 2003 and 2005 put the report's name in an attribute on <Report>. Later
+    // schemas have no such child either, so it goes where the writer puts it.
+    NSString *name = [[root attributeForName:@"Name"] stringValue];
+    if ([name length] && RDLKid(root, @"ReportName") == nil)
+      [root insertChild:RDLNewText(@"ReportName", name) atIndex:0];
+  }
+  // For every document, whatever it claims to be. A file's shape and its
+  // declared version disagree in practice: this kit's own older output
+  // announced the 2010 namespace while carrying the 2008 root shape, and so do
+  // plenty of files in the wild. The parser reads one grammar, so anything
+  // else has to become that grammar here.
+  RDLUpgradeLists(root);
+  RDLUpgradePageNames(root);
+  RDLUpgradeRootShape(root);
   return version;
 }
 

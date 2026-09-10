@@ -442,19 +442,25 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   return _expressions;
 }
 
+// The defaults MS-RDL gives every style property. A report that omits a
+// property must render the way SSRS renders it, which is what this is for --
+// and nothing may write these back into a file, or a document that said
+// nothing acquires an opinion it never had.
 + (instancetype)defaultStyle {
   RDLStyle *s = [[RDLStyle alloc] init];
-  s.fontFamily = @"Georgia";
+  s.fontFamily = @"Arial";
   s.fontSize = [RDLLength points:10];
   s.fontWeight = RDLFontWeightNormal;
   s.fontStyle = RDLFontStyleNormal;
-  s.color = @"#1a1916";
+  s.color = @"#000000";
   s.backgroundColor = @"Transparent";
-  s.textAlign = RDLTextAlignLeft;
+  // General is not Left: numbers go right and everything else goes left, which
+  // the layout decides once it knows what the text is.
+  s.textAlign = RDLTextAlignGeneral;
   s.verticalAlign = RDLVerticalAlignTop;
   s.textDecoration = RDLTextDecorationNone;
-  s.paddingLeft = [RDLLength points:4];
-  s.paddingRight = [RDLLength points:4];
+  s.paddingLeft = [RDLLength points:2];
+  s.paddingRight = [RDLLength points:2];
   s.paddingTop = [RDLLength points:2];
   s.paddingBottom = [RDLLength points:2];
   s.border = [RDLBorder none];
@@ -634,7 +640,8 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 - (instancetype)init {
   self = [super init];
   if (self)
-    _canGrow = YES;
+    // MS-RDL: a textbox that says nothing does not grow.
+    _canGrow = NO;
   return self;
 }
 
@@ -1562,9 +1569,14 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
   self = [super init];
   if (self) {
     _items = [NSMutableArray array];
-    _printOnFirstPage = YES;
-    _printOnLastPage = YES;
-    _height = 0.5;
+    // MS-RDL: a page section prints on neither the first page nor the last
+    // unless it says so.
+    _printOnFirstPage = NO;
+    _printOnLastPage = NO;
+    // And a band nobody has given a height to is not on the paper at all. Half
+    // an inch here is what made an absent PageHeader into half an inch of
+    // blank paper on every page; a report that wants a band says how tall.
+    _height = 0;
   }
   return self;
 }
@@ -1700,10 +1712,17 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.page = [[RDLPage alloc] init];
   r.pageHeader = [[RDLBand alloc] init];
   r.pageHeader.height = 0.55;
+  // Said rather than assumed: MS-RDL's default is neither end, and a new
+  // report wants its running head on every page. Written into the file, which
+  // is where a decision like this belongs.
+  r.pageHeader.printOnFirstPage = YES;
+  r.pageHeader.printOnLastPage = YES;
   r.body = [[RDLBand alloc] init];
   r.body.height = 4.0;
   r.pageFooter = [[RDLBand alloc] init];
   r.pageFooter.height = 0.4;
+  r.pageFooter.printOnFirstPage = YES;
+  r.pageFooter.printOnLastPage = YES;
   // No data sources and no datasets: a new report has no data, and a source
   // that names no document is one nobody asked for. A dataset is a query into
   // a source, so the source comes first -- which is the order Report Builder

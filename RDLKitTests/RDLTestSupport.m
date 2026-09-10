@@ -64,6 +64,12 @@ RDLReport *RDLMiniInvoice(void) {
   title.height = 0.35;
   title.style.fontSize = [RDLLength points:16];
   title.style.fontWeight = RDLFontWeightBold;
+  // A page section prints on neither the first page nor the last unless it
+  // says so -- MS-RDL's default, and this fixture wants both.
+  r.pageHeader.printOnFirstPage = YES;
+  r.pageHeader.printOnLastPage = YES;
+  r.pageFooter.printOnFirstPage = YES;
+  r.pageFooter.printOnLastPage = YES;
   [r.pageHeader.items addObject:title];
 
   RDLTextbox *note = [[RDLTextbox alloc] init];

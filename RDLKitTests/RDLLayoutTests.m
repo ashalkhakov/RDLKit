@@ -1552,8 +1552,20 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
       ![[rt.chartTitle source] isEqualToString:@"Sales"] ||
       rt.palette != RDLChartPaletteExcel)
     XCTFail(@"%@", @"the chart should survive being written and read back");
-  if (![[RDLWriter XMLStringFromReport:back] isEqualToString:xml])
-    XCTFail(@"%@", @"a chart should write identically on the second pass");
+  NSString *second = [RDLWriter XMLStringFromReport:back];
+  if (![second isEqualToString:xml]) {
+    NSArray *a = [xml componentsSeparatedByString:@"\n"];
+    NSArray *b = [second componentsSeparatedByString:@"\n"];
+    NSMutableString *diff = [NSMutableString string];
+    for (NSUInteger i = 0; i < MAX([a count], [b count]) && [diff length] < 400; i++) {
+      NSString *l = i < [a count] ? a[i] : @"(none)";
+      NSString *r2 = i < [b count] ? b[i] : @"(none)";
+      if (![l isEqualToString:r2])
+        [diff appendFormat:@"\n  %lu: %@ | %@", (unsigned long)i, l, r2];
+    }
+    XCTFail(@"%@", [NSString stringWithFormat:@"a chart should write identically on the "
+                                              @"second pass:%@", diff]);
+  }
 
   // Named colours: RDL allows them and real reports use them.
   if (![RDLHexForColorName(@"LightGrey") isEqualToString:@"d3d3d3"] ||
