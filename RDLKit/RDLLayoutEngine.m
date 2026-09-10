@@ -243,6 +243,27 @@ static void RDLApplyReportLanguage(RDLEvalScope *scope, RDLReport *report) {
   }
 }
 
+// The style an item draws with once TextAlign General has been decided:
+// numbers right, everything else left. The decision is made from the evaluated
+// value, not from the string it was formatted into -- the evaluator already
+// knows whether it produced a number, and reading "1,234.00" back out of the
+// text to guess would be undoing work that was done properly. (A date is a
+// number to nobody here: it goes left, which is what the audit describes.)
+//
+// The style is copied rather than changed: RDLResolveStyle hands back the
+// item's own style object when nothing in it is an expression, and writing to
+// that would edit the report.
+static RDLStyle *RDLStyleResolvingGeneralAlign(RDLStyle *style, id value) {
+  RDLTextAlign align = style ? style.textAlign : RDLTextAlignGeneral;
+  if (align != RDLTextAlignGeneral && align != RDLTextAlignUnspecified)
+    return style;
+  RDLStyle *out = [RDLStyle styleByMerging:nil over:style ?: [RDLStyle defaultStyle]];
+  BOOL numeric = [value isKindOfClass:[NSNumber class]] &&
+                 strcmp([value objCType], @encode(BOOL)) != 0;
+  out.textAlign = numeric ? RDLTextAlignRight : RDLTextAlignLeft;
+  return out;
+}
+
 static RDLStyle *RDLResolveStyle(RDLStyle *s, RDLEvalScope *scope) {
   if (s == nil || scope == nil || !RDLStyleIsDynamic(s))
     return s;
@@ -1657,9 +1678,14 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   if ([item isKindOfClass:[RDLTextbox class]]) {
     RDLTextbox *tb0 = (RDLTextbox *)item;
     RDLLaidOutTextbox *lt = (RDLLaidOutTextbox *)li;
-    lt.text = [RDLExpression formatValue:[RDLExpression evaluate:tb0.value scope:scope]
+    id value = [RDLExpression evaluate:tb0.value scope:scope];
+    lt.text = [RDLExpression formatValue:value
                                   format:(li.style ?: item.style).format
                                 language:scope.language];
+    // TextAlign General -- the spec's default -- is settled here, where the
+    // evaluated value still has a type. Everything downstream sees Left or
+    // Right and needs to know nothing about it.
+    li.style = RDLStyleResolvingGeneralAlign(li.style, value);
     if ([tb0.paragraphs count]) {
       NSMutableArray *spans = [NSMutableArray array];
       NSMutableArray *flat = [NSMutableArray array];
@@ -1692,7 +1718,10 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     NSString *val = [img0.value hasPrefix:@"="]
                         ? [RDLExpression evaluateText:img0.value scope:scope]
                         : img0.value;
-    lm.sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingFit;
+    // MS-RDL's default is AutoSize: an image that says nothing is drawn at
+    // its own size rather than stretched to the box.
+    lm.sizing =
+        img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingAutoSize;
     if (img0.source == RDLImageSourceEmbedded) {
       RDLEmbeddedImage *img = [scope.report embeddedImageNamed:val];
       lm.imageData = img.imageData;

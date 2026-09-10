@@ -561,6 +561,130 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"and its direction");
 }
 
+// What a report that says nothing gets. These are MS-RDL's defaults, and the
+// kit's used to be its own: Georgia at #1a1916, left-aligned, 4pt of side
+// padding, textboxes that grow, page sections on every page. A file rendered
+// one way under SSRS and another here, and nobody could see why from the file.
+- (void)testAnUnstyledReportGetsTheSpecsDefaults {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Plain\"><Value>Hello</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"    </Textbox>"
+      @"    <Image Name=\"Picture\"><Source>External</Source><Value>logo.png</Value>"
+      @"      <Top>0.5in</Top><Left>0in</Left><Width>1in</Width><Height>1in</Height>"
+      @"    </Image>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTextbox *box = (RDLTextbox *)[r.body.items firstObject];
+  if (box == nil) {
+    XCTFail(@"%@", @"the textbox did not parse");
+    return;
+  }
+  if (![box.style.fontFamily isEqualToString:@"Arial"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"FontFamily defaults to Arial, not %@",
+                                              box.style.fontFamily]);
+  if (![[box.style.fontSize stringValue] isEqualToString:@"10pt"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"FontSize defaults to 10pt, not %@",
+                                              [box.style.fontSize stringValue]]);
+  if (![box.style.color isEqualToString:@"#000000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Color defaults to black, not %@",
+                                              box.style.color]);
+  if (box.style.textAlign != RDLTextAlignGeneral)
+    XCTFail(@"%@", @"TextAlign defaults to General");
+  for (RDLLength *padding in @[ box.style.paddingLeft, box.style.paddingRight,
+                                box.style.paddingTop, box.style.paddingBottom ])
+    if (![[padding stringValue] isEqualToString:@"2pt"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"padding defaults to 2pt, not %@",
+                                                [padding stringValue]]);
+  if (box.canGrow)
+    XCTFail(@"%@", @"a textbox that says nothing does not grow");
+  RDLImage *image = (RDLImage *)r.body.items[1];
+  if (image.sizing != RDLImageSizingUnspecified && image.sizing != RDLImageSizingAutoSize)
+    XCTFail(@"%@", @"an image that says nothing is AutoSize");
+  // No page sections in the file means none on the paper: half an inch of
+  // blank header used to be invented for every report.
+  if (r.pageHeader.height > 0 || r.pageFooter.height > 0)
+    XCTFail(@"%@", [NSString stringWithFormat:@"phantom bands: header %g, footer %g",
+                                              r.pageHeader.height, r.pageFooter.height]);
+  if (r.pageHeader.printOnFirstPage || r.pageFooter.printOnLastPage)
+    XCTFail(@"%@", @"and a page section prints on neither end unless it says so");
+}
+
+// The other half of the same problem: what a round trip must not add. A report
+// that named no font came back naming one, and rendered in that font ever
+// after.
+- (void)testWritingDoesNotMaterialiseDefaults {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Bare"];
+  // +emptyReportNamed: is the designer's template for a new report, and it
+  // does have opinions -- a running head on every page, for one. They are
+  // written into the file, which is right; this test is about the ones nobody
+  // asked for, so the template's are cleared first.
+  for (RDLBand *band in @[ r.pageHeader, r.pageFooter ]) {
+    band.printOnFirstPage = NO;
+    band.printOnLastPage = NO;
+    band.height = 0;
+  }
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Plain";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  [r.body.items addObject:box];
+
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  for (NSString *invented in @[ @"<FontFamily>", @"<FontSize>", @"<FontWeight>", @"<Color>",
+                                @"<TextAlign>", @"<PaddingLeft>", @"<PaddingRight>",
+                                @"<PaddingTop>", @"<PaddingBottom>", @"<CanGrow>",
+                                @"<PrintOnFirstPage>", @"<PrintOnLastPage>", @"<Sizing>" ])
+    if ([xml rangeOfString:invented].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ was written into a report that never "
+                                                @"mentioned it", invented]);
+
+  // And what the file does say still survives.
+  box.style.fontFamily = @"Helvetica";
+  box.canGrow = YES;
+  xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<FontFamily>Helvetica</FontFamily>"].location == NSNotFound)
+    XCTFail(@"%@", @"a font that was asked for should be written");
+  if ([xml rangeOfString:@"<CanGrow>true</CanGrow>"].location == NSNotFound)
+    XCTFail(@"%@", @"and so should CanGrow when it is true");
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLTextbox *readBack = (RDLTextbox *)[back.body.items firstObject];
+  if (![readBack.style.fontFamily isEqualToString:@"Helvetica"] || !readBack.canGrow)
+    XCTFail(@"%@", @"and both should come back");
+}
+
+// General is the default alignment, and it is not Left: a number goes right.
+// The value decides, which is why it is settled while the value still has a
+// type rather than by reading the formatted string.
+- (void)testGeneralAlignmentFollowsTheValue {
+  RDLReport *r = RDLMiniInvoice();
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{ @"InvoiceNo" : @"B-2" }];
+  BOOL sawNumberRight = NO, sawTextLeft = NO;
+  for (RDLLaidOutItem *it in [[pages firstObject] items]) {
+    NSString *text = RDLLaidText(it);
+    if ([text isEqualToString:@"10"] || [text isEqualToString:@"5"]) {
+      if (it.style.textAlign == RDLTextAlignRight)
+        sawNumberRight = YES;
+      else
+        XCTFail(@"%@", [NSString stringWithFormat:@"a number under General goes right, not %ld",
+                                                  (long)it.style.textAlign]);
+    }
+    if ([text isEqualToString:@"W1"]) {
+      if (it.style.textAlign == RDLTextAlignLeft)
+        sawTextLeft = YES;
+      else
+        XCTFail(@"%@", @"and text goes left");
+    }
+  }
+  if (!sawNumberRight || !sawTextLeft)
+    XCTFail(@"%@", @"the layout should have produced both a number and a word to align");
+}
+
 - (void)testValue {
 
   if ([RDLValue valueWithSource:nil] != nil || [RDLValue valueWithSource:@""] != nil)

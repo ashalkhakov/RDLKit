@@ -190,8 +190,13 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
       run.value = @"";
       [para.runs addObject:run];
     }
-    RDLTextAlign baseAlign =
-        base.textAlign != RDLTextAlignUnspecified ? base.textAlign : RDLTextAlignLeft;
+    // What the editor shows for text nobody has aligned. General -- the spec's
+    // default -- draws text left, and NSTextView reports Left for a paragraph
+    // with no alignment of its own, so a paragraph saying Left over a base of
+    // General is saying nothing and must not make the text rich.
+    RDLTextAlign baseAlign = base.textAlign;
+    if (baseAlign == RDLTextAlignUnspecified || baseAlign == RDLTextAlignGeneral)
+      baseAlign = RDLTextAlignLeft;
     if (paraAlign != RDLTextAlignUnspecified && paraAlign != baseAlign) {
       RDLStyle *ps = [[RDLStyle alloc] init];
       ps.textAlign = paraAlign;

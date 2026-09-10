@@ -480,7 +480,10 @@ static NSString *RDLElementPath(NSXMLElement *el) {
       break;
     }
 
-  chart.legendHidden = YES;
+  // Absent ChartLegends means the default legend, which is shown. Hiding it
+  // was this kit's own idea and left a Report Builder chart without the key to
+  // its own series.
+  chart.legendHidden = NO;
   for (NSXMLNode *n in [RDLChild(el, @"ChartLegends") children]) {
     if (n.kind != NSXMLElementKind)
       continue;
@@ -805,7 +808,7 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     tb.paragraphs = [self parseParagraphs:el itemStyle:item.style];
     tb.hyperlink = RDLParseHyperlink(el);
     NSString *cg = RDLText(RDLChild(el, @"CanGrow"));
-    tb.canGrow = ![cg isEqualToString:@"false"];
+    tb.canGrow = [cg isEqualToString:@"true"];
   } else if ([el.localName isEqualToString:@"Image"]) {
     RDLImage *img = (RDLImage *)item;
     RDL_PARSE_ENUM(img.source, @"Source", RDLImageSourceFromString,
@@ -970,10 +973,11 @@ static RDLItem *RDLItemForElementName(NSString *name) {
 
 - (RDLBand *)parseBand:(NSXMLElement *)el fallbackHeight:(CGFloat)fallback {
   RDLBand *b = [[RDLBand alloc] init];
-  if (el == nil) {
-    b.height = fallback;
+  // A band that is not in the file is not a band: an absent PageHeader used to
+  // become half an inch of blank paper on every page, which is half an inch
+  // SSRS does not print. The height stays zero and the layout skips it.
+  if (el == nil)
     return b;
-  }
   b.height = RDLInchesFromString(RDLText(RDLChild(el, @"Height")));
   if (b.height <= 0)
     b.height = fallback;
@@ -1069,8 +1073,11 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   RDL_PAGE_INCHES(r.page.rightMargin, pageEl, @"RightMargin");
   RDL_PAGE_INCHES(r.page.topMargin, pageEl, @"TopMargin");
   RDL_PAGE_INCHES(r.page.bottomMargin, pageEl, @"BottomMargin");
-  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader") fallbackHeight:0.5];
-  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter") fallbackHeight:0.4];
+  // The page sections get no invented height. The body keeps one, since its
+  // Height is required by the schema and a file without it is malformed
+  // rather than silent.
+  r.pageHeader = [self parseBand:RDLChild(pageEl, @"PageHeader") fallbackHeight:0];
+  r.pageFooter = [self parseBand:RDLChild(pageEl, @"PageFooter") fallbackHeight:0];
   r.body = [self parseBand:RDLChild(layout, @"Body") fallbackHeight:4.0];
 
   [r.dataSources removeAllObjects];
@@ -1302,23 +1309,51 @@ static void RDLAddLength(NSXMLElement *parent, NSString *name, RDLExpr *expr, RD
     RDLAdd(parent, name, [len stringValue]);
 }
 
+// A property is written when it says something the spec's default does not.
+// Writing them all -- which is what this did -- means a report that named no
+// font comes back naming one, and stays that way: it renders in Arial under
+// SSRS and in whatever this kit defaulted to ever after.
+// A measurement that the spec already says by saying nothing.
+static void RDLAddLengthUnlessDefault(NSXMLElement *parent, NSString *name, RDLExpr *expr,
+                                       RDLLength *len, RDLLength *fallback) {
+  if (expr) {
+    RDLAdd(parent, name, [expr source]);
+    return;
+  }
+  if (len == nil || [[len stringValue] isEqualToString:[fallback stringValue]])
+    return;
+  RDLAdd(parent, name, [len stringValue]);
+}
+
 static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
   if (s == nil)
     s = [RDLStyle defaultStyle];
+  RDLStyle *d = [RDLStyle defaultStyle];
   NSXMLElement *el = RDLEl(@"Style");
-  RDLAdd(el, @"FontFamily", RDLStyleText(s.expressions.fontFamily, s.fontFamily ?: @"Georgia"));
-  RDLAdd(el, @"FontSize",
-          RDLStyleText(s.expressions.fontSize, [s.fontSize stringValue] ?: @"10pt"));
-  RDLAdd(el, @"FontWeight",
-          RDLStyleText(s.expressions.fontWeight,
-                        RDLStringFromFontWeight(s.fontWeight) ?: @"Normal"));
+  if (s.expressions.fontFamily)
+    RDLAdd(el, @"FontFamily", [s.expressions.fontFamily source]);
+  else if ([s.fontFamily length] && ![s.fontFamily isEqualToString:d.fontFamily])
+    RDLAdd(el, @"FontFamily", s.fontFamily);
+  if (s.expressions.fontSize)
+    RDLAdd(el, @"FontSize", [s.expressions.fontSize source]);
+  else if (s.fontSize && ![[s.fontSize stringValue] isEqualToString:[d.fontSize stringValue]])
+    RDLAdd(el, @"FontSize", [s.fontSize stringValue]);
+  if (s.expressions.fontWeight)
+    RDLAdd(el, @"FontWeight", [s.expressions.fontWeight source]);
+  else if (s.fontWeight != RDLFontWeightUnspecified && s.fontWeight != d.fontWeight)
+    RDLAdd(el, @"FontWeight", RDLStringFromFontWeight(s.fontWeight));
   if (s.expressions.fontStyle)
     RDLAdd(el, @"FontStyle", [s.expressions.fontStyle source]);
   else if (s.fontStyle != RDLFontStyleUnspecified && s.fontStyle != RDLFontStyleNormal)
     RDLAdd(el, @"FontStyle", RDLStringFromFontStyle(s.fontStyle));
-  RDLAdd(el, @"Color", RDLStyleText(s.expressions.color, s.color ?: @"#1a1916"));
-  RDLAdd(el, @"TextAlign",
-          RDLStyleText(s.expressions.textAlign, RDLStringFromTextAlign(s.textAlign) ?: @"Left"));
+  if (s.expressions.color)
+    RDLAdd(el, @"Color", [s.expressions.color source]);
+  else if ([s.color length] && ![s.color isEqualToString:d.color])
+    RDLAdd(el, @"Color", s.color);
+  if (s.expressions.textAlign)
+    RDLAdd(el, @"TextAlign", [s.expressions.textAlign source]);
+  else if (s.textAlign != RDLTextAlignUnspecified && s.textAlign != d.textAlign)
+    RDLAdd(el, @"TextAlign", RDLStringFromTextAlign(s.textAlign));
   if (s.expressions.verticalAlign)
     RDLAdd(el, @"VerticalAlign", [s.expressions.verticalAlign source]);
   else if (s.verticalAlign != RDLVerticalAlignUnspecified)
@@ -1340,10 +1375,14 @@ static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
     RDLAdd(el, @"BackgroundColor", [s.expressions.backgroundColor source]);
   else if (s.backgroundColor && ![s.backgroundColor isEqualToString:@"Transparent"])
     RDLAdd(el, @"BackgroundColor", s.backgroundColor);
-  RDLAddLength(el, @"PaddingLeft", s.expressions.paddingLeft, s.paddingLeft);
-  RDLAddLength(el, @"PaddingRight", s.expressions.paddingRight, s.paddingRight);
-  RDLAddLength(el, @"PaddingTop", s.expressions.paddingTop, s.paddingTop);
-  RDLAddLength(el, @"PaddingBottom", s.expressions.paddingBottom, s.paddingBottom);
+  RDLAddLengthUnlessDefault(el, @"PaddingLeft", s.expressions.paddingLeft, s.paddingLeft,
+                             d.paddingLeft);
+  RDLAddLengthUnlessDefault(el, @"PaddingRight", s.expressions.paddingRight, s.paddingRight,
+                             d.paddingRight);
+  RDLAddLengthUnlessDefault(el, @"PaddingTop", s.expressions.paddingTop, s.paddingTop,
+                             d.paddingTop);
+  RDLAddLengthUnlessDefault(el, @"PaddingBottom", s.expressions.paddingBottom, s.paddingBottom,
+                             d.paddingBottom);
   if (s.border && s.border.style != RDLBorderStyleNone) {
     NSXMLElement *b = RDLBorderElement(@"Border", s.border);
     if (b)
@@ -1745,7 +1784,8 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     RDLAddHyperlink(el, it);
     RDLAdd(el, @"Source", RDLStringFromImageSource(img.source) ?: @"External");
     RDLAdd(el, @"Value", img.value);
-    RDLAdd(el, @"Sizing", RDLStringFromImageSizing(img.sizing) ?: @"FitProportional");
+    if (img.sizing != RDLImageSizingUnspecified && img.sizing != RDLImageSizingAutoSize)
+      RDLAdd(el, @"Sizing", RDLStringFromImageSizing(img.sizing));
     RDLAddStyle(el, it.style);
     [parent addChild:el];
     return;
@@ -1810,7 +1850,8 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   RDLAddVisibility(el, it.hidden, it.toggleItem);
   RDLAddHyperlink(el, it);
   RDLAddItemPagination(el, it);
-  RDLAdd(el, @"CanGrow", tb.canGrow ? @"true" : @"false");
+  if (tb.canGrow)
+    RDLAdd(el, @"CanGrow", @"true");
   RDLAddStyle(el, it.style);
   NSXMLElement *paras = RDLEl(@"Paragraphs");
   if ([tb.paragraphs count]) {
@@ -1855,8 +1896,10 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
 
 - (void)addBand:(RDLBand *)b to:(NSXMLElement *)parent {
   [self addBandItems:b to:parent];
-  RDLAdd(parent, @"PrintOnFirstPage", b.printOnFirstPage ? @"true" : @"false");
-  RDLAdd(parent, @"PrintOnLastPage", b.printOnLastPage ? @"true" : @"false");
+  if (b.printOnFirstPage)
+    RDLAdd(parent, @"PrintOnFirstPage", @"true");
+  if (b.printOnLastPage)
+    RDLAdd(parent, @"PrintOnLastPage", @"true");
 }
 
 - (instancetype)initWithUnit:(RDLReportUnit)unit {
@@ -2022,12 +2065,19 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   RDLAdd(page, @"RightMargin", [self measurement:report.page.rightMargin]);
   RDLAdd(page, @"TopMargin", [self measurement:report.page.topMargin]);
   RDLAdd(page, @"BottomMargin", [self measurement:report.page.bottomMargin]);
-  NSXMLElement *header = RDLEl(@"PageHeader");
-  [self addBand:report.pageHeader to:header];
-  [page addChild:header];
-  NSXMLElement *footer = RDLEl(@"PageFooter");
-  [self addBand:report.pageFooter to:footer];
-  [page addChild:footer];
+  // A band with no height and nothing in it is not a band. Writing an empty
+  // PageHeader is what made the next reader invent half an inch of paper.
+  for (NSArray *pair in @[ @[ @"PageHeader", report.pageHeader ?: [NSNull null] ],
+                           @[ @"PageFooter", report.pageFooter ?: [NSNull null] ] ]) {
+    if (pair[1] == [NSNull null])
+      continue;
+    RDLBand *band = pair[1];
+    if (band.height <= 0 && [band.items count] == 0)
+      continue;
+    NSXMLElement *el = RDLEl(pair[0]);
+    [self addBand:band to:el];
+    [page addChild:el];
+  }
   [section addChild:page];
 
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithRootElement:root];
