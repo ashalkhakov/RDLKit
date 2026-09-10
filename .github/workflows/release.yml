@@ -116,6 +116,11 @@ jobs:
     name: macOS (signed)
     runs-on: macos-15
     timeout-minutes: 45
+    # The signing and notarisation secrets live in this environment, and an
+    # environment's secrets are only readable by a job that names it: without
+    # this line every one of them resolves to the empty string and the job
+    # ships an unsigned build, saying so and passing.
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -181,12 +186,20 @@ jobs:
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Notarize
-        if: steps.sign.outputs.signed == 'true' && env.NOTARY_APPLE_ID != ''
+        if: steps.sign.outputs.signed == 'true'
         env:
           NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
         run: |
+          # Checked here rather than in `if:`, where a step's own env block is
+          # not reliably visible to its own condition -- the step would be
+          # skipped whatever the secrets said, and a signed-but-unnotarized app
+          # that Gatekeeper still refuses would ship from a green run.
+          if [ -z "$NOTARY_APPLE_ID" ] || [ -z "$NOTARY_TEAM_ID" ] || [ -z "$NOTARY_PASSWORD" ]; then
+            echo "::warning::NOTARY_* secrets not set; signed but not notarized"
+            exit 0
+          fi
           ditto -c -k --keepParent "$BUILT/RDLDesigner.app" "$RUNNER_TEMP/RDLDesigner-notarize.zip"
           xcrun notarytool submit "$RUNNER_TEMP/RDLDesigner-notarize.zip" \
             --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" \
