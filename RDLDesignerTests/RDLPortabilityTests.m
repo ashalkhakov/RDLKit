@@ -202,4 +202,176 @@
     XCTFail(@"%@", @"no windows were found to check");
 }
 
+// Packaging: what the About panel shows and what the window manager draws.
+// Both are plist and makefile lines that nothing else exercises, so a rename
+// or a dropped resource would only be found by launching the app -- and on the
+// platform that shipped without them, only by launching it there.
+- (void)testTheAppIsPackagedWithAnIconAndAVersion {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *(^read)(NSString *) = ^NSString *(NSString *relative) {
+    return [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:relative]
+                                     encoding:NSUTF8StringEncoding
+                                        error:NULL];
+  };
+  // One plist for both platforms: gnustep-make reads <App>-Info.plist and
+  // generates Info-gnustep.plist from it, so a second file of that name in
+  // the source directory is never read -- which is how the About panel came
+  // to be missing everything below.
+  NSString *plist = read(@"RDLDesigner/RDLDesigner-Info.plist");
+  NSString *makefile = read(@"RDLDesigner/GNUmakefile");
+  NSString *project = read(@"RDLKit.xcodeproj/project.pbxproj");
+  if (plist == nil || makefile == nil || project == nil) {
+    XCTFail(@"%@", @"could not read the packaging files");
+    return;
+  }
+
+  // The icon: named by the makefile for GNUstep, by the plist for Cocoa, and
+  // present in the bundle either way.
+  if ([makefile rangeOfString:@"RDLDesigner_APPLICATION_ICON = RDLDesigner.png"].location ==
+      NSNotFound)
+    XCTFail(@"%@", @"the GNUstep build should name the application icon");
+  if ([makefile rangeOfString:@"\n  RDLDesigner.png"].location == NSNotFound)
+    XCTFail(@"%@", @"and install it as a resource, or there is nothing to show");
+  if ([plist rangeOfString:@"CFBundleIconFile"].location == NSNotFound)
+    XCTFail(@"%@", @"the Cocoa bundle should name its icon file");
+  for (NSString *icon in @[ @"RDLDesigner/RDLDesigner.png", @"RDLDesigner/RDLDesigner.icns" ])
+    if (![[NSFileManager defaultManager]
+            fileExistsAtPath:[dir stringByAppendingPathComponent:icon]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing", icon]);
+  // Registered in the project, or Xcode builds an app with no icon in it. The
+  // test bundle is not the app -- the designer's classes are linked into this
+  // one -- so what can be checked here is the project file that puts it there.
+  if ([project rangeOfString:@"RDLDesigner.icns"].location == NSNotFound)
+    XCTFail(@"%@", @"the Xcode project should build the icon into the app");
+
+  // Who wrote it and under what terms. GSInfoPanel reads exactly these keys
+  // and says "Copyright Information Not Available" when they are missing,
+  // which is what the GNUstep About panel showed; the Cocoa panel reads
+  // NSHumanReadableCopyright, which the project generates into the bundle.
+  for (NSString *key in @[ @"Authors", @"Copyright", @"CopyrightDescription", @"URL" ])
+    if ([plist rangeOfString:key].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the About panel needs %@ in "
+                                                @"RDLDesigner-Info.plist", key]);
+  // The licence is the one the repository is under, said in the panel rather
+  // than only in a file nobody opens from the app.
+  if ([plist rangeOfString:@"LGPL"].location == NSNotFound)
+    XCTFail(@"%@", @"CopyrightDescription should name the licence");
+  if ([project rangeOfString:@"INFOPLIST_KEY_NSHumanReadableCopyright = \"\";"].location !=
+      NSNotFound)
+    XCTFail(@"%@", @"the Cocoa bundle should carry a copyright line too");
+
+  // The version: one value, in the three places that are read, none of them
+  // still saying 1.0. Scripts/stamp-version.sh is what writes them.
+  NSString *release = nil;
+  NSTextCheckingResult *match = [[NSRegularExpression
+      regularExpressionWithPattern:@"<key>ApplicationRelease</key>\\s*<string>([^<]+)</string>"
+                           options:0
+                             error:NULL] firstMatchInString:plist
+                                                    options:0
+                                                      range:NSMakeRange(0, [plist length])];
+  if (match)
+    release = [plist substringWithRange:[match rangeAtIndex:1]];
+  if ([release length] == 0) {
+    XCTFail(@"%@", @"the plist should carry an ApplicationRelease");
+    return;
+  }
+  if ([plist rangeOfString:[NSString stringWithFormat:@"<key>FullVersionID</key>\n  <string>%@</string>",
+                                                             release]].location == NSNotFound)
+    XCTFail(@"%@", @"FullVersionID should say the same as ApplicationRelease");
+  if ([plist rangeOfString:[NSString stringWithFormat:
+                               @"<key>CFBundleShortVersionString</key>\n  <string>%@</string>",
+                               release]].location == NSNotFound)
+    XCTFail(@"%@", @"the bundle version should say the same as the About panel's");
+  // And nothing named Info-gnustep.plist beside it: gnustep-make generates a
+  // file of that name into the bundle, so one in the source directory is read
+  // by nobody and silently disagrees with what ships.
+  if ([[NSFileManager defaultManager]
+          fileExistsAtPath:[dir stringByAppendingPathComponent:
+                                    @"RDLDesigner/Info-gnustep.plist"]])
+    XCTFail(@"%@", @"RDLDesigner/Info-gnustep.plist is not read by anything -- "
+                   @"gnustep-make generates that file from RDLDesigner-Info.plist");
+  // Xcode generates the bundle's plist from these, so a stamp that missed them
+  // would ship a bundle still claiming whatever the project file says.
+  if ([project rangeOfString:[NSString stringWithFormat:@"MARKETING_VERSION = %@;", release]]
+          .location == NSNotFound)
+    XCTFail(@"%@", @"the Xcode project should carry the same version");
+}
+
+// The AppImage's opener. NSWorkspace hands a URL to whatever
+// [NSTask launchPathForTool:] finds, and that searches GNUstep's tool
+// directories before $PATH -- inside the image those are in the bundle, where
+// nothing opens anything, so the Website line in the About panel did nothing.
+// The wiring is three files that have to agree, and none of them is exercised
+// by building the app.
+- (void)testTheAppImageCarriesAnOpener {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *(^read)(NSString *) = ^NSString *(NSString *relative) {
+    return [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:relative]
+                                     encoding:NSUTF8StringEncoding
+                                        error:NULL];
+  };
+  NSString *shim = read(@"Scripts/appimage/open");
+  NSString *assets = read(@"Scripts/appimage/install-assets.sh");
+  NSString *appRun = read(@"Scripts/appimage/AppRun");
+  if (shim == nil || assets == nil || appRun == nil) {
+    XCTFail(@"%@", @"could not read the AppImage scripts");
+    return;
+  }
+  if (![[NSFileManager defaultManager]
+          isExecutableFileAtPath:[dir stringByAppendingPathComponent:@"Scripts/appimage/open"]])
+    XCTFail(@"%@", @"the opener has to be executable in the tree, since it is installed as-is");
+
+  // Installed where the tool lookup looks first, under both names GNUstep
+  // asks for: the GSUnknownFileTool default, and NSWorkspace's own fallback.
+  if ([assets rangeOfString:@"usr/System/Tools"].location == NSNotFound)
+    XCTFail(@"%@", @"the opener belongs in the bundle's GNUstep tools directory");
+  for (NSString *name in @[ @"open", @"xdg-open" ])
+    if ([assets rangeOfString:name].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should be installed as %@", name]);
+  if ([appRun rangeOfString:@"GSUnknownFileTool open"].location == NSNotFound)
+    XCTFail(@"%@", @"AppRun should point GSUnknownFileTool at it");
+
+  // And the host's environment has to survive the trip, or the browser it
+  // starts inherits the image's libraries and dies on a symbol.
+  for (NSString *saved in @[ @"RDL_HOST_LD_LIBRARY_PATH", @"RDL_HOST_PATH" ]) {
+    if ([appRun rangeOfString:saved].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should save %@ before overriding it",
+                                                saved]);
+    if ([shim rangeOfString:saved].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should restore %@", saved]);
+  }
+}
+
+// Ctrl, not Alt. GNUstep's default modifier map is NeXT's -- Alt_L is COMMAND
+// and both Control keys are CONTROL -- so on a Linux desktop the app answered
+// Alt+C where every other window answers Ctrl+C. AppRun writes the map with
+// the defaults tool at launch, beside the theme and the fonts.
+- (void)testAppRunPutsCommandOnTheControlKey {
+  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
+  NSString *appRun =
+      [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:
+                                                  @"Scripts/appimage/AppRun"]
+                                encoding:NSUTF8StringEncoding
+                                   error:NULL];
+  if (appRun == nil) {
+    XCTFail(@"%@", @"could not read AppRun");
+    return;
+  }
+  // The whole map, since half of it is worse than none: a key that is COMMAND
+  // and CONTROL at once fires a menu item and a text binding from one press,
+  // which gnustep-gui's KeyboardSetup warns about.
+  NSDictionary<NSString *, NSString *> *map = @{
+    @"GSFirstCommandKey" : @"Control_L",   // what menu key equivalents fire on
+    @"GSFirstControlKey" : @"NoSymbol",    // ... and no longer CONTROL as well
+    @"GSSecondControlKey" : @"Control_R",  // the right one stays a real CONTROL
+    @"GSFirstAlternateKey" : @"Alt_L",     // Alt, freed from COMMAND
+    @"GSSecondAlternateKey" : @"Alt_R",
+  };
+  for (NSString *key in map) {
+    NSString *line = [NSString stringWithFormat:@"write org.rdl.designer %@ %@", key, map[key]];
+    if ([appRun rangeOfString:line].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should write: %@", line]);
+  }
+}
+
 @end

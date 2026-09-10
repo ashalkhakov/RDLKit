@@ -9,14 +9,16 @@
   <key>CFBundleIdentifier</key>
   <string>org.rdl.designer</string>
   <key>CFBundleVersion</key>
-  <string>1.0</string>
+  <string>0.0.0-dev</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
+  <string>0.0.0-dev</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleSignature</key>
   <string>RDLK</string>
   <key>CFBundleExecutable</key>
+  <string>RDLDesigner</string>
+  <key>CFBundleIconFile</key>
   <string>RDLDesigner</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
@@ -39,6 +41,50 @@
         <string>rdlc</string>
       </array>
       <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>NSDocumentClass</key>
+      <string>RDLDocument</string>
+    </dict>
+  </array>
+
+  <!-- GNUstep reads this same file: gnustep-make looks for <App>-Info.plist
+       (Instance/rules.make) and merges it into the Info-gnustep.plist it
+       generates. What follows is what it reads and Cocoa ignores. -->
+  <key>ApplicationName</key>
+  <string>RDLDesigner</string>
+  <key>ApplicationDescription</key>
+  <string>Report designer compatible with MS RDL</string>
+  <!-- GSInfoPanel, the About panel, shows these five. -->
+  <key>ApplicationRelease</key>
+  <string>0.0.0-dev</string>
+  <key>FullVersionID</key>
+  <string>0.0.0-dev</string>
+  <key>Authors</key>
+  <array>
+    <string>Artyom Shalkhakov</string>
+  </array>
+  <key>URL</key>
+  <string>https://github.com/ashalkhakov/RDLKit</string>
+  <key>Copyright</key>
+  <string>Copyright (C) 2026 the RDLKit contributors</string>
+  <key>CopyrightDescription</key>
+  <string>GNU LGPL 2.1</string>
+  <!-- Document types in GNUstep's own form. NSDocumentController reads NSTypes
+       first and CFBundleDocumentTypes after, so both are here, the way the
+       document-based GNUstep apps this was ported from carry both. -->
+  <key>NSTypes</key>
+  <array>
+    <dict>
+      <key>NSName</key>
+      <string>RDLReport</string>
+      <key>NSHumanReadableName</key>
+      <string>Report Definition</string>
+      <key>NSUnixExtensions</key>
+      <array>
+        <string>rdl</string>
+        <string>rdlc</string>
+      </array>
+      <key>NSRole</key>
       <string>Editor</string>
       <key>NSDocumentClass</key>
       <string>RDLDocument</string>

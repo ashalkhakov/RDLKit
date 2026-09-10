@@ -46,7 +46,7 @@ jobs:
 
       - name: Install packages
         run: |
-          sudo apt-get -q -y update
+          ./.github/scripts/apt-update.sh
           sudo apt-get -q -y install \
             pkg-config libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev \
             libssl-dev libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev \
@@ -79,6 +79,9 @@ jobs:
 
       - name: Fetch linuxdeploy and the AppImage runtime
         run: ./Scripts/install-linuxdeploy.sh
+
+      - name: Stamp the version
+        run: ./Scripts/stamp-version.sh "$APP_VERSION"
 
       - name: Assemble AppDir
         run: GNUSTEP_PREFIX="$INSTALL_PATH" ./Scripts/prepare-appdir.sh
@@ -123,6 +126,9 @@ jobs:
           else
             echo "APP_VERSION=0.0.0-build${{ github.run_number }}" >> "$GITHUB_ENV"
           fi
+
+      - name: Stamp the version
+        run: ./Scripts/stamp-version.sh "$APP_VERSION"
 
       - name: Build
         run: |

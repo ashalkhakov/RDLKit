@@ -604,6 +604,16 @@ a tag triggers it from anywhere.
   bundled Liberation fonts — by writing them into the designer's own defaults
   domain at launch, so it looks the way a GNUstep desktop is expected to look
   rather than like stock GNUstep.
+
+  It also carries `Scripts/appimage/open`, installed into the bundle's GNUstep
+  tools directory as both `open` and `xdg-open` and named by the
+  `GSUnknownFileTool` default. `NSWorkspace` hands a URL to whatever
+  `+[NSTask launchPathForTool:]` finds, and that searches GNUstep's tool
+  directories before `$PATH` — inside the image those are in the bundle, where
+  no opener lives, so the About panel's website link did nothing. The shim
+  restores the host's `PATH` and `LD_LIBRARY_PATH` before handing the URL to
+  `xdg-open` or `gio open`, because a browser started with the image's
+  libraries on its path does not start.
 * **macOS** — `RDLDesigner.app`, and `rdlgen` beside the `RDLKit.framework` it
   loads through `@rpath` (the tool alone will not start), signed with a
   Developer ID and notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),

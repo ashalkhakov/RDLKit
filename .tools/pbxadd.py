@@ -37,6 +37,10 @@ TARGETS = {
 FILETYPE = {
     '.h': 'sourcecode.c.h', '.m': 'sourcecode.c.objc',
     '.xib': 'file.xib', '.plist': 'text.plist.xml',
+    # Resources that are neither code nor markup: the app icon, the sample
+    # reports and the data they read.
+    '.icns': 'image.icns', '.png': 'image.png',
+    '.rdl': 'text.xml', '.json': 'text.json',
 }
 
 
