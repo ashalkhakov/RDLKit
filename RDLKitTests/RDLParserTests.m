@@ -52,6 +52,33 @@ static NSString *RDLLegacyTableRDL(void) {
 
 @interface RDLParserTests : RDLKitTestCase
 @end
+static NSString *RDLReportWithUnsupportedItems(void) {
+  return
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"<ReportSections><ReportSection><Body><Height>6in</Height><ReportItems>"
+      @"  <Textbox Name=\"Before\"><Value>Before</Value>"
+      @"    <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height></Textbox>"
+      @"  <GaugePanel Name=\"Speed\">"
+      @"    <Top>0.5in</Top><Left>0in</Left><Width>2in</Width><Height>1.5in</Height>"
+      @"    <RadialGauges><RadialGauge Name=\"Dial\"><ClipContent>true</ClipContent>"
+      @"    </RadialGauge></RadialGauges>"
+      @"  </GaugePanel>"
+      @"  <Map Name=\"World\">"
+      @"    <Top>2.2in</Top><Left>0in</Left><Width>3in</Width><Height>1.5in</Height>"
+      @"    <MapViewport><MapCoordinateSystem>Planar</MapCoordinateSystem></MapViewport>"
+      @"  </Map>"
+      @"  <CustomReportItem Name=\"Code\"><Type>QrCode</Type>"
+      @"    <Top>4in</Top><Left>0in</Left><Width>1.2in</Width><Height>1.2in</Height>"
+      @"    <AltReportItem><Textbox Name=\"CodeAlt\"><Value>QR goes here</Value>"
+      @"    </Textbox></AltReportItem>"
+      @"    <CustomProperties><CustomProperty><Name>Code</Name>"
+      @"      <Value>https://example.org/</Value></CustomProperty></CustomProperties>"
+      @"  </CustomReportItem>"
+      @"</ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+}
+
 @implementation RDLParserTests
 
 // GNUstep asserts that the shared application exists before anything touches a
@@ -704,6 +731,37 @@ static NSString *RDLLegacyTableRDL(void) {
     XCTFail(@"%@", @"the layout should have produced both a number and a word to align");
 }
 
+// PageBreak/Disabled is an expression, on a region and on a group, and it
+// survives a round trip.
+- (void)testAPageBreakCanBeDisabled {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/"
+      @"reportdefinition\">"
+      @"  <ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+      @"    <Rectangle Name=\"Panel\">"
+      @"      <Top>0in</Top><Left>0in</Left><Width>3in</Width><Height>1in</Height>"
+      @"      <PageBreak><BreakLocation>End</BreakLocation>"
+      @"        <Disabled>=Parameters!Draft.Value</Disabled></PageBreak>"
+      @"      <ReportItems/>"
+      @"    </Rectangle>"
+      @"  </ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLItem *panel = [r.body.items firstObject];
+  if (panel.pageBreak != RDLPageBreakLocationEnd ||
+      ![[panel.pageBreakDisabled source] isEqualToString:@"=Parameters!Draft.Value"]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"read: location %ld, disabled %@",
+                                              (long)panel.pageBreak,
+                                              [panel.pageBreakDisabled source]]);
+    return;
+  }
+  RDLReport *again =
+      [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  RDLItem *back = [again.body.items firstObject];
+  if (![[back.pageBreakDisabled source] isEqualToString:@"=Parameters!Draft.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"written back: %@", [back.pageBreakDisabled source]]);
+}
+
 // PageName belongs to the data region or the group, and Report/InitialPageName
 // names the pages before either has spoken. This kit read PageName only inside
 // PageBreak -- a place no schema allows -- so a spec file's page names were
@@ -804,6 +862,65 @@ static NSString *RDLLegacyTableRDL(void) {
   NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
   if ([pages count] == 0)
     XCTFail(@"%@", @"a body item with a page name should still lay out");
+}
+
+// GaugePanel, Map and CustomReportItem used to stop the whole file from
+// opening: one gauge on a dashboard and nothing else on it could be seen
+// either. They open now, keep their place, say they are not supported -- and
+// are written back exactly as they came, so saving does not delete them.
+- (void)testUnsupportedItemsOpenAndSurviveASave {
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:RDLReportWithUnsupportedItems() error:&err];
+  if (r == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the file should open: %@",
+                                              err.localizedDescription]);
+    return;
+  }
+  if ([r.body.items count] != 4) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"every item should be there, found %lu",
+                                              (unsigned long)[r.body.items count]]);
+    return;
+  }
+  RDLUnsupportedItem *gauge = (RDLUnsupportedItem *)r.body.items[1];
+  RDLUnsupportedItem *map = (RDLUnsupportedItem *)r.body.items[2];
+  RDLUnsupportedItem *code = (RDLUnsupportedItem *)r.body.items[3];
+  if (![gauge isKindOfClass:[RDLUnsupportedItem class]] ||
+      gauge.kind != RDLUnsupportedItemKindGaugePanel ||
+      map.kind != RDLUnsupportedItemKindMap ||
+      code.kind != RDLUnsupportedItemKindCustomReportItem)
+    XCTFail(@"%@", @"each should be kept as the kind it is");
+  if (fabs(gauge.top - 0.5) > 0.001 || fabs(gauge.width - 2) > 0.001)
+    XCTFail(@"%@", @"and keep its place on the page");
+  if (![code.customType isEqualToString:@"QrCode"])
+    XCTFail(@"%@", @"a custom item says which extension it needs");
+  if (![[(RDLTextbox *)code.altItem value] isEqualToString:@"QR goes here"])
+    XCTFail(@"%@", @"and its AltReportItem is read");
+  for (NSString *name in @[ @"'Speed'", @"'World'", @"'Code'" ]) {
+    BOOL said = NO;
+    for (NSString *w in r.warnings)
+      if ([w rangeOfString:name].location != NSNotFound)
+        said = YES;
+    if (!said)
+      XCTFail(@"%@", [NSString stringWithFormat:@"no warning names %@: %@", name, r.warnings]);
+  }
+
+  // Saved: what this kit could not describe comes back intact, and a
+  // placeholder that was moved stays moved.
+  gauge.left = 1.5;
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  for (NSString *kept in @[ @"<RadialGauge", @"<MapCoordinateSystem>Planar", @"<CustomProperties>",
+                            @"https://example.org/" ])
+    if ([xml rangeOfString:kept].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"saving lost %@", kept]);
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:&err];
+  if ([back.body.items count] != 4) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"reading the saved file back: %@",
+                                              err.localizedDescription ?: @"items missing"]);
+    return;
+  }
+  RDLUnsupportedItem *gaugeBack = (RDLUnsupportedItem *)back.body.items[1];
+  if (gaugeBack.kind != RDLUnsupportedItemKindGaugePanel || fabs(gaugeBack.left - 1.5) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the moved gauge came back at %g", gaugeBack.left]);
 }
 
 - (void)testValue {
@@ -1463,6 +1580,233 @@ static NSString *RDLLegacyTableRDL(void) {
       said = YES;
   if (!said)
     XCTFail(@"%@", @"a dataset that names no data source should be an error");
+}
+
+
+#pragma mark - Charts in the spec's names
+
+// A chart with one series, whose series kind, data label and two axes are
+// given. `ns` is the schema year the document announces.
+static NSString *RDLChartDocument(NSString *ns, NSString *kind, NSString *label,
+                                  NSString *categoryAxis, NSString *valueAxis) {
+  return [NSString
+      stringWithFormat:
+          @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/%@/01/"
+          @"reportdefinition\"><ReportSections><ReportSection><Body><Height>3in</Height>"
+          @"<ReportItems><Chart Name=\"C\"><Top>0in</Top><Left>0in</Left><Width>4in</Width>"
+          @"<Height>3in</Height><ChartData><ChartSeriesCollection><ChartSeries Name=\"S\">%@"
+          @"<ChartDataPoints><ChartDataPoint><ChartDataPointValues><Y>=1</Y>"
+          @"</ChartDataPointValues>%@</ChartDataPoint></ChartDataPoints></ChartSeries>"
+          @"</ChartSeriesCollection></ChartData><ChartAreas><ChartArea Name=\"Default\">"
+          @"<ChartCategoryAxes><ChartAxis Name=\"Primary\">%@</ChartAxis></ChartCategoryAxes>"
+          @"<ChartValueAxes><ChartAxis Name=\"Primary\">%@</ChartAxis></ChartValueAxes>"
+          @"</ChartArea></ChartAreas></Chart></ReportItems></Body><Width>6in</Width><Page/>"
+          @"</ReportSection></ReportSections></Report>",
+          ns, kind, label, categoryAxis, valueAxis];
+}
+
+static RDLChart *RDLFirstChart(RDLReport *r) {
+  for (RDLItem *it in r.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      return (RDLChart *)it;
+  return nil;
+}
+
+// What Report Builder writes: a pie is a Shape, an axis is Visible or not, its
+// interval is Interval, its tick marks and grid lines are switched by Enabled,
+// and a data label shows when it is Visible. The kit read none of these, and
+// wrote names of its own that Report Builder rejects.
+- (void)testChartsReadAndWriteTheSpecsNames {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"<Type>Shape</Type><Subtype>ExplodedPie</Subtype>",
+      @"<ChartDataLabel><Visible>true</Visible></ChartDataLabel>",
+      @"<Visible>False</Visible><Interval>Auto</Interval>"
+      @"<ChartMajorGridLines><Enabled>False</Enabled></ChartMajorGridLines>"
+      @"<ChartMajorTickMarks><Type>Cross</Type></ChartMajorTickMarks>",
+      @"<Interval>25</Interval><ChartMajorTickMarks><Enabled>False</Enabled>"
+      @"</ChartMajorTickMarks>");
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    if (chart == nil) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: no chart", when]);
+      return;
+    }
+    if (chart.chartType != RDLChartTypePie || chart.subtype != RDLChartSubtypeExploded)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: kind %ld/%ld, not an exploded pie", when,
+                                                (long)chart.chartType, (long)chart.subtype]);
+    if (![[chart.series firstObject] showDataLabels])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the data labels are Visible", when]);
+    RDLChartAxis *cat = chart.categoryAxis, *val = chart.valueAxis;
+    if (!cat.hidden || cat.showMajorGridLines || cat.majorTickMarks != RDLChartTickMarksCross ||
+        cat.majorInterval != nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: category axis hidden %d, grid %d, ticks %ld, "
+                                                @"interval %@",
+                                                when, cat.hidden, cat.showMajorGridLines,
+                                                (long)cat.majorTickMarks, [cat.majorInterval source]]);
+    if (val.hidden || !val.showMajorGridLines || val.majorTickMarks != RDLChartTickMarksNone ||
+        ![[val.majorInterval source] isEqualToString:@"25"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: value axis hidden %d, grid %d, ticks %ld, "
+                                                @"interval %@",
+                                                when, val.hidden, val.showMajorGridLines,
+                                                (long)val.majorTickMarks, [val.majorInterval source]]);
+    if (pass == 1)
+      break;
+    xml = [RDLWriter XMLStringFromReport:r];
+    for (NSString *spec in @[ @"<Type>Shape</Type>", @"<Subtype>ExplodedPie</Subtype>",
+                              @"<Visible>False</Visible>", @"<Enabled>False</Enabled>",
+                              @"<Interval>25</Interval>", @"<Type>Cross</Type>" ])
+      if ([xml rangeOfString:spec].location == NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"written without %@", spec]);
+    for (NSString *invented in @[ @"<Hidden>", @"<MajorInterval>", @"<MajorTickMarks>" ])
+      if ([xml rangeOfString:invented].location != NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"written with the non-spec %@", invented]);
+  }
+}
+
+// Each kind of chart the kit draws goes out as the spec's family and variant,
+// and comes back as the same kind.
+- (void)testEveryChartKindIsWrittenAsTheSpecsTypeAndSubtype {
+  NSArray *cases = @[
+    @[ @(RDLChartTypeColumn), @(RDLChartSubtypeStacked), @"Column", @"Stacked" ],
+    @[ @(RDLChartTypeBar), @(RDLChartSubtypePercentStacked), @"Bar", @"PercentStacked" ],
+    @[ @(RDLChartTypeLine), @(RDLChartSubtypeSmooth), @"Line", @"Smooth" ],
+    @[ @(RDLChartTypeArea), @(RDLChartSubtypeUnspecified), @"Area", @"" ],
+    @[ @(RDLChartTypePie), @(RDLChartSubtypeUnspecified), @"Shape", @"Pie" ],
+    @[ @(RDLChartTypePie), @(RDLChartSubtypeExploded), @"Shape", @"ExplodedPie" ],
+    @[ @(RDLChartTypeDoughnut), @(RDLChartSubtypeUnspecified), @"Shape", @"Doughnut" ],
+    @[ @(RDLChartTypeDoughnut), @(RDLChartSubtypeExploded), @"Shape", @"ExplodedDoughnut" ],
+    @[ @(RDLChartTypeScatter), @(RDLChartSubtypeUnspecified), @"Scatter", @"" ],
+    @[ @(RDLChartTypeBubble), @(RDLChartSubtypeUnspecified), @"Scatter", @"Bubble" ],
+  ];
+  for (NSArray *c in cases) {
+    RDLChartType kind = (RDLChartType)[c[0] integerValue];
+    RDLChartSubtype variant = (RDLChartSubtype)[c[1] integerValue];
+    RDLReport *r = [RDLParser reportFromXMLString:RDLChartDocument(@"2016", @"", @"", @"", @"")
+                                            error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    chart.chartType = kind;
+    chart.subtype = variant;
+    RDLChartSeries *series = [chart.series firstObject];
+    series.type = kind;
+    series.subtype = variant;
+    NSString *xml = [RDLWriter XMLStringFromReport:r];
+    NSString *type = [NSString stringWithFormat:@"<Type>%@</Type>", c[2]];
+    BOOL subtypeRight = [c[3] length]
+                            ? [xml rangeOfString:[NSString stringWithFormat:@"<Subtype>%@</Subtype>",
+                                                                             c[3]]]
+                                      .location != NSNotFound
+                            : [xml rangeOfString:@"<Subtype>"].location == NSNotFound;
+    if ([xml rangeOfString:type].location == NSNotFound || !subtypeRight)
+      XCTFail(@"%@", [NSString stringWithFormat:@"kind %ld/%ld should be written as %@/%@",
+                                                (long)kind, (long)variant, c[2], c[3]]);
+    RDLChart *back = RDLFirstChart([RDLParser reportFromXMLString:xml error:NULL]);
+    if (back.chartType != kind || back.subtype != variant)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@/%@ read back as kind %ld/%ld, not %ld/%ld",
+                                                c[2], c[3], (long)back.chartType,
+                                                (long)back.subtype, (long)kind, (long)variant]);
+  }
+}
+
+// Files this kit wrote before it used the spec's names say Pie, Hidden,
+// MajorInterval and MajorTickMarks under the 2010 namespace. The upgrader
+// turns them into the spec's shape, so they open as they were drawn.
+- (void)testThisKitsOldChartNamesAreUpgraded {
+  NSString *xml = RDLChartDocument(
+      @"2010", @"<Type>Doughnut</Type><Subtype>Exploded</Subtype>", @"<ChartDataLabel/>",
+      @"<Hidden>true</Hidden><ChartMajorGridLines><Hidden>true</Hidden></ChartMajorGridLines>"
+      @"<MajorTickMarks>Inside</MajorTickMarks>",
+      @"<ChartMajorGridLines></ChartMajorGridLines><MajorInterval>10</MajorInterval>");
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLChart *chart = RDLFirstChart(r);
+  if (chart.chartType != RDLChartTypeDoughnut || chart.subtype != RDLChartSubtypeExploded)
+    XCTFail(@"%@", [NSString stringWithFormat:@"kind %ld/%ld, not an exploded doughnut",
+                                              (long)chart.chartType, (long)chart.subtype]);
+  if (![[chart.series firstObject] showDataLabels])
+    XCTFail(@"%@", @"an empty ChartDataLabel meant the labels were shown");
+  RDLChartAxis *cat = chart.categoryAxis, *val = chart.valueAxis;
+  if (!cat.hidden || cat.showMajorGridLines || cat.majorTickMarks != RDLChartTickMarksInside)
+    XCTFail(@"%@", [NSString stringWithFormat:@"category axis hidden %d, grid %d, ticks %ld",
+                                              cat.hidden, cat.showMajorGridLines,
+                                              (long)cat.majorTickMarks]);
+  if (val.hidden || !val.showMajorGridLines || ![[val.majorInterval source] isEqualToString:@"10"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"value axis hidden %d, grid %d, interval %@",
+                                              val.hidden, val.showMajorGridLines,
+                                              [val.majorInterval source]]);
+  if ([r.warnings count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the old names should upgrade quietly: %@",
+                                              r.warnings]);
+}
+
+// A chart the kit does not draw is said so, rather than turning quietly into a
+// column chart; a family it does draw keeps its kind when only the variant is
+// beyond it.
+- (void)testAChartKindThisKitDoesNotDrawIsReported {
+  RDLReport *funnel = [RDLParser
+      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Shape</Type><Subtype>Funnel</Subtype>",
+                                           @"", @"", @"")
+                    error:NULL];
+  if (RDLFirstChart(funnel).chartType != RDLChartTypeUnspecified ||
+      [[funnel.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Shape/Funnel"].location ==
+          NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a funnel should be reported: %@", funnel.warnings]);
+  RDLReport *stepped = [RDLParser
+      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Line</Type><Subtype>Stepped</Subtype>",
+                                           @"", @"", @"")
+                    error:NULL];
+  if (RDLFirstChart(stepped).chartType != RDLChartTypeLine ||
+      [[stepped.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Line/Stepped"].location ==
+          NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped line is still a line, and reported: %@",
+                                              stepped.warnings]);
+}
+
+#pragma mark - Writing every item's own properties
+
+// ZIndex was read and honoured but never written, so saving lost the order in
+// which overlapping items are drawn; Line and Image lost KeepTogether and
+// PageBreak the same way.
+- (void)testSavingKeepsZIndexAndLineAndImagePagination {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Layers"];
+  RDLLine *rule = [[RDLLine alloc] init];
+  rule.name = @"Rule";
+  rule.top = 1;
+  rule.width = 3;
+  rule.zIndex = 3;
+  rule.keepTogether = YES;
+  rule.pageBreak = RDLPageBreakLocationStart;
+  RDLImage *logo = [[RDLImage alloc] init];
+  logo.name = @"Logo";
+  logo.source = RDLImageSourceExternal;
+  logo.value = @"logo.png";
+  logo.width = 1;
+  logo.height = 1;
+  logo.zIndex = 2;
+  logo.keepTogether = YES;
+  logo.pageBreak = RDLPageBreakLocationEnd;
+  logo.resetPageNumber = YES;
+  RDLTextbox *caption = [[RDLTextbox alloc] init];
+  caption.name = @"Caption";
+  caption.value = @"Harbour";
+  caption.width = 2;
+  caption.height = 0.3;
+  caption.zIndex = 5;
+  [r.body.items addObjectsFromArray:@[ rule, logo, caption ]];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  NSMutableDictionary<NSString *, RDLItem *> *byName = [NSMutableDictionary dictionary];
+  for (RDLItem *it in back.body.items)
+    if (it.name)
+      byName[it.name] = it;
+  RDLItem *rule2 = byName[@"Rule"], *logo2 = byName[@"Logo"], *caption2 = byName[@"Caption"];
+  if (rule2.zIndex != 3 || logo2.zIndex != 2 || caption2.zIndex != 5)
+    XCTFail(@"%@", [NSString stringWithFormat:@"ZIndex back as %ld, %ld, %ld", (long)rule2.zIndex,
+                                              (long)logo2.zIndex, (long)caption2.zIndex]);
+  if (!rule2.keepTogether || rule2.pageBreak != RDLPageBreakLocationStart)
+    XCTFail(@"%@", @"the line's KeepTogether and PageBreak should be written");
+  if (!logo2.keepTogether || logo2.pageBreak != RDLPageBreakLocationEnd || !logo2.resetPageNumber)
+    XCTFail(@"%@", @"the image's KeepTogether and PageBreak should be written");
 }
 
 @end

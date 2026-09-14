@@ -159,6 +159,366 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
+// The number of times a piece of text was laid out, across every page.
+static NSUInteger RDLCountLaidText(NSArray<RDLLaidOutPage *> *pages, NSString *text) {
+  NSUInteger n = 0;
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) isEqualToString:text])
+        n += 1;
+  return n;
+}
+
+#pragma mark - Pagination
+
+// Pages with a body exactly 3in tall: 5in paper, half-inch margins, and a
+// half-inch page header and footer.
+static RDLReport *RDLShortPages(NSString *name) {
+  RDLReport *r = [RDLReport emptyReportNamed:name];
+  r.page.pageHeight = 5;
+  r.page.topMargin = 0.5;
+  r.page.bottomMargin = 0.5;
+  r.pageHeader.height = 0.5;
+  r.pageFooter.height = 0.5;
+  r.body.height = 1;
+  return r;
+}
+
+static RDLTextbox *RDLNoteAt(NSString *text, CGFloat top) {
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = [text stringByReplacingOccurrencesOfString:@" " withString:@"_"];
+  tb.value = text;
+  tb.top = top;
+  tb.width = 3;
+  tb.height = 0.3;
+  return tb;
+}
+
+// The 1-based page a piece of text is first laid out on, or 0 when it is not.
+static NSInteger RDLPageOfText(NSArray<RDLLaidOutPage *> *pages, NSString *text) {
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) isEqualToString:text])
+        return p.index;
+  return 0;
+}
+
+static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName length])
+      return m;
+    RDLTablixMember *inner = RDLFirstGroupMember(m.members);
+    if (inner)
+      return inner;
+  }
+  return nil;
+}
+
+// Each break is worked out from where the item lands after the ones above it
+// have moved. Worked out from each item's own design position, the second and
+// third items both went to page two, one on top of the other.
+- (void)testConsecutiveStartBreaksLandOnSuccessivePages {
+  RDLReport *r = RDLShortPages(@"Three Sheets");
+  [r.body.items addObject:RDLNoteAt(@"Alpha", 0)];
+  RDLTextbox *bravo = RDLNoteAt(@"Bravo", 0.5);
+  bravo.pageBreak = RDLPageBreakLocationStart;
+  [r.body.items addObject:bravo];
+  RDLTextbox *charlie = RDLNoteAt(@"Charlie", 1.0);
+  charlie.pageBreak = RDLPageBreakLocationStart;
+  [r.body.items addObject:charlie];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  NSArray *got = @[ @(RDLPageOfText(pages, @"Alpha")), @(RDLPageOfText(pages, @"Bravo")),
+                    @(RDLPageOfText(pages, @"Charlie")) ];
+  if (![got isEqualToArray:@[ @1, @2, @3 ]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"each break should start a page of its own: %@",
+                                              [got componentsJoinedByString:@", "]]);
+}
+
+// BreakLocation End puts what follows on a new page, and Disabled switches the
+// break off.
+- (void)testABreakAtTheEndStartsWhatFollowsOnANewPage {
+  RDLReport *r = RDLShortPages(@"Cover Note");
+  RDLTextbox *cover = RDLNoteAt(@"Cover", 0);
+  cover.pageBreak = RDLPageBreakLocationEnd;
+  [r.body.items addObject:cover];
+  [r.body.items addObject:RDLNoteAt(@"Contents", 0.5)];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLPageOfText(pages, @"Cover") != 1 || RDLPageOfText(pages, @"Contents") != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a break at the end: Cover on %ld, Contents on %ld",
+                                              (long)RDLPageOfText(pages, @"Cover"),
+                                              (long)RDLPageOfText(pages, @"Contents")]);
+
+  cover.pageBreakDisabled = [RDLValue valueWithSource:@"=2 > 1"];
+  pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLPageOfText(pages, @"Contents") != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a disabled break does not break: Contents on %ld",
+                                              (long)RDLPageOfText(pages, @"Contents")]);
+}
+
+// A group that breaks at its end breaks between its instances too, which is
+// what Report Builder's "between each instance" plus "also at the end" writes.
+- (void)testAGroupBreakingAtItsEndPutsEachInstanceOnItsOwnPage {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  RDLTablixMember *finish = RDLFirstGroupMember(tab.rowHierarchy.members);
+  if (finish == nil) {
+    XCTFail(@"%@", @"the fixture should group by finish");
+    return;
+  }
+  finish.pageBreak = RDLPageBreakLocationEnd;
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  NSInteger oil = RDLPageOfText(pages, @"Desk"), lacquer = RDLPageOfText(pages, @"Lamp"),
+            wax = RDLPageOfText(pages, @"Shelf");
+  NSSet *distinct = [NSSet setWithArray:@[ @(oil), @(lacquer), @(wax) ]];
+  if ([distinct count] != 3 || [distinct containsObject:@0] ||
+      RDLPageOfText(pages, @"Chair") != oil)
+    XCTFail(@"%@", [NSString stringWithFormat:@"one finish per page: Oil on %ld (Chair on %ld), "
+                                              @"Lacquer on %ld, Wax on %ld",
+                                              (long)oil, (long)RDLPageOfText(pages, @"Chair"),
+                                              (long)lacquer, (long)wax]);
+}
+
+// The header drawn again at the top of a continuation page takes room. The
+// rows that follow it are counted into what is left, so the last row on the
+// page is still above the page footer.
+- (void)testRepeatedHeadersLeaveRoomForThemselves {
+  RDLReport *r = RDLShortPages(@"Long List");
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Numbers";
+  ds.dataSourceName = @"Demo";
+  [ds setFieldNames:@[ @"N" ]];
+  NSMutableArray *rows = [NSMutableArray array];
+  for (NSInteger i = 1; i <= 30; i++)
+    [rows addObject:@{@"N" : [NSString stringWithFormat:@"Row %ld", (long)i]}];
+  ds.rows = rows;
+  [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Demo");
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"List";
+  tab.dataSetName = @"Numbers";
+  tab.width = 3;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.columnSpecs = @[ @{@"width" : @3, @"header" : @"Number", @"value" : @"=Fields!N.Value"} ];
+  [tab rebuildTablix];
+  [r.body.items addObject:tab];
+
+  NSArray<RDLLaidOutPage *> *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if ([pages count] < 2) {
+    XCTFail(@"%@", @"thirty rows should not fit on one short page");
+    return;
+  }
+  if (RDLCountLaidText(pages, @"Number") != [pages count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the header should head all %lu pages, not %lu",
+                                              (unsigned long)[pages count],
+                                              (unsigned long)RDLCountLaidText(pages, @"Number")]);
+  for (NSInteger i = 1; i <= 30; i++)
+    if (RDLCountLaidText(pages, [NSString stringWithFormat:@"Row %ld", (long)i]) != 1)
+      XCTFail(@"%@", [NSString stringWithFormat:@"Row %ld should be laid out once", (long)i]);
+  for (RDLLaidOutPage *page in pages) {
+    CGFloat headerBottom = 0;
+    for (RDLLaidOutItem *it in page.items)
+      if ([RDLLaidText(it) isEqualToString:@"Number"])
+        headerBottom = it.y + it.h;
+    for (RDLLaidOutItem *it in page.items) {
+      if (it.region == RDLLaidOutRegionBody && it.y + it.h > page.bodyBottom + 0.001)
+        XCTFail(@"%@", [NSString stringWithFormat:@"'%@' on page %ld ends at %g, below the body "
+                                                  @"at %g",
+                                                  RDLLaidText(it), (long)page.index,
+                                                  it.y + it.h, page.bodyBottom]);
+      if ([RDLLaidText(it) hasPrefix:@"Row "] && it.y < headerBottom - 0.001)
+        XCTFail(@"%@", [NSString stringWithFormat:@"'%@' on page %ld starts at %g, under the "
+                                                  @"header ending at %g",
+                                                  RDLLaidText(it), (long)page.index, it.y,
+                                                  headerBottom]);
+    }
+  }
+}
+
+// A subreport taller than the page goes on onto the next one. It used to be
+// culled by its design height, so everything past the first page vanished.
+- (void)testATallSubreportContinuesOntoTheNextPage {
+  RDLReport *child = [RDLReport emptyReportNamed:@"Appendix"];
+  child.body.height = 5;
+  [child.body.items addObject:RDLNoteAt(@"Appendix opens", 0)];
+  [child.body.items addObject:RDLNoteAt(@"Appendix closes", 4.5)];
+  RDLReport *r = RDLShortPages(@"With Appendix");
+  RDLSubreport *sub = [[RDLSubreport alloc] init];
+  sub.name = @"AppendixPart";
+  sub.reportName = @"Appendix";
+  sub.width = 3;
+  sub.height = 0.5;
+  sub.definition = child;
+  [r.body.items addObject:sub];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLPageOfText(pages, @"Appendix opens") != 1 || RDLPageOfText(pages, @"Appendix closes") != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the subreport should span two pages: opens on %ld, "
+                                              @"closes on %ld of %lu",
+                                              (long)RDLPageOfText(pages, @"Appendix opens"),
+                                              (long)RDLPageOfText(pages, @"Appendix closes"),
+                                              (unsigned long)[pages count]]);
+}
+
+// What runs past the body band is cut at it, in every backend, rather than
+// drawn over the page footer: the laid-out item says it is body content, and
+// the page says where the body is.
+- (void)testBodyItemsAreCutAtTheBodyBand {
+  RDLReport *r = RDLShortPages(@"Straddle");
+  RDLTextbox *tall = RDLNoteAt(@"Tall", 2.5);
+  tall.height = 1;
+  [r.body.items addObject:tall];
+  RDLTextbox *head = RDLNoteAt(@"Running head", 0.1);
+  [r.pageHeader.items addObject:head];
+
+  NSArray<RDLLaidOutPage *> *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  for (RDLLaidOutPage *page in pages) {
+    if (fabs(page.bodyTop - 1.0) > 0.001 || fabs(page.bodyBottom - 4.0) > 0.001)
+      XCTFail(@"%@", [NSString stringWithFormat:@"page %ld body band %g to %g", (long)page.index,
+                                                page.bodyTop, page.bodyBottom]);
+    for (RDLLaidOutItem *it in page.items) {
+      RDLLaidOutRegion want = [RDLLaidText(it) isEqualToString:@"Running head"]
+                                  ? RDLLaidOutRegionPageHeader
+                                  : RDLLaidOutRegionBody;
+      if (it.region != want)
+        XCTFail(@"%@", [NSString stringWithFormat:@"'%@' on page %ld is in region %ld",
+                                                  RDLLaidText(it), (long)page.index,
+                                                  (long)it.region]);
+    }
+  }
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  if ([out rangeOfString:@"clip-path:inset(0.0000in 0 0.5000in 0)"].location == NSNotFound ||
+      [out rangeOfString:@"clip-path:inset(0.5000in 0 0.0000in 0)"].location == NSNotFound)
+    XCTFail(@"%@", @"the HTML should cut the tall box at the foot of page 1 and the head of page 2");
+}
+
+// What an unsupported item looks like on the page. A custom item draws its
+// AltReportItem, as SSRS does when the extension is missing; a gauge or a map
+// is a box that says so, instead of a hole in the report.
+- (void)testUnsupportedItemsDrawAsPlaceholders {
+  RDLReport *r = [RDLParser reportFromXMLString:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\"><ReportSections><ReportSection><Body><Height>4in</Height>"
+      @"<ReportItems>"
+      @"<GaugePanel Name=\"Speed\"><Top>0in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>1.5in</Height></GaugePanel>"
+      @"<CustomReportItem Name=\"Code\"><Type>QrCode</Type>"
+      @"<Top>2in</Top><Left>0in</Left><Width>1.2in</Width><Height>1.2in</Height>"
+      @"<AltReportItem><Textbox Name=\"CodeAlt\"><Value>QR goes here</Value>"
+      @"</Textbox></AltReportItem></CustomReportItem>"
+      @"</ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections>"
+      @"</Report>"
+                                                  error:NULL];
+  NSArray<RDLLaidOutPage *> *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLCountLaidText(pages, @"QR goes here") != 1)
+    XCTFail(@"%@", @"the custom item should draw its AltReportItem");
+  BOOL placeholder = NO;
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) hasPrefix:@"GaugePanel 'Speed'"]) {
+        placeholder = YES;
+        if (fabs(it.w - 2 * 72) > 1 && fabs(it.w - 2) > 0.01)
+          XCTFail(@"%@", [NSString stringWithFormat:@"the placeholder should fill the gauge's "
+                                                    @"box, not %g wide", it.w]);
+      }
+  if (!placeholder)
+    XCTFail(@"%@", @"the gauge should be drawn as a placeholder that names it");
+}
+
+// Grouping has to read the renamed column too: a group on Region that looked
+// for a "Region" key in rows whose column is TERRITORY put every row in one blank group, and the
+// report showed one heading where there should be two.
+- (void)testAGroupSplitsOnTheColumnItsFieldNames {
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"ByRegion";
+  tab.dataSetName = @"Sales";
+  tab.top = 0.1;
+  tab.width = 6;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.rowGroups = @[ @"Region" ];
+  tab.columnSpecs = @[
+    @{@"width" : @3.0, @"header" : @"Where", @"value" : @"=Fields!Region.Value"},
+    @{@"width" : @3.0, @"header" : @"How much", @"value" : @"=Fields!Amount.Value"},
+  ];
+  [tab rebuildTablix];
+  [r.body.items addObject:tab];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLCountLaidText(pages, @"South") == 0)
+    XCTFail(@"%@", @"the South group should exist: the rows were grouped on the wrong key");
+  if (RDLCountLaidText(pages, @"120") == 0 || RDLCountLaidText(pages, @"55") == 0)
+    XCTFail(@"%@", @"and each detail row should show its amount");
+}
+
+// An aggregate that names a group sums over that group's rows. In a matrix
+// cell there are two groups in force -- the row group and the column group --
+// and the scope used to carry only their intersection, so naming either one
+// fell back to the cell: Sum(x, "ColumnGroup") gave the cell, not the column.
+- (void)testAnAggregateNamingAGroupUsesThatGroupsRows {
+  RDLReport *mx = RDLGroupedJobs();
+  RDLTablix *mtab = (RDLTablix *)mx.body.items.firstObject;
+  mtab.rowGroups = @[ @"Finish" ];
+  mtab.columnGroups = @[ @"Job" ];
+  mtab.columnSpecs = @[ @{ @"width" : @1.5, @"value" : @"=Fields!Amount.Value",
+                           @"aggregate" : @"Sum" } ];
+  [mtab rebuildTablix];
+  RDLTextbox *cell = (RDLTextbox *)mtab.tablixBody.rows.firstObject.cells.firstObject.item;
+
+  // The row group: every cell in the Oil row is Oil's total, 1840 + 420 + 95.
+  // Taken over the intersection instead, only the Desk column would say
+  // anything and it would say 1840.
+  cell.value = @"=Sum(Fields!Amount.Value, \"JobsByFinish_Finish\")";
+  NSUInteger oilTotals =
+      RDLCountLaidText([RDLGenerator pagesForReport:mx parameters:@{}], @"2355");
+  if (oilTotals < 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the Oil row's total should fill the row, "
+                                              @"found it %lu times", (unsigned long)oilTotals]);
+
+  // The column group: the Desk column shows Desk's total in every row, even
+  // the ones where Desk has no job of that finish.
+  cell.value = @"=Sum(Fields!Amount.Value, \"JobsByFinish_Job\")";
+  NSUInteger deskTotals =
+      RDLCountLaidText([RDLGenerator pagesForReport:mx parameters:@{}], @"1840");
+  if (deskTotals < 3)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the Desk column's total should be in all three "
+                                              @"finish rows, found it %lu times",
+                                              (unsigned long)deskTotals]);
+}
+
+// ReportItems!Name.Value is another textbox's value. It used to be the name
+// itself, and a page header -- the usual place for it, repeating something
+// from the body -- was laid out before the body it would have read from.
+- (void)testAPageHeaderReadsTheBodysReportItems {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Running Head"];
+  RDLTextbox *title = [[RDLTextbox alloc] init];
+  title.name = @"Title";
+  title.value = @"Harbour Dispatch";
+  title.top = 0.1;
+  title.width = 3;
+  title.height = 0.3;
+  [r.body.items addObject:title];
+  RDLTextbox *head = [[RDLTextbox alloc] init];
+  head.name = @"Head";
+  head.value = @"=ReportItems!Title.Value";
+  head.top = 0.05;
+  head.width = 3;
+  head.height = 0.3;
+  [r.pageHeader.items addObject:head];
+
+  NSUInteger seen =
+      RDLCountLaidText([RDLGenerator pagesForReport:r parameters:@{}], @"Harbour Dispatch");
+  if (seen != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the header should repeat the body's title: "
+                                              @"seen %lu times", (unsigned long)seen]);
+}
+
 - (void)testLayout {
   RDLReport *r = RDLMiniInvoice();
   NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{@"InvoiceNo" : @"B-2"}];
@@ -1906,6 +2266,316 @@ static NSArray<NSString *> *RDLTextsOf(RDLReport *r) {
   if (![texts containsObject:@"10"] || ![texts containsObject:@"40"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the cells that do have rows still add up: %@",
                                               texts]);
+}
+
+#pragma mark - Groups, one instance at a time
+
+// The first laid-out item showing a piece of text, on any page.
+static RDLLaidOutItem *RDLFirstLaid(NSArray<RDLLaidOutPage *> *pages, NSString *text) {
+  for (RDLLaidOutPage *p in pages)
+    for (RDLLaidOutItem *it in p.items)
+      if ([RDLLaidText(it) isEqualToString:text])
+        return it;
+  return nil;
+}
+
+// The Details member inside a group: grouped, but by nothing.
+static RDLTablixMember *RDLDetailsMemberIn(RDLTablixMember *group) {
+  for (RDLTablixMember *m in group.members)
+    if ([m.groupName length] && [m.groupExpressions count] == 0)
+      return m;
+  return nil;
+}
+
+static RDLSortExpression *RDLSortBy(NSString *expr, RDLSortDirection direction) {
+  RDLSortExpression *s = [[RDLSortExpression alloc] init];
+  s.expression = [RDLValue valueWithSource:expr];
+  s.direction = direction;
+  return s;
+}
+
+static RDLFilter *RDLFilterOn(NSString *expr, RDLFilterOperator oper, NSString *value) {
+  RDLFilter *f = [[RDLFilter alloc] init];
+  f.expression = [RDLValue valueWithSource:expr];
+  f.oper = oper;
+  f.values = [NSMutableArray arrayWithObject:[RDLValue valueWithSource:value]];
+  return f;
+}
+
+// Sorting finishes by their total sorts by each finish's own total. The key
+// used to be worked out over the whole dataset, so every group tied and they
+// stayed in the order they first appeared: Oil, Lacquer, Wax.
+- (void)testAGroupSortsByItsOwnAggregate {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  RDLTablixMember *finish = RDLFirstGroupMember(tab.rowHierarchy.members);
+  finish.sortExpressions = [NSMutableArray
+      arrayWithObject:RDLSortBy(@"=Sum(Fields!Amount.Value)", RDLSortDirectionDescending)];
+
+  // Oil 2355, Wax 800, Lacquer 313.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  RDLLaidOutItem *oil = RDLFirstLaid(pages, @"Desk"), *wax = RDLFirstLaid(pages, @"Shelf"),
+                 *lacquer = RDLFirstLaid(pages, @"Lamp");
+  if (!(oil && wax && lacquer && oil.y < wax.y && wax.y < lacquer.y))
+    XCTFail(@"%@", [NSString stringWithFormat:@"largest total first: Oil at %g, Wax at %g, "
+                                              @"Lacquer at %g",
+                                              oil.y, wax.y, lacquer.y]);
+}
+
+// A group's Hidden is asked of each instance, in that instance's scope. It was
+// asked once, over the whole dataset, so it hid every group or none.
+- (void)testAGroupHidesOnlyTheInstancesItsExpressionHides {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  RDLTablixMember *finish = RDLFirstGroupMember(tab.rowHierarchy.members);
+  finish.hidden = [RDLValue valueWithSource:@"=Sum(Fields!Amount.Value) < 500"];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  NSDictionary *seen = @{
+    @"Desk" : @(RDLCountLaidText(pages, @"Desk")),
+    @"Shelf" : @(RDLCountLaidText(pages, @"Shelf")),
+    @"Lamp" : @(RDLCountLaidText(pages, @"Lamp")),
+    @"Shade" : @(RDLCountLaidText(pages, @"Shade"))
+  };
+  if (![seen isEqualToDictionary:@{@"Desk" : @1, @"Shelf" : @1, @"Lamp" : @0, @"Shade" : @0}])
+    XCTFail(@"%@", [NSString stringWithFormat:@"only Lacquer (313) should be hidden: %@", seen]);
+}
+
+// The Details member's own filters and sort apply, and its Hidden is asked of
+// each row. All three used to be ignored: only the tablix's own applied.
+- (void)testTheDetailsMemberFiltersSortsAndHidesItsRows {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  RDLTablixMember *details = RDLDetailsMemberIn(RDLFirstGroupMember(tab.rowHierarchy.members));
+  if (details == nil) {
+    XCTFail(@"%@", @"the fixture should have a Details member inside the group");
+    return;
+  }
+  details.filters = [NSMutableArray
+      arrayWithObject:RDLFilterOn(@"=Fields!Amount.Value", RDLFilterOperatorGreaterThan, @"=100")];
+  details.sortExpressions =
+      [NSMutableArray arrayWithObject:RDLSortBy(@"=Fields!Amount.Value", RDLSortDirectionAscending)];
+  details.hidden = [RDLValue valueWithSource:@"=Fields!Job.Value = \"Lamp\""];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  // Frame (95) and Shade (48) are filtered out, Lamp is hidden, and Oil's rows
+  // come smallest first: Chair (420) before Desk (1840).
+  for (NSString *gone in @[ @"Frame", @"Shade", @"Lamp" ])
+    if (RDLCountLaidText(pages, gone) != 0)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should not be shown", gone]);
+  RDLLaidOutItem *chair = RDLFirstLaid(pages, @"Chair"), *desk = RDLFirstLaid(pages, @"Desk");
+  if (!(chair && desk && chair.y < desk.y))
+    XCTFail(@"%@", [NSString stringWithFormat:@"Chair (at %g) should come before Desk (at %g)",
+                                              chair.y, desk.y]);
+}
+
+// HideIfNoRows asks whether the groups beside the member have anything to
+// show, not only whether the dataset is empty: a header over a group whose
+// filter leaves nothing is hidden too.
+- (void)testHideIfNoRowsAsksTheGroupBesideIt {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  RDLTablixMember *header = tab.rowHierarchy.members[0];
+  header.hideIfNoRows = YES;
+  if (RDLCountLaidText([RDLGenerator pagesForReport:r parameters:@{}], @"Job") != 1) {
+    XCTFail(@"%@", @"the header should show while the group has rows");
+    return;
+  }
+  RDLTablixMember *finish = RDLFirstGroupMember(tab.rowHierarchy.members);
+  finish.filters = [NSMutableArray
+      arrayWithObject:RDLFilterOn(@"=Fields!Finish.Value", RDLFilterOperatorEqual, @"Paint")];
+  if (RDLCountLaidText([RDLGenerator pagesForReport:r parameters:@{}], @"Job") != 0)
+    XCTFail(@"%@", @"no finish is Paint, so the header has nothing under it and should hide");
+}
+
+// A hidden tablix is not drawn. The expansion never looked at its Hidden.
+- (void)testAHiddenTablixIsNotDrawn {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  tab.hidden = [RDLValue valueWithSource:@"=2 > 1"];
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLCountLaidText(pages, @"Job") != 0 || RDLCountLaidText(pages, @"Desk") != 0)
+    XCTFail(@"%@", @"nothing of a hidden tablix should be laid out");
+}
+
+// Column groups sort in their own scope too.
+- (void)testAColumnGroupSortsByItsOwnAggregate {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Quarters"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  [ds setFieldNames:@[ @"Region", @"Quarter", @"Amount" ]];
+  ds.rows = @[
+    @{@"Region" : @"North", @"Quarter" : @"Q1", @"Amount" : @10},
+    @{@"Region" : @"South", @"Quarter" : @"Q2", @"Amount" : @40},
+    @{@"Region" : @"North", @"Quarter" : @"Q2", @"Amount" : @5},
+  ];
+  [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Demo");
+  RDLTablix *t = [[RDLTablix alloc] init];
+  t.name = @"Pivot";
+  t.dataSetName = @"Sales";
+  t.width = 6;
+  t.headerHeight = 0.3;
+  t.rowHeight = 0.28;
+  t.rowGroups = @[ @"Region" ];
+  t.columnGroups = @[ @"Quarter" ];
+  t.columnSpecs = @[ @{@"width" : @1.5, @"header" : @"Amount",
+                       @"value" : @"=Fields!Amount.Value", @"aggregate" : @"Sum"} ];
+  [t rebuildTablix];
+  [r.body.items addObject:t];
+  [r adoptItems];
+  RDLTablixMember *quarter = RDLFirstGroupMember(t.columnHierarchy.members);
+  quarter.sortExpressions = [NSMutableArray
+      arrayWithObject:RDLSortBy(@"=Sum(Fields!Amount.Value)", RDLSortDirectionDescending)];
+
+  // Q2 adds up to 45 and Q1 to 10, so Q2 comes first although Q1 appears first.
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  RDLLaidOutItem *q1 = RDLFirstLaid(pages, @"Q1"), *q2 = RDLFirstLaid(pages, @"Q2");
+  if (!(q1 && q2 && q2.x < q1.x))
+    XCTFail(@"%@", [NSString stringWithFormat:@"Q2 (at %g) should be left of Q1 (at %g)", q2.x,
+                                              q1.x]);
+}
+
+#pragma mark - Nested data regions
+
+// One tablix over the jobs, by finish, whose second cell -- a body cell, or the
+// group's header when `inHeader` -- holds another tablix listing the jobs. Read
+// from RDL, so the parser's side of nesting is exercised too. In the header the
+// group has detail rows of its own, 0.2in each, so the list beside them needs
+// more room than they give.
+static RDLReport *RDLJobsNestedIn(BOOL inHeader) {
+  NSString *inner =
+      @"<Tablix Name=\"Inner\"><Top>0in</Top><Left>0in</Left><Width>3in</Width>"
+      @"<Height>0.25in</Height><DataSetName>Jobs</DataSetName>"
+      @"<TablixBody><TablixColumns><TablixColumn><Width>3in</Width></TablixColumn></TablixColumns>"
+      @"<TablixRows><TablixRow><Height>0.25in</Height><TablixCells><TablixCell><CellContents>"
+      @"<Textbox Name=\"JobCell\"><Value>=Fields!Job.Value</Value></Textbox>"
+      @"</CellContents></TablixCell></TablixCells></TablixRow></TablixRows></TablixBody>"
+      @"<TablixColumnHierarchy><TablixMembers><TablixMember/></TablixMembers>"
+      @"</TablixColumnHierarchy>"
+      @"<TablixRowHierarchy><TablixMembers><TablixMember><Group Name=\"InnerDetails\"/>"
+      @"</TablixMember></TablixMembers></TablixRowHierarchy></Tablix>";
+  NSString *finishCell =
+      @"<TablixCell><CellContents><Textbox Name=\"FinishCell\"><Value>=Fields!Finish.Value</Value>"
+      @"</Textbox></CellContents></TablixCell>";
+  NSString *cells = inHeader ? finishCell
+                             : [finishCell stringByAppendingFormat:
+                                               @"<TablixCell><CellContents>%@</CellContents>"
+                                               @"</TablixCell>",
+                                               inner];
+  NSString *columns = inHeader ? @"<TablixColumn><Width>1.5in</Width></TablixColumn>"
+                               : @"<TablixColumn><Width>1.5in</Width></TablixColumn>"
+                                 @"<TablixColumn><Width>3in</Width></TablixColumn>";
+  NSString *columnMembers = inHeader ? @"<TablixMember/>" : @"<TablixMember/><TablixMember/>";
+  NSString *details = inHeader ? @"<TablixMembers><TablixMember><Group Name=\"JobDetails\"/>"
+                                 @"</TablixMember></TablixMembers>"
+                               : @"";
+  NSString *rowHeight = inHeader ? @"0.2in" : @"0.25in";
+  NSString *header = inHeader ? [NSString stringWithFormat:@"<TablixHeader><Size>3in</Size>"
+                                                           @"<CellContents>%@</CellContents>"
+                                                           @"</TablixHeader>",
+                                                           inner]
+                              : @"";
+  NSString *xml = [NSString
+      stringWithFormat:
+          @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/"
+          @"reportdefinition\"><ReportSections><ReportSection><Body><Height>3in</Height>"
+          @"<ReportItems><Tablix Name=\"Outer\"><Top>0in</Top><Left>0in</Left><Width>5in</Width>"
+          @"<Height>0.25in</Height><DataSetName>Jobs</DataSetName>"
+          @"<TablixBody><TablixColumns>%@</TablixColumns><TablixRows><TablixRow>"
+          @"<Height>%@</Height><TablixCells>%@</TablixCells></TablixRow></TablixRows>"
+          @"</TablixBody><TablixColumnHierarchy><TablixMembers>%@</TablixMembers>"
+          @"</TablixColumnHierarchy><TablixRowHierarchy><TablixMembers><TablixMember>%@"
+          @"<Group Name=\"ByFinish\"><GroupExpressions><GroupExpression>=Fields!Finish.Value"
+          @"</GroupExpression></GroupExpressions></Group>%@</TablixMember></TablixMembers>"
+          @"</TablixRowHierarchy></Tablix></ReportItems></Body><Width>6in</Width><Page/>"
+          @"</ReportSection></ReportSections></Report>",
+          columns, rowHeight, cells, columnMembers, header, details];
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  RDLDataSet *jobs = RDLGroupedJobs().dataSets[0];
+  [r.dataSets addObject:jobs];
+  RDLAttachInlineSource(r, jobs, @"Demo");
+  return r;
+}
+
+// Each finish's row shows its own jobs, once each, and is as tall as they are:
+// the nested table reads the group's rows, not the whole dataset.
+- (void)checkJobsListedPerFinishIn:(RDLReport *)r where:(NSString *)where {
+  if (r == nil) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the report with a tablix in a %@ should parse",
+                                              where]);
+    return;
+  }
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  for (NSString *job in @[ @"Desk", @"Chair", @"Lamp", @"Shade", @"Shelf", @"Stool", @"Frame" ])
+    if (RDLCountLaidText(pages, job) != 1)
+      XCTFail(@"%@", [NSString stringWithFormat:@"in a %@: %@ laid out %lu times, not once", where,
+                                                job, (unsigned long)RDLCountLaidText(pages, job)]);
+  // Oil comes first with Desk, Chair and Frame; Lacquer's row starts below all
+  // three of them.
+  RDLLaidOutItem *frame = RDLFirstLaid(pages, @"Frame"), *lacquer = RDLFirstLaid(pages, @"Lacquer"),
+                 *lamp = RDLFirstLaid(pages, @"Lamp");
+  if (!(frame && lacquer && lamp && lacquer.y >= frame.y + frame.h - 0.001 &&
+        lamp.y >= frame.y + frame.h - 0.001))
+    XCTFail(@"%@", [NSString stringWithFormat:@"in a %@: Oil's row should be as tall as its jobs: "
+                                              @"Frame ends at %g, Lacquer starts at %g, Lamp at %g",
+                                              where, frame.y + frame.h, lacquer.y, lamp.y]);
+}
+
+- (void)testATablixInACellListsThatCellsRows {
+  [self checkJobsListedPerFinishIn:RDLJobsNestedIn(NO) where:@"cell"];
+}
+
+- (void)testATablixInAGroupHeaderListsThatGroupsRows {
+  RDLReport *r = RDLJobsNestedIn(YES);
+  [self checkJobsListedPerFinishIn:r where:@"group header"];
+  // The room the list needs is found below the group's rows, not by
+  // stretching the first of them.
+  RDLLaidOutItem *oil = RDLFirstLaid([RDLGenerator pagesForReport:r parameters:@{}], @"Oil");
+  if (oil == nil || oil.h > 0.2 + 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"Oil's first detail row should stay 0.2in, is %g",
+                                              oil.h]);
+}
+
+// A tablix inside a rectangle is laid out, and what is below it in the
+// rectangle moves down as far as the tablix grew. It used to be dropped.
+- (void)testATablixInARectangleIsLaidOutAndPushesWhatIsBelowIt {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items[0];
+  [r.body.items removeObject:tab];
+  RDLRectangle *panel = [[RDLRectangle alloc] init];
+  panel.name = @"Panel";
+  panel.width = 7.5;
+  panel.height = 1.2;
+  tab.top = 0.1;
+  tab.height = 0.6;
+  panel.items = [NSMutableArray arrayWithObject:tab];
+  RDLTextbox *note = [[RDLTextbox alloc] init];
+  note.name = @"Footnote";
+  note.value = @"Amounts exclude tax.";
+  note.top = 0.8;
+  note.width = 3;
+  note.height = 0.25;
+  [panel.items addObject:note];
+  [r.body.items addObject:panel];
+  [r adoptItems];
+
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  CGFloat lowest = 0;
+  for (NSString *job in @[ @"Desk", @"Chair", @"Lamp", @"Shade", @"Shelf", @"Stool", @"Frame" ]) {
+    RDLLaidOutItem *it = RDLFirstLaid(pages, job);
+    if (it == nil) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be laid out", job]);
+      return;
+    }
+    lowest = MAX(lowest, it.y + it.h);
+  }
+  RDLLaidOutItem *foot = RDLFirstLaid(pages, @"Amounts exclude tax.");
+  if (foot == nil || foot.y < lowest - 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the footnote (at %g) should be below the last row "
+                                              @"(ending at %g)",
+                                              foot.y, lowest]);
 }
 
 @end

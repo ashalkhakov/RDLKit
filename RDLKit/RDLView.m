@@ -142,110 +142,126 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
 // The page content alone: no paper tint, no frame. The canvas draws its
 // chrome around this; print and PDF output draw only this.
 - (void)drawItemsOfPage:(RDLLaidOutPage *)page atY:(CGFloat)originY {
+  NSRect band = NSMakeRect(0, originY + page.bodyTop * kRDLDPI, page.width * kRDLDPI,
+                           (page.bodyBottom - page.bodyTop) * kRDLDPI);
   for (RDLLaidOutItem *it in page.items) {
     NSRect r = NSMakeRect(it.x * kRDLDPI, originY + it.y * kRDLDPI, it.w * kRDLDPI, it.h * kRDLDPI);
-    if ([it isKindOfClass:[RDLLaidOutLine class]]) {
-      RDLBorder *b = it.style.border;
-      NSString *lc = (b && b.color.length) ? b.color : it.style.color;
-      NSBezierPath *p = [NSBezierPath bezierPath];
-      if (it.h * kRDLDPI < 0.5) {
-        [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-        [p lineToPoint:NSMakePoint(NSMaxX(r), NSMinY(r))];
-      } else if (it.w * kRDLDPI < 0.5) {
-        [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-        [p lineToPoint:NSMakePoint(NSMinX(r), NSMaxY(r))];
-      } else {
-        [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-        [p lineToPoint:NSMakePoint(NSMaxX(r), NSMaxY(r))];
-      }
-      [p setLineWidth:RDLViewPt(b.width, 1)];
-      RDLSetLineDash(p, b.style);
-      [RDLColorFromHex(lc) set];
-      [p stroke];
-      continue;
+    // A body item that runs past the body band -- a row taller than what is
+    // left of the page -- is cut there rather than drawn over the footer.
+    BOOL clip = it.region == RDLLaidOutRegionBody &&
+                (it.y < page.bodyTop || it.y + it.h > page.bodyBottom);
+    if (clip) {
+      [NSGraphicsContext saveGraphicsState];
+      NSRectClip(band);
     }
-    if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {
-      RDLFillBackground(r, it.style);
-      RDLDrawBorders(r, it.style);
-      continue;
-    }
-    if ([it isKindOfClass:[RDLLaidOutImage class]]) {
-      RDLLaidOutImage *img0 = (RDLLaidOutImage *)it;
-      RDLFillBackground(r, it.style);
-      NSImage *img = nil;
-      if ([img0.imageData length])
-        img = [[NSImage alloc] initWithData:img0.imageData];
-      else if ([img0.imageSrc length]) {
-        NSURL *u = [NSURL URLWithString:img0.imageSrc];
-        if (u.isFileURL || [img0.imageSrc hasPrefix:@"/"])
-          img = [[NSImage alloc] initWithContentsOfFile:u.isFileURL ? u.path : img0.imageSrc];
-      }
-      if (img) {
-        NSRect dst = r;
-        NSSize sz = img.size;
-        RDLImageSizing sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingFit;
-        if ((sizing == RDLImageSizingFitProportional || sizing == RDLImageSizingAutoSize) &&
-            sz.width > 0 && sz.height > 0) {
-          CGFloat scale = MIN(NSWidth(r) / sz.width, NSHeight(r) / sz.height);
-          dst.size = NSMakeSize(sz.width * scale, sz.height * scale);
-        } else if (sizing == RDLImageSizingClip) {
-          dst.size = sz;
-        }
-        [NSGraphicsContext saveGraphicsState];
-        NSRectClip(r);
-        [img drawInRect:dst
-               fromRect:NSZeroRect
-              operation:NSCompositeSourceOver
-               fraction:1.0
-         respectFlipped:YES
-                  hints:nil];
-        [NSGraphicsContext restoreGraphicsState];
-      }
-      RDLDrawBorders(r, it.style);
-      continue;
-    }
-    if ([it isKindOfClass:[RDLLaidOutChart class]]) {
-      RDLFillBackground(r, it.style);
-      // The picture is worked out by RDLChartRenderer, the same geometry the
-      // HTML backend and the designer canvas draw, so all three agree.
-      [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r];
-      RDLDrawBorders(r, it.style);
-      continue;
-    }
-    // Textbox
-    RDLFillBackground(r, it.style);
-    NSDictionary *attrs = RDLViewAttrs(it.style, RDLTextAlignUnspecified);
-    // Padding inset.
-    NSRect textRect = r;
-    CGFloat padL = RDLViewPt(it.style.paddingLeft, 0);
-    CGFloat padR = RDLViewPt(it.style.paddingRight, 0);
-    CGFloat padT = RDLViewPt(it.style.paddingTop, 0);
-    CGFloat padB = RDLViewPt(it.style.paddingBottom, 0);
-    textRect.origin.x += padL;
-    textRect.origin.y += padT;
-    textRect.size.width -= padL + padR;
-    textRect.size.height -= padT + padB;
-    RDLLaidOutTextbox *tb = (RDLLaidOutTextbox *)it;
-    NSAttributedString *rich = [tb.spans count] ? RDLSpansAttributed(tb) : nil;
-    NSString *text = tb.text ?: @"";
-    RDLVerticalAlign va = it.style.verticalAlign;
-    if (va == RDLVerticalAlignMiddle || va == RDLVerticalAlignBottom) {
-      NSRect used =
-          rich ? [rich boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
-                                    options:NSStringDrawingUsesLineFragmentOrigin]
-               : [text boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
-                                    options:NSStringDrawingUsesLineFragmentOrigin
-                                 attributes:attrs];
-      CGFloat dy = NSHeight(textRect) - NSHeight(used);
-      if (dy > 0)
-        textRect.origin.y += va == RDLVerticalAlignMiddle ? dy / 2 : dy;
-    }
-    if (rich)
-      [rich drawInRect:textRect];
-    else
-      [text drawInRect:textRect withAttributes:attrs];
-    RDLDrawBorders(r, it.style);
+    [self drawItem:it inRect:r];
+    if (clip)
+      [NSGraphicsContext restoreGraphicsState];
   }
+}
+
+- (void)drawItem:(RDLLaidOutItem *)it inRect:(NSRect)r {
+  if ([it isKindOfClass:[RDLLaidOutLine class]]) {
+    RDLBorder *b = it.style.border;
+    NSString *lc = (b && b.color.length) ? b.color : it.style.color;
+    NSBezierPath *p = [NSBezierPath bezierPath];
+    if (it.h * kRDLDPI < 0.5) {
+      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
+      [p lineToPoint:NSMakePoint(NSMaxX(r), NSMinY(r))];
+    } else if (it.w * kRDLDPI < 0.5) {
+      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
+      [p lineToPoint:NSMakePoint(NSMinX(r), NSMaxY(r))];
+    } else {
+      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
+      [p lineToPoint:NSMakePoint(NSMaxX(r), NSMaxY(r))];
+    }
+    [p setLineWidth:RDLViewPt(b.width, 1)];
+    RDLSetLineDash(p, b.style);
+    [RDLColorFromHex(lc) set];
+    [p stroke];
+    return;
+  }
+  if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {
+    RDLFillBackground(r, it.style);
+    RDLDrawBorders(r, it.style);
+    return;
+  }
+  if ([it isKindOfClass:[RDLLaidOutImage class]]) {
+    RDLLaidOutImage *img0 = (RDLLaidOutImage *)it;
+    RDLFillBackground(r, it.style);
+    NSImage *img = nil;
+    if ([img0.imageData length])
+      img = [[NSImage alloc] initWithData:img0.imageData];
+    else if ([img0.imageSrc length]) {
+      NSURL *u = [NSURL URLWithString:img0.imageSrc];
+      if (u.isFileURL || [img0.imageSrc hasPrefix:@"/"])
+        img = [[NSImage alloc] initWithContentsOfFile:u.isFileURL ? u.path : img0.imageSrc];
+    }
+    if (img) {
+      NSRect dst = r;
+      NSSize sz = img.size;
+      RDLImageSizing sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingFit;
+      if ((sizing == RDLImageSizingFitProportional || sizing == RDLImageSizingAutoSize) &&
+          sz.width > 0 && sz.height > 0) {
+        CGFloat scale = MIN(NSWidth(r) / sz.width, NSHeight(r) / sz.height);
+        dst.size = NSMakeSize(sz.width * scale, sz.height * scale);
+      } else if (sizing == RDLImageSizingClip) {
+        dst.size = sz;
+      }
+      [NSGraphicsContext saveGraphicsState];
+      NSRectClip(r);
+      [img drawInRect:dst
+             fromRect:NSZeroRect
+            operation:NSCompositeSourceOver
+             fraction:1.0
+       respectFlipped:YES
+                hints:nil];
+      [NSGraphicsContext restoreGraphicsState];
+    }
+    RDLDrawBorders(r, it.style);
+    return;
+  }
+  if ([it isKindOfClass:[RDLLaidOutChart class]]) {
+    RDLFillBackground(r, it.style);
+    // The picture is worked out by RDLChartRenderer, the same geometry the
+    // HTML backend and the designer canvas draw, so all three agree.
+    [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r];
+    RDLDrawBorders(r, it.style);
+    return;
+  }
+  // Textbox
+  RDLFillBackground(r, it.style);
+  NSDictionary *attrs = RDLViewAttrs(it.style, RDLTextAlignUnspecified);
+  // Padding inset.
+  NSRect textRect = r;
+  CGFloat padL = RDLViewPt(it.style.paddingLeft, 0);
+  CGFloat padR = RDLViewPt(it.style.paddingRight, 0);
+  CGFloat padT = RDLViewPt(it.style.paddingTop, 0);
+  CGFloat padB = RDLViewPt(it.style.paddingBottom, 0);
+  textRect.origin.x += padL;
+  textRect.origin.y += padT;
+  textRect.size.width -= padL + padR;
+  textRect.size.height -= padT + padB;
+  RDLLaidOutTextbox *tb = (RDLLaidOutTextbox *)it;
+  NSAttributedString *rich = [tb.spans count] ? RDLSpansAttributed(tb) : nil;
+  NSString *text = tb.text ?: @"";
+  RDLVerticalAlign va = it.style.verticalAlign;
+  if (va == RDLVerticalAlignMiddle || va == RDLVerticalAlignBottom) {
+    NSRect used =
+        rich ? [rich boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
+                                  options:NSStringDrawingUsesLineFragmentOrigin]
+             : [text boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
+                                  options:NSStringDrawingUsesLineFragmentOrigin
+                               attributes:attrs];
+    CGFloat dy = NSHeight(textRect) - NSHeight(used);
+    if (dy > 0)
+      textRect.origin.y += va == RDLVerticalAlignMiddle ? dy / 2 : dy;
+  }
+  if (rich)
+    [rich drawInRect:textRect];
+  else
+    [text drawInRect:textRect withAttributes:attrs];
+  RDLDrawBorders(r, it.style);
 }
 
 - (void)drawRect:(NSRect)dirtyRect {

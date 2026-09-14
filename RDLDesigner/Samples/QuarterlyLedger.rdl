@@ -99,14 +99,22 @@
                             <ChartArea>
                                 <ChartCategoryAxes>
                                     <ChartAxis>
-                                        <ChartMajorGridLines></ChartMajorGridLines>
-                                        <MajorTickMarks>Outside</MajorTickMarks>
+                                        <ChartMajorGridLines>
+                                            <Enabled>True</Enabled>
+                                        </ChartMajorGridLines>
+                                        <ChartMajorTickMarks>
+                                            <Type>Outside</Type>
+                                        </ChartMajorTickMarks>
                                     </ChartAxis>
                                 </ChartCategoryAxes>
                                 <ChartValueAxes>
                                     <ChartAxis>
-                                        <ChartMajorGridLines></ChartMajorGridLines>
-                                        <MajorTickMarks>Outside</MajorTickMarks>
+                                        <ChartMajorGridLines>
+                                            <Enabled>True</Enabled>
+                                        </ChartMajorGridLines>
+                                        <ChartMajorTickMarks>
+                                            <Type>Outside</Type>
+                                        </ChartMajorTickMarks>
                                     </ChartAxis>
                                 </ChartValueAxes>
                             </ChartArea>

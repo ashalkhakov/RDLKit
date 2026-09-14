@@ -286,6 +286,9 @@ static void RDLBox(NSXMLElement *el, RDLItem *item) {
   return loc;
 }
 
+static RDLValue *RDLParsePageBreakDisabled(NSXMLElement *el) {
+  return RDLValueFromElement(RDLChild(el, @"Disabled"));
+}
 static BOOL RDLParsePageBreakReset(NSXMLElement *el) {
   NSString *r = RDLText(RDLChild(el, @"ResetPageNumber"));
   return [r caseInsensitiveCompare:@"true"] == NSOrderedSame;
@@ -393,6 +396,96 @@ static NSString *RDLElementPath(NSXMLElement *el) {
   return cell;
 }
 
+// Chart switches are Auto, True or False, in any case.
+static BOOL RDLTextSaysTrue(NSString *text) {
+  return text && [text caseInsensitiveCompare:@"true"] == NSOrderedSame;
+}
+static BOOL RDLTextSaysFalse(NSString *text) {
+  return text && [text caseInsensitiveCompare:@"false"] == NSOrderedSame;
+}
+
+// MS-RDL names a chart by a family and a variant of it -- Shape and Pie,
+// Scatter and Bubble, Column and Stacked -- where the model names the kind of
+// chart that is drawn and how its series combine. These are the pairs where
+// the two differ; Column, Bar, Line, Area and Scatter are both a family and a
+// kind, with Plain, Stacked, PercentStacked or Smooth as their variant.
+typedef struct {
+  const char *type, *subtype;
+  RDLChartType kind;
+  RDLChartSubtype variant;
+} RDLChartVocabularyEntry;
+
+static const RDLChartVocabularyEntry kRDLChartVocabulary[] = {
+    {"Shape", "Pie", RDLChartTypePie, RDLChartSubtypeUnspecified},
+    {"Shape", "ExplodedPie", RDLChartTypePie, RDLChartSubtypeExploded},
+    {"Shape", "Doughnut", RDLChartTypeDoughnut, RDLChartSubtypeUnspecified},
+    {"Shape", "ExplodedDoughnut", RDLChartTypeDoughnut, RDLChartSubtypeExploded},
+    {"Scatter", "Bubble", RDLChartTypeBubble, RDLChartSubtypeUnspecified},
+};
+static const NSUInteger kRDLChartVocabularyCount =
+    sizeof(kRDLChartVocabulary) / sizeof(*kRDLChartVocabulary);
+
+static BOOL RDLChartFamilyIsItsOwnKind(RDLChartType kind) {
+  return kind == RDLChartTypeColumn || kind == RDLChartTypeBar || kind == RDLChartTypeLine ||
+         kind == RDLChartTypeArea || kind == RDLChartTypeScatter;
+}
+
+// A series' Type and Subtype as the kind of chart drawn. NO when they name
+// something this kit does not draw -- a funnel, a range, a stepped line --
+// leaving what could not be read unspecified.
+static BOOL RDLChartKindFromRDL(NSString *type, NSString *subtype, RDLChartType *kind,
+                               RDLChartSubtype *variant) {
+  *kind = RDLChartTypeUnspecified;
+  *variant = RDLChartSubtypeUnspecified;
+  if ([type length] == 0)
+    return [subtype length] == 0;
+  for (NSUInteger i = 0; i < kRDLChartVocabularyCount; i++) {
+    const RDLChartVocabularyEntry *e = &kRDLChartVocabulary[i];
+    if ([type caseInsensitiveCompare:@(e->type)] == NSOrderedSame && [subtype length] &&
+        [subtype caseInsensitiveCompare:@(e->subtype)] == NSOrderedSame) {
+      *kind = e->kind;
+      *variant = e->variant;
+      return YES;
+    }
+  }
+  // A shape that names no variant is a pie, which is what Shape draws by default.
+  if ([type caseInsensitiveCompare:@"Shape"] == NSOrderedSame && [subtype length] == 0) {
+    *kind = RDLChartTypePie;
+    return YES;
+  }
+  RDLChartType family = RDLChartTypeFromString(type);
+  if (!RDLChartFamilyIsItsOwnKind(family))
+    return NO;
+  *kind = family;
+  if ([subtype length] == 0)
+    return YES;
+  RDLChartSubtype v = RDLChartSubtypeFromString(subtype);
+  if (v == RDLChartSubtypeUnspecified || v == RDLChartSubtypeExploded)
+    return NO;
+  *variant = v;
+  return YES;
+}
+
+// The other way: what a series of this kind is written as. `subtype` is nil
+// when there is nothing to say beyond the family.
+static void RDLChartKindToRDL(RDLChartType kind, RDLChartSubtype variant, NSString **type,
+                              NSString **subtype) {
+  RDLChartSubtype wanted =
+      variant == RDLChartSubtypeExploded ? RDLChartSubtypeExploded : RDLChartSubtypeUnspecified;
+  for (NSUInteger i = 0; i < kRDLChartVocabularyCount; i++) {
+    const RDLChartVocabularyEntry *e = &kRDLChartVocabulary[i];
+    if (e->kind == kind && e->variant == wanted) {
+      *type = @(e->type);
+      *subtype = @(e->subtype);
+      return;
+    }
+  }
+  *type = RDLChartFamilyIsItsOwnKind(kind) ? RDLStringFromChartType(kind) : @"Column";
+  *subtype = (variant == RDLChartSubtypeUnspecified || variant == RDLChartSubtypeExploded)
+                 ? nil
+                 : RDLStringFromChartSubtype(variant);
+}
+
 // One ChartMember: the grouping and the label to write under it.
 - (RDLChartMember *)parseChartMember:(NSXMLElement *)el {
   RDLChartMember *m = [[RDLChartMember alloc] init];
@@ -417,17 +510,26 @@ static NSString *RDLElementPath(NSXMLElement *el) {
 - (void)parseChartAxis:(NSXMLElement *)el into:(RDLChartAxis *)axis {
   if (el == nil)
     return;
-  axis.hidden = [RDLText(RDLChild(el, @"Hidden")) isEqualToString:@"true"];
+  // Visible is Auto, True or False: only False hides the axis.
+  axis.hidden = RDLTextSaysFalse(RDLText(RDLChild(el, @"Visible")));
   NSXMLElement *title = RDLChild(el, @"ChartAxisTitle");
   axis.title = RDLValueFromElement(RDLChild(title, @"Caption"));
   NSXMLElement *grid = RDLChild(el, @"ChartMajorGridLines");
   if (grid)
-    axis.showMajorGridLines = ![RDLText(RDLChild(grid, @"Hidden")) isEqualToString:@"true"];
-  RDL_PARSE_ENUM(axis.majorTickMarks, @"MajorTickMarks", RDLChartTickMarksFromString,
-                  RDLText(RDLChild(el, @"MajorTickMarks")));
+    axis.showMajorGridLines = !RDLTextSaysFalse(RDLText(RDLChild(grid, @"Enabled")));
+  NSXMLElement *ticks = RDLChild(el, @"ChartMajorTickMarks");
+  if (RDLTextSaysFalse(RDLText(RDLChild(ticks, @"Enabled"))))
+    axis.majorTickMarks = RDLChartTickMarksNone;
+  else
+    RDL_PARSE_ENUM(axis.majorTickMarks, @"ChartMajorTickMarks/Type", RDLChartTickMarksFromString,
+                    RDLText(RDLChild(ticks, @"Type")));
   axis.minimum = RDLValueFromElement(RDLChild(el, @"Minimum"));
   axis.maximum = RDLValueFromElement(RDLChild(el, @"Maximum"));
-  axis.majorInterval = RDLValueFromElement(RDLChild(el, @"MajorInterval"));
+  // A number, or Auto -- which is what leaving it out means too.
+  NSString *interval = RDLText(RDLChild(el, @"Interval"));
+  axis.majorInterval = ([interval length] && [interval caseInsensitiveCompare:@"Auto"] != NSOrderedSame)
+                           ? [RDLValue valueWithSource:interval]
+                           : nil;
   axis.scalar = [RDLText(RDLChild(el, @"Scalar")) isEqualToString:@"true"];
 }
 
@@ -454,9 +556,18 @@ static NSString *RDLElementPath(NSXMLElement *el) {
     NSXMLElement *se = (NSXMLElement *)n;
     RDLChartSeries *series = [[RDLChartSeries alloc] init];
     series.name = [se attributeForName:@"Name"].stringValue;
-    RDL_PARSE_ENUM(series.type, @"Type", RDLChartTypeFromString, RDLText(RDLChild(se, @"Type")));
-    RDL_PARSE_ENUM(series.subtype, @"Subtype", RDLChartSubtypeFromString,
-                    RDLText(RDLChild(se, @"Subtype")));
+    NSString *typeText = RDLText(RDLChild(se, @"Type"));
+    NSString *subtypeText = RDLText(RDLChild(se, @"Subtype"));
+    RDLChartType kind;
+    RDLChartSubtype variant;
+    if (!RDLChartKindFromRDL(typeText, subtypeText, &kind, &variant))
+      [self.notes addObject:[NSString stringWithFormat:@"chart series '%@' is a %@%@%@ chart, which "
+                                                       @"is not drawn as such",
+                                                       series.name ?: @"", typeText ?: @"",
+                                                       [subtypeText length] ? @"/" : @"",
+                                                       subtypeText ?: @""]];
+    series.type = kind;
+    series.subtype = variant;
     // The first data point carries the expressions; the rest of the points are
     // produced by the groupings, not written out.
     NSXMLElement *point = nil;
@@ -471,8 +582,8 @@ static NSString *RDLElementPath(NSXMLElement *el) {
     series.x = RDLValueFromElement(RDLChild(values, @"X"));
     series.size = RDLValueFromElement(RDLChild(values, @"Size"));
     NSXMLElement *label = RDLChild(point, @"ChartDataLabel");
-    if (label)
-      series.showDataLabels = ![RDLText(RDLChild(label, @"Hidden")) isEqualToString:@"true"];
+    // Labels are hidden unless the label says Visible.
+    series.showDataLabels = RDLTextSaysTrue(RDLText(RDLChild(label, @"Visible")));
     NSXMLElement *marker = RDLChild(point, @"ChartMarker");
     if (marker) {
       NSString *type = RDLText(RDLChild(marker, @"Type"));
@@ -537,6 +648,7 @@ static NSString *RDLElementPath(NSXMLElement *el) {
     if (pb != RDLPageBreakLocationUnspecified)
       m.pageBreak = pb;
     m.resetPageNumber = RDLParsePageBreakReset(RDLChild(group, @"PageBreak"));
+    m.pageBreakDisabled = RDLParsePageBreakDisabled(RDLChild(group, @"PageBreak"));
     RDLValue *pn = RDLParsePageName(group);
     if (pn)
       m.pageName = pn;
@@ -782,6 +894,10 @@ static RDLItem *RDLItemForElementName(NSString *name) {
       @"Chart" : [RDLChart class],
       @"Tablix" : [RDLTablix class],
       @"Subreport" : [RDLSubreport class],
+      // Read and kept, not rendered: see RDLUnsupportedItem.
+      @"GaugePanel" : [RDLUnsupportedItem class],
+      @"Map" : [RDLUnsupportedItem class],
+      @"CustomReportItem" : [RDLUnsupportedItem class],
     };
   });
   Class cls = classes[name ?: @""];
@@ -811,6 +927,7 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     if (pb != RDLPageBreakLocationUnspecified)
       item.pageBreak = pb;
     item.resetPageNumber = RDLParsePageBreakReset(pbEl);
+    item.pageBreakDisabled = RDLParsePageBreakDisabled(pbEl);
   }
   RDLValue *pn = RDLParsePageName(el);
   if (pn)
@@ -818,7 +935,31 @@ static RDLItem *RDLItemForElementName(NSString *name) {
   NSString *ktc = RDLText(RDLChild(el, @"KeepTogether"));
   if ([ktc length])
     item.keepTogether = [ktc caseInsensitiveCompare:@"true"] == NSOrderedSame;
-  if ([item isKindOfClass:[RDLTextbox class]] && [el.localName isEqualToString:@"Textbox"]) {
+  if ([item isKindOfClass:[RDLUnsupportedItem class]]) {
+    RDLUnsupportedItem *u = (RDLUnsupportedItem *)item;
+    u.kind = RDLUnsupportedItemKindFromString(el.localName);
+    // Kept whole, so writing the report back puts it back as it came.
+    u.sourceXML = [el XMLString];
+    u.customType = RDLText(RDLChild(el, @"Type"));
+    for (NSXMLNode *n in [RDLChild(el, @"AltReportItem") children]) {
+      if (n.kind != NSXMLElementKind)
+        continue;
+      u.altItem = [self parseItem:(NSXMLElement *)n];
+      break;
+    }
+    NSString *what = [u.customType length]
+                         ? [NSString stringWithFormat:@"%@ '%@' (%@)", el.localName, item.name,
+                                                      u.customType]
+                         : [NSString stringWithFormat:@"%@ '%@'", el.localName, item.name];
+    [self.notes addObject:u.altItem
+                              ? [NSString stringWithFormat:@"%@ is not supported; its "
+                                                           @"AltReportItem is drawn instead",
+                                                           what]
+                              : [NSString stringWithFormat:@"%@ is not supported and is drawn "
+                                                           @"as a placeholder",
+                                                           what]];
+  } else if ([item isKindOfClass:[RDLTextbox class]] &&
+             [el.localName isEqualToString:@"Textbox"]) {
     RDLTextbox *tb = (RDLTextbox *)item;
     tb.value = RDLTextboxValue(el);
     tb.paragraphs = [self parseParagraphs:el itemStyle:item.style];
@@ -1187,8 +1328,16 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     }
     rp.defaultValue = [rp.defaultValues firstObject];
     for (NSXMLNode *vn in [RDLChild(RDLChild(p, @"ValidValues"), @"ParameterValues") children]) {
-      if (vn.kind == NSXMLElementKind)
-        [rp.validValues addObject:RDLValueFromElement(RDLChild((NSXMLElement *)vn, @"Value")) ?: [RDLValue literal:@""]];
+      if (vn.kind != NSXMLElementKind)
+        continue;
+      RDLValue *value = RDLValueFromElement(RDLChild((NSXMLElement *)vn, @"Value"))
+                            ?: [RDLValue literal:@""];
+      [rp.validValues addObject:value];
+      // What the value is called: what a prompt shows and what
+      // Parameters!P.Label reports.
+      RDLValue *label = RDLValueFromElement(RDLChild((NSXMLElement *)vn, @"Label"));
+      if (label && [[value source] length])
+        rp.validValueLabels[[value source]] = label;
     }
     [r.parameters addObject:rp];
   }
@@ -1423,6 +1572,8 @@ static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
   RDLAdd(parent, @"Left", [self measurement:it.left]);
   RDLAdd(parent, @"Width", [self measurement:it.width]);
   RDLAdd(parent, @"Height", [self measurement:it.height]);
+  if (it.zIndex != 0)
+    RDLAdd(parent, @"ZIndex", [NSString stringWithFormat:@"%ld", (long)it.zIndex]);
 }
 
 
@@ -1460,13 +1611,15 @@ static void RDLAddSorts(NSXMLElement *parent, NSArray<RDLSortExpression *> *sort
 // PageBreak holds a BreakLocation and ResetPageNumber. PageName is not one of
 // its children in any schema -- it belongs to the region or the group, and is
 // written there by RDLAddPageName.
-static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, BOOL reset) {
+static void RDLAddPageBreak(NSXMLElement *parent, RDLPageBreakLocation loc, RDLValue *disabled,
+                            BOOL reset) {
   BOOL hasLocation = loc != RDLPageBreakLocationUnspecified && loc != RDLPageBreakLocationNone;
-  if (!hasLocation && !reset)
+  if (!hasLocation && !reset && disabled == nil)
     return;
   NSXMLElement *pb = RDLEl(@"PageBreak");
   if (hasLocation)
     RDLAdd(pb, @"BreakLocation", RDLStringFromPageBreakLocation(loc));
+  RDLAddValue(pb, @"Disabled", disabled);
   if (reset)
     RDLAdd(pb, @"ResetPageNumber", @"true");
   [parent addChild:pb];
@@ -1501,7 +1654,7 @@ static void RDLAddHyperlink(NSXMLElement *parent, RDLItem *it) {
 static void RDLAddItemPagination(NSXMLElement *parent, RDLItem *it) {
   if (it.keepTogether)
     RDLAdd(parent, @"KeepTogether", @"true");
-  RDLAddPageBreak(parent, it.pageBreak, it.resetPageNumber);
+  RDLAddPageBreak(parent, it.pageBreak, it.pageBreakDisabled, it.resetPageNumber);
   RDLAddPageName(parent, it.pageName);
 }
 
@@ -1518,7 +1671,7 @@ static void RDLAddItemPagination(NSXMLElement *parent, RDLItem *it) {
     }
     if (m.parentExpression)
       RDLAddValue(group, @"Parent", m.parentExpression);
-    RDLAddPageBreak(group, m.pageBreak, m.resetPageNumber);
+    RDLAddPageBreak(group, m.pageBreak, m.pageBreakDisabled, m.resetPageNumber);
     RDLAddPageName(group, m.pageName);
     RDLAddFilters(group, m.filters);
     [me addChild:group];
@@ -1584,21 +1737,23 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   NSXMLElement *collection = RDLEl(collectionName);
   NSXMLElement *el = RDLEl(@"ChartAxis");
   if (axis.hidden)
-    RDLAdd(el, @"Hidden", @"true");
+    RDLAdd(el, @"Visible", @"False");
   if (axis.title != nil) {
     NSXMLElement *title = RDLEl(@"ChartAxisTitle");
     RDLAddValue(title, @"Caption", axis.title);
     [el addChild:title];
   }
   NSXMLElement *grid = RDLEl(@"ChartMajorGridLines");
-  if (!axis.showMajorGridLines)
-    RDLAdd(grid, @"Hidden", @"true");
+  RDLAdd(grid, @"Enabled", axis.showMajorGridLines ? @"True" : @"False");
   [el addChild:grid];
-  if (axis.majorTickMarks != RDLChartTickMarksUnspecified)
-    RDLAdd(el, @"MajorTickMarks", RDLStringFromChartTickMarks(axis.majorTickMarks));
+  if (axis.majorTickMarks != RDLChartTickMarksUnspecified) {
+    NSXMLElement *ticks = RDLEl(@"ChartMajorTickMarks");
+    RDLAdd(ticks, @"Type", RDLStringFromChartTickMarks(axis.majorTickMarks));
+    [el addChild:ticks];
+  }
   RDLAddValue(el, @"Minimum", axis.minimum);
   RDLAddValue(el, @"Maximum", axis.maximum);
-  RDLAddValue(el, @"MajorInterval", axis.majorInterval);
+  RDLAddValue(el, @"Interval", axis.majorInterval);
   if (axis.scalar)
     RDLAdd(el, @"Scalar", @"true");
   [collection addChild:el];
@@ -1630,8 +1785,11 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     RDLAddValue(values, @"Y", series.value);
     RDLAddValue(values, @"Size", series.size);
     [point addChild:values];
-    if (series.showDataLabels)
-      [point addChild:RDLEl(@"ChartDataLabel")];
+    if (series.showDataLabels) {
+      NSXMLElement *label = RDLEl(@"ChartDataLabel");
+      RDLAdd(label, @"Visible", @"true");
+      [point addChild:label];
+    }
     if (series.showMarker) {
       NSXMLElement *marker = RDLEl(@"ChartMarker");
       RDLAdd(marker, @"Type", @"Auto");
@@ -1643,9 +1801,10 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     // chart's own so a designer-made chart still says what it is.
     RDLChartType type = series.type != RDLChartTypeUnspecified ? series.type : chart.chartType;
     RDLChartSubtype sub = series.subtype != RDLChartSubtypeUnspecified ? series.subtype : chart.subtype;
-    RDLAdd(se, @"Type", RDLStringFromChartType(type) ?: @"Column");
-    if (sub != RDLChartSubtypeUnspecified)
-      RDLAdd(se, @"Subtype", RDLStringFromChartSubtype(sub));
+    NSString *typeName = nil, *subtypeName = nil;
+    RDLChartKindToRDL(type, sub, &typeName, &subtypeName);
+    RDLAdd(se, @"Type", typeName);
+    RDLAddIf(se, @"Subtype", subtypeName);
     [collection addChild:se];
   }
   [data addChild:collection];
@@ -1702,7 +1861,7 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     RDLAdd(tx, @"FixedRowHeaders", @"true");
   if (it.keepTogether)
     RDLAdd(tx, @"KeepTogether", @"true");
-  RDLAddPageBreak(tx, it.pageBreak, it.resetPageNumber);
+  RDLAddPageBreak(tx, it.pageBreak, it.pageBreakDisabled, it.resetPageNumber);
   RDLAddPageName(tx, it.pageName);
   RDLAddFilters(tx, it.filters);
   RDLAddSorts(tx, it.sortExpressions);
@@ -1790,12 +1949,42 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
   [parent addChild:tx];
 }
 
+// Written back as it was read: this kit cannot describe a gauge or a map, so
+// the only way not to lose one is not to rewrite it. The box and the name are
+// refreshed from the model, so a placeholder moved on the canvas stays where
+// it was put. If the kept element cannot be read back -- a prefix whose
+// declaration lived further up the original document -- the item is written
+// with its name and box, which is what is left of it.
+- (void)addUnsupportedItem:(RDLUnsupportedItem *)it to:(NSXMLElement *)parent {
+  NSXMLElement *el = [it.sourceXML length]
+                         ? [[NSXMLElement alloc] initWithXMLString:it.sourceXML error:NULL]
+                         : nil;
+  if (el == nil)
+    el = RDLEl(it.rdlElementName);
+  for (NSXMLNode *n in [[el children] copy])
+    if (n.kind == NSXMLElementKind &&
+        [@[ @"Top", @"Left", @"Height", @"Width", @"ZIndex" ] containsObject:[n localName]])
+      [n detach];
+  NSXMLNode *nameAttr = [el attributeForName:@"Name"];
+  if (nameAttr)
+    [nameAttr setStringValue:it.name ?: @""];
+  else
+    RDLAddAttr(el, @"Name", it.name);
+  [self addBox:it to:el];
+  [parent addChild:el];
+}
+
 - (void)addItem:(RDLItem *)it to:(NSXMLElement *)parent {
+  if ([it isKindOfClass:[RDLUnsupportedItem class]]) {
+    [self addUnsupportedItem:(RDLUnsupportedItem *)it to:parent];
+    return;
+  }
   if ([it isKindOfClass:[RDLLine class]]) {
     NSXMLElement *el = RDLEl(@"Line");
     RDLAddAttr(el, @"Name", it.name);
     [self addBox:it to:el];
     RDLAddVisibility(el, it.hidden, it.toggleItem);
+    RDLAddItemPagination(el, it);
     RDLAddStyle(el, it.style);
     [parent addChild:el];
     return;
@@ -1806,6 +1995,7 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
     RDLAddAttr(el, @"Name", it.name);
     [self addBox:it to:el];
     RDLAddVisibility(el, it.hidden, it.toggleItem);
+    RDLAddItemPagination(el, it);
     RDLAddHyperlink(el, it);
     RDLAdd(el, @"Source", RDLStringFromImageSource(img.source) ?: @"External");
     RDLAdd(el, @"Value", img.value);
@@ -2046,6 +2236,7 @@ static void RDLAddChartAxis(NSXMLElement *parent, NSString *collectionName, RDLC
       for (RDLValue *v in p.validValues) {
         NSXMLElement *pv = RDLEl(@"ParameterValue");
         RDLAddValue(pv, @"Value", v);
+        RDLAddValue(pv, @"Label", [p labelForValidValue:[v source]]);
         [pvs addChild:pv];
       }
       [valid addChild:pvs];

@@ -160,6 +160,32 @@ void RDLAttachInlineSource(RDLReport *report, RDLDataSet *dataSet, NSString *sou
   dataSet.commandText = @"$[*]";
 }
 
+RDLReport *RDLSalesWithRenamedColumns(void) {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Renamed Columns"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  ds.rows = @[
+    @{@"TERRITORY" : @"North", @"AMT" : @120, @"Rep" : @"Ann"},
+    @{@"TERRITORY" : @"North", @"AMT" : @30, @"Rep" : @"Bo"},
+    @{@"TERRITORY" : @"South", @"AMT" : @55, @"Rep" : @"Cy"},
+  ];
+  [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Document");
+  RDLField *region = [[RDLField alloc] init];
+  region.name = @"Region";
+  region.dataField = @"TERRITORY";
+  RDLField *amount = [[RDLField alloc] init];
+  amount.name = @"Amount";
+  amount.dataField = @"AMT";
+  ds.fields = @[ region, amount ];
+  // The rows come back from the document, through the binder, as they would
+  // for a report opened from a file.
+  ds.rows = nil;
+  [r resolveDataSources];
+  [[[RDLDataBinder alloc] init] bindReport:r error:NULL];
+  return r;
+}
+
 RDLReport *RDLGroupedJobs(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Grouped Jobs"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];

@@ -1583,6 +1583,12 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 @end
 
 @implementation RDLField
+- (NSString *)rowKey {
+  if ([self isCalculated])
+    return nil;
+  return [_dataField length] ? _dataField : _name;
+}
+
 
 // The one rule for telling the kinds apart, so nothing has to remember that it
 // is written as "the value is not nil".
@@ -1595,6 +1601,20 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 @end
 
 @implementation RDLDataSet
+- (RDLField *)fieldNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLField *field in _fields)
+    if ([field.name caseInsensitiveCompare:name] == NSOrderedSame)
+      return field;
+  return nil;
+}
+
+- (NSString *)rowKeyForFieldNamed:(NSString *)name {
+  NSString *key = [[self fieldNamed:name] rowKey];
+  return [key length] ? key : name;
+}
+
 
 // The two halves of the link, kept honest: whichever is set, the other follows
 // or is dropped. Only the setters are written, so the ivars and getters are
@@ -1646,8 +1666,13 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
   if (self) {
     _defaultValues = [NSMutableArray array];
     _validValues = [NSMutableArray array];
+    _validValueLabels = [NSMutableDictionary dictionary];
   }
   return self;
+}
+
+- (RDLValue *)labelForValidValue:(NSString *)value {
+  return value ? _validValueLabels[value] : nil;
 }
 @end
 
@@ -1851,6 +1876,32 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
   }
 }
 
+static RDLTablixMember *RDLMemberNamedIn(NSArray<RDLTablixMember *> *members, NSString *name) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName isEqualToString:name])
+      return m;
+    RDLTablixMember *inner = RDLMemberNamedIn(m.members, name);
+    if (inner)
+      return inner;
+  }
+  return nil;
+}
+
+- (RDLTablixMember *)tablixMemberNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLItem *item in [self allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLTablix class]])
+      continue;
+    RDLTablix *tablix = (RDLTablix *)item;
+    RDLTablixMember *hit = RDLMemberNamedIn(tablix.rowHierarchy.members, name)
+                               ?: RDLMemberNamedIn(tablix.columnHierarchy.members, name);
+    if (hit)
+      return hit;
+  }
+  return nil;
+}
+
 - (NSArray<RDLItem *> *)allItemsIncludingNested {
   NSMutableArray *a = [NSMutableArray array];
   RDLCollectNested([self allItems], a);
@@ -1964,5 +2015,35 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
     _items = [NSMutableArray array];
   }
   return self;
+}
+@end
+
+RDLUnsupportedItemKind RDLUnsupportedItemKindFromString(NSString *s) {
+  if ([s isEqualToString:@"GaugePanel"])
+    return RDLUnsupportedItemKindGaugePanel;
+  if ([s isEqualToString:@"Map"])
+    return RDLUnsupportedItemKindMap;
+  if ([s isEqualToString:@"CustomReportItem"])
+    return RDLUnsupportedItemKindCustomReportItem;
+  return RDLUnsupportedItemKindUnspecified;
+}
+
+NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind) {
+  switch (kind) {
+  case RDLUnsupportedItemKindGaugePanel:
+    return @"GaugePanel";
+  case RDLUnsupportedItemKindMap:
+    return @"Map";
+  case RDLUnsupportedItemKindCustomReportItem:
+    return @"CustomReportItem";
+  case RDLUnsupportedItemKindUnspecified:
+    return nil;
+  }
+  return nil;
+}
+
+@implementation RDLUnsupportedItem
+- (NSString *)rdlElementName {
+  return RDLStringFromUnsupportedItemKind(_kind) ?: @"CustomReportItem";
 }
 @end

@@ -440,6 +440,8 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) BOOL keepTogether;
 @property (nonatomic, assign) RDLPageBreakLocation pageBreak;
 @property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
+// PageBreak/Disabled: when it evaluates to true the break does not happen.
+@property (nonatomic, strong) RDLValue *pageBreakDisabled;
 // PageName: a child of the data region itself (Tablix, Rectangle, Chart), not
 // of PageBreak. Names the pages this region lands on, which is what
 // Globals!PageName reads and what the Excel renderer makes sheet names from.
@@ -512,6 +514,33 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // document and never written; nil until then, and nil is what makes a
 // subreport render as the spec's "Error: Subreport could not be shown".
 @property (nonatomic, strong) RDLReport *definition;
+@end
+
+// The report items this kit reads but does not render: a gauge panel, a map,
+// and a custom report item (the extension point third-party visuals use).
+typedef NS_ENUM(NSInteger, RDLUnsupportedItemKind) {
+  RDLUnsupportedItemKindUnspecified = 0,
+  RDLUnsupportedItemKindGaugePanel,
+  RDLUnsupportedItemKindMap,
+  RDLUnsupportedItemKindCustomReportItem,
+};
+FOUNDATION_EXPORT RDLUnsupportedItemKind RDLUnsupportedItemKindFromString(NSString *s);
+FOUNDATION_EXPORT NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind);
+
+// One of those, kept rather than refused. Refusing stopped the whole file from
+// opening over a single gauge; now the file opens, the item keeps its place on
+// the page as a placeholder, and a warning says what is missing.
+@interface RDLUnsupportedItem : RDLItem
+@property (nonatomic, assign) RDLUnsupportedItemKind kind;
+// The element exactly as it was read. The writer puts it back from this, so a
+// report opened and saved here does not lose a gauge, a map or a barcode it
+// could not describe.
+@property (nonatomic, copy) NSString *sourceXML;
+// CustomReportItem/Type: which extension the item needs, such as "QrCode".
+@property (nonatomic, copy) NSString *customType;
+// CustomReportItem/AltReportItem: what SSRS draws when the custom type is not
+// installed, which is exactly this kit's situation. nil when there is none.
+@property (nonatomic, strong) RDLItem *altItem;
 @end
 
 // What a Tablix and a Chart have in common: they are bound to a dataset and
@@ -702,6 +731,8 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, strong) RDLTablixHeader *header;
 @property (nonatomic, assign) RDLPageBreakLocation pageBreak;
 @property (nonatomic, assign) BOOL resetPageNumber; // PageBreak/ResetPageNumber (2010)
+// PageBreak/Disabled: when it evaluates to true the break does not happen.
+@property (nonatomic, strong) RDLValue *pageBreakDisabled;
 // PageName: a child of the data region itself (Tablix, Rectangle, Chart), not
 // of PageBreak. Names the pages this region lands on, which is what
 // Globals!PageName reads and what the Excel renderer makes sheet names from.
@@ -740,6 +771,12 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // both -- and the designer says which out loud rather than leaving it to be
 // inferred from an expression box that happens to have something in it.
 @property (nonatomic, readonly) BOOL isCalculated;
+// The key this field's value is stored under in a row: its DataField, which
+// names the column of the query, or its own name when it declares none. nil
+// for a calculated field, which has no column. Name and DataField differ in
+// real reports -- a field called Amount over a column called AMT -- and
+// reading rows by Name found nothing there.
+- (NSString *)rowKey;
 @end
 
 @interface RDLEmbeddedImage : NSObject
@@ -783,9 +820,18 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // shape was inferred from the data rather than declared by the report.
 - (void)setFieldNames:(NSArray<NSString *> *)names;
 @property (nonatomic, strong) NSMutableArray<RDLFilter *> *filters;
-// One entry per row: an NSDictionary keyed by field name, or any object that
-// answers to key-value coding. See RDLRowValue.
+// One entry per row: an NSDictionary keyed by the document's own column names
+// -- each field's DataField -- or any object that answers to key-value coding.
+// See RDLRowValue, and -rowKeyForFieldNamed: for getting from a field's name
+// to its key.
 @property (nonatomic, strong) NSArray *rows;
+// The field called `name`, matched without regard to case as RDL matches
+// field names; nil when the dataset declares none by that name.
+- (RDLField *)fieldNamed:(NSString *)name;
+// The key Fields!name reads from a row: the declared field's DataField, or the
+// name itself when no plain field by that name is declared -- which is how a
+// host's rows reach a report whose fields were never written down.
+- (NSString *)rowKeyForFieldNamed:(NSString *)name;
 @end
 
 @interface RDLDataSource : NSObject
@@ -803,6 +849,13 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) BOOL multiValue;
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *defaultValues; // MultiValue defaults
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *validValues;   // ValidValues/ParameterValues
+// The label each valid value is shown and reported under --
+// ParameterValue/Label -- keyed by the value's own source text. A map rather
+// than a second array beside validValues, because what it answers is "the
+// label for this value" and nothing depends on its order.
+@property (nonatomic, strong) NSMutableDictionary<NSString *, RDLValue *> *validValueLabels;
+// The label for a value, or nil when the parameter gives it none.
+- (RDLValue *)labelForValidValue:(NSString *)value;
 @end
 
 @interface RDLPage : NSObject
@@ -881,6 +934,11 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // contain one of these anywhere" wants, and a subreport in a detail row is
 // exactly that.
 - (NSArray<RDLItem *> *)allItemsIncludingNested;
+// The tablix member whose Group has this name, in any tablix of the report --
+// row or column hierarchy, at any depth. What an aggregate that names a group
+// needs in order to know how that group partitions its rows. nil when no group
+// is called that.
+- (RDLTablixMember *)tablixMemberNamed:(NSString *)name;
 // The tablix cell whose contents are this item, and the tablix it belongs to.
 // A cell holds its item rather than listing it among -childItems, so this is
 // how anything holding an item finds out that it lives in one -- which decides
@@ -893,12 +951,23 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // Layout IR. Tablix is gone by this point; backends consume these only. Split
 // per kind for the same reason the report items are: a backend that is drawing
 // an image has no business seeing chart fields.
+// Which part of the page a laid-out item belongs to. Body items are clipped to
+// the body band, so a row that straddles a page boundary is not drawn over the
+// page footer or under the page header.
+typedef NS_ENUM(NSInteger, RDLLaidOutRegion) {
+  RDLLaidOutRegionUnspecified = 0,
+  RDLLaidOutRegionPageHeader,
+  RDLLaidOutRegionBody,
+  RDLLaidOutRegionPageFooter,
+};
+
 @interface RDLLaidOutItem : NSObject
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, assign) CGFloat x, y, w, h;
 @property (nonatomic, strong) RDLStyle *style;
 @property (nonatomic, assign) NSInteger zIndex;
 @property (nonatomic, copy) NSString *hyperlink; // resolved URL, or nil
+@property (nonatomic, assign) RDLLaidOutRegion region;
 // The RDL element this came from, for diagnostics and for HTML's data-kind.
 @property (nonatomic, readonly) NSString *rdlElementName;
 @end
@@ -960,5 +1029,7 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @interface RDLLaidOutPage : NSObject
 @property (nonatomic, assign) NSInteger index;
 @property (nonatomic, assign) CGFloat width, height;
+// The body band, in inches from the top of the page: what body items clip to.
+@property (nonatomic, assign) CGFloat bodyTop, bodyBottom;
 @property (nonatomic, strong) NSMutableArray<RDLLaidOutItem *> *items;
 @end

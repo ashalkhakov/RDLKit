@@ -103,6 +103,182 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
+// VB.NET's arithmetic, which is what SSRS hosts. Each of these produced a
+// different number here, and a report full of them is wrong in a way nobody
+// can see by reading it.
+// A nested aggregate takes the inner aggregate once per instance of the
+// inner scope and aggregates those. Taking it once per row over the outer
+// scope's rows made Sum(Max(B)) over 1, 2, 3 come out as 9.
+// A field's value is the column its DataField names. Rows were read by the
+// field's Name instead, so a field called Amount over a column called AMT --
+// the ordinary case in a report written against someone else's data -- read
+// nothing at all, and nothing said so.
+- (void)testAFieldReadsTheColumnItsDataFieldNames {
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLDataSet *ds = [r dataSetNamed:@"Sales"];
+  if ([ds.rows count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the fixture should bind 3 rows, got %lu",
+                                              (unsigned long)[ds.rows count]]);
+    return;
+  }
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = ds;
+  [self expectNumber:@"=Sum(Fields!Amount.Value)" scope:scope equals:205];
+  // Field names match without regard to case, and still find the column.
+  [self expectNumber:@"=Sum(Fields!amount.Value)" scope:scope equals:205];
+  scope.row = ds.rows[2];
+  [self expectText:@"=Fields!Region.Value" scope:scope equals:@"South"];
+  // A column no field declares is still reachable by its own name.
+  [self expectText:@"=Fields!Rep.Value" scope:scope equals:@"Cy"];
+  // And binding read each field's type off its own column.
+  if ([ds fieldNamed:@"Amount"].dataType != RDLFieldDataTypeInteger)
+    XCTFail(@"%@", @"Amount's type should be inferred from the AMT column");
+}
+
+// Something that reads another dataset reads that dataset's columns through
+// that dataset's fields. The column names here are deliberately not case
+// variants of the field names -- RGN, GOAL_AMT -- because row keys match
+// without regard to case, and a mapping through the wrong dataset could
+// otherwise find the column by accident.
+- (void)testAnotherDatasetIsReadThroughItsOwnFields {
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLDataSet *sales = [r dataSetNamed:@"Sales"];
+  RDLDataSet *targets = [[RDLDataSet alloc] init];
+  targets.name = @"Targets";
+  RDLField *where = [[RDLField alloc] init];
+  where.name = @"Region";
+  where.dataField = @"RGN";
+  RDLField *goal = [[RDLField alloc] init];
+  goal.name = @"Target";
+  goal.dataField = @"GOAL_AMT";
+  targets.fields = @[ where, goal ];
+  targets.rows = @[ @{@"RGN" : @"North", @"GOAL_AMT" : @200},
+                    @{@"RGN" : @"South", @"GOAL_AMT" : @90} ];
+  [r.dataSets addObject:targets];
+
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = sales;
+  scope.row = sales.rows[2];  // South
+  // An aggregate over the other dataset.
+  [self expectNumber:@"=Sum(Fields!Target.Value, \"Targets\")" scope:scope equals:290];
+  // A Lookup: the source key is this row's Region (TERRITORY), the match and the
+  // result are the other dataset's Region (RGN) and Target (GOAL_AMT).
+  [self expectNumber:
+            @"=Lookup(Fields!Region.Value, Fields!Region.Value, Fields!Target.Value, \"Targets\")"
+               scope:scope
+              equals:90];
+  // And the scope is put back: this row's own fields still read this dataset.
+  [self expectText:@"=Fields!Region.Value" scope:scope equals:@"South"];
+}
+
+- (void)testNestedAggregatesTakeTheInnerOncePerInstance {
+  RDLReport *r = RDLGroupedJobs();
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = [r dataSetNamed:@"Jobs"];
+  // The largest job of each finish -- Oil 1840, Lacquer 265, Wax 610 -- added up.
+  [self expectNumber:@"=Sum(Max(Fields!Amount.Value, \"JobsByFinish_Finish\"))"
+               scope:scope
+              equals:2715];
+  // The average finish total: (2355 + 313 + 800) / 3.
+  [self expectNumber:@"=Avg(Sum(Fields!Amount.Value, \"JobsByFinish_Finish\"))"
+               scope:scope
+              equals:1156];
+  // No inner scope: every row is its own instance, so Max of one row is that
+  // row, and the outer Sum is the plain total.
+  [self expectNumber:@"=Sum(Max(Fields!Amount.Value))" scope:scope equals:3468];
+}
+
+- (void)testVBArithmeticAgrees {
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  // ^ binds tighter than unary minus and associates to the left.
+  [self expectNumber:@"=-2^2" scope:s equals:-4];
+  [self expectNumber:@"=2^3^2" scope:s equals:64];
+  [self expectNumber:@"=2^-2" scope:s equals:0.25];
+  [self expectNumber:@"=-2^2+1" scope:s equals:-3];
+  // Round is banker's: halves go to the even neighbour.
+  [self expectNumber:@"=Round(2.5)" scope:s equals:2];
+  [self expectNumber:@"=Round(3.5)" scope:s equals:4];
+  [self expectNumber:@"=Round(-2.5)" scope:s equals:-2];
+  // With digits, on a half that a double represents exactly -- 2.675 is not
+  // one of those, and .NET's own answer for it depends on the representation.
+  [self expectNumber:@"=Round(0.125, 2)" scope:s equals:0.12];
+  [self expectNumber:@"=Round(0.375, 2)" scope:s equals:0.38];
+  // CInt rounds, Int goes down, Fix goes toward zero.
+  [self expectNumber:@"=CInt(2.7)" scope:s equals:3];
+  [self expectNumber:@"=CInt(2.5)" scope:s equals:2];
+  [self expectNumber:@"=Int(-2.7)" scope:s equals:-3];
+  [self expectNumber:@"=Fix(-2.7)" scope:s equals:-2];
+}
+
+// Two dates compare as dates. They used to be compared as their formatted
+// text, so a September date sorted after a November one and every
+// IIf(start < end, ...) in a report was a coin toss.
+- (void)testDatesCompareAsDates {
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  [self expectText:@"=CDate(\"2020-09-13\") < CDate(\"2023-11-14\")" scope:s equals:@"True"];
+  [self expectText:@"=CDate(\"2023-11-14\") < CDate(\"2020-09-13\")" scope:s equals:@"False"];
+  [self expectText:@"=CDate(\"2020-09-13\") = CDate(\"2020-09-13\")" scope:s equals:@"True"];
+  [self expectText:@"=CDate(\"2020-01-02\") >= CDate(\"2020-01-01\")" scope:s equals:@"True"];
+
+  // And Min/Max over a date field give back dates, not milliseconds.
+  RDLReport *r = [RDLReport emptyReportNamed:@"Dates"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"D";
+  [ds setFieldNames:@[ @"When" ]];
+  ds.rows = @[ @{ @"When" : [NSDate dateWithTimeIntervalSince1970:1000000] },
+               @{ @"When" : [NSDate dateWithTimeIntervalSince1970:2000000] } ];
+  [r.dataSets addObject:ds];
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = ds;
+  id low = [RDLExpression evaluate:@"=Min(Fields!When.Value)" scope:scope];
+  if (![low isKindOfClass:[NSDate class]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Min over dates should be a date, not %@",
+                                              [low class]]);
+  else if (fabs([(NSDate *)low timeIntervalSince1970] - 1000000) > 1)
+    XCTFail(@"%@", @"and it should be the earliest one");
+}
+
+// Parameters!P.Label is the name the chosen value goes under, not the prompt.
+- (void)testParameterLabelComesFromTheChosenValue {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Params"];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Region";
+  p.prompt = @"Which region?";
+  p.dataType = RDLParameterDataTypeString;
+  [p.validValues addObject:[RDLValue literal:@"N"]];
+  [p.validValues addObject:[RDLValue literal:@"S"]];
+  p.validValueLabels[@"N"] = [RDLValue literal:@"North"];
+  p.validValueLabels[@"S"] = [RDLValue literal:@"South"];
+  [r.parameters addObject:p];
+
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.paramValues = @{ @"Region" : @"S" };
+  id label = [RDLExpression evaluate:@"=Parameters!Region.Label" scope:scope];
+  if (![[label description] isEqualToString:@"South"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Label should be South, not %@", label]);
+
+  // A value with no label of its own reports itself.
+  scope.paramValues = @{ @"Region" : @"E" };
+  label = [RDLExpression evaluate:@"=Parameters!Region.Label" scope:scope];
+  if (![[label description] isEqualToString:@"E"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"an unlabelled value reports itself, not %@",
+                                              label]);
+
+  // And the label survives a round trip through the file.
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<Label>North</Label>"].location == NSNotFound)
+    XCTFail(@"%@", @"the writer should emit ParameterValue/Label");
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLParameter *readBack = [back.parameters firstObject];
+  if (![[[readBack labelForValidValue:@"N"] source] isEqualToString:@"North"])
+    XCTFail(@"%@", @"and the reader should read it back");
+}
+
 - (void)testExpression {
   RDLReport *r = RDLMiniInvoice();
   RDLEvalScope *s = [[RDLEvalScope alloc] init];

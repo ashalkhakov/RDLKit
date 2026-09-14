@@ -573,7 +573,7 @@ static NSXMLElement *RDLChartAxisFrom(NSXMLElement *chart, NSString *outerName) 
     return out;
   NSXMLElement *visible = RDLKid(axis, @"Visible");
   if (visible && ![[RDLTrimmed(visible) lowercaseString] isEqualToString:@"true"])
-    [out addChild:RDLNewText(@"Hidden", @"true")];
+    [out addChild:RDLNewText(@"Visible", @"False")];
   NSXMLElement *title = RDLKid(axis, @"Title");
   NSXMLElement *caption = RDLKid(title, @"Caption");
   if (caption) {
@@ -581,17 +581,25 @@ static NSXMLElement *RDLChartAxisFrom(NSXMLElement *chart, NSString *outerName) 
     [axisTitle addChild:RDLNewText(@"Caption", RDLTrimmed(caption))];
     [out addChild:axisTitle];
   }
-  // 2005 said "show these gridlines"; 2008 says "these gridlines are hidden".
+  // 2005 said "show these gridlines"; 2008 says whether they are enabled, and
+  // a 2005 axis that said nothing had none.
   NSXMLElement *major = RDLKid(axis, @"MajorGridLines");
   NSXMLElement *show = RDLKid(major, @"ShowGridLines");
   NSXMLElement *grid = RDLNew(@"ChartMajorGridLines");
-  if (major != nil && show != nil &&
-      ![[RDLTrimmed(show) lowercaseString] isEqualToString:@"true"])
-    [grid addChild:RDLNewText(@"Hidden", @"true")];
-  else if (major == nil)
-    [grid addChild:RDLNewText(@"Hidden", @"true")];
+  if (major == nil ||
+      (show != nil && ![[RDLTrimmed(show) lowercaseString] isEqualToString:@"true"]))
+    [grid addChild:RDLNewText(@"Enabled", @"False")];
   [out addChild:grid];
-  for (NSString *carry in @[ @"MajorTickMarks", @"MajorInterval", @"Minimum", @"Maximum", @"Scalar" ]) {
+  NSXMLElement *ticks = RDLKid(axis, @"MajorTickMarks");
+  if (ticks) {
+    NSXMLElement *marks = RDLNew(@"ChartMajorTickMarks");
+    [marks addChild:RDLNewText(@"Type", RDLTrimmed(ticks))];
+    [out addChild:marks];
+  }
+  NSXMLElement *interval = RDLKid(axis, @"MajorInterval");
+  if (interval)
+    [out addChild:RDLNewText(@"Interval", RDLTrimmed(interval))];
+  for (NSString *carry in @[ @"Minimum", @"Maximum", @"Scalar" ]) {
     NSXMLElement *e = RDLKid(axis, carry);
     if (e)
       [out addChild:RDLNewText(carry, RDLTrimmed(e))];
@@ -651,8 +659,15 @@ static void RDLUpgradeChart(NSXMLElement *chart) {
     }
     NSXMLElement *outPoint = RDLNew(@"ChartDataPoint");
     [outPoint addChild:outValues];
-    if (RDLKid(point, @"DataLabel") != nil)
-      [outPoint addChild:RDLNew(@"ChartDataLabel")];
+    // A 2005 data label is shown unless it says it is not.
+    NSXMLElement *oldLabel = RDLKid(point, @"DataLabel");
+    NSXMLElement *labelVisible = RDLKid(oldLabel, @"Visible");
+    if (oldLabel != nil &&
+        (labelVisible == nil || [[RDLTrimmed(labelVisible) lowercaseString] isEqualToString:@"true"])) {
+      NSXMLElement *label = RDLNew(@"ChartDataLabel");
+      [label addChild:RDLNewText(@"Visible", @"true")];
+      [outPoint addChild:label];
+    }
     if (RDLKid(point, @"Marker") != nil) {
       NSXMLElement *marker = RDLNew(@"ChartMarker");
       [marker addChild:RDLNewText(@"Type", @"Auto")];
@@ -793,6 +808,97 @@ static void RDLUpgradePage(NSXMLElement *root) {
 }
 
 #pragma mark - The root shape
+
+#pragma mark - Chart names
+
+// This kit's own charts, from before it used the spec's names: a series typed
+// Pie, Doughnut or Bubble where RDL says Shape/Pie, Shape/Doughnut and
+// Scatter/Bubble; an axis with Hidden, MajorInterval and MajorTickMarks where
+// RDL has Visible, Interval and ChartMajorTickMarks/Type; grid lines and data
+// labels with Hidden where RDL has Enabled and Visible. None of those is in any
+// schema, so finding one is what says a file is in that shape -- which is why
+// this runs for every document and not by version: those files announced the
+// 2010 namespace.
+
+static void RDLReplaceKid(NSXMLElement *parent, NSXMLElement *old, NSXMLElement *replacement) {
+  NSUInteger index = [old index];
+  [old detach];
+  [parent insertChild:replacement atIndex:index];
+}
+
+static BOOL RDLSaysTrue(NSXMLElement *el) {
+  return [[RDLTrimmed(el) lowercaseString] isEqualToString:@"true"];
+}
+
+static void RDLUpgradeChartSeriesKind(NSXMLElement *series) {
+  NSXMLElement *type = RDLKid(series, @"Type");
+  NSXMLElement *subtype = RDLKid(series, @"Subtype");
+  NSString *old = RDLTrimmed(type);
+  BOOL exploded = [RDLTrimmed(subtype) isEqualToString:@"Exploded"];
+  NSString *family = nil, *variant = nil;
+  if ([old isEqualToString:@"Pie"]) {
+    family = @"Shape";
+    variant = exploded ? @"ExplodedPie" : @"Pie";
+  } else if ([old isEqualToString:@"Doughnut"]) {
+    family = @"Shape";
+    variant = exploded ? @"ExplodedDoughnut" : @"Doughnut";
+  } else if ([old isEqualToString:@"Bubble"]) {
+    family = @"Scatter";
+    variant = @"Bubble";
+  }
+  if (family == nil)
+    return;
+  [type setStringValue:family];
+  if (subtype)
+    [subtype setStringValue:variant];
+  else
+    [series addChild:RDLNewText(@"Subtype", variant)];
+}
+
+static void RDLUpgradeChartAxisNames(NSXMLElement *axis) {
+  NSXMLElement *hidden = RDLKid(axis, @"Hidden");
+  if (hidden && RDLSaysTrue(hidden))
+    RDLReplaceKid(axis, hidden, RDLNewText(@"Visible", @"False"));
+  else
+    [hidden detach];
+  NSXMLElement *interval = RDLKid(axis, @"MajorInterval");
+  if (interval)
+    RDLReplaceKid(axis, interval, RDLNewText(@"Interval", RDLTrimmed(interval)));
+  NSXMLElement *ticks = RDLKid(axis, @"MajorTickMarks");
+  if (ticks) {
+    NSXMLElement *marks = RDLNew(@"ChartMajorTickMarks");
+    [marks addChild:RDLNewText(@"Type", RDLTrimmed(ticks))];
+    RDLReplaceKid(axis, ticks, marks);
+  }
+  NSXMLElement *grid = RDLKid(axis, @"ChartMajorGridLines");
+  NSXMLElement *gridHidden = RDLKid(grid, @"Hidden");
+  if (gridHidden && RDLSaysTrue(gridHidden))
+    RDLReplaceKid(grid, gridHidden, RDLNewText(@"Enabled", @"False"));
+  else
+    [gridHidden detach];
+}
+
+static void RDLUpgradeChartDataLabel(NSXMLElement *label) {
+  NSXMLElement *hidden = RDLKid(label, @"Hidden");
+  if (hidden)
+    RDLReplaceKid(label, hidden, RDLNewText(@"Visible", RDLSaysTrue(hidden) ? @"false" : @"true"));
+  else if ([RDLElems(label) count] == 0)
+    // An empty label element was how this kit said "show the labels"; in the
+    // spec a label is hidden unless it says Visible.
+    [label addChild:RDLNewText(@"Visible", @"true")];
+}
+
+static void RDLUpgradeChartNames(NSXMLElement *el) {
+  NSString *name = RDLLN(el);
+  if ([name isEqualToString:@"ChartSeries"])
+    RDLUpgradeChartSeriesKind(el);
+  else if ([name isEqualToString:@"ChartAxis"])
+    RDLUpgradeChartAxisNames(el);
+  else if ([name isEqualToString:@"ChartDataLabel"])
+    RDLUpgradeChartDataLabel(el);
+  for (NSXMLElement *child in RDLElems(el))
+    RDLUpgradeChartNames(child);
+}
 
 // PageName inside PageBreak is RDLKit's own invention -- no schema has it
 // there -- and files this kit wrote carry it. It belongs to the region or the
@@ -1007,6 +1113,7 @@ static void RDLUpgradeElement(NSXMLElement *el) {
   RDLUpgradeLists(root);
   RDLUpgradePageNames(root);
   RDLUpgradeRootShape(root);
+  RDLUpgradeChartNames(root);
   return version;
 }
 

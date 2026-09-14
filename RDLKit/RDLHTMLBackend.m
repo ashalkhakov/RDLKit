@@ -237,6 +237,12 @@ static NSString *RDLChartSVG(RDLLaidOutChart *it) {
       NSMutableString *st = [NSMutableString string];
       [st appendFormat:@"left:%.4fin;top:%.4fin;width:%.4fin;height:%.4fin;",
                        it.x, it.y, it.w, it.h];
+      // A body item that runs past the body band is cut there, as on paper,
+      // rather than drawn over the page footer or under the header.
+      CGFloat cutTop = MAX(page.bodyTop - it.y, 0);
+      CGFloat cutBottom = MAX(it.y + it.h - page.bodyBottom, 0);
+      if (it.region == RDLLaidOutRegionBody && (cutTop > 0 || cutBottom > 0))
+        [st appendFormat:@"clip-path:inset(%.4fin 0 %.4fin 0);", cutTop, cutBottom];
       NSString *color = it.style.color.length ? it.style.color : @"#1a1916";
       NSString *ff = it.style.fontFamily.length ? it.style.fontFamily : @"Georgia";
       NSString *fs = [it.style.fontSize stringValue] ?: @"10pt";

@@ -15,6 +15,12 @@
 // belonging to the column instance. Evaluation intersects them with the
 // row instance's rows.
 @property (nonatomic, copy) NSArray *colRows;
+// The rows of each column group enclosing this cell, by group name, so an
+// aggregate that names a column group gets that column's rows.
+@property (nonatomic, copy) NSDictionary<NSString *, NSArray *> *colRowsByName;
+// What a data region in this cell reads when it is not the row's own: a group
+// header cell holds the whole group, not the first row it is attached to.
+@property (nonatomic, copy) NSArray *regionRows;
 @end
 @implementation RDLTablixCellInst
 @end
@@ -24,12 +30,17 @@
 @property (nonatomic, assign) CGFloat height;
 @property (nonatomic, assign) BOOL repeatOnNewPage;
 @property (nonatomic, assign) BOOL pageBreakBefore;
+// The row that ends a group instance breaking at its end: what follows it
+// starts a page.
+@property (nonatomic, assign) BOOL pageBreakAfter;
 @property (nonatomic, assign) BOOL resetPageNumber;
 @property (nonatomic, copy) NSString *pageName;
 @property (nonatomic, assign) CGFloat keepTogetherHeight;
 @property (nonatomic, strong) NSMutableArray<RDLTablixCellInst *> *cells;
 @property (nonatomic, strong) id row;
 @property (nonatomic, copy) NSArray *groupRows;
+// Every enclosing row group's rows, by name, for aggregates that name one.
+@property (nonatomic, copy) NSDictionary<NSString *, NSArray *> *groupRowsByName;
 // 1-based position of this row within its group, for RowNumber().
 @property (nonatomic, assign) NSInteger rowNumber;
 // The scopes enclosing this row, outermost first, for InScope() and Level().
@@ -39,6 +50,9 @@
 @property (nonatomic, assign) NSInteger recursionLevel;
 // This node's own rows plus every descendant's, for a Recursive aggregate.
 @property (nonatomic, copy) NSArray *recursiveRows;
+// What a data region nested in this row's cells reads: the detail row alone,
+// or the rows of the group a static row belongs to.
+@property (nonatomic, copy) NSArray *regionRows;
 @end
 @implementation RDLTablixInst
 - (instancetype)init {
@@ -57,6 +71,7 @@
 @property (nonatomic, strong) RDLItem *item;
 @property (nonatomic, assign) CGFloat size;
 @property (nonatomic, copy) NSArray *rows; // group-instance rows; nil = all rows
+@property (nonatomic, copy) NSString *groupName; // nil for a static column
 @end
 @implementation RDLColHeaderNode
 @end
@@ -114,6 +129,21 @@
 @implementation RDLRecursiveNode
 @end
 
+// Where a body item lands, in continuous body coordinates (slice n starts at
+// n times the body height), once everything above it has grown and moved.
+@interface RDLBodySpot : NSObject
+@property (nonatomic, assign) CGFloat top, height;
+// How far this item pushes the items below it: what it grew by plus how far a
+// page break or KeepTogether moved it. Not what it was pushed by itself --
+// the items below are pushed by that directly.
+@property (nonatomic, assign) CGFloat pushesBelow;
+// A break at the end of this item: nothing below it starts above this.
+@property (nonatomic, assign) CGFloat breakFloor;
+@property (nonatomic, assign) RDLPageBreakLocation pageBreak;
+@end
+@implementation RDLBodySpot
+@end
+
 @implementation RDLLayoutEngine
 
 static NSInteger RDLLeafCount(NSArray<RDLTablixMember *> *members) {
@@ -159,7 +189,7 @@ static id RDLEvalRow(RDLValue *value, id row, RDLEvalScope *scope) {
   if (![value isExpression]) {
     NSString *f = RDLFieldOf(source);
     if (f && row) {
-      id v = RDLRowValue(row, f);
+      id v = RDLRowValue(row, [scope.dataSet rowKeyForFieldNamed:f] ?: f);
       if (v != nil)
         return v;
     }
@@ -172,7 +202,8 @@ static id RDLEvalRow(RDLValue *value, id row, RDLEvalScope *scope) {
     scope.row = saved;
     return v;
   }
-  // No scope to evaluate in: fall back to the field the expression names.
+  // No scope to evaluate in, so no dataset to map the name through: the field
+  // the expression names, read by that name.
   NSString *f = RDLFieldOf(source);
   if (f && row) {
     id v = RDLRowValue(row, f);
@@ -358,14 +389,42 @@ static CGFloat RDLTextboxGrownHeight(RDLTextbox *item, CGFloat width, RDLEvalSco
 
 static CGFloat RDLSubreportContentHeight(RDLSubreport *sub, RDLEvalScope *outer, CGFloat bodyAvail);
 
-// How tall a cell's contents want to be. A text box grows to its text, and a
-// subreport to the report inside it: a detail row that shows one is as tall as
-// what it shows, which is the whole point of putting one there.
-static CGFloat RDLCellContentHeight(RDLItem *item, CGFloat width, RDLEvalScope *scope,
+static CGFloat RDLTablixHeight(RDLTablix *item, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail,
+                               CGFloat tablixTop);
+static CGFloat RDLRectangleContentHeight(RDLRectangle *rect, CGFloat top, RDLEvalScope *scope,
+                                         CGFloat bodyAvail, NSMapTable<RDLItem *, NSNumber *> **offsets);
+
+// How tall an item wants to be once what it holds has grown: a text box to its
+// text, a subreport to the report inside it, a tablix to its rows and a
+// rectangle to what it contains. A detail row showing one of them is as tall
+// as what it shows, which is the whole point of putting one there. `top` is
+// where the item starts in body coordinates, which a tablix's page rules
+// answer to.
+static CGFloat RDLItemContentHeight(RDLItem *item, CGFloat width, CGFloat top, RDLEvalScope *scope,
                                     CGFloat bodyAvail) {
   if ([item isKindOfClass:[RDLSubreport class]])
     return MAX(item.height, RDLSubreportContentHeight((RDLSubreport *)item, scope, bodyAvail));
+  if ([item isKindOfClass:[RDLTablix class]]) {
+    if (scope == nil || RDLIsHiddenExpr(item.hidden, scope))
+      return item.height;
+    return RDLTablixHeight((RDLTablix *)item, scope.report, scope, bodyAvail, top);
+  }
+  if ([item isKindOfClass:[RDLRectangle class]])
+    return RDLRectangleContentHeight((RDLRectangle *)item, top, scope, bodyAvail, NULL);
   return RDLTextboxGrownHeight((RDLTextbox *)item, width, scope);
+}
+
+// Items in the order they are laid out, top to bottom; items level with each
+// other keep the order they were written in.
+static NSArray<RDLItem *> *RDLItemsByTop(NSArray<RDLItem *> *items) {
+  return [items sortedArrayWithOptions:NSSortStable
+                       usingComparator:^NSComparisonResult(RDLItem *a, RDLItem *b) {
+                         if (a.top < b.top)
+                           return NSOrderedAscending;
+                         if (a.top > b.top)
+                           return NSOrderedDescending;
+                         return NSOrderedSame;
+                       }];
 }
 
 static double RDLAsN(id v) {
@@ -592,25 +651,122 @@ static NSArray *RDLPartition(NSArray *rows, NSArray<RDLValue *> *exprs, RDLEvalS
   return out;
 }
 
-static NSArray *RDLSortParts(NSArray *parts, NSArray<RDLSortExpression *> *sorts, RDLEvalScope *scope) {
-  if ([sorts count] == 0)
+// What an evaluated Hidden or Disabled says: a Boolean, or the text "true" a
+// literal leaves behind.
+static BOOL RDLIsTrue(id v) {
+  if ([v isKindOfClass:[NSNumber class]])
+    return [v boolValue];
+  return [RDLAsStr(v) caseInsensitiveCompare:@"true"] == NSOrderedSame;
+}
+
+// Runs `body` with one group instance as the scope an aggregate reads: its rows
+// as the innermost group, and under the group's name for an aggregate that
+// names it. What makes Sum(Fields!Amount.Value) in a group's sort, filter or
+// Hidden that group's total -- the same thing it means in the group's cells --
+// rather than the whole dataset's.
+static id RDLInGroupScope(NSArray *rows, NSString *groupName, RDLEvalScope *scope, id (^body)(void)) {
+  if (scope == nil)
+    return body();
+  NSArray *savedGroup = scope.groupRows;
+  NSDictionary *savedNamed = scope.groupRowsByName;
+  scope.groupRows = rows;
+  if ([groupName length]) {
+    NSMutableDictionary *named = [savedNamed mutableCopy] ?: [NSMutableDictionary dictionary];
+    named[groupName] = rows;
+    scope.groupRowsByName = named;
+  }
+  id result = body();
+  scope.groupRows = savedGroup;
+  scope.groupRowsByName = savedNamed;
+  return result;
+}
+
+static id RDLEvalInGroup(RDLValue *value, NSArray *rows, NSString *groupName, RDLEvalScope *scope) {
+  return RDLInGroupScope(rows, groupName, scope, ^id {
+    return RDLEvalRow(value, [rows firstObject], scope);
+  });
+}
+
+// Visibility/Hidden for one instance of a member: a group instance, a detail
+// row, or a static member within the group around it. With no scope -- a
+// preview with nothing bound -- an expression leaves it visible, as
+// RDLIsHiddenExpr does.
+static BOOL RDLIsHiddenInGroup(RDLValue *hidden, NSArray *rows, NSString *groupName,
+                               RDLEvalScope *scope) {
+  if (hidden == nil)
+    return NO;
+  if (![hidden isExpression])
+    return [hidden evaluateBoolInScope:nil];
+  if (scope == nil)
+    return NO;
+  return RDLIsTrue(RDLEvalInGroup(hidden, rows, groupName, scope));
+}
+
+// The instances of a group: the rows partitioned by its group expressions, each
+// instance filtered in its own scope, and those left with no rows dropped.
+static NSArray<NSArray *> *RDLGroupInstances(RDLTablixMember *m, NSArray *rows, RDLEvalScope *scope) {
+  NSMutableArray *kept = [NSMutableArray array];
+  for (NSArray *part in RDLPartition(rows, m.groupExpressions, scope)) {
+    NSArray *filtered = RDLInGroupScope(part, m.groupName, scope, ^id {
+      return RDLApplyFilters(part, m.filters, scope);
+    });
+    if ([filtered count])
+      [kept addObject:filtered];
+  }
+  return kept;
+}
+
+// Group instances in SortExpressions order. Each key is worked out once, in its
+// instance's scope, and instances with equal keys keep the order they came in.
+static NSArray *RDLSortParts(NSArray *parts, NSArray<RDLSortExpression *> *sorts, NSString *groupName,
+                             RDLEvalScope *scope) {
+  if ([sorts count] == 0 || [parts count] < 2)
     return parts;
-  return [parts sortedArrayUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
-    NSDictionary *ra = [a count] ? a[0] : @{};
-    NSDictionary *rb = [b count] ? b[0] : @{};
-    for (RDLSortExpression *s in sorts) {
-      NSComparisonResult c = RDLCmp(RDLEvalRow(s.expression, ra, scope), RDLEvalRow(s.expression, rb, scope));
-      if (s.direction == RDLSortDirectionDescending) {
-        if (c == NSOrderedAscending)
-          c = NSOrderedDescending;
-        else if (c == NSOrderedDescending)
-          c = NSOrderedAscending;
-      }
-      if (c != NSOrderedSame)
-        return c;
-    }
-    return NSOrderedSame;
-  }];
+  NSMutableArray *keyed = [NSMutableArray array];
+  for (NSArray *part in parts) {
+    NSMutableArray *keys = [NSMutableArray array];
+    for (RDLSortExpression *sort in sorts)
+      [keys addObject:RDLEvalInGroup(sort.expression, part, groupName, scope) ?: [NSNull null]];
+    [keyed addObject:@[ part, keys ]];
+  }
+  NSArray *sorted = [keyed
+      sortedArrayWithOptions:NSSortStable
+             usingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
+               for (NSUInteger i = 0; i < [sorts count]; i++) {
+                 id ka = a[1][i], kb = b[1][i];
+                 NSComparisonResult c = RDLCmp(ka == [NSNull null] ? nil : ka,
+                                               kb == [NSNull null] ? nil : kb);
+                 if (sorts[i].direction == RDLSortDirectionDescending)
+                   c = (NSComparisonResult)(-c);
+                 if (c != NSOrderedSame)
+                   return c;
+               }
+               return NSOrderedSame;
+             }];
+  NSMutableArray *out = [NSMutableArray array];
+  for (NSArray *pair in sorted)
+    [out addObject:pair[0]];
+  return out;
+}
+
+// HideIfNoRows on a static member -- a header, a total -- means "not when the
+// groups beside me have nothing to show". Beside no group at all, it is the
+// rows themselves that count.
+static BOOL RDLPeersHaveRows(NSArray<RDLTablixMember *> *peers, NSArray *rows, BOOL dataIsEmpty,
+                             RDLEvalScope *scope) {
+  if (dataIsEmpty)
+    return NO;
+  BOOL anyGroup = NO;
+  for (RDLTablixMember *peer in peers) {
+    if ([peer.groupName length] == 0)
+      continue;
+    anyGroup = YES;
+    NSUInteger n = [peer.groupExpressions count] ? [RDLGroupInstances(peer, rows, scope) count]
+                                                 : [RDLApplyFilters(rows, peer.filters, scope) count];
+    if (n > 0)
+      return YES;
+  }
+  return !anyGroup;
 }
 
 // Build the rendered column list from TablixColumnHierarchy. Returns nil when
@@ -636,33 +792,32 @@ static void RDLColPlanWalk(NSArray<RDLTablixMember *> *members, NSArray *dataRow
   for (RDLTablixMember *m in members) {
     BOOL nested = [m.members count] > 0;
     NSInteger count = nested ? RDLLeafCount(m.members) : 1;
-    if (RDLIsHiddenExpr(m.hidden, scope)) {
+    BOOL dynamic = [m.groupName length] && [m.groupExpressions count];
+    // A group's Hidden is decided per instance, below; a static member's in
+    // the scope of the columns around it.
+    if (!dynamic && RDLIsHiddenInGroup(m.hidden, dataRows, nil, scope)) {
       leaf += count;
       continue;
     }
-    // HideIfNoRows: a static member -- a column-header row, a total -- the
-    // report says not to draw when the dataset came back empty. Skipped like a
-    // hidden one, and like a hidden one it still consumes its leaves: the body
-    // rows are matched to members by position, so a member that is not drawn
-    // must still be counted.
-    if (m.hideIfNoRows && [dataRows count] == 0) {
+    // HideIfNoRows: skipped like a hidden member, and like a hidden one it
+    // still consumes its leaves: the body columns are matched to members by
+    // position, so a member that is not drawn must still be counted.
+    if (m.hideIfNoRows && !RDLPeersHaveRows(members, dataRows, [dataRows count] == 0, scope)) {
       leaf += count;
       continue;
     }
     CGFloat w = leaf < (NSInteger)[cols count] ? cols[(NSUInteger)leaf].width : 1.0;
-    if ([m.groupName length] && [m.groupExpressions count]) {
-      NSArray *parts = RDLPartition(dataRows, m.groupExpressions, scope);
-      NSMutableArray *kept = [NSMutableArray array];
+    if (dynamic) {
+      NSArray *parts = RDLSortParts(RDLGroupInstances(m, dataRows, scope), m.sortExpressions,
+                                    m.groupName, scope);
       for (NSArray *part in parts) {
-        NSArray *fp = RDLApplyFilters(part, m.filters, scope);
-        if ([fp count])
-          [kept addObject:fp];
-      }
-      for (NSArray *part in RDLSortParts(kept, m.sortExpressions, scope)) {
+        if (RDLIsHiddenInGroup(m.hidden, part, m.groupName, scope))
+          continue;
         RDLColHeaderNode *node = [[RDLColHeaderNode alloc] init];
         node.item = m.header.item;
         node.size = m.header.size;
         node.rows = part;
+        node.groupName = m.groupName;
         NSArray *newChain = [chain arrayByAddingObject:node];
         if (nested) {
           RDLColPlanWalk(m.members, part, tab, scope, newChain, leaf, plan);
@@ -722,6 +877,11 @@ static NSMutableArray *RDLBodyCells(RDLTablixRow *bodyRow, NSArray<RDLTablixColu
       cix.item = cell.item;
       cix.rowSpan = cell.rowSpan > 1 ? cell.rowSpan : 1;
       cix.colRows = e.colRows;
+      NSMutableDictionary *byName = [NSMutableDictionary dictionary];
+      for (RDLColHeaderNode *node in e.headerChain)
+        if ([node.groupName length] && node.rows)
+          byName[node.groupName] = node.rows;
+      cix.colRowsByName = byName;
       [cells addObject:cix];
       px += e.width;
     }
@@ -762,6 +922,74 @@ static NSArray *RDLIntersectRows(NSArray *rowsA, NSArray *colRows) {
   return out;
 }
 
+// The group row sets in force for one cell: the row groups around its row,
+// and the column groups over its column.
+static NSDictionary<NSString *, NSArray *> *RDLNamedRowsFor(RDLTablixInst *inst,
+                                                            RDLTablixCellInst *cell) {
+  if ([cell.colRowsByName count] == 0)
+    return inst.groupRowsByName;
+  NSMutableDictionary *named = [inst.groupRowsByName mutableCopy] ?: [NSMutableDictionary dictionary];
+  [named addEntriesFromDictionary:cell.colRowsByName];
+  return named;
+}
+
+// What a data region nested in a cell reads: the cell's own instance, and in a
+// crosstab only the part of it that is in the cell's column.
+static NSArray *RDLRegionRowsFor(RDLTablixInst *inst, RDLTablixCellInst *cell) {
+  NSArray *base = cell.regionRows ?: inst.regionRows ?: inst.groupRows ?: @[];
+  return cell.colRows ? RDLIntersectRows(base, cell.colRows) : base;
+}
+
+// How tall one cell's contents want to be, evaluated as they will be when the
+// cell is placed: in its row's scope, and in a crosstab in its column's too.
+static CGFloat RDLMeasureCell(RDLTablixInst *inst, RDLTablixCellInst *cell, RDLEvalScope *scope,
+                              CGFloat bodyAvail) {
+  id savedRow = scope.row;
+  NSArray *savedGroup = scope.groupRows;
+  NSDictionary *savedNamed = scope.groupRowsByName;
+  NSArray *savedRegion = scope.nestedRegionRows;
+  NSInteger savedNumber = scope.rowNumber;
+  NSArray *savedScopes = scope.activeScopes;
+  NSInteger savedLevel = scope.recursionLevel;
+  NSArray *savedRecursive = scope.recursiveRows;
+  if (inst.row)
+    scope.row = inst.row;
+  if (inst.groupRows)
+    scope.groupRows = inst.groupRows;
+  scope.rowNumber = inst.rowNumber;
+  scope.activeScopes = inst.activeScopes;
+  scope.recursionLevel = inst.recursionLevel;
+  scope.recursiveRows = inst.recursiveRows;
+  scope.groupRowsByName = RDLNamedRowsFor(inst, cell);
+  scope.nestedRegionRows = RDLRegionRowsFor(inst, cell);
+  if (cell.colRows) {
+    NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
+    NSArray *inter = RDLIntersectRows(base, cell.colRows);
+    scope.groupRows = inter;
+    scope.row = [inter firstObject];
+  }
+  CGFloat need = RDLItemContentHeight(cell.item, cell.width, 0, scope, bodyAvail);
+  scope.row = savedRow;
+  scope.groupRows = savedGroup;
+  scope.groupRowsByName = savedNamed;
+  scope.nestedRegionRows = savedRegion;
+  scope.rowNumber = savedNumber;
+  scope.activeScopes = savedScopes;
+  scope.recursionLevel = savedLevel;
+  scope.recursiveRows = savedRecursive;
+  return need;
+}
+
+// Makes a row taller, and the cells that were as tall as it with it.
+static void RDLGrowRow(RDLTablixInst *inst, CGFloat height) {
+  if (height <= inst.height)
+    return;
+  for (RDLTablixCellInst *cell in inst.cells)
+    if (!cell.skip && cell.rowSpan <= 1 && fabs(cell.height - inst.height) < 1e-6)
+      cell.height = height;
+  inst.height = height;
+}
+
 static void RDLApplyRowSpan(NSArray<RDLTablixInst *> *insts) {
   for (NSUInteger i = 0; i < [insts count]; i++) {
     for (RDLTablixCellInst *cell in insts[i].cells) {
@@ -779,6 +1007,49 @@ static void RDLApplyRowSpan(NSArray<RDLTablixInst *> *insts) {
       }
     }
   }
+}
+
+// How close to a page boundary counts as on it, so that arithmetic noise does
+// not leave a row a hair above the boundary it was moved to.
+static const CGFloat RDLPageEpsilon = 0.0001;
+
+// Which body slice -- which printed page, before horizontal chunks -- a point
+// in continuous body coordinates falls on, and how far down that slice it is.
+static NSInteger RDLSliceIndex(CGFloat y, CGFloat bodyAvail) {
+  return (NSInteger)floor((y + RDLPageEpsilon) / bodyAvail);
+}
+static CGFloat RDLIntoSlice(CGFloat y, CGFloat bodyAvail) {
+  return y - (CGFloat)RDLSliceIndex(y, bodyAvail) * bodyAvail;
+}
+
+// PageBreak/Disabled switches a break off; it is evaluated against the row the
+// break belongs to, so a group can break for some instances and not others.
+static RDLPageBreakLocation RDLEffectiveBreak(RDLPageBreakLocation loc, RDLValue *disabled, id row,
+                                              RDLEvalScope *scope) {
+  if (disabled == nil)
+    return loc;
+  return RDLIsTrue(RDLEvalRow(disabled, row, scope)) ? RDLPageBreakLocationNone : loc;
+}
+static BOOL RDLBreaksAtStart(RDLPageBreakLocation loc) {
+  return loc == RDLPageBreakLocationStart || loc == RDLPageBreakLocationStartAndEnd;
+}
+static BOOL RDLBreaksAtEnd(RDLPageBreakLocation loc) {
+  return loc == RDLPageBreakLocationEnd || loc == RDLPageBreakLocationStartAndEnd;
+}
+// Report Builder's "between each instance of a group", with "also at the
+// start" and "also at the end" on top of it: every group break location but
+// None breaks between instances.
+static BOOL RDLBreaksBetween(RDLPageBreakLocation loc) {
+  return RDLBreaksAtStart(loc) || RDLBreaksAtEnd(loc) || loc == RDLPageBreakLocationBetween;
+}
+
+// The header rows a tablix repeats at the top of every page it continues onto:
+// the run of RepeatOnNewPage rows it starts with.
+static NSUInteger RDLRepeatedHeaderCount(NSArray<RDLTablixInst *> *insts) {
+  NSUInteger n = 0;
+  while (n < [insts count] && insts[n].repeatOnNewPage)
+    n++;
+  return n;
 }
 
 static NSArray *RDLEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray *currentRows,
@@ -799,6 +1070,7 @@ static NSArray *RDLEmitRuns(RDLTablixMember *m, RDLTablixRow *bodyRow, NSArray *
     inst.cells = RDLBodyCells(bodyRow, tab.tablixBody.columns, headerW, h, plan);
     inst.row = (r == [NSNull null]) ? nil : r;
     inst.groupRows = groupRows;
+    inst.regionRows = (dynamic && r != [NSNull null]) ? @[ r ] : groupRows;
     inst.rowNumber = ++ordinal;
     inst.activeScopes = scopeNames;
     [local addObject:inst];
@@ -901,48 +1173,24 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
         hasGroup ? [(scopeNames ?: @[]) arrayByAddingObject:m.groupName] : (scopeNames ?: @[]);
     NSArray *exprs = m.groupExpressions;
     CGFloat childX = headerX + m.header.size;
-    if (RDLIsHiddenExpr(m.hidden, scope)) {
+    // A group's Hidden -- a group instance's, or a detail row's -- is decided
+    // per instance, below. A static member's is decided in the scope of the
+    // group around it, so a total can hide itself when that group's is zero.
+    if (!hasGroup && RDLIsHiddenInGroup(m.hidden, currentRows, nil, scope)) {
       leaf += count;
       continue;
     }
-    // HideIfNoRows: a static member -- a column-header row, a total -- the
-    // report says not to draw when the dataset came back empty. Skipped like a
-    // hidden one, and like a hidden one it still consumes its leaves: the body
-    // rows are matched to members by position, so a member that is not drawn
-    // must still be counted.
-    if (m.hideIfNoRows && dataIsEmpty) {
+    // HideIfNoRows: skipped like a hidden member, and like a hidden one it
+    // still consumes its leaves: the body rows are matched to members by
+    // position, so a member that is not drawn must still be counted.
+    if (m.hideIfNoRows && !RDLPeersHaveRows(list, currentRows, dataIsEmpty, scope)) {
       leaf += count;
       continue;
     }
 
     if (hasGroup && [exprs count]) {
-      NSArray *parts = RDLPartition(currentRows, exprs, scope);
-      NSMutableArray *kept = [NSMutableArray array];
-      for (NSArray *part in parts) {
-        NSArray *fp = RDLApplyFilters(part, m.filters, scope);
-        if ([fp count])
-          [kept addObject:fp];
-      }
-      parts = kept;
-      if ([m.sortExpressions count]) {
-        parts = [parts sortedArrayUsingComparator:^NSComparisonResult(NSArray *a, NSArray *b) {
-          NSDictionary *ra = [a count] ? a[0] : @{};
-          NSDictionary *rb = [b count] ? b[0] : @{};
-          for (RDLSortExpression *s in m.sortExpressions) {
-            NSComparisonResult c =
-                RDLCmp(RDLEvalRow(s.expression, ra, scope), RDLEvalRow(s.expression, rb, scope));
-            if (s.direction == RDLSortDirectionDescending) {
-              if (c == NSOrderedAscending)
-                c = NSOrderedDescending;
-              else if (c == NSOrderedDescending)
-                c = NSOrderedAscending;
-            }
-            if (c != NSOrderedSame)
-              return c;
-          }
-          return NSOrderedSame;
-        }];
-      }
+      NSArray *parts = RDLSortParts(RDLGroupInstances(m, currentRows, scope), m.sortExpressions,
+                                    m.groupName, scope);
       // Group/Parent: the same partitions, ordered as a tree and each carrying
       // its depth.
       NSArray<RDLRecursiveNode *> *nodes =
@@ -954,8 +1202,14 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
         parts = ordered;
       }
       NSInteger partIndex = 0;
+      NSInteger shown = 0;
+      RDLTablixInst *endsGroup = nil;
       for (NSArray *part in parts) {
         RDLRecursiveNode *node = nodes ? nodes[(NSUInteger)partIndex] : nil;
+        if (RDLIsHiddenInGroup(m.hidden, part, m.groupName, scope)) {
+          partIndex += 1;
+          continue;
+        }
         NSArray *childInsts =
             nested ? RDLWalkMembers(m.members, part, childX, leaf, tab, scope, headerW, plan,
                                      innerScopes, NO)
@@ -983,19 +1237,22 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
           hc.height = groupH;
           hc.item = m.header.item;
           hc.rowHeader = YES;
+          hc.regionRows = part;
+          // Beside every row of its group: measured and sized against them.
+          hc.rowSpan = (NSInteger)[childInsts count];
           NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
           [cells addObjectsFromArray:first.cells];
           first.cells = cells;
         }
         if (m.keepTogether)
           first.keepTogetherHeight = groupH;
-        RDLPageBreakLocation brk = m.pageBreak;
-        if (partIndex > 0 && (brk == RDLPageBreakLocationBetween ||
-                              brk == RDLPageBreakLocationStartAndEnd))
+        RDLPageBreakLocation brk =
+            RDLEffectiveBreak(m.pageBreak, m.pageBreakDisabled, [part firstObject], scope);
+        if (shown > 0 && RDLBreaksBetween(brk))
           first.pageBreakBefore = YES;
-        if (partIndex == 0 && (brk == RDLPageBreakLocationStart ||
-                               brk == RDLPageBreakLocationStartAndEnd))
+        if (shown == 0 && RDLBreaksAtStart(brk))
           first.pageBreakBefore = YES;
+        endsGroup = RDLBreaksAtEnd(brk) ? [childInsts lastObject] : nil;
         if (first.pageBreakBefore) {
           first.resetPageNumber = first.resetPageNumber || m.resetPageNumber;
           if (m.pageName != nil)
@@ -1006,17 +1263,42 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
             ci.groupRows = part;
           if (ci.row == nil)
             ci.row = [part firstObject];
+          NSMutableDictionary *named =
+              [ci.groupRowsByName mutableCopy] ?: [NSMutableDictionary dictionary];
+          if (named[m.groupName] == nil)
+            named[m.groupName] = part;
+          ci.groupRowsByName = named;
         }
         [out addObjectsFromArray:childInsts];
         partIndex += 1;
+        shown += 1;
       }
+      endsGroup.pageBreakAfter = YES;
       leaf += count;
       continue;
     }
 
     if (hasGroup && !nested) {
+      // The Details group: its own filters, then its own sort, then each row's
+      // Hidden. The placeholder row of an empty dataset is left alone.
+      NSArray *details = currentRows;
+      if (!dataIsEmpty) {
+        details = RDLApplySort(RDLApplyFilters(currentRows, m.filters, scope), m.sortExpressions,
+                               scope);
+        if (m.hidden != nil) {
+          NSMutableArray *visible = [NSMutableArray array];
+          for (id row in details)
+            if (!RDLIsHiddenInGroup(m.hidden, @[ row ], m.groupName, scope))
+              [visible addObject:row];
+          details = visible;
+        }
+        if ([details count] == 0) {
+          leaf += 1;
+          continue;
+        }
+      }
       RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
-      [out addObjectsFromArray:RDLEmitRuns(m, br, currentRows, YES, nil, currentRows, tab,
+      [out addObjectsFromArray:RDLEmitRuns(m, br, details, YES, nil, currentRows, tab,
                                             innerScopes, headerW, plan)];
       leaf += 1;
       continue;
@@ -1042,25 +1324,24 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
 static NSArray *RDLApplyPageRules(NSArray<RDLTablixInst *> *insts, CGFloat bodyAvail, CGFloat tablixTop) {
   if ([insts count] == 0 || bodyAvail <= 0)
     return insts;
+  NSInteger firstSlice = RDLSliceIndex(tablixTop, bodyAvail);
+  NSUInteger repeatCount = RDLRepeatedHeaderCount(insts);
+  CGFloat repeatH = 0;
+  for (NSUInteger i = 0; i < repeatCount; i++)
+    repeatH += insts[i].height;
   CGFloat y = 0;
   for (NSUInteger i = 0; i < [insts count]; i++) {
     RDLTablixInst *inst = insts[i];
-    if (inst.pageBreakBefore) {
-      CGFloat abs = tablixTop + y;
-      CGFloat into = fmod(abs, bodyAvail);
-      if (into < 0)
-        into += bodyAvail;
-      if (into > 0.0001)
+    if (inst.pageBreakBefore || (i > 0 && insts[i - 1].pageBreakAfter)) {
+      CGFloat into = RDLIntoSlice(tablixTop + y, bodyAvail);
+      if (into > RDLPageEpsilon)
         y += bodyAvail - into;
     }
     if (inst.keepTogetherHeight > 0) {
-      CGFloat abs = tablixTop + y;
-      CGFloat into = fmod(abs, bodyAvail);
-      if (into < 0)
-        into += bodyAvail;
+      CGFloat into = RDLIntoSlice(tablixTop + y, bodyAvail);
       CGFloat remain = bodyAvail - into;
       if (inst.keepTogetherHeight > remain + 0.001 && inst.keepTogetherHeight <= bodyAvail + 0.001) {
-        if (into > 0.0001)
+        if (into > RDLPageEpsilon)
           y += bodyAvail - into;
       }
     }
@@ -1074,13 +1355,19 @@ static NSArray *RDLApplyPageRules(NSArray<RDLTablixInst *> *insts, CGFloat bodyA
     CGFloat need = inst.height;
     if (inst.repeatOnNewPage && i + 1 < [insts count])
       need += [insts[i + 1] height];
-    CGFloat abs = tablixTop + y;
-    CGFloat into = fmod(abs, bodyAvail);
-    if (into < 0)
-      into += bodyAvail;
+    CGFloat into = RDLIntoSlice(tablixTop + y, bodyAvail);
     CGFloat remain = bodyAvail - into;
-    if (into > 0.0001 && need <= bodyAvail + 0.001 && need > remain + 0.001)
+    if (into > RDLPageEpsilon && need <= bodyAvail + 0.001 && need > remain + 0.001)
       y += remain;
+    // A page this tablix continues onto starts with its repeated header rows,
+    // which placeTablix draws there. The rows that follow start below them;
+    // counting the room here, rather than offsetting the rows when they are
+    // drawn, is what keeps the last row on a page out of the page footer.
+    if (i >= repeatCount && repeatH > 0 && RDLSliceIndex(tablixTop + y, bodyAvail) > firstSlice) {
+      CGFloat at = RDLIntoSlice(tablixTop + y, bodyAvail);
+      if (at < repeatH - RDLPageEpsilon)
+        y += repeatH - at;
+    }
     inst.yRel = y;
     y += inst.height;
   }
@@ -1095,7 +1382,14 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
   if ([body.rows count] == 0)
     return @[];
   RDLDataSet *ds = [report dataSetNamed:tab.dataSetName];
-  NSArray *dataRows = ds.rows ?: @[];
+  // A tablix inside a tablix cell reads that cell's rows -- the detail row or
+  // the group it sits in -- when it reads the same dataset, or names none.
+  // That is what makes a table in a group's cell a master-detail layout.
+  BOOL inCell = scope.nestedRegionRows != nil;
+  if (inCell && ds == nil)
+    ds = scope.dataSet;
+  NSArray *dataRows =
+      (inCell && ds == scope.dataSet) ? scope.nestedRegionRows : (ds.rows ?: @[]);
   dataRows = RDLApplyFilters(dataRows, tab.filters, scope);
   dataRows = RDLApplySort(dataRows, tab.sortExpressions, scope);
 
@@ -1241,48 +1535,44 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
 
   RDLApplyRowSpan(walked);
 
-  // CanGrow: grow row instances so long cell text is not clipped.
+  // CanGrow: rows grow so what their cells hold is not clipped. A cell that
+  // spans rows -- a RowSpan, or a group's header beside the group's rows -- is
+  // measured afterwards, against the rows it spans once they have grown, and
+  // what it still needs goes on the last of them. Measured with the first row
+  // alone, it stretched that row and left the rest of the group as it was.
   if (scope) {
-    NSDictionary *savedRow = scope.row;
-    NSArray *savedGroup = scope.groupRows;
     RDLDataSet *savedSet = scope.dataSet;
     scope.dataSet = ds ?: savedSet;
     for (RDLTablixInst *inst in walked) {
-      if (inst.row)
-        scope.row = inst.row;
-        scope.rowNumber = inst.rowNumber;
-        scope.activeScopes = inst.activeScopes;
-        scope.recursionLevel = inst.recursionLevel;
-        scope.recursiveRows = inst.recursiveRows;
-      if (inst.groupRows)
-        scope.groupRows = inst.groupRows;
       CGFloat grown = inst.height;
       for (RDLTablixCellInst *cell in inst.cells) {
         if (cell.skip || cell.rowSpan > 1 || cell.item == nil)
           continue;
-        NSDictionary *cSavedRow = scope.row;
-        NSArray *cSavedGroup = scope.groupRows;
-        if (cell.colRows) {
-          NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
-          NSArray *inter = RDLIntersectRows(base, cell.colRows);
-          scope.groupRows = inter;
-          scope.row = [inter firstObject];
-        }
-          CGFloat need = RDLCellContentHeight(cell.item, cell.width, scope, bodyAvail);
-        scope.row = cSavedRow;
-        scope.groupRows = cSavedGroup;
-        if (need > grown)
-          grown = need;
+        grown = MAX(grown, RDLMeasureCell(inst, cell, scope, bodyAvail));
       }
-      if (grown > inst.height) {
-        for (RDLTablixCellInst *cell in inst.cells) {
-          if (!cell.skip && cell.rowSpan <= 1 && fabs(cell.height - inst.height) < 1e-6)
-            cell.height = grown;
+      RDLGrowRow(inst, grown);
+    }
+    // Last row first, and within a row the innermost header first, so an
+    // outer span is measured over rows its inner spans have already grown.
+    for (NSInteger i = (NSInteger)[walked count] - 1; i >= 0; i--) {
+      RDLTablixInst *inst = walked[(NSUInteger)i];
+      for (RDLTablixCellInst *cell in [inst.cells reverseObjectEnumerator]) {
+        if (cell.skip || cell.rowSpan <= 1)
+          continue;
+        NSUInteger span = MIN((NSUInteger)cell.rowSpan, [walked count] - (NSUInteger)i);
+        CGFloat total = 0;
+        for (NSUInteger k = 0; k < span; k++)
+          total += [(RDLTablixInst *)walked[(NSUInteger)i + k] height];
+        if (cell.item) {
+          CGFloat need = RDLMeasureCell(inst, cell, scope, bodyAvail);
+          if (need > total + 1e-6) {
+            RDLTablixInst *last = walked[(NSUInteger)i + span - 1];
+            RDLGrowRow(last, last.height + (need - total));
+            total = need;
+          }
         }
-        inst.height = grown;
+        cell.height = total;
       }
-      scope.row = savedRow;
-      scope.groupRows = savedGroup;
     }
     scope.dataSet = savedSet;
   }
@@ -1294,7 +1584,8 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
     if (total > first.keepTogetherHeight)
       first.keepTogetherHeight = total;
   }
-  if (tab.pageBreak == RDLPageBreakLocationStart && [walked count]) {
+  if (RDLBreaksAtStart(RDLEffectiveBreak(tab.pageBreak, tab.pageBreakDisabled, nil, scope)) &&
+      [walked count]) {
     RDLTablixInst *first0 = walked[0];
     first0.pageBreakBefore = YES;
     first0.resetPageNumber = first0.resetPageNumber || tab.resetPageNumber;
@@ -1307,7 +1598,10 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
     inst.yRel = y;
     y += inst.height;
   }
-  return RDLApplyPageRules(walked, bodyAvail, tablixTop);
+  // The row a nested tablix sits in is not split across pages, so page rules
+  // inside a cell have nothing to act on -- and measured from the top of the
+  // cell they would put breaks in the wrong places.
+  return inCell ? walked : RDLApplyPageRules(walked, bodyAvail, tablixTop);
 }
 
 static CGFloat RDLTablixHeight(RDLTablix *item, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail,
@@ -1317,6 +1611,31 @@ static CGFloat RDLTablixHeight(RDLTablix *item, RDLReport *report, RDLEvalScope 
     return item.height;
   RDLTablixInst *last = [insts lastObject];
   return last.yRel + last.height;
+}
+
+// A rectangle is a small body of its own: an item that grows pushes down the
+// items below it, and the rectangle is as tall as the lowest of them. Hands
+// back how far each item is pushed when `offsets` asks, for placement to use.
+static CGFloat RDLRectangleContentHeight(RDLRectangle *rect, CGFloat top, RDLEvalScope *scope,
+                                         CGFloat bodyAvail, NSMapTable<RDLItem *, NSNumber *> **offsets) {
+  NSArray<RDLItem *> *children = RDLItemsByTop(rect.childItems);
+  NSMapTable *pushes = [NSMapTable strongToStrongObjectsMapTable];
+  NSMutableArray<NSNumber *> *growth = [NSMutableArray array];
+  CGFloat bottom = rect.height;
+  for (NSUInteger i = 0; i < [children count]; i++) {
+    RDLItem *child = children[i];
+    CGFloat push = 0;
+    for (NSUInteger j = 0; j < i; j++)
+      if (children[j].top < child.top)
+        push += [growth[j] doubleValue];
+    CGFloat h = RDLItemContentHeight(child, child.width, top + child.top + push, scope, bodyAvail);
+    [growth addObject:@(MAX(h - child.height, 0))];
+    [pushes setObject:@(push) forKey:child];
+    bottom = MAX(bottom, child.top + push + h);
+  }
+  if (offsets)
+    *offsets = pushes;
+  return bottom;
 }
 
 // Dataset-level filters apply to every consumer of a dataset -- details and
@@ -1392,11 +1711,9 @@ static CGFloat RDLSubreportContentHeight(RDLSubreport *sub, RDLEvalScope *outer,
   NSMapTable *saved = RDLApplyDataSetFilters(sub.definition, inner);
   CGFloat bottom = 0;
   for (RDLItem *it in sub.definition.body.items) {
-    CGFloat h = it.height;
-    if ([it isKindOfClass:[RDLTablix class]])
-      h = RDLTablixHeight((RDLTablix *)it, sub.definition, inner, bodyAvail, it.top);
-    else if ([it isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)it canGrow])
-      h = MAX(h, RDLTextboxGrownHeight((RDLTextbox *)it, it.width, inner));
+    if ([it isKindOfClass:[RDLTablix class]] && RDLIsHiddenExpr(it.hidden, inner))
+      continue;
+    CGFloat h = RDLItemContentHeight(it, it.width, it.top, inner, bodyAvail);
     bottom = MAX(bottom, it.top + h);
   }
   RDLRestoreDataSetRows(saved);
@@ -1404,32 +1721,6 @@ static CGFloat RDLSubreportContentHeight(RDLSubreport *sub, RDLEvalScope *outer,
 }
 
 // Design-height delta for an item once expanded/grown (tablix rows, CanGrow text).
-static CGFloat RDLGrownDelta(RDLItem *t, RDLReport *report, RDLEvalScope *scope, CGFloat bodyAvail) {
-  if ([t isKindOfClass:[RDLTablix class]]) {
-    RDLTablix *tb = (RDLTablix *)t;
-    CGFloat design = t.height > 0 ? t.height : (tb.headerHeight + tb.rowHeight);
-    return RDLTablixHeight(tb, report, scope, bodyAvail, t.top) - design;
-  }
-  if ([t isKindOfClass:[RDLSubreport class]])
-    return MAX(RDLSubreportContentHeight((RDLSubreport *)t, scope, bodyAvail) - t.height, 0);
-  if ([t isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)t canGrow])
-    return RDLTextboxGrownHeight((RDLTextbox *)t, t.width, scope) - t.height;
-  return 0;
-}
-
-static CGFloat RDLExtraBelow(CGFloat y, NSArray<RDLItem *> *growers, RDLReport *report,
-                              RDLEvalScope *scope, CGFloat bodyAvail) {
-  CGFloat extra = 0;
-  for (RDLItem *t in growers) {
-    if (t.top < y) {
-      CGFloat grown = RDLGrownDelta(t, report, scope, bodyAvail);
-      if (grown > 0)
-        extra += grown;
-    }
-  }
-  return extra;
-}
-
 // Group `rows` by one chart hierarchy. With no grouping there is a single
 // bucket holding everything, which is what an ungrouped series wants.
 static RDLChartBuckets *RDLGroupForChart(NSArray *rows, RDLChartMember *member,
@@ -1632,16 +1923,38 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
            onPage:(RDLLaidOutPage *)page
             clipTop:(CGFloat)clipTop
          clipBottom:(CGFloat)clipBottom {
-  if ([item isKindOfClass:[RDLTablix class]])
-    return;
   if (RDLIsHiddenExpr(item.hidden, scope))
     return;
+  if ([item isKindOfClass:[RDLTablix class]]) {
+    // A tablix inside a rectangle or a cell: placed on the band being filled,
+    // measured from its top, as a subreport's own tablix is.
+    [self placeTablix:item
+              originX:ox
+            tablixTop:(oy + item.top - clipTop)
+             sliceTop:0
+              bodyTop:clipTop
+           bodyBottom:clipBottom
+                scope:scope
+               onPage:page
+              chunkX0:0
+              chunkX1:0
+                hLead:0];
+    return;
+  }
   CGFloat x = ox + item.left;
   CGFloat y = oy + item.top;
   CGFloat w = item.width;
   CGFloat h = item.height;
+  NSMapTable<RDLItem *, NSNumber *> *offsets = nil;
   if ([item isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)item canGrow])
     h = MAX(h, RDLTextboxGrownHeight((RDLTextbox *)item, w, scope));
+  else if ([item isKindOfClass:[RDLSubreport class]])
+    // Culled by what it shows, not by its design box: a subreport that runs
+    // on past the page it starts on is still there on the next one.
+    h = MAX(h, RDLSubreportContentHeight((RDLSubreport *)item, scope, clipBottom - clipTop));
+  else if ([item isKindOfClass:[RDLRectangle class]])
+    h = RDLRectangleContentHeight((RDLRectangle *)item, y - clipTop, scope, clipBottom - clipTop,
+                                  &offsets);
   if (y + h < clipTop || y > clipBottom)
     return;
   // The laid-out class mirrors the item's; Tablix never reaches here because it
@@ -1686,6 +1999,8 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     // evaluated value still has a type. Everything downstream sees Left or
     // Right and needs to know nothing about it.
     li.style = RDLStyleResolvingGeneralAlign(li.style, value);
+    if ([item.name length])
+      scope.reportItemValues[item.name] = value ?: @"";
     if ([tb0.paragraphs count]) {
       NSMutableArray *spans = [NSMutableArray array];
       NSMutableArray *flat = [NSMutableArray array];
@@ -1745,10 +2060,26 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
               clipBottom:clipBottom];
     scope.language = savedLanguage;
     return;
+  } else if ([item isKindOfClass:[RDLUnsupportedItem class]]) {
+    [self placeUnsupported:(RDLUnsupportedItem *)item
+                         x:x
+                         y:y
+                     scope:scope
+                    onPage:page
+                   clipTop:clipTop
+                clipBottom:clipBottom];
+    scope.language = savedLanguage;
+    return;
   } else if ([item isKindOfClass:[RDLRectangle class]]) {
     [page.items addObject:li];
     for (RDLItem *child in item.childItems)
-      [self placeItem:child originX:x originY:y scope:scope onPage:page clipTop:clipTop clipBottom:clipBottom];
+      [self placeItem:child
+              originX:x
+              originY:(y + [[offsets objectForKey:child] doubleValue])
+                scope:scope
+               onPage:page
+              clipTop:clipTop
+           clipBottom:clipBottom];
     scope.language = savedLanguage;
     return;
   }
@@ -1759,6 +2090,65 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
 // A line of text where the subreport would have been: the spec's error text
 // when the definition could not be processed, and the report's own
 // NoRowsMessage when it could but has nothing to say.
+// A gauge, a map or a custom item this kit does not draw. A custom item's
+// AltReportItem is what SSRS shows when the custom type is not installed, so
+// that is drawn, filling the item's box. Anything else becomes a bordered box
+// saying what should have been there, rather than a gap nobody can explain.
++ (void)placeUnsupported:(RDLUnsupportedItem *)u
+                       x:(CGFloat)x
+                       y:(CGFloat)y
+                   scope:(RDLEvalScope *)scope
+                  onPage:(RDLLaidOutPage *)page
+                 clipTop:(CGFloat)clipTop
+              clipBottom:(CGFloat)clipBottom {
+  RDLItem *alt = u.altItem;
+  if (alt) {
+    CGFloat l = alt.left, t = alt.top, w = alt.width, h = alt.height;
+    alt.left = 0;
+    alt.top = 0;
+    alt.width = u.width;
+    alt.height = u.height;
+    [self placeItem:alt
+            originX:x
+            originY:y
+              scope:scope
+             onPage:page
+            clipTop:clipTop
+         clipBottom:clipBottom];
+    alt.left = l;
+    alt.top = t;
+    alt.width = w;
+    alt.height = h;
+    return;
+  }
+  RDLStyle *style = [RDLStyle styleByMerging:nil
+                                        over:RDLResolveStyle(u.style, scope)
+                                                 ?: [RDLStyle defaultStyle]];
+  RDLBorder *frame = [RDLBorder solidColor:@"#8a857c"];
+  style.border = frame;
+  style.borderLeft = frame;
+  style.borderRight = frame;
+  style.borderTop = frame;
+  style.borderBottom = frame;
+  style.backgroundColor = @"#f3f1ec";
+  style.color = @"#5c574e";
+  style.textAlign = RDLTextAlignCenter;
+  style.verticalAlign = RDLVerticalAlignMiddle;
+  NSString *what = [u.customType length]
+                       ? [NSString stringWithFormat:@"%@ (%@)", u.rdlElementName, u.customType]
+                       : u.rdlElementName;
+  RDLLaidOutTextbox *lt = [[RDLLaidOutTextbox alloc] init];
+  lt.name = u.name;
+  lt.x = x;
+  lt.y = y;
+  lt.w = u.width;
+  lt.h = u.height;
+  lt.zIndex = u.zIndex;
+  lt.style = style;
+  lt.text = [NSString stringWithFormat:@"%@ '%@' - not supported", what, u.name ?: @""];
+  [page.items addObject:lt];
+}
+
 + (void)placeMessage:(NSString *)text
              forItem:(RDLItem *)item
                    x:(CGFloat)x
@@ -1838,7 +2228,6 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
              bodyBottom:clipBottom
                   scope:inner
                  onPage:page
-              firstPage:YES
                 chunkX0:0
                 chunkX1:0
                   hLead:0];
@@ -1871,6 +2260,12 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
   NSDictionary *savedRow = scope.row;
   RDLDataSet *savedSet = scope.dataSet;
   NSArray *savedGroup = scope.groupRows;
+  // Put back on the way out: a tablix nested in a cell sets these to its own
+  // rows' values, and the cells after it in the outer row read them.
+  NSInteger savedRowNumber = scope.rowNumber;
+  NSArray *savedScopes = scope.activeScopes;
+  NSInteger savedLevel = scope.recursionLevel;
+  NSArray *savedRecursive = scope.recursiveRows;
   if (inst.row)
     scope.row = inst.row;
   // Set whether or not there is a row: a group header has no row of its own
@@ -1907,6 +2302,14 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
     }
     NSDictionary *cellSavedRow = scope.row;
     NSArray *cellSavedGroup = scope.groupRows;
+    NSDictionary *cellSavedNamed = scope.groupRowsByName;
+    NSArray *cellSavedRegion = scope.nestedRegionRows;
+    scope.groupRowsByName = RDLNamedRowsFor(inst, cell);
+    scope.nestedRegionRows = RDLRegionRowsFor(inst, cell);
+    scope.rowNumber = inst.rowNumber;
+    scope.activeScopes = inst.activeScopes;
+    scope.recursionLevel = inst.recursionLevel;
+    scope.recursiveRows = inst.recursiveRows;
     if (cell.colRows) {
       NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
       NSArray *inter = RDLIntersectRows(base, cell.colRows);
@@ -1931,10 +2334,16 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
     contents.height = savedH;
     scope.row = cellSavedRow;
     scope.groupRows = cellSavedGroup;
+    scope.groupRowsByName = cellSavedNamed;
+    scope.nestedRegionRows = cellSavedRegion;
   }
   scope.row = savedRow;
   scope.dataSet = savedSet;
   scope.groupRows = savedGroup;
+  scope.rowNumber = savedRowNumber;
+  scope.activeScopes = savedScopes;
+  scope.recursionLevel = savedLevel;
+  scope.recursiveRows = savedRecursive;
 }
 
 // Horizontal pagination: compute column chunks for a tablix wider than the
@@ -2002,21 +2411,21 @@ static NSArray<NSDictionary *> *RDLHChunks(NSArray<RDLTablixInst *> *insts, CGFl
         bodyBottom:(CGFloat)bodyBottom
              scope:(RDLEvalScope *)scope
             onPage:(RDLLaidOutPage *)page
-         firstPage:(BOOL)firstPage
            chunkX0:(CGFloat)chunkX0
            chunkX1:(CGFloat)chunkX1
              hLead:(CGFloat)hLead {
+  // Hidden is on the tablix like on any item, and placeItem -- which checks
+  // it for everything else -- never sees a tablix.
+  if (RDLIsHiddenExpr(item.hidden, scope))
+    return;
   CGFloat bodyAvail = bodyBottom - bodyTop;
   NSArray *insts = RDLExpandTablix((RDLTablix *)item, scope.report, scope, bodyAvail, tablixTop);
   CGFloat x0 = ox + item.left;
   CGFloat sliceBot = sliceTop + bodyAvail;
-  CGFloat repeatH = 0;
-  if (!firstPage) {
-    for (RDLTablixInst *r in insts) {
-      if (r.repeatOnNewPage)
-        repeatH += r.height;
-    }
-  }
+  // On a page the tablix continues onto, its header rows are drawn again at
+  // the top; RDLApplyPageRules has left room for them.
+  BOOL firstPage = RDLSliceIndex(tablixTop, bodyAvail) >= RDLSliceIndex(sliceTop, bodyAvail);
+  NSUInteger repeatCount = firstPage ? 0 : RDLRepeatedHeaderCount(insts);
   BOOL any = NO;
   for (RDLTablixInst *r in insts) {
     CGFloat absY = tablixTop + r.yRel;
@@ -2029,19 +2438,19 @@ static NSArray<NSDictionary *> *RDLHChunks(NSArray<RDLTablixInst *> *insts, CGFl
     return;
 
   NSDictionary *savedPrev = scope.previousRow;
-  if (!firstPage && repeatH > 0) {
+  if (repeatCount > 0) {
     CGFloat hy = bodyTop;
-    for (RDLTablixInst *r in insts) {
-      if (!r.repeatOnNewPage)
-        continue;
+    for (NSUInteger i = 0; i < repeatCount; i++) {
+      RDLTablixInst *r = insts[i];
       [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:hy scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
                      chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
       hy += r.height;
     }
   }
   NSDictionary *prev = savedPrev;
+  NSUInteger index = 0;
   for (RDLTablixInst *r in insts) {
-    if (!firstPage && r.repeatOnNewPage) {
+    if (index++ < repeatCount) {
       if (r.row)
         prev = r.row;
       continue;
@@ -2052,7 +2461,7 @@ static NSArray<NSDictionary *> *RDLHChunks(NSArray<RDLTablixInst *> *insts, CGFl
         prev = r.row;
       continue;
     }
-    CGFloat pageY = bodyTop + (absY - sliceTop) + (firstPage ? 0 : repeatH);
+    CGFloat pageY = bodyTop + (absY - sliceTop);
     scope.previousRow = prev;
     [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:pageY scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
                    chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
@@ -2062,24 +2471,81 @@ static NSArray<NSDictionary *> *RDLHChunks(NSArray<RDLTablixInst *> *insts, CGFl
   scope.previousRow = savedPrev;
 }
 
-// Page-break shift for a body item positioned at y0 with height h. `PageBreak
-// Start` moves the item to the next slice boundary; `KeepTogether` avoids
+// Page-break shift for a body item positioned at y0 with height h. A break at
+// its start moves the item to the next slice boundary; `KeepTogether` avoids
 // straddling a boundary when the item fits in one slice.
-static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bodyAvail) {
-  if (bodyAvail <= 0)
+static CGFloat RDLBodyItemShift(RDLPageBreakLocation brk, BOOL keepTogether, CGFloat y0, CGFloat h,
+                                CGFloat bodyAvail) {
+  CGFloat into = RDLIntoSlice(y0, bodyAvail);
+  if (into <= RDLPageEpsilon)
     return 0;
-  CGFloat into = fmod(y0, bodyAvail);
-  if (into < 0)
-    into += bodyAvail;
-  if (into <= 0.0001)
-    return 0;
-  BOOL breakStart =
-      item.pageBreak == RDLPageBreakLocationStart || item.pageBreak == RDLPageBreakLocationStartAndEnd;
-  if (breakStart && y0 > 0.0001)
+  if (RDLBreaksAtStart(brk))
     return bodyAvail - into;
-  if (item.keepTogether && h <= bodyAvail + 0.001 && h > (bodyAvail - into) + 0.001)
+  if (keepTogether && h <= bodyAvail + 0.001 && h > (bodyAvail - into) + 0.001)
     return bodyAvail - into;
   return 0;
+}
+
+// Lays out the body top to bottom. Doing it once, in order, is what makes page
+// breaks cumulative: two items that both break at their start land on
+// successive pages, because the second is pushed by the first's move before
+// its own break is worked out.
+static NSMapTable<RDLItem *, RDLBodySpot *> *RDLPlanBody(RDLReport *report, RDLEvalScope *scope,
+                                                        CGFloat bodyAvail) {
+  NSArray<RDLItem *> *ordered = RDLItemsByTop(report.body.items);
+  NSMapTable *spots = [NSMapTable strongToStrongObjectsMapTable];
+  for (NSUInteger i = 0; i < [ordered count]; i++) {
+    RDLItem *it = ordered[i];
+    CGFloat push = 0, floorY = 0;
+    for (NSUInteger j = 0; j < i; j++) {
+      RDLItem *above = ordered[j];
+      if (above.top >= it.top)
+        continue;
+      RDLBodySpot *a = [spots objectForKey:above];
+      push += a.pushesBelow;
+      floorY = MAX(floorY, a.breakFloor);
+    }
+    RDLBodySpot *spot = [[RDLBodySpot alloc] init];
+    spot.pageBreak = RDLEffectiveBreak(it.pageBreak, it.pageBreakDisabled, nil, scope);
+    CGFloat y0 = MAX(it.top + push, floorY);
+    CGFloat grown;
+    if ([it isKindOfClass:[RDLTablix class]] && RDLIsHiddenExpr(it.hidden, scope)) {
+      // A hidden tablix is not laid out, so it has nothing to grow by.
+      spot.height = 0;
+      grown = 0;
+    } else if ([it isKindOfClass:[RDLTablix class]]) {
+      // Expanded where it lands, so its own page rules answer for that page.
+      RDLTablix *tb = (RDLTablix *)it;
+      y0 += RDLBodyItemShift(spot.pageBreak, NO, y0, 0, bodyAvail);
+      spot.height = RDLTablixHeight(tb, report, scope, bodyAvail, y0);
+      CGFloat design = it.height > 0 ? it.height : (tb.headerHeight + tb.rowHeight);
+      grown = spot.height - design;
+    } else {
+      grown = MAX(RDLItemContentHeight(it, it.width, y0, scope, bodyAvail) - it.height, 0);
+      spot.height = it.height + grown;
+      CGFloat shift = RDLBodyItemShift(spot.pageBreak, it.keepTogether, y0, spot.height, bodyAvail);
+      if (shift > 0) {
+        // Moved to another page: a tablix inside it answers to that page now.
+        y0 += shift;
+        grown = MAX(RDLItemContentHeight(it, it.width, y0, scope, bodyAvail) - it.height, 0);
+        spot.height = it.height + grown;
+      }
+    }
+    spot.top = y0;
+    spot.pushesBelow = (y0 - (it.top + push)) + MAX(grown, 0);
+    if (RDLBreaksAtEnd(spot.pageBreak)) {
+      CGFloat bottom = y0 + spot.height;
+      spot.breakFloor = ceil((bottom - RDLPageEpsilon) / bodyAvail) * bodyAvail;
+    }
+    [spots setObject:spot forKey:it];
+  }
+  return spots;
+}
+
+// Records which part of the page the items placed since `from` belong to.
+static void RDLMarkRegion(RDLLaidOutPage *page, NSUInteger from, RDLLaidOutRegion region) {
+  for (NSUInteger i = from; i < [page.items count]; i++)
+    page.items[i].region = region;
 }
 
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
@@ -2115,32 +2581,15 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
   NSMapTable *savedRows = RDLApplyDataSetFilters(report, measure);
 
   NSMutableArray *tablixes = [NSMutableArray array];
-  NSMutableArray *growers = [NSMutableArray array];
-  for (RDLItem *it in report.body.items) {
-    if ([it isKindOfClass:[RDLTablix class]]) {
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
       [tablixes addObject:it];
-      [growers addObject:it];
-    } else if ([it isKindOfClass:[RDLSubreport class]]) {
-      // A subreport is as tall as the report inside it, which is not known
-      // until that report has been filtered and expanded -- so it pushes what
-      // is below it down, the same way a tablix does.
-      [growers addObject:it];
-    } else if ([it isKindOfClass:[RDLTextbox class]] && [(RDLTextbox *)it canGrow]) {
-      [growers addObject:it];
-    }
-  }
 
+  NSMapTable<RDLItem *, RDLBodySpot *> *plan = RDLPlanBody(report, measure, bodyAvail);
   CGFloat expanded = 0;
   for (RDLItem *it in report.body.items) {
-    if ([it isKindOfClass:[RDLTablix class]]) {
-      expanded = MAX(expanded,
-                     it.top + RDLTablixHeight((RDLTablix *)it, report, measure, bodyAvail, it.top));
-    } else {
-      CGFloat gh = it.height + MAX(RDLGrownDelta(it, report, measure, bodyAvail), 0);
-      CGFloat y0 = it.top + RDLExtraBelow(it.top, growers, report, measure, bodyAvail);
-      y0 += RDLBodyItemShift(it, y0, gh, bodyAvail);
-      expanded = MAX(expanded, y0 + gh);
-    }
+    RDLBodySpot *spot = [plan objectForKey:it];
+    expanded = MAX(expanded, spot.top + spot.height);
   }
   CGFloat bodyNeeded = MAX(report.body.height, expanded);
   NSInteger vTotal = (NSInteger)MAX(1, (NSInteger)ceil(bodyNeeded / bodyAvail));
@@ -2150,7 +2599,9 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
   NSMapTable *chunkMap = [NSMapTable strongToStrongObjectsMapTable];
   NSInteger maxChunks = 1;
   for (RDLTablix *t in tablixes) {
-    CGFloat tTop = t.top + RDLExtraBelow(t.top, growers, report, measure, bodyAvail);
+    if (RDLIsHiddenExpr(t.hidden, measure))
+      continue;
+    CGFloat tTop = [plan objectForKey:t].top;
     NSArray *tInsts = RDLExpandTablix(t, report, measure, bodyAvail, tTop);
     CGFloat availW = report.page.pageWidth - report.page.rightMargin - (mx + t.left);
     CGFloat hw = RDLHeaderWidth(t.rowHierarchy.members);
@@ -2166,15 +2617,16 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
   // a page name changes (from body items and tablix group breaks).
   NSMutableArray<NSDictionary *> *marks = [NSMutableArray array];
   for (RDLItem *it in report.body.items) {
+    RDLBodySpot *spot = [plan objectForKey:it];
     if ([it isKindOfClass:[RDLTablix class]]) {
-      CGFloat tTop = it.top + RDLExtraBelow(it.top, growers, report, measure, bodyAvail);
-        NSArray *insts = RDLExpandTablix((RDLTablix *)it, report, measure, bodyAvail, tTop);
+      if (RDLIsHiddenExpr(it.hidden, measure))
+        continue;
+      NSArray *insts = RDLExpandTablix((RDLTablix *)it, report, measure, bodyAvail, spot.top);
       for (RDLTablixInst *inst in insts) {
         if (!inst.resetPageNumber && [inst.pageName length] == 0)
           continue;
-        NSInteger slice = (NSInteger)floor((tTop + inst.yRel) / bodyAvail + 0.0001);
         [marks addObject:@{
-          @"slice" : @(slice),
+          @"slice" : @(RDLSliceIndex(spot.top + inst.yRel, bodyAvail)),
           @"reset" : @(inst.resetPageNumber),
           @"name" : inst.pageName ?: @""
         }];
@@ -2182,16 +2634,21 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
     } else if (it.resetPageNumber || it.pageName != nil) {
       // Evaluated here, the way the tablix path does it. Stored raw, the
       // RDLValue reached -[NSString length] further down and threw.
-      CGFloat gh = it.height + MAX(RDLGrownDelta(it, report, measure, bodyAvail), 0);
-      CGFloat y0 = it.top + RDLExtraBelow(it.top, growers, report, measure, bodyAvail);
-      y0 += RDLBodyItemShift(it, y0, gh, bodyAvail);
-      NSInteger slice = (NSInteger)floor(y0 / bodyAvail + 0.0001);
       NSString *named = it.pageName ? RDLAsStr(RDLEvalRow(it.pageName, nil, measure)) : @"";
+      // The numbering restarts where the break is: on the page the item
+      // starts, or for a break only at its end, on the page after it.
+      BOOL onlyAtEnd = spot.pageBreak == RDLPageBreakLocationEnd;
       [marks addObject:@{
-        @"slice" : @(slice),
-        @"reset" : @(it.resetPageNumber),
+        @"slice" : @(RDLSliceIndex(spot.top, bodyAvail)),
+        @"reset" : @(it.resetPageNumber && !onlyAtEnd),
         @"name" : named ?: @""
       }];
+      if (it.resetPageNumber && RDLBreaksAtEnd(spot.pageBreak))
+        [marks addObject:@{
+          @"slice" : @(RDLSliceIndex(spot.breakFloor, bodyAvail)),
+          @"reset" : @YES,
+          @"name" : @""
+        }];
     }
   }
   [marks sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
@@ -2255,6 +2712,8 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
     page.index = p;
     page.width = report.page.pageWidth;
     page.height = report.page.pageHeight;
+    page.bodyTop = bodyTop;
+    page.bodyBottom = bodyBottom;
 
     BOOL showHeader = (p == 1 && report.pageHeader.printOnFirstPage) ||
                       (p == total && report.pageHeader.printOnLastPage) || (p != 1 && p != total);
@@ -2263,15 +2722,6 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
     if (p == 1 && p == total) {
       showHeader = report.pageHeader.printOnFirstPage;
       showFooter = report.pageFooter.printOnFirstPage;
-    }
-    if (showHeader) {
-      for (RDLItem *it in report.pageHeader.items)
-        [self placeItem:it originX:mx originY:my scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
-    }
-    if (showFooter) {
-      CGFloat fy = report.page.pageHeight - report.page.bottomMargin - footerH;
-      for (RDLItem *it in report.pageFooter.items)
-        [self placeItem:it originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
     }
 
     CGFloat sliceTop = (CGFloat)sliceIdx * bodyAvail;
@@ -2282,17 +2732,11 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
         continue;
       if (chunkIdx != 0)
         continue;
-      CGFloat dy = RDLExtraBelow(item.top, growers, report, measure, bodyAvail);
-        CGFloat grownH =
-            item.height + MAX(RDLGrownDelta(item, report, measure, bodyAvail), 0);
-      CGFloat y0 = item.top + dy;
-      dy += RDLBodyItemShift(item, y0, grownH, bodyAvail);
-      y0 = item.top + dy;
-      CGFloat y1 = y0 + grownH;
-      if (y1 <= sliceTop || y0 >= sliceTop + bodyAvail)
+      RDLBodySpot *spot = [plan objectForKey:item];
+      if (spot.top + spot.height <= sliceTop || spot.top >= sliceTop + bodyAvail)
         continue;
       CGFloat saved = item.top;
-      item.top = item.top + dy;
+      item.top = spot.top;
       [self placeItem:item
               originX:mx
               originY:(bodyTop - sliceTop)
@@ -2303,8 +2747,9 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
       item.top = saved;
     }
     for (RDLTablix *t in tablixes) {
-      CGFloat tTop = t.top + RDLExtraBelow(t.top, growers, report, measure, bodyAvail);
-      CGFloat tBot = tTop + RDLTablixHeight(t, report, measure, bodyAvail, tTop);
+      RDLBodySpot *spot = [plan objectForKey:t];
+      CGFloat tTop = spot.top;
+      CGFloat tBot = tTop + spot.height;
       if (tBot <= sliceTop || tTop >= sliceTop + bodyAvail)
         continue;
       CGFloat cx0 = 0, cx1 = 0, lead = 0;
@@ -2320,7 +2765,6 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
       } else if (chunkIdx != 0) {
         continue;
       }
-      BOOL first = (tTop >= sliceTop);
       [self placeTablix:t
                 originX:mx
               tablixTop:tTop
@@ -2329,10 +2773,27 @@ static CGFloat RDLBodyItemShift(RDLItem *item, CGFloat y0, CGFloat h, CGFloat bo
              bodyBottom:bodyBottom
                   scope:scope
                  onPage:page
-              firstPage:first
                 chunkX0:cx0
                 chunkX1:cx1
                   hLead:lead];
+    }
+    RDLMarkRegion(page, 0, RDLLaidOutRegionBody);
+
+    // After the body: a page header or footer that says ReportItems!InvoiceNo
+    // reads the value the body placed on this page, which is the most common
+    // thing a running head does and the reason SSRS allows ReportItems there.
+    if (showHeader) {
+      NSUInteger from = [page.items count];
+      for (RDLItem *it in report.pageHeader.items)
+        [self placeItem:it originX:mx originY:my scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
+      RDLMarkRegion(page, from, RDLLaidOutRegionPageHeader);
+    }
+    if (showFooter) {
+      NSUInteger from = [page.items count];
+      CGFloat fy = report.page.pageHeight - report.page.bottomMargin - footerH;
+      for (RDLItem *it in report.pageFooter.items)
+        [self placeItem:it originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
+      RDLMarkRegion(page, from, RDLLaidOutRegionPageFooter);
     }
 
     BOOL anyZ = NO;

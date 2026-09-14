@@ -366,6 +366,13 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
 // canvas has not got. Double-clicking it opens that report in a window of its
 // own, which is where its contents are edited.
 - (void)drawSubreport:(RDLSubreport *)sub inRect:(NSRect)r {
+  NSString *name = [sub.reportName length] ? sub.reportName : @"(no report)";
+  [self drawPlaceholder:[NSString stringWithFormat:@"Subreport: %@", name] inRect:r];
+}
+
+// A dashed box with one centred line in it: what the canvas draws for an item
+// whose contents it does not render itself.
+- (void)drawPlaceholder:(NSString *)label inRect:(NSRect)r {
   [[NSColor colorWithCalibratedWhite:0.94 alpha:1.0] set];
   NSRectFill(r);
   NSBezierPath *frame = [NSBezierPath bezierPathWithRect:NSInsetRect(r, 0.5, 0.5)];
@@ -382,8 +389,6 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     NSForegroundColorAttributeName : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0],
     NSParagraphStyleAttributeName : centred
   };
-  NSString *name = [sub.reportName length] ? sub.reportName : @"(no report)";
-  NSString *label = [NSString stringWithFormat:@"Subreport: %@", name];
   NSSize size = [label sizeWithAttributes:attrs];
   [label drawInRect:NSMakeRect(NSMinX(r) + 4, NSMidY(r) - size.height / 2,
                                MAX(NSWidth(r) - 8, 1), size.height)
@@ -426,6 +431,14 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
       RDLDrawGroupBrackets((RDLTablix *)it, r, _ctx.zoom);
   } else if ([it isKindOfClass:[RDLSubreport class]]) {
     [self drawSubreport:(RDLSubreport *)it inRect:r];
+  } else if ([it isKindOfClass:[RDLUnsupportedItem class]]) {
+    // Kept in the file and on the page, but not something this canvas can
+    // draw: the box says what it is, so it can still be moved and sized.
+    RDLUnsupportedItem *u = (RDLUnsupportedItem *)it;
+    NSString *what = [u.customType length]
+                         ? [NSString stringWithFormat:@"%@ (%@)", u.rdlElementName, u.customType]
+                         : u.rdlElementName;
+    [self drawPlaceholder:[NSString stringWithFormat:@"%@: not supported", what] inRect:r];
   } else if ([it isKindOfClass:[RDLChart class]]) {
     // The canvas shows the real chart, not a stand-in: the model is laid out
     // against whatever data is bound and drawn by the same RDLChartRenderer

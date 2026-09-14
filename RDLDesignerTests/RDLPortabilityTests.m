@@ -427,6 +427,11 @@
                                                       [NSCharacterSet whitespaceAndNewlineCharacterSet]]]);
     if ([xml rangeOfString:@"<TypeName>"].location != NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ writes TypeName unprefixed", file]);
+    // Chart names this kit once invented; the spec's are Interval and
+    // ChartMajorTickMarks.
+    for (NSString *invented in @[ @"<MajorTickMarks>", @"<MajorInterval>" ])
+      if ([xml rangeOfString:invented].location != NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ still says %@", file, invented]);
   }
   if (checked < 11)
     XCTFail(@"%@", [NSString stringWithFormat:@"only %lu samples were checked",

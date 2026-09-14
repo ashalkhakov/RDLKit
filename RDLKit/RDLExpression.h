@@ -17,6 +17,21 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 @property (nonatomic, strong) id row;
 @property (nonatomic, strong) RDLDataSet *dataSet;
 @property (nonatomic, copy) NSArray *groupRows;
+// The rows of every group instance enclosing what is being evaluated, by the
+// group's name -- row groups and, in a crosstab cell, column groups. What
+// Sum(x, "ColumnGroup") sums over. groupRows is the innermost of them; with
+// only that, a group named in an aggregate fell back to the innermost scope and
+// a matrix cell's column total came out as the cell itself.
+@property (nonatomic, copy) NSDictionary<NSString *, NSArray *> *groupRowsByName;
+// The rows a data region nested in the tablix cell being laid out reads: that
+// cell's own instance -- a detail row, a group's rows, and in a crosstab only
+// those of the cell's column as well. nil outside a tablix cell, where a data
+// region reads its whole dataset.
+@property (nonatomic, copy) NSArray *nestedRegionRows;
+// What each textbox placed so far evaluated to, by name: what
+// ReportItems!Name.Value reads. The layout fills it as it places items, and
+// places the page header and footer after the body so they can see it.
+@property (nonatomic, strong) NSMutableDictionary<NSString *, id> *reportItemValues;
 @property (nonatomic, strong) id previousRow;
 // Which row this is within the innermost scope, counting from 1. What
 // RowNumber() reports; 0 means the layout engine has not said.
@@ -58,6 +73,7 @@ typedef NS_ENUM(NSInteger, RDLExprNodeKind) {
   RDLExprNodeKindParameter,   // Parameters!Name.Property
   RDLExprNodeKindGlobal,      // Globals!Name
   RDLExprNodeKindUser,        // User!Name
+  RDLExprNodeKindReportItem,  // ReportItems!Name.Value -- another textbox's value
   RDLExprNodeKindIdentifier,  // a bare name -- `name`
   RDLExprNodeKindOperator,    // `op`, `args`
   RDLExprNodeKindCall,        // a function -- `name`, `args`

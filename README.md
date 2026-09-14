@@ -60,9 +60,9 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 * **Report items**
   * Textbox (multi-Paragraph/TextRun, CanGrow, styles)
   * Line (horizontal / vertical / sloped, dash styles)
-  * Rectangle
+  * Rectangle (a container: what grows inside it pushes down what is below, and it may hold a Tablix)
   * Image (`Source` Embedded/External, `Sizing` Fit/FitProportional/Clip/AutoSize, report-level `EmbeddedImages`)
-  * Chart (Column/Bar/Line/Pie: first series, category group, data point)
+  * Chart (Column/Bar/Line/Pie: first series, category group, data point), read and written in the spec's vocabulary — `Shape`/`Pie`, `Scatter`/`Bubble`, axis `Visible`/`Interval`, `ChartMajorTickMarks`, grid lines `Enabled`, data labels `Visible` — so Report Builder's charts draw as designed and this kit's charts validate
   * Tablix
   * List (mapped onto Tablix)
 * **Styles**
@@ -76,12 +76,16 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * `Language` (per item; see Localization)
   * conditional formatting: any style property may be an `=` expression
 * **Behavior**
-  * `Visibility/Hidden` (static or expression) on items and tablix members
+  * `Visibility/Hidden` (static or expression) on items, tablixes and tablix members — decided per group instance and per detail row, with aggregates over that instance's rows
+  * `HideIfNoRows`, decided by whether the groups beside the member have anything to show
+  * `SortExpressions` and `Filters` on groups (in each instance's own scope, so a group can sort by its total) and on the Details member
   * `ActionInfo/Hyperlink` (HTML `<a>`)
   * `ZIndex`
-  * `PageBreak` (with `ResetPageNumber` and `PageName` → `Globals!PageName`)
+  * `PageBreak` — `BreakLocation` `Start`, `End`, `StartAndEnd` and `Between` on items, tablixes and groups, `Disabled`, `ResetPageNumber`, and `PageName` → `Globals!PageName`
   * `KeepTogether` on body items
-  * `RepeatOnNewPage`
+  * `RepeatOnNewPage`, with room left for the repeated header on each continuation page
+  * subreports that run on past the page they start on
+  * body content cut at the body band, so nothing is drawn over the page header or footer
   * `NoRowsMessage`
   * Body `Style` (page background)
   * crosstab pivot via dynamic `TablixColumnHierarchy` groups (nested groups render tiered, spanning column headers)

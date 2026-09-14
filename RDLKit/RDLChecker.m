@@ -659,9 +659,14 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
       RDLCheckNode(arg, scope, source, run);
     return RDLUnknownType();
 
+  case RDLExprNodeKindReportItem:
+    // Another textbox's value: its type is whatever that textbox yields, which
+    // is not known until the layout has placed it.
+    return RDLUnknownType();
+
   case RDLExprNodeKindIdentifier:
     // The evaluator resolves a few (True, False, Nothing) and treats the rest
-    // as text. ReportItems!X is a reference to another textbox's value.
+    // as text.
     return RDLUnknownType();
   }
   return RDLUnknownType();
@@ -793,7 +798,20 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   RDLCheckValue(item.pageName, scope, run);
   RDLCheckStyle(item.style, scope, run);
 
-  if ([item isKindOfClass:[RDLTextbox class]]) {
+  if ([item isKindOfClass:[RDLUnsupportedItem class]]) {
+    // Opened, and kept on save, but not drawn: said here as well as in the
+    // report's warnings, because --check is where someone looks before
+    // trusting a render.
+    RDLUnsupportedItem *u = (RDLUnsupportedItem *)item;
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"unsupported-report-item", scope, nil,
+                        u.altItem
+                            ? [NSString stringWithFormat:@"%@ is not supported; its "
+                                                         @"AltReportItem is rendered instead",
+                                                         u.rdlElementName]
+                            : [NSString stringWithFormat:@"%@ is not supported and renders "
+                                                         @"as a placeholder",
+                                                         u.rdlElementName]);
+  } else if ([item isKindOfClass:[RDLTextbox class]]) {
     RDLTextbox *tb = (RDLTextbox *)item;
     RDLCheckSource(tb.value, RDLSubScope(scope, @"Value", nil), run);
     for (RDLParagraph *para in tb.paragraphs)

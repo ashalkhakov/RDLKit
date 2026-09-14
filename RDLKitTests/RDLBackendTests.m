@@ -460,22 +460,23 @@ static NSString *RDLEnt(NSString *name) {
   if (!note.nullable)
     XCTFail(@"%@", @"Nullable not parsed");
   // An element this kit does not model fails the parse rather than being
-  // skipped, so the report that comes back is always the report on disk.
-  // CustomReportItem is the example because it is real MS-RDL and genuinely
-  // not implemented -- Subreport used to stand here, and now renders.
-  NSString *withCRI = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
-                                                     withString:
-      @"<CustomReportItem Name=\"Cri1\"><Type>Barcode</Type><Top>1in</Top><Left>0in</Left>"
-      @"<Width>2in</Width><Height>1in</Height></CustomReportItem>"
+  // skipped, so the report that comes back is always the report on disk. The
+  // element is invented on purpose: Subreport stood here until it rendered,
+  // and CustomReportItem until it became a placeholder. A name from outside
+  // the schema keeps this about the rule rather than about a feature list.
+  NSString *withUnknown = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
+                                                         withString:
+      @"<NotAReportItem Name=\"Odd1\"><Top>1in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>1in</Height></NotAReportItem>"
       @"</ReportItems></Body>"];
   NSError *subErr = nil;
-  RDLReport *rejected = [RDLParser reportFromXMLString:withCRI error:&subErr];
+  RDLReport *rejected = [RDLParser reportFromXMLString:withUnknown error:&subErr];
   if (rejected != nil)
-    XCTFail(@"%@", @"a CustomReportItem should be rejected, not skipped");
-  else if ([subErr.localizedDescription rangeOfString:@"CustomReportItem"].location == NSNotFound ||
-           [subErr.localizedDescription rangeOfString:@"Cri1"].location == NSNotFound ||
+    XCTFail(@"%@", @"an element outside the schema should be rejected, not skipped");
+  else if ([subErr.localizedDescription rangeOfString:@"NotAReportItem"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"Odd1"].location == NSNotFound ||
            [subErr.localizedDescription rangeOfString:@"/Report"].location == NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for CustomReportItem: %@",
+    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for an unknown element: %@",
                                                subErr.localizedDescription]);
   if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
     XCTFail(@"%@", @"Body Style not parsed");

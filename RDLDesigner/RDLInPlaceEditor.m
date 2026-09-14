@@ -70,7 +70,10 @@
     [NSApp sendAction:@selector(editSubreport:) to:nil from:nil];
     return;
   }
-  if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]])
+  // Nothing here has text to edit. An unsupported item in particular must not
+  // reach the text field below, which asks the item for a textbox's value.
+  if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]] ||
+      [hit isKindOfClass:[RDLUnsupportedItem class]])
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);
   r.size.height = MAX(NSHeight(r), 19);

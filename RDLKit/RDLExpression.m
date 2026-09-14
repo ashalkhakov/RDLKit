@@ -7,8 +7,10 @@
 @implementation RDLEvalScope
 - (instancetype)init {
   self = [super init];
-  if (self)
+  if (self) {
     _recursionLevel = -1; // 0 is a real depth, so "not recursive" needs its own
+    _reportItemValues = [NSMutableDictionary dictionary];
+  }
   return self;
 }
 @end
@@ -25,7 +27,7 @@
 // callers in a loop resolve once and fetch many; see -[RDLExprNode
 // valueFromRow:].
 @interface RDLExprNode (RDLRowMemo)
-- (id)valueFromRow:(id)row;
+- (id)valueFromRow:(id)row key:(NSString *)key;
 @end
 
 static NSString *RDLResolveRowKey(id row, NSString *key) {
@@ -282,11 +284,14 @@ static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
 }
 
 @implementation RDLExprNode {
-  // How the last row's class spelled this node's field name. Rows in a
+  // How the last row's class spelled the key this node reads. Rows in a
   // dataset are homogeneous, so this hits on every row after the first and
   // takes the resolution cost out of the loop entirely. Private: it is a
-  // cache, not part of the tree.
+  // cache, not part of the tree. Remembered against the key asked for, since
+  // that is the field's DataField and a node may be read in more than one
+  // dataset's scope.
   Class _memoClass;
+  NSString *_memoFor;
   NSString *_memoKey;
 }
 
@@ -297,14 +302,16 @@ static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
   return self;
 }
 
-// This node's field, out of `row`.
-- (id)valueFromRow:(id)row {
-  if (row == nil || [_name length] == 0)
+// The value stored under `key` in `row` -- the key being the field's DataField,
+// which the caller has already worked out from the field's name.
+- (id)valueFromRow:(id)row key:(NSString *)key {
+  if (row == nil || [key length] == 0)
     return nil;
   Class cls = [row class];
-  if (cls != _memoClass) {
-    _memoKey = RDLResolveRowKey(row, _name);
+  if (cls != _memoClass || ![key isEqualToString:_memoFor]) {
+    _memoKey = RDLResolveRowKey(row, key);
     _memoClass = cls;
+    _memoFor = [key copy];
   }
   if (_memoKey == nil)
     return nil;
@@ -312,7 +319,7 @@ static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
   // Dictionaries of the same class can still differ in their keys, so a miss
   // means resolve again rather than report the field as absent.
   if (v == nil && [row isKindOfClass:[NSDictionary class]]) {
-    NSString *fresh = RDLResolveRowKey(row, _name);
+    NSString *fresh = RDLResolveRowKey(row, key);
     if (fresh != nil && ![fresh isEqualToString:_memoKey]) {
       _memoKey = fresh;
       v = RDLFetchRowKey(row, fresh);
@@ -634,25 +641,37 @@ static NSArray *RDLLex(NSString *src) {
   return left;
 }
 - (RDLExprNode *)parseMul {
-  RDLExprNode *left = [self parsePow];
+  RDLExprNode *left = [self parseUnary];
   for (;;) {
     if ([self matchOp:@"*"])
-      left = RDLOp(RDLExprOperatorMultiply, left, [self parsePow]);
+      left = RDLOp(RDLExprOperatorMultiply, left, [self parseUnary]);
     else if ([self matchOp:@"/"])
-      left = RDLOp(RDLExprOperatorDivide, left, [self parsePow]);
+      left = RDLOp(RDLExprOperatorDivide, left, [self parseUnary]);
     else if ([self matchOp:@"\\"])
-      left = RDLOp(RDLExprOperatorIntegerDivide, left, [self parsePow]);
+      left = RDLOp(RDLExprOperatorIntegerDivide, left, [self parseUnary]);
     else if ([self matchOp:@"mod"] || [self matchOp:@"%"])
-      left = RDLOp(RDLExprOperatorModulo, left, [self parsePow]);
+      left = RDLOp(RDLExprOperatorModulo, left, [self parseUnary]);
     else
       break;
   }
   return left;
 }
+// The operand of ^ may carry a sign of its own -- 2^-3 -- but a sign there
+// binds only that operand, which is what keeps ^ left-associative.
+- (RDLExprNode *)parsePowOperand {
+  if ([self matchOp:@"-"])
+    return RDLOp(RDLExprOperatorNegate, [self parsePowOperand], nil);
+  if ([self matchOp:@"+"])
+    return [self parsePowOperand];
+  return [self parsePrimary];
+}
+// VB.NET: ^ binds tighter than unary minus and associates to the left. So
+// -2^2 is -(2^2) = -4 and 2^3^2 is (2^3)^2 = 64. Taking the left operand from
+// the unary level gave 4, and recursing on the right gave 512.
 - (RDLExprNode *)parsePow {
-  RDLExprNode *left = [self parseUnary];
-  if ([self matchOp:@"^"])
-    return RDLOp(RDLExprOperatorPower, left, [self parsePow]);
+  RDLExprNode *left = [self parsePrimary];
+  while ([self matchOp:@"^"])
+    left = RDLOp(RDLExprOperatorPower, left, [self parsePowOperand]);
   return left;
 }
 - (RDLExprNode *)parseUnary {
@@ -662,7 +681,7 @@ static NSArray *RDLLex(NSString *src) {
     return [self parseUnary];
   if ([self matchOp:@"not"])
     return RDLOp(RDLExprOperatorNot, [self parseUnary], nil);
-  return [self parsePrimary];
+  return [self parsePow];
 }
 - (RDLExprNode *)parseCall:(NSString *)name {
   [self matchP:@"("];
@@ -726,6 +745,8 @@ static NSArray *RDLLex(NSString *src) {
       a.kind = RDLExprNodeKindGlobal;
     else if ([low isEqualToString:@"user"])
       a.kind = RDLExprNodeKindUser;
+    else if ([low isEqualToString:@"reportitems"])
+      a.kind = RDLExprNodeKindReportItem;
     else
       a.kind = RDLExprNodeKindIdentifier;
     return a;
@@ -861,8 +882,16 @@ static NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName) {
   if ([dsName length]) {
     ds = [scope.report dataSetNamed:dsName];
     // Not a dataset name: treat as a group scope name → current group rows.
-    if (ds == nil && scope.groupRows != nil)
-      return scope.groupRows;
+    if (ds == nil) {
+      // A group's name: that group instance's rows, which the layout supplies
+      // for every group enclosing the expression -- the row group's total in
+      // a matrix cell, or the column group's.
+      NSArray *named = scope.groupRowsByName[dsName];
+      if (named != nil)
+        return named;
+      if (scope.groupRows != nil)
+        return scope.groupRows;
+    }
   } else if (ds == nil && [scope.report.dataSets count])
     ds = scope.report.dataSets[0];
   return ds.rows ?: @[];
@@ -894,6 +923,20 @@ static BOOL RDLLike(NSString *value, NSString *pattern) {
   return [rx numberOfMatchesInString:val options:0 range:NSMakeRange(0, val.length)] > 0;
 }
 
+// How Min and Max order two values. Dates as dates, numbers as numbers, and
+// anything else as text. Everything used to go through RDLNum, so Min over a
+// date field returned milliseconds since 1970 and Min over words returned 0.
+static NSComparisonResult RDLOrder(id a, id b) {
+  if ([a isKindOfClass:[NSDate class]] && [b isKindOfClass:[NSDate class]])
+    return [(NSDate *)a compare:(NSDate *)b];
+  if ([a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]] ||
+      [a isKindOfClass:[NSDate class]] || [b isKindOfClass:[NSDate class]]) {
+    double l = RDLNum(a), r = RDLNum(b);
+    return l < r ? NSOrderedAscending : (l > r ? NSOrderedDescending : NSOrderedSame);
+  }
+  return [RDLStr(a) compare:RDLStr(b)];
+}
+
 static BOOL RDLCmp(id a, RDLExprOperator op, id b) {
   if (op == RDLExprOperatorIs)
     return RDLIsNothing(a) == RDLIsNothing(b) || (b == [NSNull null] && RDLIsNothing(a));
@@ -901,6 +944,23 @@ static BOOL RDLCmp(id a, RDLExprOperator op, id b) {
     return !(RDLIsNothing(a) == RDLIsNothing(b) || (b == [NSNull null] && RDLIsNothing(a)));
   if (op == RDLExprOperatorLike)
     return RDLLike(RDLStr(a), RDLStr(b));
+  // Two dates compare as dates. They used to fall through to the string
+  // branch and be compared as their formatted text in the machine's locale,
+  // so CDate("2020-09-13") < CDate("2023-11-14") was False -- "Sep" sorts
+  // after "Nov". A date against a number still goes numeric, which is how a
+  // date arrives from a data source that carries epoch milliseconds.
+  if ([a isKindOfClass:[NSDate class]] && [b isKindOfClass:[NSDate class]]) {
+    NSComparisonResult c = [(NSDate *)a compare:(NSDate *)b];
+    switch (op) {
+    case RDLExprOperatorEqual: return c == NSOrderedSame;
+    case RDLExprOperatorNotEqual: return c != NSOrderedSame;
+    case RDLExprOperatorGreater: return c == NSOrderedDescending;
+    case RDLExprOperatorLess: return c == NSOrderedAscending;
+    case RDLExprOperatorGreaterOrEqual: return c != NSOrderedAscending;
+    case RDLExprOperatorLessOrEqual: return c != NSOrderedDescending;
+    default: break;
+    }
+  }
   BOOL numeric = [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
   if (numeric) {
     double l = RDLNum(a), r = RDLNum(b);
@@ -941,20 +1001,14 @@ static id RDLEvaluateField(RDLEvalScope *scope, RDLExprNode *node) {
   if (scope.row == nil)
     return missing ? RDLYes(YES) : @"";
   // Through the node's memo: this runs once per row of the dataset, and
-  // resolving the key each time costs several times the lookup.
-  id v = [node valueFromRow:scope.row];
-  if (v == nil) {
-    // Calculated field on the current dataset.
-    for (id f in scope.dataSet.fields) {
-      if (![f isKindOfClass:[RDLField class]])
-        continue;
-      RDLField *fld = (RDLField *)f;
-      if ([fld.name caseInsensitiveCompare:name] != NSOrderedSame || ![fld isCalculated])
-        continue;
-      v = [fld.value evaluateInScope:scope];
-      break;
-    }
-  }
+  // resolving the key each time costs several times the lookup. The key is
+  // the field's DataField; reading the row by the field's Name found nothing
+  // whenever the two differed.
+  RDLField *field = [scope.dataSet fieldNamed:name];
+  id v = [node valueFromRow:scope.row
+                          key:([scope.dataSet rowKeyForFieldNamed:name] ?: name)];
+  if (v == nil && [field isCalculated])
+    v = [field.value evaluateInScope:scope];
   if (missing)
     return RDLYes(v == nil);
   return v ?: @"";
@@ -981,8 +1035,7 @@ static id RDLParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
   for (RDLParameter *p in scope.report.parameters)
     if ([p.name caseInsensitiveCompare:name] == NSOrderedSame)
       hit = p;
-  if ([prop caseInsensitiveCompare:@"Label"] == NSOrderedSame)
-    return hit.prompt.length ? hit.prompt : (hit.name ?: name);
+  BOOL wantsLabel = [prop caseInsensitiveCompare:@"Label"] == NSOrderedSame;
   id raw = scope.paramValues[hit.name ?: name];
   if (raw == nil || ([raw isKindOfClass:[NSString class]] && [(NSString *)raw length] == 0)) {
     // Defaults are RDLValues, so a default written as an expression is
@@ -1000,6 +1053,23 @@ static id RDLParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
   }
   if (hit.multiValue && [raw isKindOfClass:[NSString class]])
     raw = @[ raw ];
+  // Label is the name the chosen value goes under -- ValidValues/
+  // ParameterValue/Label -- and the value itself when it has no label. It
+  // used to return the prompt, which is the question, not the answer.
+  if (wantsLabel) {
+    if ([raw isKindOfClass:[NSArray class]]) {
+      NSMutableArray *labels = [NSMutableArray array];
+      for (id v in (NSArray *)raw) {
+        RDLValue *label = [hit labelForValidValue:RDLStr(v)];
+        [labels addObject:(label ? [label evaluateInScope:scope] : v) ?: @""];
+      }
+      return labels;
+    }
+    RDLValue *label = [hit labelForValidValue:RDLStr(raw)];
+    if (label)
+      return [label evaluateInScope:scope] ?: @"";
+    return raw ?: @"";
+  }
   if ([prop caseInsensitiveCompare:@"Count"] == NSOrderedSame)
     return @([raw isKindOfClass:[NSArray class]] ? [(NSArray *)raw count] : (raw != nil ? 1 : 0));
   if ([raw isKindOfClass:[NSArray class]]) {
@@ -1056,7 +1126,99 @@ static BOOL RDLIsRecursiveFlag(RDLExprNode *arg) {
          [arg.name caseInsensitiveCompare:@"Recursive"] == NSOrderedSame;
 }
 
+static BOOL RDLIsAggregateName(NSString *n) {
+  static NSSet *names;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    names = [NSSet setWithArray:@[ @"sum", @"count", @"countdistinct", @"avg", @"first", @"last",
+                                   @"min", @"max", @"stdev", @"stdevp", @"var", @"varp",
+                                   @"aggregate" ]];
+  });
+  return [names containsObject:[n lowercaseString]];
+}
+
+// The group an inner aggregate names, when it names one the report has.
+static NSString *RDLInnerAggregateGroup(RDLExprNode *expr, RDLEvalScope *scope) {
+  if (expr.kind != RDLExprNodeKindCall || !RDLIsAggregateName(expr.name) ||
+      [expr.args count] < 2 || RDLIsRecursiveFlag(expr.args[1]))
+    return nil;
+  NSString *name = RDLDsName(expr.args[1], scope);
+  if (name == nil || [scope.report dataSetNamed:name] != nil)
+    return nil;
+  return [scope.report tablixMemberNamed:name] != nil ? name : nil;
+}
+
+// The instances an outer aggregate walks when its argument is itself an
+// aggregate -- Sum(Max(x, "Group")): one per instance of the inner scope, which
+// is what SSRS means by a nested aggregate. The inner Max is taken over each
+// group's rows and the outer Sum adds the results. With no inner scope, every
+// row is its own instance. nil when the argument is not an aggregate, which
+// keeps the ordinary one-value-per-row path.
+//
+// Taking the inner aggregate once per row over the whole outer scope -- what
+// this did -- made Sum(Max(B)) over 1, 2, 3 come out as 9.
+static NSArray<NSArray *> *RDLNestedAggregateUnits(RDLExprNode *expr, NSArray *rows,
+                                                    RDLEvalScope *scope) {
+  if (expr.kind != RDLExprNodeKindCall || !RDLIsAggregateName(expr.name))
+    return nil;
+  NSString *group = RDLInnerAggregateGroup(expr, scope);
+  RDLTablixMember *member = group ? [scope.report tablixMemberNamed:group] : nil;
+  if ([member.groupExpressions count] == 0) {
+    NSMutableArray *each = [NSMutableArray arrayWithCapacity:[rows count]];
+    for (id row in rows)
+      [each addObject:@[ row ]];
+    return each;
+  }
+  NSMutableArray<NSString *> *order = [NSMutableArray array];
+  NSMutableDictionary<NSString *, NSMutableArray *> *byKey = [NSMutableDictionary dictionary];
+  id savedRow = scope.row;
+  for (id row in rows) {
+    scope.row = row;
+    NSMutableArray *parts = [NSMutableArray array];
+    for (RDLValue *e in member.groupExpressions)
+      [parts addObject:RDLStr([e evaluateInScope:scope])];
+    NSString *key = [parts componentsJoinedByString:@"\x1f"];
+    if (byKey[key] == nil) {
+      byKey[key] = [NSMutableArray array];
+      [order addObject:key];
+    }
+    [byKey[key] addObject:row];
+  }
+  scope.row = savedRow;
+  NSMutableArray *units = [NSMutableArray arrayWithCapacity:[order count]];
+  for (NSString *key in order)
+    [units addObject:byKey[key]];
+  return units;
+}
+
+// Run `body` with the scope's dataset switched to the one `name` names, when
+// it names one. Something that reads another dataset's rows -- Sum(x,
+// "Other"), RunningValue over "Other" -- has to map field names through that
+// dataset's fields: with DataField honoured, the current dataset's
+// Region->TERRITORY would otherwise be looked for in rows whose column is RGN.
+static id RDLInDataSetNamed(RDLEvalScope *scope, NSString *name, id (^body)(void)) {
+  RDLDataSet *other = [name length] ? [scope.report dataSetNamed:name] : nil;
+  if (other == nil || other == scope.dataSet)
+    return body();
+  RDLDataSet *saved = scope.dataSet;
+  scope.dataSet = other;
+  id result = body();
+  scope.dataSet = saved;
+  return result;
+}
+
+static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope);
+
 static id RDLExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
+  NSString *ds = ([args count] > 1 && !RDLIsRecursiveFlag(args[1]))
+                     ? RDLDsName(args[1], scope)
+                     : nil;
+  return RDLInDataSetNamed(scope, ds, ^id {
+    return RDLExecAggInScope(n, args, scope);
+  });
+}
+
+static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
   NSString *ds = ([args count] > 1 && !RDLIsRecursiveFlag(args[1]))
                      ? RDLDsName(args[1], scope)
                      : nil;
@@ -1113,32 +1275,50 @@ static id RDLExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
   double acc = 0;
   double accSq = 0;
   BOOL any = NO;
-  double mn = 0, mx = 0;
+  id mn = nil, mx = nil;
   NSDictionary *saved = scope.row;
-  for (id row in rows) {
+  NSArray *savedGroupRows = scope.groupRows;
+  NSDictionary *savedNamedRows = scope.groupRowsByName;
+  NSArray<NSArray *> *units = RDLNestedAggregateUnits(expr, rows, scope);
+  NSString *innerGroup = units ? RDLInnerAggregateGroup(expr, scope) : nil;
+  NSUInteger unitCount = units ? [units count] : [rows count];
+  for (NSUInteger u = 0; u < unitCount; u++) {
+    id row = units ? [units[u] firstObject] : rows[u];
+    if (units) {
+      scope.groupRows = units[u];
+      if (innerGroup) {
+        NSMutableDictionary *named =
+            [savedNamedRows mutableCopy] ?: [NSMutableDictionary dictionary];
+        named[innerGroup] = units[u];
+        scope.groupRowsByName = named;
+      }
+    }
     scope.row = row;
-    double x = expr ? RDLNum(RDLExec(expr, scope)) : 0;
+    id v = expr ? RDLExec(expr, scope) : nil;
+    double x = RDLNum(v);
     if (!any) {
-      mn = mx = x;
+      mn = mx = v;
       any = YES;
     }
     acc += x;
     accSq += x * x;
-    if (x < mn)
-      mn = x;
-    if (x > mx)
-      mx = x;
+    if (v != nil && RDLOrder(v, mn) == NSOrderedAscending)
+      mn = v;
+    if (v != nil && RDLOrder(v, mx) == NSOrderedDescending)
+      mx = v;
   }
   scope.row = saved;
+  scope.groupRows = savedGroupRows;
+  scope.groupRowsByName = savedNamedRows;
   if ([n isEqualToString:@"sum"] || [n isEqualToString:@"aggregate"])
     return @(acc);
   if ([n isEqualToString:@"avg"])
-    return @([rows count] ? acc / [rows count] : 0);
+    return @(unitCount ? acc / unitCount : 0);
   if ([n isEqualToString:@"min"])
-    return @(any ? mn : 0);
+    return any ? (mn ?: @0) : @0;
   if ([n isEqualToString:@"max"])
-    return @(any ? mx : 0);
-  NSUInteger cnt = [rows count];
+    return any ? (mx ?: @0) : @0;
+  NSUInteger cnt = unitCount;
   if ([n isEqualToString:@"var"] || [n isEqualToString:@"stdev"]) {
     if (cnt < 2)
       return @0;
@@ -1160,7 +1340,16 @@ static id RDLExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
 
 // RunningValue(expr, "Function", ["Scope"]) — aggregate over rows up to and
 // including the current row.
+static id RDLExecRunningValueInScope(NSArray *args, RDLEvalScope *scope);
+
 static id RDLExecRunningValue(NSArray *args, RDLEvalScope *scope) {
+  NSString *ds = [args count] > 2 ? RDLDsName(args[2], scope) : nil;
+  return RDLInDataSetNamed(scope, ds, ^id {
+    return RDLExecRunningValueInScope(args, scope);
+  });
+}
+
+static id RDLExecRunningValueInScope(NSArray *args, RDLEvalScope *scope) {
   RDLExprNode *expr = [args count] ? args[0] : nil;
   NSString *fn = [args count] > 1 ? [RDLStr(RDLExec(args[1], scope)) lowercaseString] : @"sum";
   NSString *ds = [args count] > 2 ? RDLDsName(args[2], scope) : nil;
@@ -1178,7 +1367,7 @@ static id RDLExecRunningValue(NSArray *args, RDLEvalScope *scope) {
   double acc = 0;
   NSInteger cnt = 0;
   BOOL any = NO;
-  double mn = 0, mx = 0;
+  id mn = nil, mx = nil;
   NSUInteger idx = 0;
   for (id row in rows) {
     scope.row = row;
@@ -1187,14 +1376,14 @@ static id RDLExecRunningValue(NSArray *args, RDLEvalScope *scope) {
     if (!RDLIsNothing(v))
       cnt += 1;
     if (!any) {
-      mn = mx = x;
+      mn = mx = v;
       any = YES;
     }
     acc += x;
-    if (x < mn)
-      mn = x;
-    if (x > mx)
-      mx = x;
+    if (v != nil && RDLOrder(v, mn) == NSOrderedAscending)
+      mn = v;
+    if (v != nil && RDLOrder(v, mx) == NSOrderedDescending)
+      mx = v;
     if (stop != NSNotFound && idx >= stop)
       break;
     idx += 1;
@@ -1205,9 +1394,9 @@ static id RDLExecRunningValue(NSArray *args, RDLEvalScope *scope) {
   if ([fn isEqualToString:@"avg"])
     return @(cnt ? acc / cnt : 0);
   if ([fn isEqualToString:@"min"])
-    return @(any ? mn : 0);
+    return any ? (mn ?: @0) : @0;
   if ([fn isEqualToString:@"max"])
-    return @(any ? mx : 0);
+    return any ? (mx ?: @0) : @0;
   return @(acc);
 }
 
@@ -1233,6 +1422,13 @@ static id RDLExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
   }
   NSMutableArray *hits = [NSMutableArray array];
   NSDictionary *saved = scope.row;
+  // The source was evaluated above, in the current dataset. What is matched
+  // and returned belongs to the dataset being searched, and reads its columns
+  // through that dataset's fields.
+  RDLDataSet *savedSet = scope.dataSet;
+  RDLDataSet *searched = ds ? [scope.report dataSetNamed:ds] : nil;
+  if (searched)
+    scope.dataSet = searched;
   for (id key in keys) {
     for (id row in rows) {
       if (destExpr == nil)
@@ -1250,6 +1446,7 @@ static id RDLExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
       break;
   }
   scope.row = saved;
+  scope.dataSet = savedSet;
   if ([kind isEqualToString:@"lookup"])
     return [hits count] ? hits[0] : nil;
   return hits;
@@ -1315,7 +1512,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
   if ([n isEqualToString:@"cdbl"] || [n isEqualToString:@"cdec"] || [n isEqualToString:@"val"])
     return @(RDLNum(a0));
   if ([n isEqualToString:@"cint"] || [n isEqualToString:@"clng"])
-    return @((double)(NSInteger)RDLNum(a0));
+    return @(rint(RDLNum(a0)));
   if ([n isEqualToString:@"cbool"])
     return RDLYes(RDLBool(a0));
   if ([n isEqualToString:@"cdate"])
@@ -1399,7 +1596,10 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
   if ([n isEqualToString:@"round"]) {
     double digits = RDLNum(a1);
     double f = pow(10, digits);
-    return @(round(RDLNum(a0) * f) / f);
+    // Banker's rounding, which is what VB.NET's Round does and what a report
+    // full of halves depends on: rint() follows the current rounding mode,
+    // which is round-half-to-even by default.
+    return @(rint(RDLNum(a0) * f) / f);
   }
   if ([n isEqualToString:@"abs"])
     return @(fabs(RDLNum(a0)));
@@ -1415,8 +1615,12 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
     return @(ceil(RDLNum(a0)));
   if ([n isEqualToString:@"floor"])
     return @(floor(RDLNum(a0)));
-  if ([n isEqualToString:@"fix"] || [n isEqualToString:@"int"])
-    return @((double)(NSInteger)RDLNum(a0));
+  // Int goes down, Fix goes toward zero: they differ for negatives, which is
+  // the whole reason VB has both. Int(-2.7) is -3 and Fix(-2.7) is -2.
+  if ([n isEqualToString:@"int"])
+    return @(floor(RDLNum(a0)));
+  if ([n isEqualToString:@"fix"])
+    return @(trunc(RDLNum(a0)));
   if ([n isEqualToString:@"isnothing"])
     return RDLYes(RDLIsNothing(a0));
   if ([n isEqualToString:@"isnumeric"]) {
@@ -1644,6 +1848,10 @@ static id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     return RDLGlobal(scope, ast.name);
   if (ast.kind == RDLExprNodeKindUser)
     return RDLUser(scope, ast.name);
+  // Another textbox's value, as the layout recorded it when it placed that
+  // textbox. It used to evaluate to its own name.
+  if (ast.kind == RDLExprNodeKindReportItem)
+    return scope.reportItemValues[ast.name ?: @""] ?: @"";
   if (ast.kind == RDLExprNodeKindIdentifier)
     return ast.name ?: @"";
   if (ast.kind == RDLExprNodeKindOperator) {

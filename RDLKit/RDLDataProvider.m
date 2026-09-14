@@ -325,9 +325,11 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
     // hand, or one whose fields were named before there was a document to read.
     // A field that says what it holds is left alone; one that says nothing has
     // nothing to lose by being told.
+    // Read off the field's own column -- its DataField -- not a column that
+    // happens to share the field's name. A calculated field has no column.
     for (RDLField *field in dataSet.fields)
-      if (field.dataType == RDLFieldDataTypeUnknown)
-        field.dataType = RDLInferredFieldType(rows, field.name);
+      if (field.dataType == RDLFieldDataTypeUnknown && [field rowKey] != nil)
+        field.dataType = RDLInferredFieldType(rows, [field rowKey]);
   }
   return YES;
 }
