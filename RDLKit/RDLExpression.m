@@ -281,7 +281,7 @@ static NSDate *RDLAsDate(id v, NSDate *fallback) {
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
     f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     for (NSString *fmt in @[
-           @"yyyy-MM-dd", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd HH:mm:ss", @"MM/dd/yyyy", @"d MMM yyyy",
+           @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd", @"MM/dd/yyyy", @"d MMM yyyy",
            @"MMM d, yyyy"
          ]) {
       f.dateFormat = fmt;
@@ -662,16 +662,22 @@ static NSDate *RDLDateLiteral(NSString *text) {
   f.lenient = NO;
   NSArray<NSString *> *dates = @[ @"M/d/yyyy", @"yyyy-M-d" ];
   NSArray<NSString *> *times = @[ @"h:mm:ss a", @"h:mm a", @"h a", @"H:mm:ss" ];
+  // Date + time before date alone. GNUstep's NSDateFormatter accepts trailing
+  // content the format does not mention even with lenient = NO, so "M/d/yyyy"
+  // matches "9/15/2026 1:05:07 PM" and drops the time; the fuller pattern has
+  // to be tried first so the whole literal is read. (Cocoa rejects the
+  // trailing text and reaches the same combined pattern anyway.)
   for (NSString *d in dates) {
+    for (NSString *tm in times) {
+      f.dateFormat = [NSString stringWithFormat:@"%@ %@", d, tm];
+      NSDate *found = [f dateFromString:t];
+      if (found)
+        return found;
+    }
     f.dateFormat = d;
     NSDate *found = [f dateFromString:t];
     if (found)
       return found;
-    for (NSString *tm in times) {
-      f.dateFormat = [NSString stringWithFormat:@"%@ %@", d, tm];
-      if ((found = [f dateFromString:t]))
-        return found;
-    }
   }
   for (NSString *tm in times) {
     f.dateFormat = tm;
@@ -2073,9 +2079,11 @@ static NSDate *RDLDateFromText(NSString *text) {
   [f setFormatterBehavior:NSDateFormatterBehavior10_4];
   f.locale = RDLPOSIXLocale();
   NSString *trimmed = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  // Formats that carry a time first: GNUstep's NSDateFormatter would let a
+  // date-only pattern swallow a string that also has a time and drop it.
   for (NSString *format in @[
-         @"MMMM d, yyyy", @"d MMMM yyyy", @"EEEE, MMMM d, yyyy", @"MMMM d, yyyy h:mm a", @"yyyy-MM-dd'T'HH:mm:ssZZZZZ",
-         @"yyyy-MM-dd'T'HH:mm:ss.SSS", @"yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ"
+         @"MMMM d, yyyy h:mm a", @"yyyy-MM-dd'T'HH:mm:ssZZZZZ", @"yyyy-MM-dd'T'HH:mm:ss.SSS",
+         @"yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", @"MMMM d, yyyy", @"d MMMM yyyy", @"EEEE, MMMM d, yyyy"
        ]) {
     f.dateFormat = format;
     if ((d = [f dateFromString:trimmed]))
@@ -4656,9 +4664,32 @@ static double RDLWallClockSeconds(NSDate *date) {
 // it: from the week holding 1 January, or from the first week with four days,
 // or seven, in the year -- a date before that week being in the last week of
 // the year before.
+// The 1-based day of the year, Jan 1 being 1 (what -[NSCalendar
+// ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:]
+// returns on Cocoa). GNUstep's ordinalityOfUnit:inUnit: answers 0 for this
+// pair, which read day-of-year as -1 in RDLWeekOfYear and sent it recursing
+// a day at a time until the stack ran out (and made DatePart("y") 0). So it
+// is computed from the calendar directly: midnight of the date, less midnight
+// of its Jan 1, in days.
+static NSInteger RDLDayOfYear(NSCalendar *calendar, NSDate *date) {
+  NSDateComponents *c =
+      [calendar components:NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit fromDate:date];
+  NSDateComponents *jan1 = [[NSDateComponents alloc] init];
+  jan1.year = c.year;
+  jan1.month = 1;
+  jan1.day = 1;
+  NSDate *start = [calendar dateFromComponents:jan1];
+  NSDateComponents *midnight = [[NSDateComponents alloc] init];
+  midnight.year = c.year;
+  midnight.month = c.month;
+  midnight.day = c.day;
+  NSDate *today = [calendar dateFromComponents:midnight];
+  return (NSInteger)round([today timeIntervalSinceDate:start] / kRDLSecondsPerDay) + 1;
+}
+
 static NSInteger RDLWeekOfYear(NSDate *date, NSInteger firstDay, RDLFirstWeekOfYearName rule) {
   NSCalendar *calendar = [NSCalendar currentCalendar];
-  NSInteger dayOfYear = (NSInteger)[calendar ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:date] - 1;
+  NSInteger dayOfYear = RDLDayOfYear(calendar, date) - 1;
   NSInteger dayOfWeek = [calendar components:NSWeekdayCalendarUnit fromDate:date].weekday - 1;
   NSInteger first = firstDay - 1;
   NSInteger dayForJan1 = dayOfWeek - (dayOfYear % kRDLDaysInWeek);
@@ -4778,7 +4809,7 @@ static id RDLDatePart(NSArray *vals, NSString *language) {
     result = p.month;
     break;
   case RDLDateIntervalNameDayOfYear:
-    result = (NSInteger)[calendar ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:date];
+    result = RDLDayOfYear(calendar, date);   // GNUstep's ordinalityOfUnit:inUnit: answers 0 here
     break;
   case RDLDateIntervalNameDay:
     result = p.day;
