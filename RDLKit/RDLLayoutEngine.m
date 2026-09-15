@@ -746,6 +746,30 @@ static CGFloat RDLEstimateTextHeight(NSString *text, RDLStyle *style, CGFloat wi
 // -- a line 1.35 times the size, a character 0.52 of it -- so a box of narrow
 // letters grew as much as one of wide ones, and text past the estimate was cut
 // off. The estimate stays for text there is no font to measure with.
+#if !defined(__APPLE__)
+// The space paragraphs ask for above and below themselves, in points. GNUstep's
+// typesetter leaves paragraphSpacingBefore and paragraphSpacing out of the
+// height it measures (and out of the rectangles it lays lines in); Cocoa counts
+// them, so they are added back to the measured height on GNUstep.
+static CGFloat RDLParagraphSpacingPoints(NSAttributedString *text) {
+  CGFloat total = 0;
+  NSString *plain = [text string];
+  NSUInteger at = 0, length = [plain length];
+  while (at < length) {
+    NSRange paragraph = [plain paragraphRangeForRange:NSMakeRange(at, 0)];
+    if (paragraph.length == 0)
+      break;
+    NSParagraphStyle *style = [text attribute:NSParagraphStyleAttributeName
+                                      atIndex:paragraph.location
+                               effectiveRange:NULL];
+    if (style != nil)
+      total += style.paragraphSpacingBefore + style.paragraphSpacing;
+    at = NSMaxRange(paragraph);
+  }
+  return total;
+}
+#endif
+
 static CGFloat RDLMeasureTextHeight(NSAttributedString *text, NSString *plain, RDLStyle *style,
                                     CGFloat widthIn) {
   if ([text length] == 0)
@@ -759,7 +783,11 @@ static CGFloat RDLMeasureTextHeight(NSAttributedString *text, NSString *plain, R
   CGFloat usable = MAX(widthIn - padL - padR, 0.01) * 72.0;
   NSRect used = [text boundingRectWithSize:NSMakeSize(usable, CGFLOAT_MAX)
                                    options:NSStringDrawingUsesLineFragmentOrigin];
-  return ceil(NSHeight(used)) / 72.0 + padT + padB;
+  CGFloat points = NSHeight(used);
+#if !defined(__APPLE__)
+  points += RDLParagraphSpacingPoints(text);
+#endif
+  return ceil(points) / 72.0 + padT + padB;
 }
 
 static CGFloat RDLEstimateTextHeight(NSString *text, RDLStyle *style, CGFloat widthIn) {
