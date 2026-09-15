@@ -1955,7 +1955,8 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
          @"=\"Walnut\" Like \"W*\"", @"=\"W1\" Like \"W#\"", @"=\"Wa\" Like \"W[a-c]\"", @"=\"Wd\" Like \"W[!a-c]\"",
          @"=\"a*b\" Like \"a[*]b\"", @"=\"a-b\" Like \"a[-x]b\"", @"=\"x.y\" Like \"x.y\"", @"=\"ab\" Like \"a[]b\"",
          @"=(\"line\" & vbCrLf & \"x\") Like \"line*\"", @"=\"é\" Like \"?\"", @"=Not (\"walnut\" Like \"W*\")",
-         @"=Not (\"Wb\" Like \"W[!a-c]\")", @"=Not (\"xzy\" Like \"x.y\")"
+         @"=Not (\"Wb\" Like \"W[!a-c]\")", @"=Not (\"xzy\" Like \"x.y\")",
+         @"=\"x😀y\" Like \"x😀y\"", @"=\"x😀y\" Like \"x[😀]y\""
        ])
     [self expectTrue:source scope:scope];
   NSArray<NSArray *> *numbers = @[

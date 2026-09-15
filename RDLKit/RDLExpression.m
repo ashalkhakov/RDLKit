@@ -77,10 +77,6 @@ id RDLRowValue(id row, NSString *key) {
   return RDLFetchRowKey(row, RDLResolveRowKey(row, key));
 }
 
-static id RDLLookup(id row, NSString *name) {
-  return RDLRowValue(row, name);
-}
-
 // Nothing: nil, or NSNull where a collection holds it. The empty string is a
 // string, as it is in VB: IsNothing("") is False, and Count counts it.
 static BOOL RDLIsNothing(id v) {
@@ -1280,20 +1276,16 @@ static NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName) {
 }
 
 // One character of a Like pattern as a regular expression matches it: ASCII
-// letters and digits as they are, anything else by its code point, so no
-// character of the pattern means anything to the regular expression.
+// letters and digits as they are, anything else by its UTF-16 code unit, so no
+// character of the pattern means anything to the regular expression. The two
+// halves of a surrogate pair are escaped one by one; ICU puts them back
+// together as the character they make, in a list as much as in the text.
 static NSString *RDLRegexCharacter(NSString *text, NSUInteger *i) {
   unichar c = [text characterAtIndex:*i];
   *i += 1;
   if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
     return [NSString stringWithCharacters:&c length:1];
-  UTF32Char point = c;
-  if (CFStringIsSurrogateHighCharacter(c) && *i < [text length] &&
-      CFStringIsSurrogateLowCharacter([text characterAtIndex:*i])) {
-    point = CFStringGetLongCharacterForSurrogatePair(c, [text characterAtIndex:*i]);
-    *i += 1;
-  }
-  return [NSString stringWithFormat:@"\\x{%X}", (unsigned)point];
+  return [NSString stringWithFormat:@"\\x{%X}", (unsigned)c];
 }
 
 // VB's Like, under Option Compare Binary, as SSRS compiles expressions: ? any one

@@ -1999,12 +1999,6 @@ static NSXMLElement *RDLBorderElement(NSString *tag, RDLBorder *b) {
   return el;
 }
 
-// A style property is written as its expression when it has one, so a report
-// round-trips with the user's own text rather than a re-printed form.
-static NSString *RDLStyleText(RDLExpr *expr, NSString *constant) {
-  return expr ? [expr source] : constant;
-}
-
 // Sparse Style for rich-text runs/paragraphs: only explicitly set fields are
 // written so unset ones keep inheriting from the textbox style on re-parse.
 // Returns nil when nothing was set.
@@ -2065,14 +2059,6 @@ static void RDLAddSparseStyle(NSXMLElement *parent, RDLStyle *s) {
   NSXMLElement *el = RDLSparseStyleElement(s);
   if (el)
     [parent addChild:el];
-}
-
-// One measurement property: its expression if it has one, else its constant.
-static void RDLAddLength(NSXMLElement *parent, NSString *name, RDLExpr *expr, RDLLength *len) {
-  if (expr)
-    RDLAdd(parent, name, [expr source]);
-  else if (len)
-    RDLAdd(parent, name, [len stringValue]);
 }
 
 // A property is written when it says something the spec's default does not.

@@ -1319,7 +1319,10 @@ a decision on record rather than a surprise.
   for equal string literals (.NET interns them) and for small boxed numbers
   (the runtime shares them); the checker reports the latter. A value that is
   `#Error` at render time is shown, not reported. `NumeralVariant` 5 and 7,
-  whose digits MS-RDL does not give, are written as 1.
+  whose digits MS-RDL does not give, are written as 1. `Like` matches whole
+  characters where VB matches UTF-16 code units, so a character outside the
+  Basic Multilingual Plane (an emoji, say) is one `?` here and two in SSRS:
+  `"😀" Like "?"` is True here and False there.
 - Images (§7.3): an `AutoSize` image moves what is below it but not what is
   beside it, and in a tablix cell it takes the cell's width. A remote image
   is read only when the host allows remote documents. `BackgroundImage/
