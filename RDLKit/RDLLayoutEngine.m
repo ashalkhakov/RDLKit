@@ -363,6 +363,14 @@ static NSString *RDLLocaleIdentifierOfCollation(NSString *collation) {
         [NSCharacterSet characterSetWithRange:NSMakeRange(kRDLFirstFoldedKana, kRDLLastFoldedKana - kRDLFirstFoldedKana + 1)];
   NSString *identifier = RDLLocaleIdentifierOfCollation(dataSet.collation);
   comparer->_locale = identifier ? [NSLocale localeWithLocaleIdentifier:identifier] : RDLLocaleForLanguage(scope.language);
+  // GNUstep's -compare:options:range:locale: collates by byte under the POSIX
+  // (C) locale, so the case-, accent- and width-insensitive options are
+  // ignored there and "apple" never equals "APPLE" -- which a filter or a sort
+  // with no explicit collation would hit whenever the machine's locale is
+  // POSIX (an unconfigured CI box). A nil locale uses Unicode's own folding,
+  // which honours the options; a real collation locale keeps its ordering.
+  if ([[comparer->_locale localeIdentifier] rangeOfString:@"POSIX"].location != NSNotFound)
+    comparer->_locale = nil;
   return comparer;
 }
 
