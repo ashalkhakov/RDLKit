@@ -2780,9 +2780,12 @@ static NSString *RDLDecimalCaseText(NSArray<NSString *> *p) {
   RDLNumberFailure failure = RDLNumberFailureUnspecified;
   RDLNumber *r = nil;
   if ([op isEqualToString:@"fromdouble"])
-    r = [[RDLNumber numberWithDouble:[p[1] doubleValue]] numberConvertedTo:RDLConversionTargetDecimal failure:&failure];
+    // strtod, not -[NSString doubleValue]: GNUstep's doubleValue drops digits
+    // past ~18 on a large-magnitude literal (123456789012345680000 parses as
+    // 1.23...e17), which would misread the fixture's operand, not the result.
+    r = [[RDLNumber numberWithDouble:strtod([p[1] UTF8String], NULL)] numberConvertedTo:RDLConversionTargetDecimal failure:&failure];
   else if ([op isEqualToString:@"fromsingle"])
-    r = [[RDLNumber numberWithSingle:(float)[p[1] doubleValue]] numberConvertedTo:RDLConversionTargetDecimal
+    r = [[RDLNumber numberWithSingle:strtof([p[1] UTF8String], NULL)] numberConvertedTo:RDLConversionTargetDecimal
                                                                          failure:&failure];
   else if ([op isEqualToString:@"parse"])
     r = a;
