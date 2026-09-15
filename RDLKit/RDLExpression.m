@@ -158,6 +158,50 @@ static NSString *RDLGeneralNumberText(double d, int digits) {
 static id RDLDateInFormat(NSDate *date, NSString *format, NSLocale *locale);
 static NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *locale);
 
+// GNUstep writes a large or high-precision NSDecimalNumber's -description in
+// scientific notation ("1.8446744073709551615E19"), where Cocoa writes the
+// digits out in full. This expands that form back to plain digits, exactly
+// (it is a shift of the decimal point, no rounding). A string with no
+// exponent is returned unchanged, so it is a no-op on Cocoa.
+static NSString *RDLExpandScientific(NSString *s) {
+  NSRange e = [s rangeOfString:@"E" options:NSCaseInsensitiveSearch];
+  if (e.location == NSNotFound)
+    return s;
+  long exponent = (long)[[s substringFromIndex:e.location + 1] integerValue];
+  NSString *mantissa = [s substringToIndex:e.location];
+  BOOL negative = [mantissa hasPrefix:@"-"];
+  if (negative || [mantissa hasPrefix:@"+"])
+    mantissa = [mantissa substringFromIndex:1];
+  NSRange dot = [mantissa rangeOfString:@"."];
+  NSString *whole = dot.location == NSNotFound ? mantissa : [mantissa substringToIndex:dot.location];
+  NSString *fraction = dot.location == NSNotFound ? @"" : [mantissa substringFromIndex:dot.location + 1];
+  NSString *digits = [whole stringByAppendingString:fraction];
+  long point = (long)[whole length] + exponent;   // digits before the point
+  NSString *out;
+  if (point <= 0) {
+    NSString *zeros = [@"" stringByPaddingToLength:(NSUInteger)(-point) withString:@"0" startingAtIndex:0];
+    out = [NSString stringWithFormat:@"0.%@%@", zeros, digits];
+  } else if (point >= (long)[digits length]) {
+    NSString *zeros = [@"" stringByPaddingToLength:(NSUInteger)(point - (long)[digits length])
+                                        withString:@"0"
+                                       startingAtIndex:0];
+    out = [digits stringByAppendingString:zeros];
+  } else {
+    out = [NSString stringWithFormat:@"%@.%@", [digits substringToIndex:(NSUInteger)point],
+                                     [digits substringFromIndex:(NSUInteger)point]];
+  }
+  // A fractional part left by the expansion keeps only its significant tail.
+  if ([out rangeOfString:@"."].location != NSNotFound) {
+    NSUInteger end = [out length];
+    while (end > 0 && [out characterAtIndex:end - 1] == '0')
+      end -= 1;
+    if (end > 0 && [out characterAtIndex:end - 1] == '.')
+      end -= 1;
+    out = [out substringToIndex:end];
+  }
+  return negative ? [@"-" stringByAppendingString:out] : out;
+}
+
 static NSString *RDLStr(id v) {
   if (RDLIsNothing(v))
     return @"";
@@ -189,6 +233,10 @@ static NSString *RDLStr(id v) {
     NSString *text = RDLVisualBasicDateText(v, [NSLocale currentLocale]);
     return [text length] ? text : [v description];
   }
+  // A Decimal (or any other number) in full: GNUstep's -description writes a
+  // large decimal in scientific notation, which RDLExpandScientific undoes.
+  if ([v isKindOfClass:[NSNumber class]])
+    return RDLExpandScientific([v description]);
   return [v description];
 }
 
@@ -3094,6 +3142,28 @@ static NSNumberFormatter *RDLFormatterInStyle(NSLocale *locale, NSNumberFormatte
   return f;
 }
 
+// The minor units of an ISO 4217 currency -- the digits after the point a
+// currency amount is written with. Cocoa's currency NSNumberFormatter reports
+// this as its fraction digits; GNUstep's reports 0 for every currency and
+// gives no pattern to read it from, so it is derived from the currency code.
+// Two, but for the currencies that have none or three (the four-digit ones are
+// funds, not cash, and do not arise here).
+static NSInteger RDLCurrencyMinorUnits(NSString *code) {
+  static NSSet *zero, *three;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    zero = [NSSet setWithArray:@[ @"BIF", @"CLP", @"DJF", @"GNF", @"ISK", @"JPY", @"KMF", @"KRW", @"PYG", @"RWF",
+                                  @"UGX", @"VND", @"VUV", @"XAF", @"XOF", @"XPF" ]];
+    three = [NSSet setWithArray:@[ @"BHD", @"IQD", @"JOD", @"KWD", @"LYD", @"OMR", @"TND" ]];
+  });
+  NSString *c = [code uppercaseString] ?: @"";
+  if ([zero containsObject:c])
+    return 0;
+  if ([three containsObject:c])
+    return 3;
+  return 2;
+}
+
 + (instancetype)cultureForLocale:(NSLocale *)locale {
   RDLNumberCulture *c = [[self alloc] init];
   NSNumberFormatter *decimal = RDLFormatterInStyle(locale, NSNumberFormatterDecimalStyle);
@@ -3105,7 +3175,12 @@ static NSNumberFormatter *RDLFormatterInStyle(NSLocale *locale, NSNumberFormatte
   c.secondaryGroupSize = (NSInteger)decimal.secondaryGroupingSize;
   NSNumberFormatter *currency = RDLFormatterInStyle(locale, NSNumberFormatterCurrencyStyle);
   c.currencySymbol = currency.currencySymbol ?: @"¤";
-  c.currencyDigits = (NSInteger)currency.maximumFractionDigits;
+  // GNUstep's currency formatter reports 0 fraction digits and no pattern for
+  // every currency; when it gives no pattern to trust, take the digits from
+  // the currency code instead. (Cocoa gives a real pattern, so it is used.)
+  c.currencyDigits = [currency.positiveFormat length]
+                         ? (NSInteger)currency.maximumFractionDigits
+                         : RDLCurrencyMinorUnits([locale objectForKey:NSLocaleCurrencyCode]);
   c.currencyPattern = [currency.positiveFormat length] ? currency.positiveFormat : @"¤#,##0.00";
   c.currencyNegativePattern = [currency.negativeFormat length] ? currency.negativeFormat
                                                                : [@"-" stringByAppendingString:c.currencyPattern];
@@ -4726,6 +4801,31 @@ static RDLExprError *RDLInvalidArgument(NSString *name) {
 
 // A FirstDayOfWeek argument as the day it names, 1 for Sunday to 7 for
 // Saturday; System is the culture's first day. `error` for one VB refuses.
+// The first day of the week a region writes its calendars with, as CLDR's
+// weekData records it (1 = Sunday ... 7 = Saturday, matching VB's
+// FirstDayOfWeek and -[NSCalendar firstWeekday]). The world default is Monday;
+// the Sunday and Saturday regions are the listed exceptions. Used where
+// GNUstep cannot supply it (its -firstWeekday is Sunday everywhere).
+static NSInteger RDLFirstWeekdayForRegion(NSString *region) {
+  static NSSet *sunday, *saturday;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    sunday = [NSSet setWithArray:@[ @"AG", @"AS", @"AU", @"BD", @"BR", @"BS", @"BT", @"BW", @"BZ", @"CA", @"CN", @"CO",
+                                    @"DM", @"DO", @"ET", @"GT", @"GU", @"HK", @"HN", @"ID", @"IL", @"IN", @"JM", @"JP",
+                                    @"KE", @"KH", @"KR", @"LA", @"MH", @"MM", @"MO", @"MT", @"MX", @"MZ", @"NI", @"NP",
+                                    @"PA", @"PE", @"PH", @"PK", @"PR", @"PT", @"PY", @"SA", @"SG", @"SV", @"TH", @"TT",
+                                    @"TW", @"UM", @"US", @"VE", @"VI", @"WS", @"YE", @"ZA", @"ZW" ]];
+    saturday = [NSSet setWithArray:@[ @"AE", @"AF", @"BH", @"DJ", @"DZ", @"EG", @"IQ", @"IR", @"JO", @"KW", @"LY",
+                                      @"MA", @"OM", @"QA", @"SD", @"SY" ]];
+  });
+  NSString *r = [region uppercaseString] ?: @"";
+  if ([sunday containsObject:r])
+    return RDLFirstDayOfWeekNameSunday;
+  if ([saturday containsObject:r])
+    return RDLFirstDayOfWeekNameSaturday;
+  return RDLFirstDayOfWeekNameMonday;
+}
+
 static NSInteger RDLFirstDayOfWeek(id value, RDLFirstDayOfWeekName fallback, NSLocale *locale, id *error) {
   NSInteger day = fallback;
   if (!RDLIsNothing(value)) {
@@ -4744,6 +4844,11 @@ static NSInteger RDLFirstDayOfWeek(id value, RDLFirstDayOfWeekName fallback, NSL
     NSCalendar *calendar = [[NSCalendar currentCalendar] copy];
     calendar.locale = locale;
     day = (NSInteger)calendar.firstWeekday;
+    // GNUstep's -firstWeekday is Sunday for every locale, so the culture's
+    // own first day (Monday across most of the world) is taken from the
+    // region instead, as CLDR -- and .NET's DateTimeFormatInfo -- record it.
+    if (day == RDLFirstDayOfWeekNameSunday)
+      day = RDLFirstWeekdayForRegion([locale objectForKey:NSLocaleCountryCode]);
   }
   return day;
 }
