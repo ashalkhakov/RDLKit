@@ -1590,6 +1590,28 @@ static NSXMLNode *RDLPlainCopy(NSXMLNode *node) {
   return copy;
 }
 
+// Append a kept node under `parent`, building top-down: the element is attached
+// to `parent` before its children so a prefixed name (am:Name) resolves against
+// the namespace already in scope on the writer's tree, rather than GNUstep
+// minting a fresh prefix (am_1) with a redundant xmlns redeclaration on the
+// detached copy RDLPlainCopy would otherwise hand back.
+static void RDLAppendPlainCopy(NSXMLElement *parent, NSXMLNode *node) {
+  if (node.kind != NSXMLElementKind) {
+    NSXMLNode *copy = RDLPlainCopy(node);
+    if (copy)
+      [parent addChild:copy];
+    return;
+  }
+  NSXMLElement *element = (NSXMLElement *)node;
+  NSXMLElement *copy = [NSXMLElement elementWithName:element.name];
+  [parent addChild:copy];
+  for (NSXMLNode *attribute in [element attributes])
+    if (![attribute.name hasPrefix:@"xmlns"])
+      [copy addAttribute:RDLPlainCopy(attribute)];
+  for (NSXMLNode *child in [element children])
+    RDLAppendPlainCopy(copy, child);
+}
+
 static NSXMLElement *RDLElementAtPath(NSXMLElement *root, NSArray<NSString *> *path) {
   NSXMLElement *here = root;
   for (NSString *step in path) {
@@ -1647,9 +1669,7 @@ static void RDLPutBackPreserved(NSXMLElement *root, RDLReport *report) {
     }
     if ([[writtenUnder objectForKey:parent] containsObject:RDLKeptKey(kept.node)])
       continue;
-    NSXMLNode *copy = RDLPlainCopy(kept.node);
-    if (copy)
-      [parent addChild:copy];
+    RDLAppendPlainCopy(parent, kept.node);
   }
 }
 
