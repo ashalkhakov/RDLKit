@@ -157,6 +157,18 @@ static NSString *RDLGeneralNumberText(double d, int digits) {
 
 static id RDLDateInFormat(NSDate *date, NSString *format, NSLocale *locale);
 static NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *locale);
+static NSString *RDLExpandScientific(NSString *s);
+
+// A whole NSDecimalNumber as a long long, exactly. -[NSDecimalNumber
+// longLongValue] routes through a double on GNUstep and overflows to
+// LLONG_MIN at the top of the range (9223372036854775807 came back as
+// -9223372036854775808), so the digits are read from the number's own text
+// instead -- expanded out of the scientific form GNUstep writes it in.
+static long long RDLDecimalLongLong(NSNumber *number) {
+  if (![number isKindOfClass:[NSDecimalNumber class]])
+    return [number longLongValue];
+  return [RDLExpandScientific([number description]) longLongValue];
+}
 
 // GNUstep writes a large or high-precision NSDecimalNumber's -description in
 // scientific notation ("1.8446744073709551615E19"), where Cocoa writes the
@@ -690,7 +702,7 @@ static NSString *RDLLexTypeCharacter(NSString *src, NSUInteger *i) {
 // VB types one: Integer, or Long when it is too large for Integer -- and here
 // Decimal when it is too large for Long, rather than refuse it.
 static id RDLIntegralLiteral(NSDecimalNumber *number, NSString *suffix) {
-  long long whole = [number longLongValue];
+  long long whole = RDLDecimalLongLong(number);
   if ([suffix isEqualToString:@"S"])
     return RDLShort((short)whole);
   if ([suffix isEqualToString:@"I"] || [suffix isEqualToString:@"%"] || [suffix isEqualToString:@"US"])
@@ -2182,7 +2194,7 @@ static id RDLConvertToWhole(id value, RDLConversionTarget target, RDLConversionS
   // -[NSDecimalNumber longLongValue] directly, not through -stringValue:
   // GNUstep writes a decimal's stringValue in scientific notation
   // ("2.147483648E9"), which -longLongValue on the string then reads as 2.
-  return RDLIntegralResult([whole longLongValue], carried);
+  return RDLIntegralResult(RDLDecimalLongLong(whole), carried);
 }
 
 // Into a Single, a Double or a Decimal. .NET takes a Double into a Decimal at
