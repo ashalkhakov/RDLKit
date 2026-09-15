@@ -576,8 +576,7 @@ static RDLStyle *RDLStyleResolvingGeneralAlign(RDLStyle *style, id value) {
   if (align != RDLTextAlignGeneral && align != RDLTextAlignUnspecified)
     return style;
   RDLStyle *out = [RDLStyle styleByMerging:nil over:style ?: [RDLStyle defaultStyle]];
-  BOOL numeric = [value isKindOfClass:[NSNumber class]] &&
-                 strcmp([value objCType], @encode(BOOL)) != 0;
+  BOOL numeric = RDLNumericTypeOfValue(value) != RDLNumericTypeUnspecified;
   out.textAlign = numeric ? RDLTextAlignRight : RDLTextAlignLeft;
   return out;
 }
@@ -1062,6 +1061,8 @@ static NSArray<RDLItem *> *RDLItemsByTop(NSArray<RDLItem *> *items) {
 }
 
 static double RDLAsN(id v) {
+  if ([v isKindOfClass:[RDLNumber class]])
+    return [(RDLNumber *)v doubleValue];
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
   if ([v isKindOfClass:[NSString class]])
@@ -1081,7 +1082,12 @@ static NSComparisonResult RDLCmp(id a, id b, RDLTextComparer *text) {
     if (da != nil && db != nil)
       return [da compare:db];
   }
-  BOOL numeric = [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
+  // Two numbers exactly, in the wider of their types; a number and anything
+  // else as Doubles.
+  RDLNumber *x = [RDLNumber numberFromValue:a], *y = [RDLNumber numberFromValue:b];
+  if (x && y)
+    return [x compare:y];
+  BOOL numeric = x || y || [a isKindOfClass:[NSNumber class]] || [b isKindOfClass:[NSNumber class]];
   if (numeric) {
     double d = RDLAsN(a) - RDLAsN(b);
     if (d < 0)
@@ -1287,6 +1293,8 @@ static NSArray *RDLPartition(NSArray *rows, NSArray<RDLValue *> *exprs, RDLEvalS
 // What an evaluated Hidden or Disabled says: a Boolean, or the text "true" a
 // literal leaves behind.
 static BOOL RDLIsTrue(id v) {
+  if ([v isKindOfClass:[RDLNumber class]])
+    return ![(RDLNumber *)v isZero];
   if ([v isKindOfClass:[NSNumber class]])
     return [v boolValue];
   return [RDLAsStr(v) caseInsensitiveCompare:@"true"] == NSOrderedSame;

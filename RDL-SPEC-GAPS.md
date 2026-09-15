@@ -661,9 +661,17 @@ diverges from VB.NET as hosted by SSRS in ways that change output.
 ### 10.1 Type system
 
 A number carries its VB type (P1): `Short`, `Integer`, `Long`, `Decimal`,
-`Single` or `Double`, as `NSNumber`'s own type encoding and `NSDecimalNumber`
-for `Decimal` (`RDLNumericTypeOfValue`). `Byte` shares `Short`'s encoding, and
-the unsigned types are read as the next wider signed one. Literals are typed
+`Single` or `Double`, held in the kit's own `RDLNumber` rather than in
+Foundation's classes, whose record of a number's type is not the same on Cocoa
+and GNUstep (`RDLNumericTypeOfValue`). `Decimal` is .NET's own: a 96-bit whole
+number, 0 to 28 places and a sign. Its places are part of its value's text, as
+in .NET -- `1.10D` writes "1.10", `100D * 1.00D` "100.00", `2D / 3D`
+"0.6666666666666666666666666667" -- and its rounding, overflow, `Mod` and its
+conversion from a `Double` come out as .NET's do; the tests hold it to results
+taken from .NET. `Byte` and `SByte` are carried as a `Short` and the unsigned
+types as the next wider signed one. A Foundation number from a data source or a
+host's object becomes the `RDLNumber` of its type when the field is read; a
+laid-out chart hands its values on as Foundation numbers. Literals are typed
 (§10.2), and the operators follow VB: `+`, `-`, `*` and `Mod` give the wider of
 the operands' types; `/` gives a `Double` for whole numbers and otherwise the
 wider of `Decimal`, `Single` and `Double`; `\` rounds a non-whole operand to a

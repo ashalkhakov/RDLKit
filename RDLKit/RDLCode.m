@@ -126,7 +126,7 @@ static id RDLCodeConverted(id value, RDLCodeType type) {
 static id RDLCodeStartingValue(RDLCodeType type) {
   RDLConversionTarget number = RDLCodeConversionTarget(type);
   if (number != RDLConversionTargetUnspecified)
-    return RDLValueConvertedTo([NSNumber numberWithInt:0], number);
+    return RDLValueConvertedTo([RDLNumber numberWithInteger:0], number);
   return type == RDLCodeTypeBoolean ? [NSNumber numberWithBool:NO] : nil;
 }
 
@@ -1132,11 +1132,11 @@ static RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStateme
     double limit = RDLValueAsNumber(end);
     double step = s.step ? RDLValueAsNumber(by) : 1;
     if (s.type != RDLCodeTypeUnspecified || frame.locals[[s.name lowercaseString]] == nil)
-      [self declare:s.name type:s.type value:@(value) frame:frame];
+      [self declare:s.name type:s.type value:[RDLNumber numberWithDouble:value] frame:frame];
     for (NSUInteger round = 0; round < kRDLCodeLoopLimit; round++) {
       if (step >= 0 ? value > limit : value < limit)
         break;
-      if ([self failed:[self assign:s.name value:@(value) frame:frame scope:scope] frame:frame])
+      if ([self failed:[self assign:s.name value:[RDLNumber numberWithDouble:value] frame:frame scope:scope] frame:frame])
         return RDLCodeFlowReturn;
       RDLCodeFlow flow = [self run:s.body frame:frame scope:scope];
       if (flow == RDLCodeFlowExitFor)

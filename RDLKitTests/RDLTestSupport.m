@@ -126,6 +126,8 @@ RDLReport *RDLMiniInvoice(void) {
 }
 
 double RDLAsNum(id v) {
+  if ([v isKindOfClass:[RDLNumber class]])
+    return [(RDLNumber *)v doubleValue];
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
   if ([v isKindOfClass:[NSString class]])

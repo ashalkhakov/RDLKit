@@ -1014,7 +1014,7 @@ static NSString *RDLReportWithUnsupportedItems(void) {
   scope.dataSet = bds;
   scope.row = @{@"Amount" : @21};
   id twice = [RDLExpression evaluate:@"=Fields!Double.Value" scope:scope];
-  if (![twice isKindOfClass:[NSNumber class]] || [twice doubleValue] != 42.0)
+  if (![twice isKindOfClass:[RDLNumber class]] || [twice doubleValue] != 42.0)
     XCTFail(@"%@", [NSString stringWithFormat:@"calculated field evaluated to %@", twice]);
 
   // Second pass byte-identical: nothing was normalised away on the way in.

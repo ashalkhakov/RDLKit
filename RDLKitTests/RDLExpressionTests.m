@@ -726,7 +726,9 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       sc.row = row;
       [got addObject:[e evaluateInScope:sc] ?: @0];
     }
-    if (![got isEqualToArray:@[ @1, @2, @3, @4 ]])
+    NSArray *want = @[ [RDLNumber numberWithInteger:1], [RDLNumber numberWithInteger:2], [RDLNumber numberWithInteger:3],
+                       [RDLNumber numberWithInteger:4] ];
+    if (![got isEqualToArray:want])
       XCTFail(@"%@", [NSString stringWithFormat:@"mixed key casing → %@", got]);
 
     // And switching between a dictionary and a KVC object mid-run.
@@ -1169,7 +1171,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
   }
-  if (![[RDLExpression evaluate:@"=0.1D" scope:scope] isEqual:[NSDecimalNumber decimalNumberWithString:@"0.1"]])
+  if (![[RDLExpression evaluate:@"=0.1D" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.1"]])
     XCTFail(@"%@", @"0.1D should be exactly a tenth");
 
   NSCalendar *cal = [NSCalendar currentCalendar];
@@ -1254,7 +1256,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
   }
-  if (![[RDLExpression evaluate:@"=0.1D + 0.2D" scope:scope] isEqual:[NSDecimalNumber decimalNumberWithString:@"0.3"]])
+  if (![[RDLExpression evaluate:@"=0.1D + 0.2D" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.3"]])
     XCTFail(@"%@", @"0.1D + 0.2D should be exactly 0.3");
   [self expectText:@"=\"1\" + \"2\"" scope:scope equals:@"12"];
   [self expectText:@"=\"a\" & 1 & True" scope:scope equals:@"a1True"];
@@ -1336,7 +1338,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
   }
-  if (![[RDLExpression evaluate:@"=CDec(0.1 + 0.2)" scope:scope] isEqual:[NSDecimalNumber decimalNumberWithString:@"0.3"]])
+  if (![[RDLExpression evaluate:@"=CDec(0.1 + 0.2)" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.3"]])
     XCTFail(@"%@", @"CDec(0.1 + 0.2) should be exactly 0.3, a Double taken at 15 digits");
   NSDictionary<NSString *, NSString *> *texts = @{
     @"=CStr(0.1 + 0.2)" : @"0.3",
@@ -1477,12 +1479,12 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   ];
   for (NSArray *c in cases) {
     id value = [RDLExpression evaluate:c[0] scope:scope];
-    if (![value isKindOfClass:[NSNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-6 ||
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-6 ||
         RDLNumericTypeOfValue(value) != [c[2] integerValue])
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
   }
-  NSDecimalNumber *third = [NSDecimalNumber decimalNumberWithString:@"0.3"];
+  RDLNumber *third = [RDLNumber decimalWithText:@"0.3"];
   if (![[RDLExpression evaluate:@"=Sum(Fields!Price.Value)" scope:scope] isEqual:third])
     XCTFail(@"%@", @"a Decimal field's 0.1 and 0.2 should total exactly 0.3");
   if (![[RDLExpression evaluate:@"=Code.Exact()" scope:scope] isEqual:third])
@@ -1591,15 +1593,15 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   ];
   for (NSArray *c in cases) {
     id value = [RDLExpression evaluate:c[0] scope:scope];
-    if (![value isKindOfClass:[NSNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 ||
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 ||
         RDLNumericTypeOfValue(value) != [c[2] integerValue])
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
   }
-  if (![[RDLExpression evaluate:@"=Round(2.675D, 2)" scope:scope] isEqual:[NSDecimalNumber decimalNumberWithString:@"2.68"]])
+  if (![[RDLExpression evaluate:@"=Round(2.675D, 2)" scope:scope] isEqual:[RDLNumber decimalWithText:@"2.68"]])
     XCTFail(@"%@", @"Round(2.675D, 2) should be exactly 2.68, a Decimal rounded to even");
   if (![[RDLExpression evaluate:@"=Round(2.665D, 2, MidpointRounding.AwayFromZero)" scope:scope]
-          isEqual:[NSDecimalNumber decimalNumberWithString:@"2.67"]])
+          isEqual:[RDLNumber decimalWithText:@"2.67"]])
     XCTFail(@"%@", @"Round(2.665D, 2, AwayFromZero) should be exactly 2.67");
   [self expectText:@"=Math.Max(1, 0 / 0)" scope:scope equals:@"NaN"];
   [self expectText:@"=MidpointRounding.AwayFromZero" scope:scope equals:@"AwayFromZero"];
@@ -1973,7 +1975,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   ];
   for (NSArray *c in numbers) {
     id value = [RDLExpression evaluate:c[0] scope:scope];
-    if (![value isKindOfClass:[NSNumber class]] || [value intValue] != [c[1] intValue] ||
+    if (![value isKindOfClass:[RDLNumber class]] || [value integerValue] != [c[1] integerValue] ||
         RDLNumericTypeOfValue(value) != RDLNumericTypeInteger)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Integer %@", c[0], value,
                                                 (long)RDLNumericTypeOfValue(value), c[1]]);
@@ -2109,7 +2111,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     ];
     for (NSArray *c in integers) {
       id value = [RDLExpression evaluate:c[0] scope:scope];
-      if (![value isKindOfClass:[NSNumber class]] || [value integerValue] != [c[1] integerValue] ||
+      if (![value isKindOfClass:[RDLNumber class]] || [value integerValue] != [c[1] integerValue] ||
           RDLNumericTypeOfValue(value) != RDLNumericTypeInteger)
         XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Integer %@", c[0], value,
                                                   (long)RDLNumericTypeOfValue(value), c[1]]);
@@ -2125,7 +2127,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     ];
     for (NSArray *c in longs) {
       id value = [RDLExpression evaluate:c[0] scope:scope];
-      if (![value isKindOfClass:[NSNumber class]] || [value longLongValue] != [c[1] longLongValue] ||
+      if (![value isKindOfClass:[RDLNumber class]] || [value longLongValue] != [c[1] longLongValue] ||
           RDLNumericTypeOfValue(value) != RDLNumericTypeLong)
         XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Long %@", c[0], value,
                                                   (long)RDLNumericTypeOfValue(value), c[1]]);
@@ -2302,7 +2304,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   };
   for (NSString *source in numbers) {
     id value = [RDLExpression evaluate:source scope:scope];
-    if (![value isKindOfClass:[NSNumber class]] || fabs([value doubleValue] - [numbers[source] doubleValue]) > 1e-4)
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [numbers[source] doubleValue]) > 1e-4)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want %@", source, value, numbers[source]]);
   }
   for (NSString *source in @[ @"=IsArray(Split(\"a,b\", \",\"))", @"=Not IsArray(\"a\")", @"=Not IsError(1)", @"=Not IsDBNull(Nothing)" ])
@@ -2681,9 +2683,9 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   if ([first.problems count] || ![[first valueNamed:@"zone"].value isEqual:@"A"] ||
       ![[first valueNamed:@"Region"].value isEqual:@"N"] || ![[first valueNamed:@"Region"].labels isEqual:@[ @"North" ]] ||
       [[first valueNamed:@"Region"].validValues count] != 1 || ![[first valueNamed:@"Regions"].value isEqual:@[ @"N" ]] ||
-      ![[first valueNamed:@"Copies"].value isEqual:@2] ||
+      ![[first valueNamed:@"Copies"].value isEqual:[RDLNumber numberWithInteger:2]] ||
       RDLNumericTypeOfValue([first valueNamed:@"Copies"].value) != RDLNumericTypeInteger ||
-      ![[first valueNamed:@"Rate"].value isEqual:@2.5] || ![[first valueNamed:@"Rush"].value isEqual:@YES] ||
+      ![[first valueNamed:@"Rate"].value isEqual:[RDLNumber numberWithDouble:2.5]] || ![[first valueNamed:@"Rush"].value isEqual:@YES] ||
       ![[first valueNamed:@"Due"].value isKindOfClass:[NSDate class]] || [first valueNamed:@"Season"].value != nil ||
       ![[first valueNamed:@"Fixed"].value isEqual:@"as written"] || ![first valueNamed:@"Region"].defaulted)
     XCTFail(@"%@", [NSString stringWithFormat:@"defaults, types and a list read from a dataset: %@", said(first)]);
@@ -2765,6 +2767,118 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be #Error", source]);
   if (RDLSawDiagnostic(RDLCheckExpression(@"=Convert.ToBase64String(Convert.FromBase64String(\"aGk=\"))", NO), @"unknown-member", nil))
     XCTFail(@"%@", @"the checker should know both");
+}
+
+@end
+
+// One line of the Decimal fixture worked out by RDLNumber, written as the
+// fixture writes .NET's answer.
+static NSString *RDLDecimalCaseText(NSArray<NSString *> *p) {
+  NSString *op = p[0];
+  RDLNumber *a = [p count] > 1 ? [RDLNumber decimalWithText:p[1]] : nil;
+  RDLNumber *b = [p count] > 2 ? [RDLNumber decimalWithText:p[2]] : nil;
+  RDLNumberFailure failure = RDLNumberFailureUnspecified;
+  RDLNumber *r = nil;
+  if ([op isEqualToString:@"fromdouble"])
+    r = [[RDLNumber numberWithDouble:[p[1] doubleValue]] numberConvertedTo:RDLConversionTargetDecimal failure:&failure];
+  else if ([op isEqualToString:@"fromsingle"])
+    r = [[RDLNumber numberWithSingle:(float)[p[1] doubleValue]] numberConvertedTo:RDLConversionTargetDecimal
+                                                                         failure:&failure];
+  else if ([op isEqualToString:@"parse"])
+    r = a;
+  else if (a == nil)
+    return @"!overflow";
+  else if ([op isEqualToString:@"cmp"])
+    return [NSString stringWithFormat:@"%ld", (long)[a compare:b]];
+  else if ([op isEqualToString:@"add"])
+    r = [a numberByAdding:b failure:&failure];
+  else if ([op isEqualToString:@"sub"])
+    r = [a numberBySubtracting:b failure:&failure];
+  else if ([op isEqualToString:@"mul"])
+    r = [a numberByMultiplyingBy:b failure:&failure];
+  else if ([op isEqualToString:@"div"])
+    r = [a numberByDividingBy:b failure:&failure];
+  else if ([op isEqualToString:@"mod"])
+    r = [a numberByModulo:b failure:&failure];
+  else if ([op isEqualToString:@"round"])
+    r = [a numberRoundedToDigits:[p[2] integerValue]
+                        midpoint:[p[3] isEqualToString:@"away"] ? RDLMidpointRoundingAwayFromZero : RDLMidpointRoundingToEven
+                         failure:&failure];
+  else if ([op isEqualToString:@"floor"] || [op isEqualToString:@"int"])
+    r = [a numberByRounding:RDLWholeRoundingFloor];
+  else if ([op isEqualToString:@"ceiling"])
+    r = [a numberByRounding:RDLWholeRoundingCeiling];
+  else if ([op isEqualToString:@"truncate"] || [op isEqualToString:@"fix"])
+    r = [a numberByRounding:RDLWholeRoundingTruncate];
+  else if ([op isEqualToString:@"neg"])
+    r = [a negatedWithFailure:&failure];
+  else if ([op isEqualToString:@"abs"])
+    r = [a absoluteValueWithFailure:&failure];
+  else if ([op isEqualToString:@"clng"])
+    r = [a numberConvertedTo:RDLConversionTargetLong failure:&failure];
+  else
+    return [@"unknown operation " stringByAppendingString:op];
+  if (r)
+    return [r description];
+  return failure == RDLNumberFailureDivisionByZero ? @"!divzero" : @"!overflow";
+}
+
+@implementation RDLExpressionTests (Decimal)
+
+// Decimal is .NET's own: a 96-bit whole number, 0 to 28 places and a sign. Its
+// places are part of its text, and its rounding, overflow, Mod and conversion
+// from a Double are .NET's, which the fixture holds it to case by case --
+// operands at random and at the edges, each with what .NET 8 made of them.
+// Decimal used to be NSDecimalNumber, which kept no places (1.10D wrote "1.1"),
+// and whose text GNUstep writes in scientific notation.
+- (void)testDecimalArithmeticIsDotNets {
+  NSString *fixture = [[NSString alloc] initWithData:[self fixtureNamed:@"decimal-dotnet.txt"]
+                                            encoding:NSUTF8StringEncoding];
+  NSMutableArray<NSString *> *wrong = [NSMutableArray array];
+  NSUInteger cases = 0;
+  for (NSString *line in [fixture componentsSeparatedByString:@"\n"]) {
+    NSRange arrow = [line rangeOfString:@" => "];
+    if ([line hasPrefix:@"#"] || arrow.location == NSNotFound)
+      continue;
+    cases += 1;
+    NSString *want = [line substringFromIndex:NSMaxRange(arrow)];
+    NSString *got = RDLDecimalCaseText([[line substringToIndex:arrow.location] componentsSeparatedByString:@" "]);
+    if (![got isEqualToString:want])
+      [wrong addObject:[NSString stringWithFormat:@"%@, not %@", line, got]];
+  }
+  if (cases == 0)
+    XCTFail(@"%@", @"the Decimal fixture should have cases");
+  if ([wrong count])
+    XCTFail(@"%lu of %lu Decimal cases differ from .NET: %@", (unsigned long)[wrong count], (unsigned long)cases,
+            [wrong subarrayWithRange:NSMakeRange(0, MIN([wrong count], (NSUInteger)10))]);
+
+  // And through the expression language, as CStr and Format write the results.
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDictionary<NSString *, NSString *> *written = @{
+    @"=CStr(1.10D)" : @"1.10",
+    @"=CStr(1.10D + 1D)" : @"2.10",
+    @"=CStr(100D * 1.00D)" : @"100.00",
+    @"=CStr(0.00D * 5D)" : @"0.00",
+    @"=CStr(2D / 3D)" : @"0.6666666666666666666666666667",
+    @"=CStr(1.0D / 4D)" : @"0.25",
+    @"=CStr(10.00D / 4D)" : @"2.50",
+    @"=CStr(7.50D Mod 2.0D)" : @"1.50",
+    @"=CStr(1.5D Mod 2D)" : @"1.5",
+    @"=CStr(CDec(661777.4807356275))" : @"661777.480735628",
+    @"=CStr(CDec(\"1.0000000000000000000000000000001\"))" : @"1.0000000000000000000000000000",
+    @"=CStr(79228162514264337593543950335D + 0.1D)" : @"79228162514264337593543950335",
+    @"=CStr(1.10D = 1.1D)" : @"True",
+    @"=Format(1.10D, \"G\")" : @"1.10",
+    @"=Format(1.10D, \"G5\")" : @"1.1",
+  };
+  for (NSString *source in written) {
+    NSString *got = [RDLExpression evaluateText:source scope:scope];
+    if (![got isEqualToString:written[source]])
+      XCTFail(@"%@ → %@, want %@", source, got, written[source]);
+  }
+  if (![[RDLExpression evaluate:@"=79228162514264337593543950335D + 0.5D" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"a Decimal that rounds past the largest should be the overflow VB throws");
 }
 
 @end

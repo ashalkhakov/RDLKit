@@ -74,7 +74,7 @@ static id RDLParameterTyped(RDLParameter *parameter, id raw, BOOL *mismatched) {
                        : nil;
   if (text != nil && [text length] == 0)
     return nil;
-  BOOL number = [raw isKindOfClass:[NSNumber class]] && !RDLNumberIsBoolean(raw);
+  RDLNumber *number = [RDLNumber numberFromValue:raw];
   id typed = nil;
   switch (parameter.dataType) {
   case RDLParameterDataTypeInteger:
@@ -82,7 +82,7 @@ static id RDLParameterTyped(RDLParameter *parameter, id raw, BOOL *mismatched) {
       NSScanner *scanner = [NSScanner scannerWithString:text];
       long long whole = 0;
       if ([scanner scanLongLong:&whole] && [scanner isAtEnd] && whole >= INT_MIN && whole <= INT_MAX)
-        typed = [NSNumber numberWithInt:(int)whole];
+        typed = [RDLNumber numberWithInteger:(int32_t)whole];
     } else if (number) {
       id converted = RDLValueConvertedTo(raw, RDLConversionTargetInteger);
       typed = [converted isKindOfClass:[RDLExprError class]] ? nil : converted;
@@ -93,9 +93,9 @@ static id RDLParameterTyped(RDLParameter *parameter, id raw, BOOL *mismatched) {
       NSScanner *scanner = [NSScanner scannerWithString:text];
       double real = 0;
       if ([scanner scanDouble:&real] && [scanner isAtEnd])
-        typed = [NSNumber numberWithDouble:real];
+        typed = [RDLNumber numberWithDouble:real];
     } else if (number) {
-      typed = [NSNumber numberWithDouble:[raw doubleValue]];
+      typed = [RDLNumber numberWithDouble:[number doubleValue]];
     }
     break;
   case RDLParameterDataTypeBoolean:
@@ -130,8 +130,9 @@ static BOOL RDLParameterValuesMatch(id a, id b) {
     return a == b;
   if ([a isKindOfClass:[NSDate class]] && [b isKindOfClass:[NSDate class]])
     return [(NSDate *)a isEqualToDate:b];
-  if ([a isKindOfClass:[NSNumber class]] && [b isKindOfClass:[NSNumber class]])
-    return [(NSNumber *)a compare:b] == NSOrderedSame;
+  RDLNumber *x = [RDLNumber numberFromValue:a], *y = [RDLNumber numberFromValue:b];
+  if (x && y)
+    return [x isEqualToNumber:y];
   return [RDLParameterText(a) isEqualToString:RDLParameterText(b)];
 }
 

@@ -22,6 +22,7 @@ RDLKit_HEADER_FILES = \
   RDLSubreportLoader.h \
   RDLTextAttributes.h \
   RDLParameterValues.h \
+  RDLNumber.h \
   RDLDataEvaluation.h
 RDLKit_OBJC_FILES = \
   RDLReport.m \
@@ -49,6 +50,7 @@ RDLKit_OBJC_FILES = \
   RDLMarkup.m \
   RDLCode.m \
   RDLParameterValues.m \
+  RDLNumber.m \
   RDLDataEvaluation.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever

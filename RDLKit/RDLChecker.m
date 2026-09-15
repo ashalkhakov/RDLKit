@@ -684,7 +684,7 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
   switch (node.kind) {
   case RDLExprNodeKindLiteral: {
     id v = node.value;
-    if ([v isKindOfClass:[NSNumber class]])
+    if ([v isKindOfClass:[RDLNumber class]] || [v isKindOfClass:[NSNumber class]])
       return RDLNumberType();
     if ([v isKindOfClass:[NSString class]])
       return RDLStringType();

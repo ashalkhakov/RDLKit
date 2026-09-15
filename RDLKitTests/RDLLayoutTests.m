@@ -1862,6 +1862,11 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     XCTFail(@"%@", [NSString stringWithFormat:@"Books values → %@ (wanted 10, 20, 35)", books.values]);
   if ([music.values[2] doubleValue] != 2)
     XCTFail(@"%@", [NSString stringWithFormat:@"Music 2021 → %@", music.values[2]]);
+  // Foundation numbers, as a laid-out chart's API says, though the expressions
+  // that made them work in RDLNumbers: the renderer reads them as NSNumbers.
+  for (id v in [books.values arrayByAddingObjectsFromArray:music.values])
+    if (![v isKindOfClass:[NSNumber class]])
+      XCTFail(@"a laid-out chart's value should be an NSNumber, not %@", [v class]);
   if ([books.color isEqualToString:music.color])
     XCTFail(@"%@", @"two series should not get the same colour");
   // Stacked, so the axis has to reach the tallest stack, not the tallest bar.
@@ -2061,6 +2066,54 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
       !(spring < autumn && autumn < winter))
     XCTFail(@"%@", [NSString stringWithFormat:@"March, September, December is the order: %@",
                                               texts]);
+}
+
+// Two numbers compare exactly in a filter or a sort, in the wider of their
+// types: Longs past 2^53 that a Double cannot tell apart are still apart.
+- (void)testFiltersAndSortsCompareNumbersExactly {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Ids"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Runs";
+  ds.dataSourceName = @"Demo";
+  [ds setFieldNames:@[ @"Job", @"Id" ]];
+  ds.rows = @[
+    @{ @"Job" : @"Later", @"Id" : @9007199254740993LL },
+    @{ @"Job" : @"Earlier", @"Id" : @9007199254740992LL },
+  ];
+  [r.dataSets addObject:ds];
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"Runs";
+  tab.dataSetName = @"Runs";
+  tab.width = 6;
+  tab.headerHeight = 0.3;
+  tab.rowHeight = 0.28;
+  tab.columnSpecs = @[ @{ @"width" : @3.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value" } ];
+  [tab rebuildTablix];
+  [r.body.items addObject:tab];
+  NSArray<NSString *> *(^shown)(void) = ^NSArray<NSString *> * {
+    NSMutableArray *texts = [NSMutableArray array];
+    for (RDLLaidOutPage *p in [RDLGenerator pagesForReport:r parameters:@{}])
+      for (RDLLaidOutItem *it in p.items)
+        if ([RDLLaidText(it) length])
+          [texts addObject:RDLLaidText(it)];
+    return texts;
+  };
+
+  RDLFilter *one = [[RDLFilter alloc] init];
+  one.expression = [RDLValue valueWithSource:@"=Fields!Id.Value"];
+  one.oper = RDLFilterOperatorEqual;
+  [one.values addObject:[RDLValue valueWithSource:@"=9007199254740993"]];
+  [tab.filters addObject:one];
+  NSArray<NSString *> *kept = shown();
+  if (![kept containsObject:@"Later"] || [kept containsObject:@"Earlier"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"only the Id equal to 9007199254740993 should pass: %@", kept]);
+
+  [tab.filters removeAllObjects];
+  [tab.sortExpressions addObject:RDLSortBy(@"=Fields!Id.Value", RDLSortDirectionAscending)];
+  NSArray<NSString *> *sorted = shown();
+  NSUInteger earlier = [sorted indexOfObject:@"Earlier"], later = [sorted indexOfObject:@"Later"];
+  if (earlier == NSNotFound || later == NSNotFound || earlier > later)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the smaller Id should come first: %@", sorted]);
 }
 
 // TopN and its three relatives cannot be decided a row at a time: which rows
@@ -2344,6 +2397,12 @@ static RDLFilter *RDLFilterOn(NSString *expr, RDLFilterOperator oper, NSString *
   };
   if (![seen isEqualToDictionary:@{@"Desk" : @1, @"Shelf" : @1, @"Lamp" : @0, @"Shade" : @0}])
     XCTFail(@"%@", [NSString stringWithFormat:@"only Lacquer (313) should be hidden: %@", seen]);
+
+  // A number is a Hidden too, as CBool reads it: anything but zero hides.
+  finish.hidden = [RDLValue valueWithSource:@"=IIf(Sum(Fields!Amount.Value) < 500, 2, 0)"];
+  pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  if (RDLCountLaidText(pages, @"Lamp") != 0 || RDLCountLaidText(pages, @"Desk") != 1)
+    XCTFail(@"%@", @"a group whose Hidden comes to 2 should hide, and one whose comes to 0 should not");
 }
 
 // The Details member's own filters and sort apply, and its Hidden is asked of
@@ -2401,6 +2460,10 @@ static RDLFilter *RDLFilterOn(NSString *expr, RDLFilterOperator oper, NSString *
   NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
   if (RDLCountLaidText(pages, @"Job") != 0 || RDLCountLaidText(pages, @"Desk") != 0)
     XCTFail(@"%@", @"nothing of a hidden tablix should be laid out");
+  // A number hides as CBool reads it, whatever its text says.
+  tab.hidden = [RDLValue valueWithSource:@"=2"];
+  if (RDLCountLaidText([RDLGenerator pagesForReport:r parameters:@{}], @"Desk") != 0)
+    XCTFail(@"%@", @"a tablix whose Hidden is 2 should be hidden");
 }
 
 // Column groups sort in their own scope too.

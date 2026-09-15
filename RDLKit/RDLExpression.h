@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import "RDLNumber.h"
 @class RDLReport;
 @class RDLDataSet;
 @class RDLParameterValues;
@@ -121,41 +122,10 @@ typedef NS_ENUM(NSInteger, RDLRenderFormat) {
 @property (nonatomic, strong) NSMutableDictionary<NSString *, id> *codeLocals;
 @end
 
-// A value as the expression language reads one: as a number (text such as
-// "1,000" counts; anything that is not a number is 0), as text, and as True or
-// False. What the report's code converts its As types with.
-// VB's numeric types, in the order a value widens through them, as a value
-// carries one: NSNumber's own type encoding -- s, i, q, f, d -- and
-// NSDecimalNumber for Decimal. Byte shares Short's encoding, which Foundation
-// does not tell apart; the unsigned types are read as the next wider signed one.
-typedef NS_ENUM(NSInteger, RDLNumericType) {
-  RDLNumericTypeUnspecified = 0,  // not a number: text, a date, True or False, Nothing
-  RDLNumericTypeShort,
-  RDLNumericTypeInteger,
-  RDLNumericTypeLong,
-  RDLNumericTypeDecimal,
-  RDLNumericTypeSingle,
-  RDLNumericTypeDouble,
-};
+// A value's VB numeric type: an RDLNumber's own, and for a Foundation number
+// handed in from outside, the type RDLNumber would read it as.
 FOUNDATION_EXPORT RDLNumericType RDLNumericTypeOfValue(id value);
 
-// The type one of VB's conversion functions converts to: CByte, CSByte,
-// CShort, CUShort, CInt, CUInt, CLng, CULng, CSng, CDbl and CDec. An unsigned
-// type is carried in the signed one that holds it, ULong in a Decimal.
-typedef NS_ENUM(NSInteger, RDLConversionTarget) {
-  RDLConversionTargetUnspecified = 0,
-  RDLConversionTargetByte,
-  RDLConversionTargetSByte,
-  RDLConversionTargetShort,
-  RDLConversionTargetUShort,
-  RDLConversionTargetInteger,
-  RDLConversionTargetUInteger,
-  RDLConversionTargetLong,
-  RDLConversionTargetULong,
-  RDLConversionTargetSingle,
-  RDLConversionTargetDouble,
-  RDLConversionTargetDecimal,
-};
 // A value as VB's conversion function to that type converts it, or an
 // RDLExprError where that function would throw.
 FOUNDATION_EXPORT id RDLValueConvertedTo(id value, RDLConversionTarget target);
@@ -177,6 +147,9 @@ FOUNDATION_EXPORT BOOL RDLTextMatchesLikePattern(NSString *text, NSString *patte
 @property (nonatomic, readonly, copy) NSString *message;
 @end
 
+// A value as the expression language reads one: as a number (text such as
+// "1,000" counts; anything that is not a number is 0), as text, and as True or
+// False. What the report's code converts its As types with.
 FOUNDATION_EXPORT double RDLValueAsNumber(id value);
 FOUNDATION_EXPORT NSString *RDLValueAsText(id value);
 FOUNDATION_EXPORT BOOL RDLValueAsBoolean(id value);
