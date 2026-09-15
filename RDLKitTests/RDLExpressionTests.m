@@ -19,9 +19,12 @@ static BOOL RDLIsNothingValue(id v) {
   return v == nil || v == [NSNull null];
 }
 
-// True or False, as NSNumber holds a Boolean.
+// True or False, as NSNumber holds a Boolean. The library's own test: the
+// CFBoolean singletons are not a symbol GNUstep's Foundation exports (the
+// bundle failed to load with "undefined symbol: kCFBooleanTrue"), and
+// RDLNumberIsBoolean already answers this portably.
 static BOOL RDLNumberIsBooleanValue(id v) {
-  return [v isKindOfClass:[NSNumber class]] && (v == (id)kCFBooleanTrue || v == (id)kCFBooleanFalse || strcmp([v objCType], @encode(BOOL)) == 0);
+  return RDLNumberIsBoolean(v);
 }
 
 static RDLReport *RDLCheckableReport(void) {

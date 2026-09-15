@@ -8,6 +8,16 @@
 #import "RDLParameterValues.h"
 #import "RDLDataProvider.h"
 
+#if !defined(__APPLE__)
+// gnustep-gui's NSLayoutManager has no -setUsesFontLeading: (the typesetter
+// never adds leading), and ARC refuses to send a selector nothing declares.
+// The call below is guarded by respondsToSelector:, so declaring it is all
+// that is needed for the build; if gnustep-gui gains it, it will be used.
+@interface NSLayoutManager (RDLFontLeading)
+- (void)setUsesFontLeading:(BOOL)flag;
+@end
+#endif
+
 @interface RDLTablixCellInst : NSObject
 @property (nonatomic, assign) CGFloat xRel;
 @property (nonatomic, assign) CGFloat width;
@@ -2307,7 +2317,6 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
 
   // Crosstab: emit one column-header row per column-group tier. Consecutive
   // leaves sharing a header node are merged into a single spanning cell.
-  CGFloat planHdrTotalH = 0;
   NSArray<RDLTablixInst *> *tierRows = nil;
   if (plan) {
     NSUInteger tiers = 0;
@@ -2364,8 +2373,6 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
     }
     if ([headerRows count]) {
       tierRows = headerRows;
-      for (RDLTablixInst *hr in headerRows)
-        planHdrTotalH += hr.height;
       NSMutableArray *withHeader = [NSMutableArray arrayWithArray:headerRows];
       [withHeader addObjectsFromArray:walked];
       walked = withHeader;

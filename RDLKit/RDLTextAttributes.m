@@ -256,24 +256,36 @@ static const CGFloat kRDLListIndentPoints = 18.0;
     CGFloat after = para.spaceAfter ? [para.spaceAfter points] : 0;
     if (firstLine == 0 && otherLines == 0 && right == 0 && before == 0 && after == 0)
       continue;
-    [out enumerateAttribute:NSParagraphStyleAttributeName
-                    inRange:range
-                    options:0
-                 usingBlock:^(id value, NSRange sub, BOOL *stop) {
-                   NSMutableParagraphStyle *ps =
-                       [(value ?: [NSParagraphStyle defaultParagraphStyle]) mutableCopy];
-                   ps.firstLineHeadIndent = firstLine * unit;
-                   ps.headIndent = otherLines * unit;
-                   ps.tailIndent = -right * unit;
-                   ps.paragraphSpacingBefore = before * unit;
-                   ps.paragraphSpacing = after * unit;
-                   if (otherLines > firstLine) {
-                     NSTextTab *tab = [[NSTextTab alloc] initWithType:NSLeftTabStopType
-                                                             location:otherLines * unit];
-                     ps.tabStops = @[ tab ];
-                   }
-                   [out addAttribute:NSParagraphStyleAttributeName value:ps range:sub];
-                 }];
+    // Run by run over the existing paragraph styles. Not
+    // -enumerateAttribute:inRange:options:usingBlock:, a Cocoa addition
+    // GNUstep's NSAttributedString does not declare (RDLRichTextFormatter
+    // has the same note); -attribute:atIndex:longestEffectiveRange:inRange:
+    // is on both. Each run is rewritten in place, and the next lookup
+    // starts past it, so the new style is never re-read.
+    NSUInteger at = range.location, stopAt = NSMaxRange(range);
+    while (at < stopAt) {
+      NSRange sub = NSMakeRange(at, 0);
+      id value = [out attribute:NSParagraphStyleAttributeName
+                        atIndex:at
+          longestEffectiveRange:&sub
+                        inRange:range];
+      if (sub.length == 0)
+        break;
+      NSMutableParagraphStyle *ps =
+          [(value ?: [NSParagraphStyle defaultParagraphStyle]) mutableCopy];
+      ps.firstLineHeadIndent = firstLine * unit;
+      ps.headIndent = otherLines * unit;
+      ps.tailIndent = -right * unit;
+      ps.paragraphSpacingBefore = before * unit;
+      ps.paragraphSpacing = after * unit;
+      if (otherLines > firstLine) {
+        NSTextTab *tab = [[NSTextTab alloc] initWithType:NSLeftTabStopType
+                                                location:otherLines * unit];
+        ps.tabStops = @[ tab ];
+      }
+      [out addAttribute:NSParagraphStyleAttributeName value:ps range:sub];
+      at = NSMaxRange(sub);
+    }
   }
   return out;
 }

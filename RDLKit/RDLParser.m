@@ -1524,6 +1524,16 @@ static void RDLCollectPrefixes(NSXMLNode *node, NSXMLElement *context, NSMutable
 // grammar has elements of that grammar the current one has no place for.
 // Attributes of the XML Schema instance namespace are the reader's, as xsi:nil
 // is, and namespace declarations go back on the root instead.
+// Forward: an independent, document-free snapshot of a node (defined below).
+// A preserved node must outlive the parse document it came from, and on
+// GNUstep -[NSXMLNode copy] yields a node that still shares memory with that
+// document -- freed when the document is, so its later dealloc is a
+// use-after-free (rdlgen --check crashed on teardown, every run). RDLPlainCopy
+// rebuilds the node from its name / value / children with the class factory
+// methods, owning nothing else; it is what the writer already emits, so the
+// stored form and the written form match.
+static NSXMLNode *RDLPlainCopy(NSXMLNode *node);
+
 static void RDLCollectUnread(NSXMLElement *original, NSXMLElement *written, NSArray<NSString *> *path, BOOL keepingRDL,
                              NSMutableArray<RDLPreservedNode *> *kept, NSMutableDictionary<NSString *, NSString *> *namespaces) {
   for (NSXMLNode *attribute in [original attributes]) {
@@ -1533,7 +1543,7 @@ static void RDLCollectUnread(NSXMLElement *original, NSXMLElement *written, NSAr
       continue;
     RDLPreservedNode *node = [[RDLPreservedNode alloc] init];
     node.parentPath = path;
-    node.node = [attribute copy];
+    node.node = RDLPlainCopy(attribute);
     RDLCollectPrefixes(attribute, original, namespaces);
     [kept addObject:node];
   }
@@ -1549,7 +1559,7 @@ static void RDLCollectUnread(NSXMLElement *original, NSXMLElement *written, NSAr
     } else if ([[child prefix] length] || (keepingRDL && !RDLWasRead(child))) {
       RDLPreservedNode *node = [[RDLPreservedNode alloc] init];
       node.parentPath = path;
-      node.node = [child copy];
+      node.node = RDLPlainCopy(child);
       RDLCollectPrefixes(child, child, namespaces);
       [kept addObject:node];
     }

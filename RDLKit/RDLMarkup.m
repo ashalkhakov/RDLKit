@@ -125,10 +125,17 @@ static NSString *RDLEntityText(NSString *name) {
     NSString *digits = [name substringFromIndex:hex ? 2 : 1];
     if ([digits length] == 0)
       return nil;
+    // scanLongLong:, not scanUnsignedLongLong: -- GNUstep's NSScanner has
+    // only the signed one, and a code point fits either way; a sign in the
+    // digits is rejected below like any other stray character.
     unsigned long long code = 0;
+    long long decimal = 0;
     NSScanner *scanner = [NSScanner scannerWithString:digits];
-    BOOL read = hex ? [scanner scanHexLongLong:&code] : [scanner scanUnsignedLongLong:&code];
-    if (!read || ![scanner isAtEnd] || code == 0 || code > 0x10FFFF)
+    BOOL read = hex ? [scanner scanHexLongLong:&code] : [scanner scanLongLong:&decimal];
+    if (!hex && read && decimal >= 0)
+      code = (unsigned long long)decimal;
+    if (!read || ![scanner isAtEnd] || [digits hasPrefix:@"-"] || [digits hasPrefix:@"+"]
+        || code == 0 || code > 0x10FFFF)
       return nil;
     UTF32Char character = (UTF32Char)code;
     return [[NSString alloc] initWithBytes:&character
