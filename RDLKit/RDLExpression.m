@@ -305,6 +305,115 @@ BOOL RDLValueAsBoolean(id value) {
   return RDLBool(value);
 }
 
+#if !defined(__APPLE__)
+// A number that remembers the VB type it was made with.
+//
+// RDLNumericTypeOfValue reads an NSNumber's type from its objCType, which is
+// how Cocoa records the constructor used (numberWithInt: -> 'i', short -> 's',
+// float -> 'f'). GNUstep's NSNumber normalises its storage instead -- every
+// integer constructor funnels through numberWithInt:, small values become
+// tagged pointers, and Single collapses to Double -- so objCType no longer
+// tells Short from Integer from Long, and Single from Double. RDLNumber holds
+// the type explicitly and reports the matching objCType; every value query is
+// forwarded to a backing NSNumber, so it behaves as a number everywhere else
+// (comparison, equality, hashing, dictionary keys, formatting). It is used
+// only on GNUstep; on Cocoa the plain constructors already carry the type.
+@interface RDLNumber : NSNumber
++ (NSNumber *)rdlNumberWithNumber:(NSNumber *)number type:(RDLNumericType)type;
+@end
+
+@implementation RDLNumber {
+  NSNumber *_backing;
+  RDLNumericType _type;
+}
++ (NSNumber *)rdlNumberWithNumber:(NSNumber *)number type:(RDLNumericType)type {
+  if (number == nil)
+    return nil;
+  RDLNumber *n = [RDLNumber alloc];
+  n->_backing = number;
+  n->_type = type;
+  return n;
+}
+- (const char *)objCType {
+  switch (_type) {
+  case RDLNumericTypeShort:
+    return @encode(short);
+  case RDLNumericTypeInteger:
+    return @encode(int);
+  case RDLNumericTypeLong:
+    return @encode(long long);
+  case RDLNumericTypeSingle:
+    return @encode(float);
+  case RDLNumericTypeDouble:
+    return @encode(double);
+  default:
+    return [_backing objCType];
+  }
+}
+- (void)getValue:(void *)value {
+  [_backing getValue:value];
+}
+- (signed char)charValue { return [_backing charValue]; }
+- (unsigned char)unsignedCharValue { return [_backing unsignedCharValue]; }
+- (short)shortValue { return [_backing shortValue]; }
+- (unsigned short)unsignedShortValue { return [_backing unsignedShortValue]; }
+- (int)intValue { return [_backing intValue]; }
+- (unsigned int)unsignedIntValue { return [_backing unsignedIntValue]; }
+- (long)longValue { return [_backing longValue]; }
+- (unsigned long)unsignedLongValue { return [_backing unsignedLongValue]; }
+- (long long)longLongValue { return [_backing longLongValue]; }
+- (unsigned long long)unsignedLongLongValue { return [_backing unsignedLongLongValue]; }
+- (float)floatValue { return [_backing floatValue]; }
+- (double)doubleValue { return [_backing doubleValue]; }
+- (BOOL)boolValue { return [_backing boolValue]; }
+- (NSInteger)integerValue { return [_backing integerValue]; }
+- (NSUInteger)unsignedIntegerValue { return [_backing unsignedIntegerValue]; }
+- (NSDecimal)decimalValue { return [_backing decimalValue]; }
+- (BOOL)isEqualToNumber:(NSNumber *)number { return [_backing isEqualToNumber:number]; }
+- (BOOL)isEqual:(id)object { return [_backing isEqual:object]; }
+- (NSUInteger)hash { return [_backing hash]; }
+- (NSComparisonResult)compare:(NSNumber *)other { return [_backing compare:other]; }
+- (NSString *)description { return [_backing description]; }
+- (NSString *)descriptionWithLocale:(id)locale { return [_backing descriptionWithLocale:locale]; }
+- (NSString *)stringValue { return [_backing stringValue]; }
+@end
+#endif
+
+// The VB-typed number constructors. On Cocoa the plain NSNumber constructors
+// already report the type through objCType; on GNUstep they do not, so the
+// value is wrapped in an RDLNumber that does. Call sites use these instead of
+// -numberWithShort: / -numberWithInt: / -numberWithLongLong: / -numberWithFloat:
+// wherever the result is a value whose VB type matters. (Double needs no
+// wrapper: its objCType survives on both.)
+static inline NSNumber *RDLShort(short v) {
+#if defined(__APPLE__)
+  return RDLShort(v);
+#else
+  return [RDLNumber rdlNumberWithNumber:[NSNumber numberWithShort:v] type:RDLNumericTypeShort];
+#endif
+}
+static inline NSNumber *RDLInt(int v) {
+#if defined(__APPLE__)
+  return RDLInt(v);
+#else
+  return [RDLNumber rdlNumberWithNumber:[NSNumber numberWithInt:v] type:RDLNumericTypeInteger];
+#endif
+}
+static inline NSNumber *RDLLong(long long v) {
+#if defined(__APPLE__)
+  return RDLLong(v);
+#else
+  return [RDLNumber rdlNumberWithNumber:[NSNumber numberWithLongLong:v] type:RDLNumericTypeLong];
+#endif
+}
+static inline NSNumber *RDLSingle(float v) {
+#if defined(__APPLE__)
+  return RDLSingle(v);
+#else
+  return [RDLNumber rdlNumberWithNumber:[NSNumber numberWithFloat:v] type:RDLNumericTypeSingle];
+#endif
+}
+
 RDLNumericType RDLNumericTypeOfValue(id value) {
   if ([value isKindOfClass:[NSDecimalNumber class]])
     return RDLNumericTypeDecimal;
@@ -535,21 +644,21 @@ static NSString *RDLLexTypeCharacter(NSString *src, NSUInteger *i) {
 static id RDLIntegralLiteral(NSDecimalNumber *number, NSString *suffix) {
   long long whole = [number longLongValue];
   if ([suffix isEqualToString:@"S"])
-    return [NSNumber numberWithShort:(short)whole];
+    return RDLShort((short)whole);
   if ([suffix isEqualToString:@"I"] || [suffix isEqualToString:@"%"] || [suffix isEqualToString:@"US"])
-    return [NSNumber numberWithInt:(int)whole];
+    return RDLInt((int)whole);
   if ([suffix isEqualToString:@"L"] || [suffix isEqualToString:@"&"] || [suffix isEqualToString:@"UI"])
-    return [NSNumber numberWithLongLong:whole];
+    return RDLLong(whole);
   if ([suffix isEqualToString:@"D"] || [suffix isEqualToString:@"@"] || [suffix isEqualToString:@"UL"])
     return number;
   if ([suffix isEqualToString:@"F"] || [suffix isEqualToString:@"!"])
-    return [NSNumber numberWithFloat:[number floatValue]];
+    return RDLSingle([number floatValue]);
   if ([suffix isEqualToString:@"R"] || [suffix isEqualToString:@"#"])
     return [NSNumber numberWithDouble:[number doubleValue]];
   if ([number compare:[NSDecimalNumber decimalNumberWithMantissa:INT_MAX exponent:0 isNegative:NO]] != NSOrderedDescending)
-    return [NSNumber numberWithInt:(int)whole];
+    return RDLInt((int)whole);
   if ([number compare:[NSDecimalNumber decimalNumberWithMantissa:LLONG_MAX exponent:0 isNegative:NO]] != NSOrderedDescending)
-    return [NSNumber numberWithLongLong:whole];
+    return RDLLong(whole);
   return number;
 }
 
@@ -603,7 +712,7 @@ static NSUInteger RDLLexNumber(NSString *src, NSUInteger i, id *value) {
   else if ([suffix isEqualToString:@"D"] || [suffix isEqualToString:@"@"])
     *value = number;
   else if ([suffix isEqualToString:@"F"] || [suffix isEqualToString:@"!"])
-    *value = [NSNumber numberWithFloat:(float)[plain doubleValue]];
+    *value = RDLSingle((float)[plain doubleValue]);
   else
     *value = [NSNumber numberWithDouble:[plain doubleValue]];
   return at;
@@ -639,12 +748,12 @@ static NSUInteger RDLLexBasedNumber(NSString *src, NSUInteger i, id *value) {
   }
   NSString *suffix = RDLLexTypeCharacter(src, &at);
   if ([suffix isEqualToString:@"S"])
-    *value = [NSNumber numberWithShort:(short)(unsigned short)whole];
+    *value = RDLShort((short)(unsigned short)whole);
   else if ([suffix isEqualToString:@"L"] || [suffix isEqualToString:@"&"] || [suffix isEqualToString:@"UI"] ||
            [suffix isEqualToString:@"UL"] || whole > 0xFFFFFFFFULL)
-    *value = [NSNumber numberWithLongLong:(long long)whole];
+    *value = RDLLong((long long)whole);
   else
-    *value = [NSNumber numberWithInt:(int)(unsigned int)whole];
+    *value = RDLInt((int)(unsigned int)whole);
   return at;
 }
 
@@ -660,25 +769,36 @@ static NSDate *RDLDateLiteral(NSString *text) {
   [f setFormatterBehavior:NSDateFormatterBehavior10_4];
   f.locale = RDLPOSIXLocale();
   f.lenient = NO;
-  NSArray<NSString *> *dates = @[ @"M/d/yyyy", @"yyyy-M-d" ];
   NSArray<NSString *> *times = @[ @"h:mm:ss a", @"h:mm a", @"h a", @"H:mm:ss" ];
-  // Date + time before date alone. GNUstep's NSDateFormatter accepts trailing
-  // content the format does not mention even with lenient = NO, so "M/d/yyyy"
-  // matches "9/15/2026 1:05:07 PM" and drops the time; the fuller pattern has
-  // to be tried first so the whole literal is read. (Cocoa rejects the
-  // trailing text and reaches the same combined pattern anyway.)
-  for (NSString *d in dates) {
-    for (NSString *tm in times) {
-      f.dateFormat = [NSString stringWithFormat:@"%@ %@", d, tm];
-      NSDate *found = [f dateFromString:t];
-      if (found)
-        return found;
+  // GNUstep's NSDateFormatter matches loosely even with lenient = NO: it
+  // ignores trailing content the format does not mention, and it will read
+  // "2020-01-31" through "M/d/yyyy" and land on a nonsense year rather than
+  // fail. So the pattern is not discovered by trying each and taking the
+  // first that parses -- it is chosen from the shape of the text. A "/"
+  // means M/d/yyyy, a "-" (with no "/") means yyyy-M-d, and a ":" or an
+  // AM/PM marker means a time is present. (On Cocoa the strict matcher makes
+  // this moot; it is harmless there.)
+  BOOL hasTime = [t rangeOfString:@":"].location != NSNotFound
+      || [t rangeOfString:@"AM" options:NSCaseInsensitiveSearch].location != NSNotFound
+      || [t rangeOfString:@"PM" options:NSCaseInsensitiveSearch].location != NSNotFound;
+  NSString *datePattern = [t rangeOfString:@"/"].location != NSNotFound     ? @"M/d/yyyy"
+      : [t rangeOfString:@"-"].location != NSNotFound                       ? @"yyyy-M-d"
+                                                                           : nil;
+  if (datePattern) {
+    if (hasTime) {
+      for (NSString *tm in times) {
+        f.dateFormat = [NSString stringWithFormat:@"%@ %@", datePattern, tm];
+        NSDate *found = [f dateFromString:t];
+        if (found)
+          return found;
+      }
+    } else {
+      f.dateFormat = datePattern;
+      return [f dateFromString:t];
     }
-    f.dateFormat = d;
-    NSDate *found = [f dateFromString:t];
-    if (found)
-      return found;
   }
+  if (!hasTime)
+    return nil;
   for (NSString *tm in times) {
     f.dateFormat = tm;
     NSDate *found = [f dateFromString:t];
@@ -1038,7 +1158,7 @@ static NSArray *RDLLex(NSString *src) {
     @"vbpropercase" : @3
   };
   if (named[low])
-    return RDLLit([NSNumber numberWithInt:[named[low] intValue]]);
+    return RDLLit(RDLInt([named[low] intValue]));
   RDLTok *next = [self peek];
   if (next && next.kind == RDLExprTokenKindPunctuation && [next.s isEqualToString:@"("])
     return [self parseCall:ident];
@@ -1486,9 +1606,9 @@ static id RDLNumericOperand(id v) {
   if (RDLIsError(v))
     return v;
   if (RDLNumberIsBoolean(v))
-    return [NSNumber numberWithShort:[v boolValue] ? -1 : 0];
+    return RDLShort([v boolValue] ? -1 : 0);
   if (RDLIsNothing(v))
-    return [NSNumber numberWithInt:0];
+    return RDLInt(0);
   if ([v isKindOfClass:[NSNumber class]])
     return v;
   if ([v isKindOfClass:[NSDate class]])
@@ -1501,10 +1621,10 @@ static id RDLNumericOperand(id v) {
 // A whole number in a type, or the overflow VB throws when it does not fit.
 static id RDLIntegralResult(long long v, RDLNumericType type) {
   if (type == RDLNumericTypeShort)
-    return v < SHRT_MIN || v > SHRT_MAX ? RDLOverflow() : [NSNumber numberWithShort:(short)v];
+    return v < SHRT_MIN || v > SHRT_MAX ? RDLOverflow() : RDLShort((short)v);
   if (type == RDLNumericTypeInteger)
-    return v < INT_MIN || v > INT_MAX ? RDLOverflow() : [NSNumber numberWithInt:(int)v];
-  return [NSNumber numberWithLongLong:v];
+    return v < INT_MIN || v > INT_MAX ? RDLOverflow() : RDLInt((int)v);
+  return RDLLong(v);
 }
 
 static NSDecimalNumber *RDLAsDecimal(NSNumber *n) {
@@ -1517,11 +1637,11 @@ static NSDecimalNumber *RDLAsDecimal(NSNumber *n) {
 // operators take one; the overflow when it does not fit.
 static id RDLAsLong(NSNumber *n) {
   if (RDLIsIntegralType(RDLNumericTypeOfValue(n)))
-    return [NSNumber numberWithLongLong:[n longLongValue]];
+    return RDLLong([n longLongValue]);
   double d = rint([n doubleValue]);
   if (!(d >= -9223372036854775808.0 && d < 9223372036854775808.0))
     return RDLOverflow();
-  return [NSNumber numberWithLongLong:(long long)d];
+  return RDLLong((long long)d);
 }
 
 // +, -, *, /, \, Mod and ^ as VB does them: in the wider of the operands'
@@ -1650,7 +1770,7 @@ static id RDLArithmetic(RDLExprOperator op, id left, id right) {
   default:
     return nil;
   }
-  return type == RDLNumericTypeSingle ? [NSNumber numberWithFloat:(float)r] : [NSNumber numberWithDouble:r];
+  return type == RDLNumericTypeSingle ? RDLSingle((float)r) : [NSNumber numberWithDouble:r];
 }
 
 // A condition's operand, or And's, Or's and Not's when neither is a number, as
@@ -1696,7 +1816,7 @@ static id RDLNegate(id v) {
   if (type == RDLNumericTypeDecimal)
     return [RDLAsDecimal(n) decimalNumberByMultiplyingBy:[NSDecimalNumber decimalNumberWithMantissa:1 exponent:0 isNegative:YES]];
   if (type == RDLNumericTypeSingle)
-    return [NSNumber numberWithFloat:-[n floatValue]];
+    return RDLSingle(-[n floatValue]);
   return [NSNumber numberWithDouble:-[n doubleValue]];
 }
 
@@ -1704,7 +1824,7 @@ static id RDLNegate(id v) {
 // a Decimal, Single or Double rounded to a Long first -- in the wider type.
 static id RDLBitwise(RDLExprOperator op, id left, id right) {
   id a = RDLNumericOperand(left);
-  id b = op == RDLExprOperatorNot ? [NSNumber numberWithInt:0] : RDLNumericOperand(right);
+  id b = op == RDLExprOperatorNot ? RDLInt(0) : RDLNumericOperand(right);
   if (RDLIsError(a))
     return a;
   if (RDLIsError(b))
@@ -1933,9 +2053,9 @@ static id RDLConversionOperand(id v, RDLConversionTarget target, RDLConversionSt
   BOOL whole = RDLIsWholeTarget(target);
   if (RDLNumberIsBoolean(v)) {
     if (![v boolValue])
-      return [NSNumber numberWithInt:0];
+      return RDLInt(0);
     if (style == RDLConversionStyleDotNet)
-      return [NSNumber numberWithInt:1];
+      return RDLInt(1);
     long long minimum = 0;
     unsigned long long maximum = 0;
     RDLNumericType carried = RDLNumericTypeUnspecified;
@@ -1943,10 +2063,10 @@ static id RDLConversionOperand(id v, RDLConversionTarget target, RDLConversionSt
     RDLWholeTargetRange(target, &minimum, &maximum, &carried, &unused);
     if (whole && minimum == 0)
       return [NSDecimalNumber decimalNumberWithMantissa:maximum exponent:0 isNegative:NO];
-    return [NSNumber numberWithShort:-1];
+    return RDLShort(-1);
   }
   if (RDLIsNothing(v))
-    return [NSNumber numberWithInt:0];
+    return RDLInt(0);
   if ([v isKindOfClass:[NSNumber class]])
     return v;
   if (![v isKindOfClass:[NSString class]])
@@ -2005,13 +2125,16 @@ static id RDLConvertToWhole(id value, RDLConversionTarget target, RDLConversionS
   NSDecimal x = [RDLAsDecimal(n) decimalValue], rounded;
   NSDecimalRound(&rounded, &x, 0, NSRoundBankers);
   NSDecimalNumber *whole = [NSDecimalNumber decimalNumberWithDecimal:rounded];
-  NSDecimalNumber *lowest = RDLAsDecimal([NSNumber numberWithLongLong:minimum]);
+  NSDecimalNumber *lowest = RDLAsDecimal(RDLLong(minimum));
   NSDecimalNumber *highest = [NSDecimalNumber decimalNumberWithMantissa:maximum exponent:0 isNegative:NO];
   if ([whole compare:lowest] == NSOrderedAscending || [whole compare:highest] == NSOrderedDescending)
     return RDLOverflow();
   if (carried == RDLNumericTypeDecimal)
     return whole;
-  return RDLIntegralResult([[whole stringValue] longLongValue], carried);
+  // -[NSDecimalNumber longLongValue] directly, not through -stringValue:
+  // GNUstep writes a decimal's stringValue in scientific notation
+  // ("2.147483648E9"), which -longLongValue on the string then reads as 2.
+  return RDLIntegralResult([whole longLongValue], carried);
 }
 
 // Into a Single, a Double or a Decimal. .NET takes a Double into a Decimal at
@@ -2026,7 +2149,7 @@ static id RDLConvertToFloating(id value, RDLConversionTarget target, RDLConversi
   if (target == RDLConversionTargetDouble)
     return [NSNumber numberWithDouble:[n doubleValue]];
   if (target == RDLConversionTargetSingle)
-    return [NSNumber numberWithFloat:(float)[n doubleValue]];
+    return RDLSingle((float)[n doubleValue]);
   RDLNumericType type = RDLNumericTypeOfValue(n);
   if (type == RDLNumericTypeDecimal || RDLIsIntegralType(type))
     return RDLAsDecimal(n);
@@ -2072,7 +2195,10 @@ id RDLValueConvertedTo(id value, RDLConversionTarget target) {
 // forms en-US writes ("January 5, 2020", "Sunday, January 5, 2020"); nil
 // when it is none of them.
 static NSDate *RDLDateFromText(NSString *text) {
-  NSDate *d = RDLAsDate(text, nil) ?: RDLDateLiteral(text);
+  // RDLDateLiteral first: it reads M/d/yyyy with a time, which RDLAsDate's
+  // date-only patterns would swallow on GNUstep (dropping the time), and it
+  // returns nil for the forms only RDLAsDate knows, so nothing is lost.
+  NSDate *d = RDLDateLiteral(text) ?: RDLAsDate(text, nil);
   if (d)
     return d;
   NSDateFormatter *f = [[NSDateFormatter alloc] init];
@@ -2153,7 +2279,7 @@ static id RDLWholePart(id v, BOOL towardZero) {
   if (type == RDLNumericTypeDecimal)
     return RDLDecimalWhole(n, rounding);
   double d = RDLDoubleWhole([n doubleValue], rounding);
-  return type == RDLNumericTypeSingle ? [NSNumber numberWithFloat:(float)d] : [NSNumber numberWithDouble:d];
+  return type == RDLNumericTypeSingle ? RDLSingle((float)d) : [NSNumber numberWithDouble:d];
 }
 
 // Abs, keeping the type; the smallest whole number of a type has no absolute
@@ -2168,7 +2294,7 @@ static id RDLAbsolute(id v) {
   if (type == RDLNumericTypeDecimal)
     return [RDLAsDecimal(n) compare:[NSDecimalNumber zero]] == NSOrderedAscending ? RDLNegate(n) : n;
   if (type == RDLNumericTypeSingle)
-    return [NSNumber numberWithFloat:fabsf([n floatValue])];
+    return RDLSingle(fabsf([n floatValue]));
   return [NSNumber numberWithDouble:fabs([n doubleValue])];
 }
 
@@ -2300,7 +2426,7 @@ static id RDLSign(id value) {
       return [RDLExprError errorWithMessage:@"Function does not accept floating point Not-a-Number values."];
     sign = (d > 0) - (d < 0);
   }
-  return [NSNumber numberWithInt:sign];
+  return RDLInt(sign);
 }
 
 // Math.Max and Math.Min: in the wider of the two types, as .NET's overloads
@@ -2319,7 +2445,7 @@ static id RDLExtreme(id left, id right, BOOL largest) {
   }
   double x = [a doubleValue], y = [b doubleValue];
   double r = isnan(x) || isnan(y) ? NAN : largest ? MAX(x, y) : MIN(x, y);
-  return type == RDLNumericTypeSingle ? [NSNumber numberWithFloat:(float)r] : [NSNumber numberWithDouble:r];
+  return type == RDLNumericTypeSingle ? RDLSingle((float)r) : [NSNumber numberWithDouble:r];
 }
 
 // A maths function of two Doubles, or the error VB throws for an argument that
@@ -2440,8 +2566,8 @@ static id RDLParam(RDLEvalScope *scope, NSString *name, NSString *prop) {
   if ([prop caseInsensitiveCompare:@"Label"] == NSOrderedSame)
     return parameter.parameter.multiValue ? parameter.labels : RDLOutOfCollection([parameter.labels firstObject]);
   if ([prop caseInsensitiveCompare:@"Count"] == NSOrderedSame)
-    return [NSNumber numberWithInt:(int)([parameter.value isKindOfClass:[NSArray class]] ? [(NSArray *)parameter.value count]
-                                                                                       : (parameter.value != nil ? 1 : 0))];
+    return RDLInt((int)([parameter.value isKindOfClass:[NSArray class]] ? [(NSArray *)parameter.value count]
+                                                                                       : (parameter.value != nil ? 1 : 0)));
   if ([prop caseInsensitiveCompare:@"IsMultiValue"] == NSOrderedSame)
     return RDLYes(parameter.parameter.multiValue);
   return parameter.value;
@@ -2621,7 +2747,7 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
     rows = scope.recursiveRows;
   RDLExprNode *expr = [args count] ? args[0] : nil;
   if ([n isEqualToString:@"countrows"])
-    return [NSNumber numberWithInt:(int)[rows count]];
+    return RDLInt((int)[rows count]);
   // Which row this is, counting from 1, as the layout engine numbers rows while
   // it expands a data region: within the innermost scope for RowNumber(Nothing);
   // within its instance, in the order its rows are shown, for a group's name;
@@ -2630,17 +2756,17 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
   if ([n isEqualToString:@"rownumber"]) {
     NSString *named = expr ? RDLDsName(expr, scope) : nil;
     if (named == nil)
-      return [NSNumber numberWithInt:(int)scope.rowNumber];
+      return RDLInt((int)scope.rowNumber);
     NSArray *instance = scope.groupRowsByName[named];
     if (instance != nil) {
       NSUInteger at = scope.row ? [instance indexOfObjectIdenticalTo:scope.row] : NSNotFound;
-      return [NSNumber numberWithInt:at == NSNotFound ? (int)[instance count] : (int)at + 1];
+      return RDLInt(at == NSNotFound ? (int)[instance count] : (int)at + 1);
     }
-    return [NSNumber numberWithInt:(int)(scope.regionRowNumber ?: scope.rowNumber)];
+    return RDLInt((int)(scope.regionRowNumber ?: scope.rowNumber));
   }
   if ([n isEqualToString:@"count"]) {
     if (expr == nil)
-      return [NSNumber numberWithInt:(int)[rows count]];
+      return RDLInt((int)[rows count]);
     NSInteger c = 0;
     id error = nil;
     NSDictionary *saved = scope.row;
@@ -2655,7 +2781,7 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
         c += 1;
     }
     scope.row = saved;
-    return error ?: [NSNumber numberWithInt:(int)c];
+    return error ?: RDLInt((int)c);
   }
   if ([n isEqualToString:@"countdistinct"]) {
     NSMutableSet *seen = [NSMutableSet set];
@@ -2672,7 +2798,7 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
         [seen addObject:RDLStr(v)];
     }
     scope.row = saved;
-    return error ?: [NSNumber numberWithInt:(int)[seen count]];
+    return error ?: RDLInt((int)[seen count]);
   }
   if ([n isEqualToString:@"first"] || [n isEqualToString:@"last"]) {
     id row = [n isEqualToString:@"first"] ? rows.firstObject : rows.lastObject;
@@ -2747,7 +2873,7 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
     return total;
   // Over no values at all, Nothing, as in SSRS; the counts are 0.
   if ([n isEqualToString:@"avg"])
-    return present ? RDLArithmetic(RDLExprOperatorDivide, total, [NSNumber numberWithInt:(int)present]) : nil;
+    return present ? RDLArithmetic(RDLExprOperatorDivide, total, RDLInt((int)present)) : nil;
   if ([n isEqualToString:@"min"])
     return mn;
   if ([n isEqualToString:@"max"])
@@ -4403,14 +4529,14 @@ static id RDLInStr(NSArray *vals) {
     return error;
   NSString *text = RDLStr(arg(first)), *find = RDLStr(arg(first + 1));
   if ([text length] == 0)
-    return [NSNumber numberWithInt:0];
+    return RDLInt(0);
   if ([find length] == 0)
-    return [NSNumber numberWithInt:(int)start];
+    return RDLInt((int)start);
   if ((NSUInteger)start > [text length])
-    return [NSNumber numberWithInt:0];
+    return RDLInt(0);
   NSUInteger from = (NSUInteger)start - 1;
   NSRange r = [text rangeOfString:find options:RDLSearchOptions(method) range:NSMakeRange(from, [text length] - from)];
-  return [NSNumber numberWithInt:r.location == NSNotFound ? 0 : (int)r.location + 1];
+  return RDLInt(r.location == NSNotFound ? 0 : (int)r.location + 1);
 }
 
 // InStrRev(text, find, start, compare): where find last is in text, ending at
@@ -4432,11 +4558,11 @@ static id RDLInStrRev(NSArray *vals) {
   NSString *text = RDLStr(arg(0)), *find = RDLStr(arg(1));
   NSUInteger end = start == -1 ? [text length] : (NSUInteger)start;
   if ([text length] == 0 || end > [text length])
-    return [NSNumber numberWithInt:0];
+    return RDLInt(0);
   if ([find length] == 0)
-    return [NSNumber numberWithInt:(int)end];
+    return RDLInt((int)end);
   NSRange r = [text rangeOfString:find options:RDLSearchOptions(method) | NSBackwardsSearch range:NSMakeRange(0, end)];
-  return [NSNumber numberWithInt:r.location == NSNotFound ? 0 : (int)r.location + 1];
+  return RDLInt(r.location == NSNotFound ? 0 : (int)r.location + 1);
 }
 
 // Replace(text, find, replacement, start, count, compare): the text from start
@@ -4769,7 +4895,7 @@ static id RDLDateDiff(NSArray *vals, NSString *language) {
     result = (long long)trunc(elapsed);
     break;
   }
-  return [NSNumber numberWithLongLong:result];
+  return RDLLong(result);
 }
 
 // DatePart(interval, date, firstDayOfWeek, firstWeekOfYear), as an Integer: w
@@ -4830,7 +4956,7 @@ static id RDLDatePart(NSArray *vals, NSString *language) {
     result = p.second;
     break;
   }
-  return [NSNumber numberWithInt:(int)result];
+  return RDLInt((int)result);
 }
 
 // DateAdd(interval, number, date): the whole part of number, in years,
@@ -4964,7 +5090,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
   if ([n isEqualToString:@"cdate"])
     return RDLConvertToDate(a0);
   if ([n isEqualToString:@"len"])
-    return [NSNumber numberWithInt:(int)RDLStr(a0).length];
+    return RDLInt((int)RDLStr(a0).length);
   if ([n isEqualToString:@"ucase"])
     return [RDLStr(a0) uppercaseString];
   if ([n isEqualToString:@"lcase"])
@@ -5110,7 +5236,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
     return [NSString stringWithFormat:@"%lo", (unsigned long)RDLNum(a0)];
   if ([n isEqualToString:@"asc"]) {
     NSString *s = RDLStr(a0);
-    return [NSNumber numberWithInt:[s length] ? (int)[s characterAtIndex:0] : 0];
+    return RDLInt([s length] ? (int)[s characterAtIndex:0] : 0);
   }
   if ([n isEqualToString:@"chr"])
     return [NSString stringWithFormat:@"%C", (unichar)MAX(0, (NSInteger)RDLNum(a0))];
@@ -5217,7 +5343,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
       return error;
     NSComparisonResult c = method == RDLCompareMethodText ? [RDLStr(a0) caseInsensitiveCompare:RDLStr(a1)]
                                                           : [RDLStr(a0) compare:RDLStr(a1) options:NSLiteralSearch];
-    return [NSNumber numberWithInt:c == NSOrderedAscending ? -1 : c == NSOrderedDescending ? 1 : 0];
+    return RDLInt(c == NSOrderedAscending ? -1 : c == NSOrderedDescending ? 1 : 0);
   }
   // StrConv(text, conversion): upper, lower or proper case; VB's conversions for
   // East Asian scripts are #Error here.
@@ -5255,7 +5381,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
     NSString *text = RDLStr(a0);
     if ([text length] == 0)
       return RDLInvalidArgument(@"String");
-    return [NSNumber numberWithInt:[text characterAtIndex:0]];
+    return RDLInt([text characterAtIndex:0]);
   }
   if ([n isEqualToString:@"chrw"]) {
     NSInteger code = 0;
@@ -5569,7 +5695,7 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope) 
     @"vbstrconv.lowercase" : @(RDLStrConvLowercase), @"vbstrconv.propercase" : @(RDLStrConvProperCase)
   };
   if (enumerations[n])
-    return [NSNumber numberWithInt:[enumerations[n] intValue]];
+    return RDLInt([enumerations[n] intValue]);
   if ([n isEqualToString:@"midpointrounding.toeven"])
     return [RDLMidpointRoundingValue valueWithMode:RDLMidpointRoundingToEven];
   if ([n isEqualToString:@"midpointrounding.awayfromzero"])
@@ -5610,7 +5736,7 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope) 
       return a;
     if (RDLIsError(b))
       return b;
-    return [NSNumber numberWithLongLong:(long long)[a intValue] * [b intValue]];
+    return RDLLong((long long)[a intValue] * [b intValue]);
   }
   if ([n isEqualToString:@"convert.todatetime"])
     return RDLConvertToDate(arg(0));
