@@ -11,6 +11,12 @@
 // spelled out at each call site.
 NSString *const RDLReportDocumentType = @"rdl";
 
+@interface RDLDocument ()
+// Whether the last reading of the data sources was allowed to fetch remote
+// documents, which is what evaluating them again for new parameter values may do.
+@property (nonatomic, assign) BOOL fetchesRemoteDocuments;
+@end
+
 @implementation RDLDocument
 
 // A report is saved when the person says so. In-place autosaving would write
@@ -176,15 +182,24 @@ NSString *const RDLReportDocumentType = @"rdl";
 
 #pragma mark - Parameters and data
 
+// A newly loaded report has been given no values: its parameters have their
+// defaults, which the report works out -- an expression's by evaluating it,
+// not as the text of its source.
 - (void)syncParamValuesFromReport {
-  NSMutableDictionary *pv = [NSMutableDictionary dictionary];
-  for (RDLParameter *p in _report.parameters) {
-    // The binding is text the user can edit, so an expression default seeds
-    // the field with its source rather than a value nothing could reproduce.
-    if ([p.name length])
-      pv[p.name] = [p.defaultValue source] ?: @"";
-  }
-  _paramValues = pv;
+  _paramValues = @{};
+}
+
+// Evaluating the data sources as it goes: a parameter's list may come from a
+// query that reads the parameters before it.
+- (RDLParameterValues *)parameterValues {
+  return [[[RDLDataEvaluation alloc] initWithReport:_report binder:[self dataBinder]] evaluateWithParameters:_paramValues
+                                                                                                environment:nil];
+}
+
+- (RDLDataBinder *)dataBinder {
+  RDLDataBinder *binder = [[RDLDataBinder alloc] initWithBaseURL:[self baseURL]];
+  binder.allowsRemoteDocuments = self.fetchesRemoteDocuments;
+  return binder;
 }
 
 - (void)setParamValue:(NSString *)value forName:(NSString *)name {
@@ -193,6 +208,9 @@ NSString *const RDLReportDocumentType = @"rdl";
   NSMutableDictionary *pv = [_paramValues mutableCopy] ?: [NSMutableDictionary dictionary];
   pv[name] = value ?: @"";
   _paramValues = pv;
+  // A query that reads the parameter reads the new value before anything is
+  // shown with it.
+  [self parameterValues];
   // A preview binding, not a document edit: publish but do not dirty.
   [self postChange:[RDLChange dataChange]];
 }
@@ -204,10 +222,15 @@ NSString *const RDLReportDocumentType = @"rdl";
   RDLDataBinder *binder = [[RDLDataBinder alloc]
       initWithBaseURL:[self baseURL]];
   binder.allowsRemoteDocuments = fetchRemote;
+  self.fetchesRemoteDocuments = fetchRemote;
   BOOL ok = [binder bindReport:_report error:error];
+  // The sources that read the parameters, for the values given so far.
+  RDLDataEvaluation *evaluation = [[RDLDataEvaluation alloc] initWithReport:_report binder:binder];
+  [evaluation evaluateWithParameters:_paramValues environment:nil];
   // A subreport is data too, in the sense that matters here: nothing shows
   // until its definition has been found and its own sources read.
   NSMutableArray *all = [[binder notes] mutableCopy] ?: [NSMutableArray array];
+  [all addObjectsFromArray:evaluation.notes];
   [all addObjectsFromArray:[self loadSubreports]];
   if (notes)
     *notes = all;
@@ -302,14 +325,32 @@ NSString *const RDLReportDocumentType = @"rdl";
   if (backend == nil)
     return nil;
   [self loadSubreports];
+  // External images are read as the data is: beside the report, and remote
+  // ones only if reading the data was allowed to fetch them.
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.documentBinder = [self dataBinder];
   return [RDLGenerator renderReport:_report
                          parameters:_paramValues
-                       usingBackend:backend];
+                       usingBackend:backend
+                        environment:environment];
 }
 
 - (BOOL)exportUsingBackend:(id<RDLBackend>)backend
                      toURL:(NSURL *)url
                      error:(NSError **)error {
+  // What a report server would refuse to render, this refuses to export.
+  NSArray<RDLParameterValue *> *refused = [[self parameterValues] problems];
+  if ([refused count]) {
+    if (error) {
+      NSMutableArray<NSString *> *reasons = [NSMutableArray array];
+      for (RDLParameterValue *value in refused)
+        [reasons addObject:value.problemDescription ?: @""];
+      *error = [NSError errorWithDomain:@"RDLDocument" code:4 userInfo:@{
+        NSLocalizedDescriptionKey : [reasons componentsJoinedByString:@"\n"]
+      }];
+    }
+    return NO;
+  }
   NSData *data = [self exportDataUsingBackend:backend];
   if (data == nil || url == nil) {
     if (error)

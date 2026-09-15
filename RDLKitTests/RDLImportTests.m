@@ -1259,9 +1259,17 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
     XCTFail(@"%@", @"the catalogue is suspiciously short");
 
   for (RDLFunctionInfo *f in functions) {
+    // Dispatched by name, or through the table of conversions.
     NSString *dispatch =
         [NSString stringWithFormat:@"isEqualToString:@\"%@\"", [f.name lowercaseString]];
-    if ([source rangeOfString:dispatch].location == NSNotFound)
+    NSString *conversion =
+        [NSString stringWithFormat:@"@\"%@\" : @(RDLConversionTarget", [f.name lowercaseString]];
+    // Or as one of Math's or Financial's members, which SSRS takes by name alone.
+    NSString *math = [NSString stringWithFormat:@"isEqualToString:@\"math.%@\"", [f.name lowercaseString]];
+    NSString *financial = [NSString stringWithFormat:@"isEqualToString:@\"financial.%@\"", [f.name lowercaseString]];
+    if ([source rangeOfString:dispatch].location == NSNotFound &&
+        [source rangeOfString:conversion].location == NSNotFound && [source rangeOfString:math].location == NSNotFound &&
+        [source rangeOfString:financial].location == NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue offers %@, which the "
                                                 @"evaluator does not implement",
                                                 f.name]);
@@ -1353,6 +1361,14 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLExprToken *h in plain)
     if (h.kind == RDLExprTokenKindFunction)
       XCTFail(@"%@", @"Frobnicate is not a function this evaluator has");
+
+  // Variables! is a collection like Fields!, and is coloured as one.
+  BOOL variablesIsReference = NO;
+  for (RDLExprToken *h in [RDLExpr tokensForSource:@"=Variables!Rate.Value * 2"])
+    if (h.kind == RDLExprTokenKindReference && [h.text isEqualToString:@"Variables"])
+      variablesIsReference = YES;
+  if (!variablesIsReference)
+    XCTFail(@"%@", @"Variables! should read as a reference");
 
   // Text that is not an expression is one run, so an editor can show a literal
   // through the same path.

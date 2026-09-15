@@ -552,11 +552,23 @@ static NSXMLElement *RDLChartMemberFrom(NSXMLElement *grouping, NSString *dynami
 static NSXMLElement *RDLChartHierarchy(NSXMLElement *chart, NSString *hierarchyName,
                                         NSString *groupingsName, NSString *groupingName,
                                         NSString *dynamicName) {
+  // Each grouping is a level of categories or series, the first the outermost,
+  // so each becomes a member inside the one before it. They used to become
+  // siblings, and everything past the first was lost.
   NSXMLElement *members = RDLNew(@"ChartMembers");
+  NSXMLElement *innermost = nil;
   for (NSXMLElement *g in RDLKids(RDLKid(chart, groupingsName), groupingName)) {
     NSXMLElement *m = RDLChartMemberFrom(g, dynamicName);
-    if (m)
+    if (m == nil)
+      continue;
+    if (innermost == nil) {
       [members addChild:m];
+    } else {
+      NSXMLElement *inside = RDLNew(@"ChartMembers");
+      [inside addChild:m];
+      [innermost addChild:inside];
+    }
+    innermost = m;
   }
   if ([RDLElems(members) count] == 0)
     return nil;
@@ -569,6 +581,8 @@ static NSXMLElement *RDLChartHierarchy(NSXMLElement *chart, NSString *hierarchyN
 static NSXMLElement *RDLChartAxisFrom(NSXMLElement *chart, NSString *outerName) {
   NSXMLElement *axis = RDLKid(RDLKid(chart, outerName), @"Axis");
   NSXMLElement *out = RDLNew(@"ChartAxis");
+  // ChartAxis@Name is required from 2008 on; a 2005 chart has one of each axis.
+  [out addAttribute:[NSXMLNode attributeWithName:@"Name" stringValue:@"Primary"]];
   if (axis == nil)
     return out;
   NSXMLElement *visible = RDLKid(axis, @"Visible");
@@ -579,30 +593,74 @@ static NSXMLElement *RDLChartAxisFrom(NSXMLElement *chart, NSString *outerName) 
   if (caption) {
     NSXMLElement *axisTitle = RDLNew(@"ChartAxisTitle");
     [axisTitle addChild:RDLNewText(@"Caption", RDLTrimmed(caption))];
+    // Center, Near and Far keep their names; so does the Style.
+    NSXMLElement *titlePosition = RDLKid(title, @"Position");
+    if ([RDLTrimmed(titlePosition) length])
+      [axisTitle addChild:RDLNewText(@"Position", RDLTrimmed(titlePosition))];
+    NSXMLElement *titleStyle = RDLKid(title, @"Style");
+    if (titleStyle)
+      [axisTitle addChild:[titleStyle copy]];
     [out addChild:axisTitle];
   }
+  // The axis' own Style: its labels' font and colour, and its numbers' Format.
+  NSXMLElement *axisStyle = RDLKid(axis, @"Style");
+  if (axisStyle)
+    [out addChild:[axisStyle copy]];
   // 2005 said "show these gridlines"; 2008 says whether they are enabled, and
-  // a 2005 axis that said nothing had none.
+  // a 2005 axis that said nothing had none. Their Style draws them.
   NSXMLElement *major = RDLKid(axis, @"MajorGridLines");
   NSXMLElement *show = RDLKid(major, @"ShowGridLines");
   NSXMLElement *grid = RDLNew(@"ChartMajorGridLines");
   if (major == nil ||
       (show != nil && ![[RDLTrimmed(show) lowercaseString] isEqualToString:@"true"]))
     [grid addChild:RDLNewText(@"Enabled", @"False")];
+  NSXMLElement *majorStyle = RDLKid(major, @"Style");
+  if (majorStyle)
+    [grid addChild:[majorStyle copy]];
   [out addChild:grid];
-  NSXMLElement *ticks = RDLKid(axis, @"MajorTickMarks");
-  if (ticks) {
-    NSXMLElement *marks = RDLNew(@"ChartMajorTickMarks");
-    [marks addChild:RDLNewText(@"Type", RDLTrimmed(ticks))];
-    [out addChild:marks];
+  // Minor grid lines, spaced by 2005's MinorInterval, which spaces the minor
+  // tick marks too.
+  NSString *minorInterval = RDLTrimmed(RDLKid(axis, @"MinorInterval"));
+  NSXMLElement *minor = RDLKid(axis, @"MinorGridLines");
+  if ([[RDLTrimmed(RDLKid(minor, @"ShowGridLines")) lowercaseString] isEqualToString:@"true"]) {
+    NSXMLElement *minorGrid = RDLNew(@"ChartMinorGridLines");
+    [minorGrid addChild:RDLNewText(@"Enabled", @"True")];
+    if ([minorInterval length])
+      [minorGrid addChild:RDLNewText(@"Interval", minorInterval)];
+    NSXMLElement *minorStyle = RDLKid(minor, @"Style");
+    if (minorStyle)
+      [minorGrid addChild:[minorStyle copy]];
+    [out addChild:minorGrid];
   }
+  // A 2005 axis has no tick marks unless it says which; from 2008 one that
+  // says nothing has them outside, so the "none" is written out.
+  NSString *ticks = RDLTrimmed(RDLKid(axis, @"MajorTickMarks"));
+  NSXMLElement *marks = RDLNew(@"ChartMajorTickMarks");
+  [marks addChild:[ticks length] ? RDLNewText(@"Type", ticks) : RDLNewText(@"Enabled", @"False")];
+  [out addChild:marks];
+  NSString *minorTicks = RDLTrimmed(RDLKid(axis, @"MinorTickMarks"));
+  if ([minorTicks length] && [minorTicks caseInsensitiveCompare:@"None"] != NSOrderedSame) {
+    NSXMLElement *minorMarks = RDLNew(@"ChartMinorTickMarks");
+    [minorMarks addChild:RDLNewText(@"Enabled", @"True")];
+    [minorMarks addChild:RDLNewText(@"Type", minorTicks)];
+    if ([minorInterval length])
+      [minorMarks addChild:RDLNewText(@"Interval", minorInterval)];
+    [out addChild:minorMarks];
+  }
+  // 2005's Margin is a Boolean, false unless it says otherwise; 2008's is Auto.
+  BOOL margin = [[RDLTrimmed(RDLKid(axis, @"Margin")) lowercaseString] isEqualToString:@"true"];
+  [out addChild:RDLNewText(@"Margin", margin ? @"True" : @"False")];
   NSXMLElement *interval = RDLKid(axis, @"MajorInterval");
   if (interval)
     [out addChild:RDLNewText(@"Interval", RDLTrimmed(interval))];
-  for (NSString *carry in @[ @"Minimum", @"Maximum", @"Scalar" ]) {
-    NSXMLElement *e = RDLKid(axis, carry);
-    if (e)
-      [out addChild:RDLNewText(carry, RDLTrimmed(e))];
+  // 2005 calls the ends of the scale Min and Max; they used to be looked for
+  // under the 2008 names, which a 2005 axis never has, and lost.
+  NSDictionary<NSString *, NSString *> *renamed =
+      @{@"Min" : @"Minimum", @"Max" : @"Maximum", @"Minimum" : @"Minimum", @"Maximum" : @"Maximum", @"Scalar" : @"Scalar"};
+  for (NSString *name in @[ @"Min", @"Max", @"Minimum", @"Maximum", @"Scalar" ]) {
+    NSXMLElement *e = RDLKid(axis, name);
+    if (e && RDLKid(out, renamed[name]) == nil)
+      [out addChild:RDLNewText(renamed[name], RDLTrimmed(e))];
   }
   return out;
 }
@@ -647,30 +705,92 @@ static void RDLUpgradeChart(NSXMLElement *chart) {
     NSXMLElement *point = [RDLKids(RDLKid(oldSeries, @"DataPoints"), @"DataPoint") firstObject];
     NSXMLElement *dataValues = RDLKid(point, @"DataValues");
     NSXMLElement *outValues = RDLNew(@"ChartDataPointValues");
+    // A 2005 data value may say by its Name which it is. One that does not is
+    // placed by its order: the value, then on a scatter or bubble chart its X,
+    // then a bubble's Size -- the order a bubble chart with a year for X and
+    // a sum for its size writes them in. A stock chart's are its high, low,
+    // open and close, or high, low and close, in the order the chart control
+    // under SSRS takes them; 2005 does not say.
+    BOOL xy = [type isEqualToString:@"Scatter"] || [type isEqualToString:@"Bubble"];
+    BOOL stock = [type isEqualToString:@"Stock"];
+    NSArray<NSString *> *order = stock && [subtype isEqualToString:@"HighLowClose"] ? @[ @"High", @"Low", @"End" ]
+                                 : stock                                          ? @[ @"High", @"Low", @"Start", @"End" ]
+                                 : xy                                             ? @[ @"Y", @"X", @"Size" ]
+                                                                                  : @[ @"Y" ];
+    NSDictionary<NSString *, NSString *> *named = @{
+      @"x" : @"X", @"y" : @"Y", @"size" : @"Size", @"high" : @"High", @"low" : @"Low",
+      @"start" : @"Start", @"open" : @"Start", @"end" : @"End", @"close" : @"End"
+    };
+    NSUInteger unnamed = 0;
     for (NSXMLElement *dv in RDLKids(dataValues, @"DataValue")) {
-      // 2005 named the axes by position; the first is Y unless it says X.
       NSXMLElement *value = RDLKid(dv, @"Value");
       NSXMLElement *x = RDLKid(dv, @"X");
-      if (x)
+      if (x && RDLKid(outValues, @"X") == nil)
         [outValues addChild:RDLNewText(@"X", RDLTrimmed(x))];
-      if (value)
-        [outValues addChild:RDLNewText(RDLKid(outValues, @"Y") ? @"Size" : @"Y",
-                                        RDLTrimmed(value))];
+      if (value == nil)
+        continue;
+      NSString *name = RDLTrimmed(RDLKid(dv, @"Name"));
+      NSString *role = nil;
+      if ([name length])
+        role = named[[name lowercaseString]];
+      while (role == nil && unnamed < [order count]) {
+        NSString *next = order[unnamed++];
+        if (RDLKid(outValues, next) == nil)
+          role = next;
+      }
+      if (role && RDLKid(outValues, role) == nil)
+        [outValues addChild:RDLNewText(role, RDLTrimmed(value))];
     }
     NSXMLElement *outPoint = RDLNew(@"ChartDataPoint");
     [outPoint addChild:outValues];
-    // A 2005 data label is shown unless it says it is not.
+    // A 2005 data point is filled by its Style's BackgroundColor, Color being
+    // ignored there; from 2008 its fill is its Color.
+    NSXMLElement *pointStyle = RDLKid(point, @"Style");
+    if (pointStyle) {
+      NSXMLElement *style = [pointStyle copy];
+      NSXMLElement *background = RDLKid(style, @"BackgroundColor");
+      [RDLKid(style, @"Color") detach];
+      if (background)
+        [background setName:@"Color"];
+      [outPoint addChild:style];
+    }
+    // A 2005 data label says what a 2008 one does, its Value being the Label.
+    // It is hidden unless it says Visible, an omitted Boolean being false; it
+    // used to be shown, which put numbers on a chart whose label only set the
+    // Format they would have had.
     NSXMLElement *oldLabel = RDLKid(point, @"DataLabel");
-    NSXMLElement *labelVisible = RDLKid(oldLabel, @"Visible");
-    if (oldLabel != nil &&
-        (labelVisible == nil || [[RDLTrimmed(labelVisible) lowercaseString] isEqualToString:@"true"])) {
+    if (oldLabel != nil) {
       NSXMLElement *label = RDLNew(@"ChartDataLabel");
-      [label addChild:RDLNewText(@"Visible", @"true")];
+      NSXMLElement *labelVisible = RDLKid(oldLabel, @"Visible");
+      BOOL shown = labelVisible != nil &&
+                   [[RDLTrimmed(labelVisible) lowercaseString] isEqualToString:@"true"];
+      [label addChild:RDLNewText(@"Visible", shown ? @"true" : @"false")];
+      NSXMLElement *style = RDLKid(oldLabel, @"Style");
+      if (style)
+        [label addChild:[style copy]];
+      NSXMLElement *value = RDLKid(oldLabel, @"Value");
+      if ([RDLTrimmed(value) length])
+        [label addChild:RDLNewText(@"Label", RDLTrimmed(value))];
+      for (NSString *carry in @[ @"Position", @"Rotation" ]) {
+        NSXMLElement *e = RDLKid(oldLabel, carry);
+        if ([RDLTrimmed(e) length])
+          [label addChild:RDLNewText(carry, RDLTrimmed(e))];
+      }
       [outPoint addChild:label];
     }
-    if (RDLKid(point, @"Marker") != nil) {
+    // A 2005 marker is None unless it names a Type, and is not drawn without a
+    // Size; an empty one used to become Auto, which put markers on every line.
+    NSXMLElement *oldMarker = RDLKid(point, @"Marker");
+    if (oldMarker != nil) {
       NSXMLElement *marker = RDLNew(@"ChartMarker");
-      [marker addChild:RDLNewText(@"Type", @"Auto")];
+      NSString *markerType = RDLTrimmed(RDLKid(oldMarker, @"Type"));
+      NSString *markerSize = RDLTrimmed(RDLKid(oldMarker, @"Size"));
+      [marker addChild:RDLNewText(@"Type", [markerType length] && [markerSize length] ? markerType : @"None")];
+      if ([markerSize length])
+        [marker addChild:RDLNewText(@"Size", markerSize)];
+      NSXMLElement *markerStyle = RDLKid(oldMarker, @"Style");
+      if (markerStyle)
+        [marker addChild:[markerStyle copy]];
       [outPoint addChild:marker];
     }
     NSXMLElement *points = RDLNew(@"ChartDataPoints");
@@ -682,10 +802,15 @@ static void RDLUpgradeChart(NSXMLElement *chart) {
     [outSeries addChild:points];
     // The type moved from the chart onto each series in 2008, which is what
     // lets one chart mix bars and a line.
-    if ([type length])
-      [outSeries addChild:RDLNewText(@"Type", type)];
-    if ([subtype length])
-      [outSeries addChild:RDLNewText(@"Subtype", subtype)];
+    // A 2005 stock chart is a 2008 range chart: a stock chart, or a candlestick.
+    NSString *seriesType = stock ? @"Range" : type;
+    NSString *seriesSubtype = !stock                                    ? subtype
+                              : [subtype isEqualToString:@"Candlestick"] ? @"Candlestick"
+                                                                         : @"Stock";
+    if ([seriesType length])
+      [outSeries addChild:RDLNewText(@"Type", seriesType)];
+    if ([seriesSubtype length])
+      [outSeries addChild:RDLNewText(@"Subtype", seriesSubtype)];
     [collection addChild:outSeries];
   }
   NSXMLElement *data = RDLNew(@"ChartData");
@@ -710,6 +835,17 @@ static void RDLUpgradeChart(NSXMLElement *chart) {
   NSXMLElement *position = RDLKid(oldLegend, @"Position");
   if (position)
     [legend addChild:RDLNewText(@"Position", RDLTrimmed(position))];
+  if (oldLegend != nil) {
+    // 2005's Table is a table fitted to the room, which 2008 calls AutoTable;
+    // Column -- 2005's default, which 2008's is not -- and Row keep their names.
+    NSString *layout = RDLTrimmed(RDLKid(oldLegend, @"Layout"));
+    [legend addChild:RDLNewText(@"Layout", [layout isEqualToString:@"Table"] ? @"AutoTable"
+                                            : [layout length]                 ? layout
+                                                                              : @"Column")];
+    NSXMLElement *legendStyle = RDLKid(oldLegend, @"Style");
+    if (legendStyle)
+      [legend addChild:[legendStyle copy]];
+  }
   [legends addChild:legend];
 
   NSXMLElement *titles = nil;
@@ -717,6 +853,10 @@ static void RDLUpgradeChart(NSXMLElement *chart) {
   if (caption) {
     NSXMLElement *title = RDLNew(@"ChartTitle");
     [title addChild:RDLNewText(@"Caption", RDLTrimmed(caption))];
+    // A 2005 chart title's Position is ignored, as the spec says; its Style is not.
+    NSXMLElement *titleStyle = RDLKid(RDLKid(chart, @"Title"), @"Style");
+    if (titleStyle)
+      [title addChild:[titleStyle copy]];
     titles = RDLNew(@"ChartTitles");
     [titles addChild:title];
   }
@@ -950,7 +1090,10 @@ static void RDLUpgradeRootShape(NSXMLElement *root) {
   if (body == nil && width == nil && page == nil)
     return;  // nothing that belongs in a section; leave the file as it is
 
-  if ((header || footer) && page == nil)
+  // Columns and ColumnSpacing were the Body's in 2005; 2008 made them the Page's.
+  NSXMLElement *columns = RDLKid(body, @"Columns");
+  NSXMLElement *columnSpacing = RDLKid(body, @"ColumnSpacing");
+  if ((header || footer || columns || columnSpacing) && page == nil)
     page = RDLNew(@"Page");
   else if (page)
     page = RDLTake(page);
@@ -958,6 +1101,10 @@ static void RDLUpgradeRootShape(NSXMLElement *root) {
     [page addChild:RDLTake(header)];
   if (footer)
     [page addChild:RDLTake(footer)];
+  if (columns)
+    [page addChild:RDLTake(columns)];
+  if (columnSpacing)
+    [page addChild:RDLTake(columnSpacing)];
 
   NSXMLElement *section = RDLNew(@"ReportSection");
   if (body)
@@ -1071,6 +1218,30 @@ static void RDLUpgradeList(NSXMLElement *list) {
   [list setName:@"Tablix"];
 }
 
+#pragma mark - Style values
+
+// The 2005 WritingMode values -- lr-tb, tb-rl and rl-tb -- where 2008 and later
+// say Horizontal and Vertical, and say right-to-left with Direction. None of
+// the old values is valid in a later schema, so finding one is what says a file
+// is in the old shape, whatever it declares; this runs for every document.
+static void RDLUpgradeStyleValues(NSXMLElement *el) {
+  if ([RDLLN(el) isEqualToString:@"Style"]) {
+    NSXMLElement *mode = RDLKid(el, @"WritingMode");
+    NSString *old = [RDLTrimmed(mode) lowercaseString];
+    if ([old isEqualToString:@"lr-tb"]) {
+      [mode setStringValue:@"Horizontal"];
+    } else if ([old isEqualToString:@"tb-rl"]) {
+      [mode setStringValue:@"Vertical"];
+    } else if ([old isEqualToString:@"rl-tb"]) {
+      [mode setStringValue:@"Horizontal"];
+      if (RDLKid(el, @"Direction") == nil)
+        [el addChild:RDLNewText(@"Direction", @"RTL")];
+    }
+  }
+  for (NSXMLElement *child in RDLElems(el))
+    RDLUpgradeStyleValues(child);
+}
+
 static void RDLUpgradeElement(NSXMLElement *el) {
   // Depth first: an inner Table inside a Rectangle is converted before the
   // outer one moves it, and a converted subtree is never revisited.
@@ -1114,6 +1285,7 @@ static void RDLUpgradeElement(NSXMLElement *el) {
   RDLUpgradePageNames(root);
   RDLUpgradeRootShape(root);
   RDLUpgradeChartNames(root);
+  RDLUpgradeStyleValues(root);
   return version;
 }
 

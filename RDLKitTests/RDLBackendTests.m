@@ -686,4 +686,57 @@ static NSString *RDLEnt(NSString *name) {
   }
 }
 
+
+#pragma mark - Colours and border styles
+
+// RDL writes a colour as a name, #rrggbb, #rgb or #aarrggbb -- alpha first.
+// Only #rrggbb used to be read: #80ff0000 came out green, #f80 as the default
+// ink.
+- (void)testEveryColourFormIsRead {
+  CGFloat r = -1, g = -1, b = -1, a = -1;
+  if (!RDLColorComponents(@"#80ff0000", &r, &g, &b, &a) || fabs(r - 1) > 0.001 || g > 0.001 ||
+      b > 0.001 || fabs(a - 128.0 / 255.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#80ff0000 is half-transparent red: %g %g %g %g", r, g,
+                                              b, a]);
+  if (!RDLColorComponents(@"#f80", &r, &g, &b, &a) || fabs(r - 1) > 0.001 ||
+      fabs(g - 136.0 / 255.0) > 0.001 || b > 0.001 || fabs(a - 1) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#f80 is #ff8800: %g %g %g %g", r, g, b, a]);
+  if (!RDLColorComponents(@"LightGrey", &r, &g, &b, &a) || fabs(r - 211.0 / 255.0) > 0.001)
+    XCTFail(@"%@", @"a colour name is its value");
+  if (RDLColorComponents(@"Transparent", &r, &g, &b, &a) || RDLColorComponents(@"#12345", &r, &g, &b, &a))
+    XCTFail(@"%@", @"Transparent and malformed text are not colours");
+  if (![RDLHexFromColor(RDLColorFromHex(@"#80ff0000")) isEqualToString:@"#80ff0000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a translucent colour keeps its alpha when written: %@",
+                                              RDLHexFromColor(RDLColorFromHex(@"#80ff0000"))]);
+}
+
+// The HTML page gets colours CSS reads the same way -- rgba() for alpha, since
+// CSS would take #aarrggbb's alpha from the wrong end -- and every border
+// style, not just solid, dashed, dotted and double.
+- (void)testHTMLWritesColoursAndBorderStylesCSSCanRead {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Swatches"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Swatch";
+  tb.value = @"Swatch";
+  tb.width = 2;
+  tb.height = 0.5;
+  RDLStyle *st = [[RDLStyle alloc] init];
+  st.color = @"#80ff0000";
+  st.backgroundColor = @"#0f0";
+  st.borderTop = [RDLBorder solidColor:@"#336699"];
+  st.borderTop.style = RDLBorderStyleGroove;
+  st.borderBottom = [RDLBorder solidColor:@"#336699"];
+  st.borderBottom.style = RDLBorderStyleInset;
+  tb.style = st;
+  [r.body.items addObject:tb];
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  for (NSString *needle in @[ @"color:rgba(255,0,0,0.502)", @"background:#00ff00",
+                              @"border-top:1pt groove #336699", @"border-bottom:1pt inset #336699" ])
+    if ([out rangeOfString:needle].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the HTML should say %@", needle]);
+}
+
 @end

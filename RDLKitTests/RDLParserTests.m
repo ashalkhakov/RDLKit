@@ -1636,7 +1636,7 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     if (chart.chartType != RDLChartTypePie || chart.subtype != RDLChartSubtypeExploded)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@: kind %ld/%ld, not an exploded pie", when,
                                                 (long)chart.chartType, (long)chart.subtype]);
-    if (![[chart.series firstObject] showDataLabels])
+    if (![[chart.series firstObject] dataLabel].visible)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@: the data labels are Visible", when]);
     RDLChartAxis *cat = chart.categoryAxis, *val = chart.valueAxis;
     if (!cat.hidden || cat.showMajorGridLines || cat.majorTickMarks != RDLChartTickMarksCross ||
@@ -1723,7 +1723,7 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
   if (chart.chartType != RDLChartTypeDoughnut || chart.subtype != RDLChartSubtypeExploded)
     XCTFail(@"%@", [NSString stringWithFormat:@"kind %ld/%ld, not an exploded doughnut",
                                               (long)chart.chartType, (long)chart.subtype]);
-  if (![[chart.series firstObject] showDataLabels])
+  if (![[chart.series firstObject] dataLabel].visible)
     XCTFail(@"%@", @"an empty ChartDataLabel meant the labels were shown");
   RDLChartAxis *cat = chart.categoryAxis, *val = chart.valueAxis;
   if (!cat.hidden || cat.showMajorGridLines || cat.majorTickMarks != RDLChartTickMarksInside)
@@ -1743,23 +1743,23 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
 // column chart; a family it does draw keeps its kind when only the variant is
 // beyond it.
 - (void)testAChartKindThisKitDoesNotDrawIsReported {
-  RDLReport *funnel = [RDLParser
-      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Shape</Type><Subtype>Funnel</Subtype>",
+  RDLReport *treeMap = [RDLParser
+      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Shape</Type><Subtype>TreeMap</Subtype>",
                                            @"", @"", @"")
                     error:NULL];
-  if (RDLFirstChart(funnel).chartType != RDLChartTypeUnspecified ||
-      [[funnel.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Shape/Funnel"].location ==
+  if (RDLFirstChart(treeMap).chartType != RDLChartTypeUnspecified ||
+      [[treeMap.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Shape/TreeMap"].location ==
           NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"a funnel should be reported: %@", funnel.warnings]);
-  RDLReport *stepped = [RDLParser
-      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Line</Type><Subtype>Stepped</Subtype>",
+    XCTFail(@"%@", [NSString stringWithFormat:@"a tree map should be reported: %@", treeMap.warnings]);
+  RDLReport *map = [RDLParser
+      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Scatter</Type><Subtype>Map</Subtype>",
                                            @"", @"", @"")
                     error:NULL];
-  if (RDLFirstChart(stepped).chartType != RDLChartTypeLine ||
-      [[stepped.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Line/Stepped"].location ==
+  if (RDLFirstChart(map).chartType != RDLChartTypeScatter ||
+      [[map.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Scatter/Map"].location ==
           NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped line is still a line, and reported: %@",
-                                              stepped.warnings]);
+    XCTFail(@"%@", [NSString stringWithFormat:@"a scatter map is still a scatter chart, and reported: %@",
+                                              map.warnings]);
 }
 
 #pragma mark - Writing every item's own properties
@@ -1807,6 +1807,697 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", @"the line's KeepTogether and PageBreak should be written");
   if (!logo2.keepTogether || logo2.pageBreak != RDLPageBreakLocationEnd || !logo2.resetPageNumber)
     XCTFail(@"%@", @"the image's KeepTogether and PageBreak should be written");
+}
+
+
+// Everything a data label says is read and written back: whether it shows,
+// what it says, where it sits, its rotation and its style, on the data point
+// and on the series.
+- (void)testChartDataLabelsAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016",
+      @"<Type>Line</Type><ChartDataLabel><UseValueAsLabel>true</UseValueAsLabel>"
+      @"<Visible>true</Visible><Position>Bottom</Position></ChartDataLabel>",
+      @"<ChartDataLabel><Style><Format>N1</Format><Color>Red</Color><FontSize>12pt</FontSize></Style>"
+      @"<Label>#VALY{N0} (#PERCENT{P0})</Label><Visible>true</Visible><Position>Outside</Position>"
+      @"<Rotation>-45</Rotation></ChartDataLabel>",
+      @"", @"");
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
+    RDLChartDataLabel *point = series.dataLabel, *all = series.seriesDataLabel;
+    if (!point.visible || ![[point.label source] isEqualToString:@"#VALY{N0} (#PERCENT{P0})"] ||
+        point.position != RDLChartDataLabelPositionOutside || point.rotation != -45 ||
+        ![point.style.format isEqualToString:@"N1"] || ![point.style.color isEqualToString:@"Red"] ||
+        fabs([point.style.fontSize points] - 12) > 0.01)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the point's label %d %@ %ld %ld %@ %@", when,
+                                                point.visible, [point.label source], (long)point.position,
+                                                (long)point.rotation, point.style.format, point.style.color]);
+    if (!all.visible || !all.useValueAsLabel || all.position != RDLChartDataLabelPositionBottom)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the series' label %d %d %ld", when, all.visible,
+                                                all.useValueAsLabel, (long)all.position]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+
+// A legend's Style, Position and Layout, a title's Style and Position, and an
+// axis' Style and its title's Style and Position are read and written back.
+// None of them was read.
+- (void)testChartLegendTitleAndAxisStylesAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"", @"",
+      @"<ChartAxisTitle><Caption>Year</Caption><Position>Far</Position><Style><Color>Red</Color></Style>"
+      @"</ChartAxisTitle><Style><FontStyle>Italic</FontStyle><Color>Green</Color></Style>",
+      @"<Style><Format>$#,##0</Format><FontSize>12pt</FontSize></Style>");
+  xml = [xml stringByReplacingOccurrencesOfString:@"</ChartAreas>"
+                                       withString:@"</ChartAreas><ChartLegends><ChartLegend Name=\"Default\">"
+                                                  @"<Style><FontSize>8pt</FontSize><BackgroundColor>LightGreen"
+                                                  @"</BackgroundColor><Border><Style>Solid</Style><Color>Gray</Color>"
+                                                  @"</Border></Style><Position>BottomLeft</Position><Layout>Row"
+                                                  @"</Layout></ChartLegend></ChartLegends><ChartTitles>"
+                                                  @"<ChartTitle Name=\"Default\"><Caption>Sales</Caption><Style>"
+                                                  @"<FontSize>14pt</FontSize><FontWeight>Normal</FontWeight></Style>"
+                                                  @"<Position>RightCenter</Position></ChartTitle></ChartTitles>"];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    if (chart.legendPosition != RDLChartLegendPositionBottomLeft || chart.legendLayout != RDLChartLegendLayoutRow ||
+        fabs([chart.legendStyle.fontSize points] - 8) > 0.01 ||
+        ![chart.legendStyle.backgroundColor isEqualToString:@"LightGreen"] ||
+        chart.legendStyle.border.style != RDLBorderStyleSolid)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the legend %ld %ld %@ %@ %ld", when, (long)chart.legendPosition,
+                                                (long)chart.legendLayout, [chart.legendStyle.fontSize stringValue],
+                                                chart.legendStyle.backgroundColor,
+                                                (long)chart.legendStyle.border.style]);
+    if (![[chart.chartTitle source] isEqualToString:@"Sales"] ||
+        chart.titlePosition != RDLChartTitlePositionRightCenter ||
+        chart.titleStyle.fontWeight != RDLFontWeightNormal || fabs([chart.titleStyle.fontSize points] - 14) > 0.01)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the title %ld %ld", when, (long)chart.titlePosition,
+                                                (long)chart.titleStyle.fontWeight]);
+    RDLChartAxis *cat = chart.categoryAxis, *val = chart.valueAxis;
+    if (cat.titlePosition != RDLChartAxisTitlePositionFar || ![cat.titleStyle.color isEqualToString:@"Red"] ||
+        cat.style.fontStyle != RDLFontStyleItalic || ![cat.style.color isEqualToString:@"Green"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the category axis %ld %@ %ld %@", when,
+                                                (long)cat.titlePosition, cat.titleStyle.color,
+                                                (long)cat.style.fontStyle, cat.style.color]);
+    if (![val.style.format isEqualToString:@"$#,##0"] || fabs([val.style.fontSize points] - 12) > 0.01)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the value axis %@ %@", when, val.style.format,
+                                                [val.style.fontSize stringValue]]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+
+// A chart's colours are read and written back: a Custom palette's own colours,
+// expressions among them, a series' Style and its data points' Style -- whose
+// Color may be worked out for each point -- and every palette name.
+- (void)testChartColoursAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"<Type>Column</Type><Style><Color>Navy</Color></Style>",
+      @"<Style><Color>=IIf(Sum(Fields!Amount.Value) &gt; 15, \"Red\", \"Green\")</Color></Style>", @"", @"");
+  xml = [xml stringByReplacingOccurrencesOfString:@"</ChartAreas>"
+                                       withString:@"</ChartAreas><Palette>Custom</Palette><ChartCustomPaletteColors>"
+                                                  @"<ChartCustomPaletteColor>Red</ChartCustomPaletteColor>"
+                                                  @"<ChartCustomPaletteColor>=IIf(1 &gt; 0, \"#00FF00\", \"Blue\")"
+                                                  @"</ChartCustomPaletteColor></ChartCustomPaletteColors>"];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    RDLChartSeries *series = [chart.series firstObject];
+    if (chart.palette != RDLChartPaletteCustom || [chart.customPaletteColors count] != 2 ||
+        ![[chart.customPaletteColors[0] source] isEqualToString:@"Red"] ||
+        ![[chart.customPaletteColors[1] source] hasPrefix:@"=IIf(1 > 0"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the Custom palette %ld %@", when, (long)chart.palette,
+                                                chart.customPaletteColors]);
+    if (![series.style.color isEqualToString:@"Navy"] ||
+        ![[series.pointStyle.expressions.color source] hasPrefix:@"=IIf(Sum(Fields!Amount.Value) > 15"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the series' colour %@ and its points' %@", when,
+                                                series.style.color, [series.pointStyle.expressions.color source]]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+  for (NSString *name in @[ @"Default", @"EarthTones", @"Excel", @"GrayScale", @"Pastel", @"Light", @"SemiTransparent",
+                            @"Custom", @"Berry", @"BrightPastel", @"Chocolate", @"Fire", @"Pacific", @"PacificLight",
+                            @"PacificSemiTransparent", @"SeaGreen" ])
+    if (![RDLStringFromChartPalette(RDLChartPaletteFromString(name)) isEqualToString:name])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the %@ palette should be known", name]);
+}
+
+
+// An axis' grid lines and tick marks, major and minor, with their intervals,
+// lengths and styles, its Margin and its LabelInterval are read and written
+// back; minor tick marks that do not say they are enabled are off.
+- (void)testChartAxisLinesMarksMarginAndLabelIntervalAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"", @"",
+      @"<ChartMajorGridLines><Enabled>True</Enabled><Interval>2</Interval><Style><Border><Color>Red</Color>"
+      @"<Style>Solid</Style></Border></Style></ChartMajorGridLines><ChartMinorGridLines><Enabled>True</Enabled>"
+      @"<Interval>0.5</Interval></ChartMinorGridLines><ChartMajorTickMarks><Type>Cross</Type><Length>3</Length>"
+      @"<Interval>1</Interval></ChartMajorTickMarks><ChartMinorTickMarks><Enabled>True</Enabled><Type>Inside</Type>"
+      @"<Interval>0.5</Interval></ChartMinorTickMarks><Margin>False</Margin><LabelInterval>2</LabelInterval>",
+      @"<ChartMinorTickMarks><Type>Inside</Type></ChartMinorTickMarks>");
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChartAxis *cat = RDLFirstChart(r).categoryAxis, *val = RDLFirstChart(r).valueAxis;
+    if (!cat.showMajorGridLines || ![[cat.majorGridLinesInterval source] isEqualToString:@"2"] ||
+        ![cat.majorGridLinesStyle.border.color isEqualToString:@"Red"] || !cat.showMinorGridLines ||
+        ![[cat.minorGridLinesInterval source] isEqualToString:@"0.5"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the grid lines %@ %@ %d %@", when, [cat.majorGridLinesInterval source],
+                                                cat.majorGridLinesStyle.border.color, cat.showMinorGridLines,
+                                                [cat.minorGridLinesInterval source]]);
+    if (cat.majorTickMarks != RDLChartTickMarksCross || ![[cat.majorTickMarksLength source] isEqualToString:@"3"] ||
+        ![[cat.majorTickMarksInterval source] isEqualToString:@"1"] || cat.minorTickMarks != RDLChartTickMarksInside ||
+        ![[cat.minorTickMarksInterval source] isEqualToString:@"0.5"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the tick marks %ld %@ %@ %ld %@", when, (long)cat.majorTickMarks,
+                                                [cat.majorTickMarksLength source], [cat.majorTickMarksInterval source],
+                                                (long)cat.minorTickMarks, [cat.minorTickMarksInterval source]]);
+    if (cat.margin != RDLChartAxisMarginFalse || ![[cat.labelInterval source] isEqualToString:@"2"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: margin %ld, label interval %@", when, (long)cat.margin,
+                                                [cat.labelInterval source]]);
+    if (val.minorTickMarks != RDLChartTickMarksNone)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: minor tick marks that say nothing of Enabled are off: %ld", when,
+                                                (long)val.minorTickMarks]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+
+// A marker's Type, Size and Style are read and written back, on the data point
+// and on the series.
+- (void)testChartMarkersAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"<Type>Line</Type><ChartMarker><Type>Auto</Type></ChartMarker>",
+      @"<ChartMarker><Type>Diamond</Type><Size>8pt</Size><Style><Color>Red</Color></Style></ChartMarker>", @"", @"");
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
+    if (series.marker.type != RDLChartMarkerTypeDiamond || ![[series.marker.size source] isEqualToString:@"8pt"] ||
+        ![series.marker.style.color isEqualToString:@"Red"] || series.seriesMarker.type != RDLChartMarkerTypeAuto)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: markers %ld %@ %@ / %ld", when, (long)series.marker.type,
+                                                [series.marker.size source], series.marker.style.color,
+                                                (long)series.seriesMarker.type]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+
+// A series names the value axis it is plotted against, an axis says which side
+// of the plot it is on, a chart says what it shows when it has no data, and a
+// line may be stepped -- all read and written back. None of these was read, and
+// a stepped line was warned about.
+- (void)testChartValueAxesNoDataMessageAndSteppedLinesAreReadAndWritten {
+  NSString *xml = RDLChartDocument(
+      @"2016", @"<Type>Line</Type><Subtype>Stepped</Subtype><ValueAxisName>Secondary</ValueAxisName>", @"", @"",
+      @"<Minimum>0</Minimum></ChartAxis><ChartAxis Name=\"Secondary\"><Location>Opposite</Location><Maximum>500</Maximum>");
+  xml = [xml stringByReplacingOccurrencesOfString:@"<ChartAreas>"
+                                       withString:@"<ChartNoDataMessage Name=\"NoDataMessage\"><Caption>Nothing to show"
+                                                  @"</Caption><Position>BottomLeft</Position><Style><Color>Red</Color>"
+                                                  @"</Style></ChartNoDataMessage><ChartAreas>"];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    RDLChartSeries *series = [chart.series firstObject];
+    RDLChartAxis *secondary = [chart.secondaryValueAxes firstObject];
+    if (series.type != RDLChartTypeLine || series.subtype != RDLChartSubtypeStepped ||
+        ![series.valueAxisName isEqualToString:@"Secondary"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the series %ld %ld %@", when, (long)series.type,
+                                                (long)series.subtype, series.valueAxisName]);
+    if (![chart.valueAxis.name isEqualToString:@"Primary"] || [chart.secondaryValueAxes count] != 1 ||
+        ![secondary.name isEqualToString:@"Secondary"] || secondary.location != RDLChartAxisLocationOpposite ||
+        ![[secondary.maximum source] isEqualToString:@"500"] || [chart indexOfValueAxisNamed:@"Secondary"] != 1)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the value axes %@ %lu %@ %ld %@", when, chart.valueAxis.name,
+                                                (unsigned long)[chart.secondaryValueAxes count], secondary.name,
+                                                (long)secondary.location, [secondary.maximum source]]);
+    if (![[chart.noDataMessage source] isEqualToString:@"Nothing to show"] ||
+        chart.noDataMessagePosition != RDLChartTitlePositionBottomLeft ||
+        ![chart.noDataMessageStyle.color isEqualToString:@"Red"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the no-data message %@ %ld %@", when, [chart.noDataMessage source],
+                                                (long)chart.noDataMessagePosition, chart.noDataMessageStyle.color]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+  // Stepped is a line's alone: on a column it is the column's default, as the
+  // spec says, and nothing to warn about.
+  RDLReport *r = [RDLParser reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Column</Type><Subtype>Stepped</Subtype>",
+                                                                  @"", @"", @"")
+                                          error:NULL];
+  RDLChartSeries *column = [RDLFirstChart(r).series firstObject];
+  if (column.type != RDLChartTypeColumn || column.subtype != RDLChartSubtypeUnspecified)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped column is a column: %ld %ld", (long)column.type,
+                                              (long)column.subtype]);
+  for (NSString *w in r.warnings)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped column: %@", w]);
+}
+
+// SSRS refuses a series plotted against a value axis the chart does not have
+// (rsValueAxisNameNotFound), so the checker does too.
+- (void)testASeriesNamingAValueAxisTheChartLacksIsAnError {
+  NSString *xml = RDLChartDocument(@"2016", @"<Type>Line</Type><ValueAxisName>Tertiary</ValueAxisName>", @"", @"",
+                                   @"</ChartAxis><ChartAxis Name=\"Secondary\">");
+  BOOL (^refused)(NSString *) = ^BOOL(NSString *doc) {
+    for (RDLDiagnostic *d in [RDLChecker checkReport:[RDLParser reportFromXMLString:doc error:NULL]])
+      if ([d.rule isEqualToString:@"value-axis-name-not-found"] && d.severity == RDLDiagnosticSeverityError)
+        return YES;
+    return NO;
+  };
+  if (!refused(xml))
+    XCTFail(@"%@", @"a series plotted against an axis named Tertiary, which the chart lacks, is an error");
+  if (refused([xml stringByReplacingOccurrencesOfString:@"Tertiary" withString:@"Secondary"]))
+    XCTFail(@"%@", @"a series plotted against the chart's Secondary axis is fine");
+}
+
+
+// Chart members nest: a year's quarters along the category axis, a kind's
+// regions in the legend. Only the outermost member was read, and saving lost
+// the rest.
+- (void)testNestedChartMembersAreReadAndWritten {
+  NSString *(^member)(NSString *, NSString *) = ^NSString *(NSString *name, NSString *inside) {
+    return [NSString stringWithFormat:@"<ChartMember><Group Name=\"%@\"><GroupExpressions><GroupExpression>"
+                                      @"=Fields!%@.Value</GroupExpression></GroupExpressions></Group>"
+                                      @"<Label>=Fields!%@.Value</Label>%@</ChartMember>",
+                                      name, name, name, inside];
+  };
+  NSString *categories = member(@"Year", [NSString stringWithFormat:@"<ChartMembers>%@</ChartMembers>",
+                                                                      member(@"Quarter", @"")]);
+  NSString *series = member(@"Kind", [NSString stringWithFormat:@"<ChartMembers>%@</ChartMembers>",
+                                                                 member(@"Region", @"")]);
+  NSString *xml = [RDLChartDocument(@"2016", @"<Type>Column</Type>", @"", @"", @"")
+      stringByReplacingOccurrencesOfString:@"<ChartData>"
+                                withString:[NSString stringWithFormat:
+                                                         @"<ChartCategoryHierarchy><ChartMembers>%@</ChartMembers>"
+                                                         @"</ChartCategoryHierarchy><ChartSeriesHierarchy><ChartMembers>"
+                                                         @"%@</ChartMembers></ChartSeriesHierarchy><ChartData>",
+                                                         categories, series]];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    NSArray<RDLChartMember *> *years = chart.categoryMembers, *kinds = chart.seriesMembers;
+    RDLChartMember *quarter = [[years firstObject].members firstObject];
+    RDLChartMember *region = [[kinds firstObject].members firstObject];
+    if ([years count] != 1 || [[years firstObject].members count] != 1 || ![quarter.groupName isEqualToString:@"Quarter"] ||
+        ![[quarter.groupExpressions.firstObject source] isEqualToString:@"=Fields!Quarter.Value"] ||
+        ![[quarter.label source] isEqualToString:@"=Fields!Quarter.Value"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the year's quarters %lu %@ %@", when, (unsigned long)[years count],
+                                                quarter.groupName, [quarter.label source]]);
+    if ([kinds count] != 1 || ![region.groupName isEqualToString:@"Region"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the kind's regions %lu %@", when, (unsigned long)[kinds count],
+                                                region.groupName]);
+    if ([[chart categoryGroups] count] != 2 || [[chart seriesGroups] count] != 2)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: two levels each: %lu %lu", when,
+                                                (unsigned long)[[chart categoryGroups] count],
+                                                (unsigned long)[[chart seriesGroups] count]]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+
+// A range chart's High and Low, and a stock chart's and a candlestick's Start
+// and End, are read and written back, and a range, a range column or bar, a
+// stock chart and a candlestick are each read as such. None of those values was
+// read, and every range chart was reported and drawn as columns. A box plot is
+// still reported.
+- (void)testRangeStockAndCandlestickChartsAreReadAndWritten {
+  NSDictionary<NSString *, NSNumber *> *kinds = @{
+    @"<Type>Range</Type>" : @(RDLChartTypeRange),
+    @"<Type>Range</Type><Subtype>Smooth</Subtype>" : @(RDLChartTypeRange),
+    @"<Type>Range</Type><Subtype>Column</Subtype>" : @(RDLChartTypeRangeColumn),
+    @"<Type>Range</Type><Subtype>Bar</Subtype>" : @(RDLChartTypeRangeBar),
+    @"<Type>Range</Type><Subtype>Stock</Subtype>" : @(RDLChartTypeStock),
+    @"<Type>Range</Type><Subtype>Candlestick</Subtype>" : @(RDLChartTypeCandlestick),
+  };
+  for (NSString *kind in kinds) {
+    NSString *xml = [RDLChartDocument(@"2016", kind, @"", @"", @"")
+        stringByReplacingOccurrencesOfString:@"<Y>=1</Y>"
+                                  withString:@"<High>=Max(Fields!Price.Value)</High><Low>=Min(Fields!Price.Value)</Low>"
+                                             @"<Start>=First(Fields!Price.Value)</Start>"
+                                             @"<End>=Last(Fields!Price.Value)</End>"];
+    for (NSUInteger pass = 0; pass < 2; pass++) {
+      NSString *when = [NSString stringWithFormat:@"%@ %@", kind, pass == 0 ? @"read" : @"read back"];
+      RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
+      if (series.type != (RDLChartType)[kinds[kind] integerValue] ||
+          ([kind containsString:@"Smooth"] && series.subtype != RDLChartSubtypeSmooth) ||
+          ![[series.high source] isEqualToString:@"=Max(Fields!Price.Value)"] ||
+          ![[series.low source] isEqualToString:@"=Min(Fields!Price.Value)"] ||
+          ![[series.start source] isEqualToString:@"=First(Fields!Price.Value)"] ||
+          ![[series.end source] isEqualToString:@"=Last(Fields!Price.Value)"])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@: %ld %ld, %@ %@ %@ %@", when, (long)series.type,
+                                                  (long)series.subtype, [series.high source], [series.low source],
+                                                  [series.start source], [series.end source]]);
+      for (NSString *w in r.warnings)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+      xml = [RDLWriter XMLStringFromReport:r];
+    }
+  }
+  RDLReport *boxPlot = [RDLParser
+      reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Range</Type><Subtype>BoxPlot</Subtype>", @"", @"", @"")
+                    error:NULL];
+  if ([[boxPlot.warnings componentsJoinedByString:@"\n"] rangeOfString:@"Range/BoxPlot"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a box plot is still reported: %@", boxPlot.warnings]);
+}
+
+
+// A funnel and a pyramid are read as such and written back. They were reported
+// and drawn as columns.
+- (void)testFunnelAndPyramidChartsAreReadAndWritten {
+  NSDictionary<NSString *, NSNumber *> *kinds = @{
+    @"<Type>Shape</Type><Subtype>Funnel</Subtype>" : @(RDLChartTypeFunnel),
+    @"<Type>Shape</Type><Subtype>Pyramid</Subtype>" : @(RDLChartTypePyramid),
+  };
+  for (NSString *kind in kinds) {
+    NSString *xml = RDLChartDocument(@"2016", kind, @"", @"", @"");
+    for (NSUInteger pass = 0; pass < 2; pass++) {
+      RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
+      if (series.type != (RDLChartType)[kinds[kind] integerValue])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)series.type]);
+      for (NSString *w in r.warnings)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %@", kind, (unsigned long)pass, w]);
+      xml = [RDLWriter XMLStringFromReport:r];
+    }
+  }
+}
+
+
+// A polar chart and a radar chart are read as such and written back. They were
+// reported and drawn as columns.
+- (void)testPolarAndRadarChartsAreReadAndWritten {
+  NSDictionary<NSString *, NSNumber *> *kinds = @{
+    @"<Type>Polar</Type>" : @(RDLChartTypePolar),
+    @"<Type>Polar</Type><Subtype>Radar</Subtype>" : @(RDLChartTypeRadar),
+  };
+  for (NSString *kind in kinds) {
+    NSString *xml = RDLChartDocument(@"2016", kind, @"", @"", @"");
+    for (NSUInteger pass = 0; pass < 2; pass++) {
+      RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
+      if (series.type != (RDLChartType)[kinds[kind] integerValue])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)series.type]);
+      for (NSString *w in r.warnings)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %@", kind, (unsigned long)pass, w]);
+      xml = [RDLWriter XMLStringFromReport:r];
+    }
+  }
+}
+
+
+// A report's Code is read and written back as written, so saving a report
+// keeps its functions; it used to be dropped. What is read runs.
+- (void)testTheReportsCodeIsReadAndWritten {
+  NSString *code = @"Function Twice(n As Double) As Double\n  Return n * 2 ' & <twice>\nEnd Function";
+  NSString *escaped = [[[code stringByReplacingOccurrencesOfString:@"&" withString:@"&amp;"]
+      stringByReplacingOccurrencesOfString:@"<" withString:@"&lt;"]
+      stringByReplacingOccurrencesOfString:@">" withString:@"&gt;"];
+  NSString *xml = [RDLChartDocument(@"2016", @"<Type>Column</Type>", @"", @"", @"")
+      stringByReplacingOccurrencesOfString:@"<ReportSections>"
+                                withString:[NSString stringWithFormat:@"<Code>%@</Code><ReportSections>", escaped]];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    if (![r.code isEqualToString:code])
+      XCTFail(@"%@", [NSString stringWithFormat:@"pass %lu: the code as written: %@", (unsigned long)pass, r.code]);
+    RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+    scope.report = r;
+    if ([[RDLExpression evaluate:@"=Code.Twice(21)" scope:scope] doubleValue] != 42)
+      XCTFail(@"%@", [NSString stringWithFormat:@"pass %lu: Code.Twice(21) should be 42", (unsigned long)pass]);
+    xml = [RDLWriter XMLStringFromReport:r];
+  }
+}
+
+// ReportParameter's settings, read and written back: Hidden, AllowBlank and
+// UsedInQuery; a DataSetReference for defaults and for valid values; a Prompt
+// that is absent -- nobody may give the parameter a value -- kept apart from
+// one that is empty; and a value written xsi:nil, which is Nothing. None was
+// read, an absent or empty Prompt became the parameter's name, and a nil value
+// was the empty string.
+- (void)testReportParameterSettingsAreReadAndWritten {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Asking"];
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  NSRegularExpression *block = [NSRegularExpression
+      regularExpressionWithPattern:@"<ReportParameters\\s*/>|<ReportParameters>.*?</ReportParameters>"
+                           options:NSRegularExpressionDotMatchesLineSeparators
+                             error:NULL];
+  NSString *parameters =
+      @"<ReportParameters>"
+      @"<ReportParameter Name=\"Region\"><DataType>String</DataType><Prompt>Region</Prompt>"
+      @"<AllowBlank>true</AllowBlank><UsedInQuery>False</UsedInQuery>"
+      @"<DefaultValue><DataSetReference><DataSetName>Regions</DataSetName><ValueField>Code</ValueField></DataSetReference></DefaultValue>"
+      @"<ValidValues><DataSetReference><DataSetName>Regions</DataSetName><ValueField>Code</ValueField>"
+      @"<LabelField>Name</LabelField></DataSetReference></ValidValues></ReportParameter>"
+      @"<ReportParameter Name=\"Internal\"><DataType>Integer</DataType><Hidden>true</Hidden><Nullable>true</Nullable>"
+      @"<DefaultValue><Values><Value xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\" /></Values></DefaultValue>"
+      @"</ReportParameter>"
+      @"<ReportParameter Name=\"Blank\"><DataType>String</DataType><Prompt></Prompt></ReportParameter>"
+      @"</ReportParameters>";
+  NSTextCheckingResult *hit = [block firstMatchInString:xml options:0 range:NSMakeRange(0, [xml length])];
+  if (hit == nil) {
+    XCTFail(@"%@", @"the writer should write a ReportParameters element to replace");
+    return;
+  }
+  xml = [xml stringByReplacingCharactersInRange:hit.range withString:parameters];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    RDLReport *read = [RDLParser reportFromXMLString:xml error:NULL];
+    NSString *when = pass ? @"written back" : @"as read";
+    if ([read.parameters count] != 3) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: three parameters, not %lu", when, (unsigned long)[read.parameters count]]);
+      return;
+    }
+    RDLParameter *region = read.parameters[0], *internal = read.parameters[1], *blank = read.parameters[2];
+    if (![region.prompt isEqualToString:@"Region"] || !region.allowBlank || region.hidden ||
+        region.usedInQuery != RDLUsedInQueryFalse)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: Region's settings", when]);
+    if (![region.defaultValuesReference.dataSetName isEqualToString:@"Regions"] ||
+        ![region.defaultValuesReference.valueField isEqualToString:@"Code"] ||
+        ![region.validValuesReference.labelField isEqualToString:@"Name"] || [region.defaultValues count])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: Region's dataset references", when]);
+    if (internal.prompt != nil || !internal.hidden || !internal.nullable)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: Internal has no prompt and is hidden: %@", when, internal.prompt]);
+    if ([internal.defaultValue evaluateInScope:[[RDLEvalScope alloc] init]] != nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: a nil default should be Nothing", when]);
+    if (blank.prompt == nil || [blank.prompt length])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: an empty prompt should stay empty: %@", when, blank.prompt]);
+    NSString *written = [RDLWriter XMLStringFromReport:read];
+    NSRegularExpression *blankBlock = [NSRegularExpression
+        regularExpressionWithPattern:@"<ReportParameter Name=\"Blank\">.*?</ReportParameter>"
+                             options:NSRegularExpressionDotMatchesLineSeparators
+                               error:NULL];
+    NSTextCheckingResult *blankHit = [blankBlock firstMatchInString:written options:0
+                                                              range:NSMakeRange(0, [written length])];
+    if (blankHit == nil || [[written substringWithRange:blankHit.range] rangeOfString:@"DefaultValue"].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: a parameter with no defaults writes no DefaultValue", when]);
+    xml = [RDLWriter XMLStringFromReport:read];
+  }
+}
+
+// A dataset's query settings and how its text compares, read and written back:
+// QueryParameters with their values and DataType, CommandType, Timeout,
+// CaseSensitivity, AccentSensitivity, KanatypeSensitivity, WidthSensitivity,
+// InterpretSubtotalsAsDetails and Collation. None was read, so a report saved
+// here lost them.
+- (void)testDataSetQuerySettingsAreReadAndWritten {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Queried"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Rows";
+  ds.dataSourceName = @"Docs";
+  ds.commandText = @"$.Rows[*]";
+  RDLQueryParameter *region = [[RDLQueryParameter alloc] init];
+  region.name = @"Region";
+  region.value = [RDLValue valueWithSource:@"=Parameters!Region.Value"];
+  RDLQueryParameter *top = [[RDLQueryParameter alloc] init];
+  top.name = @"Top";
+  top.value = [RDLValue literal:@"10"];
+  top.dataType = RDLParameterDataTypeInteger;
+  ds.queryParameters = @[ region, top ];
+  ds.commandType = RDLCommandTypeText;
+  ds.timeout = 30;
+  ds.caseSensitivity = RDLAutoBooleanTrue;
+  ds.accentSensitivity = RDLAutoBooleanFalse;
+  ds.kanatypeSensitivity = RDLAutoBooleanAuto;
+  ds.widthSensitivity = RDLAutoBooleanTrue;
+  ds.interpretSubtotalsAsDetails = RDLAutoBooleanFalse;
+  ds.collation = @"Latin1_General";
+  [r.dataSets addObject:ds];
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    RDLDataSet *read = [[RDLParser reportFromXMLString:xml error:NULL].dataSets firstObject];
+    NSString *when = pass ? @"written back" : @"as read";
+    if ([read.queryParameters count] != 2 || ![read.queryParameters[0].name isEqualToString:@"Region"] ||
+        ![[read.queryParameters[0].value source] isEqualToString:@"=Parameters!Region.Value"] ||
+        ![[read.queryParameters[1].value source] isEqualToString:@"10"] ||
+        read.queryParameters[1].dataType != RDLParameterDataTypeInteger)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the query parameters", when]);
+    if (read.commandType != RDLCommandTypeText || read.timeout != 30 || read.caseSensitivity != RDLAutoBooleanTrue ||
+        read.accentSensitivity != RDLAutoBooleanFalse || read.kanatypeSensitivity != RDLAutoBooleanAuto ||
+        read.widthSensitivity != RDLAutoBooleanTrue || read.interpretSubtotalsAsDetails != RDLAutoBooleanFalse ||
+        ![read.collation isEqualToString:@"Latin1_General"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the query and comparison settings", when]);
+    xml = [RDLWriter XMLStringFromReport:[RDLParser reportFromXMLString:xml error:NULL]];
+  }
+}
+
+// An image's MIMEType is read and written back, and the checker asks for one
+// where MS-RDL requires it: on an image read from data. It was not read.
+- (void)testAnImagesMIMETypeIsReadWrittenAndRequiredForData {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Typed"];
+  RDLImage *image = [[RDLImage alloc] init];
+  image.name = @"Photo";
+  image.source = RDLImageSourceDatabase;
+  image.value = @"=Fields!Photo.Value";
+  image.mimeType = @"image/jpeg";
+  image.width = 1;
+  image.height = 1;
+  [r.body.items addObject:image];
+  [r adoptItems];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  if (![[(RDLImage *)[back.body.items firstObject] mimeType] isEqualToString:@"image/jpeg"])
+    XCTFail(@"%@", @"MIMEType should come back as written");
+  BOOL reported = NO;
+  image.mimeType = nil;
+  for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+    if ([d.rule isEqualToString:@"image-mime-type"])
+      reported = YES;
+  if (!reported)
+    XCTFail(@"%@", @"an image read from data with no MIMEType should be reported");
+}
+
+// A page's Columns, ColumnSpacing and Style and the report's
+// ConsumeContainerWhitespace, read and written back; and a 2005 report's Body
+// Columns and ColumnSpacing moved to its Page, where 2008 put them. None was
+// read.
+- (void)testPageColumnsStyleAndWhitespaceAreReadAndWritten {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Paged"];
+  r.page.columns = 3;
+  r.page.columnSpacing = 0.25;
+  r.page.style = [[RDLStyle alloc] init];
+  r.page.style.backgroundColor = @"#ddeeff";
+  r.consumeContainerWhitespace = YES;
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    RDLReport *read = [RDLParser reportFromXMLString:xml error:NULL];
+    if (read.page.columns != 3 || fabs(read.page.columnSpacing - 0.25) > 0.001 ||
+        ![read.page.style.backgroundColor isEqualToString:@"#ddeeff"] || !read.consumeContainerWhitespace)
+      XCTFail(@"%@", [NSString stringWithFormat:@"pass %lu: %ld columns %g apart, %@, %d", (unsigned long)pass,
+                                                (long)read.page.columns, read.page.columnSpacing,
+                                                read.page.style.backgroundColor, read.consumeContainerWhitespace]);
+    xml = [RDLWriter XMLStringFromReport:read];
+  }
+  RDLReport *plain = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:[RDLReport emptyReportNamed:@"Plain"]]
+                                              error:NULL];
+  if (plain.page.columns != 1 || fabs(plain.page.columnSpacing - RDLDefaultColumnSpacing) > 0.001 || plain.page.style)
+    XCTFail(@"%@", @"a report that says nothing has one column, 0.5in apart, and no page style");
+
+  NSString *old = @"<?xml version=\"1.0\"?>"
+                  @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition\">"
+                  @"<Body><ReportItems/><Height>1in</Height><ColumnSpacing>0.25in</ColumnSpacing><Columns>3</Columns></Body>"
+                  @"<Width>2.5in</Width></Report>";
+  RDLReport *upgraded = [RDLParser reportFromXMLString:old error:NULL];
+  if (upgraded.page.columns != 3 || fabs(upgraded.page.columnSpacing - 0.25) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"2005's Body columns should be the page's: %ld, %g",
+                                              (long)upgraded.page.columns, upgraded.page.columnSpacing]);
+}
+
+// What this kit does not read is written back where it was: an element or
+// attribute with no place in the model -- authoring metadata, rd: designer
+// state, AutoRefresh, a text box's DocumentMapLabel, a page's
+// InteractiveHeight, ReportParametersLayout, the root's MustUnderstand -- goes
+// back under the element it came from, with the namespaces it needs declared.
+// An item deleted takes its pieces with it, a setting the kit now writes
+// itself wins over the one kept, a report written and read again comes out the
+// same, and a file upgraded from 2005 keeps its designer state but not the old
+// grammar's own elements. Opening one says what was kept. All of it was
+// dropped, silently.
+- (void)testWhatThisKitDoesNotReadIsWrittenBack {
+  NSString *xml =
+      @"<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+      @"<Report MustUnderstand=\"df\" xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition\" "
+      @"xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\" "
+      @"xmlns:df=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily\" "
+      @"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
+      @"xmlns:am=\"http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata\">"
+      @"<am:AuthoringMetadata>\n    <am:CreatedBy>\n      <am:Name>Kit</am:Name>\n    </am:CreatedBy>\n  </am:AuthoringMetadata>"
+      @"<df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>"
+      @"<AutoRefresh>0</AutoRefresh>"
+      @"<ReportSections><ReportSection><Body><ReportItems>"
+      @"<Textbox Name=\"Kept\"><Paragraphs><Paragraph><TextRuns><TextRun><Value>kept</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+      @"<rd:DefaultName>Kept</rd:DefaultName><DocumentMapLabel>In the map</DocumentMapLabel>"
+      @"<Top>0in</Top><Left>0in</Left><Height>0.25in</Height><Width>2in</Width></Textbox>"
+      @"<Textbox Name=\"Gone\"><Paragraphs><Paragraph><TextRuns><TextRun><Value>gone</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+      @"<rd:DefaultName>GoneName</rd:DefaultName><Top>1in</Top><Left>0in</Left><Height>0.25in</Height><Width>2in</Width></Textbox>"
+      @"</ReportItems><Height>2in</Height></Body><Width>6.5in</Width>"
+      @"<Page><PageHeight>11in</PageHeight><PageWidth>8.5in</PageWidth><InteractiveHeight>11in</InteractiveHeight></Page>"
+      @"</ReportSection></ReportSections>"
+      @"<ReportParameters><ReportParameter Name=\"P\"><DataType>String</DataType><Nullable>false</Nullable><Prompt>P</Prompt>"
+      @"</ReportParameter><ReportParameter Name=\"Maybe\"><DataType>String</DataType><Nullable>true</Nullable><Prompt>Maybe</Prompt>"
+      @"<DefaultValue><Values><Value xsi:nil=\"true\" /></Values></DefaultValue></ReportParameter></ReportParameters>"
+      @"<ReportParametersLayout><GridLayoutDefinition><NumberOfColumns>4</NumberOfColumns><NumberOfRows>2</NumberOfRows>"
+      @"</GridLayoutDefinition></ReportParametersLayout>"
+      @"<rd:ReportID>5ad2</rd:ReportID>"
+      @"</Report>";
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  BOOL said = NO;
+  for (NSString *warning in r.warnings)
+    if ([warning hasPrefix:@"kept "] && [warning rangeOfString:@"am:AuthoringMetadata"].location != NSNotFound)
+      said = YES;
+  if (!said)
+    XCTFail(@"%@", [NSString stringWithFormat:@"opening it should say what was kept: %@", r.warnings]);
+
+  RDLItem *gone = nil;
+  for (RDLItem *item in r.body.items)
+    if ([item.name isEqualToString:@"Gone"])
+      gone = item;
+  [r.body.items removeObject:gone];
+  [(RDLParameter *)[r.parameters firstObject] setNullable:YES];
+  // A kept piece of a name the writer now writes itself gives way to it.
+  RDLPreservedNode *stale = [[RDLPreservedNode alloc] init];
+  stale.parentPath = @[ @"ReportParameters#0", @"ReportParameter[P]#0" ];
+  stale.node = [NSXMLElement elementWithName:@"Nullable" stringValue:@"false"];
+  r.preservedNodes = [r.preservedNodes arrayByAddingObject:stale];
+  NSString *written = [RDLWriter XMLStringFromReport:r];
+  NSString * (^block)(NSString *) = ^NSString *(NSString *pattern) {
+    NSRegularExpression *rx = [NSRegularExpression regularExpressionWithPattern:pattern
+                                                                        options:NSRegularExpressionDotMatchesLineSeparators
+                                                                          error:NULL];
+    NSTextCheckingResult *hit = [rx firstMatchInString:written options:0 range:NSMakeRange(0, [written length])];
+    return hit ? [written substringWithRange:hit.range] : @"";
+  };
+  for (NSString *needle in @[
+         @"<am:AuthoringMetadata>", @"<am:Name>Kit</am:Name>", @"<df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>",
+         @"<AutoRefresh>0</AutoRefresh>", @"<NumberOfColumns>4</NumberOfColumns>", @"<rd:ReportID>5ad2</rd:ReportID>",
+         @"MustUnderstand=\"df\"", @"xmlns:am=\"http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata\"",
+         @"xmlns:df="
+       ])
+    if ([written rangeOfString:needle].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be written back", needle]);
+  NSString *kept = block(@"<Textbox Name=\"Kept\">.*?</Textbox>");
+  if ([kept rangeOfString:@"<rd:DefaultName>Kept</rd:DefaultName>"].location == NSNotFound ||
+      [kept rangeOfString:@"<DocumentMapLabel>In the map</DocumentMapLabel>"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a text box's own pieces go back in it: %@", kept]);
+  if ([block(@"<Page>.*?</Page>") rangeOfString:@"<InteractiveHeight>11in</InteractiveHeight>"].location == NSNotFound)
+    XCTFail(@"%@", @"a page's pieces go back in the page");
+  if ([written rangeOfString:@"GoneName"].location != NSNotFound || [written rangeOfString:@"Gone"].location != NSNotFound)
+    XCTFail(@"%@", @"a deleted item's pieces go with it");
+  NSString *parameter = block(@"<ReportParameter Name=\"P\">.*?</ReportParameter>");
+  if ([[parameter componentsSeparatedByString:@"<Nullable>"] count] != 2 ||
+      [parameter rangeOfString:@"<Nullable>true</Nullable>"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the setting as it now is, once: %@", parameter]);
+  if ([written rangeOfString:@"xsi:nil"].location != NSNotFound)
+    XCTFail(@"%@", @"xsi:nil is the reader's, read as Nothing, and not written back beside the value it became");
+  NSError *xmlError = nil;
+  if ([[NSXMLDocument alloc] initWithXMLString:written options:0 error:&xmlError] == nil)
+    XCTFail(@"%@", [NSString stringWithFormat:@"what is written should be XML: %@", xmlError]);
+  RDLReport *again = [RDLParser reportFromXMLString:written error:NULL];
+  if (![[RDLWriter XMLStringFromReport:again] isEqualToString:written])
+    XCTFail(@"%@", @"written and read again, it should come out the same");
+
+  NSString *old = @"<?xml version=\"1.0\"?>"
+                  @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition\" "
+                  @"xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+                  @"<rd:DrawGrid>true</rd:DrawGrid><PageWidth>8.5in</PageWidth><InteractiveHeight>11in</InteractiveHeight>"
+                  @"<Body><ReportItems/><Height>1in</Height></Body><Width>2.5in</Width></Report>";
+  NSString *upgraded = [RDLWriter XMLStringFromReport:[RDLParser reportFromXMLString:old error:NULL]];
+  if ([upgraded rangeOfString:@"<rd:DrawGrid>true</rd:DrawGrid>"].location == NSNotFound ||
+      [[upgraded componentsSeparatedByString:@"<PageWidth>"] count] != 2 ||
+      [upgraded rangeOfString:@"InteractiveHeight"].location != NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"an upgraded file keeps its designer state and not the old grammar: %@", upgraded]);
 }
 
 @end

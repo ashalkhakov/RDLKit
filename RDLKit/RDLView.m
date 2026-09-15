@@ -33,19 +33,69 @@ static void RDLSetLineDash(NSBezierPath *p, RDLBorderStyle style) {
   }
 }
 
-static void RDLStrokeBorderEdge(NSPoint a, NSPoint b, RDLBorder *border, RDLBorder *fallback) {
+static void RDLStrokeSegment(NSPoint a, NSPoint b, CGFloat width, RDLBorderStyle style,
+                             NSColor *color) {
+  NSBezierPath *p = [NSBezierPath bezierPath];
+  [p moveToPoint:a];
+  [p lineToPoint:b];
+  [p setLineWidth:width];
+  RDLSetLineDash(p, style);
+  [color set];
+  [p stroke];
+}
+
+static NSPoint RDLOffsetPoint(NSPoint p, NSPoint inward, CGFloat by) {
+  return NSMakePoint(p.x + inward.x * by, p.y + inward.y * by);
+}
+
+// One edge of a box's border. `inward` points into the box, and `leading` is
+// YES for the top and left edges, which the three-dimensional styles shade
+// against the bottom and right: Double draws two thin lines, Groove and Ridge a
+// dark and a light half, Inset and Outset the whole edge darker or lighter.
+// They used to be drawn as a plain solid line.
+static void RDLStrokeBorderEdge(NSPoint a, NSPoint b, NSPoint inward, BOOL leading, RDLBorder *border,
+                                RDLBorder *fallback) {
   RDLBorder *use =
       (border && border.style != RDLBorderStyleUnspecified &&
        border.style != RDLBorderStyleNone) ? border : fallback;
   if (use == nil || use.style == RDLBorderStyleUnspecified || use.style == RDLBorderStyleNone)
     return;
-  NSBezierPath *p = [NSBezierPath bezierPath];
-  [p moveToPoint:a];
-  [p lineToPoint:b];
-  [p setLineWidth:RDLViewPt(use.width, 1)];
-  RDLSetLineDash(p, use.style);
-  [RDLColorFromHex(use.color) set];
-  [p stroke];
+  CGFloat width = RDLViewPt(use.width, 1);
+  NSColor *color = RDLColorFromHex(use.color);
+  NSColor *dark = [color blendedColorWithFraction:0.45 ofColor:[NSColor blackColor]] ?: color;
+  NSColor *light = [color blendedColorWithFraction:0.55 ofColor:[NSColor whiteColor]] ?: color;
+  switch (use.style) {
+  case RDLBorderStyleDouble: {
+    CGFloat third = width / 3;
+    RDLStrokeSegment(RDLOffsetPoint(a, inward, -third), RDLOffsetPoint(b, inward, -third), third,
+                     RDLBorderStyleSolid, color);
+    RDLStrokeSegment(RDLOffsetPoint(a, inward, third), RDLOffsetPoint(b, inward, third), third,
+                     RDLBorderStyleSolid, color);
+    break;
+  }
+  case RDLBorderStyleGroove:
+  case RDLBorderStyleRidge: {
+    BOOL groove = use.style == RDLBorderStyleGroove;
+    NSColor *outer = (groove == leading) ? dark : light;
+    NSColor *inner = (groove == leading) ? light : dark;
+    CGFloat half = width / 2;
+    RDLStrokeSegment(RDLOffsetPoint(a, inward, -half / 2), RDLOffsetPoint(b, inward, -half / 2), half,
+                     RDLBorderStyleSolid, outer);
+    RDLStrokeSegment(RDLOffsetPoint(a, inward, half / 2), RDLOffsetPoint(b, inward, half / 2), half,
+                     RDLBorderStyleSolid, inner);
+    break;
+  }
+  case RDLBorderStyleInset:
+  case RDLBorderStyleWindowInset:
+    RDLStrokeSegment(a, b, width, RDLBorderStyleSolid, leading ? dark : light);
+    break;
+  case RDLBorderStyleOutset:
+    RDLStrokeSegment(a, b, width, RDLBorderStyleSolid, leading ? light : dark);
+    break;
+  default:
+    RDLStrokeSegment(a, b, width, use.style, color);
+    break;
+  }
 }
 
 // Font + text attributes for a resolved style (used both for the plain text
@@ -69,15 +119,161 @@ static void RDLDrawBorders(NSRect r, RDLStyle *s) {
   RDLBorder *all =
       (s.border && s.border.style != RDLBorderStyleUnspecified &&
        s.border.style != RDLBorderStyleNone) ? s.border : nil;
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMinY(r)), s.borderTop, all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMaxY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)), s.borderBottom,
-                       all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMinX(r), NSMaxY(r)), s.borderLeft, all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMaxX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)), s.borderRight,
-                       all);
+  // The view is flipped: the top edge is at the smaller y, and inward is down.
+  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMinY(r)),
+                      NSMakePoint(0, 1), YES, s.borderTop, all);
+  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMaxY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)),
+                      NSMakePoint(0, -1), NO, s.borderBottom, all);
+  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMinX(r), NSMaxY(r)),
+                      NSMakePoint(1, 0), YES, s.borderLeft, all);
+  RDLStrokeBorderEdge(NSMakePoint(NSMaxX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)),
+                      NSMakePoint(-1, 0), NO, s.borderRight, all);
+}
+
+// Overline, which the text system has no attribute for: a line over each line
+// of text, drawn once the text itself is. It used to be missing in PDF.
+static void RDLDrawOverlines(NSAttributedString *text, NSRect rect, NSColor *color) {
+  if ([text length] == 0)
+    return;
+  NSTextStorage *storage = [[NSTextStorage alloc] initWithAttributedString:text];
+  NSLayoutManager *layout = [[NSLayoutManager alloc] init];
+  NSTextContainer *container =
+      [[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(rect), CGFLOAT_MAX)];
+  [container setLineFragmentPadding:0];
+  [layout addTextContainer:container];
+  [storage addLayoutManager:layout];
+  NSUInteger glyphs = [layout numberOfGlyphs];
+  NSUInteger index = 0;
+  [color set];
+  while (index < glyphs) {
+    NSRange line = NSMakeRange(0, 0);
+    NSRect used = [layout lineFragmentUsedRectForGlyphAtIndex:index effectiveRange:&line];
+    if (line.length == 0)
+      break;
+    if (NSWidth(used) > 0) {
+      NSBezierPath *p = [NSBezierPath bezierPath];
+      CGFloat y = NSMinY(rect) + NSMinY(used) + 0.5;
+      [p moveToPoint:NSMakePoint(NSMinX(rect) + NSMinX(used), y)];
+      [p lineToPoint:NSMakePoint(NSMinX(rect) + NSMaxX(used), y)];
+      [p setLineWidth:1];
+      [p stroke];
+    }
+    if (NSMaxRange(line) <= index)
+      break;
+    index = NSMaxRange(line);
+  }
+}
+
+// Style/BackgroundImage, over the background colour and under the contents:
+// tiled both ways or one way, stretched to fit, or placed once at its
+// position -- the top left for Clip -- and cut at the box. The spec's default
+// is to tile.
+static void RDLDrawBackgroundImage(NSRect r, RDLLaidOutItem *it) {
+  NSImage *img = nil;
+  if ([it.backgroundImageData length]) {
+    img = [[NSImage alloc] initWithData:it.backgroundImageData];
+  } else if ([it.backgroundImageSrc length]) {
+    NSURL *u = [NSURL URLWithString:it.backgroundImageSrc];
+    if (u.isFileURL || [it.backgroundImageSrc hasPrefix:@"/"])
+      img = [[NSImage alloc] initWithContentsOfFile:u.isFileURL ? u.path : it.backgroundImageSrc];
+  }
+  NSSize size = img.size;
+  if (img == nil || size.width <= 0 || size.height <= 0 || NSWidth(r) <= 0 || NSHeight(r) <= 0)
+    return;
+  RDLBackgroundRepeat repeat = it.backgroundRepeat != RDLBackgroundRepeatUnspecified
+                                   ? it.backgroundRepeat
+                                   : RDLBackgroundRepeatRepeat;
+  [NSGraphicsContext saveGraphicsState];
+  NSRectClip(r);
+  if (repeat == RDLBackgroundRepeatFit) {
+    [img drawInRect:r fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0
+        respectFlipped:YES hints:nil];
+  } else {
+    // Where a single copy sits. The view is flipped: the top is the smaller y.
+    RDLBackgroundPosition pos =
+        repeat == RDLBackgroundRepeatClip ? RDLBackgroundPositionTopLeft : it.backgroundPosition;
+    CGFloat x = NSMinX(r), y = NSMinY(r);
+    if (pos == RDLBackgroundPositionTop || pos == RDLBackgroundPositionCenter ||
+        pos == RDLBackgroundPositionBottom)
+      x = NSMidX(r) - size.width / 2;
+    else if (pos == RDLBackgroundPositionTopRight || pos == RDLBackgroundPositionRight ||
+             pos == RDLBackgroundPositionBottomRight)
+      x = NSMaxX(r) - size.width;
+    if (pos == RDLBackgroundPositionLeft || pos == RDLBackgroundPositionCenter ||
+        pos == RDLBackgroundPositionRight)
+      y = NSMidY(r) - size.height / 2;
+    else if (pos == RDLBackgroundPositionBottomLeft || pos == RDLBackgroundPositionBottom ||
+             pos == RDLBackgroundPositionBottomRight)
+      y = NSMaxY(r) - size.height;
+    BOOL tileX = repeat == RDLBackgroundRepeatRepeat || repeat == RDLBackgroundRepeatRepeatX;
+    BOOL tileY = repeat == RDLBackgroundRepeatRepeat || repeat == RDLBackgroundRepeatRepeatY;
+    NSInteger cols = tileX ? (NSInteger)ceil(NSWidth(r) / size.width) : 1;
+    NSInteger rows = tileY ? (NSInteger)ceil(NSHeight(r) / size.height) : 1;
+    if (cols * rows > 4096) {
+      // A tiny image over a large box: a pattern rather than thousands of draws.
+      [[NSColor colorWithPatternImage:img] set];
+      NSRectFill(r);
+    } else {
+      CGFloat ox = tileX ? NSMinX(r) : x, oy = tileY ? NSMinY(r) : y;
+      for (NSInteger row = 0; row < rows; row++)
+        for (NSInteger col = 0; col < cols; col++)
+          [img drawInRect:NSMakeRect(ox + col * size.width, oy + row * size.height, size.width,
+                                     size.height)
+                 fromRect:NSZeroRect
+                operation:NSCompositeSourceOver
+                 fraction:1.0
+           respectFlipped:YES
+                    hints:nil];
+    }
+  }
+  [NSGraphicsContext restoreGraphicsState];
+}
+
+// BackgroundGradientType: from BackgroundColor to BackgroundGradientEndColor,
+// across, down, along a diagonal, or with the end colour in the middle of the
+// box or of one of its centre lines. The view is flipped, so a positive angle
+// runs downward. NO when the style asks for no gradient.
+static BOOL RDLFillGradient(NSRect r, RDLStyle *s) {
+  RDLGradientType type = s.backgroundGradientType;
+  if (type == RDLGradientTypeUnspecified || type == RDLGradientTypeNone ||
+      RDLColorIsTransparent(s.backgroundGradientEndColor))
+    return NO;
+  NSColor *start = RDLColorIsTransparent(s.backgroundColor) ? [NSColor clearColor]
+                                                            : RDLColorFromHex(s.backgroundColor);
+  NSColor *end = RDLColorFromHex(s.backgroundGradientEndColor);
+  NSGradient *two = [[NSGradient alloc] initWithStartingColor:start endingColor:end];
+  NSGradient *banded = [[NSGradient alloc] initWithColors:@[ start, end, start ]];
+  switch (type) {
+  case RDLGradientTypeLeftRight:
+    [two drawInRect:r angle:0];
+    break;
+  case RDLGradientTypeTopBottom:
+    [two drawInRect:r angle:90];
+    break;
+  case RDLGradientTypeDiagonalLeft:
+    [two drawInRect:r angle:45];
+    break;
+  case RDLGradientTypeDiagonalRight:
+    [two drawInRect:r angle:135];
+    break;
+  case RDLGradientTypeHorizontalCenter:
+    [banded drawInRect:r angle:90];
+    break;
+  case RDLGradientTypeVerticalCenter:
+    [banded drawInRect:r angle:0];
+    break;
+  case RDLGradientTypeCenter:
+  default:
+    [[[NSGradient alloc] initWithStartingColor:end endingColor:start] drawInRect:r
+                                                          relativeCenterPosition:NSZeroPoint];
+    break;
+  }
+  return YES;
 }
 
 static void RDLFillBackground(NSRect r, RDLStyle *s) {
+  if (RDLFillGradient(r, s))
+    return;
   NSString *bg = s.backgroundColor;
   if (!RDLColorIsTransparent(bg)) {
     [RDLColorFromHex(bg) set];
@@ -127,7 +323,11 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     [self setNeedsDisplay:YES];
     return;
   }
-  [self applyPages:[RDLLayoutEngine pagesForReport:self.report paramValues:self.paramValues]];
+  // The preview is what SSRS's own viewer is: interactive, rendered as RPL.
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.renderFormat = RDLRenderFormatPreview;
+  environment.documentBinder = self.documentBinder;
+  [self applyPages:[RDLLayoutEngine pagesForReport:self.report paramValues:self.paramValues environment:environment]];
 }
 
 - (void)drawPage:(RDLLaidOutPage *)page atY:(CGFloat)originY {
@@ -150,9 +350,17 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     // left of the page -- is cut there rather than drawn over the footer.
     BOOL clip = it.region == RDLLaidOutRegionBody &&
                 (it.y < page.bodyTop || it.y + it.h > page.bodyBottom);
+    NSRect clipRect = band;
+    // Part of a row split across pages is cut to its piece, which is inside
+    // the band.
+    if (it.inPiece) {
+      clipRect = NSMakeRect(0, originY + it.pieceTop * kRDLDPI, page.width * kRDLDPI,
+                            (it.pieceBottom - it.pieceTop) * kRDLDPI);
+      clip = it.y < it.pieceTop || it.y + it.h > it.pieceBottom;
+    }
     if (clip) {
       [NSGraphicsContext saveGraphicsState];
-      NSRectClip(band);
+      NSRectClip(clipRect);
     }
     [self drawItem:it inRect:r];
     if (clip)
@@ -183,12 +391,14 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   }
   if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {
     RDLFillBackground(r, it.style);
+    RDLDrawBackgroundImage(r, it);
     RDLDrawBorders(r, it.style);
     return;
   }
   if ([it isKindOfClass:[RDLLaidOutImage class]]) {
     RDLLaidOutImage *img0 = (RDLLaidOutImage *)it;
     RDLFillBackground(r, it.style);
+    RDLDrawBackgroundImage(r, it);
     NSImage *img = nil;
     if ([img0.imageData length])
       img = [[NSImage alloc] initWithData:img0.imageData];
@@ -200,13 +410,15 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     if (img) {
       NSRect dst = r;
       NSSize sz = img.size;
-      RDLImageSizing sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingFit;
-      if ((sizing == RDLImageSizingFitProportional || sizing == RDLImageSizingAutoSize) &&
-          sz.width > 0 && sz.height > 0) {
+      // AutoSize, the default, has laid the box out at the image's own size, so
+      // the image fills it, as Fit does; Clip draws the image at its own size
+      // from the top left, and FitProportional as large as fits unstretched.
+      RDLImageSizing sizing = img0.sizing != RDLImageSizingUnspecified ? img0.sizing : RDLImageSizingAutoSize;
+      if (sizing == RDLImageSizingFitProportional && sz.width > 0 && sz.height > 0) {
         CGFloat scale = MIN(NSWidth(r) / sz.width, NSHeight(r) / sz.height);
         dst.size = NSMakeSize(sz.width * scale, sz.height * scale);
       } else if (sizing == RDLImageSizingClip) {
-        dst.size = sz;
+        dst.size = img0.naturalWidth > 0 ? NSMakeSize(img0.naturalWidth * kRDLDPI, img0.naturalHeight * kRDLDPI) : sz;
       }
       [NSGraphicsContext saveGraphicsState];
       NSRectClip(r);
@@ -223,6 +435,7 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   }
   if ([it isKindOfClass:[RDLLaidOutChart class]]) {
     RDLFillBackground(r, it.style);
+    RDLDrawBackgroundImage(r, it);
     // The picture is worked out by RDLChartRenderer, the same geometry the
     // HTML backend and the designer canvas draw, so all three agree.
     [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r];
@@ -231,6 +444,21 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   }
   // Textbox
   RDLFillBackground(r, it.style);
+  RDLDrawBackgroundImage(r, it);
+  NSRect box = r;
+  // Vertical text is the horizontal layout turned a quarter: to the right for
+  // Vertical, which reads top to bottom, and to the left for Rotate270, which
+  // reads bottom to top. The view is flipped, so a positive angle turns right.
+  BOOL turned = it.style.writingMode == RDLWritingModeVertical ||
+                it.style.writingMode == RDLWritingModeRotate270;
+  if (turned) {
+    [NSGraphicsContext saveGraphicsState];
+    NSAffineTransform *turn = [NSAffineTransform transform];
+    [turn translateXBy:NSMidX(box) yBy:NSMidY(box)];
+    [turn rotateByDegrees:it.style.writingMode == RDLWritingModeVertical ? 90 : -90];
+    [turn concat];
+    r = NSMakeRect(-NSHeight(box) / 2, -NSWidth(box) / 2, NSHeight(box), NSWidth(box));
+  }
   NSDictionary *attrs = RDLViewAttrs(it.style, RDLTextAlignUnspecified);
   // Padding inset.
   NSRect textRect = r;
@@ -261,7 +489,12 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     [rich drawInRect:textRect];
   else
     [text drawInRect:textRect withAttributes:attrs];
-  RDLDrawBorders(r, it.style);
+  if (it.style.textDecoration == RDLTextDecorationOverline)
+    RDLDrawOverlines(rich ?: [[NSAttributedString alloc] initWithString:text attributes:attrs], textRect,
+                     RDLColorFromHex(it.style.color));
+  if (turned)
+    [NSGraphicsContext restoreGraphicsState];
+  RDLDrawBorders(box, it.style);
 }
 
 - (void)drawRect:(NSRect)dirtyRect {

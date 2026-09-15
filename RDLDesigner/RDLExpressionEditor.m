@@ -85,8 +85,13 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
     RDLEntry(@"Globals!TotalPages", @"How many pages there are."),
     RDLEntry(@"Globals!ReportName", @"The report's name."),
     RDLEntry(@"Globals!ExecutionTime", @"When the report was run."),
+    RDLEntry(@"Globals!OverallPageNumber", @"The page, counted across page-number resets."),
+    RDLEntry(@"Globals!OverallTotalPages", @"How many pages there are, across resets."),
     RDLEntry(@"Globals!PageName", @"The name of the page being printed."),
-    RDLEntry(@"Globals!UserID", @"Who is running the report."),
+    RDLEntry(@"Globals!RenderFormat.Name", @"What the report is being rendered as: PDF, HTML5, or RPL in the preview."),
+    RDLEntry(@"Globals!RenderFormat.IsInteractive", @"True when the report is read on screen."),
+    RDLEntry(@"User!UserID", @"Who is running the report."),
+    RDLEntry(@"User!Language", @"The culture of whoever is reading the report."),
   ];
 }
 

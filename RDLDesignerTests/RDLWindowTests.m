@@ -1463,6 +1463,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   // A free-text parameter applies as it is typed, not only on Return.
   RDLParameter *title = [[RDLParameter alloc] init];
   title.name = @"Title";
+  title.prompt = @"Title";
   title.dataType = RDLParameterDataTypeString;
   title.defaultValue = [RDLValue literal:@"Untitled"];
   [report.parameters addObject:title];
@@ -2832,6 +2833,111 @@ static NSTabView *_centerTabViewOf(id wc) {
   // And the table beside it agrees.
   if (![[RDLDatasetFieldsView sourceOfField:item] isEqualToString:@"Item"])
     XCTFail(@"%@", @"the dataset table shows the same column");
+}
+
+// The pane asks as a report server's prompt pane asks: not for a Hidden
+// parameter, nor one with no Prompt; from a list read from a dataset, shown by
+// its labels and giving its values; starting on the default the report works
+// out; and saying beside a value what is wrong with it. Export refuses what a
+// server would refuse to render. Every parameter was asked for, a default was
+// its source text, and only a list written out could be chosen from.
+- (void)testParametersAreAskedForAsAReportServerAsks {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Served"];
+  RDLDataSet *regions = [[RDLDataSet alloc] init];
+  regions.name = @"Regions";
+  regions.rows = @[ @{ @"Code" : @"N", @"Name" : @"North" }, @{ @"Code" : @"S", @"Name" : @"South" } ];
+  [report.dataSets addObject:regions];
+  RDLParameter * (^parameter)(NSString *, NSString *) = ^RDLParameter *(NSString *name, NSString *prompt) {
+    RDLParameter *p = [[RDLParameter alloc] init];
+    p.name = name;
+    p.prompt = prompt;
+    p.dataType = RDLParameterDataTypeString;
+    p.defaultValue = [RDLValue literal:@"x"];
+    [report.parameters addObject:p];
+    return p;
+  };
+  RDLParameter *region = parameter(@"Region", @"Which region?");
+  region.defaultValue = [RDLValue literal:@"S"];
+  region.validValuesReference = [[RDLDataSetReference alloc] init];
+  region.validValuesReference.dataSetName = @"Regions";
+  region.validValuesReference.valueField = @"Code";
+  region.validValuesReference.labelField = @"Name";
+  parameter(@"Secret", @"Secret").hidden = YES;
+  parameter(@"Internal", nil);
+  RDLParameter *copies = parameter(@"Copies", @"How many copies?");
+  copies.dataType = RDLParameterDataTypeInteger;
+  copies.defaultValue = nil;
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  if ([doc.paramValues count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"nothing has been given yet: %@", doc.paramValues]);
+  RDLDataView *pane = [[RDLDataView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400) document:doc];
+  [pane reload];
+
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  NSPopUpButton *chooser = nil;
+  for (NSView *v in [[[pane subviews] firstObject] subviews]) {
+    if ([v isKindOfClass:[NSPopUpButton class]])
+      chooser = (NSPopUpButton *)v;
+    else if ([v isKindOfClass:[NSTextField class]])
+      [texts addObject:[(NSTextField *)v stringValue]];
+  }
+  if ([texts containsObject:@"Secret"] || [texts containsObject:@"Internal"] || ![texts containsObject:@"Which region?"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"asked for the wrong parameters: %@", texts]);
+  if (![[chooser itemTitles] isEqual:(@[ @"North", @"South" ])] || ![[chooser titleOfSelectedItem] isEqualToString:@"South"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the list should be the dataset's, by label, on the default: %@ %@",
+                                              [chooser itemTitles], [chooser titleOfSelectedItem]]);
+  BOOL said = NO;
+  for (NSString *text in texts)
+    if ([text rangeOfString:@"'Copies' parameter is missing a value"].location != NSNotFound)
+      said = YES;
+  if (!said)
+    XCTFail(@"%@", [NSString stringWithFormat:@"what is wrong should be said beside it: %@", texts]);
+  [chooser selectItemWithTitle:@"North"];
+  [pane paramChanged:chooser];
+  if (![doc.paramValues[@"Region"] isEqualToString:@"N"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"choosing a label should give its value: %@", doc.paramValues]);
+
+  NSURL *out = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:@"RDLServedExport.html"]];
+  NSError *error = nil;
+  if ([doc exportUsingBackend:[RDLGenerator backendNamed:@"HTML"] toURL:out error:&error] ||
+      [error.localizedDescription rangeOfString:@"'Copies'"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"export should refuse a missing value: %@", error]);
+  [doc setParamValue:@"2" forName:@"Copies"];
+  if (![doc exportUsingBackend:[RDLGenerator backendNamed:@"HTML"] toURL:out error:&error])
+    XCTFail(@"%@", [NSString stringWithFormat:@"with the value given, export should go ahead: %@", error]);
+  [[NSFileManager defaultManager] removeItemAtURL:out error:NULL];
+}
+
+// A parameter the report's query reads narrows the data when it is given in the
+// designer, as it is when the report is rendered: the query is evaluated again
+// with the new value before the preview shows it.
+- (void)testAParameterGivenInTheDesignerReachesTheQuery {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Narrowed"];
+  RDLDataSource *people = [[RDLDataSource alloc] init];
+  people.name = @"People";
+  people.dataProvider = @"JSON";
+  people.connectString = RDLConnectionString(@{
+    @"jsondata" : @"{\"Rows\":[{\"Region\":\"N\",\"Name\":\"Ann\"},{\"Region\":\"S\",\"Name\":\"Bo\"},{\"Region\":\"S\",\"Name\":\"Cy\"}]}"
+  });
+  [report.dataSources addObject:people];
+  RDLDataSet *rows = [[RDLDataSet alloc] init];
+  rows.name = @"Rows";
+  rows.dataSourceName = @"People";
+  rows.commandText = @"=\"$.Rows[?(@.Region=='\" & Parameters!Region.Value & \"')]\"";
+  [report.dataSets addObject:rows];
+  RDLParameter *region = [[RDLParameter alloc] init];
+  region.name = @"Region";
+  region.prompt = @"Region";
+  region.dataType = RDLParameterDataTypeString;
+  region.defaultValue = [RDLValue literal:@"S"];
+  [report.parameters addObject:region];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  [doc bindDataSourcesFetchingRemote:NO notes:NULL error:NULL];
+  if ([rows.rows count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"read with the default, S: %lu rows", (unsigned long)[rows.rows count]]);
+  [doc setParamValue:@"N" forName:@"Region"];
+  if ([rows.rows count] != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"given N, the query should narrow: %lu rows", (unsigned long)[rows.rows count]]);
 }
 
 @end

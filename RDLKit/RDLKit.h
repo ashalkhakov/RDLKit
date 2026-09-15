@@ -16,6 +16,10 @@
 #import "RDLView.h"
 #import "RDLBackend.h"
 #import "RDLGenerator.h"
+// A report's parameters, worked out and checked as a report server does.
+#import "RDLParameterValues.h"
+// The stage before layout that evaluates the data sources for the parameters.
+#import "RDLDataEvaluation.h"
 // Datasets from documents: JSON, XML and CSV, which is what a local report
 // viewer binds to.
 #import "RDLJSONPath.h"

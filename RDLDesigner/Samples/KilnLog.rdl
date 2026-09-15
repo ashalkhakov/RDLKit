@@ -413,6 +413,7 @@
                                                     <CanGrow>true</CanGrow>
                                                     <Style>
                                                         <FontFamily>Georgia</FontFamily>
+                                                        <Format>yyyy-MM-dd</Format>
                                                         <Color>#1a1916</Color>
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
@@ -425,6 +426,7 @@
                                                                     <Value>=Fields!FiredOn.Value</Value>
                                                                     <Style>
                                                                         <FontFamily>Georgia</FontFamily>
+                                                                        <Format>yyyy-MM-dd</Format>
                                                                         <Color>#1a1916</Color>
                                                                         <VerticalAlign>Top</VerticalAlign>
                                                                         <PaddingLeft>4pt</PaddingLeft>

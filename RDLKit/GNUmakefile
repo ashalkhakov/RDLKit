@@ -20,7 +20,9 @@ RDLKit_HEADER_FILES = \
   RDLXMLDataProvider.h \
   RDLCSVDataProvider.h \
   RDLSubreportLoader.h \
-  RDLTextAttributes.h
+  RDLTextAttributes.h \
+  RDLParameterValues.h \
+  RDLDataEvaluation.h
 RDLKit_OBJC_FILES = \
   RDLReport.m \
   RDLParser.m \
@@ -43,7 +45,11 @@ RDLKit_OBJC_FILES = \
   RDLXMLDataProvider.m \
   RDLCSVDataProvider.m \
   RDLSubreportLoader.m \
-  RDLTextAttributes.m
+  RDLTextAttributes.m \
+  RDLMarkup.m \
+  RDLCode.m \
+  RDLParameterValues.m \
+  RDLDataEvaluation.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever
 # allocation happens to notice, long after the write that did the damage, so it

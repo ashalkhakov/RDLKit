@@ -1,6 +1,8 @@
 #import <Foundation/Foundation.h>
 @class RDLReport;
 @class RDLDataSet;
+@class RDLParameterValues;
+@class RDLDataBinder;
 
 // One value out of one row of a dataset.
 //
@@ -11,6 +13,35 @@
 // asked only for keys it actually has, so a field it lacks reads as nil rather
 // than raising.
 FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
+
+// Style.Calendar: the calendar a date is written in. Default, and a style that
+// names none, is the culture's own.
+typedef NS_ENUM(NSInteger, RDLCalendar) {
+  RDLCalendarUnspecified = 0,
+  RDLCalendarDefault,
+  RDLCalendarGregorian,
+  RDLCalendarGregorianArabic,
+  RDLCalendarGregorianMiddleEastFrench,
+  RDLCalendarGregorianTransliteratedEnglish,
+  RDLCalendarGregorianTransliteratedFrench,
+  RDLCalendarGregorianUSEnglish,
+  RDLCalendarHebrew,
+  RDLCalendarHijri,
+  RDLCalendarJapanese,
+  RDLCalendarKorean,
+  RDLCalendarTaiwan,
+  RDLCalendarThaiBuddhist,
+};
+
+// What a report is being rendered as, for Globals!RenderFormat: a PDF, an HTML
+// page, or the designer's preview, which is what SSRS's own viewer renders as
+// RPL. Unspecified is taken as the preview.
+typedef NS_ENUM(NSInteger, RDLRenderFormat) {
+  RDLRenderFormatUnspecified = 0,
+  RDLRenderFormatPDF,
+  RDLRenderFormatHTML,
+  RDLRenderFormatPreview,
+};
 
 @interface RDLEvalScope : NSObject
 @property (nonatomic, strong) RDLReport *report;
@@ -32,10 +63,21 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 // ReportItems!Name.Value reads. The layout fills it as it places items, and
 // places the page header and footer after the body so they can see it.
 @property (nonatomic, strong) NSMutableDictionary<NSString *, id> *reportItemValues;
+// What each HideDuplicates text box last showed, and in which instance of its
+// scope, while one tablix is placed on one page: [text, that instance's rows].
+// nil outside a tablix, where there is nothing above a text box to repeat.
+@property (nonatomic, strong) NSMutableDictionary<NSString *, NSArray *> *shownDuplicates;
+// The values of the Variables in scope, by name: the report's, and within a
+// group, that group instance's and those of the groups around it.
+@property (nonatomic, copy) NSDictionary<NSString *, id> *variableValues;
 @property (nonatomic, strong) id previousRow;
 // Which row this is within the innermost scope, counting from 1. What
 // RowNumber() reports; 0 means the layout engine has not said.
 @property (nonatomic, assign) NSInteger rowNumber;
+// Which detail row this is within the whole data region, counting from 1, in
+// the order the rows are shown: what RowNumber of the region's dataset reports.
+// 0 where the layout engine has not said.
+@property (nonatomic, assign) NSInteger regionRowNumber;
 // The scopes enclosing whatever is being evaluated, outermost first: the
 // dataset name, then each group's name. InScope() asks whether a name is in
 // here, and Level() is a position within it.
@@ -53,7 +95,17 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 @property (nonatomic, copy) NSString *pageName; // Globals!PageName
 @property (nonatomic, strong) NSDate *executionTime;
 @property (nonatomic, copy) NSDictionary<NSString *, id> *paramValues; // NSString or NSArray (MultiValue)
+// The report's parameters worked out from paramValues -- their values in their
+// types, defaults, labels and valid values -- which Parameters! reads. Worked out
+// when first read if nobody has set it; setting paramValues sets it aside.
+@property (nonatomic, strong) RDLParameterValues *parameterValues;
+// Who is running the report, for User!UserID; the account this process runs
+// as when nil.
 @property (nonatomic, copy) NSString *userID;
+// Where an external image is read from, and whether a remote one may be; nil
+// reads only an absolute path.
+@property (nonatomic, strong) RDLDataBinder *documentBinder;
+@property (nonatomic, assign) RDLRenderFormat renderFormat;
 // The culture whatever is being rendered right now is written in: the
 // report's Language, or an item's own override of it. Format() and every
 // formatted value read this.
@@ -62,7 +114,72 @@ FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
 // answers -- and what a report following its reader sets Language to. The
 // machine's own when nothing says otherwise.
 @property (nonatomic, copy) NSString *userLanguage;
+// Inside the report's code: the running function's local variables, by
+// lower-cased name, Nothing kept as NSNull; nil anywhere else. A name in an
+// expression there is one of these, or one of the module's own variables,
+// before it is anything else.
+@property (nonatomic, strong) NSMutableDictionary<NSString *, id> *codeLocals;
 @end
+
+// A value as the expression language reads one: as a number (text such as
+// "1,000" counts; anything that is not a number is 0), as text, and as True or
+// False. What the report's code converts its As types with.
+// VB's numeric types, in the order a value widens through them, as a value
+// carries one: NSNumber's own type encoding -- s, i, q, f, d -- and
+// NSDecimalNumber for Decimal. Byte shares Short's encoding, which Foundation
+// does not tell apart; the unsigned types are read as the next wider signed one.
+typedef NS_ENUM(NSInteger, RDLNumericType) {
+  RDLNumericTypeUnspecified = 0,  // not a number: text, a date, True or False, Nothing
+  RDLNumericTypeShort,
+  RDLNumericTypeInteger,
+  RDLNumericTypeLong,
+  RDLNumericTypeDecimal,
+  RDLNumericTypeSingle,
+  RDLNumericTypeDouble,
+};
+FOUNDATION_EXPORT RDLNumericType RDLNumericTypeOfValue(id value);
+
+// The type one of VB's conversion functions converts to: CByte, CSByte,
+// CShort, CUShort, CInt, CUInt, CLng, CULng, CSng, CDbl and CDec. An unsigned
+// type is carried in the signed one that holds it, ULong in a Decimal.
+typedef NS_ENUM(NSInteger, RDLConversionTarget) {
+  RDLConversionTargetUnspecified = 0,
+  RDLConversionTargetByte,
+  RDLConversionTargetSByte,
+  RDLConversionTargetShort,
+  RDLConversionTargetUShort,
+  RDLConversionTargetInteger,
+  RDLConversionTargetUInteger,
+  RDLConversionTargetLong,
+  RDLConversionTargetULong,
+  RDLConversionTargetSingle,
+  RDLConversionTargetDouble,
+  RDLConversionTargetDecimal,
+};
+// A value as VB's conversion function to that type converts it, or an
+// RDLExprError where that function would throw.
+FOUNDATION_EXPORT id RDLValueConvertedTo(id value, RDLConversionTarget target);
+// A value as VB's CBool reads it -- Nothing False, a number True unless zero,
+// text True or False or a number -- or an RDLExprError where CBool would throw.
+// What a condition is taken as, in an expression and in the report's code.
+FOUNDATION_EXPORT id RDLValueConvertedToBoolean(id value);
+// VB's Like: ? * # [list] [!list] and ranges, case-sensitive as expressions
+// compare, or ignoring case as a dataset's filters do by default. NO for a
+// pattern VB refuses.
+FOUNDATION_EXPORT BOOL RDLTextMatchesLikePattern(NSString *text, NSString *pattern, BOOL ignoringCase);
+
+// What an expression comes to when evaluating it fails the way VB throws -- an
+// overflow, a division by zero, text used as a number that is not one. It
+// reads as #Error, as SSRS shows such a value, and any operator or function
+// given one gives it back.
+@interface RDLExprError : NSObject
++ (instancetype)errorWithMessage:(NSString *)message;
+@property (nonatomic, readonly, copy) NSString *message;
+@end
+
+FOUNDATION_EXPORT double RDLValueAsNumber(id value);
+FOUNDATION_EXPORT NSString *RDLValueAsText(id value);
+FOUNDATION_EXPORT BOOL RDLValueAsBoolean(id value);
 
 // What a node of a parsed expression is. An enum rather than a string,
 // because a mistyped comparison against a string is a branch that silently
@@ -74,12 +191,19 @@ typedef NS_ENUM(NSInteger, RDLExprNodeKind) {
   RDLExprNodeKindGlobal,      // Globals!Name
   RDLExprNodeKindUser,        // User!Name
   RDLExprNodeKindReportItem,  // ReportItems!Name.Value -- another textbox's value
+  RDLExprNodeKindVariable,    // Variables!Name.Value -- a report or group variable
   RDLExprNodeKindIdentifier,  // a bare name -- `name`
   RDLExprNodeKindOperator,    // `op`, `args`
   RDLExprNodeKindCall,        // a function -- `name`, `args`
-  // Code.Fn(...) or Instance.Method(...): `name` is the whole dotted name.
-  // Parsed so the tree is complete; this kit does not execute custom code.
+  // A shared member by its dotted name -- Math.Sqrt(...), String.Format(...),
+  // Code.Fn(...), Instance.Method(...) -- `name` the whole name, `args` its
+  // arguments. The .NET and Visual Basic runtime members SSRS offers every
+  // expression are evaluated; the report's own code is not yet.
   RDLExprNodeKindMember,
+  // A member read from a value -- Fields!When.Value.Year,
+  // Fields!Name.Value.Substring(0, 3) -- `name` the member, `args[0]` the
+  // value it is read from and the rest its arguments.
+  RDLExprNodeKindMethod,
 };
 
 typedef NS_ENUM(NSInteger, RDLExprOperator) {
@@ -246,10 +370,22 @@ FOUNDATION_EXPORT NSString *RDLHostLanguage(void);
 FOUNDATION_EXPORT BOOL RDLLanguageIsKnown(NSString *language);
 
 // VB-style RDL expressions: tokenize → AST (translation) → execute.
+// How a value is written as text: its Format, and the culture, calendar and
+// digits a style writes it in. A NumeralLanguage left unset is the Language.
+@interface RDLTextFormatting : NSObject
+@property (nonatomic, copy) NSString *format;
+@property (nonatomic, copy) NSString *language;
+@property (nonatomic, assign) RDLCalendar calendar;
+@property (nonatomic, copy) NSString *numeralLanguage;
+// 1 to 7, as Style.NumeralVariant; 0 is unset, which is 1.
+@property (nonatomic, assign) NSInteger numeralVariant;
+@end
+
 @interface RDLExpression : NSObject
 + (id)evaluate:(NSString *)expr scope:(RDLEvalScope *)scope;
 + (NSString *)evaluateText:(NSString *)expr scope:(RDLEvalScope *)scope;
 + (NSString *)formatValue:(id)value format:(NSString *)format;
++ (NSString *)formatValue:(id)value formatting:(RDLTextFormatting *)formatting;
 // The same, in a culture: "de-DE" writes 1.234,50 € where "en-US" writes
 // $1,234.50, and month names come out in that language. `language` nil or
 // empty means the machine's own locale, which is the fallback RDL itself

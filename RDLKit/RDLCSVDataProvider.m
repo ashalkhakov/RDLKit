@@ -82,10 +82,12 @@ static NSArray<NSString *> *RDLFixedWidthSplit(NSString *line, NSArray<NSNumber 
 }
 
 - (NSArray *)rowsFromData:(NSData *)documentData
+                   query:(NSString *)query
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error {
   RDL_UNUSED(dataSet);
+  RDL_UNUSED(query);
   if (documentData == nil) {
     if (error)
       *error = RDLDataError(30, @"there is no text to read");

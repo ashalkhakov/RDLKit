@@ -1,4 +1,5 @@
 #import "RDLReport.h"
+#import "RDLCode.h"
 
 #pragma mark - Enum <-> RDL wire strings
 
@@ -116,6 +117,105 @@ NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v) {
   return RDLStringFromEnum(v, kRDLLayoutDirectionNames, kRDLLayoutDirectionNamesCount);
 }
 
+static const char *const kRDLGradientTypeNames[] = {
+    "",           "None",          "LeftRight",        "TopBottom",     "Center",
+    "DiagonalLeft", "DiagonalRight", "HorizontalCenter", "VerticalCenter"};
+static const NSInteger kRDLGradientTypeNamesCount =
+    (NSInteger)(sizeof(kRDLGradientTypeNames) / sizeof(*kRDLGradientTypeNames));
+RDLGradientType RDLGradientTypeFromString(NSString *s) {
+  return (RDLGradientType)RDLEnumFromString(s, kRDLGradientTypeNames, kRDLGradientTypeNamesCount);
+}
+NSString *RDLStringFromGradientType(RDLGradientType v) {
+  return RDLStringFromEnum(v, kRDLGradientTypeNames, kRDLGradientTypeNamesCount);
+}
+
+static const char *const kRDLMarkupTypeNames[] = {"", "None", "HTML"};
+static const NSInteger kRDLMarkupTypeNamesCount =
+    (NSInteger)(sizeof(kRDLMarkupTypeNames) / sizeof(*kRDLMarkupTypeNames));
+RDLMarkupType RDLMarkupTypeFromString(NSString *s) {
+  return (RDLMarkupType)RDLEnumFromString(s, kRDLMarkupTypeNames, kRDLMarkupTypeNamesCount);
+}
+NSString *RDLStringFromMarkupType(RDLMarkupType v) {
+  return RDLStringFromEnum(v, kRDLMarkupTypeNames, kRDLMarkupTypeNamesCount);
+}
+
+static const char *const kRDLListStyleNames[] = {"", "None", "Numbered", "Bulleted"};
+static const NSInteger kRDLListStyleNamesCount =
+    (NSInteger)(sizeof(kRDLListStyleNames) / sizeof(*kRDLListStyleNames));
+RDLListStyle RDLListStyleFromString(NSString *s) {
+  return (RDLListStyle)RDLEnumFromString(s, kRDLListStyleNames, kRDLListStyleNamesCount);
+}
+NSString *RDLStringFromListStyle(RDLListStyle v) {
+  return RDLStringFromEnum(v, kRDLListStyleNames, kRDLListStyleNamesCount);
+}
+
+static const char *const kRDLTextEffectNames[] = {"", "None", "Shadow", "Emboss", "Embed", "Frame"};
+static const NSInteger kRDLTextEffectNamesCount =
+    (NSInteger)(sizeof(kRDLTextEffectNames) / sizeof(*kRDLTextEffectNames));
+RDLTextEffect RDLTextEffectFromString(NSString *s) {
+  return (RDLTextEffect)RDLEnumFromString(s, kRDLTextEffectNames, kRDLTextEffectNamesCount);
+}
+NSString *RDLStringFromTextEffect(RDLTextEffect v) {
+  return RDLStringFromEnum(v, kRDLTextEffectNames, kRDLTextEffectNamesCount);
+}
+
+static const char *const kRDLUnicodeBiDiNames[] = {"", "Normal", "Embed", "BiDiOverride"};
+static const NSInteger kRDLUnicodeBiDiNamesCount =
+    (NSInteger)(sizeof(kRDLUnicodeBiDiNames) / sizeof(*kRDLUnicodeBiDiNames));
+RDLUnicodeBiDi RDLUnicodeBiDiFromString(NSString *s) {
+  return (RDLUnicodeBiDi)RDLEnumFromString(s, kRDLUnicodeBiDiNames, kRDLUnicodeBiDiNamesCount);
+}
+NSString *RDLStringFromUnicodeBiDi(RDLUnicodeBiDi v) {
+  return RDLStringFromEnum(v, kRDLUnicodeBiDiNames, kRDLUnicodeBiDiNamesCount);
+}
+
+static const char *const kRDLBackgroundRepeatNames[] = {"",       "Repeat", "RepeatX", "RepeatY",
+                                                        "NoRepeat", "Fit",    "Clip"};
+static const NSInteger kRDLBackgroundRepeatNamesCount =
+    (NSInteger)(sizeof(kRDLBackgroundRepeatNames) / sizeof(*kRDLBackgroundRepeatNames));
+RDLBackgroundRepeat RDLBackgroundRepeatFromString(NSString *s) {
+  return (RDLBackgroundRepeat)RDLEnumFromString(s, kRDLBackgroundRepeatNames,
+                                                kRDLBackgroundRepeatNamesCount);
+}
+NSString *RDLStringFromBackgroundRepeat(RDLBackgroundRepeat v) {
+  return RDLStringFromEnum(v, kRDLBackgroundRepeatNames, kRDLBackgroundRepeatNamesCount);
+}
+
+static const char *const kRDLBackgroundPositionNames[] = {
+    "",     "Default", "Top",         "TopLeft", "TopRight",  "Left",
+    "Center", "Right", "BottomRight", "Bottom",  "BottomLeft"};
+static const NSInteger kRDLBackgroundPositionNamesCount =
+    (NSInteger)(sizeof(kRDLBackgroundPositionNames) / sizeof(*kRDLBackgroundPositionNames));
+RDLBackgroundPosition RDLBackgroundPositionFromString(NSString *s) {
+  return (RDLBackgroundPosition)RDLEnumFromString(s, kRDLBackgroundPositionNames,
+                                                  kRDLBackgroundPositionNamesCount);
+}
+NSString *RDLStringFromBackgroundPosition(RDLBackgroundPosition v) {
+  return RDLStringFromEnum(v, kRDLBackgroundPositionNames, kRDLBackgroundPositionNamesCount);
+}
+
+static const char *const kRDLWritingModeNames[] = {"", "Horizontal", "Vertical", "Rotate270"};
+static const NSInteger kRDLWritingModeNamesCount =
+    (NSInteger)(sizeof(kRDLWritingModeNames) / sizeof(*kRDLWritingModeNames));
+RDLWritingMode RDLWritingModeFromString(NSString *s) {
+  return (RDLWritingMode)RDLEnumFromString(s, kRDLWritingModeNames, kRDLWritingModeNamesCount);
+}
+NSString *RDLStringFromWritingMode(RDLWritingMode v) {
+  return RDLStringFromEnum(v, kRDLWritingModeNames, kRDLWritingModeNamesCount);
+}
+
+static const char *const kRDLCalendarNames[] = {
+    "", "Default", "Gregorian", "GregorianArabic", "GregorianMiddleEastFrench", "GregorianTransliteratedEnglish",
+    "GregorianTransliteratedFrench", "GregorianUSEnglish", "Hebrew", "Hijri", "Japanese", "Korean", "Taiwan",
+    "ThaiBuddhist"};
+static const NSInteger kRDLCalendarNamesCount = (NSInteger)(sizeof(kRDLCalendarNames) / sizeof(*kRDLCalendarNames));
+RDLCalendar RDLCalendarFromString(NSString *s) {
+  return (RDLCalendar)RDLEnumFromString(s, kRDLCalendarNames, kRDLCalendarNamesCount);
+}
+NSString *RDLStringFromCalendar(RDLCalendar v) {
+  return RDLStringFromEnum(v, kRDLCalendarNames, kRDLCalendarNamesCount);
+}
+
 RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s) {
   return (RDLKeepWithGroup)RDLEnumFromString(s, kRDLKeepWithGroupNames, kRDLKeepWithGroupNamesCount);
 }
@@ -150,21 +250,47 @@ NSString *RDLStringFromParameterDataType(RDLParameterDataType v) {
   return RDLStringFromEnum(v, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
 }
 
+static const char *const kRDLUsedInQueryNames[] = {"", "False", "True", "Auto"};
+static const NSInteger kRDLUsedInQueryNamesCount = (NSInteger)(sizeof(kRDLUsedInQueryNames) / sizeof(*kRDLUsedInQueryNames));
+RDLUsedInQuery RDLUsedInQueryFromString(NSString *s) {
+  return (RDLUsedInQuery)RDLEnumFromString(s, kRDLUsedInQueryNames, kRDLUsedInQueryNamesCount);
+}
+NSString *RDLStringFromUsedInQuery(RDLUsedInQuery v) {
+  return RDLStringFromEnum(v, kRDLUsedInQueryNames, kRDLUsedInQueryNamesCount);
+}
+
+static const char *const kRDLAutoBooleanNames[] = {"", "Auto", "True", "False"};
+static const NSInteger kRDLAutoBooleanNamesCount = (NSInteger)(sizeof(kRDLAutoBooleanNames) / sizeof(*kRDLAutoBooleanNames));
+RDLAutoBoolean RDLAutoBooleanFromString(NSString *s) {
+  return (RDLAutoBoolean)RDLEnumFromString(s, kRDLAutoBooleanNames, kRDLAutoBooleanNamesCount);
+}
+NSString *RDLStringFromAutoBoolean(RDLAutoBoolean v) {
+  return RDLStringFromEnum(v, kRDLAutoBooleanNames, kRDLAutoBooleanNamesCount);
+}
+
+static const char *const kRDLCommandTypeNames[] = {"", "Text", "StoredProcedure", "TableDirect"};
+static const NSInteger kRDLCommandTypeNamesCount = (NSInteger)(sizeof(kRDLCommandTypeNames) / sizeof(*kRDLCommandTypeNames));
+RDLCommandType RDLCommandTypeFromString(NSString *s) {
+  return (RDLCommandType)RDLEnumFromString(s, kRDLCommandTypeNames, kRDLCommandTypeNamesCount);
+}
+NSString *RDLStringFromCommandType(RDLCommandType v) {
+  return RDLStringFromEnum(v, kRDLCommandTypeNames, kRDLCommandTypeNamesCount);
+}
+
 // RDL writes .NET type names, sometimes with the "System." prefix.
-static const char *const kRDLFieldDataTypeNames[] = {"",        "Boolean", "DateTime", "Integer",
-                                                     "Float",   "Decimal", "String"};
+static const char *const kRDLFieldDataTypeNames[] = {"",       "Boolean", "DateTime", "Short",  "Integer",
+                                                     "Long",   "Single",  "Float",    "Decimal", "String"};
 static const NSInteger kRDLFieldDataTypeNamesCount =
     (NSInteger)(sizeof(kRDLFieldDataTypeNames) / sizeof(*kRDLFieldDataTypeNames));
 RDLFieldDataType RDLFieldDataTypeFromString(NSString *s) {
   NSString *bare = [s hasPrefix:@"System."] ? [s substringFromIndex:7] : s;
-  // The names RDL uses are not all the names .NET uses.
-  if ([bare caseInsensitiveCompare:@"Int32"] == NSOrderedSame ||
-      [bare caseInsensitiveCompare:@"Int16"] == NSOrderedSame ||
-      [bare caseInsensitiveCompare:@"Int64"] == NSOrderedSame)
-    bare = @"Integer";
-  else if ([bare caseInsensitiveCompare:@"Double"] == NSOrderedSame ||
-           [bare caseInsensitiveCompare:@"Single"] == NSOrderedSame)
-    bare = @"Float";
+  // The names RDL uses are not all the names .NET uses. A whole-number type
+  // goes in the signed one that holds its range.
+  NSDictionary<NSString *, NSString *> *dotNet = @{
+    @"byte" : @"Short", @"sbyte" : @"Short", @"int16" : @"Short", @"uint16" : @"Integer", @"int32" : @"Integer",
+    @"uint32" : @"Long", @"int64" : @"Long", @"uint64" : @"Decimal", @"double" : @"Float"
+  };
+  bare = dotNet[[bare lowercaseString]] ?: bare;
   return (RDLFieldDataType)RDLEnumFromString(bare, kRDLFieldDataTypeNames,
                                               kRDLFieldDataTypeNamesCount);
 }
@@ -173,8 +299,15 @@ NSString *RDLStringFromFieldDataType(RDLFieldDataType v) {
 }
 
 static const char *const kRDLChartTypeNames[] = {"",     "Column",   "Bar",     "Line",  "Area",
-                                                 "Pie",  "Doughnut", "Scatter", "Bubble"};
+                                                 "Pie",  "Doughnut", "Scatter", "Bubble",
+                                                 "Range", "RangeColumn", "RangeBar", "Stock", "Candlestick",
+                                                 "Funnel", "Pyramid", "Polar", "Radar"};
 static const NSInteger kRDLChartTypeNamesCount = (NSInteger)(sizeof(kRDLChartTypeNames) / sizeof(*kRDLChartTypeNames));
+BOOL RDLChartTypeIsRange(RDLChartType type) {
+  return type == RDLChartTypeRange || type == RDLChartTypeRangeColumn || type == RDLChartTypeRangeBar ||
+         type == RDLChartTypeStock || type == RDLChartTypeCandlestick;
+}
+
 RDLChartType RDLChartTypeFromString(NSString *s) {
   return (RDLChartType)RDLEnumFromString(s, kRDLChartTypeNames, kRDLChartTypeNamesCount);
 }
@@ -183,7 +316,7 @@ NSString *RDLStringFromChartType(RDLChartType v) {
 }
 
 static const char *const kRDLChartSubtypeNames[] = {"",       "Plain",  "Stacked",
-                                                    "PercentStacked", "Smooth", "Exploded"};
+                                                    "PercentStacked", "Smooth", "Exploded", "Stepped"};
 static const NSInteger kRDLChartSubtypeNamesCount =
     (NSInteger)(sizeof(kRDLChartSubtypeNames) / sizeof(*kRDLChartSubtypeNames));
 RDLChartSubtype RDLChartSubtypeFromString(NSString *s) {
@@ -207,9 +340,10 @@ NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v) {
   return RDLStringFromEnum(v, kRDLChartLegendPositionNames, kRDLChartLegendPositionNamesCount);
 }
 
-static const char *const kRDLChartPaletteNames[] = {"",          "Default",   "EarthTones",
-                                                    "Excel",     "GrayScale", "Pastel",
-                                                    "Light",     "SemiTransparent"};
+static const char *const kRDLChartPaletteNames[] = {
+    "",       "Default", "EarthTones",   "Excel", "GrayScale", "Pastel",       "Light",
+    "SemiTransparent",   "Custom",       "Berry", "BrightPastel", "Chocolate", "Fire",
+    "Pacific", "PacificLight", "PacificSemiTransparent", "SeaGreen"};
 static const NSInteger kRDLChartPaletteNamesCount =
     (NSInteger)(sizeof(kRDLChartPaletteNames) / sizeof(*kRDLChartPaletteNames));
 RDLChartPalette RDLChartPaletteFromString(NSString *s) {
@@ -217,6 +351,16 @@ RDLChartPalette RDLChartPaletteFromString(NSString *s) {
 }
 NSString *RDLStringFromChartPalette(RDLChartPalette v) {
   return RDLStringFromEnum(v, kRDLChartPaletteNames, kRDLChartPaletteNamesCount);
+}
+
+static const char *const kRDLChartAxisMarginNames[] = {"", "Auto", "True", "False"};
+static const NSInteger kRDLChartAxisMarginNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisMarginNames) / sizeof(*kRDLChartAxisMarginNames));
+RDLChartAxisMargin RDLChartAxisMarginFromString(NSString *s) {
+  return (RDLChartAxisMargin)RDLEnumFromString(s, kRDLChartAxisMarginNames, kRDLChartAxisMarginNamesCount);
+}
+NSString *RDLStringFromChartAxisMargin(RDLChartAxisMargin v) {
+  return RDLStringFromEnum(v, kRDLChartAxisMarginNames, kRDLChartAxisMarginNamesCount);
 }
 
 static const char *const kRDLChartTickMarksNames[] = {"", "None", "Inside", "Outside", "Cross"};
@@ -229,24 +373,146 @@ NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v) {
   return RDLStringFromEnum(v, kRDLChartTickMarksNames, kRDLChartTickMarksNamesCount);
 }
 
-// Series colours. Deliberately muted rather than saturated, to sit with the
-// rest of what this kit draws; the named palettes keep RDL's names so a report
-// asking for one gets something recognisably like it.
+static const char *const kRDLChartDataLabelPositionNames[] = {
+    "",     "Auto",        "Top",    "TopLeft",    "TopRight", "Left",
+    "Center", "Right",     "BottomRight", "Bottom", "BottomLeft", "Outside"};
+static const NSInteger kRDLChartDataLabelPositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartDataLabelPositionNames) / sizeof(*kRDLChartDataLabelPositionNames));
+RDLChartDataLabelPosition RDLChartDataLabelPositionFromString(NSString *s) {
+  return (RDLChartDataLabelPosition)RDLEnumFromString(s, kRDLChartDataLabelPositionNames,
+                                                      kRDLChartDataLabelPositionNamesCount);
+}
+NSString *RDLStringFromChartDataLabelPosition(RDLChartDataLabelPosition v) {
+  return RDLStringFromEnum(v, kRDLChartDataLabelPositionNames, kRDLChartDataLabelPositionNamesCount);
+}
+
+@implementation RDLChartDataLabel
+@end
+
+static const char *const kRDLChartMarkerTypeNames[] = {
+    "",       "None",  "Square", "Circle", "Diamond", "Triangle",
+    "Cross",  "Star4", "Star5",  "Star6",  "Star10",  "Auto"};
+static const NSInteger kRDLChartMarkerTypeNamesCount =
+    (NSInteger)(sizeof(kRDLChartMarkerTypeNames) / sizeof(*kRDLChartMarkerTypeNames));
+RDLChartMarkerType RDLChartMarkerTypeFromString(NSString *s) {
+  return (RDLChartMarkerType)RDLEnumFromString(s, kRDLChartMarkerTypeNames, kRDLChartMarkerTypeNamesCount);
+}
+NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v) {
+  return RDLStringFromEnum(v, kRDLChartMarkerTypeNames, kRDLChartMarkerTypeNamesCount);
+}
+
+@implementation RDLChartMarker
+@end
+
+static const char *const kRDLChartAxisLocationNames[] = {"", "Default", "Opposite"};
+static const NSInteger kRDLChartAxisLocationNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisLocationNames) / sizeof(*kRDLChartAxisLocationNames));
+RDLChartAxisLocation RDLChartAxisLocationFromString(NSString *s) {
+  return (RDLChartAxisLocation)RDLEnumFromString(s, kRDLChartAxisLocationNames, kRDLChartAxisLocationNamesCount);
+}
+NSString *RDLStringFromChartAxisLocation(RDLChartAxisLocation v) {
+  return RDLStringFromEnum(v, kRDLChartAxisLocationNames, kRDLChartAxisLocationNamesCount);
+}
+
+static const char *const kRDLChartLegendLayoutNames[] = {"", "AutoTable", "Column", "Row", "WideTable", "TallTable"};
+static const NSInteger kRDLChartLegendLayoutNamesCount =
+    (NSInteger)(sizeof(kRDLChartLegendLayoutNames) / sizeof(*kRDLChartLegendLayoutNames));
+RDLChartLegendLayout RDLChartLegendLayoutFromString(NSString *s) {
+  return (RDLChartLegendLayout)RDLEnumFromString(s, kRDLChartLegendLayoutNames, kRDLChartLegendLayoutNamesCount);
+}
+NSString *RDLStringFromChartLegendLayout(RDLChartLegendLayout v) {
+  return RDLStringFromEnum(v, kRDLChartLegendLayoutNames, kRDLChartLegendLayoutNamesCount);
+}
+
+static const char *const kRDLChartTitlePositionNames[] = {
+    "",         "TopCenter",   "TopLeft",     "TopRight",    "LeftTop",      "LeftCenter", "LeftBottom",
+    "RightTop", "RightCenter", "RightBottom", "BottomRight", "BottomCenter", "BottomLeft"};
+static const NSInteger kRDLChartTitlePositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartTitlePositionNames) / sizeof(*kRDLChartTitlePositionNames));
+RDLChartTitlePosition RDLChartTitlePositionFromString(NSString *s) {
+  return (RDLChartTitlePosition)RDLEnumFromString(s, kRDLChartTitlePositionNames, kRDLChartTitlePositionNamesCount);
+}
+NSString *RDLStringFromChartTitlePosition(RDLChartTitlePosition v) {
+  return RDLStringFromEnum(v, kRDLChartTitlePositionNames, kRDLChartTitlePositionNamesCount);
+}
+
+static const char *const kRDLChartAxisTitlePositionNames[] = {"", "Center", "Near", "Far"};
+static const NSInteger kRDLChartAxisTitlePositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisTitlePositionNames) / sizeof(*kRDLChartAxisTitlePositionNames));
+RDLChartAxisTitlePosition RDLChartAxisTitlePositionFromString(NSString *s) {
+  return (RDLChartAxisTitlePosition)RDLEnumFromString(s, kRDLChartAxisTitlePositionNames,
+                                                      kRDLChartAxisTitlePositionNamesCount);
+}
+NSString *RDLStringFromChartAxisTitlePosition(RDLChartAxisTitlePosition v) {
+  return RDLStringFromEnum(v, kRDLChartAxisTitlePositionNames, kRDLChartAxisTitlePositionNamesCount);
+}
+
+@implementation RDLLaidOutChartAxis
+@end
+
+@implementation RDLChartTextStyle
+- (instancetype)init {
+  if ((self = [super init]))
+    _scale = 1;
+  return self;
+}
+@end
+
+// Series colours. The named palettes are Microsoft's own -- the colours the
+// .NET chart control SSRS draws with gives them, in its order -- so a chart
+// asking for one looks as it does there. Default and the Pacific palettes are
+// not published; they keep this kit's own muted colours, Pacific sharing
+// Default's, and PacificLight and PacificSemiTransparent this kit's light and
+// see-through ones. Custom has none of its own: they are the chart's.
 NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette) {
   switch (palette) {
-  case RDLChartPaletteEarthTones:
-    return @[ @"#7a5c3e", @"#a8814f", @"#5c6b4a", @"#8a6a4f", @"#3f4f3a", @"#c2a06a", @"#6b4f3a" ];
-  case RDLChartPaletteExcel:
-    return @[ @"#4572a7", @"#aa4643", @"#89a54e", @"#71588f", @"#4198af", @"#db843d", @"#93a9cf" ];
-  case RDLChartPaletteGrayScale:
-    return @[ @"#2b2b2b", @"#4f4f4f", @"#737373", @"#979797", @"#bbbbbb", @"#585858", @"#8c8c8c" ];
   case RDLChartPalettePastel:
-    return @[ @"#a8c8e0", @"#e0b8b0", @"#c2d6a8", @"#d0c0dc", @"#a8d6d0", @"#e6cfa8", @"#c8bfae" ];
-  case RDLChartPaletteLight:
-    return @[ @"#cfe0ec", @"#f0d5cf", @"#dbe8c8", @"#e4dcec", @"#cfe6e2", @"#f2e3c8", @"#ded7c9" ];
+    return @[ @"#87ceeb", @"#32cd32", @"#ba55d3", @"#f08080", @"#4682b4", @"#9acd32", @"#40e0d0",
+             @"#ff69b4", @"#f0e68c", @"#d2b48c", @"#8fbc8b", @"#6495ed", @"#dda0dd", @"#5f9ea0",
+             @"#ffdab9", @"#ffa07a" ];
+  case RDLChartPaletteEarthTones:
+    return @[ @"#ff8000", @"#b8860b", @"#c04000", @"#6b8e23", @"#cd853f", @"#c0c000", @"#228b22",
+             @"#d2691e", @"#808000", @"#20b2aa", @"#f4a460", @"#00c000", @"#8fbc8b", @"#b22222",
+             @"#8b4513", @"#c00000" ];
   case RDLChartPaletteSemiTransparent:
+    return @[ @"#96ff0000", @"#9600ff00", @"#960000ff", @"#96ffff00", @"#9600ffff", @"#96ff00ff",
+             @"#96aa7814", @"#50ff0000", @"#5000ff00", @"#500000ff", @"#50ffff00", @"#5000ffff",
+             @"#50ff00ff", @"#50aa7814", @"#96647832", @"#96285a96" ];
+  case RDLChartPaletteLight:
+    return @[ @"#e6e6fa", @"#fff0f5", @"#ffdab9", @"#fffacd", @"#ffe4e1", @"#f0fff0", @"#f0f8ff",
+             @"#f5f5f5", @"#faebd7", @"#e0ffff" ];
+  case RDLChartPaletteExcel:
+    return @[ @"#9999ff", @"#993366", @"#ffffcc", @"#ccffff", @"#660066", @"#ff8080", @"#0066cc",
+             @"#ccccff", @"#000080", @"#ff00ff", @"#ffff00", @"#00ffff", @"#800080", @"#800000",
+             @"#008080", @"#0000ff" ];
+  case RDLChartPaletteBerry:
+    return @[ @"#8a2be2", @"#ba55d3", @"#4169e1", @"#c71585", @"#0000ff", @"#8a2be2", @"#da70d6",
+             @"#7b68ee", @"#c000c0", @"#0000cd", @"#800080" ];
+  case RDLChartPaletteChocolate:
+    return @[ @"#a0522d", @"#d2691e", @"#8b0000", @"#cd853f", @"#a52a2a", @"#f4a460", @"#8b4513",
+             @"#c04000", @"#b22222", @"#b65c3a" ];
+  case RDLChartPaletteFire:
+    return @[ @"#ffd700", @"#ff0000", @"#ff1493", @"#dc143c", @"#ff8c00", @"#ff00ff", @"#ffff00",
+             @"#ff4500", @"#c71585", @"#dde221" ];
+  case RDLChartPaletteSeaGreen:
+    return @[ @"#2e8b57", @"#66cdaa", @"#4682b4", @"#008b8b", @"#5f9ea0", @"#3cb371", @"#48d1cc",
+             @"#b0c4de", @"#8fbc8b", @"#87ceeb" ];
+  case RDLChartPaletteBrightPastel:
+    return @[ @"#418cf0", @"#fcb441", @"#e0400a", @"#056492", @"#bfbfbf", @"#1a3b69", @"#ffe382",
+             @"#129cdd", @"#ca6b4b", @"#005cdb", @"#f3d288", @"#506381", @"#f1b9a8", @"#e0830a",
+             @"#7893be" ];
+  case RDLChartPaletteGrayScale:
+    return @[ @"#c8c8c8", @"#bdbdbd", @"#b2b2b2", @"#a7a7a7", @"#9c9c9c", @"#919191", @"#868686",
+             @"#7b7b7b", @"#707070", @"#656565", @"#5a5a5a", @"#4f4f4f", @"#444444", @"#393939",
+             @"#2e2e2e", @"#232323" ];
+  case RDLChartPalettePacificLight:
+    return @[ @"#cfe0ec", @"#f0d5cf", @"#dbe8c8", @"#e4dcec", @"#cfe6e2", @"#f2e3c8", @"#ded7c9" ];
+  case RDLChartPalettePacificSemiTransparent:
     return @[ @"#6f8fae", @"#ae7f78", @"#93a878", @"#9a8caa", @"#78a49e", @"#c0a173", @"#9c9384" ];
+  case RDLChartPaletteCustom:
+    return @[];
   case RDLChartPaletteDefault:
+  case RDLChartPalettePacific:
   case RDLChartPaletteUnspecified:
   default:
     return @[ @"#4a6b8a", @"#a8603f", @"#6b7f4a", @"#7a5f8a", @"#3f7f78", @"#b08a4a", @"#5c574e" ];
@@ -402,7 +668,11 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
          _color == nil && _backgroundColor == nil && _textAlign == nil && _verticalAlign == nil &&
          _textDecoration == nil && _format == nil && _language == nil &&
          _paddingLeft == nil && _paddingRight == nil &&
-         _paddingTop == nil && _paddingBottom == nil;
+         _paddingTop == nil && _paddingBottom == nil && _lineHeight == nil &&
+         _writingMode == nil && _direction == nil && _backgroundGradientType == nil &&
+         _backgroundGradientEndColor == nil && _textEffect == nil && _shadowColor == nil &&
+         _shadowOffset == nil && _unicodeBiDi == nil && _calendar == nil && _numeralLanguage == nil &&
+         _numeralVariant == nil;
 }
 @end
 
@@ -427,6 +697,9 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   b.color = color ?: @"#1a1916";
   return b;
 }
+@end
+
+@implementation RDLBackgroundImage
 @end
 
 @implementation RDLStyle
@@ -485,10 +758,23 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
       run.textDecoration != RDLTextDecorationUnspecified ? run.textDecoration : base.textDecoration;
   s.format = [run.format length] ? run.format : base.format;
   s.language = [run.language length] ? run.language : base.language;
+  s.calendar = run.calendar != RDLCalendarUnspecified ? run.calendar : base.calendar;
+  s.numeralLanguage = [run.numeralLanguage length] ? run.numeralLanguage : base.numeralLanguage;
+  s.numeralVariant = run.numeralVariant > 0 ? run.numeralVariant : base.numeralVariant;
   s.paddingLeft = base.paddingLeft;
   s.paddingRight = base.paddingRight;
   s.paddingTop = base.paddingTop;
   s.paddingBottom = base.paddingBottom;
+  s.lineHeight = run.lineHeight ?: base.lineHeight;
+  s.direction = base.direction;
+  s.writingMode = base.writingMode;
+  s.backgroundGradientType = base.backgroundGradientType;
+  s.backgroundGradientEndColor = base.backgroundGradientEndColor;
+  s.backgroundImage = base.backgroundImage;
+  s.textEffect = base.textEffect;
+  s.shadowColor = base.shadowColor;
+  s.shadowOffset = base.shadowOffset;
+  s.unicodeBiDi = base.unicodeBiDi;
   s.border = base.border;
   s.borderLeft = base.borderLeft;
   s.borderRight = base.borderRight;
@@ -499,6 +785,16 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 @end
 
 @implementation RDLTextRun
+- (BOOL)hasOwnProperties {
+  return self.label != nil || self.toolTip != nil || self.hyperlink != nil ||
+         self.markupType == RDLMarkupTypeHTML;
+}
+- (void)takeOwnPropertiesFrom:(RDLTextRun *)other {
+  self.label = other.label;
+  self.toolTip = other.toolTip;
+  self.hyperlink = other.hyperlink;
+  self.markupType = other.markupType;
+}
 @end
 
 @implementation RDLParagraph
@@ -506,6 +802,20 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   if ((self = [super init]))
     _runs = [NSMutableArray array];
   return self;
+}
+- (BOOL)hasOwnLayout {
+  return self.leftIndent || self.rightIndent || self.hangingIndent || self.spaceBefore ||
+         self.spaceAfter || self.listLevel > 0 ||
+         (self.listStyle != RDLListStyleUnspecified && self.listStyle != RDLListStyleNone);
+}
+- (void)takeLayoutFrom:(RDLParagraph *)other {
+  self.leftIndent = other.leftIndent;
+  self.rightIndent = other.rightIndent;
+  self.hangingIndent = other.hangingIndent;
+  self.spaceBefore = other.spaceBefore;
+  self.spaceAfter = other.spaceAfter;
+  self.listStyle = other.listStyle;
+  self.listLevel = other.listLevel;
 }
 @end
 
@@ -545,11 +855,15 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 }
 @end
 
+@implementation RDLVariable
+@end
+
 @implementation RDLTablixMember
 - (instancetype)init {
   self = [super init];
   if (self) {
     _members = [NSMutableArray array];
+    _variables = [NSMutableArray array];
     _groupExpressions = [NSMutableArray array];
     _sortExpressions = [NSMutableArray array];
     _filters = [NSMutableArray array];
@@ -716,8 +1030,10 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 @implementation RDLChartMember
 - (instancetype)init {
   self = [super init];
-  if (self)
+  if (self) {
     _groupExpressions = [NSMutableArray array];
+    _members = [NSMutableArray array];
+  }
   return self;
 }
 @end
@@ -728,6 +1044,7 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
   if (self) {
     _showMajorGridLines = YES;
     _majorTickMarks = RDLChartTickMarksOutside;
+    _minorTickMarks = RDLChartTickMarksNone;
   }
   return self;
 }
@@ -746,13 +1063,41 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
     _series = [NSMutableArray array];
     _categoryAxis = [[RDLChartAxis alloc] init];
     _valueAxis = [[RDLChartAxis alloc] init];
-    _legendPosition = RDLChartLegendPositionRightCenter;
+    _secondaryValueAxes = [NSMutableArray array];
+    _customPaletteColors = [NSMutableArray array];
+    // No legend Position until one is named: the parser only sets what a file
+    // says, so a default here was what every chart without one got -- the
+    // middle of the right, where the spec puts it at the top right.
   }
   return self;
 }
 
 - (NSString *)rdlElementName {
   return @"Chart";
+}
+
+static NSArray<RDLChartMember *> *RDLChartGroupChain(NSArray<RDLChartMember *> *members) {
+  NSMutableArray<RDLChartMember *> *chain = [NSMutableArray array];
+  for (RDLChartMember *m = [members firstObject]; [m.groupExpressions count]; m = [m.members firstObject])
+    [chain addObject:m];
+  return chain;
+}
+
+- (NSArray<RDLChartMember *> *)categoryGroups {
+  return RDLChartGroupChain(self.categoryMembers);
+}
+
+- (NSArray<RDLChartMember *> *)seriesGroups {
+  return RDLChartGroupChain(self.seriesMembers);
+}
+
+- (NSUInteger)indexOfValueAxisNamed:(NSString *)name {
+  if ([name length] == 0 || [self.valueAxis.name isEqualToString:name])
+    return 0;
+  NSUInteger i = [self.secondaryValueAxes indexOfObjectPassingTest:^BOOL(RDLChartAxis *axis, NSUInteger idx, BOOL *stop) {
+    return [axis.name isEqualToString:name];
+  }];
+  return i == NSNotFound ? NSNotFound : i + 1;
 }
 
 #pragma mark - Designer conveniences
@@ -788,6 +1133,7 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
     [members addObject:m];
   }
   m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
+  [m.members removeAllObjects];
   [m.groupExpressions removeAllObjects];
   [m.groupExpressions addObject:RDLChartFieldValue(field)];
   m.label = RDLChartFieldValue(field);
@@ -1660,6 +2006,15 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 @implementation RDLDataSource
 @end
 
+@implementation RDLPreservedNode
+@end
+
+@implementation RDLQueryParameter
+@end
+
+@implementation RDLDataSetReference
+@end
+
 @implementation RDLParameter
 - (instancetype)init {
   self = [super init];
@@ -1676,6 +2031,8 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 }
 @end
 
+const CGFloat RDLDefaultColumnSpacing = 0.5;
+
 @implementation RDLPage
 - (instancetype)init {
   self = [super init];
@@ -1683,6 +2040,8 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
     _pageWidth = 8.5;
     _pageHeight = 11.0;
     _leftMargin = _rightMargin = _topMargin = _bottomMargin = 0.5;
+    _columns = 1;
+    _columnSpacing = RDLDefaultColumnSpacing;
   }
   return self;
 }
@@ -1728,6 +2087,20 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   RDLAdoptItems(self.pageFooter.items, self);
 }
 
+@synthesize codeModule = _codeModule;
+
+- (void)setCode:(NSString *)code {
+  _code = [code copy];
+  _codeModule = nil;
+}
+
+- (RDLCodeModule *)codeModule {
+  if (_codeModule == nil &&
+      [[_code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length])
+    _codeModule = [RDLCodeModule moduleWithSource:_code];
+  return _codeModule;
+}
+
 + (instancetype)emptyReportNamed:(NSString *)name {
   RDLReport *r = [[RDLReport alloc] init];
   r.name = name ?: @"Untitled";
@@ -1756,6 +2129,7 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
   r.embeddedImages = [NSMutableArray array];
+  r.variables = [NSMutableArray array];
   r.warnings = [NSMutableArray array];
   return r;
 }

@@ -1,7 +1,9 @@
 #import <Foundation/Foundation.h>
 #import "RDLBackend.h"
+#import "RDLExpression.h"
 @class RDLReport;
 @class RDLLaidOutPage;
+@class RDLRenderEnvironment;
 
 // Pipeline: bind data → layout (tablix expansion) → laid-out pages → backend.
 @interface RDLGenerator : NSObject
@@ -20,7 +22,13 @@
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
                                    parameters:(NSDictionary<NSString *, NSString *> *)params
                                  userLanguage:(NSString *)userLanguage;
+// For a reader, a user and a render format.
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                   parameters:(NSDictionary<NSString *, NSString *> *)params
+                                  environment:(RDLRenderEnvironment *)environment;
 + (NSArray<id<RDLBackend>> *)backends;
+// What rendering with a backend is, for Globals!RenderFormat.
++ (RDLRenderFormat)renderFormatForBackend:(id<RDLBackend>)backend;
 + (id<RDLBackend>)backendNamed:(NSString *)name;
 + (NSData *)renderPages:(NSArray<RDLLaidOutPage *> *)pages
                   title:(NSString *)title
@@ -32,6 +40,12 @@
               parameters:(NSDictionary<NSString *, NSString *> *)params
              usingBackend:(id<RDLBackend>)backend
             userLanguage:(NSString *)userLanguage;
+// Rendered for the environment's reader and user, as the backend renders --
+// unless the environment names a render format of its own.
++ (NSData *)renderReport:(RDLReport *)report
+              parameters:(NSDictionary<NSString *, NSString *> *)params
+             usingBackend:(id<RDLBackend>)backend
+             environment:(RDLRenderEnvironment *)environment;
 + (NSData *)PDFForReport:(RDLReport *)report
               parameters:(NSDictionary<NSString *, NSString *> *)params;
 + (NSString *)HTMLStringForReport:(RDLReport *)report

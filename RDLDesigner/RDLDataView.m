@@ -77,6 +77,28 @@
   return YES;
 }
 
+// A value as the text that gives it again: a date in ISO form, which a
+// DateTime parameter reads back whatever the culture, and anything else as
+// CStr writes it.
+static NSString *RDLParameterValueText(id value) {
+  if ([value isKindOfClass:[NSDate class]]) {
+    NSDateFormatter *iso = [[NSDateFormatter alloc] init];
+    iso.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    iso.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss";
+    return [iso stringFromDate:value];
+  }
+  return value ? [RDLExpression formatValue:value format:nil language:nil] : @"";
+}
+
+// Whether a parameter after the one at `index` reads its valid values or
+// default from a dataset, whose filters may read the one that changed.
+static BOOL RDLLaterParameterReadsADataSet(NSArray<RDLParameter *> *parameters, NSInteger index) {
+  for (NSUInteger i = (NSUInteger)index + 1; i < [parameters count]; i++)
+    if (parameters[i].validValuesReference || parameters[i].defaultValuesReference)
+      return YES;
+  return NO;
+}
+
 - (NSTextField *)label:(NSString *)t frame:(NSRect)f {
   NSTextField *l = [[NSTextField alloc] initWithFrame:f];
   [l setBezeled:NO];
@@ -102,14 +124,26 @@
   CGFloat y = 8;
   [_stack addSubview:[self label:@"Parameters" frame:NSMakeRect(10, y, 220, 16)]];
   y += 20;
-  if ([report.parameters count] == 0) {
-    NSTextField *empty = [self label:@"No parameters on this report." frame:NSMakeRect(10, y, 220, 16)];
+  // Asked for as a report server's prompt pane asks: not a Hidden parameter, nor
+  // one with no Prompt, which nobody may give a value.
+  NSMutableArray<RDLParameter *> *asked = [NSMutableArray array];
+  for (RDLParameter *p in report.parameters)
+    if (!p.hidden && p.prompt != nil)
+      [asked addObject:p];
+  if ([asked count] == 0) {
+    NSTextField *empty = [self label:[report.parameters count] ? @"This report asks for no parameters."
+                                                               : @"No parameters on this report."
+                               frame:NSMakeRect(10, y, 220, 16)];
     [empty setFont:[NSFont userFontOfSize:10]];
     [_stack addSubview:empty];
     y += 22;
   }
-  NSInteger tag = 0;
-  for (RDLParameter *p in report.parameters) {
+  RDLParameterValues *resolved = [doc parameterValues];
+  for (RDLParameter *p in asked) {
+    // The parameter's place among the report's, which is how a control says
+    // which one it gives.
+    NSInteger tag = (NSInteger)[report.parameters indexOfObjectIdenticalTo:p];
+    RDLParameterValue *state = [resolved valueNamed:p.name];
     // Prompt is what a parameter is called when it is being asked for; the
     // name is what expressions call it, and goes in the tooltip with the type.
     NSString *asked = [p.prompt length] ? p.prompt : (p.name ?: @"");
@@ -121,17 +155,20 @@
                                              p.multiValue ? @", one of several" : @""]];
     [_stack addSubview:l];
     y += 16;
-    NSString *current = doc.paramValues[p.name] ?: ([p.defaultValue source] ?: @"");
-    if ([p.validValues count]) {
+    NSString *current = doc.paramValues[p.name] ?: RDLParameterValueText(state.value);
+    if (state.validValues) {
       // A parameter that lists what it accepts is chosen from, not typed into
       // -- which is what ValidValues is for, and what stops a typo rendering
-      // an empty report.
+      // an empty report. Each is shown by its label and gives its value.
       NSPopUpButton *pop =
           [[NSPopUpButton alloc] initWithFrame:NSMakeRect(10, y, 220, 22) pullsDown:NO];
-      for (RDLValue *v in p.validValues)
-        [pop addItemWithTitle:[v source] ?: @""];
-      if ([pop itemWithTitle:current])
-        [pop selectItemWithTitle:current];
+      for (RDLParameterChoice *choice in state.validValues) {
+        [pop addItemWithTitle:choice.label ?: RDLParameterValueText(choice.value)];
+        [[pop lastItem] setRepresentedObject:RDLParameterValueText(choice.value)];
+      }
+      NSInteger chosen = [pop indexOfItemWithRepresentedObject:current];
+      if (chosen >= 0)
+        [pop selectItemAtIndex:chosen];
       [pop setTag:tag];
       [pop setTarget:self];
       [pop setAction:@selector(paramChanged:)];
@@ -148,7 +185,15 @@
       [_stack addSubview:f];
     }
     y += 28;
-    tag += 1;
+    // What a report server would say about the value, beside it.
+    if (state.problem != RDLParameterProblemUnspecified) {
+      NSTextField *problem = [self label:state.problemDescription ?: @"" frame:NSMakeRect(10, y - 4, 220, 26)];
+      [problem setFont:[NSFont userFontOfSize:9]];
+      [problem setTextColor:[NSColor systemRedColor]];
+      [[problem cell] setWraps:YES];
+      [_stack addSubview:problem];
+      y += 26;
+    }
   }
   y += 8;
   // What the report will read, and what it has read: a summary, not an editor.
@@ -201,12 +246,17 @@
   NSInteger i = [sender tag];
   if (i < 0 || i >= (NSInteger)[params count])
     return;
-  NSString *value = [sender isKindOfClass:[NSPopUpButton class]]
-                        ? [(NSPopUpButton *)sender titleOfSelectedItem]
-                        : [sender stringValue];
+  BOOL chosen = [sender isKindOfClass:[NSPopUpButton class]];
+  NSString *value = chosen ? ([[(NSPopUpButton *)sender selectedItem] representedObject]
+                                  ?: [(NSPopUpButton *)sender titleOfSelectedItem])
+                           : [sender stringValue];
   _applyingParameter = YES;
   [_document setParamValue:value forName:[params[i] name]];
   _applyingParameter = NO;
+  // A choice made may change the lists after it, and what is wrong: shown again
+  // once the control in use is done with, never while it is.
+  if (chosen && RDLLaterParameterReadsADataSet(params, i))
+    [self performSelector:@selector(reload) withObject:nil afterDelay:0];
 }
 
 // As it is typed, rather than only on Return: a parameter value is something
@@ -220,8 +270,11 @@
 
 - (void)controlTextDidEndEditing:(NSNotification *)obj {
   id sender = [obj object];
-  if ([sender isKindOfClass:[NSTextField class]])
+  if ([sender isKindOfClass:[NSTextField class]]) {
     [self paramChanged:sender];
+    // Typing is finished, so what is wrong with the value can be said.
+    [self performSelector:@selector(reload) withObject:nil afterDelay:0];
+  }
 }
 
 @end

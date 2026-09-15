@@ -32,6 +32,7 @@
   RDLJSONDataProvider *provider = [[RDLJSONDataProvider alloc] init];
   NSError *err = nil;
   NSArray *rows = [provider rowsFromData:[self data:json]
+                                 query:@"$.Order[*]"
                                  dataSet:[self dataSetNamed:@"Orders" query:@"$.Order[*]" source:@"S"]
                               properties:@{}
                                    error:&err];
@@ -49,6 +50,7 @@
 
   // A document that is already an array of objects needs no query at all.
   NSArray *plain = [provider rowsFromData:[self data:@"[{\"A\":1},{\"A\":2}]"]
+                                  query:@""
                                   dataSet:[self dataSetNamed:@"Plain" query:@"" source:@"S"]
                                properties:@{}
                                     error:NULL];
@@ -57,6 +59,7 @@
 
   // Bad JSON is an error, not an empty report.
   if ([provider rowsFromData:[self data:@"{oops"]
+                     query:@"$"
                      dataSet:[self dataSetNamed:@"Bad" query:@"$" source:@"S"]
                   properties:@{}
                        error:NULL] != nil)
@@ -72,6 +75,7 @@
   RDLXMLDataProvider *provider = [[RDLXMLDataProvider alloc] init];
   NSError *err = nil;
   NSArray *rows = [provider rowsFromData:[self data:xml]
+                                 query:@"//Order"
                                  dataSet:[self dataSetNamed:@"Orders"
                                                       query:@"//Order"
                                                      source:@"S"]
@@ -94,6 +98,7 @@
 
   // With no XPath, the root's children are the rows.
   NSArray *implied = [provider rowsFromData:[self data:xml]
+                                    query:@""
                                     dataSet:[self dataSetNamed:@"Orders" query:@"" source:@"S"]
                                  properties:@{}
                                       error:NULL];
@@ -107,7 +112,7 @@
 
   // Headers, quoted fields, and a comma inside one.
   NSString *csv = @"Item,Qty,Note\nBowl,2,\"Blue, glazed\"\nCup,1,Plain\n";
-  NSArray *rows = [provider rowsFromData:[self data:csv] dataSet:ds properties:@{} error:NULL];
+  NSArray *rows = [provider rowsFromData:[self data:csv] query:ds.commandText dataSet:ds properties:@{} error:NULL];
   if ([rows count] != 2 || ![rows[0][@"Note"] isEqualToString:@"Blue, glazed"] ||
       ![rows[1][@"Item"] isEqualToString:@"Cup"])
     XCTFail(@"%@", [NSString stringWithFormat:@"csv rows: %@", rows]);
@@ -115,6 +120,7 @@
   // Tabs, named because nobody can type one into a connect string.
   NSString *tsv = @"Item\tQty\nBowl\t2\n";
   NSArray *tabbed = [provider rowsFromData:[self data:tsv]
+                                   query:ds.commandText
                                    dataSet:ds
                                 properties:@{@"delimiter" : @"Tab"}
                                      error:NULL];
@@ -124,6 +130,7 @@
   // No headers: the columns are named for their position, which is what the
   // designer will show as field names.
   NSArray *headerless = [provider rowsFromData:[self data:@"Bowl,2\nCup,1\n"]
+                                       query:ds.commandText
                                        dataSet:ds
                                     properties:@{@"hasheaders" : @"false"}
                                          error:NULL];
@@ -132,6 +139,7 @@
 
   // Fixed width, trimmed.
   NSArray *fixed = [provider rowsFromData:[self data:@"Item      Qty\nBowl      2  \n"]
+                                  query:ds.commandText
                                   dataSet:ds
                                properties:@{@"widths" : @"10,3"}
                                     error:NULL];
@@ -424,6 +432,121 @@
   // The names and their order are the report's either way.
   if (![[ds fieldNames] isEqualToArray:@[ @"Qty", @"Note" ]])
     XCTFail(@"%@", [NSString stringWithFormat:@"fields: %@", [ds fieldNames]]);
+}
+
+// A connect string read and written as .NET's DbConnectionStringBuilder does: a
+// value holding ";" -- inline data, say -- is quoted, in ' when it holds a " and
+// no ', otherwise in " with each " doubled; "==" in a key is an "="; a quoted
+// bare token is the document; and a value that merely contains a quote is read
+// as it is written. Every ";" used to end a value, quoted or not, so inline data
+// holding one was cut short.
+- (void)testConnectStringsAreQuotedAsDotNetQuotesThem {
+  NSDictionary *read =
+      RDLConnectionProperties(@"jsondata='{\"Note\":\"one; two\"}'; Delimiter = \"a \"\"b\"\";c\" ;Odd==Key=1;data.csv");
+  NSDictionary *want = @{ @"jsondata" : @"{\"Note\":\"one; two\"}", @"delimiter" : @"a \"b\";c", @"odd=key" : @"1", @"" : @"data.csv" };
+  if (![read isEqual:want])
+    XCTFail(@"%@", [NSString stringWithFormat:@"read %@, want %@", read, want]);
+  if (![RDLConnectionProperties(@"jsondata={\"A\":\"x\"}")[@"jsondata"] isEqualToString:@"{\"A\":\"x\"}"])
+    XCTFail(@"%@", @"a value that only contains quotes is read as it is written");
+  NSArray<NSDictionary *> *written = @[
+    @{ @"jsondata" : @"{\"Note\":\"one; two\"}" }, @{ @"delimiter" : @"a \"b\";c'd" }, @{ @"data" : @"Item,Qty\nBowl,2" },
+    @{ @"" : @"my;file.csv", @"hasheaders" : @"true" }, @{ @"odd=key" : @"1" }, @{ @"jsondata" : @"{\"A\":\"x\"}" }
+  ];
+  for (NSDictionary *properties in written) {
+    NSString *line = RDLConnectionString(properties);
+    if (![RDLConnectionProperties(line) isEqual:properties])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ written as %@ reads back as %@", properties, line,
+                                                RDLConnectionProperties(line)]);
+  }
+  if (![RDLConnectionString(@{ @"jsondata" : @"{\"Note\":\"one; two\"}" }) isEqualToString:@"jsondata='{\"Note\":\"one; two\"}'"] ||
+      ![RDLConnectionString(@{ @"jsondata" : @"{\"A\":\"x\"}" }) isEqualToString:@"jsondata={\"A\":\"x\"}"])
+    XCTFail(@"%@", @"a value is quoted when it needs to be, in ' when it holds a \", and otherwise left alone");
+}
+
+// Report Builder writes a delimited-text source's provider as Text, and it binds
+// as CSV. It found no provider.
+- (void)testATextSourceBindsAsCSV {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Flat"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Flat";
+  source.dataProvider = @"Text";
+  source.connectString = RDLConnectionString(@{ @"data" : @"Item,Qty\nBowl,2\nCup,1" });
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [self dataSetNamed:@"Rows" query:nil source:@"Flat"];
+  [report.dataSets addObject:ds];
+  RDLDataBinder *binder = [[RDLDataBinder alloc] init];
+  if (![binder bindReport:report error:NULL] || [ds.rows count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a Text source should bind as CSV: %@ %@", ds.rows, binder.notes]);
+}
+
+// The data sources evaluated before layout, as a stage of their own: a
+// CommandText or ConnectString written as an expression reads the parameters,
+// and a dataset a parameter's valid values come from is bound just before that
+// parameter, so the list cascades through a query from the choice before it;
+// the static bind leaves such datasets to that stage. A web document is given
+// the query parameters as its query string, as SSRS's XML data extension gives
+// them. Such datasets were bound once, as the report was read, with their
+// expressions as text.
+- (void)testDataSourcesAreEvaluatedWithTheParameters {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Evaluated"];
+  RDLDataSource *people = [[RDLDataSource alloc] init];
+  people.name = @"People";
+  people.dataProvider = @"JSON";
+  people.connectString = RDLConnectionString(@{
+    @"jsondata" : @"{\"Rows\":[{\"Region\":\"N\",\"Name\":\"Ann\"},{\"Region\":\"S\",\"Name\":\"Bo\"},{\"Region\":\"S\",\"Name\":\"Cy\"}]}"
+  });
+  RDLDataSource *given = [[RDLDataSource alloc] init];
+  given.name = @"Given";
+  given.dataProvider = @"JSON";
+  given.connectString = @"=\"jsondata=\" & Parameters!Doc.Value";
+  [report.dataSources addObjectsFromArray:@[ people, given ]];
+  RDLDataSet *rows = [self dataSetNamed:@"Rows"
+                                  query:@"=\"$.Rows[?(@.Region=='\" & Parameters!Region.Value & \"')]\""
+                                 source:@"People"];
+  RDLDataSet *docs = [self dataSetNamed:@"Docs" query:nil source:@"Given"];
+  [report.dataSets addObjectsFromArray:@[ rows, docs ]];
+  RDLParameter * (^parameter)(NSString *, NSString *) = ^RDLParameter *(NSString *name, NSString *byDefault) {
+    RDLParameter *p = [[RDLParameter alloc] init];
+    p.name = name;
+    p.prompt = name;
+    p.dataType = RDLParameterDataTypeString;
+    p.defaultValue = byDefault ? [RDLValue literal:byDefault] : nil;
+    [report.parameters addObject:p];
+    return p;
+  };
+  parameter(@"Region", @"S");
+  RDLParameter *name = parameter(@"Name", nil);
+  name.validValuesReference = [[RDLDataSetReference alloc] init];
+  name.validValuesReference.dataSetName = @"Rows";
+  name.validValuesReference.valueField = @"Name";
+  parameter(@"Doc", @"[{\"X\":1}]");
+
+  RDLDataBinder *binder = [[RDLDataBinder alloc] init];
+  [binder bindReport:report error:NULL];
+  if (rows.rows != nil || docs.rows != nil)
+    XCTFail(@"%@", @"the static bind should leave a dataset that reads parameters to the evaluation");
+  RDLDataEvaluation *evaluation = [[RDLDataEvaluation alloc] initWithReport:report binder:binder];
+  NSArray<NSString *> * (^labels)(RDLParameterValues *) = ^NSArray<NSString *> *(RDLParameterValues *values) {
+    NSMutableArray *out = [NSMutableArray array];
+    for (RDLParameterChoice *choice in [values valueNamed:@"Name"].validValues)
+      [out addObject:choice.label ?: @""];
+    return out;
+  };
+  RDLParameterValues *north = [evaluation evaluateWithParameters:@{ @"Region" : @"N" } environment:nil];
+  if (![labels(north) isEqual:@[ @"Ann" ]] || [rows.rows count] != 1 || [docs.rows count] != 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"for N: %@, %lu rows, %lu documents, %@", labels(north),
+                                              (unsigned long)[rows.rows count], (unsigned long)[docs.rows count], evaluation.notes]);
+  RDLParameterValues *south =
+      [evaluation evaluateWithParameters:@{ @"Region" : @"S", @"Doc" : @"[{\"X\":1},{\"X\":2}]" } environment:nil];
+  if (![labels(south) isEqual:(@[ @"Bo", @"Cy" ])] || [rows.rows count] != 2 || [docs.rows count] != 2 || [evaluation.notes count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"for S: %@, %lu rows, %lu documents, %@", labels(south),
+                                              (unsigned long)[rows.rows count], (unsigned long)[docs.rows count], evaluation.notes]);
+
+  NSURL *web = RDLURLAddingQueryItems([NSURL URLWithString:@"https://example.com/feed?format=json"], @[
+    [NSURLQueryItem queryItemWithName:@"Region" value:@"S"], [NSURLQueryItem queryItemWithName:@"Top" value:@"10"]
+  ]);
+  if (![[web absoluteString] isEqualToString:@"https://example.com/feed?format=json&Region=S&Top=10"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"query parameters should follow the query string: %@", web]);
 }
 
 @end

@@ -17,6 +17,9 @@
 @class RDLReport;
 @class RDLEditingContext;
 
+@class RDLParameterValues;
+@class RDLDataBinder;
+
 @interface RDLDocument : NSDocument
 // Replacing the report wholesale (open, revert) is a load, not an edit: it
 // clears undo and dirty. Use RDLEditor for anything smaller.
@@ -55,6 +58,12 @@
 
 - (void)syncParamValuesFromReport;
 - (void)setParamValue:(NSString *)value forName:(NSString *)name;
+// The report's parameters worked out from the values given so far: defaults
+// where none is given, the valid values to choose from, and what is wrong.
+- (RDLParameterValues *)parameterValues;
+// A binder for this document: documents beside its file, and remote ones as the
+// last reading of its data allowed. What previews and exports read images with.
+- (RDLDataBinder *)dataBinder;
 
 
 // Read every data source the report names -- all of them, not the first: a

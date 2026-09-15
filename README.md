@@ -58,21 +58,25 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 ## Supported RDL subset
 
 * **Report items**
-  * Textbox (multi-Paragraph/TextRun, CanGrow, styles)
+  * Textbox (multi-Paragraph/TextRun, CanGrow, CanShrink — sized by measuring the text in the fonts it is drawn in; what is directly below a shrinking box moves up — paragraph LeftIndent, RightIndent, HangingIndent, SpaceBefore and SpaceAfter, numbered and bulleted lists by ListStyle and ListLevel, styles — on runs and paragraphs as well, where any of them may be an expression — and each run's own Label, ToolTip and Hyperlink, the last two as a title and a link in HTML; MarkupType=HTML for a small subset — b, strong, i, em, u, s, strike, font (color, face, size 1–7), a, h1–h6, p, div, br, ul, ol, li and the common entities — with any other tag, and CSS `style` attributes, ignored and their text kept)
   * Line (horizontal / vertical / sloped, dash styles)
   * Rectangle (a container: what grows inside it pushes down what is below, and it may hold a Tablix)
-  * Image (`Source` Embedded/External, `Sizing` Fit/FitProportional/Clip/AutoSize, report-level `EmbeddedImages`)
-  * Chart (Column/Bar/Line/Pie: first series, category group, data point), read and written in the spec's vocabulary — `Shape`/`Pie`, `Scatter`/`Bubble`, axis `Visible`/`Interval`, `ChartMajorTickMarks`, grid lines `Enabled`, data labels `Visible` — so Report Builder's charts draw as designed and this kit's charts validate
-  * Tablix
+  * Image (`Source` Embedded, External -- beside the report, or by URL when remote documents are allowed -- or Database bytes with their `MIMEType`, such as `=Convert.FromBase64String(Fields!Logo.Value)`; `Sizing` Fit/FitProportional/Clip and AutoSize, which sizes the box to the image and moves what is below it; report-level `EmbeddedImages`)
+  * Chart (Column/Bar/Line/Pie: first series, category group, data point), read and written in the spec's vocabulary — `Shape`/`Pie`, `Scatter`/`Bubble`, axis `Visible`/`Interval`, `ChartMajorTickMarks`, grid lines `Enabled` — so Report Builder's charts draw as designed and this kit's charts validate; data labels on every chart type, on the data point or the whole series, saying their `Label` with the chart keywords (`#VALY`, `#VALX`, `#SERIESNAME`, `#AXISLABEL`, `#INDEX`, `#PERCENT`, `#TOTAL`, `#LEGENDTEXT`, `#AVG`, `#MIN`, `#MAX`, `#FIRST`, each with an optional `{format}`) or their value in their `Format`, placed by `Position` (a pie's `Outside` beyond the slice) in their font size, colour and weight; a legend at any of the 12 `Position`s (top right by default), its items in a `Layout` of rows or columns, in its `Style`'s font with its box's background and border; a title on any side by its `Position`, turned on the left and right, in its `Style`; axis labels in their axis' `Style` — a value axis' numbers in its `Format` — and axis titles in theirs, at the `Near`, `Center` or `Far` end of their axis; chart text in its font family and slant in both backends; colours from the chart's `Palette` — all 16 names, the named ones in Microsoft's own colours (Default and the Pacific palettes, whose colours are not published, in this kit's own), a pie's slices one each from it, `Custom` taking `ChartCustomPaletteColors` — with a series' `Style` `Color` over the palette and a data point's `Color`, worked out for each point, over that; each axis' major and minor grid lines (the category axis' too) and tick marks — `Inside`, `Outside` or `Cross`, at their `Length` — each at its own `Interval`, grid lines in their `Style`'s border colour, labels `LabelInterval` apart, and `Margin` (a line on an axis without one runs from end to end; bars always keep theirs); markers in their `Type`'s shape — `Auto` a different one for each series — at their `Size` in their `Color`; scatter points at their `X` on a scale of numbers, and bubbles as big as their `Size`; a series plotted against the value axis its `ValueAxisName` names, on that axis' own scale, drawn on the side its `Location` says; a chart with no rows saying its `ChartNoDataMessage` instead; stepped and smooth lines; and nested category and series groups, a category or series for each inner group within each outer one, the outer categories labelled in a row of their own; and range, range column and bar, stock and candlestick charts from each point's high, low, open and close; and funnels and pyramids, a band for each category as tall as its share; and polar and radar charts, the categories round a circle clockwise from twelve o'clock on rings of the value axis
+  * Tablix — including `HideDuplicates` (per group or dataset, shown again on each page), `ColSpan` across dynamic column groups, `GroupsBeforeRowHeaders`, right-to-left `LayoutDirection`, the full `TablixCorner` grid (a cell over each row-header column, beside each column-header tier, with `RowSpan`/`ColSpan`), and the tablix's own `Style` background and border, boxed on each page it spans or left open along the break with `OmitBorderOnPageBreak`
   * List (mapped onto Tablix)
 * **Styles**
   * fonts (weight/style/size/family)
-  * color
-  * background,
-  * per-side borders, padding
+  * color and background — named colours, `#rrggbb`, `#rgb` and `#aarrggbb` (alpha first, as RDL writes it)
+  * background gradients (`BackgroundGradientType` with `BackgroundGradientEndColor`: across, down, diagonal, and from the centre or a centre line)
+  * background images (`BackgroundImage` embedded, external or from data, tiled, placed once at a `Position`, stretched to fit, or clipped)
+  * per-side borders in every style (`Double`, `Groove`, `Ridge`, `Inset`, `Outset` included), padding
   * TextAlign
   * VerticalAlign
-  * TextDecoration
+  * TextDecoration, `Overline` included
+  * `LineHeight`
+  * `TextEffect` (`Shadow` in `ShadowColor` at `ShadowOffset`, `Emboss`, `Embed`, `Frame`) and `UnicodeBiDi` (HTML)
+  * `Direction` (right-to-left text) and `WritingMode` (`Vertical` and `Rotate270` text turned in its box; the 2005 `lr-tb`/`tb-rl`/`rl-tb` values are upgraded)
   * `Language` (per item; see Localization)
   * conditional formatting: any style property may be an `=` expression
 * **Behavior**
@@ -82,12 +86,15 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * `ActionInfo/Hyperlink` (HTML `<a>`)
   * `ZIndex`
   * `PageBreak` — `BreakLocation` `Start`, `End`, `StartAndEnd` and `Between` on items, tablixes and groups, `Disabled`, `ResetPageNumber`, and `PageName` → `Globals!PageName`
-  * `KeepTogether` on body items
+  * `KeepTogether` on body items, groups and tablixes (measured after rows grow), and `KeepWithGroup` — a header stays with the row below it, a total with the row above it
   * `RepeatOnNewPage`, with room left for the repeated header on each continuation page
+  * a tablix row taller than a page split across pages between two lines of its text, going on under the repeated header rows
   * subreports that run on past the page they start on
   * body content cut at the body band, so nothing is drawn over the page header or footer
   * `NoRowsMessage`
-  * Body `Style` (page background)
+  * Body `Style` (the body's background), and `Page/Style` painted on every page inside its margins, behind the page header, body and footer
+  * `Page/Columns` and `ColumnSpacing`: a PDF page lays the body out in that many columns, each as wide as the report, flowing on from one to the next (HTML keeps one column, as SSRS's interactive renderers do)
+  * `ConsumeContainerWhitespace`: a body or rectangle whose contents grow keeps the space below them, as SSRS does by default, or gives it up when the report says so
   * crosstab pivot via dynamic `TablixColumnHierarchy` groups (nested groups render tiered, spanning column headers)
   * horizontal pagination of wide tablixes with `RepeatRowHeaders`
 * **Data**
@@ -106,30 +113,43 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
 * **Localization**
   * report `Language`, static (`en-US`) or an expression (`=User!Language`, `=Parameters!Culture.Value`)
   * per-item `Style/Language`, which overrides it for that item and everything inside it
-  * numbers, currency and dates formatted in that culture (`Format`, `FormatCurrency`, `FormatNumber`, `FormatPercent`, `Style/Format`, and values with no format at all)
+  * numbers, currency and dates formatted in that culture (`Format`, `FormatCurrency`, `FormatNumber`, `FormatPercent`, `FormatDateTime`, `Style/Format`, and values with no format at all), as .NET Framework writes them: every standard and custom number format (`N2`, `X8`, `#,##0.00;(#,##0.00);zero`, `0.0%`, `0.00E+00`), every standard and custom date format (`D`, `g`, `dddd, MMMM d`, `HH:mm:ss.fff`), and VB's named formats and `TriState` arguments; a value a format cannot take is `#Error`
   * `User!Language` — the reader's culture, passed in per render
-* **Parameters**
-  * String/Integer/Float/Boolean/DateTime coercion
-  * `Nullable`
-  * `MultiValue` (arrays, `Parameters!P.Count`, `Join`)
-  * `ValidValues`
-  * defaults incl. `=` expressions
+* **Parameters**, worked out once per render as a report server works them out (`RDLParameterValues`)
+  * each value in its String/Integer/Float/Boolean/DateTime type
+  * `Nullable` and `AllowBlank` enforced; `Hidden`; a parameter with no `Prompt` is read-only
+  * `MultiValue` (arrays, `Parameters!P.Count`, `Parameters!P.IsMultiValue`, `Join`)
+  * `ValidValues` written or read from a dataset (`DataSetReference`, with its `LabelField`), through the dataset's filters -- which may read an earlier parameter, so one list cascades from another
+  * defaults written (incl. `=` expressions, which read only the parameters declared before them) or read from a dataset; a default with a value that is not valid is dropped, as MS-RDL says
+  * what is wrong said as a report server says it; `rdlgen` refuses to render, and the designer to export, a report with such a parameter. `rdlgen -p Name=a -p Name=b` gives a `MultiValue` parameter both values, and `-p Name:isnull=true` gives Nothing
 * **Expressions**: a subset of Visual Basic needed for report calculations
   * basic arithmetic and logical operators
   * ~90 builtin functions
+  * .NET members: a value's own (`Fields!Name.Value.Substring(0, 3)`, `Fields!When.Value.AddDays(1).Year`, `.ToString("N2")`), and the shared members of `Math`, `Convert`, `String` (`String.Format` with `{0,8:N2}` items) and the Visual Basic runtime's `Financial`
+  * Visual Basic's numeric types — `Short`, `Integer`, `Long`, `Decimal` (exact), `Single`, `Double` — with every literal form (`7L`, `1.25D`, `&HFF`, `#1/31/2020#`) and VB's operator rules: widening, `\` and `Mod`, bitwise `And`/`Or`/`Xor`, `+` joining only text; conversions (`CInt`, `CByte`, `CDec`, `CULng`, `Convert.ToInt32`, …) in the type they name; field values in the type their `TypeName` declares, parameters in theirs, `Sum` in its values' type (exact for `Decimal`) and the counts as `Integer`s, the report code's variables in their `As` types, and `Math`'s members (`Round` with `MidpointRounding`, `Floor`, `Sign`, `Max`, …) in the type their .NET overload gives; where VB throws — overflow, division by zero, a conversion out of range, text that is not a number or not a date — the value is `#Error`
+  * Visual Basic's semantics, as SSRS compiles expressions: text compares ordinally (`Like` with `[a-z]` and `[!…]`, `InStr`, `InStrRev`, `Replace` with `CompareMethod.Text`, `Lookup` keys); conditions read as `CBool` reads them; `IIf`, `Switch` and `Choose` work out every argument; typed Boolean, DateTime and String fields; VB.NET's `DateDiff`, `DatePart` (with week-of-year rules), `DateAdd`, `Weekday`, `WeekdayName` and `MonthName` with a first day of the week and the culture's names; `RowNumber` in the scope it names, `RunningValue` over every aggregate, and aggregates over no values as Nothing
+  * Report Builder's function library: VB's text, date, inspection and conversion functions (`StrComp`, `StrConv`, `LSet`, `Filter`, `TimeValue`, `DateString`, `IsArray`, `Str`, …), `Math`'s and `Financial`'s members by name alone (`Truncate`, `Atan2`, `Pmt`, `NPV`, `IRR`, `MIRR`, …), and `#Error` for a function SSRS does not have; `Globals!RenderFormat.Name` and `.IsInteractive` (`PDF`, `HTML5`, `RPL` in the preview) and `User!UserID` from an `RDLRenderEnvironment` the host passes in
+  * the report's `Code`, kept on save and run in a small subset of Visual Basic — `Function`/`Sub`, `Dim`, `If`/`ElseIf`, `Select Case`, `For`/`For Each`/`While`/`Do` loops, `Return`, calls between its functions — as `Code.Name(...)`
   * aggregates (`Sum`, `Avg`, `Min`, `Max`, `Count`, `CountDistinct`, `CountRows`, `First`, `Last`, `StDev`, `StDevP`, `Var`, `VarP`, `Aggregate`, `RunningValue`) with group/dataset scopes, and the `Recursive` flag over a recursive group's subtree
   * `Lookup`/`LookupSet`/`MultiLookup`
   * `Globals!` (incl. sectioned `PageNumber`/`TotalPages`, `OverallPageNumber`/`OverallTotalPages`, `PageName`)
   * `User!`
   * `Parameters!`
+  * `Variables!` — report `Variables`, worked out once, and group `Variables`, worked out for each instance of the group
 * **Subreports**: `Subreport` with `Parameters` (`Value`, `Omit`) and `NoRowsMessage` — one report rendered inside another, its `ReportName` resolved beside the report that names it (`RDLSubreportLoader`), which is how master-detail is written in RDL
 
 Not supported yet:
+* `Style/BackgroundHatchType` (hatch patterns): not read, so an item that asks for one shows its plain background
 * Gauge/Map
 * Toggle/InteractiveSort/DocumentMap
 * Drillthrough/BookmarkLink actions
 
 Skipped elements are reported in `report.warnings` instead of dropped silently.
+What the reader does not read is kept and written back where it was on save --
+authoring metadata, `rd:` designer state, `ReportParametersLayout`, custom
+properties and the rest -- following the report as it is edited: a deleted item
+takes its pieces with it, and a setting the kit writes itself replaces the kept
+one.
 
 ## Testing
 
@@ -298,8 +318,15 @@ rdlgen report.rdl -o out.pdf --language fr-FR
 A `Language` that is not a culture this machine knows is reported by the
 checker (`unknown-language`) rather than silently formatting as English.
 
-Not supported: `Calendar`, `NumeralLanguage` and `NumeralVariant`; and
-localized *labels*, which RDL has no native form for -- SSRS reports do it with
+A style's `Calendar` writes dates in that calendar -- `Hebrew`, `Hijri`,
+`Japanese`, `Korean`, `Taiwan`, `ThaiBuddhist` or a Gregorian variant -- and
+its `NumeralVariant` writes digits as the `NumeralLanguage` (or the
+`Language`) would: 2 ASCII, 3 the script's own (Arabic, Devanagari, Thai and
+the other cultures MS-RDL lists), 4 ideographic and 6 wide for Chinese,
+Japanese and Korean. Variants 5 and 7, whose digits MS-RDL does not give, are
+kept but written as 1.
+
+Not supported: localized *labels*, which RDL has no native form for -- SSRS reports do it with
 a custom assembly or a lookup table, and so would a report here.
 
 ## Data sources
@@ -343,6 +370,7 @@ file.
 
 | `XML` | `xmldoc=orders.xml`, `xmldata=<Orders>…` | XPath: `//Order` |
 | `CSV` | `stock.csv;HasHeaders=true;Delimiter=Tab` | — (the file is the rows) |
+| `Text` | as `CSV`, which is how Report Builder writes a delimited-text source | — |
 
 `RDLJSONPath` is a module of its own, with the set the mainstream
 implementations agree on:
@@ -380,6 +408,37 @@ CSV also reads fixed-width files (`stock.txt;Widths=10,20,8`), and without
 headers the columns are `Column1`, `Column2`, … A JSON object or a repeated XML
 element inside a row stays a list of rows, which is what a nested region reads;
 CSV is flat and has nothing of the kind.
+
+A connect string is read and written the way .NET's `DbConnectionStringBuilder`
+reads and writes one: a value that starts with `"` or `'` runs to its closing
+quote, the quote doubled inside it, and may hold `;` -- inline data with one in
+it is written `jsondata='{"Note":"one; two"}'` -- `==` in a key is `=`, and any
+other value runs to the next `;` as written, so `jsondata={"A":"x"}` needs no
+quotes.
+
+A `ConnectString` or `CommandText` may be an expression, and a dataset's
+`QueryParameters` always are, reading the report's parameters. Those datasets
+are bound by a stage of their own that runs before layout, `RDLDataEvaluation`:
+it works out the parameters and binds each such dataset for their values -- one a
+parameter's valid values come from just before that parameter, so a list can
+cascade through a query:
+
+```xml
+<CommandText>="$.Rows[?(@.Region=='" &amp; Parameters!Region.Value &amp; "')]"</CommandText>
+```
+
+Query parameter values go to the data source with the query: an `http(s)`
+document gets them as its URL's query string, as SSRS's XML data extension gives
+them to a web source. `rdlgen` runs the stage before rendering, and the designer
+whenever data is read or a parameter's value is given.
+
+How a dataset's text compares where its data is processed -- its filters, and its
+regions' filters, sorts and groups -- is the dataset's own: `CaseSensitivity`,
+`AccentSensitivity`, `WidthSensitivity` and `KanatypeSensitivity` are `Auto`
+unless the report says otherwise, which for a document means `False`, so
+"apple" and "Apple" are one group and "résumé" equals "resume". `Collation` names
+the SQL Server collation whose locale orders the text (`Finnish_Swedish_100`
+puts "ä" after "z"); without one it is the report's `Language`.
 
 A dataset links to its source the way the file does -- by name -- with the
 resolved object beside it:
@@ -426,15 +485,20 @@ fields it discovers are the ones the expression editor offers. Renaming a
 source carries the datasets that read from it.
 
 Report **parameters** have a navigator of their own beside those two, with add
-and remove; choosing one puts its settings — prompt, type, whether it allows
-blank or takes several values, its default, and what it accepts — in the
+and remove; choosing one puts its settings — prompt, type, whether it may be
+Nothing or takes several values, its default, and what it accepts — in the
 inspector, where the settings of anything selected go.
 
 The generator window reads **every** source the report names with one **Read
 data** button, ticking **Fetch by URL** to allow http(s), and offers to go and
 find any document that is not where the report says -- which is the usual state
-of a report authored on another machine. Parameters are asked for beside it: by
-their prompt, and from a list when the report says what they accept.
+of a report authored on another machine. Parameters are asked for beside it as a
+report server's prompt pane asks: by their prompt, from a list -- shown by its
+labels, and read from a dataset where the report says so -- when the report says
+what they accept, starting on their default, with what is wrong with a value said
+beside it. A hidden parameter, or one with no prompt, is not asked for. The
+inspector does not yet offer `Hidden`, `AllowBlank` or a list read from a dataset;
+a report that has them keeps them.
 
 The **Harbor Manifest** sample is a worked example of all of it in one report:
 a JSON document carried in the report, read as shipments (`$.Shipment[*]`),
@@ -461,6 +525,7 @@ needs, so a caller can validate what it is about to supply.
 ```
 rdlgen report.rdl --check      # diagnostics; non-zero exit on errors
 rdlgen report.rdl --contract   # JSON: datasets, field types, parameters
+rdlgen report.rdl -o out.rdl   # written back: 2010 grammar, unread parts kept
 ```
 
 It works over a small type language rather than a flat set of scalars: a

@@ -679,4 +679,118 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
     XCTFail(@"%@", @"the literals around it should come back unchanged");
 }
 
+
+// A list's markers are drawn in the editor but are not text anyone typed, so
+// they must not end up in the runs; and the indents, spacing and list style
+// of each paragraph must come back out of the editor, expressions included.
+- (void)testParagraphLayoutAndListsSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Steps";
+  NSMutableArray *paras = [NSMutableArray array];
+  for (NSString *value in @[ @"Mix", @"=Fields!Step.Value", @"Notes" ]) {
+    RDLParagraph *para = [[RDLParagraph alloc] init];
+    RDLTextRun *run = [[RDLTextRun alloc] init];
+    run.value = value;
+    [para.runs addObject:run];
+    [paras addObject:para];
+  }
+  ((RDLParagraph *)paras[0]).listStyle = RDLListStyleNumbered;
+  ((RDLParagraph *)paras[0]).listLevel = 1;
+  ((RDLParagraph *)paras[1]).listStyle = RDLListStyleNumbered;
+  ((RDLParagraph *)paras[1]).listLevel = 1;
+  ((RDLParagraph *)paras[2]).leftIndent = [RDLLength points:12];
+  ((RDLParagraph *)paras[2]).spaceAfter = [RDLLength points:4];
+  item.paragraphs = paras;
+
+  NSAttributedString *shown = [RDLRichTextCodec attributedStringForItem:item];
+  if (![[shown string] isEqualToString:@"1.\tMix\n2.\t=Fields!Step.Value\nNotes"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the editor should show the markers: %@", [shown string]]);
+  NSRange expr = [[shown string] rangeOfString:@"=Fields!Step.Value"];
+  if (![[shown attribute:RDLExpressionRunAttributeName atIndex:expr.location effectiveRange:NULL]
+          isEqualToString:@"=Fields!Step.Value"])
+    XCTFail(@"%@", @"the expression run after a marker should still be marked");
+
+  [RDLRichTextCodec applyAttributedString:shown toItem:item];
+  NSArray<RDLParagraph *> *back = item.paragraphs;
+  if ([back count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"three paragraphs should come back, not %lu",
+                                              (unsigned long)[back count]]);
+    return;
+  }
+  NSString *first = [back[0].runs.firstObject value], *second = [back[1].runs.firstObject value];
+  if (![first isEqualToString:@"Mix"] || ![second isEqualToString:@"=Fields!Step.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the markers should stay out of the runs: %@, %@",
+                                              first, second]);
+  if (back[0].listStyle != RDLListStyleNumbered || back[1].listLevel != 1 ||
+      [back[2].leftIndent points] != 12 || [back[2].spaceAfter points] != 4)
+    XCTFail(@"%@", @"the paragraphs' layout should come back from the editor");
+}
+
+
+// Expressions in a run's style and a paragraph's cannot be shown as what they
+// evaluate to, so the editor shows the textbox's style -- and must still hand
+// them back rather than reading the style off what it showed.
+- (void)testStyleExpressionsSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Signed";
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  para.style = [[RDLStyle alloc] init];
+  para.style.expressions.textAlign = [RDLExpr expressionWithSource:@"=\"Center\""];
+  RDLTextRun *label = [[RDLTextRun alloc] init];
+  label.value = @"Net ";
+  RDLTextRun *amount = [[RDLTextRun alloc] init];
+  amount.value = @"=Fields!Net.Value";
+  amount.style = [[RDLStyle alloc] init];
+  amount.style.expressions.color =
+      [RDLExpr expressionWithSource:@"=IIf(Fields!Net.Value < 0, \"Red\", \"Black\")"];
+  [para.runs addObjectsFromArray:@[ label, amount ]];
+  item.paragraphs = [NSMutableArray arrayWithObject:para];
+
+  [RDLRichTextCodec applyAttributedString:[RDLRichTextCodec attributedStringForItem:item]
+                                   toItem:item];
+  RDLParagraph *back = [item.paragraphs firstObject];
+  RDLTextRun *net = [back.runs lastObject];
+  if (![[net.style.expressions.color source] hasPrefix:@"=IIf(Fields!Net.Value < 0"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the run's Color expression should come back: %@",
+                                              [net.style.expressions.color source]]);
+  if ([[back.runs firstObject] style] != nil && ![[[back.runs firstObject] style].expressions isEmpty])
+    XCTFail(@"%@", @"the label next to it should not take its expression");
+  if (![[back.style.expressions.textAlign source] isEqualToString:@"=\"Center\""])
+    XCTFail(@"%@", @"the paragraph's TextAlign expression should come back");
+}
+
+
+// A run's Label, ToolTip and link are not visible in the editor, and must come
+// back out of it on the run they belong to.
+- (void)testRunLabelsToolTipsLinksAndMarkupSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Docs";
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *plain = [[RDLTextRun alloc] init];
+  plain.value = @"See ";
+  RDLTextRun *linked = [[RDLTextRun alloc] init];
+  linked.value = @"the guide";
+  linked.label = [RDLValue valueWithSource:@"Guide"];
+  linked.toolTip = [RDLValue valueWithSource:@"=\"Opens the guide\""];
+  linked.hyperlink = [RDLValue valueWithSource:@"https://example.com/docs"];
+  linked.markupType = RDLMarkupTypeHTML;
+  [para.runs addObjectsFromArray:@[ plain, linked ]];
+  item.paragraphs = [NSMutableArray arrayWithObject:para];
+
+  [RDLRichTextCodec applyAttributedString:[RDLRichTextCodec attributedStringForItem:item]
+                                   toItem:item];
+  NSArray<RDLTextRun *> *runs = [item.paragraphs.firstObject runs];
+  RDLTextRun *back = [runs lastObject];
+  if ([runs count] != 2 || ![back.value isEqualToString:@"the guide"] ||
+      ![back.hyperlink.source isEqualToString:@"https://example.com/docs"] ||
+      ![back.toolTip.source isEqualToString:@"=\"Opens the guide\""] ||
+      ![back.label.source isEqualToString:@"Guide"] || back.markupType != RDLMarkupTypeHTML)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the run should keep its link, tooltip and label: "
+                                              @"%lu runs, %@ %@ %@",
+                                              (unsigned long)[runs count], back.hyperlink.source,
+                                              back.toolTip.source, back.label.source]);
+  if ([[runs firstObject] hasOwnProperties])
+    XCTFail(@"%@", @"the plain run beside it should not take them");
+}
+
 @end

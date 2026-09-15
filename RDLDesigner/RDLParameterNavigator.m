@@ -65,6 +65,9 @@
     name = [NSString stringWithFormat:@"Parameter%lu", (unsigned long)++n];
   } while ([_context.report parameterNamed:name]);
   parameter.name = name;
+  // Asked for by its name, as Report Builder starts one: a parameter with no
+  // Prompt is one nobody may give a value.
+  parameter.prompt = name;
   // String, because that is what a parameter is until someone says otherwise,
   // and because every other type reads from text anyway.
   parameter.dataType = RDLParameterDataTypeString;

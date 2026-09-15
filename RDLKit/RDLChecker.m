@@ -1,4 +1,5 @@
 #import "RDLChecker.h"
+#import "RDLCode.h"
 #import "RDLExpression.h"
 
 @implementation RDLDiagnostic
@@ -149,7 +150,10 @@ static RDLType *RDLTypeOfFieldDeclaration(RDLFieldDataType t) {
     return RDLBooleanType();
   case RDLFieldDataTypeDateTime:
     return RDLDateType();
+  case RDLFieldDataTypeShort:
   case RDLFieldDataTypeInteger:
+  case RDLFieldDataTypeLong:
+  case RDLFieldDataTypeSingle:
   case RDLFieldDataTypeFloat:
   case RDLFieldDataTypeDecimal:
     return RDLNumberType();
@@ -231,13 +235,14 @@ static NSDictionary<NSString *, RDLFunctionEntry *> *RDLFunctions(void) {
     // Union takes sets and gives one back; two or more of them.
     put(@"union", RDLFn(@[ SET ], 2, YES, SET, NO));
 
-    for (NSString *name in @[ @"isnothing", @"ismissing", @"isdate", @"isnumeric" ])
+    for (NSString *name in @[ @"isnothing", @"isdate", @"isnumeric", @"isarray", @"iserror", @"isdbnull" ])
       put(name, RDLFn(@[ A ], 1, NO, B, NO));
 
     // Conversions.
     put(@"cstr", RDLFn(@[ A ], 1, NO, S, NO));
     put(@"str", RDLFn(@[ A ], 1, NO, S, NO));
-    for (NSString *name in @[ @"cint", @"clng", @"cdbl", @"cdec", @"csng", @"cbyte", @"val" ])
+    for (NSString *name in @[ @"cbyte", @"csbyte", @"cshort", @"cushort", @"cint", @"cuint", @"clng", @"culng",
+                              @"csng", @"cdbl", @"cdec", @"val" ])
       put(name, RDLFn(@[ A ], 1, NO, N, NO));
     put(@"cbool", RDLFn(@[ A ], 1, NO, B, NO));
     put(@"cdate", RDLFn(@[ A ], 1, NO, D, NO));
@@ -249,28 +254,46 @@ static NSDictionary<NSString *, RDLFunctionEntry *> *RDLFunctions(void) {
     put(@"left", RDLFn(@[ S, N ], 2, NO, S, NO));
     put(@"right", RDLFn(@[ S, N ], 2, NO, S, NO));
     put(@"mid", RDLFn(@[ S, N, N ], 2, NO, S, NO));
-    put(@"substring", RDLFn(@[ S, N, N ], 2, NO, S, NO));
     for (NSString *name in @[ @"trim", @"ltrim", @"rtrim", @"ucase", @"lcase", @"strreverse" ])
       put(name, RDLFn(@[ S ], 1, NO, S, NO));
-    put(@"replace", RDLFn(@[ S, S, S, N ], 3, NO, S, NO));
-    put(@"instr", RDLFn(@[ S, S, N ], 2, NO, N, NO));
-    put(@"instrrev", RDLFn(@[ S, S, N ], 2, NO, N, NO));
+    // The start, a count, and a CompareMethod.
+    put(@"replace", RDLFn(@[ S, S, S, N, N, N ], 3, NO, S, NO));
+    // InStr's start comes first when it is given, so any of the first three may be it.
+    put(@"instr", RDLFn(@[ A, A, A, N ], 2, NO, N, NO));
+    put(@"instrrev", RDLFn(@[ S, S, N, N ], 2, NO, N, NO));
     put(@"split", RDLFn(@[ S, S ], 1, NO, A, NO));
     put(@"space", RDLFn(@[ N ], 1, NO, S, NO));
-    put(@"string", RDLFn(@[ N, S ], 2, NO, S, NO));
+    put(@"strdup", RDLFn(@[ N, S ], 2, NO, S, NO));
+    put(@"strcomp", RDLFn(@[ S, S, N ], 2, NO, N, NO));
+    put(@"strconv", RDLFn(@[ S, N, N ], 2, NO, S, NO));
+    put(@"lset", RDLFn(@[ S, N ], 2, NO, S, NO));
+    put(@"rset", RDLFn(@[ S, N ], 2, NO, S, NO));
+    put(@"ascw", RDLFn(@[ S ], 1, NO, N, NO));
+    put(@"chrw", RDLFn(@[ N ], 1, NO, S, NO));
+    put(@"getchar", RDLFn(@[ S, N ], 2, NO, S, NO));
+    put(@"filter", RDLFn(@[ A, S, B, N ], 2, NO, A, NO));
+    put(@"cobj", RDLFn(@[ A ], 1, NO, A, NO));
+    put(@"timevalue", RDLFn(@[ A ], 1, NO, D, NO));
+    put(@"timeofday", RDLFn(@[], 0, NO, D, NO));
+    put(@"timer", RDLFn(@[], 0, NO, N, NO));
+    put(@"datestring", RDLFn(@[], 0, NO, S, NO));
+    put(@"timestring", RDLFn(@[], 0, NO, S, NO));
     put(@"chr", RDLFn(@[ N ], 1, NO, S, NO));
     put(@"asc", RDLFn(@[ S ], 1, NO, N, NO));
     put(@"hex", RDLFn(@[ N ], 1, NO, S, NO));
     put(@"oct", RDLFn(@[ N ], 1, NO, S, NO));
     put(@"format", RDLFn(@[ A, S ], 1, NO, S, NO));
+    // The digits, then TriStates for a leading digit, parentheses and grouping.
     for (NSString *name in @[ @"formatnumber", @"formatcurrency", @"formatpercent" ])
-      put(name, RDLFn(@[ A, N ], 1, NO, S, NO));
+      put(name, RDLFn(@[ A, N, A, A, A ], 1, NO, S, NO));
+    put(@"formatdatetime", RDLFn(@[ A, N ], 1, NO, S, NO));
 
     // Arithmetic.
     for (NSString *name in @[ @"abs", @"sign", @"int", @"fix", @"ceiling", @"floor", @"sqrt",
-                              @"exp", @"sin", @"cos", @"tan", @"atan", @"atn" ])
+                              @"exp", @"sin", @"cos", @"tan", @"atan", @"log10" ])
       put(name, RDLFn(@[ N ], 1, NO, N, NO));
-    put(@"round", RDLFn(@[ N, N ], 1, NO, N, NO));
+    // Digits, a MidpointRounding, or both.
+    put(@"round", RDLFn(@[ N, A, A ], 1, NO, N, NO));
     put(@"log", RDLFn(@[ N, N ], 1, NO, N, NO));
     put(@"pow", RDLFn(@[ N, N ], 2, NO, N, NO));
     put(@"rgb", RDLFn(@[ N, N, N ], 3, NO, S, NO));
@@ -278,22 +301,21 @@ static NSDictionary<NSString *, RDLFunctionEntry *> *RDLFunctions(void) {
     // Dates.
     put(@"now", RDLFn(@[], 0, NO, D, NO));
     put(@"today", RDLFn(@[], 0, NO, D, NO));
-    for (NSString *name in @[ @"year", @"month", @"day", @"hour", @"minute", @"second",
-                              @"quarter", @"week" ])
+    for (NSString *name in @[ @"year", @"month", @"day", @"hour", @"minute", @"second" ])
       put(name, RDLFn(@[ D ], 1, NO, N, NO));
     put(@"weekday", RDLFn(@[ D, N ], 1, NO, N, NO));
     put(@"weekdayname", RDLFn(@[ N, B, N ], 1, NO, S, NO));
     put(@"monthname", RDLFn(@[ N, B ], 1, NO, S, NO));
-    put(@"dateadd", RDLFn(@[ S, N, D ], 3, NO, D, NO));
-    put(@"datediff", RDLFn(@[ S, D, D ], 3, NO, N, NO));
-    put(@"datepart", RDLFn(@[ S, D, N, N ], 2, NO, N, NO));
+    // An interval is a letter or a DateInterval.
+    put(@"dateadd", RDLFn(@[ A, N, D ], 3, NO, D, NO));
+    put(@"datediff", RDLFn(@[ A, D, D, N, N ], 3, NO, N, NO));
+    put(@"datepart", RDLFn(@[ A, D, N, N ], 2, NO, N, NO));
     put(@"dateserial", RDLFn(@[ N, N, N ], 3, NO, D, NO));
     put(@"timeserial", RDLFn(@[ N, N, N ], 3, NO, D, NO));
     put(@"datevalue", RDLFn(@[ A ], 1, NO, D, NO));
 
     // Row position within a scope.
     put(@"rownumber", RDLFn(@[ S ], 0, NO, N, YES));
-    put(@"rowcount", RDLFn(@[ S ], 0, NO, N, YES));
     // Where in the scope chain we are. Neither needs a data region: asking
     // whether you are inside a scope is meaningful anywhere.
     put(@"inscope", RDLFn(@[ S ], 1, NO, B, NO));
@@ -301,6 +323,85 @@ static NSDictionary<NSString *, RDLFunctionEntry *> *RDLFunctions(void) {
     table = t;
   });
   return table;
+}
+
+// The shared .NET and Visual Basic runtime members SSRS offers every
+// expression, by their dotted name without the namespace, and what they take.
+static NSDictionary<NSString *, RDLFunctionEntry *> *RDLStaticMembers(void) {
+  static NSDictionary *table = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    RDLType *N = RDLNumberType(), *S = RDLStringType(), *B = RDLBooleanType();
+    RDLType *D = RDLDateType(), *A = RDLUnknownType();
+    NSMutableDictionary *t = [NSMutableDictionary dictionary];
+    for (NSString *name in @[ @"math.abs", @"math.sqrt", @"math.sign", @"math.ceiling", @"math.floor",
+                              @"math.truncate", @"math.exp", @"math.log10", @"math.sin", @"math.cos", @"math.tan",
+                              @"math.asin", @"math.acos", @"math.atan", @"math.sinh", @"math.cosh", @"math.tanh" ])
+      t[name] = RDLFn(@[ N ], 1, NO, N, NO);
+    t[@"math.round"] = RDLFn(@[ N, A, A ], 1, NO, N, NO);
+    t[@"math.log"] = RDLFn(@[ N, N ], 1, NO, N, NO);
+    for (NSString *name in @[ @"math.pow", @"math.max", @"math.min", @"math.atan2", @"math.ieeeremainder", @"math.bigmul" ])
+      t[name] = RDLFn(@[ N, N ], 2, NO, N, NO);
+    for (NSString *name in @[ @"math.pi", @"math.e" ])
+      t[name] = RDLFn(@[], 0, NO, N, NO);
+    for (NSString *name in @[ @"midpointrounding.toeven", @"midpointrounding.awayfromzero" ])
+      t[name] = RDLFn(@[], 0, NO, A, NO);
+    for (NSString *name in @[ @"dateformat.generaldate", @"dateformat.longdate", @"dateformat.shortdate",
+                              @"dateformat.longtime", @"dateformat.shorttime", @"tristate.true", @"tristate.false",
+                              @"tristate.usedefault", @"comparemethod.binary", @"comparemethod.text",
+                              @"firstdayofweek.system", @"firstdayofweek.sunday", @"firstdayofweek.monday",
+                              @"firstdayofweek.tuesday", @"firstdayofweek.wednesday", @"firstdayofweek.thursday",
+                              @"firstdayofweek.friday", @"firstdayofweek.saturday", @"firstweekofyear.system",
+                              @"firstweekofyear.jan1", @"firstweekofyear.firstfourdays", @"firstweekofyear.firstfullweek",
+                              @"dateinterval.year", @"dateinterval.quarter", @"dateinterval.month", @"dateinterval.dayofyear",
+                              @"dateinterval.day", @"dateinterval.weekofyear", @"dateinterval.weekday", @"dateinterval.hour",
+                              @"dateinterval.minute", @"dateinterval.second",
+                              @"vbstrconv.uppercase", @"vbstrconv.lowercase", @"vbstrconv.propercase" ])
+      t[name] = RDLFn(@[], 0, NO, N, NO);
+    for (NSString *name in @[ @"convert.todouble", @"convert.todecimal", @"convert.tosingle", @"convert.tobyte",
+                              @"convert.tosbyte", @"convert.toint16", @"convert.touint16", @"convert.toint32",
+                              @"convert.touint32", @"convert.toint64", @"convert.touint64" ])
+      t[name] = RDLFn(@[ A ], 1, NO, N, NO);
+    t[@"convert.tostring"] = RDLFn(@[ A, A ], 1, NO, S, NO);
+    t[@"convert.toboolean"] = RDLFn(@[ A ], 1, NO, B, NO);
+    t[@"convert.frombase64string"] = RDLFn(@[ S ], 1, NO, A, NO);
+    t[@"convert.tobase64string"] = RDLFn(@[ A ], 1, NO, S, NO);
+    t[@"convert.todatetime"] = RDLFn(@[ A ], 1, NO, D, NO);
+    t[@"string.format"] = RDLFn(@[ S, A ], 1, YES, S, NO);
+    t[@"string.concat"] = RDLFn(@[ A ], 1, YES, S, NO);
+    t[@"string.join"] = RDLFn(@[ S, A ], 2, YES, S, NO);
+    t[@"string.isnullorempty"] = RDLFn(@[ A ], 1, NO, B, NO);
+    t[@"string.empty"] = RDLFn(@[], 0, NO, S, NO);
+    for (NSString *name in @[ @"financial.pmt", @"financial.pv", @"financial.fv", @"financial.nper" ])
+      t[name] = RDLFn(@[ N, N, N, N, N ], 3, NO, N, NO);
+    t[@"financial.rate"] = RDLFn(@[ N, N, N, N, N, N ], 3, NO, N, NO);
+    for (NSString *name in @[ @"financial.ipmt", @"financial.ppmt" ])
+      t[name] = RDLFn(@[ N, N, N, N, N, N ], 4, NO, N, NO);
+    t[@"financial.sln"] = RDLFn(@[ N, N, N ], 3, NO, N, NO);
+    t[@"financial.syd"] = RDLFn(@[ N, N, N, N ], 4, NO, N, NO);
+    t[@"financial.ddb"] = RDLFn(@[ N, N, N, N, N ], 4, NO, N, NO);
+    t[@"financial.npv"] = RDLFn(@[ N, A ], 2, NO, N, NO);
+    t[@"financial.irr"] = RDLFn(@[ A, N ], 1, NO, N, NO);
+    t[@"financial.mirr"] = RDLFn(@[ A, N, N ], 3, NO, N, NO);
+    table = t;
+  });
+  return table;
+}
+
+// The members .NET gives a value, which an expression may read from one.
+static NSSet<NSString *> *RDLValueMembers(void) {
+  static NSSet *set = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    set = [NSSet setWithArray:@[
+      @"tostring", @"length", @"count", @"toupper", @"toupperinvariant", @"tolower", @"tolowerinvariant", @"trim",
+      @"trimstart", @"trimend", @"substring", @"contains", @"startswith", @"endswith", @"indexof", @"lastindexof",
+      @"replace", @"padleft", @"padright", @"split", @"year", @"month", @"day", @"hour", @"minute", @"second",
+      @"dayofweek", @"dayofyear", @"date", @"adddays", @"addhours", @"addminutes", @"addseconds", @"addmonths",
+      @"addyears", @"toshortdatestring", @"tolongdatestring", @"name", @"isinteractive"
+    ]];
+  });
+  return set;
 }
 
 // MS-RDL functions this kit still cannot execute, and why they are not simply
@@ -322,7 +423,7 @@ static NSSet *RDLKnownGlobals(void) {
   dispatch_once(&once, ^{
     set = [NSSet setWithArray:@[
       @"pagenumber", @"totalpages", @"overallpagenumber", @"overalltotalpages", @"executiontime",
-      @"reportname", @"pagename", @"reportfolder", @"reportserverurl"
+      @"reportname", @"pagename", @"reportfolder", @"reportserverurl", @"renderformat"
     ]];
   });
   return set;
@@ -342,6 +443,10 @@ static NSSet *RDLKnownGlobals(void) {
 // body read the report's dataset when there is only one of them; a page header
 // or footer may not read dataset fields at all, whatever the count.
 @property (nonatomic, assign) BOOL insideBody;
+// The parameters an expression may read, by lower-cased name; nil for all. A
+// parameter's default and valid values are worked out in the order the
+// parameters are declared, so they see only those before it.
+@property (nonatomic, copy) NSSet<NSString *> *parametersDeclaredBefore;
 @end
 @implementation RDLScope
 - (RDLType *)record {
@@ -425,8 +530,17 @@ static RDLType *RDLCheckOp(RDLExprNode *node, RDLScope *scope, NSString *source,
                                             RDLTypeDescription(b)]);
     return RDLBooleanType();
   case RDLExprOperatorLike:
+    return RDLBooleanType();
   case RDLExprOperatorIs:
   case RDLExprOperatorIsNot:
+    // Is compares references, and VB will not compile it on a value that is not
+    // one: a number, a Boolean or a date written as a literal.
+    for (NSUInteger i = 0; i < [node.args count] && i < [types count]; i++)
+      if (node.args[i].kind == RDLExprNodeKindLiteral &&
+          (types[i].tag == RDLTagNumber || types[i].tag == RDLTagBoolean || types[i].tag == RDLTagDate))
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"type", scope, source,
+                   [NSString stringWithFormat:@"'%@' compares references, and was given %@", text,
+                                              RDLTypeDescription(types[i])]);
     return RDLBooleanType();
   case RDLExprOperatorAdd:
     // "+" is addition or concatenation depending on its operands, so there is
@@ -461,6 +575,11 @@ static RDLType *RDLCheckCall(RDLExprNode *node, RDLScope *scope, NSString *sourc
                                RDLCheckRun *run) {
   NSString *fn = [(node.name ?: @"") lowercaseString];
   RDLFunctionEntry *entry = RDLFunctions()[fn];
+  // Math's and Financial's members, which SSRS makes available by their names
+  // alone; Max and Min are the aggregates, found above.
+  if (entry == nil)
+    entry = RDLStaticMembers()[[@"math." stringByAppendingString:fn]]
+                ?: RDLStaticMembers()[[@"financial." stringByAppendingString:fn]];
   if (entry == nil) {
     if ([RDLUnimplementedFunctions() containsObject:fn])
       RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"unimplemented", scope, source,
@@ -569,6 +688,8 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
       return RDLNumberType();
     if ([v isKindOfClass:[NSString class]])
       return RDLStringType();
+    if ([v isKindOfClass:[NSDate class]])
+      return RDLDateType();
     return RDLUnknownType();
   }
 
@@ -611,10 +732,17 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
                  [NSString stringWithFormat:@"no parameter named '%@'", node.name ?: @"?"]);
       return RDLUnknownType();
     }
+    if (scope.parametersDeclaredBefore &&
+        ![scope.parametersDeclaredBefore containsObject:[found.name lowercaseString] ?: @""])
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-dependency", scope, source,
+                 [NSString stringWithFormat:@"'%@' is not declared before this parameter, so it has no value yet",
+                                            found.name ?: @"?"]);
     if ([node.prop caseInsensitiveCompare:@"Count"] == NSOrderedSame)
       return RDLNumberType();
     if ([node.prop caseInsensitiveCompare:@"Label"] == NSOrderedSame)
       return RDLStringType();
+    if ([node.prop caseInsensitiveCompare:@"IsMultiValue"] == NSOrderedSame)
+      return RDLBooleanType();
     switch (found.dataType) {
     case RDLParameterDataTypeBoolean:
       return RDLBooleanType();
@@ -652,11 +780,81 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
   case RDLExprNodeKindCall:
     return RDLCheckCall(node, scope, source, run);
 
-  case RDLExprNodeKindMember:
-    // Code.Fn(...) or Instance.Method(...): the report supplies the body, so
-    // there is nothing here to resolve. Check the arguments and stop.
+  case RDLExprNodeKindMember: {
     for (RDLExprNode *arg in node.args)
       RDLCheckNode(arg, scope, source, run);
+    NSString *dotted = [(node.name ?: @"") lowercaseString];
+    for (NSString *space in @[ @"system.", @"microsoft.visualbasic." ])
+      if ([dotted hasPrefix:space])
+        dotted = [dotted substringFromIndex:space.length];
+    // Code.Fn(...): one of the report's own functions, given as many arguments
+    // as it takes.
+    if ([dotted hasPrefix:@"code."]) {
+      NSString *function = [node.name substringFromIndex:[node.name length] - ([dotted length] - [@"code." length])];
+      NSUInteger least = 0, most = 0;
+      NSUInteger given = [node.args count];
+      if (![scope.report.codeModule function:function takesAtLeast:&least atMost:&most])
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-member", scope, source,
+                            [NSString stringWithFormat:@"the report's code has no function named '%@'", function]);
+      else if (given < least || given > most)
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"arity", scope, source,
+                            [NSString stringWithFormat:@"%@ takes %@ arguments, given %lu", node.name,
+                                                       least == most ? [NSString stringWithFormat:@"%lu", (unsigned long)least]
+                                                                     : [NSString stringWithFormat:@"%lu to %lu",
+                                                                                                  (unsigned long)least,
+                                                                                                  (unsigned long)most],
+                                                       (unsigned long)given]);
+      return RDLUnknownType();
+    }
+    // Fields.Name.Value and the like: a collection written with a dot, which is
+    // not RDL -- say how RDL writes it rather than calling it an assembly.
+    NSArray<NSString *> *parts = [node.name componentsSeparatedByString:@"."];
+    if ([@[ @"fields", @"parameters", @"globals", @"user", @"reportitems", @"variables" ]
+            containsObject:[parts[0] lowercaseString]]) {
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"syntax", scope, source,
+                          [NSString stringWithFormat:@"%@ is written with a dot; RDL writes %@!%@", node.name, parts[0],
+                                                     [[parts subarrayWithRange:NSMakeRange(1, [parts count] - 1)]
+                                                         componentsJoinedByString:@"."]]);
+      return RDLUnknownType();
+    }
+    RDLFunctionEntry *entry = RDLStaticMembers()[dotted];
+    if (entry != nil) {
+      RDLType *type = entry.type;
+      NSInteger given = (NSInteger)[node.args count];
+      NSInteger most = type.variadic ? -1 : (NSInteger)[type.params count];
+      if (given < type.minimum || (most >= 0 && given > most)) {
+        NSString *want = most < 0 ? [NSString stringWithFormat:@"at least %ld", (long)type.minimum]
+                         : type.minimum == most
+                             ? [NSString stringWithFormat:@"%ld", (long)most]
+                             : [NSString stringWithFormat:@"%ld to %ld", (long)type.minimum, (long)most];
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"arity", scope, source,
+                            [NSString stringWithFormat:@"%@ takes %@ arguments, given %ld", node.name, want,
+                                                       (long)given]);
+      }
+      return RDLUnknownType();
+    }
+    NSString *owner = [[dotted componentsSeparatedByString:@"."] firstObject];
+    if ([@[ @"math", @"convert", @"string", @"financial", @"midpointrounding", @"dateformat", @"tristate", @"comparemethod", @"firstdayofweek",
+                                  @"firstweekofyear", @"dateinterval", @"vbstrconv" ] containsObject:owner])
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-member", scope, source,
+                          [NSString stringWithFormat:@"no member named '%@'", node.name]);
+    else
+      // Instance.Method(...) from a custom assembly, which this kit cannot load.
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"unimplemented", scope, source,
+                          [NSString stringWithFormat:@"%@ is in an assembly this kit cannot run", node.name]);
+    return RDLUnknownType();
+  }
+
+  case RDLExprNodeKindMethod:
+    for (RDLExprNode *arg in node.args)
+      RDLCheckNode(arg, scope, source, run);
+    if (![RDLValueMembers() containsObject:[(node.name ?: @"") lowercaseString]])
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-member", scope, source,
+                          [NSString stringWithFormat:@"no member named '%@'", node.name ?: @"?"]);
+    return RDLUnknownType();
+
+  case RDLExprNodeKindVariable:
+    // A variable's type is whatever its own expression yields.
     return RDLUnknownType();
 
   case RDLExprNodeKindReportItem:
@@ -706,10 +904,93 @@ static RDLScope *RDLSubScope(RDLScope *outer, NSString *step, RDLDataSet *ds) {
   s.table = ds ? RDLTableType(RDLRecordOfDataSet(ds)) : outer.table;
   s.path = [outer.path length] ? [NSString stringWithFormat:@"%@ / %@", outer.path, step] : step;
   s.insideBody = outer.insideBody;
+  s.parametersDeclaredBefore = outer.parametersDeclaredBefore;
   return s;
 }
 
 static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run);
+
+// What a QueryParameter's value may not read, because the query runs before
+// there is any of it: a field, a report item, a variable, an aggregate,
+// RunningValue, RowNumber or Previous (MS-RDL's rsFieldInQueryParameterExpression
+// and its kin). How the first one found is written, or nil.
+static NSString *RDLForbiddenInQueryParameter(RDLExprNode *node) {
+  if (node == nil)
+    return nil;
+  if (node.kind == RDLExprNodeKindField)
+    return [NSString stringWithFormat:@"Fields!%@", node.name ?: @""];
+  if (node.kind == RDLExprNodeKindReportItem)
+    return [NSString stringWithFormat:@"ReportItems!%@", node.name ?: @""];
+  if (node.kind == RDLExprNodeKindVariable)
+    return [NSString stringWithFormat:@"Variables!%@", node.name ?: @""];
+  if (node.kind == RDLExprNodeKindCall) {
+    NSString *name = [node.name lowercaseString] ?: @"";
+    if (RDLFunctions()[name].aggregate || [name isEqualToString:@"rownumber"])
+      return node.name;
+  }
+  for (RDLExprNode *arg in node.args) {
+    NSString *found = RDLForbiddenInQueryParameter(arg);
+    if (found)
+      return found;
+  }
+  return nil;
+}
+
+static BOOL RDLValueIsNothingLiteral(RDLValue *value) {
+  RDLExprNode *root = [value isExpression] && [value.expression parsedCompletely] ? value.expression.root : nil;
+  return root.kind == RDLExprNodeKindLiteral && root.value == [NSNull null];
+}
+
+// A parameter's own settings, as MS-RDL requires them: a DataSetReference names
+// a dataset and fields it has (rsInvalidDataSetReferenceField), a value written
+// in it is not one the parameter refuses (rsParameterValueNullOrBlank), and a
+// parameter nobody is asked for has a value to have.
+static void RDLCheckParameterDefinition(RDLParameter *p, RDLReport *report, RDLScope *scope, RDLCheckRun *run) {
+  NSString *name = p.name ?: @"?";
+  for (RDLDataSetReference *ref in @[ p.defaultValuesReference ?: (id)[NSNull null], p.validValuesReference ?: (id)[NSNull null] ]) {
+    if ((id)ref == [NSNull null])
+      continue;
+    RDLDataSet *ds = [report dataSetNamed:ref.dataSetName];
+    if (ds == nil) {
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-dataset", scope, nil,
+                 [NSString stringWithFormat:@"no dataset named '%@'", ref.dataSetName ?: @""]);
+      continue;
+    }
+    // A dataset that declares no fields finds them in its data.
+    if ([ds.fields count] == 0)
+      continue;
+    NSMutableArray<NSString *> *fields = [NSMutableArray arrayWithObject:ref.valueField ?: @""];
+    if (ref == p.validValuesReference && [ref.labelField length])
+      [fields addObject:ref.labelField];
+    for (NSString *field in fields)
+      if ([ds fieldNamed:field] == nil)
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-field", scope, nil,
+                   [NSString stringWithFormat:@"dataset '%@' has no field '%@'", ds.name ?: @"?", field]);
+  }
+  // AllowBlank is for String parameters only; for another type "" is not a
+  // blank but not a value at all.
+  BOOL text = p.dataType == RDLParameterDataTypeString || p.dataType == RDLParameterDataTypeUnspecified;
+  NSArray<RDLValue *> *defaults = [p.defaultValues count] ? p.defaultValues : (p.defaultValue ? @[ p.defaultValue ] : @[]);
+  for (RDLValue *v in [defaults arrayByAddingObjectsFromArray:p.validValues]) {
+    if (text && !p.allowBlank && ![v isExpression] && [[v source] length] == 0)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-value", scope, nil,
+                 [NSString stringWithFormat:@"'%@' does not allow a blank value, and one is written in it", name]);
+    if (!p.nullable && RDLValueIsNothingLiteral(v))
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-value", scope, [v source],
+                 [NSString stringWithFormat:@"'%@' is not Nullable, and Nothing is written in it", name]);
+  }
+  if (p.multiValue && p.nullable)
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-definition", scope, nil,
+               [NSString stringWithFormat:@"'%@' is both MultiValue and Nullable, which RDL does not allow", name]);
+  if (!p.multiValue && [defaults count] > 1)
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"parameter-value", scope, nil,
+               [NSString stringWithFormat:@"'%@' takes one value, so only the first of its %lu defaults is used", name,
+                                          (unsigned long)[defaults count]]);
+  BOOL hasDefault = [defaults count] > 0 || p.defaultValuesReference != nil;
+  if (p.prompt == nil && !hasDefault && (!p.nullable || [p.validValues count] || p.validValuesReference))
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-definition", scope, nil,
+               [NSString stringWithFormat:@"'%@' is not asked for and has no default, so it can have no value", name]);
+}
 
 // Language, wherever it is written. A code is checked against the cultures
 // this machine knows, because "en-UK" and "de_DE " format as if they were
@@ -737,10 +1018,17 @@ static void RDLCheckStyle(RDLStyle *style, RDLScope *scope, RDLCheckRun *run) {
     RDLCheckLanguage([RDLValue literal:style.language], scope, run);
   if (e == nil)
     return;
+  NSNull *none = [NSNull null];
   for (RDLExpr *expr in @[
-         e.color ?: [NSNull null], e.backgroundColor ?: [NSNull null],
-         e.fontFamily ?: [NSNull null], e.fontSize ?: [NSNull null], e.format ?: [NSNull null],
-         e.language ?: [NSNull null]
+         e.color ?: none, e.backgroundColor ?: none, e.fontFamily ?: none, e.fontSize ?: none,
+         e.fontWeight ?: none, e.fontStyle ?: none, e.textAlign ?: none,
+         e.verticalAlign ?: none, e.textDecoration ?: none, e.format ?: none,
+         e.language ?: none, e.paddingLeft ?: none, e.paddingRight ?: none,
+         e.paddingTop ?: none, e.paddingBottom ?: none, e.lineHeight ?: none,
+         e.writingMode ?: none, e.direction ?: none, e.backgroundGradientType ?: none,
+         e.backgroundGradientEndColor ?: none, e.textEffect ?: none, e.shadowColor ?: none,
+         e.shadowOffset ?: none, e.unicodeBiDi ?: none, e.calendar ?: none, e.numeralLanguage ?: none,
+         e.numeralVariant ?: none
        ]) {
     if ((id)expr == [NSNull null])
       continue;
@@ -770,6 +1058,17 @@ static void RDLCheckTablixMembers(NSArray<RDLTablixMember *> *members, RDLScope 
         RDLCheckValue(v, ms, run);
     }
     RDLCheckTablixMembers(m.members, ms, run);
+  }
+}
+
+// A chart hierarchy's members, and the members nested inside them.
+static void RDLCheckChartMembers(NSArray<RDLChartMember *> *members, NSString *what, RDLScope *scope,
+                                 RDLCheckRun *run) {
+  for (RDLChartMember *m in members) {
+    for (RDLValue *g in m.groupExpressions)
+      RDLCheckValue(g, RDLSubScope(scope, what, nil), run);
+    RDLCheckValue(m.label, RDLSubScope(scope, [what stringByAppendingString:@" label"], nil), run);
+    RDLCheckChartMembers(m.members, what, scope, run);
   }
 }
 
@@ -814,27 +1113,61 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   } else if ([item isKindOfClass:[RDLTextbox class]]) {
     RDLTextbox *tb = (RDLTextbox *)item;
     RDLCheckSource(tb.value, RDLSubScope(scope, @"Value", nil), run);
-    for (RDLParagraph *para in tb.paragraphs)
-      for (RDLTextRun *r in para.runs)
+    for (RDLParagraph *para in tb.paragraphs) {
+      RDLCheckStyle(para.style, RDLSubScope(scope, @"Paragraph", nil), run);
+      for (RDLTextRun *r in para.runs) {
         RDLCheckSource(r.value, RDLSubScope(scope, @"TextRun", nil), run);
+        RDLCheckStyle(r.style, RDLSubScope(scope, @"TextRun", nil), run);
+        RDLCheckValue(r.label, RDLSubScope(scope, @"TextRun Label", nil), run);
+        RDLCheckValue(r.toolTip, RDLSubScope(scope, @"TextRun ToolTip", nil), run);
+        RDLCheckValue(r.hyperlink, RDLSubScope(scope, @"TextRun Hyperlink", nil), run);
+      }
+    }
   } else if ([item isKindOfClass:[RDLImage class]]) {
-    RDLCheckSource([(RDLImage *)item value], RDLSubScope(scope, @"Value", nil), run);
+    RDLImage *image = (RDLImage *)item;
+    RDLCheckSource(image.value, RDLSubScope(scope, @"Value", nil), run);
+    // A Database image is bytes and nothing else, so what they are has to be
+    // said: MS-RDL requires MIMEType there, from the five it names.
+    if (image.source == RDLImageSourceDatabase && [image.mimeType length] == 0)
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"image-mime-type", scope, nil,
+                 @"an image read from data must say its MIMEType");
+    else if (image.source == RDLImageSourceDatabase &&
+             ![@[ @"image/bmp", @"image/jpeg", @"image/gif", @"image/png", @"image/x-png" ]
+                 containsObject:[image.mimeType lowercaseString]])
+      RDLReportDiagnostic(run, RDLDiagnosticSeverityWarning, @"image-mime-type", scope, nil,
+                 [NSString stringWithFormat:@"'%@' is not one of the image types RDL names", image.mimeType]);
   } else if ([item isKindOfClass:[RDLChart class]]) {
     RDLChart *chart = (RDLChart *)item;
     RDLCheckValue(chart.chartTitle, scope, run);
-    for (RDLChartMember *m in chart.categoryMembers) {
-      for (RDLValue *g in m.groupExpressions)
-        RDLCheckValue(g, RDLSubScope(scope, @"Category", nil), run);
-      RDLCheckValue(m.label, RDLSubScope(scope, @"Category label", nil), run);
-    }
-    for (RDLChartMember *m in chart.seriesMembers) {
-      for (RDLValue *g in m.groupExpressions)
-        RDLCheckValue(g, RDLSubScope(scope, @"Series", nil), run);
-      RDLCheckValue(m.label, RDLSubScope(scope, @"Series label", nil), run);
-    }
+    RDLCheckChartMembers(chart.categoryMembers, @"Category", scope, run);
+    RDLCheckChartMembers(chart.seriesMembers, @"Series", scope, run);
     for (RDLChartSeries *s in chart.series) {
       RDLCheckValue(s.value, RDLSubScope(scope, @"Series value", nil), run);
       RDLCheckValue(s.x, RDLSubScope(scope, @"Series X", nil), run);
+      RDLCheckValue(s.high, RDLSubScope(scope, @"Series high", nil), run);
+      RDLCheckValue(s.low, RDLSubScope(scope, @"Series low", nil), run);
+      RDLCheckValue(s.start, RDLSubScope(scope, @"Series open", nil), run);
+      RDLCheckValue(s.end, RDLSubScope(scope, @"Series close", nil), run);
+      RDLCheckValue(s.dataLabel.label, RDLSubScope(scope, @"Data label", nil), run);
+      RDLCheckValue(s.seriesDataLabel.label, RDLSubScope(scope, @"Series data label", nil), run);
+      RDLCheckStyle(s.style, RDLSubScope(scope, @"Series style", nil), run);
+      RDLCheckStyle(s.pointStyle, RDLSubScope(scope, @"Data point style", nil), run);
+      RDLCheckValue(s.marker.size, RDLSubScope(scope, @"Marker size", nil), run);
+      RDLCheckStyle(s.marker.style, RDLSubScope(scope, @"Marker style", nil), run);
+      RDLCheckValue(s.seriesMarker.size, RDLSubScope(scope, @"Series marker size", nil), run);
+      RDLCheckStyle(s.seriesMarker.style, RDLSubScope(scope, @"Series marker style", nil), run);
+      // rsValueAxisNameNotFound: SSRS refuses a series plotted against an axis
+      // the chart does not have.
+      if ([chart indexOfValueAxisNamed:s.valueAxisName] == NSNotFound)
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"value-axis-name-not-found", scope, nil,
+                            [NSString stringWithFormat:@"series '%@' is plotted against a value axis named '%@', "
+                                                       @"which the chart does not have",
+                                                       s.name ?: @"", s.valueAxisName]);
+    }
+    RDLCheckValue(chart.noDataMessage, RDLSubScope(scope, @"No data message", nil), run);
+    RDLCheckStyle(chart.noDataMessageStyle, RDLSubScope(scope, @"No data message style", nil), run);
+    for (RDLValue *color in chart.customPaletteColors) {
+      RDLCheckValue(color, RDLSubScope(scope, @"Custom palette colour", nil), run);
     }
   } else if ([item isKindOfClass:[RDLSubreport class]]) {
     RDLSubreport *sub = (RDLSubreport *)item;
@@ -921,6 +1254,9 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   root.path = @"";
 
   RDLCheckLanguage(report.language, RDLSubScope(root, @"Language", nil), run);
+  // The report's code: whatever in it is not part of what this kit runs.
+  for (NSString *problem in report.codeModule.problems)
+    RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"code", RDLSubScope(root, @"Code", nil), nil, problem);
 
   // Calculated fields are expressions over their own dataset.
   for (RDLDataSet *ds in report.dataSets) {
@@ -950,18 +1286,35 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
       for (RDLValue *v in filter.values)
         RDLCheckValue(v, dscope, run);
     }
+    for (RDLQueryParameter *qp in ds.queryParameters) {
+      RDLScope *qs = RDLSubScope(dscope, [NSString stringWithFormat:@"QueryParameter '%@'", qp.name ?: @"(unnamed)"], nil);
+      qs.dataSet = nil;
+      qs.table = nil;
+      NSString *forbidden = [qp.value isExpression] ? RDLForbiddenInQueryParameter(qp.value.expression.root) : nil;
+      if (forbidden)
+        RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"query-parameter", qs, [qp.value source],
+                   [NSString stringWithFormat:@"a query parameter's value may not read %@: the query runs before there is any",
+                                              forbidden]);
+      else
+        RDLCheckValue(qp.value, qs, run);
+    }
   }
 
   // Parameter defaults cannot see a dataset.
+  NSMutableSet<NSString *> *declared = [NSMutableSet set];
   for (RDLParameter *p in report.parameters) {
     RDLScope *ps = RDLSubScope(root, [NSString stringWithFormat:@"Parameter '%@'",
                                                                   p.name ?: @"(unnamed)"],
                                  nil);
+    ps.parametersDeclaredBefore = declared;
     RDLCheckValue(p.defaultValue, ps, run);
     for (RDLValue *v in p.defaultValues)
       RDLCheckValue(v, ps, run);
     for (RDLValue *v in p.validValues)
       RDLCheckValue(v, ps, run);
+    RDLCheckParameterDefinition(p, report, ps, run);
+    if ([p.name length])
+      [declared addObject:[p.name lowercaseString]];
   }
 
   NSArray *bands = @[ @[ @"PageHeader", report.pageHeader ?: [NSNull null] ],
@@ -995,8 +1348,14 @@ static NSDictionary *RDLObjCTypeFor(RDLFieldDataType t) {
     return @{@"objcClass" : @"NSNumber", @"objcType" : @"BOOL"};
   case RDLFieldDataTypeDateTime:
     return @{@"objcClass" : @"NSDate"};
+  case RDLFieldDataTypeShort:
+    return @{@"objcClass" : @"NSNumber", @"objcType" : @"short"};
   case RDLFieldDataTypeInteger:
     return @{@"objcClass" : @"NSNumber", @"objcType" : @"NSInteger"};
+  case RDLFieldDataTypeLong:
+    return @{@"objcClass" : @"NSNumber", @"objcType" : @"long long"};
+  case RDLFieldDataTypeSingle:
+    return @{@"objcClass" : @"NSNumber", @"objcType" : @"float"};
   case RDLFieldDataTypeFloat:
     return @{@"objcClass" : @"NSNumber", @"objcType" : @"double"};
   case RDLFieldDataTypeDecimal:

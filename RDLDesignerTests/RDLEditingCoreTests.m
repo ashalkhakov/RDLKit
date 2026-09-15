@@ -116,8 +116,10 @@ static RDLReport *RDLGroupedJobs(void) {
   p.defaultValue = [RDLValue literal:@"Acme"];
   [doc.report.parameters addObject:p];
   [doc syncParamValuesFromReport];
-  if (![doc.paramValues[@"Customer"] isEqualToString:@"Acme"])
-    XCTFail(@"%@", @"paramValues should pick up the parameter default");
+  // Nothing is given until someone gives it; the default is the report's own.
+  if (doc.paramValues[@"Customer"] != nil ||
+      ![[[doc parameterValues] valueNamed:@"Customer"].value isEqualToString:@"Acme"])
+    XCTFail(@"%@", @"a parameter nobody has given a value has its default");
   [doc setParamValue:@"Other" forName:@"Customer"];
   if (![doc.paramValues[@"Customer"] isEqualToString:@"Other"])
     XCTFail(@"%@", @"setParamValue should take effect");
