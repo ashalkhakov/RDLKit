@@ -218,7 +218,7 @@ bin that moved since the previous audit.
 | `PageName` | UI | The writer now places it correctly. |
 | `KeepTogether` | UI | |
 | `ZIndex` | UI (was UI+MODEL) | Written and honoured at render; no front/back commands and the canvas ignores it. |
-| `Name` editing | UI | A rename must also update `ToggleItem` and `ReportItems!` references, and kept pieces found by name (§5). |
+| `Name` editing | UI | An item rename must also update `ToggleItem` and `ReportItems!` references. Renaming a dataset, source, field or parameter carries the pieces kept under it (§5). |
 | `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | Kept and written back. |
 
 ### 4.4 Style
@@ -349,11 +349,7 @@ matter more than missing features because they destroy work.
 
 | Trigger | What is lost | Fix |
 |---|---|---|
-| Data source pane on a SQL/OLEDB source | Touching any control rewrites `DataProvider` and `ConnectString` (viewing alone does not). | Show unknown providers read-only. |
-| Undo of a field rename/retype/kind change | No-op: the views mutate the shared `RDLField` objects before `setFields:`, whose snapshot is a shallow copy *(by inspection)*. | Deep-copy the snapshot. |
-| Rename a dataset, source, field or parameter | Kept pieces are found by name path, so they are lost. | Rename the kept paths too. |
 | In-place plain edit of a rich textbox | `Paragraphs` are replaced and run styles dropped. | "Mixed" state; keep runs when the text is unchanged. |
-| Save | The report is renamed to the file's basename after the write, overwriting a name typed in the inspector. | Only name an unnamed report. |
 
 Two smaller ones: selecting an empty cell from the outline passes body
 row/cell indices where the insertion point expects grid coordinates, so
@@ -383,7 +379,15 @@ the parameter unaskable rather than asked for with no words ("Asked for" says
 which). A chart of a type the popup did not offer, shown as Column and written
 back as Column by the next edit of any of its fields (the popup is the
 enumeration now); and a chart's nested category and series groups, dropped when
-its category or series field was edited (only the outermost group is).
+its category or series field was edited (only the outermost group is). A
+SQL or OLEDB data source rewritten as JSON by touching any control in its pane
+(an unrecognised provider is shown as the file has it, and written back
+unchanged); undo of a field rename, retype or kind change doing nothing (the
+panes edit a copy and the editor keeps each field as it was); the pieces of a
+file this kit does not read, dropped when the dataset, source, field or
+parameter they sit under was renamed (a rename carries them); and a report
+renamed to its file's basename on every save, over a name typed in the
+inspector (only a report with no name takes the file's).
 
 ## 6. Designer priorities
 
@@ -404,9 +408,10 @@ its category or series field was edited (only the outermost group is).
    subtype, several series and what a range or stock chart plots are P1.5.
 4. Done: the cell popups went with the column spec; group filters go
    through `RDLEditor`, on the tablix dialog's copy.
-5. Unknown data providers read-only; deep-copied field undo; renames that
-   carry kept pieces; paste into a cell; outline cell coordinates; stop
-   renaming the report on save.
+5. Done: unknown data providers are read-only, a field edit undoes, renames
+   carry the pieces kept under what they rename, paste goes into the selected
+   cell, the outline addresses cells by the grid, and saving no longer renames
+   a report that has a name.
 
 ### P1 — expose what the model already has
 

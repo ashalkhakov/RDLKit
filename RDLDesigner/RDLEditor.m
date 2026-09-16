@@ -213,7 +213,18 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
 - (void)setFields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet {
   if (dataSet == nil)
     return;
-  NSArray *old = [dataSet.fields copy];
+  // Each field as it is now, not the same objects: the panes edit the fields
+  // themselves before handing them over, so an array copy would be a snapshot
+  // of what they have already become, and undo would do nothing.
+  NSMutableArray *old = [NSMutableArray array];
+  for (RDLField *field in dataSet.fields)
+    [old addObject:[field copy]];
+  // A field renamed in place: the pieces kept under it are found by a path
+  // that names it, so they move with it.
+  for (NSUInteger i = 0; i < [old count] && i < [fields count]; i++)
+    [_document.report renameKeptPiecesOfElement:@"Field"
+                                           from:[old[i] name]
+                                             to:[fields[i] name]];
   [self beginGroup:@"Edit Fields"];
   [[self undoProxy] setFields:old ofDataSet:dataSet];
   dataSet.fields = [fields copy];
@@ -251,6 +262,8 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self beginGroup:@"Rename Data Source"];
   [[self undoProxy] renameDataSource:source to:was];
   source.name = name;
+  // The pieces of the file kept under it are found by a path that names it.
+  [_document.report renameKeptPiecesOfElement:@"DataSource" from:was to:name];
   // Every dataset that named it. A rename that left them pointing at nothing
   // would empty the report the next time it was bound.
   for (RDLDataSet *ds in _document.report.dataSets)
@@ -305,6 +318,8 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
     return;
   [self beginGroup:@"Edit Parameter"];
   [[self undoProxy] setValue:old forKeyPath:keyPath ofParameter:parameter];
+  if ([keyPath isEqualToString:@"name"])
+    [_document.report renameKeptPiecesOfElement:@"ReportParameter" from:old to:value];
   [parameter setValue:value forKeyPath:keyPath];
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
@@ -382,6 +397,7 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self beginGroup:@"Rename Dataset"];
   [[self undoProxy] renameDataSet:dataSet to:old];
   dataSet.name = name;
+  [report renameKeptPiecesOfElement:@"DataSet" from:old to:name];
   // Every region that named it. Charts and tablixes both carry a dataSetName;
   // a rename that left them behind would silently unbind them.
   for (RDLBand *band in [report allBands])

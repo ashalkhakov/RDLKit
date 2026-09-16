@@ -3331,4 +3331,117 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
     XCTFail(@"%@", @"and the title should have been written");
 }
 
+// The report's name is the report's. Saving gives a nameless report the file's
+// name, and leaves a named one alone -- it used to overwrite what was typed in
+// the inspector with the file's basename, on every save and every autosave.
+- (void)testSavingNamesOnlyANamelessReport {
+  RDLReport *report = [RDLReport emptyReportNamed:@""];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  [doc setFileURL:[NSURL fileURLWithPath:@"/tmp/rdlkit-quarterly.rdl"]];
+  if (![report.name isEqualToString:@"rdlkit-quarterly"])
+    XCTFail(@"a report with no name should take the file's, not %@", report.name);
+
+  report.name = @"Quarterly sales";
+  [doc setFileURL:[NSURL fileURLWithPath:@"/tmp/rdlkit-quarterly-2.rdl"]];
+  if (![report.name isEqualToString:@"Quarterly sales"])
+    XCTFail(@"saving should leave a named report alone, not rename it to %@", report.name);
+}
+
+// A data source whose provider this kit does not read -- SQL, OLEDB -- is
+// shown as the file has it and written back unchanged. It used to read as
+// JSON, so touching any control rewrote both the provider and the connect
+// string.
+- (void)testAnUnknownDataProviderIsShownReadOnly {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Sales"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Warehouse";
+  source.dataProvider = @"SQL";
+  source.connectString = @"Data Source=db;Initial Catalog=Sales";
+  [report.dataSources addObject:source];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSourceView *pane = [[RDLDataSourceView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+  pane.dataSource = source;
+  [pane reload];
+  NSPopUpButton *kinds = [pane valueForKey:@"typePop"];
+  NSTextField *summary = [pane valueForKey:@"summaryLabel"];
+  if ([kinds isEnabled])
+    XCTFail(@"%@", @"a provider this pane does not model is not chosen from its list");
+  if ([[summary stringValue] rangeOfString:@"SQL"].location == NSNotFound ||
+      [[summary stringValue] rangeOfString:@"Initial Catalog=Sales"].location == NSNotFound)
+    XCTFail(@"the pane should say what the file has: %@", [summary stringValue]);
+
+  // And nothing it does writes over them.
+  [pane changed:kinds];
+  if (![source.dataProvider isEqualToString:@"SQL"] ||
+      ![source.connectString isEqualToString:@"Data Source=db;Initial Catalog=Sales"])
+    XCTFail(@"the source should be as the file had it, not %@ / %@", source.dataProvider, source.connectString);
+}
+
+// Renaming a field in the dataset pane undoes. The pane used to edit the
+// field the report holds and then hand the list over, so what the editor kept
+// for undo was the same object, already renamed, and undo did nothing.
+- (void)testUndoOfAFieldRenameInThePanePutsItBack {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Sales"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Rows";
+  [ds setFieldNames:@[ @"Sku", @"Amount" ]];
+  [report.dataSets addObject:ds];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDatasetFieldsView *pane =
+      [[RDLDatasetFieldsView alloc] initWithFrame:NSMakeRect(0, 0, 400, 300) context:ctx];
+  pane.dataSet = ds;
+  [pane reload];
+  NSTableView *table = [pane valueForKey:@"table"];
+  RDLField *before = [ds.fields firstObject];
+  NSString *was = before.name;
+
+  // Typed into the name column, which is how the table writes a rename back.
+  [(id<NSTableViewDataSource>)pane tableView:table
+                              setObjectValue:@"Item"
+                              forTableColumn:[table tableColumnWithIdentifier:@"name"]
+                                         row:0];
+  if (![[[ds.fields firstObject] name] isEqualToString:@"Item"])
+    XCTFail(@"the pane should rename the field, not leave %@", [[ds.fields firstObject] name]);
+  if (![before.name isEqualToString:was])
+    XCTFail(@"%@", @"the field the report held should not have been edited behind the editor");
+
+  [ctx.document.undoManager undo];
+  if (![[[ds.fields firstObject] name] isEqualToString:was])
+    XCTFail(@"one undo should put the name back, not leave %@", [[ds.fields firstObject] name]);
+}
+
+// Renaming a dataset in the designer carries what the file kept under it: the
+// pieces are found by a path that names the dataset, so a rename used to lose
+// them on the next save, and undo puts both back.
+- (void)testRenamingADatasetCarriesItsKeptPieces {
+  NSString *xml =
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\""
+      @" xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+      @"<Width>7.5in</Width>"
+      @"<DataSources><DataSource Name=\"Warehouse\"><ConnectionProperties><DataProvider>JSON</DataProvider>"
+      @"<ConnectString>jsondata=[]</ConnectString></ConnectionProperties></DataSource></DataSources>"
+      @"<DataSets><DataSet Name=\"Sales\"><rd:DataSetInfo><rd:DataSetName>Sales</rd:DataSetName></rd:DataSetInfo>"
+      @"<Query><DataSourceName>Warehouse</DataSourceName><CommandText>$[*]</CommandText></Query>"
+      @"<Fields><Field Name=\"Amount\"><DataField>Amount</DataField></Field></Fields></DataSet></DataSets>"
+      @"<Body><Height>1in</Height><ReportItems/></Body></Report>";
+  NSError *err = nil;
+  RDLReport *report = [RDLParser reportFromXMLString:xml error:&err];
+  if (report == nil || [report.preservedNodes count] == 0) {
+    XCTFail(@"the fixture should open with pieces this kit does not read: %@", err.localizedDescription);
+    return;
+  }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  [ctx.editor renameDataSet:ds to:@"Ledger"];
+  if ([[RDLWriter XMLStringFromReport:report] rangeOfString:@"<rd:DataSetInfo>"].location == NSNotFound)
+    XCTFail(@"%@", @"the kept piece should be written under the renamed dataset");
+
+  [ctx.document.undoManager undo];
+  if (![ds.name isEqualToString:@"Sales"])
+    XCTFail(@"undo should put the name back, not leave %@", ds.name);
+  if ([[RDLWriter XMLStringFromReport:report] rangeOfString:@"<rd:DataSetInfo>"].location == NSNotFound)
+    XCTFail(@"%@", @"and the kept piece should be written under the name it went back to");
+}
+
 @end

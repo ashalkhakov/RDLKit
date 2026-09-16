@@ -26,6 +26,8 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
 @end
 
 @implementation RDLDataSourceView {
+  // Whether the source names a provider this pane does not model.
+  BOOL _unknownProvider;
   RDLEditingContext *_context;
   BOOL _filling;
 }
@@ -78,6 +80,11 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   BOOL any = _dataSource != nil;
   NSDictionary *properties = RDLConnectionProperties(_dataSource.connectString);
   RDLDataProviderKind kind = RDLDataProviderKindFromString(_dataSource.dataProvider);
+  // A provider this kit does not read -- SQL, OLEDB, anything a server offers
+  // -- is shown as the file has it and left alone. Taking it for JSON, which
+  // is what an unrecognised one used to become, meant that touching any
+  // control here rewrote both the provider and the connect string.
+  _unknownProvider = any && kind == RDLDataProviderKindUnspecified;
   if (kind == RDLDataProviderKindUnspecified)
     kind = RDLDataProviderKindJSON;
 
@@ -118,8 +125,15 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   [_contentScroll setHidden:!any || !embedded];
   [_empty setHidden:any];
   [_documentLabel setStringValue:embedded ? @"Content" : @"File"];
-  [_summaryLabel setStringValue:any ? [NSString stringWithFormat:@"Connect string: %@",
-                                                                 _dataSource.connectString ?: @""]
+  for (NSView *v in @[ _typePop, _wherePop, _documentField, _headerCheck, _delimiterPop, _widthsField ])
+    [(NSControl *)v setEnabled:!_unknownProvider];
+  [_contentView setEditable:!_unknownProvider];
+  [_summaryLabel setStringValue:any ? (_unknownProvider
+                                           ? [NSString stringWithFormat:@"%@ source, shown as the file has it: %@",
+                                                                        _dataSource.dataProvider ?: @"Unknown",
+                                                                        _dataSource.connectString ?: @""]
+                                           : [NSString stringWithFormat:@"Connect string: %@",
+                                                                        _dataSource.connectString ?: @""])
                                     : @""];
 }
 
@@ -130,7 +144,7 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
 // depend on it too.
 - (void)changed:(id)sender {
   (void)sender;
-  if (_filling || _dataSource == nil)
+  if (_filling || _dataSource == nil || _unknownProvider)
     return;
   RDLDataProviderKind kind = [self chosenKind];
   NSMutableDictionary *properties = [NSMutableDictionary dictionary];

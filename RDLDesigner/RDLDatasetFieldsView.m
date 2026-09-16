@@ -290,7 +290,10 @@
   if (row < 0 || row >= (NSInteger)[fields count])
     return;
   NSMutableArray *edited = [fields mutableCopy];
-  RDLField *f = edited[(NSUInteger)row];
+  // A copy, edited in place of the original: the field the report holds stays
+  // as it was until the editor is told, which is what it keeps for undo.
+  RDLField *f = [edited[(NSUInteger)row] copy];
+  edited[(NSUInteger)row] = f;
   NSString *text = [value description];
   if ([[column identifier] isEqualToString:@"type"]) {
     RDLFieldDataType type = RDLFieldDataTypeFromString(text);

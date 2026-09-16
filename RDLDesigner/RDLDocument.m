@@ -105,13 +105,15 @@ NSString *const RDLReportDocumentType = @"rdl";
   return [[self XMLString] dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-// A report's name is the file it lives in, so saving under a new name renames
-// it. NSDocument tells us here rather than in -writeToURL:, which also runs
-// for autosave and for a temporary write.
+// A report that has no name of its own takes the file's, so a new report is
+// not called nothing. One that has a name keeps it: the name is the report's,
+// written in the file and read by `Globals!ReportName`, and saving -- which
+// also happens for autosave and for a temporary write -- used to overwrite a
+// name typed in the inspector with the file's basename.
 - (void)setFileURL:(NSURL *)url {
   [super setFileURL:url];
   NSString *base = [[url lastPathComponent] stringByDeletingPathExtension];
-  if ([base length] && ![base isEqualToString:_report.name]) {
+  if ([base length] && [_report.name length] == 0) {
     _report.name = base;
     [self postChange:[RDLChange reportChange:@[ @"name" ]]];
   }

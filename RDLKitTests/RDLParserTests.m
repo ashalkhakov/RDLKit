@@ -2670,4 +2670,52 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", @"clearing the field should leave no category group");
 }
 
+// A piece of the file this kit does not read is found again by a path whose
+// steps name the elements it sits under. Renaming one of those elements used
+// to move the piece out of reach, so it was dropped on the next save.
+- (void)testRenamingAnElementCarriesThePiecesKeptUnderIt {
+  NSString *xml =
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\""
+      @" xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+      @"<Width>7.5in</Width>"
+      @"<DataSources><DataSource Name=\"Warehouse\"><rd:SecurityType>None</rd:SecurityType>"
+      @"<ConnectionProperties><DataProvider>JSON</DataProvider>"
+      @"<ConnectString>jsondata=[]</ConnectString></ConnectionProperties></DataSource></DataSources>"
+      @"<DataSets><DataSet Name=\"Sales\"><rd:DataSetInfo><rd:DataSetName>Ledger</rd:DataSetName></rd:DataSetInfo>"
+      @"<Query><DataSourceName>Warehouse</DataSourceName><CommandText>$[*]</CommandText></Query>"
+      @"<Fields><Field Name=\"Amount\"><DataField>Amount</DataField>"
+      @"<rd:FieldDescription>What it sold for</rd:FieldDescription></Field></Fields></DataSet></DataSets>"
+      @"<Body><Height>1in</Height><ReportItems/></Body></Report>";
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    XCTFail(@"the fixture should open: %@", err.localizedDescription);
+    return;
+  }
+  if ([r.preservedNodes count] == 0) {
+    XCTFail(@"%@", @"the fixture should have pieces this kit does not read");
+    return;
+  }
+
+  [[r.dataSets firstObject] setName:@"Ledger"];
+  [r renameKeptPiecesOfElement:@"DataSet" from:@"Sales" to:@"Ledger"];
+  [[[r.dataSets firstObject].fields firstObject] setName:@"Total"];
+  [r renameKeptPiecesOfElement:@"Field" from:@"Amount" to:@"Total"];
+  NSString *written = [RDLWriter XMLStringFromReport:r];
+  if ([written rangeOfString:@"<rd:DataSetName>Ledger</rd:DataSetName>"].location == NSNotFound)
+    XCTFail(@"%@", @"the piece kept under the dataset should go back under its new name");
+  if ([written rangeOfString:@"<rd:FieldDescription>What it sold for</rd:FieldDescription>"].location == NSNotFound)
+    XCTFail(@"%@", @"and the piece kept under the field should go with the field");
+  // What was not renamed is where it was.
+  if ([written rangeOfString:@"<rd:SecurityType>None</rd:SecurityType>"].location == NSNotFound)
+    XCTFail(@"%@", @"a piece under an element nobody renamed should be untouched");
+
+  // A name nothing goes by changes nothing.
+  NSArray<RDLPreservedNode *> *before = r.preservedNodes;
+  [r renameKeptPiecesOfElement:@"DataSet" from:@"Nowhere" to:@"Somewhere"];
+  if (![r.preservedNodes isEqualToArray:before])
+    XCTFail(@"%@", @"renaming what no kept piece sits under should leave them alone");
+}
+
 @end

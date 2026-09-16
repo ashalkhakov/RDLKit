@@ -2020,6 +2020,15 @@ static NSUInteger RDLSpanOf(NSInteger span) {
 @end
 
 @implementation RDLField
+
+- (id)copyWithZone:(NSZone *)zone {
+  RDLField *copy = [[[self class] allocWithZone:zone] init];
+  copy.name = _name;
+  copy.dataField = _dataField;
+  copy.value = _value;
+  copy.dataType = _dataType;
+  return copy;
+}
 - (NSString *)rowKey {
   if ([self isCalculated])
     return nil;
@@ -2301,6 +2310,38 @@ static void RDLCollectChartGroupNames(NSArray<RDLChartMember *> *members, NSMuta
         [[candidate itemsIncludingNested] indexOfObjectIdenticalTo:item] != NSNotFound)
       holder = (RDLTablix *)candidate;
   return holder;
+}
+
+- (void)renameKeptPiecesOfElement:(NSString *)element from:(NSString *)was to:(NSString *)name {
+  if ([element length] == 0 || [was length] == 0 || [name length] == 0 || [was isEqualToString:name] ||
+      [_preservedNodes count] == 0)
+    return;
+  // A step is "LocalName[Name]#n": the element, the Name it carries, and which
+  // of the siblings alike it is. Only the Name changes.
+  NSString *from = [NSString stringWithFormat:@"%@[%@]#", element, was];
+  NSString *to = [NSString stringWithFormat:@"%@[%@]#", element, name];
+  NSMutableArray<RDLPreservedNode *> *renamed = [NSMutableArray array];
+  for (RDLPreservedNode *kept in _preservedNodes) {
+    NSMutableArray<NSString *> *path = [NSMutableArray array];
+    BOOL touched = NO;
+    for (NSString *step in kept.parentPath) {
+      if ([step hasPrefix:from]) {
+        [path addObject:[to stringByAppendingString:[step substringFromIndex:[from length]]]];
+        touched = YES;
+      } else {
+        [path addObject:step];
+      }
+    }
+    if (!touched) {
+      [renamed addObject:kept];
+      continue;
+    }
+    RDLPreservedNode *moved = [[RDLPreservedNode alloc] init];
+    moved.parentPath = path;
+    moved.node = kept.node;
+    [renamed addObject:moved];
+  }
+  _preservedNodes = renamed;
 }
 
 - (NSSet<NSString *> *)scopeNames {

@@ -134,7 +134,9 @@ static RDLReport *RDLGroupedJobs(void) {
   if (!doc.isDirty)
     XCTFail(@"%@", @"an edit should dirty the document");
 
-  // Save round-trip: writes, clears dirty, and adopts the file name.
+  // Save round-trip: writes, clears dirty, and leaves the report's own name
+  // alone -- the name is the report's, written in the file and read by
+  // Globals!ReportName, and a report that has one keeps it.
   NSString *tmp = [NSTemporaryDirectory()
       stringByAppendingPathComponent:@"rdl-doc-check.rdl"];
   NSURL *url = [NSURL fileURLWithPath:tmp];
@@ -144,8 +146,8 @@ static RDLReport *RDLGroupedJobs(void) {
                                                err.localizedDescription]);
   if (doc.isDirty)
     XCTFail(@"%@", @"saving should clear dirty");
-  if (![doc.report.name isEqualToString:@"rdl-doc-check"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"report should adopt the file name, got %@",
+  if (![doc.report.name isEqualToString:@"Editable"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"saving should leave the report's name alone, got %@",
                                                doc.report.name]);
 
   RDLDocument *reopened = [[RDLDocument alloc] initWithReport:nil];
@@ -1940,6 +1942,76 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   [doc.undoManager undo];
   if (![[RDLEditor XMLStringForItem:tab] isEqualToString:before])
     XCTFail(@"%@", @"one undo should put the tablix back as it was");
+}
+
+// Pasting with a cell selected puts what was copied in that cell. It used to
+// go into the band behind the tablix instead, where the cell stayed empty and
+// the pasted item sat at the copy's own position.
+- (void)testPastingIntoACellPutsItInTheCell {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:r];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixCell *cell = tab.tablixBody.rows[1].cells[1];
+  RDLItem *was = cell.item;
+  NSUInteger inBand = [r.body.items count];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Copied";
+  box.value = @"=Fields!Amount.Value";
+  [r.body.items addObject:box];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  if (![ctx copySelectedItem]) {
+    XCTFail(@"%@", @"the textbox should copy");
+    return;
+  }
+  [ctx.selection selectCellOfTablix:tab
+                                row:(NSInteger)[RDLTablixGeometry gridRowOf:tab forBodyRow:1]
+                             column:(NSInteger)[RDLTablixGeometry gridColumnOf:tab forBodyColumn:1]
+                      inBandWithKey:@"body"];
+  [ctx pasteItem];
+  if (cell.item == was || cell.item == nil)
+    XCTFail(@"%@", @"the pasted item should be what the cell holds now");
+  if ([r.body.items count] != inBand + 1)
+    XCTFail(@"%@", @"and it should not have gone into the band as well");
+  if ([[tab structuralProblems] count])
+    XCTFail(@"pasting into a cell should leave the table consistent: %@", [tab structuralProblems]);
+  [ctx.document.undoManager undo];
+  (void)doc;
+}
+
+// Undo of a field edit puts the field back. The editor keeps each field as it
+// was, not the array alone: the fields are objects the panes hand over edited,
+// so a snapshot of the array held the same ones, already changed, and undo did
+// nothing.
+- (void)testUndoOfAFieldEditPutsItBack {
+  RDLReport *r = RDLEditableReport();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLDataSet *ds = [r.dataSets firstObject];
+  RDLField *field = [ds.fields firstObject];
+  if (field == nil) {
+    XCTFail(@"%@", @"the fixture's dataset should have fields");
+    return;
+  }
+  NSString *was = field.name;
+  RDLFieldDataType type = field.dataType;
+  // What a pane hands over: the list with an edited copy in the field's place.
+  NSMutableArray *edited = [ds.fields mutableCopy];
+  RDLField *changed = [field copy];
+  changed.name = @"Renamed";
+  changed.dataType = RDLFieldDataTypeInteger;
+  edited[0] = changed;
+  [ed setFields:edited ofDataSet:ds];
+  if (![[ds.fields.firstObject name] isEqualToString:@"Renamed"])
+    XCTFail(@"%@", @"the dataset should hold the edited field");
+  // What the editor kept is each field as it was, not the objects themselves:
+  // editing one after handing the list over must not change what undo restores.
+  field.name = @"Mutated";
+  field.dataType = RDLFieldDataTypeFloat;
+  [doc.undoManager undo];
+  RDLField *back = [ds.fields firstObject];
+  if (![back.name isEqualToString:was] || back.dataType != type)
+    XCTFail(@"undo should put the field back, not leave it as %@ (%ld)", back.name, (long)back.dataType);
 }
 
 @end

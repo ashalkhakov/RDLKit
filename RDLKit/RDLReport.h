@@ -1274,7 +1274,10 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 @property (nonatomic, strong) RDLStyle *style; // Body/section Style (background, border)
 @end
 
-@interface RDLField : NSObject
+// Copied so that an editor can keep what a field was: the views edit the field
+// objects themselves, and a snapshot of the array alone would hold the same
+// ones, already changed.
+@interface RDLField : NSObject <NSCopying>
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *dataField;
 // A calculated field: the expression that produces it, nil for a plain one.
@@ -1493,6 +1496,12 @@ FOUNDATION_EXPORT const CGFloat RDLDefaultColumnSpacing;
 // prefixes those pieces use, with their URIs, which go back on the root.
 @property (nonatomic, copy) NSArray<RDLPreservedNode *> *preservedNodes;
 @property (nonatomic, copy) NSDictionary<NSString *, NSString *> *preservedNamespaces;
+// A kept piece is found again by a path whose steps name the elements it sits
+// under -- "DataSet[Sales]#0" -- so renaming one of those elements moves the
+// piece out of reach and it is dropped on the next save. This renames the step:
+// `element` is the element's local name (DataSet, DataSource, ReportParameter,
+// Field), and every path through one of that name called `was` now says `name`.
+- (void)renameKeptPiecesOfElement:(NSString *)element from:(NSString *)was to:(NSString *)name;
 @property (nonatomic, readonly) RDLCodeModule *codeModule;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, strong) RDLPage *page;

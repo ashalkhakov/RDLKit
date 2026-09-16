@@ -298,6 +298,15 @@ static NSString * const kRDLItemPboardType = @"com.rdlkit.item-xml";
       return;
   }
   [RDLItemFactory renameTreeUniquely:item inReport:self.report];
+  // Into the cell, when that is what is selected: a cell holds one item, and
+  // where it sits is the cell's business, so there is nothing to offset.
+  if (point.cell != nil) {
+    [_editor beginGroup:@"Paste"];
+    [_editor setItem:item inCell:point.cell ofTablix:point.cellTablix];
+    [_editor endGroup];
+    [_selection selectItem:item inBandWithKey:point.bandKey];
+    return;
+  }
   // Offset the copy so it does not hide exactly behind the original.
   CGFloat step = [RDLEditor gridStep] * 2;
   item.left = [RDLEditor snap:item.left + step];
