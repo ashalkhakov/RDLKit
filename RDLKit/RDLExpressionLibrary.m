@@ -576,12 +576,13 @@ static NSArray<NSArray *> *RDLNestedAggregateUnits(RDLExprNode *expr, NSArray *r
   }
   NSMutableArray<NSString *> *order = [NSMutableArray array];
   NSMutableDictionary<NSString *, NSMutableArray *> *byKey = [NSMutableDictionary dictionary];
-  id savedRow = scope.row;
+  // One scope for the walk, so the caller's own row is never disturbed.
+  RDLEvalScope *each = [scope scopeBy:nil];
   for (id row in rows) {
-    scope.row = row;
+    each.row = row;
     NSMutableArray *parts = [NSMutableArray array];
     for (RDLValue *e in member.groupExpressions)
-      [parts addObject:RDLStr([e evaluateInScope:scope])];
+      [parts addObject:RDLStr([e evaluateInScope:each])];
     NSString *key = [parts componentsJoinedByString:@"\x1f"];
     if (byKey[key] == nil) {
       byKey[key] = [NSMutableArray array];
@@ -589,7 +590,6 @@ static NSArray<NSArray *> *RDLNestedAggregateUnits(RDLExprNode *expr, NSArray *r
     }
     [byKey[key] addObject:row];
   }
-  scope.row = savedRow;
   NSMutableArray *units = [NSMutableArray arrayWithCapacity:[order count]];
   for (NSString *key in order)
     [units addObject:byKey[key]];
@@ -601,15 +601,11 @@ static NSArray<NSArray *> *RDLNestedAggregateUnits(RDLExprNode *expr, NSArray *r
 // "Other"), RunningValue over "Other" -- has to map field names through that
 // dataset's fields: with DataField honoured, the current dataset's
 // Region->TERRITORY would otherwise be looked for in rows whose column is RGN.
-static id RDLInDataSetNamed(RDLEvalScope *scope, NSString *name, id (^body)(void)) {
+static id RDLInDataSetNamed(RDLEvalScope *scope, NSString *name, id (^body)(RDLEvalScope *)) {
   RDLDataSet *other = [name length] ? [scope.report dataSetNamed:name] : nil;
   if (other == nil || other == scope.dataSet)
-    return body();
-  RDLDataSet *saved = scope.dataSet;
-  scope.dataSet = other;
-  id result = body();
-  scope.dataSet = saved;
-  return result;
+    return body(scope);
+  return body([scope scopeBy:^(RDLEvalScope *inner) { inner.dataSet = other; }]);
 }
 
 static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope);
@@ -618,8 +614,8 @@ static id RDLExecAgg(NSString *n, NSArray *args, RDLEvalScope *scope) {
   NSString *ds = ([args count] > 1 && !RDLIsRecursiveFlag(args[1]))
                      ? RDLDsName(args[1], scope)
                      : nil;
-  return RDLInDataSetNamed(scope, ds, ^id {
-    return RDLExecAggInScope(n, args, scope);
+  return RDLInDataSetNamed(scope, ds, ^id(RDLEvalScope *inner) {
+    return RDLExecAggInScope(n, args, inner);
   });
 }
 
@@ -659,10 +655,10 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
       return RDLInt((int)[rows count]);
     NSInteger c = 0;
     id error = nil;
-    NSDictionary *saved = scope.row;
+    RDLEvalScope *each = [scope scopeBy:nil];
     for (id row in rows) {
-      scope.row = row;
-      id v = RDLExec(expr, scope);
+      each.row = row;
+      id v = RDLExec(expr, each);
       if (RDLIsError(v)) {
         error = v;
         break;
@@ -670,16 +666,15 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
       if (!RDLIsNothing(v))
         c += 1;
     }
-    scope.row = saved;
     return error ?: RDLInt((int)c);
   }
   if ([n isEqualToString:@"countdistinct"]) {
     NSMutableSet *seen = [NSMutableSet set];
     id error = nil;
-    NSDictionary *saved = scope.row;
+    RDLEvalScope *each = [scope scopeBy:nil];
     for (id row in rows) {
-      scope.row = row;
-      id v = expr ? RDLExec(expr, scope) : @"";
+      each.row = row;
+      id v = expr ? RDLExec(expr, each) : @"";
       if (RDLIsError(v)) {
         error = v;
         break;
@@ -687,18 +682,14 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
       if (!RDLIsNothing(v))
         [seen addObject:RDLStr(v)];
     }
-    scope.row = saved;
     return error ?: RDLInt((int)[seen count]);
   }
   if ([n isEqualToString:@"first"] || [n isEqualToString:@"last"]) {
     id row = [n isEqualToString:@"first"] ? rows.firstObject : rows.lastObject;
     if (row == nil)
       return nil;
-    NSDictionary *saved = scope.row;
-    scope.row = row;
-    id v = expr ? RDLExec(expr, scope) : @"";
-    scope.row = saved;
-    return v;
+    RDLEvalScope *at = [scope scopeBy:^(RDLEvalScope *s) { s.row = row; }];
+    return expr ? RDLExec(expr, at) : @"";
   }
   double acc = 0;
   double accSq = 0;
@@ -709,25 +700,26 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
   BOOL adds = [n isEqualToString:@"sum"] || [n isEqualToString:@"aggregate"] || [n isEqualToString:@"avg"];
   id total = nil;
   NSUInteger present = 0;
-  NSDictionary *saved = scope.row;
-  NSArray *savedGroupRows = scope.groupRows;
   NSDictionary *savedNamedRows = scope.groupRowsByName;
+  // One scope for the whole walk: what it is set to as each row is summarised
+  // is nobody else's business, so there is nothing to put back afterwards.
+  RDLEvalScope *each = [scope scopeBy:nil];
   NSArray<NSArray *> *units = RDLNestedAggregateUnits(expr, rows, scope);
   NSString *innerGroup = units ? RDLInnerAggregateGroup(expr, scope) : nil;
   NSUInteger unitCount = units ? [units count] : [rows count];
   for (NSUInteger u = 0; u < unitCount; u++) {
     id row = units ? [units[u] firstObject] : rows[u];
     if (units) {
-      scope.groupRows = units[u];
+      each.groupRows = units[u];
       if (innerGroup) {
         NSMutableDictionary *named =
             [savedNamedRows mutableCopy] ?: [NSMutableDictionary dictionary];
         named[innerGroup] = units[u];
-        scope.groupRowsByName = named;
+        each.groupRowsByName = named;
       }
     }
-    scope.row = row;
-    id v = expr ? RDLExec(expr, scope) : nil;
+    each.row = row;
+    id v = expr ? RDLExec(expr, each) : nil;
     if (RDLIsError(v)) {
       error = v;
       break;
@@ -754,9 +746,6 @@ static id RDLExecAggInScope(NSString *n, NSArray *args, RDLEvalScope *scope) {
     if (RDLOrder(v, mx) == NSOrderedDescending)
       mx = v;
   }
-  scope.row = saved;
-  scope.groupRows = savedGroupRows;
-  scope.groupRowsByName = savedNamedRows;
   if (error)
     return error;
   if ([n isEqualToString:@"sum"] || [n isEqualToString:@"aggregate"])
@@ -794,8 +783,8 @@ static id RDLExecRunningValueInScope(NSArray *args, RDLEvalScope *scope);
 
 static id RDLExecRunningValue(NSArray *args, RDLEvalScope *scope) {
   NSString *ds = [args count] > 2 ? RDLDsName(args[2], scope) : nil;
-  return RDLInDataSetNamed(scope, ds, ^id {
-    return RDLExecRunningValueInScope(args, scope);
+  return RDLInDataSetNamed(scope, ds, ^id(RDLEvalScope *inner) {
+    return RDLExecRunningValueInScope(args, inner);
   });
 }
 
@@ -825,11 +814,8 @@ static id RDLExecRunningValueInScope(NSArray *args, RDLEvalScope *scope) {
   }
   // The aggregate itself, over the rows from the first to this one.
   NSArray *upToHere = stop == NSNotFound ? rows : [rows subarrayWithRange:NSMakeRange(0, stop + 1)];
-  NSArray *savedGroup = scope.groupRows;
-  scope.groupRows = upToHere;
-  id value = RDLExecAggInScope(fn, expr ? @[ expr ] : @[], scope);
-  scope.groupRows = savedGroup;
-  return value;
+  RDLEvalScope *sofar = [scope scopeBy:^(RDLEvalScope *s) { s.groupRows = upToHere; }];
+  return RDLExecAggInScope(fn, expr ? @[ expr ] : @[], sofar);
 }
 
 static id RDLExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
@@ -853,23 +839,24 @@ static id RDLExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
     [keys addObject:source];
   }
   NSMutableArray *hits = [NSMutableArray array];
-  NSDictionary *saved = scope.row;
   // The source was evaluated above, in the current dataset. What is matched
   // and returned belongs to the dataset being searched, and reads its columns
-  // through that dataset's fields.
-  RDLDataSet *savedSet = scope.dataSet;
+  // through that dataset's fields -- so the matching is done in a scope of its
+  // own, and the caller's stays as it was.
   RDLDataSet *searched = ds ? [scope.report dataSetNamed:ds] : nil;
-  if (searched)
-    scope.dataSet = searched;
+  RDLEvalScope *in = [scope scopeBy:^(RDLEvalScope *s) {
+    if (searched)
+      s.dataSet = searched;
+  }];
   for (id key in keys) {
     for (id row in rows) {
       if (destExpr == nil)
         break;
-      scope.row = row;
-      id dest = RDLExec(destExpr, scope);
+      in.row = row;
+      id dest = RDLExec(destExpr, in);
       if (!RDLKeyEq(dest, key))
         continue;
-      id v = resultExpr ? RDLExec(resultExpr, scope) : dest;
+      id v = resultExpr ? RDLExec(resultExpr, in) : dest;
       [hits addObject:v ?: [NSNull null]];
       if ([kind isEqualToString:@"lookup"])
         break;
@@ -877,8 +864,6 @@ static id RDLExecLookup(NSString *kind, NSArray *args, RDLEvalScope *scope) {
     if ([kind isEqualToString:@"lookup"] && [hits count])
       break;
   }
-  scope.row = saved;
-  scope.dataSet = savedSet;
   if ([kind isEqualToString:@"lookup"])
     return [hits count] ? hits[0] : nil;
   return hits;
@@ -3578,11 +3563,8 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
         return nil;
       if ([ast.args count] == 0)
         return nil;
-      NSDictionary *saved = scope.row;
-      scope.row = scope.previousRow;
-      id v = RDLExec(ast.args[0], scope);
-      scope.row = saved;
-      return v;
+      RDLEvalScope *before = [scope scopeBy:^(RDLEvalScope *s) { s.row = scope.previousRow; }];
+      return RDLExec(ast.args[0], before);
     }
     if ([n isEqualToString:@"join"]) {
       id arr = [ast.args count] ? RDLExec(ast.args[0], scope) : nil;
