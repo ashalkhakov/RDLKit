@@ -54,3 +54,33 @@ FOUNDATION_EXPORT NSArray *RDLLexCode(NSString *src);
 // writes without writing it: a Select's subject, and the comparison a Case
 // clause means.
 FOUNDATION_EXPORT RDLTok *RDLCodeMakeToken(RDLExprTokenKind kind, NSString *text);
+
+// Between the evaluator and the runtime library it calls. The library is every
+// function the language offers -- the conversions, the formatting, the text and
+// date work, and .NET's members -- and the evaluator needs only to hand a call
+// to it; these few go the other way, because a function of the library asks the
+// same questions of a value that an operator does.
+FOUNDATION_EXPORT NSString *RDLStrInLocale(id v, NSLocale *locale);
+FOUNDATION_EXPORT BOOL RDLKeyEq(id a, id b);
+FOUNDATION_EXPORT NSDate *RDLAsDate(id v, NSDate *fallback);
+FOUNDATION_EXPORT NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName);
+FOUNDATION_EXPORT BOOL RDLLike(NSString *value, NSString *pattern, BOOL ignoringCase, BOOL *valid);
+FOUNDATION_EXPORT NSComparisonResult RDLOrder(id a, id b);
+FOUNDATION_EXPORT RDLExprError *RDLNumberError(RDLNumberFailure failure);
+FOUNDATION_EXPORT BOOL RDLIsError(id v);
+FOUNDATION_EXPORT BOOL RDLIsIntegralType(RDLNumericType t);
+FOUNDATION_EXPORT BOOL RDLIsNumberValue(id v);
+FOUNDATION_EXPORT id RDLNumericOperand(id v);
+FOUNDATION_EXPORT id RDLArithmetic(RDLExprOperator op, id left, id right);
+FOUNDATION_EXPORT id RDLBooleanOperand(id v);
+FOUNDATION_EXPORT id RDLOperate(RDLExprOperator op, id a, id b);
+FOUNDATION_EXPORT id RDLDateInFormat(NSDate *date, NSString *format, NSLocale *locale);
+FOUNDATION_EXPORT NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *locale);
+
+// Reading a row by a field's key. A row may be a dictionary or an object
+// answering to the key, and finding out which is worth remembering: callers in
+// a loop resolve the key once and fetch many times. Declared here because the
+// evaluator and the runtime library both ask, and the parser implements it.
+@interface RDLExprNode (RDLRowReading)
+- (id)valueFromRow:(id)row key:(NSString *)key;
+@end
