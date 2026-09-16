@@ -116,3 +116,17 @@ NSUInteger RDLCodeClosingBracket(NSString *text, NSUInteger open);
 NSArray<NSString *> *RDLCodeSplitList(NSString *text);
 NSString *RDLCodeWithoutComment(NSString *line);
 NSSet<NSString *> *RDLCodeReservedWords(void);
+
+// Shared between the phases: the pieces the parser makes, and the value
+// handling the interpreter does with them.
+FOUNDATION_EXPORT RDLCodeType RDLCodeTypeNamed(NSString *name);
+FOUNDATION_EXPORT RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStatement *> *body);
+
+// The parser. The interpreter makes one to read a module's source.
+@interface RDLCodeReader : NSObject
+@property (nonatomic, strong) NSMutableArray<NSString *> *problems;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, RDLCodeFunction *> *functions;
+@property (nonatomic, strong) NSMutableArray<RDLCodeDeclarator *> *variables;
+- (instancetype)initWithSource:(NSString *)source;
+- (void)read;
+@end
