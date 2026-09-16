@@ -331,11 +331,18 @@
              kind:RDLFieldKindPopUpTitle];
   [_bindings bind:_titleField keyPath:@"title" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
+  // Every type the kit models, from the enumeration rather than from a list
+  // typed into the XIB: a chart of a type the popup did not offer showed as
+  // Column, and the first edit of any chart field wrote that back.
+  [_chartKindPop removeAllItems];
+  NSMutableArray<NSNumber *> *chartTypes = [NSMutableArray array];
+  for (RDLChartType type = RDLChartTypeColumn; type <= RDLChartTypeRadar; type++) {
+    [_chartKindPop addItemWithTitle:RDLStringFromChartType(type)];
+    [chartTypes addObject:@(type)];
+  }
   [_bindings bind:_chartKindPop keyPath:@"chartType" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLChartTypeColumn), @(RDLChartTypeBar), @(RDLChartTypeLine),
-                     @(RDLChartTypeArea), @(RDLChartTypePie), @(RDLChartTypeDoughnut),
-                     @(RDLChartTypeScatter) ]
+           values:chartTypes
       placeholder:nil];
   [_bindings bind:_catField keyPath:@"categoryField" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];

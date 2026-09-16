@@ -2618,4 +2618,56 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"the default should survive the round trip: %@", [back.defaultValue source]);
 }
 
+// Setting the field a chart groups its categories by changes that grouping and
+// nothing else: the groups nested inside it stay, its name stays -- an
+// aggregate may name it as its scope -- and a label that says something of its
+// own is left alone. Rewriting the whole member is how editing one field used
+// to drop a nested category or series group.
+- (void)testSettingAChartsCategoryKeepsWhatIsNestedInIt {
+  RDLChart *chart = [[RDLChart alloc] init];
+  chart.name = @"Sales";
+  RDLChartMember *outer = [[RDLChartMember alloc] init];
+  outer.groupName = @"ByYear";
+  [outer.groupExpressions addObject:[RDLValue valueWithSource:@"=Fields!Year.Value"]];
+  outer.label = [RDLValue valueWithSource:@"=Fields!Year.Value"];
+  RDLChartMember *inner = [[RDLChartMember alloc] init];
+  inner.groupName = @"ByQuarter";
+  [inner.groupExpressions addObject:[RDLValue valueWithSource:@"=Fields!Quarter.Value"]];
+  [outer.members addObject:inner];
+  [chart.categoryMembers addObject:outer];
+
+  chart.categoryField = @"Season";
+  if ([chart.categoryMembers count] != 1 || chart.categoryMembers.firstObject != outer)
+    XCTFail(@"%@", @"the outermost group is the one edited");
+  if ([outer.members count] != 1 || outer.members.firstObject != inner)
+    XCTFail(@"%@", @"the group nested inside it should still be there");
+  if (![outer.groupName isEqualToString:@"ByYear"])
+    XCTFail(@"a named group should keep its name, not become %@", outer.groupName);
+  if (![[outer.groupExpressions.firstObject source] isEqualToString:@"=Fields!Season.Value"] ||
+      ![[outer.label source] isEqualToString:@"=Fields!Season.Value"])
+    XCTFail(@"the group should read the new field, its label following: %@", [outer.label source]);
+  if (![chart.categoryField isEqualToString:@"Season"])
+    XCTFail(@"%@", @"and the field reads back as what was set");
+
+  // A label that says something of its own is not overwritten.
+  outer.label = [RDLValue literal:@"Season"];
+  chart.categoryField = @"Region";
+  if (![[outer.label source] isEqualToString:@"Season"])
+    XCTFail(@"%@", @"a label of its own should be left alone");
+
+  // The series side is the same, and clearing a field takes its groups away.
+  RDLChartMember *series = [[RDLChartMember alloc] init];
+  series.groupName = @"ByKind";
+  [series.groupExpressions addObject:[RDLValue valueWithSource:@"=Fields!Kind.Value"]];
+  [series.members addObject:[[RDLChartMember alloc] init]];
+  [chart.seriesMembers addObject:series];
+  chart.seriesField = @"Line";
+  if ([series.members count] != 1 || ![series.groupName isEqualToString:@"ByKind"] ||
+      ![[series.groupExpressions.firstObject source] isEqualToString:@"=Fields!Line.Value"])
+    XCTFail(@"%@", @"the series group should be edited the same way");
+  chart.categoryField = nil;
+  if ([chart.categoryMembers count])
+    XCTFail(@"%@", @"clearing the field should leave no category group");
+}
+
 @end

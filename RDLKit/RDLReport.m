@@ -1243,22 +1243,34 @@ static RDLValue *RDLChartFieldValue(NSString *field) {
   return [RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
 }
 
-static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString *field,
-                              NSString *chartName, NSString *suffix) {
+// What the outermost member of a hierarchy groups on. Only that: the groups
+// nested inside it, its name and a label of its own are the file's, and
+// rewriting the whole member is how editing one field used to drop them.
+static void RDLSetOutermostGroupField(NSMutableArray<RDLChartMember *> *members, NSString *field,
+                                      NSString *chartName, NSString *suffix) {
   if ([field length] == 0) {
     [members removeAllObjects];
     return;
   }
+  RDLValue *wanted = RDLChartFieldValue(field);
   RDLChartMember *m = [members firstObject];
   if (m == nil) {
     m = [[RDLChartMember alloc] init];
     [members addObject:m];
   }
-  m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
-  [m.members removeAllObjects];
-  [m.groupExpressions removeAllObjects];
-  [m.groupExpressions addObject:RDLChartFieldValue(field)];
-  m.label = RDLChartFieldValue(field);
+  RDLValue *was = [m.groupExpressions firstObject];
+  if ([m.groupExpressions count])
+    m.groupExpressions[0] = wanted;
+  else
+    [m.groupExpressions addObject:wanted];
+  // A label follows the field while it shows it, and is left alone once it
+  // says something of its own.
+  if (m.label == nil || (was != nil && [[m.label source] isEqualToString:[was source]]))
+    m.label = wanted;
+  // A group already named keeps its name: an aggregate may name it as its
+  // scope, and renaming it would leave that expression pointing at nothing.
+  if ([m.groupName length] == 0)
+    m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
 }
 
 - (NSString *)categoryField {
@@ -1267,7 +1279,7 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 }
 
 - (void)setCategoryField:(NSString *)field {
-  RDLSetSoleMember(_categoryMembers, field, self.name, @"Category");
+  RDLSetOutermostGroupField(_categoryMembers, field, self.name, @"Category");
 }
 
 - (NSString *)seriesField {
@@ -1276,7 +1288,7 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 }
 
 - (void)setSeriesField:(NSString *)field {
-  RDLSetSoleMember(_seriesMembers, field, self.name, @"Series");
+  RDLSetOutermostGroupField(_seriesMembers, field, self.name, @"Series");
 }
 
 - (NSString *)valueField {

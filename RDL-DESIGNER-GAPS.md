@@ -301,8 +301,8 @@ not yet keep that.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Types beyond the seven: Bubble, Range, RangeColumn, RangeBar, Stock, Candlestick, Funnel, Pyramid, Polar, Radar; subtypes including Stepped | UI | A loaded chart of one of these shows as Column (§5). Range and Stock need High/Low (and Start/End) value fields. |
-| Multiple series, series grouping, per-series type | UI | The inspector edits series[0] and member[0]. |
+| Subtypes (Stacked, PercentStacked, Smooth, Exploded, Stepped); the High/Low and Start/End values a Range or Stock chart plots | UI | Every type the kit models is in the popup, from the enumeration, and a chart keeps the type its file gave it. What it plots, and its subtype, have no control. |
+| Multiple series, series grouping, per-series type | UI | The inspector edits the first series, and the outermost category and series group; groups nested inside those are kept as the file has them. |
 | Legend hidden/position/layout, title position, axis titles/min/max/interval/label interval/margin/grid lines/tick marks, palettes and custom colours, markers, data labels, secondary axis, series and point style, no-data message, X/Size values | UI (was partly MODEL) | Engine draws them. |
 | 3D, strip lines, scale breaks, border skin, empty points, BoxPlot/ErrorBar/TreeMap | MODEL | Kept and written back. |
 
@@ -349,8 +349,6 @@ matter more than missing features because they destroy work.
 
 | Trigger | What is lost | Fix |
 |---|---|---|
-| Open a chart of a type the popup lacks | Shows as Column; picking any entry changes its type. | Offer every type. |
-| Edit a chart's category field | Nested category and series groups are dropped. | Edit the first level only. |
 | Data source pane on a SQL/OLEDB source | Touching any control rewrites `DataProvider` and `ConnectString` (viewing alone does not). | Show unknown providers read-only. |
 | Undo of a field rename/retype/kind change | No-op: the views mutate the shared `RDLField` objects before `setFields:`, whose snapshot is a shallow copy *(by inspection)*. | Deep-copy the snapshot. |
 | Rename a dataset, source, field or parameter | Kept pieces are found by name path, so they are lost. | Rename the kept paths too. |
@@ -382,7 +380,10 @@ once (`defaultValues` is now the one place, and `defaultValue` is the first of
 them); typing over values a `DataSetReference` supplies, which could never be
 written (they are shown read-only); and clearing a prompt, which quietly made
 the parameter unaskable rather than asked for with no words ("Asked for" says
-which).
+which). A chart of a type the popup did not offer, shown as Column and written
+back as Column by the next edit of any of its fields (the popup is the
+enumeration now); and a chart's nested category and series groups, dropped when
+its category or series field was edited (only the outermost group is).
 
 ## 6. Designer priorities
 
@@ -398,7 +399,9 @@ which).
 2. Parameters — done: the default is kept in one place, so an edited one is
    saved; `DataSetReference` defaults and values are shown read-only; and
    "Asked for" tells an empty prompt from an absent one.
-3. Chart: every type in the popup; category edits that keep nested groups.
+3. Charts — done: every type is in the popup and kept, and editing a
+   category or series field leaves the groups nested inside it alone. The
+   subtype, several series and what a range or stock chart plots are P1.5.
 4. Done: the cell popups went with the column spec; group filters go
    through `RDLEditor`, on the tablix dialog's copy.
 5. Unknown data providers read-only; deep-copied field undo; renames that

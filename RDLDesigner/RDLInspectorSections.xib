@@ -1063,17 +1063,7 @@
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="chartKindPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="message"/>
-                        <menu key="menu" id="chartKindPopMenu">
-                            <items>
-                                <menuItem title="Column" id="mi12"/>
-                                <menuItem title="Bar" id="mi13"/>
-                                <menuItem title="Line" id="mi14"/>
-                                <menuItem title="Area" id="mi16"/>
-                                <menuItem title="Pie" id="mi15"/>
-                                <menuItem title="Doughnut" id="mi17"/>
-                                <menuItem title="Scatter" id="mi18"/>
-                            </items>
-                        </menu>
+                        <menu key="menu" id="chartKindPopMenu"/>
                     </popUpButtonCell>
                     <connections>
                         <action selector="changed:" target="-2" id="chartKindPopAction"/>

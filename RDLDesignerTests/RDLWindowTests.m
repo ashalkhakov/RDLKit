@@ -3299,4 +3299,36 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
 }
 
 
+// The chart type popup offers every type the kit models. It offered seven, so
+// a chart of any other type showed as Column -- and the next edit of any chart
+// field wrote Column back into the file.
+- (void)testTheChartTypePopupOffersEveryType {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charts"];
+  RDLChart *chart = [[RDLChart alloc] init];
+  chart.name = @"Prices";
+  chart.chartType = RDLChartTypeStock;
+  chart.categoryField = @"Day";
+  chart.valueField = @"Close";
+  [report.body.items addObject:chart];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:chart inBandWithKey:@"body"];
+  RDLInspectorView *inspector =
+      [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 700) context:ctx];
+  [inspector reload];
+  NSPopUpButton *kinds = [inspector valueForKey:@"chartKindPop"];
+  if ([kinds numberOfItems] != (NSInteger)RDLChartTypeRadar)
+    XCTFail(@"the popup should offer every type, not %ld", (long)[kinds numberOfItems]);
+  if (![[kinds titleOfSelectedItem] isEqualToString:RDLStringFromChartType(RDLChartTypeStock)])
+    XCTFail(@"a stock chart should show as Stock, not %@", [kinds titleOfSelectedItem]);
+
+  // And editing another of its settings leaves the type where it was.
+  NSTextField *title = [inspector valueForKey:@"titleField"];
+  [title setStringValue:@"Closing prices"];
+  [inspector changed:title];
+  if (chart.chartType != RDLChartTypeStock)
+    XCTFail(@"editing the title retyped the chart as %@", RDLStringFromChartType(chart.chartType));
+  if (![chart.title isEqualToString:@"Closing prices"])
+    XCTFail(@"%@", @"and the title should have been written");
+}
+
 @end
