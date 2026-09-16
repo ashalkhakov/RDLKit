@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDesignerTestSupport.h"
 #import "RDLCanvasRenderer.h"
+#import "RDLCanvasView.h"
 
 
 
@@ -17,10 +18,11 @@
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
-// Where the text sits inside a text box on the canvas. All four sides of
-// Padding count, and they scale with the zoom like everything else drawn. The
-// bottom one used to be left out: text ran to the bottom edge on the canvas
-// and stopped short of it everywhere else.
+// Where the text sits inside a text box on the canvas, in model space: the
+// canvas's own inset plus all four sides of Padding. The zoom is not in it --
+// that is the view transform's job -- and the bottom side used to be left out,
+// so text ran to the bottom edge on the canvas and stopped short of it
+// everywhere else.
 - (void)testTheTextRectTakesPaddingOnAllFourSides {
   RDLStyle *style = [[RDLStyle alloc] init];
   style.paddingLeft = [RDLLength points:4];
@@ -28,30 +30,87 @@
   style.paddingTop = [RDLLength points:8];
   style.paddingBottom = [RDLLength points:10];
 
-  // The canvas insets text by 2pt across and 1pt down before any Padding.
-  NSRect text = [RDLCanvasRenderer textRectForStyle:style
-                                             inRect:NSMakeRect(0, 0, 200, 100)
-                                               zoom:1];
+  NSRect text = [RDLCanvasRenderer textRectForStyle:style inRect:NSMakeRect(0, 0, 200, 100)];
   NSRect want = NSMakeRect(2 + 4, 1 + 8, 200 - 4 - 4 - 6, 100 - 2 - 8 - 10);
   if (!NSEqualRects(text, want))
     XCTFail(@"the text rect is %@, expected %@", NSStringFromRect(text), NSStringFromRect(want));
 
-  // Padding is a measurement on the page, so it grows with the zoom; the
-  // canvas's own inset does not.
-  NSRect zoomed = [RDLCanvasRenderer textRectForStyle:style
-                                               inRect:NSMakeRect(0, 0, 400, 200)
-                                                 zoom:2];
-  NSRect wantZoomed = NSMakeRect(2 + 8, 1 + 16, 400 - 4 - 8 - 12, 200 - 2 - 16 - 20);
-  if (!NSEqualRects(zoomed, wantZoomed))
-    XCTFail(@"at zoom 2 the text rect is %@, expected %@", NSStringFromRect(zoomed),
-            NSStringFromRect(wantZoomed));
-
   // A style that asks for no padding still gets the canvas's own inset.
   NSRect bare = [RDLCanvasRenderer textRectForStyle:[[RDLStyle alloc] init]
-                                             inRect:NSMakeRect(0, 0, 200, 100)
-                                               zoom:1];
+                                             inRect:NSMakeRect(0, 0, 200, 100)];
   if (!NSEqualRects(bare, NSMakeRect(2, 1, 196, 98)))
     XCTFail(@"an unpadded text rect is %@", NSStringFromRect(bare));
+}
+
+// Zooming is one transform over model space rather than a number threaded
+// through every measurement. Everything the canvas draws goes through it, and
+// every point arriving from the mouse comes back the other way, so the two
+// cannot drift apart -- which is what they used to do.
+- (void)testTheViewTransformScalesAndInvertsExactly {
+  NSAffineTransform *xf = RDLCanvasViewTransform(2.0);
+  NSPoint scaled = [xf transformPoint:NSMakePoint(30, 40)];
+  if (!NSEqualPoints(scaled, NSMakePoint(60, 80)))
+    XCTFail(@"at 200%% the point drew at %@", NSStringFromPoint(scaled));
+  NSSize size = [xf transformSize:NSMakeSize(10, 5)];
+  if (!NSEqualSizes(size, NSMakeSize(20, 10)))
+    XCTFail(@"at 200%% the size drew as %@", NSStringFromSize(size));
+
+  // The mouse comes back the other way, exactly.
+  NSPoint back = RDLModelPointFromView(scaled, 2.0);
+  if (!NSEqualPoints(back, NSMakePoint(30, 40)))
+    XCTFail(@"the point came back as %@", NSStringFromPoint(back));
+  if (!NSEqualPoints(RDLModelPointFromView(NSMakePoint(15, 25), 0.5), NSMakePoint(30, 50)))
+    XCTFail(@"%@", @"zooming out should move a click further down the page, not nearer");
+
+  // A zoom nobody set is 100%, not a division by zero.
+  if (!NSEqualPoints(RDLModelPointFromView(NSMakePoint(7, 9), 0), NSMakePoint(7, 9)))
+    XCTFail(@"%@", @"a zoom of nothing should leave a point where it is");
+}
+
+// That the canvas really does draw through the view transform, rather than
+// merely owning one. Everything else here checks the geometry, which is model
+// space and says nothing about the zoom; without this, taking the transform
+// out of the drawing broke nothing that anyone could see.
+//
+// The paper's top-left is RDLPageGeometry's default origin in model space, so
+// on screen its left edge belongs at that many points times the zoom. The edge
+// is a hard step from the dark backdrop to the pale paper, which is why it can
+// be found by looking rather than by arithmetic on a rect.
+- (void)testTheCanvasDrawsThroughTheViewTransform {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Transform"];
+  NSPoint origin = [RDLPageGeometry defaultPaperOrigin];
+
+  for (NSNumber *z in @[ @1.0, @2.0 ]) {
+    CGFloat zoom = [z doubleValue];
+    RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+    ctx.zoom = zoom;
+    NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:zoom];
+    RDLCanvasView *view =
+        [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) context:ctx];
+    [view setFrameSize:size];
+
+    // A thin strip a little way down the paper, so the scan crosses its left
+    // edge rather than the empty canvas above it.
+    NSRect strip = NSMakeRect(0, origin.y * zoom + 20, MIN(400.0, size.width), 4);
+    NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:strip];
+    // -cacheDisplayInRect:toBitmapImageRep: rather than a context set up here:
+    // it is what puts the view's coordinates onto a bitmap that starts
+    // somewhere other than the view's own origin. Drawing into a context made
+    // by hand does not, and the strip came back empty.
+    [view cacheDisplayInRect:strip toBitmapImageRep:rep];
+
+    NSInteger edge = -1;
+    for (NSInteger x = 0; x < [rep pixelsWide] && edge < 0; x++)
+      if ([[rep colorAtX:x y:0] brightnessComponent] > 0.5)
+        edge = x;
+    if (edge < 0) {
+      XCTFail(@"at %.0f%% the paper was not found on the canvas at all", zoom * 100);
+      continue;
+    }
+    if (fabs((CGFloat)edge - origin.x * zoom) > 2.0)
+      XCTFail(@"at %.0f%% the paper starts at %ld, expected %.0f", zoom * 100, (long)edge,
+              origin.x * zoom);
+  }
 }
 
 - (void)testPageGeometry {
@@ -88,8 +147,7 @@
   [r.body.items addObject:box];
 
   RDLPageGeometry *g = [RDLPageGeometry geometryForReport:r
-                                                     zoom:1.0
-                                              paperOrigin:NSMakePoint(0, 0)];
+paperOrigin:NSMakePoint(0, 0)];
 
   if (fabs(NSWidth(g.paperRect) - 8.5 * 72) > 0.01)
     XCTFail(@"%@", @"paper width should be the page width in points");
@@ -143,14 +201,15 @@
   if ([g findRectOfItem:orphan rect:NULL])
     XCTFail(@"%@", @"an item not in the report should not be found");
 
-  // Zoom scales everything from the paper origin.
-  RDLPageGeometry *z2 = [RDLPageGeometry geometryForReport:r
-                                                      zoom:2.0
-                                               paperOrigin:NSMakePoint(0, 0)];
-  NSRect hr2;
-  [z2 findRectOfItem:header rect:&hr2];
-  if (fabs(NSMinX(hr2) - 2 * NSMinX(hr)) > 0.01 || fabs(NSWidth(hr2) - 2 * NSWidth(hr)) > 0.01)
-    XCTFail(@"%@", @"doubling the zoom should double position and size");
+  // The geometry is the same whatever the canvas is zoomed to: it is model
+  // space, and the zoom is the view transform's. What used to be checked here
+  // by building a second geometry at 200% is now the transform's own business,
+  // so it is checked by scaling the rect this one gives.
+  NSAffineTransform *at200 = RDLCanvasViewTransform(2.0);
+  NSPoint drawnAt = [at200 transformPoint:NSMakePoint(NSMinX(hr), NSMinY(hr))];
+  NSSize drawnSize = [at200 transformSize:NSMakeSize(NSWidth(hr), NSHeight(hr))];
+  if (fabs(drawnAt.x - 2 * NSMinX(hr)) > 0.01 || fabs(drawnSize.width - 2 * NSWidth(hr)) > 0.01)
+    XCTFail(@"%@", @"at 200% the same rect should be drawn twice as far out and twice as wide");
 
   // Hit testing: body, handles, and nesting.
   NSString *kind = nil, *bandKey = nil;
@@ -207,7 +266,8 @@
   topTablix.columnSpecs = @[ @{@"width" : @1.0, @"header" : @"H", @"value" : @"" } ];
   [r.body.items addObject:topTablix];
 
-  g = [RDLPageGeometry geometryForReport:r zoom:1.0 paperOrigin:NSMakePoint(0, 0)];
+  g = [RDLPageGeometry geometryForReport:r
+paperOrigin:NSMakePoint(0, 0)];
   NSArray *rects = nil;
   NSArray *tablixes = [g tablixItemsWithRects:&rects];
   if ([tablixes count] != 2)
@@ -234,47 +294,47 @@
   // The grid is the body: its rows and its columns.
   if ([RDLTablixGeometry rowCountOf:t] != [t.tablixBody.rows count] || [RDLTablixGeometry columnCountOf:t] != 2)
     XCTFail(@"%@", @"a plain table's grid is its body's rows and columns");
-  NSRect c0 = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0 zoom:1.0];
+  NSRect c0 = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0];
   if (fabs(NSMinX(c0) - 100) > 0.01 || fabs(NSWidth(c0) - 144) > 0.01)
     XCTFail(@"%@", @"the first cell spans the first column");
   if (fabs(NSMinY(c0) - 200) > 0.01 || fabs(NSHeight(c0) - 36) > 0.01)
     XCTFail(@"%@", @"the heading row sits at the top of the item, as tall as it is");
-  NSRect c1 = [RDLTablixGeometry cellRectOf:t itemRect:r row:1 column:1 zoom:1.0];
+  NSRect c1 = [RDLTablixGeometry cellRectOf:t itemRect:r row:1 column:1];
   if (fabs(NSMinX(c1) - (100 + 144)) > 0.01 || fabs(NSMinY(c1) - (200 + 36)) > 0.01 ||
       fabs(NSHeight(c1) - 18) > 0.01)
     XCTFail(@"%@", @"the second row's second cell comes after the first column, below the heading");
   // A very short row still gets a clickable height.
   CGFloat was = t.tablixBody.rows[1].height;
   t.tablixBody.rows[1].height = 0.001;
-  if ([RDLTablixGeometry heightOfRow:1 of:t zoom:1.0] < 8.0)
+  if ([RDLTablixGeometry heightOfRow:1 of:t] < 8.0)
     XCTFail(@"%@", @"a very short row should still get a clickable minimum");
   t.tablixBody.rows[1].height = was;
 
   // Hit testing.
   NSUInteger row = 99, column = 99;
-  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 210) row:&row column:&column zoom:1.0] ||
+  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 210) row:&row column:&column] ||
       row != 0 || column != 0)
     XCTFail(@"a point in the heading's first cell should hit it, not %lu, %lu", (unsigned long)row,
             (unsigned long)column);
-  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(250, 245) row:&row column:&column zoom:1.0] ||
+  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(250, 245) row:&row column:&column] ||
       row != 1 || column != 1)
     XCTFail(@"a point in the second row's second cell should hit it, not %lu, %lu", (unsigned long)row,
             (unsigned long)column);
-  if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(10, 10) row:NULL column:NULL zoom:1.0])
+  if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(10, 10) row:NULL column:NULL])
     XCTFail(@"%@", @"a point outside the item should not be a cell");
 
   // Borders between body columns only. The last column's right edge belongs
   // to the item's east resize handle, so dragging there must resize the item.
   NSUInteger border = 99;
-  if (![RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:&border zoom:1.0] ||
+  if (![RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:&border] ||
       border != 0)
     XCTFail(@"%@", @"the border between the two columns belongs to the one on its left");
-  if ([RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(NSMaxX(r), 210) column:NULL zoom:1.0])
+  if ([RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(NSMaxX(r), 210) column:NULL])
     XCTFail(@"%@", @"the last column's right edge is the item's east handle, not a border");
   RDLTablix *one = [[RDLTablix alloc] init];
   one.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"A", @"value" : @""} ];
   [one rebuildTablix];
-  if ([RDLTablixGeometry tablix:one itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:NULL zoom:1.0])
+  if ([RDLTablixGeometry tablix:one itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:NULL])
     XCTFail(@"%@", @"a single-column tablix has no internal border");
   // A grouped table's row-header column is its group's, not a column to drag.
   RDLTablix *grouped = [[RDLTablix alloc] init];
@@ -289,17 +349,19 @@
   [grouped rebuildTablix];
   CGFloat header = [[grouped rowHeaderColumnWidths].firstObject doubleValue] * 72;
   NSRect g = NSMakeRect(100, 200, 6.0 * 72, 60);
-  if ([RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(100 + header, 210) column:NULL zoom:1.0])
+  if ([RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(100 + header, 210) column:NULL])
     XCTFail(@"%@", @"the edge of a row-header column is not a column border");
   CGFloat between = 100 + header + grouped.tablixBody.columns[0].width * 72;
-  if (![RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(between, 210) column:&border zoom:1.0] ||
+  if (![RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(between, 210) column:&border] ||
       border != 0)
     XCTFail(@"%@", @"the border after a grouped table's first body column is that column's");
 
-  // Zoom scales the grid.
-  NSRect z = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0 zoom:2.0];
-  if (fabs(NSWidth(z) - 288) > 0.01 || fabs(NSHeight(z) - 72) > 0.01)
-    XCTFail(@"%@", @"zoom should scale the cell grid");
+  // The grid is model space too: one cell is the same size whatever the canvas
+  // is zoomed to, and the transform is what makes it bigger on screen.
+  NSRect cell = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0];
+  NSSize at200 = [RDLCanvasViewTransform(2.0) transformSize:cell.size];
+  if (fabs(at200.width - 2 * NSWidth(cell)) > 0.01 || fabs(at200.height - 2 * NSHeight(cell)) > 0.01)
+    XCTFail(@"%@", @"at 200% a cell should be drawn twice the size it is measured");
 }
 
 // A header is its member's: drawn beside the first row that member spans --

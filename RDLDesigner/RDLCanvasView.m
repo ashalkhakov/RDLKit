@@ -159,15 +159,11 @@
   if (target == nil)
     return NO;
 
-  // Into inches, which is what an item's position is in: the band frame is in
-  // view points, so the distance has to be divided by the points in an inch as
-  // well as by the zoom. Dividing by the zoom alone stored points as inches and
-  // put the item a hundred inches off the page, where it drew nowhere and could
-  // not be clicked.
-  CGFloat zoom = geometry.zoom > 0 ? geometry.zoom : 1.0;
-  CGFloat perInch = RDLPointsPerInch * zoom;
-  CGFloat left = (p.x - NSMinX(target.frame)) / perInch;
-  CGFloat top = (p.y - NSMinY(target.frame)) / perInch;
+  // Into inches, which is what an item's position is in. `p` is already in
+  // model space, so only the points in an inch are left to divide by -- the
+  // zoom came off when the point did.
+  CGFloat left = (p.x - NSMinX(target.frame)) / RDLPointsPerInch;
+  CGFloat top = (p.y - NSMinY(target.frame)) / RDLPointsPerInch;
 
   RDLTextbox *box = [[RDLTextbox alloc] init];
   box.name = [RDLItemFactory uniqueNameWithPrefix:binding[RDLPaletteLabelKey] ?: @"Field"
@@ -197,8 +193,10 @@
 
 - (void)sizeToPage {
   _geometry = nil; // the page changed shape
-  [self setFrameSize:[RDLPageGeometry canvasSizeForReport:_context.report
-                                                     zoom:_context.zoom]];
+  // The view's own frame is the one thing still measured in view points: it is
+  // what the scroll view scrolls, so it has to grow with the zoom even though
+  // everything drawn inside it is model space.
+  [self setFrameSize:[RDLPageGeometry canvasSizeForReport:_context.report zoom:_context.zoom]];
 }
 
 // One snapshot per draw or event, cached until something invalidates it. It
@@ -206,7 +204,6 @@
 - (RDLPageGeometry *)geometry {
   if (_geometry == nil)
     _geometry = [RDLPageGeometry geometryForReport:_context.report
-                                              zoom:_context.zoom
                                        paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
   // Set on the way out rather than at build time: which tablix is being worked
   // in changes with the selection, which does not invalidate the geometry --
@@ -338,7 +335,8 @@
 // --- Tablix context menu -----------------------------------------------------
 
 - (NSMenu *)menuForEvent:(NSEvent *)event {
-  NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+  NSPoint p = RDLModelPointFromView([self convertPoint:[event locationInWindow] fromView:nil],
+                                    _context.zoom);
   NSString *bandKey = nil;
   NSRect itemRect = NSZeroRect;
   RDLItem *hit = [[self geometry] itemAtPoint:p kind:NULL bandKey:&bandKey rect:&itemRect];
@@ -356,8 +354,7 @@
                                    itemRect:ownerRect
                                       point:p
                                         row:&row
-                                     column:&gridColumn
-                                       zoom:_context.zoom];
+                                     column:&gridColumn];
     m = [self tablixMenuForGridRow:onCell ? (NSInteger)row : -1
                         gridColumn:onCell ? (NSInteger)gridColumn : -1
                               item:owner];

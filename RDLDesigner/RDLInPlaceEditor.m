@@ -50,15 +50,14 @@
     // A cell of the grid: what is edited is the textbox in it, as itself.
     RDLTablix *tablixHit = (RDLTablix *)hit;
     NSUInteger row = 0, column = 0;
-    if ([RDLTablixGeometry tablix:tablixHit itemRect:itemRect point:p row:&row column:&column zoom:_ctx.zoom]) {
+    if ([RDLTablixGeometry tablix:tablixHit itemRect:itemRect point:p row:&row column:&column]) {
       RDLItem *content = [RDLTablixGeometry itemOf:tablixHit inRow:row column:column];
       if ([content isKindOfClass:[RDLTextbox class]])
         [self beginEditingHit:content
                          rect:[RDLTablixGeometry cellRectOf:tablixHit
                                                    itemRect:itemRect
                                                         row:row
-                                                     column:column
-                                                       zoom:_ctx.zoom]
+                                                     column:column]
                         point:p];
     }
     return;
@@ -75,7 +74,6 @@
       [hit isKindOfClass:[RDLUnsupportedItem class]])
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);
-  r.size.height = MAX(NSHeight(r), 19);
   // The editor mirrors the attributed preview: same font (family, size,
   // weight, italic — all zoom-scaled), alignment and text color.
   [self startFieldForItem:hit
@@ -86,13 +84,22 @@
                    color:RDLColorFromHex(hit.style.color)];
 }
 
+// `rect` arrives in model space, like everything else the canvas works out.
+// The editor is not drawn by the canvas, though: it is a real NSTextField added
+// as a subview, and a subview's frame is in the view's own points. So this is
+// the one place that puts the zoom back, and the smallest usable height is
+// applied afterwards -- 19 points on screen, not 19 that grow with the zoom.
 - (void)startFieldForItem:(RDLItem *)it
-                    rect:(NSRect)rect
+                    rect:(NSRect)modelRect
                  initial:(NSString *)text
                     font:(NSFont *)font
                    align:(NSTextAlignment)align
                    color:(NSColor *)color {
   [self commit];
+  CGFloat zoom = _ctx.zoom > 0 ? _ctx.zoom : 1.0;
+  NSRect rect = NSMakeRect(NSMinX(modelRect) * zoom, NSMinY(modelRect) * zoom,
+                           NSWidth(modelRect) * zoom, NSHeight(modelRect) * zoom);
+  rect.size.height = MAX(NSHeight(rect), 19);
   _editItem = it;
   _editorCancelled = NO;
   _editorStarting = YES;

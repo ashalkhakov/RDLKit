@@ -6,12 +6,19 @@ const CGFloat RDLPointsPerInch = 72.0;
 NSString * const RDLHandleMove = @"move";
 const CGFloat RDLTablixHandleBand = 12.0;
 
-CGFloat RDLTablixHandleBandForZoom(CGFloat zoom) {
-  return RDLTablixHandleBand * (zoom > 0 ? zoom : 1.0);
+NSAffineTransform *RDLCanvasViewTransform(CGFloat zoom) {
+  NSAffineTransform *xf = [NSAffineTransform transform];
+  [xf scaleBy:zoom > 0 ? zoom : 1.0];
+  return xf;
 }
 
-NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom) {
-  CGFloat band = RDLTablixHandleBandForZoom(zoom);
+NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom) {
+  CGFloat z = zoom > 0 ? zoom : 1.0;
+  return NSMakePoint(point.x / z, point.y / z);
+}
+
+NSRect RDLTablixHandleRect(NSRect itemRect) {
+  CGFloat band = RDLTablixHandleBand;
   return NSMakeRect(NSMinX(itemRect) - band, NSMinY(itemRect) - band,
                     NSWidth(itemRect) + band, NSHeight(itemRect) + band);
 }
@@ -42,13 +49,10 @@ static const CGFloat kColumnBorderSlop = 3.0;
   RDLReport *_report;
 }
 
-+ (instancetype)geometryForReport:(RDLReport *)report
-                             zoom:(CGFloat)zoom
-                      paperOrigin:(NSPoint)origin {
++ (instancetype)geometryForReport:(RDLReport *)report paperOrigin:(NSPoint)origin {
   RDLPageGeometry *g = [[RDLPageGeometry alloc] init];
   g->_report = report;
-  g->_zoom = zoom > 0 ? zoom : 1.0;
-  CGFloat scale = RDLPointsPerInch * g->_zoom;
+  CGFloat scale = RDLPointsPerInch;
   RDLPage *page = report.page;
   g->_paperRect = NSMakeRect(origin.x, origin.y, page.pageWidth * scale,
                              page.pageHeight * scale);
@@ -90,27 +94,23 @@ static const CGFloat kRDLBracketTick = 4;
 static const CGFloat kRDLBracketGap = 3;
 
 + (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count
-                                          inRect:(NSRect)rect
-                                            zoom:(CGFloat)zoom {
-  CGFloat z = zoom > 0 ? zoom : 1.0;
+                                          inRect:(NSRect)rect {
   NSMutableArray *out = [NSMutableArray array];
   for (NSUInteger i = 0; i < count; i++) {
-    CGFloat x = NSMinX(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i)) * z;
-    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick * z,
+    CGFloat x = NSMinX(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i));
+    [out addObject:[NSValue valueWithRect:NSMakeRect(x, NSMinY(rect), kRDLBracketTick,
                                                      NSHeight(rect))]];
   }
   return out;
 }
 
 + (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count
-                                             inRect:(NSRect)rect
-                                               zoom:(CGFloat)zoom {
-  CGFloat z = zoom > 0 ? zoom : 1.0;
+                                             inRect:(NSRect)rect {
   NSMutableArray *out = [NSMutableArray array];
   for (NSUInteger i = 0; i < count; i++) {
-    CGFloat y = NSMinY(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i)) * z;
+    CGFloat y = NSMinY(rect) - (kRDLBracketGap + kRDLBracketStep * (CGFloat)(count - i));
     [out addObject:[NSValue valueWithRect:NSMakeRect(NSMinX(rect), y, NSWidth(rect),
-                                                     kRDLBracketTick * z)]];
+                                                     kRDLBracketTick)]];
   }
   return out;
 }
@@ -120,7 +120,7 @@ static const CGFloat kRDLBracketGap = 3;
 }
 
 - (NSRect)rectForItem:(RDLItem *)item origin:(NSPoint)origin {
-  CGFloat scale = RDLPointsPerInch * _zoom;
+  CGFloat scale = RDLPointsPerInch;
   return NSMakeRect(origin.x + item.left * scale, origin.y + item.top * scale,
                     item.width * scale, MAX(1, item.height * scale));
 }
@@ -167,8 +167,7 @@ static const CGFloat kRDLBracketGap = 3;
       NSRect cell = [RDLTablixGeometry cellRectOf:tablix
                                          itemRect:itemRect
                                               row:row
-                                           column:col
-                                             zoom:_zoom];
+                                           column:col];
       if (item == target) {
         if (outRect)
           *outRect = cell;
@@ -245,7 +244,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
     // an unselected region has no band drawn, and a target nobody can see is
     // a click stolen from whatever is really there.
     if (it == _engagedTablix && !NSPointInRect(point, r) &&
-        NSPointInRect(point, RDLTablixHandleRect(r, self.zoom))) {
+        NSPointInRect(point, RDLTablixHandleRect(r))) {
       if (outKind)
         *outKind = RDLHandleMove;
       if (outRect)
@@ -278,8 +277,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
                         itemRect:itemRect
                            point:point
                              row:&row
-                          column:&col
-                            zoom:_zoom])
+                          column:&col])
     return nil;
   RDLItem *item = [RDLTablixGeometry itemOf:tablix inRow:row column:col];
   if (item == nil)
@@ -287,8 +285,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
   NSRect cell = [RDLTablixGeometry cellRectOf:tablix
                                      itemRect:itemRect
                                           row:row
-                                       column:col
-                                         zoom:_zoom];
+                                       column:col];
   if ([item.childItems count]) {
     RDLItem *child = [self itemInItems:item.childItems
                                 origin:NSMakePoint(NSMinX(cell), NSMinY(cell))
@@ -415,63 +412,61 @@ static const CGFloat kUnbuiltColumnWidth = 60.0;
   return n + [self headerColumnCountOf:tablix];
 }
 
-+ (CGFloat)heightOfRow:(NSUInteger)row of:(RDLTablix *)tablix zoom:(CGFloat)zoom {
++ (CGFloat)heightOfRow:(NSUInteger)row of:(RDLTablix *)tablix {
   NSArray<NSNumber *> *headings = [tablix columnHeaderRowHeights];
   if (row < [headings count])
-    return MAX(kMinPreviewRowHeight, [headings[row] doubleValue] * RDLPointsPerInch * zoom);
+    return MAX(kMinPreviewRowHeight, [headings[row] doubleValue] * RDLPointsPerInch);
   NSUInteger index = row - [headings count];
   NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
   CGFloat inches = index < [rows count] ? rows[index].height : 0;
   if (inches <= 0)
     inches = index == 0 ? tablix.headerHeight : tablix.rowHeight;
-  return MAX(kMinPreviewRowHeight, inches * RDLPointsPerInch * zoom);
+  return MAX(kMinPreviewRowHeight, inches * RDLPointsPerInch);
 }
 
-+ (CGFloat)widthOfBodyColumn:(NSUInteger)column of:(RDLTablix *)tablix zoom:(CGFloat)zoom {
++ (CGFloat)widthOfBodyColumn:(NSUInteger)column of:(RDLTablix *)tablix {
   NSArray<NSNumber *> *headers = [tablix rowHeaderColumnWidths];
   if (column < [headers count])
-    return [headers[column] doubleValue] * RDLPointsPerInch * zoom;
+    return [headers[column] doubleValue] * RDLPointsPerInch;
   NSUInteger index = column - [headers count];
   NSArray<RDLTablixColumn *> *columns = tablix.tablixBody.columns;
   if (index < [columns count] && columns[index].width > 0)
-    return columns[index].width * RDLPointsPerInch * zoom;
+    return columns[index].width * RDLPointsPerInch;
   // A tablix not built yet is described by its column specs.
   NSArray *specs = tablix.columnSpecs ?: @[];
-  return index < [specs count] ? [specs[index][@"width"] doubleValue] * RDLPointsPerInch * zoom
+  return index < [specs count] ? [specs[index][@"width"] doubleValue] * RDLPointsPerInch
                                : kUnbuiltColumnWidth;
 }
 
 + (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
                  row:(NSUInteger)row
-              column:(NSUInteger)column
-                zoom:(CGFloat)zoom {
+              column:(NSUInteger)column {
   CGFloat x = NSMinX(itemRect);
   for (NSUInteger i = 0; i < column; i++)
-    x += [self widthOfBodyColumn:i of:tablix zoom:zoom];
+    x += [self widthOfBodyColumn:i of:tablix];
   CGFloat y = NSMinY(itemRect);
   for (NSUInteger j = 0; j < row; j++)
-    y += [self heightOfRow:j of:tablix zoom:zoom];
-  return NSMakeRect(x, y, [self widthOfBodyColumn:column of:tablix zoom:zoom],
-                    [self heightOfRow:row of:tablix zoom:zoom]);
+    y += [self heightOfRow:j of:tablix];
+  return NSMakeRect(x, y, [self widthOfBodyColumn:column of:tablix],
+                    [self heightOfRow:row of:tablix]);
 }
 
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
            row:(NSUInteger *)outRow
-        column:(NSUInteger *)outColumn
-          zoom:(CGFloat)zoom {
+        column:(NSUInteger *)outColumn {
   NSUInteger rows = [self rowCountOf:tablix], cols = [self columnCountOf:tablix];
   if (rows == 0 || cols == 0 || !NSPointInRect(point, itemRect))
     return NO;
   CGFloat y = NSMinY(itemRect);
   for (NSUInteger r = 0; r < rows; r++) {
-    CGFloat h = [self heightOfRow:r of:tablix zoom:zoom];
+    CGFloat h = [self heightOfRow:r of:tablix];
     if (point.y >= y && point.y < y + h) {
       CGFloat x = NSMinX(itemRect);
       for (NSUInteger c = 0; c < cols; c++) {
-        CGFloat w = [self widthOfBodyColumn:c of:tablix zoom:zoom];
+        CGFloat w = [self widthOfBodyColumn:c of:tablix];
         if (point.x >= x && point.x < x + w) {
           if (outRow)
             *outRow = r;
@@ -605,12 +600,11 @@ static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUIntege
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
              x:(CGFloat)x
-        column:(NSUInteger *)outColumn
-          zoom:(CGFloat)zoom {
+        column:(NSUInteger *)outColumn {
   NSUInteger cols = [self columnCountOf:tablix];
   CGFloat left = NSMinX(itemRect);
   for (NSUInteger c = 0; c < cols; c++) {
-    CGFloat w = [self widthOfBodyColumn:c of:tablix zoom:zoom];
+    CGFloat w = [self widthOfBodyColumn:c of:tablix];
     if (x >= left && x < left + w) {
       if (outColumn)
         *outColumn = c;
@@ -631,28 +625,25 @@ static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUIntege
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     handleColumnAtPoint:(NSPoint)point
-                 column:(NSUInteger *)outColumn
-                   zoom:(CGFloat)zoom {
-  NSRect band = RDLTablixHandleRect(itemRect, zoom);
+                 column:(NSUInteger *)outColumn {
+  NSRect band = RDLTablixHandleRect(itemRect);
   // The strip above the grid only, and not the corner square to its left.
   if (point.y < NSMinY(band) || point.y >= NSMinY(itemRect) || point.x < NSMinX(itemRect))
     return NO;
-  return [self tablix:tablix itemRect:itemRect x:point.x column:outColumn zoom:zoom];
+  return [self tablix:tablix itemRect:itemRect x:point.x column:outColumn];
 }
 
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     dropColumnAtPoint:(NSPoint)point
-               column:(NSUInteger *)outColumn
-                 zoom:(CGFloat)zoom {
-  return [self tablix:tablix itemRect:itemRect x:point.x column:outColumn zoom:zoom];
+               column:(NSUInteger *)outColumn {
+  return [self tablix:tablix itemRect:itemRect x:point.x column:outColumn];
 }
 
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     columnBorderAtPoint:(NSPoint)point
-                 column:(NSUInteger *)outColumn
-                   zoom:(CGFloat)zoom {
+                 column:(NSUInteger *)outColumn {
   NSUInteger headers = [self headerColumnCountOf:tablix];
   NSUInteger columns = [self columnCountOf:tablix];
   if (columns < headers + 2)
@@ -660,16 +651,16 @@ static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUIntege
   CGFloat gridBottom = NSMinY(itemRect);
   NSUInteger rows = [self rowCountOf:tablix];
   for (NSUInteger r = 0; r < rows; r++)
-    gridBottom += [self heightOfRow:r of:tablix zoom:zoom];
+    gridBottom += [self heightOfRow:r of:tablix];
   if (point.y < NSMinY(itemRect) || point.y > gridBottom)
     return NO;
   CGFloat x = NSMinX(itemRect);
   for (NSUInteger c = 0; c < headers; c++)
-    x += [self widthOfBodyColumn:c of:tablix zoom:zoom];
+    x += [self widthOfBodyColumn:c of:tablix];
   // Between body columns only: the last one's right edge is the item's east
   // handle, and a row-header column is as wide as its group says.
   for (NSUInteger c = headers; c + 1 < columns; c++) {
-    x += [self widthOfBodyColumn:c of:tablix zoom:zoom];
+    x += [self widthOfBodyColumn:c of:tablix];
     if (fabs(point.x - x) <= kColumnBorderSlop) {
       if (outColumn)
         *outColumn = c - headers;

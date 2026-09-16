@@ -162,7 +162,7 @@ UI.
 | Canvas | Selection | Single item (or one cell) |
 | Canvas | Resize handles | Three (E, S, SE) |
 | Canvas | Align / distribute / same size / z-order | — |
-| Canvas | Rulers, zoom 40–400%, grid | Yes (grid toggle is visual only) |
+| Canvas | Rulers, zoom 40–400%, grid | Yes (grid toggle is visual only). Zoom is one view transform over model-space geometry: everything is measured, drawn and hit-tested in points at 100%, and `RDLCanvasViewTransform` applies the scale once, with every mouse point coming back through `RDLModelPointFromView`. Panning is the scroll view's. |
 | Canvas | Outline (report → bands → items → tablix rows → cells) | Yes; no drag |
 | Canvas | Undo/redo, cut/copy/paste/duplicate/delete | Yes |
 | Files | Open `.rdl` (2005–2016), scaffold from `.docx`, Samples | Yes; the parser's `warnings` are never shown |
@@ -226,7 +226,7 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `PaddingLeft/Right/Top/Bottom` | — | Four fields, each taking a length or an expression, and the canvas insets text by all four sides at zoom (P1.1). |
+| `PaddingLeft/Right/Top/Bottom` | — | Four fields, each taking a length or an expression, and the canvas insets text by all four sides (P1.1). |
 | `Border` + per-edge borders | UI | The canvas draws each edge in its own style, width and colour through `RDLBorderPainter`, the one the preview and PDF use, so a rectangle is bordered and a thick or dashed edge looks like itself (P1.1). Each edge is stated in the Borders… panel, which is also how a cell is bordered, since `TablixCell` has no `Style` of its own (P1.1). |
 | `FontWeight` beyond Normal/Bold | UI (engine PART) | The popup offers every weight; Font… still collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
 | Style expressions on every property | UI | 9 of 27 wired. |

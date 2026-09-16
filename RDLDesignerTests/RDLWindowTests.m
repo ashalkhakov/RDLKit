@@ -1695,8 +1695,7 @@ static NSTabView *_centerTabViewOf(id wc) {
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
   RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-                                                            zoom:1.0
-                                                     paperOrigin:NSMakePoint(0, 0)];
+paperOrigin:NSMakePoint(0, 0)];
   NSRect rect = NSZeroRect;
   if (![geometry findRectOfItem:tablix rect:&rect]) {
     XCTFail(@"%@", @"the tablix should have a rect");
@@ -1758,7 +1757,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 
   // And it reads as one handle per column rather than as a single bar: the
   // boundary between two of them is drawn, so there is something to aim at.
-  CGFloat boundary = NSMinX(rect) + [RDLTablixGeometry widthOfBodyColumn:0 of:tablix zoom:1.0];
+  CGFloat boundary = NSMinX(rect) + [RDLTablixGeometry widthOfBodyColumn:0 of:tablix];
   NSColor *seam = [[bitmap colorAtX:(NSInteger)boundary y:(NSInteger)(NSMinY(rect) - 6)]
       colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
   CGFloat fromFill = fabs([seam redComponent] - [band redComponent]) +
@@ -1830,7 +1829,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   [[canvas geometry] findRectOfItem:tablix rect:&rect];
   CGFloat x = NSMinX(rect);
   for (NSUInteger i = 0; i < 2; i++)
-    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:ctx.zoom];
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix];
 
   [canvas mouseDown:RDLMouseEventInView(canvas, NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 6),
                                         NSEventTypeLeftMouseDown, 1)];
@@ -1936,7 +1935,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSString *before = [RDLEditor XMLStringForItem:matrix];
   CGFloat x = NSMinX(rect);
   for (NSUInteger i = 0; i < 2; i++)
-    x += [RDLTablixGeometry widthOfBodyColumn:i of:matrix zoom:ctx.zoom];
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:matrix];
   [canvas mouseDown:RDLMouseEventInView(canvas, NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 6),
                                         NSEventTypeLeftMouseDown, 1)];
   [canvas mouseDragged:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
@@ -1983,7 +1982,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSPoint grab = NSMakePoint(NSMinX(rect) + 6, NSMinY(rect) - 4);
   CGFloat x = NSMinX(rect);
   for (NSUInteger i = 0; i < 2; i++)
-    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:ctx.zoom];
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix];
   NSPoint drop = NSMakePoint(x + 6, NSMinY(rect) - 4);
 
   [canvas mouseDown:RDLMouseEventInView(canvas, grab, NSEventTypeLeftMouseDown, 1)];
@@ -2054,8 +2053,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   NSString *movedHeader = before[0];
 
   RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-                                                            zoom:1.0
-                                                     paperOrigin:NSMakePoint(0, 0)];
+paperOrigin:NSMakePoint(0, 0)];
   NSRect rect = NSZeroRect;
   [geometry findRectOfItem:tablix rect:&rect];
   // The handle of the first column: in the band, above the grid.
@@ -2063,8 +2061,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   if (![RDLTablixGeometry tablix:tablix
                         itemRect:rect
              handleColumnAtPoint:NSMakePoint(NSMinX(rect) + 4, NSMinY(rect) - 4)
-                          column:&column
-                            zoom:1.0] ||
+                          column:&column] ||
       column != 0) {
     XCTFail(@"%@", [NSString stringWithFormat:@"the first column's handle is above it: %lu",
                                               (unsigned long)column]);
@@ -2075,20 +2072,18 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([RDLTablixGeometry tablix:tablix
                        itemRect:rect
             handleColumnAtPoint:NSMakePoint(NSMinX(rect) - 4, NSMinY(rect) - 4)
-                         column:&ignored
-                           zoom:1.0])
+                         column:&ignored])
     XCTFail(@"%@", @"the corner moves the region, not a column");
 
   // Dropped on the third column.
   CGFloat x = NSMinX(rect);
   for (NSUInteger i = 0; i < 2; i++)
-    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix zoom:1.0];
+    x += [RDLTablixGeometry widthOfBodyColumn:i of:tablix];
   NSUInteger target = 0;
   if (![RDLTablixGeometry tablix:tablix
                         itemRect:rect
                dropColumnAtPoint:NSMakePoint(x + 4, NSMinY(rect) - 4)
-                          column:&target
-                            zoom:1.0]) {
+                          column:&target]) {
     XCTFail(@"%@", @"the drop should land in a column");
     return;
   }
@@ -2114,8 +2109,7 @@ static NSTabView *_centerTabViewOf(id wc) {
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
   RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-                                                            zoom:1.0
-                                                     paperOrigin:NSMakePoint(0, 0)];
+paperOrigin:NSMakePoint(0, 0)];
   NSRect rect = NSZeroRect;
   if (![geometry findRectOfItem:tablix rect:&rect]) {
     XCTFail(@"%@", @"the tablix should have a rect");
@@ -2188,43 +2182,45 @@ static NSTabView *_centerTabViewOf(id wc) {
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
 
-  CGFloat outside = RDLTablixHandleBand + 6;  // beyond the band at 100%
+  // One geometry, in model space, whatever the canvas is zoomed to: the band
+  // is RDLTablixHandleBand thick there and the view transform makes it
+  // thicker on screen.
+  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
+                                                    paperOrigin:NSMakePoint(0, 0)];
+  NSRect rect = NSZeroRect;
+  if (![geometry findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the tablix should have a rect");
+    return;
+  }
+  geometry.engagedTablix = tablix;  // the band belongs to the engaged region
+  NSRect band = RDLTablixHandleRect(rect);
+  if (fabs((NSMinY(rect) - NSMinY(band)) - RDLTablixHandleBand) > 0.01)
+    XCTFail(@"%@", @"the band is one thickness above the region in model space");
+  NSSize drawn = [RDLCanvasViewTransform(2.0) transformSize:band.size];
+  if (fabs(drawn.height - 2 * NSHeight(band)) > 0.01)
+    XCTFail(@"%@", @"at 200% the band should be drawn twice as thick");
+
+  // What that thickening is for: a click as far out as the band reaches at
+  // 200% lands on the region, and the same screen point at 100% does not.
+  // Drawing and hit-testing agree because the point comes back through the
+  // same transform the drawing went out through.
+  // A fixed distance on screen, which is the whole point: the same click lands
+  // outside the band at 100% and inside it at 200%, because converting it back
+  // through the transform halves it while the band stays as thick as it is.
+  CGFloat outsideOnScreen = RDLTablixHandleBand + 6;
   for (NSNumber *z in @[ @1.0, @2.0 ]) {
     CGFloat zoom = [z doubleValue];
-    RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-                                                              zoom:zoom
-                                                       paperOrigin:NSMakePoint(0, 0)];
-    NSRect rect = NSZeroRect;
-    if (![geometry findRectOfItem:tablix rect:&rect]) {
-      XCTFail(@"%@", @"the tablix should have a rect");
-      return;
-    }
-    geometry.engagedTablix = tablix;  // the band belongs to the engaged region
-    NSRect band = RDLTablixHandleRect(rect, zoom);
-    if (fabs((NSMinY(rect) - NSMinY(band)) - RDLTablixHandleBand * zoom) > 0.01)
-      XCTFail(@"%@", @"the band should be as many times thicker as the zoom");
-
+    NSPoint onScreen = NSMakePoint(NSMidX(rect) * zoom, NSMinY(rect) * zoom - outsideOnScreen);
     NSString *kind = nil, *bandKey = nil;
-    NSRect hit = NSZeroRect;
-    RDLItem *at = [geometry itemAtPoint:NSMakePoint(NSMidX(rect), NSMinY(rect) - outside)
+    RDLItem *at = [geometry itemAtPoint:RDLModelPointFromView(onScreen, zoom)
                                    kind:&kind
                                 bandKey:&bandKey
-                                   rect:&hit];
+                                   rect:NULL];
     if (zoom == 1.0 && at == tablix)
       XCTFail(@"%@", @"at 100% that point is above the band, not in it");
     if (zoom == 2.0 && at != tablix)
       XCTFail(@"%@", @"at 200% the band reaches that far and should be hit");
   }
-
-  // The group brackets step out from the region by the same factor, so they
-  // stay clear of the band that grew with them.
-  NSRect region = NSMakeRect(120, 80, 400, 200);
-  NSRect one = [[RDLPageGeometry rowGroupBracketsForCount:2 inRect:region zoom:1.0][0] rectValue];
-  NSRect two = [[RDLPageGeometry rowGroupBracketsForCount:2 inRect:region zoom:2.0][0] rectValue];
-  if (fabs((NSMinX(region) - NSMinX(two)) - 2 * (NSMinX(region) - NSMinX(one))) > 0.01)
-    XCTFail(@"%@", @"a row bracket should stand twice as far out at twice the zoom");
-  if (fabs(NSWidth(two) - 2 * NSWidth(one)) > 0.01)
-    XCTFail(@"%@", @"and its turned-in ends should be twice as long");
 }
 
 // 400%, because that is what makes a nested group structure readable. The
@@ -2526,8 +2522,7 @@ static NSTabView *_centerTabViewOf(id wc) {
       tablix = (RDLTablix *)item;
   RDLItem *cellItem = [tablix.tablixBody.rows[1].cells firstObject].item;
   RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-                                                            zoom:1.0
-                                                     paperOrigin:NSMakePoint(0, 0)];
+paperOrigin:NSMakePoint(0, 0)];
   NSRect cellRect = NSZeroRect;
   if (![geometry findRectOfItem:cellItem rect:&cellRect]) {
     XCTFail(@"%@", @"an item in a cell has a rect of its own -- the cell's");
@@ -2948,8 +2943,7 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   NSRect cell = [RDLTablixGeometry cellRectOf:tablix
                                      itemRect:itemRect
                                           row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:bodyRow]
-                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn]
-                                         zoom:zoom];
+                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn]];
   return NSMakePoint(NSMidX(cell), NSMidY(cell));
 }
 
@@ -3074,7 +3068,7 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   CGFloat border = NSMinX(rect);
   NSUInteger headers = [RDLTablixGeometry headerColumnCountOf:tablix];
   for (NSUInteger c = 0; c <= headers; c++)
-    border += [RDLTablixGeometry widthOfBodyColumn:c of:tablix zoom:ctx.zoom];
+    border += [RDLTablixGeometry widthOfBodyColumn:c of:tablix];
   CGFloat y = NSMinY(rect) + 4;
   // Off the grid by a little: what is dropped is snapped.
   CGFloat moved = 0.33 * RDLPointsPerInch * ctx.zoom;
@@ -3168,8 +3162,7 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   NSRect header = [RDLTablixGeometry cellRectOf:tablix
                                        itemRect:rect
                                             row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:first]
-                                         column:headerColumn
-                                           zoom:ctx.zoom];
+                                         column:headerColumn];
   NSMenu *menu = [canvas menuForEvent:RDLMouseEventInView(canvas, NSMakePoint(NSMidX(header), NSMidY(header)),
                                                           NSEventTypeRightMouseDown, 1)];
   NSMenu *rowGroup = [[menu itemWithTitle:@"Row Group"] submenu];
@@ -3191,8 +3184,7 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   NSRect cell = [RDLTablixGeometry cellRectOf:tablix
                                      itemRect:rect
                                           row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:first]
-                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:0]
-                                         zoom:ctx.zoom];
+                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:0]];
   menu = [canvas menuForEvent:RDLMouseEventInView(canvas, NSMakePoint(NSMidX(cell), NSMidY(cell)),
                                                   NSEventTypeRightMouseDown, 1)];
   rowGroup = [[menu itemWithTitle:@"Row Group"] submenu];

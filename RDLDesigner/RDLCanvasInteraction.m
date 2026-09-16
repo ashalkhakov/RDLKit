@@ -59,7 +59,10 @@
 }
 
 - (void)mouseDown:(NSEvent *)event {
-  NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
+  // Into model space at once: everything below works in the page's own
+  // coordinates, the same ones the drawing uses.
+  NSPoint p = RDLModelPointFromView([_hostView convertPoint:[event locationInWindow] fromView:nil],
+                                    _ctx.zoom);
   [_host interactionCommitEditing];
   // Take keyboard focus so Return-to-edit and Delete work after a click;
   // Cocoa does not focus a view on click by itself.
@@ -78,8 +81,7 @@
                          itemRect:itemRect
                             point:p
                               row:&gridRow
-                           column:&gridCol
-                             zoom:_ctx.zoom] &&
+                           column:&gridCol] &&
         [RDLTablixGeometry itemOf:(RDLTablix *)hit inRow:gridRow column:gridCol] == nil) {
       // An empty cell: nothing in it to select, so the cell is what is
       // selected -- and what the next thing inserted goes into.
@@ -114,8 +116,7 @@
         [RDLTablixGeometry tablix:(RDLTablix *)hit
                          itemRect:itemRect
               handleColumnAtPoint:p
-                           column:&handleColumn
-                             zoom:_ctx.zoom]) {
+                           column:&handleColumn]) {
       if ([RDLTablixGeometry tablix:(RDLTablix *)hit columnIsMovable:handleColumn]) {
         _dragKind = @"tabmove";
         _dragActive = NO;
@@ -140,8 +141,7 @@
         [RDLTablixGeometry tablix:(RDLTablix *)hit
                          itemRect:itemRect
               columnBorderAtPoint:p
-                           column:&borderCol
-                             zoom:_ctx.zoom]) {
+                           column:&borderCol]) {
       // Dragging an internal column border resizes that column.
       _dragKind = @"tabcol";
       _dragActive = NO;
@@ -172,7 +172,10 @@
 - (void)mouseDragged:(NSEvent *)event {
   if (_dragKind == nil)
     return;
-  NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
+  // Into model space at once: everything below works in the page's own
+  // coordinates, the same ones the drawing uses.
+  NSPoint p = RDLModelPointFromView([_hostView convertPoint:[event locationInWindow] fromView:nil],
+                                    _ctx.zoom);
   if (!_dragActive) {
     // Slop threshold: the jiggle between the clicks of a double-click (or a
     // sloppy single click) must not move the item — that both disturbed
@@ -189,9 +192,8 @@
     if (_dragGroupOpen)
       [_ctx.editor beginGroup:@"Move"];
   }
-  CGFloat z = _ctx.zoom;
-  CGFloat dx = (p.x - _dragStart.x) / (RDLPointsPerInch * z);
-  CGFloat dy = (p.y - _dragStart.y) / (RDLPointsPerInch * z);
+  CGFloat dx = (p.x - _dragStart.x) / RDLPointsPerInch;
+  CGFloat dy = (p.y - _dragStart.y) / RDLPointsPerInch;
   if ([_dragKind isEqualToString:@"move"])
     [_ctx.editor moveItem:[_ctx selectedItem] toLeft:_origLeft + dx top:_origTop + dy];
   else if ([_dragKind isEqualToString:@"se"])
@@ -209,8 +211,7 @@
     _dragColumnTarget = [RDLTablixGeometry tablix:_dragTablix
                                          itemRect:_dragTablixRect
                                 dropColumnAtPoint:p
-                                           column:&target
-                                             zoom:z]
+                                           column:&target]
                             ? (NSInteger)target
                             : -1;
     [_host interactionNeedsRedraw];
@@ -231,15 +232,17 @@
     _dragGroupOpen = NO;
   }
   if ([_dragKind isEqualToString:@"tabmove"] && _dragActive) {
-    NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
+    // Into model space at once: everything below works in the page's own
+  // coordinates, the same ones the drawing uses.
+  NSPoint p = RDLModelPointFromView([_hostView convertPoint:[event locationInWindow] fromView:nil],
+                                    _ctx.zoom);
     RDLTablix *tablix = (RDLTablix *)[_ctx selectedItem];
     NSUInteger target = 0;
     if ([tablix isKindOfClass:[RDLTablix class]] &&
         [RDLTablixGeometry tablix:tablix
                          itemRect:_dragTablixRect
                  dropColumnAtPoint:p
-                           column:&target
-                             zoom:_ctx.zoom]) {
+                           column:&target]) {
       NSInteger body = [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:target];
       if (body >= 0)
         [_ctx.editor moveTablixColumnAtIndex:_dragColIndex
@@ -337,8 +340,10 @@
 }
 
 - (void)mouseMoved:(NSEvent *)event {
-  NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
-  CGFloat z = _ctx.zoom;
+  // Into model space at once: everything below works in the page's own
+  // coordinates, the same ones the drawing uses.
+  NSPoint p = RDLModelPointFromView([_hostView convertPoint:[event locationInWindow] fromView:nil],
+                                    _ctx.zoom);
   RDLItem *hoverTab = nil;
   NSInteger hoverRow = -1, hoverCol = -1;
   BOOL onBorder = NO;
@@ -355,12 +360,12 @@
       continue;
     NSRect ir = [rects[i] rectValue];
     NSUInteger bc = 0;
-    if ([RDLTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc zoom:z]) {
+    if ([RDLTablixGeometry tablix:it itemRect:ir columnBorderAtPoint:p column:&bc]) {
       onBorder = YES;
       break;
     }
     NSUInteger row = 0, column = 0;
-    if ([RDLTablixGeometry tablix:it itemRect:ir point:p row:&row column:&column zoom:z]) {
+    if ([RDLTablixGeometry tablix:it itemRect:ir point:p row:&row column:&column]) {
       hoverTab = it;
       hoverRow = (NSInteger)row;
       hoverCol = (NSInteger)column;
