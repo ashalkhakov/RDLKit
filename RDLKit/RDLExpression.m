@@ -1,4 +1,5 @@
 #import "RDLExpression.h"
+#import "RDLValueBoxing.h"
 #import "RDLCode.h"
 #import "RDLExpressionCatalog.h"
 #import "RDLReport.h"
@@ -77,16 +78,7 @@ id RDLRowValue(id row, NSString *key) {
   return RDLFetchRowKey(row, RDLResolveRowKey(row, key));
 }
 
-// Nothing: nil, or NSNull where a collection holds it. The empty string is a
-// string, as it is in VB: IsNothing("") is False, and Count counts it.
-static BOOL RDLIsNothing(id v) {
-  return v == nil || v == [NSNull null];
-}
 
-// A value as a collection holds it, Nothing being NSNull there.
-static id RDLOutOfCollection(id v) {
-  return v == [NSNull null] ? nil : v;
-}
 
 // Boolean NSNumber detection that does not rely on CFBoolean singletons
 // (portable across Apple Foundation and GNUstep). The singletons where they
@@ -149,20 +141,6 @@ static NSString *RDLStrInLocale(id v, NSLocale *locale) {
   return [text isKindOfClass:[NSString class]] && [text length] ? text : RDLStr(v);
 }
 
-static double RDLNum(id v) {
-  if ([v isKindOfClass:[RDLNumber class]])
-    return [(RDLNumber *)v doubleValue];
-  if ([v isKindOfClass:[NSNumber class]])
-    return [v doubleValue];
-  if ([v isKindOfClass:[NSDate class]])
-    return [(NSDate *)v timeIntervalSince1970] * 1000.0;
-  if ([v isKindOfClass:[NSString class]]) {
-    NSString *s = [(NSString *)v stringByReplacingOccurrencesOfString:@"," withString:@""];
-    s = [s stringByReplacingOccurrencesOfString:@"$" withString:@""];
-    return [s doubleValue];
-  }
-  return 0;
-}
 
 static BOOL RDLBool(id v) {
   BOOL bv = NO;
@@ -184,17 +162,7 @@ static BOOL RDLBool(id v) {
   return [s length] > 0;
 }
 
-// A number, or a Foundation number -- True and False among them -- that came
-// from outside the expression language.
-static BOOL RDLNumericLikeValue(id v) {
-  return [v isKindOfClass:[RDLNumber class]] || [v isKindOfClass:[NSNumber class]];
-}
 
-static BOOL RDLNumericLike(id v) {
-  if (RDLNumericLikeValue(v))
-    return YES;
-  return [v isKindOfClass:[NSString class]] && [RDLNumber doubleWithText:v] != nil;
-}
 
 static BOOL RDLKeyEq(id a, id b) {
   if (RDLIsNothing(a) && RDLIsNothing(b))
@@ -207,9 +175,6 @@ static BOOL RDLKeyEq(id a, id b) {
   return [RDLStr(a) isEqualToString:RDLStr(b)];
 }
 
-static id RDLYes(BOOL b) {
-  return b ? @YES : @NO;
-}
 
 static NSDate *RDLAsDate(id v, NSDate *fallback);
 
@@ -252,26 +217,13 @@ BOOL RDLValueAsBoolean(id value) {
   return RDLBool(value);
 }
 
-// The numbers the expression language makes, by the VB type they are.
-static RDLNumber *RDLShort(int16_t v) {
-  return [RDLNumber numberWithShort:v];
-}
 
-static RDLNumber *RDLInt(int32_t v) {
-  return [RDLNumber numberWithInteger:v];
-}
 
-static RDLNumber *RDLLong(int64_t v) {
-  return [RDLNumber numberWithLong:v];
-}
 
 static RDLNumber *RDLSingle(float v) {
   return [RDLNumber numberWithSingle:v];
 }
 
-static RDLNumber *RDLDouble(double v) {
-  return [RDLNumber numberWithDouble:v];
-}
 
 RDLNumericType RDLNumericTypeOfValue(id value) {
   return [[RDLNumber numberFromValue:value] type];

@@ -10,6 +10,8 @@
 #import "RDLZipArchive.h"
 #import "RDLDocxReader.h"
 #import "RDLImporter.h"
+// The handful of ways the expression language boxes a value.
+#import "RDLValueBoxing.h"
 #import "RDLExpression.h"
 #import "RDLExpressionCatalog.h"
 #import "RDLLayoutEngine.h"

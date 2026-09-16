@@ -21,6 +21,7 @@ RDLKit_HEADER_FILES = \
   RDLCSVDataProvider.h \
   RDLSubreportLoader.h \
   RDLTextAttributes.h \
+  RDLValueBoxing.h \
   RDLBorderPainter.h \
   RDLLinePainter.h \
   RDLParameterValues.h \
@@ -49,6 +50,7 @@ RDLKit_OBJC_FILES = \
   RDLCSVDataProvider.m \
   RDLSubreportLoader.m \
   RDLTextAttributes.m \
+  RDLValueBoxing.m \
   RDLBorderPainter.m \
   RDLLinePainter.m \
   RDLMarkup.m \
