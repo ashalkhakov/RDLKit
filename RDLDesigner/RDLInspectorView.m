@@ -76,6 +76,11 @@
 // Line section
 @property (nonatomic, strong) IBOutlet NSView *lineBox;
 @property (nonatomic, strong) IBOutlet NSTextField *lineColorField;
+// A line's own thickness and dash, which the canvas has always drawn and the
+// inspector never offered.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *lineWidthField;
+@property (nonatomic, strong) IBOutlet NSButton *lineWidthExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *lineDashPop;
 // Rectangle section
 @property (nonatomic, strong) IBOutlet NSView *rectBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *rectBGField;
@@ -160,7 +165,7 @@
                          _languageExprButton, _docLanguageExprButton,
                          _rectBGExprButton, _sizeExprButton, _textBGExprButton,
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
-                         _padBottomExprButton ])
+                         _padBottomExprButton, _lineWidthExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -360,8 +365,25 @@
              kind:RDLFieldKindTextOrExpression values:nil placeholder:nil];
 
   // Line and Rectangle each expose one style property.
-  [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
+  // A line is drawn in its border's colour, at its border's width, dashed as
+  // its border says -- which is what MS-RDL means by a Line's style, and what
+  // every backend reads. The ink field used to write style.color, where only a
+  // line with no border colour of its own would ever show it.
+  [_bindings bind:_lineColorField keyPath:@"style.border.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_lineWidthField keyPath:@"style.border.width" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"1pt"];
+  // None, Dotted, Dashed and Solid: the whole of what a line can be drawn as.
+  // The treatments past Solid -- Double, Groove and the rest -- shade an edge
+  // of a box, and a line stroked in any of them comes out solid, so offering
+  // them would be offering something that does not happen.
+  [_bindings bind:_lineDashPop
+          keyPath:@"style.border.style"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_lineDashPop, RDLBorderStyleNone, RDLBorderStyleSolid,
+                               ^(NSInteger v) { return RDLStringFromBorderStyle((RDLBorderStyle)v); })
+      placeholder:nil];
   [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
   [_bindings bind:_bgColorWell keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
@@ -793,6 +815,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _padRightExprButton) return _padRightField;
   if (sender == _padTopExprButton) return _padTopField;
   if (sender == _padBottomExprButton) return _padBottomField;
+  if (sender == _lineWidthExprButton) return _lineWidthField;
   return nil;
 }
 

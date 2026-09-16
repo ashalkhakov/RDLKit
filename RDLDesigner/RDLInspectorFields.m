@@ -94,6 +94,39 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
   return YES;
 }
 
+// The same question asked of an item's kind rather than of what it happens to
+// hold: every step of the path is a property the object in front of it
+// declares, whether or not anything has been put there yet. A line that states
+// no border still has a style that can hold one, so "style.border.width" is a
+// property of that line -- there is simply nothing at the end of it yet.
+//
+// Worth keeping the two apart. RDLCanReadKeyPath answers "can this be read
+// now", which is what filling a control needs; this answers "does this item
+// have such a property at all", which is what deciding to write one needs. A
+// control from a section that does not apply still fails both.
+static BOOL RDLKeyPathIsDeclared(id target, NSString *keyPath) {
+  id probe = target;
+  for (NSString *key in [keyPath componentsSeparatedByString:@"."]) {
+    if (probe == nil)
+      return YES;  // declared, but nothing there yet: the steps so far all hold
+    if (![probe respondsToSelector:NSSelectorFromString(key)])
+      return NO;
+    probe = [probe valueForKey:key];
+  }
+  return YES;
+}
+
+// What a path needs in place before it can be written through. Only the line
+// section reaches two steps down today, and this is deliberately a list rather
+// than a walk that makes an object of whatever class a property declares:
+// creating things on the way to a mistyped path would turn a typo into a model
+// change. Undo leaves the made object behind, which costs nothing -- a border
+// stating no style, width or colour is not written to the file at all.
+static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
+  if ([keyPath hasPrefix:@"style.border."] && item.style.border == nil)
+    item.style.border = [[RDLBorder alloc] init];
+}
+
 - (void)fillFromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
   for (RDLFieldBinding *b in _bindings) {
     id target = [self targetForBinding:b item:item band:band report:report];
@@ -198,10 +231,15 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
   for (RDLFieldBinding *b in _bindings) {
     if (b.control != control)
       continue;
-    // Same reasoning as RDLCanReadKeyPath: a control belonging to a section
-    // that does not apply must not write into an item without that property.
-    if (b.scope == RDLFieldScopeItem && item != nil && !RDLCanReadKeyPath(item, b.keyPath))
+    // A control belonging to a section that does not apply must not write into
+    // an item without that property. Asked of the item's kind, not of what it
+    // holds: a line that states no border yet still has somewhere to put one,
+    // and the old question -- can this be read right now -- answered no, so
+    // the thickness and dash fields wrote nowhere and said nothing about it.
+    if (b.scope == RDLFieldScopeItem && item != nil && !RDLKeyPathIsDeclared(item, b.keyPath))
       continue;
+    if (b.scope == RDLFieldScopeItem && item != nil)
+      RDLEnsureKeyPathIsWritable(item, b.keyPath);
     id value = nil;
     switch (b.kind) {
       case RDLFieldKindText: {

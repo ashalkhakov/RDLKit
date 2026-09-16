@@ -54,6 +54,9 @@
                 <outlet property="leftField" destination="leftField" id="leftFieldOutlet"/>
                 <outlet property="lineBox" destination="lineBox" id="lineBoxOutlet"/>
                 <outlet property="lineColorField" destination="lineColorField" id="lineColorFieldOutlet"/>
+                <outlet property="lineWidthField" destination="lineWidthField" id="lineWidthFieldOutlet"/>
+                <outlet property="lineWidthExprButton" destination="lineWidthExprButton" id="lineWidthExprButtonOutlet"/>
+                <outlet property="lineDashPop" destination="lineDashPop" id="lineDashPopOutlet"/>
                 <outlet property="marginField" destination="marginField" id="marginFieldOutlet"/>
                 <outlet property="marginLabel" destination="lbl8" id="marginLabelOutlet"/>
                 <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
@@ -1022,7 +1025,7 @@
             </subviews>
         </customView>
         <customView id="lineBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="48"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="106"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl23">
@@ -1046,6 +1049,58 @@
                         <outlet property="delegate" destination="-2" id="lineColorFieldDelegate"/>
                     </connections>
                 </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblLineWidth">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Thickness" id="lblLineWidthCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblLineDash">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Dash" id="lblLineDashCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How thick the line is drawn" focusRingType="none" id="lineWidthField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="64" width="86" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="lineWidthFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="lineWidthFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="lineWidthFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="lineWidthExprButton">
+                    <rect key="frame" x="100" y="64" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="lineWidthExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="lineWidthExprButtonAction"/>
+                    </connections>
+                </button>
+                <popUpButton id="lineDashPop">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="lineDashPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="lineDashPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="lineDashPopAction"/>
+                    </connections>
+                </popUpButton>
             </subviews>
         </customView>
         <customView id="rectBox">

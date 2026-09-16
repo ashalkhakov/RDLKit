@@ -714,6 +714,106 @@
     XCTFail(@"%@", @"the cell's top edge should draw at the width it was given");
 }
 
+// A line's thickness, dash and ink, in the real inspector. All three belong to
+// its border, which is where every backend reads them from; the ink field used
+// to write style.color, so on a line whose file gave a border colour, typing a
+// colour changed nothing anyone could see.
+- (void)testTheLineSectionEditsTheBorderItIsDrawnWith {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Ruled"];
+  RDLLine *line = [[RDLLine alloc] init];
+  line.name = @"Rule";
+  line.left = 0.5;
+  line.top = 0.5;
+  line.width = 2.0;
+  line.height = 0;
+  line.style.border = [RDLBorder solidColor:@"#336699"];
+  line.style.border.width = [RDLLength points:3];
+  [report.body.items addObject:line];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:line inBandWithKey:@"body"];
+
+  for (NSString *name in @[ @"lineColorField", @"lineWidthField", @"lineDashPop",
+                            @"lineWidthExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+  if ([[inspector valueForKey:@"lineBox"] isHidden])
+    XCTFail(@"%@", @"a line should show the line section");
+
+  // Model -> fields, from the border rather than from the item's own colour.
+  if (![[[inspector valueForKey:@"lineColorField"] stringValue] isEqualToString:@"#336699"])
+    XCTFail(@"the ink shows %@", [[inspector valueForKey:@"lineColorField"] stringValue]);
+  if (![[[inspector valueForKey:@"lineWidthField"] stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"the thickness shows %@", [[inspector valueForKey:@"lineWidthField"] stringValue]);
+
+  // Fields -> model, onto the border, leaving the item's own colour alone.
+  NSTextField *ink = [inspector valueForKey:@"lineColorField"];
+  [ink setStringValue:@"#b00020"];
+  [inspector changed:ink];
+  if (![line.style.border.color isEqualToString:@"#b00020"])
+    XCTFail(@"the border's colour reads %@", line.style.border.color);
+  // The item's own Color is left where it was. Every style carries the
+  // #000000 MS-RDL gives it, so the check is that editing the ink did not
+  // reach for it, not that nothing is there.
+  if (![line.style.color isEqualToString:@"#000000"])
+    XCTFail(@"editing the ink moved the item's own colour to %@", line.style.color);
+
+  NSTextField *thick = [inspector valueForKey:@"lineWidthField"];
+  [thick setStringValue:@"4pt"];
+  [inspector changed:thick];
+  if (![[line.style.border.width stringValue] isEqualToString:@"4pt"])
+    XCTFail(@"the thickness reads %@", [line.style.border.width stringValue]);
+
+  // The dash list offers what a line can actually be drawn as, and no more.
+  NSPopUpButton *dash = [inspector valueForKey:@"lineDashPop"];
+  if ([dash numberOfItems] != RDLBorderStyleSolid - RDLBorderStyleNone + 1)
+    XCTFail(@"the dash list holds %ld styles", (long)[dash numberOfItems]);
+  [dash selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleDashed)];
+  [inspector changed:dash];
+  if (line.style.border.style != RDLBorderStyleDashed)
+    XCTFail(@"the dash reads %ld", (long)line.style.border.style);
+}
+
+// The same section on a line that states no border at all, which is what a
+// freshly drawn one is. Every field here writes through style.border, so if
+// nothing is there to write through, the section is a row of controls that
+// quietly do nothing -- the failure this whole section exists to remove.
+- (void)testTheLineSectionWorksOnALineWithNoBorderYet {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Bare"];
+  RDLLine *line = [[RDLLine alloc] init];
+  line.name = @"Fresh";
+  line.left = 0.5;
+  line.top = 0.5;
+  line.width = 2.0;
+  line.height = 0;
+  [report.body.items addObject:line];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:line inBandWithKey:@"body"];
+
+  NSTextField *thick = [inspector valueForKey:@"lineWidthField"];
+  [thick setStringValue:@"5pt"];
+  [inspector changed:thick];
+  if (line.style.border == nil) {
+    XCTFail(@"%@", @"a thickness typed on a line with no border went nowhere");
+    return;
+  }
+  if (![[line.style.border.width stringValue] isEqualToString:@"5pt"])
+    XCTFail(@"the thickness reads %@", [line.style.border.width stringValue]);
+
+  NSTextField *ink = [inspector valueForKey:@"lineColorField"];
+  [ink setStringValue:@"#b00020"];
+  [inspector changed:ink];
+  if (![line.style.border.color isEqualToString:@"#b00020"])
+    XCTFail(@"the ink reads %@", line.style.border.color);
+}
+
 // A property of two values is a box to tick: what off and on mean is the
 // binding's, so the model keeps its own vocabulary and the pane shows a state.
 - (void)testACheckboxBindsATwoValuedProperty {

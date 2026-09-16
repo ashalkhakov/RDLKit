@@ -147,7 +147,7 @@ UI.
 | Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
 | Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | — |
 | Image | Source, Value, Sizing | Embedded/External only; Value has no f(x) |
-| Line | Colour | Text field only (no well, no expression); width/style — |
+| Line | Colour, thickness, dash | Ink, thickness (with f(x)) and a dash list of None/Dotted/Dashed/Solid, all three on the border the line is drawn with (P1.1). No colour well, and no expression on the ink or the dash. |
 | Subreport | `ReportName`, status, Parameters…, Edit Subreport… | Yes; `NoRowsMessage`/`MergeTransactions`/`OmitBorderOnPageBreak` — |
 | Tablix | Dataset; heading-row and value-row heights | Yes, in place |
 | Tablix | Columns: heading, value, width, Shows, Report, align, total | Tablix dialog, column width field, context menu, handle band, border drag — each edits the body in place, one undo (§4.7) |
@@ -250,7 +250,7 @@ bin that moved since the previous audit.
 |---|---|---|
 | Image: pick an embedded image; import a file as embedded | UI | |
 | Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
-| Line width, style | UI | The canvas draws a line at its border's width, colour and dash, running the way its box says (P1.1); *as audited* every line was a one-pixel rule along the top of its box, and a line with no width -- a vertical one -- drew nothing at all. Still no control for the width or the style: the inspector offers a line only a colour. |
+| Line width, style | — | The canvas draws a line at its border's width, colour and dash, running the way its box says, and the inspector edits all three (P1.1); *as audited* every line was a one-pixel rule along the top of its box, a line with no width -- a vertical one -- drew nothing at all, and the ink field wrote a property nothing read. |
 | Line: the other diagonal | MODEL | |
 | Rectangle padding, `PageBreak`, `KeepTogether` | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
 | Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
