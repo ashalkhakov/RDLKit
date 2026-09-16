@@ -3509,4 +3509,42 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
 }
 
 
+// Removing a field must not carry another field's kept pieces onto it. The
+// pieces are found by a path naming the field, and pairing the list off before
+// and after by position -- which is right for a rename -- moves them by one
+// the moment a field is added or removed.
+- (void)testRemovingAFieldDoesNotMoveAnothersKeptPieces {
+  NSString *xml =
+      @"<?xml version=\"1.0\"?>"
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\""
+      @" xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+      @"<Width>7.5in</Width>"
+      @"<DataSources><DataSource Name=\"Warehouse\"><ConnectionProperties><DataProvider>JSON</DataProvider>"
+      @"<ConnectString>jsondata=[]</ConnectString></ConnectionProperties></DataSource></DataSources>"
+      @"<DataSets><DataSet Name=\"Sales\">"
+      @"<Query><DataSourceName>Warehouse</DataSourceName><CommandText>$[*]</CommandText></Query>"
+      @"<Fields>"
+      @"<Field Name=\"Amount\"><DataField>Amount</DataField>"
+      @"<rd:FieldDescription>What it sold for</rd:FieldDescription></Field>"
+      @"<Field Name=\"Sku\"><DataField>Sku</DataField>"
+      @"<rd:FieldDescription>Stock code</rd:FieldDescription></Field>"
+      @"</Fields></DataSet></DataSets>"
+      @"<Body><Height>1in</Height><ReportItems/></Body></Report>";
+  NSError *err = nil;
+  RDLReport *report = [RDLParser reportFromXMLString:xml error:&err];
+  RDLDataSet *ds = [report.dataSets firstObject];
+  if ([ds.fields count] != 2) {
+    XCTFail(@"the fixture should have two fields: %@", err.localizedDescription);
+    return;
+  }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  // The first field goes, which is what the − button hands over.
+  [ctx.editor setFields:@[ ds.fields[1] ] ofDataSet:ds];
+  NSString *written = [RDLWriter XMLStringFromReport:report];
+  if ([written rangeOfString:@"Stock code"].location == NSNotFound)
+    XCTFail(@"%@", @"the remaining field should keep what was kept under it");
+  if ([written rangeOfString:@"What it sold for"].location != NSNotFound)
+    XCTFail(@"%@", @"the removed field's pieces should go with it, not move onto the one left");
+}
+
 @end

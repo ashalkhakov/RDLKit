@@ -295,28 +295,28 @@
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_weightPop, RDLFontWeightLighter, RDLFontWeightExtraBold,
-                               (NSString * (*)(NSInteger))RDLStringFromFontWeight)
+                               ^(NSInteger v) { return RDLStringFromFontWeight((RDLFontWeight)v); })
       placeholder:nil];
   [_bindings bind:_alignPop
           keyPath:@"style.textAlign"
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_alignPop, RDLTextAlignGeneral, RDLTextAlignJustify,
-                               (NSString * (*)(NSInteger))RDLStringFromTextAlign)
+                               ^(NSInteger v) { return RDLStringFromTextAlign((RDLTextAlign)v); })
       placeholder:nil];
   [_bindings bind:_verticalPop
           keyPath:@"style.verticalAlign"
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_verticalPop, RDLVerticalAlignTop, RDLVerticalAlignBottom,
-                               (NSString * (*)(NSInteger))RDLStringFromVerticalAlign)
+                               ^(NSInteger v) { return RDLStringFromVerticalAlign((RDLVerticalAlign)v); })
       placeholder:nil];
   [_bindings bind:_decorationPop
           keyPath:@"style.textDecoration"
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_decorationPop, RDLTextDecorationNone, RDLTextDecorationLineThrough,
-                               (NSString * (*)(NSInteger))RDLStringFromTextDecoration)
+                               ^(NSInteger v) { return RDLStringFromTextDecoration((RDLTextDecoration)v); })
       placeholder:nil];
   // Italic is one of two, so it is a box to tick rather than a list of two.
   [_bindings bind:_italicCheck
@@ -422,7 +422,7 @@
 // A popup holding a whole vocabulary: every case from `first` to `last`, named
 // as the model names it, and the matching values for the binding to write.
 static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NSInteger last,
-                                         NSString *(*name)(NSInteger)) {
+                                         NSString *(^name)(NSInteger)) {
   [pop removeAllItems];
   NSMutableArray<NSNumber *> *values = [NSMutableArray array];
   for (NSInteger value = first; value <= last; value++) {

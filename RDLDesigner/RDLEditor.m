@@ -220,11 +220,14 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   for (RDLField *field in dataSet.fields)
     [old addObject:[field copy]];
   // A field renamed in place: the pieces kept under it are found by a path
-  // that names it, so they move with it.
-  for (NSUInteger i = 0; i < [old count] && i < [fields count]; i++)
-    [_document.report renameKeptPiecesOfElement:@"Field"
-                                           from:[old[i] name]
-                                             to:[fields[i] name]];
+  // that names it, so they move with it. Only when the list is the same length
+  // -- a rename does not add or remove one, and pairing them off across an
+  // added or removed field would carry one field's pieces onto another.
+  if ([old count] == [fields count])
+    for (NSUInteger i = 0; i < [old count]; i++)
+      [_document.report renameKeptPiecesOfElement:@"Field"
+                                             from:[old[i] name]
+                                               to:[fields[i] name]];
   [self beginGroup:@"Edit Fields"];
   [[self undoProxy] setFields:old ofDataSet:dataSet];
   dataSet.fields = [fields copy];
