@@ -52,7 +52,11 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   // NSColorWell over an RDL colour string. The well opens NSColorPanel, which
   // is the standard way to pick one; the hex field beside it stays, because a
   // report's colours are often given rather than chosen.
-  RDLFieldKindColor
+  RDLFieldKindColor,
+  // A checkbox over a property of two values: `values` holds what off and on
+  // mean, in that order -- Normal and Italic, say -- so the box says what the
+  // property is without a list of two to choose from.
+  RDLFieldKindCheck
 };
 
 @interface RDLFieldBinding : NSObject

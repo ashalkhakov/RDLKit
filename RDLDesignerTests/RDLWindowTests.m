@@ -3444,4 +3444,69 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
     XCTFail(@"%@", @"and the kept piece should be written under the name it went back to");
 }
 
+// The text section holds each vocabulary whole. The weight popup offered two
+// of fourteen and the alignment popup three of five, so a textbox that was
+// SemiBold or Justified showed the first entry instead -- and the next edit of
+// anything in the section wrote that wrong value into the file.
+- (void)testTheTextSectionShowsEveryStyleItCanHold {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Styled"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Box";
+  box.value = @"Total";
+  box.style.fontWeight = RDLFontWeightSemiBold;
+  box.style.textAlign = RDLTextAlignJustify;
+  box.style.verticalAlign = RDLVerticalAlignMiddle;
+  box.style.fontStyle = RDLFontStyleItalic;
+  box.style.textDecoration = RDLTextDecorationLineThrough;
+  box.style.backgroundColor = @"#ffeeaa";
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLInspectorView *inspector =
+      [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 700) context:ctx];
+  [inspector reload];
+
+  NSDictionary<NSString *, NSString *> *shown = @{
+    @"weightPop" : RDLStringFromFontWeight(RDLFontWeightSemiBold),
+    @"alignPop" : RDLStringFromTextAlign(RDLTextAlignJustify),
+    @"verticalPop" : RDLStringFromVerticalAlign(RDLVerticalAlignMiddle),
+    @"decorationPop" : RDLStringFromTextDecoration(RDLTextDecorationLineThrough),
+  };
+  for (NSString *outlet in shown) {
+    NSPopUpButton *pop = [inspector valueForKey:outlet];
+    if (![[pop titleOfSelectedItem] isEqualToString:shown[outlet]])
+      XCTFail(@"%@ shows %@, not %@", outlet, [pop titleOfSelectedItem], shown[outlet]);
+  }
+  if ([[inspector valueForKey:@"italicCheck"] state] != NSOnState)
+    XCTFail(@"%@", @"an italic textbox should show the box ticked");
+  NSTextField *background = [inspector valueForKey:@"textBGField"];
+  if (![[background stringValue] isEqualToString:@"#ffeeaa"])
+    XCTFail(@"the background should be shown, not %@", [background stringValue]);
+
+  // Editing one thing in the section leaves the rest of it alone.
+  NSTextField *format = [inspector valueForKey:@"formatField"];
+  [format setStringValue:@"C2"];
+  [inspector changed:format];
+  if (box.style.fontWeight != RDLFontWeightSemiBold || box.style.textAlign != RDLTextAlignJustify ||
+      box.style.verticalAlign != RDLVerticalAlignMiddle ||
+      box.style.textDecoration != RDLTextDecorationLineThrough ||
+      box.style.fontStyle != RDLFontStyleItalic)
+    XCTFail(@"editing the format rewrote the rest: %@ %@ %@ %@",
+            RDLStringFromFontWeight(box.style.fontWeight), RDLStringFromTextAlign(box.style.textAlign),
+            RDLStringFromVerticalAlign(box.style.verticalAlign),
+            RDLStringFromTextDecoration(box.style.textDecoration));
+  if (![box.style.format isEqualToString:@"C2"])
+    XCTFail(@"%@", @"and the format should have been written");
+
+  // The background is the text box's own, and undoes.
+  [background setStringValue:@"#dfe7ff"];
+  [inspector changed:background];
+  if (![box.style.backgroundColor isEqualToString:@"#dfe7ff"])
+    XCTFail(@"the background should be written, not %@", box.style.backgroundColor);
+  [ctx.document.undoManager undo];
+  if (![box.style.backgroundColor isEqualToString:@"#ffeeaa"])
+    XCTFail(@"%@", @"one undo should put the background back");
+}
+
+
 @end

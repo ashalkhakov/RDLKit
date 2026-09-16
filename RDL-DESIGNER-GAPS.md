@@ -136,12 +136,13 @@ UI.
 | Items | Name | Shown, not editable |
 | Items | Visibility, Hyperlink, PageBreak, ResetPageNumber, PageName, KeepTogether | — |
 | Style | Font family, size, colour, format, language | Yes (text or expression) |
-| Style | Font weight | Popup: Normal / Bold (model has the full list) |
-| Style | Font style (italic), text decoration | Font panel / rich-text editor only |
-| Style | Background colour | Rectangle only |
-| Style | Text align | Popup: Left / Center / Right |
-| Style | Vertical align, padding, borders | — |
-| Style | Expressions | f(x) on 8 of the 27 style expressions |
+| Style | Font weight | Popup, the whole list from the enumeration |
+| Style | Font style (italic), text decoration | Italic ticks a box; decoration is a popup |
+| Style | Background colour | Textbox and rectangle |
+| Style | Text align | Popup, all five including General and Justify |
+| Style | Vertical align | Popup: Top / Middle / Bottom |
+| Style | Padding, borders | — |
+| Style | Expressions | f(x) on 9 of the 27 style expressions |
 | Textbox | Value / expression | Yes; in-place double-click |
 | Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
 | Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | — |
@@ -225,14 +226,10 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `FontStyle`, `TextDecoration` as inspector controls | UI | Font… also writes an explicit `FontStyle` Normal. |
-| `VerticalAlign` | UI | |
 | `PaddingLeft/Right/Top/Bottom` | UI | The canvas ignores bottom padding. |
 | `Border` + per-edge borders | UI | The canvas draws only the default border, as a thin frame. |
-| Textbox `BackgroundColor` | UI | The well exists in the rectangle section only. |
-| `FontWeight` beyond Normal/Bold | UI (engine PART) | Font… collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
-| `TextAlign` General/Justify | UI | Justify per paragraph in the rich-text editor only. |
-| Style expressions on every property | UI | 8 of 27 wired. |
+| `FontWeight` beyond Normal/Bold | UI (engine PART) | The popup offers every weight; Font… still collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
+| Style expressions on every property | UI | 9 of 27 wired. |
 | `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | UI (was MODEL) | Engine FULL or PART. |
 | `BackgroundHatchType` | MODEL | |
 
@@ -418,9 +415,11 @@ inspector (only a report with no name takes the file's).
 In rough order of how often a Report Builder user reaches for it:
 
 1. Style: borders and padding (default and per edge) on textbox,
-   rectangle and cell; textbox background; `VerticalAlign`; the full
-   weight list; italic and decoration; General/Justify; f(x) on every
-   style property.
+   rectangle and cell; f(x) on every style property. Done: a text box has
+   the background the engine paints for it, `VerticalAlign`, italic and
+   text decoration; and the weight and alignment popups hold their whole
+   vocabulary, so a file that says SemiBold or Justify is no longer shown
+   -- and written back -- as Normal or Left.
 2. Common item properties: `Hidden`, `ToggleItem`, `Hyperlink`,
    `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
    front/back commands and canvas z-order.

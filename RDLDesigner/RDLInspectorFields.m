@@ -171,6 +171,12 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
                                                : RDLColorFromHex(hex)];
         break;
       }
+      case RDLFieldKindCheck: {
+        NSUInteger on = [b.values count] > 1 ? 1 : NSNotFound;
+        NSUInteger index = [b.values indexOfObject:(value ?: [NSNull null])];
+        [(NSButton *)b.control setState:index == on && on != NSNotFound ? NSOnState : NSOffState];
+        break;
+      }
       case RDLFieldKindPopUpIndex: {
         NSPopUpButton *pop = (NSPopUpButton *)b.control;
         NSUInteger index = [b.values indexOfObject:(value ?: [NSNull null])];
@@ -287,6 +293,15 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
       case RDLFieldKindColor:
         value = RDLHexFromColor([(NSColorWell *)b.control color]);
         break;
+      case RDLFieldKindCheck: {
+        NSUInteger i = [(NSButton *)b.control state] == NSOnState ? 1 : 0;
+        if (i >= [b.values count])
+          return YES; // bound, but nothing sensible to write
+        value = b.values[i];
+        if (value == [NSNull null])
+          value = nil;
+        break;
+      }
       case RDLFieldKindPopUpIndex: {
         NSInteger i = [(NSPopUpButton *)b.control indexOfSelectedItem];
         if (i < 0 || i >= (NSInteger)[b.values count])

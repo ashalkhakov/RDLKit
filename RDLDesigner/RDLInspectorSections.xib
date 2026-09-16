@@ -59,6 +59,11 @@
                 <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
                 <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
                 <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
+                <outlet property="textBGField" destination="textBGField" id="textBGFieldOutlet"/>
+                <outlet property="textBGExprButton" destination="textBGExprButton" id="textBGExprButtonOutlet"/>
+                <outlet property="verticalPop" destination="verticalPop" id="verticalPopOutlet"/>
+                <outlet property="decorationPop" destination="decorationPop" id="decorationPopOutlet"/>
+                <outlet property="italicCheck" destination="italicCheck" id="italicCheckOutlet"/>
                 <outlet property="rectBGField" destination="rectBGField" id="rectBGFieldOutlet"/>
                 <outlet property="rectBox" destination="rectBox" id="rectBoxOutlet"/>
                 <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
@@ -517,7 +522,7 @@
             </subviews>
         </customView>
         <customView id="textBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="314"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="404"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl16">
@@ -652,12 +657,7 @@
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="weightPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="message"/>
-                        <menu key="menu" id="weightPopMenu">
-                            <items>
-                                <menuItem title="Roman" id="mi1"/>
-                                <menuItem title="Bold" id="mi2"/>
-                            </items>
-                        </menu>
+                        <menu key="menu" id="weightPopMenu"/>
                     </popUpButtonCell>
                     <connections>
                         <action selector="changed:" target="-2" id="weightPopAction"/>
@@ -677,13 +677,7 @@
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="alignPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="message"/>
-                        <menu key="menu" id="alignPopMenu">
-                            <items>
-                                <menuItem title="Left" id="mi3"/>
-                                <menuItem title="Center" id="mi4"/>
-                                <menuItem title="Right" id="mi5"/>
-                            </items>
-                        </menu>
+                        <menu key="menu" id="alignPopMenu"/>
                     </popUpButtonCell>
                     <connections>
                         <action selector="changed:" target="-2" id="alignPopAction"/>
@@ -791,6 +785,89 @@
                     </buttonCell>
                     <connections>
                         <action selector="editExpression:" target="-2" id="languageExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblTextVertical">
+                    <rect key="frame" x="10" y="314" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="In the box" id="lblTextVerticalCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="verticalPop">
+                    <rect key="frame" x="10" y="330" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="verticalPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="verticalPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="verticalPopAction"/>
+                    </connections>
+                </popUpButton>
+                <button toolTip="Italic" id="italicCheck">
+                    <rect key="frame" x="136" y="330" width="114" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Italic" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="italicCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="italicCheckAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblTextDecoration">
+                    <rect key="frame" x="10" y="358" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Drawn through" id="lblTextDecorationCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblTextBG">
+                    <rect key="frame" x="136" y="358" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Behind" id="lblTextBGCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="decorationPop">
+                    <rect key="frame" x="10" y="374" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="decorationPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="decorationPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="decorationPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField toolTip="The colour behind this text box" focusRingType="none" id="textBGField" customClass="RDLExpressionField">
+                    <rect key="frame" x="136" y="374" width="86" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="textBGFieldCell">
+                        <font key="font" metaFont="system"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="textBGFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="textBGFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="textBGExprButton">
+                    <rect key="frame" x="226" y="374" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="textBGExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="textBGExprButtonAction"/>
                     </connections>
                 </button>
             </subviews>

@@ -526,4 +526,40 @@
     XCTFail(@"%@", @"a text box shows the geometry and text sections");
 }
 
+// A property of two values is a box to tick: what off and on mean is the
+// binding's, so the model keeps its own vocabulary and the pane shows a state.
+- (void)testACheckboxBindsATwoValuedProperty {
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Check"]];
+  RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Box";
+  item.style.fontStyle = RDLFontStyleItalic;
+  [doc.report.body.items addObject:item];
+
+  NSButton *italic = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 80, 20)];
+  [italic setButtonType:NSSwitchButton];
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:italic keyPath:@"style.fontStyle" scope:RDLFieldScopeItem
+            kind:RDLFieldKindCheck
+          values:@[ @(RDLFontStyleNormal), @(RDLFontStyleItalic) ]
+     placeholder:nil];
+
+  [bindings fillFromItem:item band:doc.report.body report:doc.report];
+  if ([italic state] != NSOnState)
+    XCTFail(@"%@", @"an italic textbox should show the box ticked");
+  [italic setState:NSOffState];
+  [bindings applyControl:italic editor:editor item:item bandKey:@"body"];
+  if (item.style.fontStyle != RDLFontStyleNormal)
+    XCTFail(@"unticking should write the off value, not %ld", (long)item.style.fontStyle);
+  [doc.undoManager undo];
+  if (item.style.fontStyle != RDLFontStyleItalic)
+    XCTFail(@"%@", @"and undo should put it back");
+
+  // A value that is neither shows as off, rather than as the on value.
+  item.style.fontStyle = RDLFontStyleUnspecified;
+  [bindings fillFromItem:item band:doc.report.body report:doc.report];
+  if ([italic state] != NSOffState)
+    XCTFail(@"%@", @"a property that is neither should not show as ticked");
+}
+
 @end

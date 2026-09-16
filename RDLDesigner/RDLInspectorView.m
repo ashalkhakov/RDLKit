@@ -27,6 +27,13 @@
 @property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
+// A text box's own background, which the engine paints and the pane did not
+// offer; how its text sits in the box; whether it is italic; and what is drawn
+// through or under it.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *textBGField;
+@property (nonatomic, strong) IBOutlet NSButton *textBGExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *verticalPop, *decorationPop;
+@property (nonatomic, strong) IBOutlet NSButton *italicCheck;
 @property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
 // The column of the selected cell. A column is part of the tablix's body rather
 // than an item's property, so it is applied by hand rather than through a key
@@ -144,7 +151,7 @@
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
                          _languageExprButton, _docLanguageExprButton,
-                         _rectBGExprButton, _sizeExprButton ])
+                         _rectBGExprButton, _sizeExprButton, _textBGExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -280,14 +287,46 @@
              kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"10pt"];
   // Vocabulary popups map menu index to the enum case, so the model value and
   // the menu title no longer have to be the same word ("Roman" shows Normal).
-  [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:RDLFieldScopeItem
+  // Each holds its whole vocabulary, filled from the enumeration: a popup that
+  // did not offer a value showed the first entry instead, and the next edit of
+  // anything in the section wrote that wrong value into the file.
+  [_bindings bind:_weightPop
+          keyPath:@"style.fontWeight"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLFontWeightNormal), @(RDLFontWeightBold) ]
+           values:RDLFillPopUp(_weightPop, RDLFontWeightLighter, RDLFontWeightExtraBold,
+                               (NSString * (*)(NSInteger))RDLStringFromFontWeight)
       placeholder:nil];
-  [_bindings bind:_alignPop keyPath:@"style.textAlign" scope:RDLFieldScopeItem
+  [_bindings bind:_alignPop
+          keyPath:@"style.textAlign"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
+           values:RDLFillPopUp(_alignPop, RDLTextAlignGeneral, RDLTextAlignJustify,
+                               (NSString * (*)(NSInteger))RDLStringFromTextAlign)
       placeholder:nil];
+  [_bindings bind:_verticalPop
+          keyPath:@"style.verticalAlign"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_verticalPop, RDLVerticalAlignTop, RDLVerticalAlignBottom,
+                               (NSString * (*)(NSInteger))RDLStringFromVerticalAlign)
+      placeholder:nil];
+  [_bindings bind:_decorationPop
+          keyPath:@"style.textDecoration"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_decorationPop, RDLTextDecorationNone, RDLTextDecorationLineThrough,
+                               (NSString * (*)(NSInteger))RDLStringFromTextDecoration)
+      placeholder:nil];
+  // Italic is one of two, so it is a box to tick rather than a list of two.
+  [_bindings bind:_italicCheck
+          keyPath:@"style.fontStyle"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck
+           values:@[ @(RDLFontStyleNormal), @(RDLFontStyleItalic) ]
+      placeholder:nil];
+  [_bindings bind:_textBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindTextOrExpression];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
   [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
@@ -378,6 +417,19 @@
              kind:RDLFieldKindNumber];
   [_bindings bind:_footerHField keyPath:@"pageFooter.height" scope:RDLFieldScopeReport
              kind:RDLFieldKindNumber];
+}
+
+// A popup holding a whole vocabulary: every case from `first` to `last`, named
+// as the model names it, and the matching values for the binding to write.
+static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NSInteger last,
+                                         NSString *(*name)(NSInteger)) {
+  [pop removeAllItems];
+  NSMutableArray<NSNumber *> *values = [NSMutableArray array];
+  for (NSInteger value = first; value <= last; value++) {
+    [pop addItemWithTitle:name(value) ?: @""];
+    [values addObject:@(value)];
+  }
+  return values;
 }
 
 #pragma mark - Fill (model → UI)
@@ -715,6 +767,7 @@
   if (sender == _languageExprButton) return _languageField;
   if (sender == _docLanguageExprButton) return _docLanguageField;
   if (sender == _rectBGExprButton) return _rectBGField;
+  if (sender == _textBGExprButton) return _textBGField;
   if (sender == _sizeExprButton) return _sizeField;
   return nil;
 }
