@@ -2,6 +2,7 @@
 #import "RDLTestSupport.h"
 #import "RDLCode.h"
 #import "RDLDataProvider.h"
+#import <objc/runtime.h>
 
 // Was a diagnostic of this rule reported, mentioning `needle`?
 static BOOL RDLSawDiagnostic(NSArray<RDLDiagnostic *> *ds, NSString *rule, NSString *needle) {
@@ -1046,6 +1047,65 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   for (RDLExprToken *t in [RDLExpr tokensForSource:@"=1 +\n2"])
     if (t.kind == RDLExprTokenKindNewline)
       XCTFail(@"%@", @"an expression should not be given line breaks to parse");
+}
+
+// A derived scope is the same scope in another situation, so everything has to
+// come across -- asked of the class itself, because the next property somebody
+// adds to a scope is the one that would be forgotten, and forgetting one is a
+// wrong answer rather than a crash.
+- (void)testADerivedScopeCarriesEverythingAcross {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  RDLReport *report = [RDLReport emptyReportNamed:@"Derived"];
+  scope.report = report;
+  scope.row = @{@"N" : @1};
+  scope.previousRow = @{@"N" : @0};
+  scope.groupRows = @[ @{@"N" : @1} ];
+  scope.groupRowsByName = @{@"G" : @[ @{@"N" : @1} ]};
+  scope.nestedRegionRows = @[ @{@"N" : @2} ];
+  scope.variableValues = @{@"V" : @7};
+  scope.shownDuplicates = [@{@"T" : @[ @"x" ]} mutableCopy];
+  scope.activeScopes = @[ @"Jobs" ];
+  scope.recursionLevel = 2;
+  scope.recursiveRows = @[ @{@"N" : @3} ];
+  scope.rowNumber = 4;
+  scope.regionRowNumber = 5;
+  scope.pageNumber = 6;
+  scope.totalPages = 7;
+  scope.overallPageNumber = 8;
+  scope.overallTotalPages = 9;
+  scope.pageName = @"Sheet";
+  scope.executionTime = [NSDate dateWithTimeIntervalSince1970:1000];
+  scope.paramValues = @{@"P" : @"v"};
+  scope.userID = @"someone";
+  scope.language = @"en-GB";
+  scope.userLanguage = @"en-US";
+  scope.codeLocals = [@{@"l" : @1} mutableCopy];
+  scope.renderFormat = RDLRenderFormatHTML;
+
+  RDLEvalScope *derived = [scope scopeBy:^(RDLEvalScope *s) { s.rowNumber = 99; }];
+  if (derived.rowNumber != 99)
+    XCTFail(@"%@", @"the change should be applied to the copy");
+  if (scope.rowNumber != 4)
+    XCTFail(@"%@", @"and not to the scope it came from");
+
+  unsigned int count = 0;
+  objc_property_t *list = class_copyPropertyList([RDLEvalScope class], &count);
+  for (unsigned int i = 0; i < count; i++) {
+    NSString *name = @(property_getName(list[i]));
+    if ([name isEqualToString:@"rowNumber"])
+      continue;  // the one the change altered
+    id mine = [scope valueForKey:name];
+    id theirs = [derived valueForKey:name];
+    if (mine != theirs && ![mine isEqual:theirs])
+      XCTFail(@"a derived scope lost %@: %@ became %@", name, mine, theirs);
+  }
+  free(list);
+
+  // What layout accumulates is shared rather than copied: a text box placed
+  // while evaluating in a derived scope is one the page header can still read.
+  derived.reportItemValues[@"Total"] = @42;
+  if (![scope.reportItemValues[@"Total"] isEqual:@42])
+    XCTFail(@"%@", @"the values layout records should be one thing, not a copy each");
 }
 
 - (void)testTheReportsCodeRuns {

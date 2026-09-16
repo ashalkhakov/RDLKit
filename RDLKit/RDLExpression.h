@@ -120,6 +120,18 @@ typedef NS_ENUM(NSInteger, RDLRenderFormat) {
 // expression there is one of these, or one of the module's own variables,
 // before it is anything else.
 @property (nonatomic, strong) NSMutableDictionary<NSString *, id> *codeLocals;
+
+// The same scope, in another situation: evaluating a Lookup in a second
+// dataset, an aggregate over a group's rows, Previous on the row before. The
+// copy is shallow on purpose -- what layout accumulates as it goes, the values
+// of the text boxes it has placed and the duplicates it has hidden, is one
+// thing shared by every derived scope, because a page header read after the
+// body has to see what the body wrote.
+//
+// Deriving rather than assigning and putting back: reading in another dataset
+// used to be three fields saved, overwritten and restored by hand, and a
+// forgotten one is a wrong answer rather than a crash.
+- (instancetype)scopeBy:(void (^)(RDLEvalScope *scope))change;
 @end
 
 // A value's VB numeric type: an RDLNumber's own, and for a Foundation number

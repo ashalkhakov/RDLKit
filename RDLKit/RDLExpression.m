@@ -18,6 +18,44 @@
   return self;
 }
 
+- (instancetype)scopeBy:(void (^)(RDLEvalScope *scope))change {
+  RDLEvalScope *copy = [[RDLEvalScope alloc] init];
+  // Straight to the ivars: -setParamValues: sets aside what was worked out from
+  // them, and a copy has not changed them.
+  copy->_report = _report;
+  copy->_row = _row;
+  copy->_dataSet = _dataSet;
+  copy->_groupRows = _groupRows;
+  copy->_groupRowsByName = _groupRowsByName;
+  copy->_nestedRegionRows = _nestedRegionRows;
+  copy->_reportItemValues = _reportItemValues;
+  copy->_shownDuplicates = _shownDuplicates;
+  copy->_variableValues = _variableValues;
+  copy->_previousRow = _previousRow;
+  copy->_rowNumber = _rowNumber;
+  copy->_regionRowNumber = _regionRowNumber;
+  copy->_activeScopes = _activeScopes;
+  copy->_recursionLevel = _recursionLevel;
+  copy->_recursiveRows = _recursiveRows;
+  copy->_pageNumber = _pageNumber;
+  copy->_totalPages = _totalPages;
+  copy->_overallPageNumber = _overallPageNumber;
+  copy->_overallTotalPages = _overallTotalPages;
+  copy->_pageName = _pageName;
+  copy->_executionTime = _executionTime;
+  copy->_paramValues = _paramValues;
+  copy->_parameterValues = _parameterValues;
+  copy->_userID = _userID;
+  copy->_documentBinder = _documentBinder;
+  copy->_renderFormat = _renderFormat;
+  copy->_language = _language;
+  copy->_userLanguage = _userLanguage;
+  copy->_codeLocals = _codeLocals;
+  if (change)
+    change(copy);
+  return copy;
+}
+
 // Other values, other parameters: what was worked out from the old ones is set
 // aside.
 - (void)setParamValues:(NSDictionary<NSString *, id> *)paramValues {
