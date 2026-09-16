@@ -454,13 +454,8 @@ static id RDLEvalRow(RDLValue *value, id row, RDLEvalScope *scope) {
     }
     return source;
   }
-  if (scope) {
-    NSDictionary *saved = scope.row;
-    scope.row = row;
-    id v = [value evaluateInScope:scope];
-    scope.row = saved;
-    return v;
-  }
+  if (scope)
+    return [value evaluateInScope:[scope scopeBy:^(RDLEvalScope *in) { in.row = row; }]];
   // No scope to evaluate in, so no dataset to map the name through: the field
   // the expression names, read by that name.
   NSString *f = RDLFieldOf(source);
@@ -1277,21 +1272,18 @@ static BOOL RDLIsTrue(id v) {
 // names it. What makes Sum(Fields!Amount.Value) in a group's sort, filter or
 // Hidden that group's total -- the same thing it means in the group's cells --
 // rather than the whole dataset's.
-static id RDLInGroupScope(NSArray *rows, NSString *groupName, RDLEvalScope *scope, id (^body)(void)) {
+static id RDLInGroupScope(NSArray *rows, NSString *groupName, RDLEvalScope *scope,
+                          id (^body)(RDLEvalScope *)) {
   if (scope == nil)
-    return body();
-  NSArray *savedGroup = scope.groupRows;
-  NSDictionary *savedNamed = scope.groupRowsByName;
-  scope.groupRows = rows;
-  if ([groupName length]) {
-    NSMutableDictionary *named = [savedNamed mutableCopy] ?: [NSMutableDictionary dictionary];
-    named[groupName] = rows;
-    scope.groupRowsByName = named;
-  }
-  id result = body();
-  scope.groupRows = savedGroup;
-  scope.groupRowsByName = savedNamed;
-  return result;
+    return body(nil);
+  return body([scope scopeBy:^(RDLEvalScope *in) {
+    in.groupRows = rows;
+    if ([groupName length]) {
+      NSMutableDictionary *named = [scope.groupRowsByName mutableCopy] ?: [NSMutableDictionary dictionary];
+      named[groupName] = rows;
+      in.groupRowsByName = named;
+    }
+  }]);
 }
 
 static NSDictionary<NSString *, id> *RDLEvaluateVariables(NSArray<RDLVariable *> *variables,
@@ -1306,18 +1298,15 @@ static NSDictionary<NSString *, id> *RDLGroupVariables(RDLTablixMember *m, NSArr
                                                       RDLEvalScope *scope) {
   if ([m.variables count] == 0 || scope == nil)
     return outer;
-  return RDLInGroupScope(part, m.groupName, scope, ^id {
-    id savedRow = scope.row;
-    scope.row = [part firstObject];
-    NSDictionary *values = RDLEvaluateVariables(m.variables, outer, scope);
-    scope.row = savedRow;
-    return values;
+  return RDLInGroupScope(part, m.groupName, scope, ^id(RDLEvalScope *groupScope) {
+    RDLEvalScope *atFirst = [groupScope scopeBy:^(RDLEvalScope *in) { in.row = [part firstObject]; }];
+    return RDLEvaluateVariables(m.variables, outer, atFirst);
   });
 }
 
 static id RDLEvalInGroup(RDLValue *value, NSArray *rows, NSString *groupName, RDLEvalScope *scope) {
-  return RDLInGroupScope(rows, groupName, scope, ^id {
-    return RDLEvalRow(value, [rows firstObject], scope);
+  return RDLInGroupScope(rows, groupName, scope, ^id(RDLEvalScope *groupScope) {
+    return RDLEvalRow(value, [rows firstObject], groupScope);
   });
 }
 
@@ -1341,8 +1330,8 @@ static BOOL RDLIsHiddenInGroup(RDLValue *hidden, NSArray *rows, NSString *groupN
 static NSArray<NSArray *> *RDLGroupInstances(RDLTablixMember *m, NSArray *rows, RDLEvalScope *scope) {
   NSMutableArray *kept = [NSMutableArray array];
   for (NSArray *part in RDLPartition(rows, m.groupExpressions, scope)) {
-    NSArray *filtered = RDLInGroupScope(part, m.groupName, scope, ^id {
-      return RDLApplyFilters(part, m.filters, scope);
+    NSArray *filtered = RDLInGroupScope(part, m.groupName, scope, ^id(RDLEvalScope *groupScope) {
+      return RDLApplyFilters(part, m.filters, groupScope);
     });
     if ([filtered count])
       [kept addObject:filtered];
@@ -1616,48 +1605,32 @@ static NSArray *RDLRegionRowsFor(RDLTablixInst *inst, RDLTablixCellInst *cell) {
 // Runs `body` with the scope as a cell sees it when it is placed: its row's
 // data, groups and variables, and in a crosstab its column's; then puts the
 // scope back.
+// Runs `body` in the scope a cell sees when it is placed: its row's data,
+// groups and variables, and in a crosstab its column's. The scope it is given
+// is the cell's; the one passed in is left alone.
 static void RDLInCellScope(RDLTablixInst *inst, RDLTablixCellInst *cell, RDLEvalScope *scope,
-                           void (^body)(void)) {
-  id savedRow = scope.row;
-  NSArray *savedGroup = scope.groupRows;
-  NSDictionary *savedNamed = scope.groupRowsByName;
-  NSArray *savedRegion = scope.nestedRegionRows;
-  NSInteger savedNumber = scope.rowNumber;
-  NSInteger savedRegionNumber = scope.regionRowNumber;
-  NSArray *savedScopes = scope.activeScopes;
-  NSInteger savedLevel = scope.recursionLevel;
-  NSArray *savedRecursive = scope.recursiveRows;
-  NSDictionary *savedVariables = scope.variableValues;
-  if (inst.variableValues)
-    scope.variableValues = inst.variableValues;
-  if (inst.row)
-    scope.row = inst.row;
-  if (inst.groupRows)
-    scope.groupRows = inst.groupRows;
-  scope.rowNumber = inst.rowNumber;
-  scope.regionRowNumber = inst.regionRowNumber;
-  scope.activeScopes = inst.activeScopes;
-  scope.recursionLevel = inst.recursionLevel;
-  scope.recursiveRows = inst.recursiveRows;
-  scope.groupRowsByName = RDLNamedRowsFor(inst, cell);
-  scope.nestedRegionRows = RDLRegionRowsFor(inst, cell);
-  if (cell.colRows) {
-    NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
-    NSArray *inter = RDLIntersectRows(base, cell.colRows);
-    scope.groupRows = inter;
-    scope.row = [inter firstObject];
-  }
-  body();
-  scope.row = savedRow;
-  scope.groupRows = savedGroup;
-  scope.groupRowsByName = savedNamed;
-  scope.nestedRegionRows = savedRegion;
-  scope.rowNumber = savedNumber;
-  scope.regionRowNumber = savedRegionNumber;
-  scope.activeScopes = savedScopes;
-  scope.recursionLevel = savedLevel;
-  scope.recursiveRows = savedRecursive;
-  scope.variableValues = savedVariables;
+                           void (^body)(RDLEvalScope *)) {
+  body([scope scopeBy:^(RDLEvalScope *in) {
+    if (inst.variableValues)
+      in.variableValues = inst.variableValues;
+    if (inst.row)
+      in.row = inst.row;
+    if (inst.groupRows)
+      in.groupRows = inst.groupRows;
+    in.rowNumber = inst.rowNumber;
+    in.regionRowNumber = inst.regionRowNumber;
+    in.activeScopes = inst.activeScopes;
+    in.recursionLevel = inst.recursionLevel;
+    in.recursiveRows = inst.recursiveRows;
+    in.groupRowsByName = RDLNamedRowsFor(inst, cell);
+    in.nestedRegionRows = RDLRegionRowsFor(inst, cell);
+    if (cell.colRows) {
+      NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
+      NSArray *inter = RDLIntersectRows(base, cell.colRows);
+      in.groupRows = inter;
+      in.row = [inter firstObject];
+    }
+  }]);
 }
 
 // How tall one cell's contents want to be, evaluated as they will be when the
@@ -1669,14 +1642,14 @@ static void RDLInCellScope(RDLTablixInst *inst, RDLTablixCellInst *cell, RDLEval
 static CGFloat RDLMeasureCell(RDLTablixInst *inst, RDLTablixCellInst *cell, CGFloat height,
                               RDLEvalScope *scope, CGFloat bodyAvail) {
   __block CGFloat need = 0;
-  RDLInCellScope(inst, cell, scope, ^{
+  RDLInCellScope(inst, cell, scope, ^(RDLEvalScope *cellScope) {
     // Measured at the size it is placed at: an item in a cell takes the cell's
     // box, and has no height of its own for a text box to grow from or shrink to.
     RDLItem *contents = cell.item;
     CGFloat savedW = contents.width, savedH = contents.height;
     contents.width = cell.width;
     contents.height = height;
-    need = RDLItemContentHeight(contents, cell.width, 0, scope, bodyAvail);
+    need = RDLItemContentHeight(contents, cell.width, 0, cellScope, bodyAvail);
     contents.width = savedW;
     contents.height = savedH;
   });
@@ -2126,10 +2099,10 @@ static NSArray<RDLLineSpan *> *RDLRowLines(RDLTablixInst *inst, RDLEvalScope *sc
     if (cell.skip || cell.rowSpan > 1 || ![cell.item isKindOfClass:[RDLTextbox class]])
       continue;
     RDLTextbox *tb = (RDLTextbox *)cell.item;
-    RDLInCellScope(inst, cell, scope, ^{
-      if (RDLIsHiddenExpr(tb.hidden, scope))
+    RDLInCellScope(inst, cell, scope, ^(RDLEvalScope *cellScope) {
+      if (RDLIsHiddenExpr(tb.hidden, cellScope))
         return;
-      RDLTextboxLines(tb, cell.width, cell.height > 0 ? cell.height : inst.height, scope,
+      RDLTextboxLines(tb, cell.width, cell.height > 0 ? cell.height : inst.height, cellScope,
                       ^(CGFloat top, CGFloat bottom) {
                         RDLLineSpan *span = [[RDLLineSpan alloc] init];
                         span.top = top;
@@ -2480,8 +2453,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
   // what it still needs goes on the last of them. Measured with the first row
   // alone, it stretched that row and left the rest of the group as it was.
   if (scope) {
-    RDLDataSet *savedSet = scope.dataSet;
-    scope.dataSet = ds ?: savedSet;
+    RDLEvalScope *measuring = ds ? [scope scopeBy:^(RDLEvalScope *in) { in.dataSet = ds; }] : scope;
     for (RDLTablixInst *inst in walked) {
       // A row grows to its tallest cell, and shrinks to it when every cell
       // holding something is a text box that can shrink.
@@ -2490,7 +2462,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
       for (RDLTablixCellInst *cell in inst.cells) {
         if (cell.skip || cell.rowSpan > 1 || cell.item == nil)
           continue;
-        CGFloat need = RDLMeasureCell(inst, cell, inst.height, scope, bodyAvail);
+        CGFloat need = RDLMeasureCell(inst, cell, inst.height, measuring, bodyAvail);
         grown = MAX(grown, need);
         fitted = MAX(fitted, need);
         measured = YES;
@@ -2514,7 +2486,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
         for (NSUInteger k = 0; k < span; k++)
           total += [(RDLTablixInst *)walked[(NSUInteger)i + k] height];
         if (cell.item) {
-          CGFloat need = RDLMeasureCell(inst, cell, total, scope, bodyAvail);
+          CGFloat need = RDLMeasureCell(inst, cell, total, measuring, bodyAvail);
           if (need > total + 1e-6) {
             RDLTablixInst *last = walked[(NSUInteger)i + span - 1];
             RDLGrowRow(last, last.height + (need - total));
@@ -2524,7 +2496,6 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
         cell.height = total;
       }
     }
-    scope.dataSet = savedSet;
   }
   if (tab.keepTogether && [walked count]) {
     RDLTablixInst *first = walked[0];
@@ -2638,14 +2609,15 @@ static NSDictionary<NSString *, id> *RDLEvaluateVariables(NSArray<RDLVariable *>
   if ([variables count] == 0 || scope == nil)
     return outer;
   NSMutableDictionary *values = [outer mutableCopy] ?: [NSMutableDictionary dictionary];
-  NSDictionary *saved = scope.variableValues;
+  // One scope for the walk: each variable sees the ones worked out before it,
+  // and the caller's own variables are left as they were.
+  RDLEvalScope *each = [scope scopeBy:nil];
   for (RDLVariable *var in variables) {
     if ([var.name length] == 0)
       continue;
-    scope.variableValues = values;
-    values[var.name] = [var.value evaluateInScope:scope] ?: [NSNull null];
+    each.variableValues = values;
+    values[var.name] = [var.value evaluateInScope:each] ?: [NSNull null];
   }
-  scope.variableValues = saved;
   return values;
 }
 
@@ -2758,13 +2730,10 @@ static RDLChartBuckets *RDLGroupForChart(NSArray *rows, NSArray<RDLChartMember *
 static id RDLChartAggregate(RDLValue *value, NSArray *rows, RDLEvalScope *scope) {
   if (value == nil || [rows count] == 0)
     return [NSNull null];
-  NSDictionary *savedRow = scope.row;
-  NSArray *savedGroup = scope.groupRows;
-  scope.row = [rows firstObject];
-  scope.groupRows = rows;
-  id v = [value evaluateInScope:scope];
-  scope.row = savedRow;
-  scope.groupRows = savedGroup;
+  id v = [value evaluateInScope:[scope scopeBy:^(RDLEvalScope *in) {
+    in.row = [rows firstObject];
+    in.groupRows = rows;
+  }]];
   if (v == nil || v == [NSNull null])
     return [NSNull null];
   if ([v isKindOfClass:[NSNumber class]])
@@ -2787,13 +2756,10 @@ static double RDLNiceInterval(double span, NSInteger want) {
 
 // Text evaluated over the rows of one data point.
 static NSString *RDLChartText(RDLValue *value, NSArray *rows, RDLEvalScope *scope) {
-  NSDictionary *savedRow = scope.row;
-  NSArray *savedGroup = scope.groupRows;
-  scope.row = [rows firstObject];
-  scope.groupRows = rows;
-  NSString *text = [value evaluateTextInScope:scope];
-  scope.row = savedRow;
-  scope.groupRows = savedGroup;
+  NSString *text = [value evaluateTextInScope:[scope scopeBy:^(RDLEvalScope *in) {
+    in.row = [rows firstObject];
+    in.groupRows = rows;
+  }]];
   return text ?: @"";
 }
 
@@ -2992,14 +2958,11 @@ static NSString *RDLChartColorHex(NSString *color) {
 
 // A data point's Color, worked out over the point's own rows.
 static NSString *RDLChartPointColor(RDLStyle *style, NSArray *rows, RDLEvalScope *scope) {
-  NSDictionary *savedRow = scope.row;
-  NSArray *savedGroup = scope.groupRows;
-  scope.row = [rows firstObject];
-  scope.groupRows = rows;
-  NSString *color = RDLChartColorHex(RDLResolveStyle(style, scope).color);
-  scope.row = savedRow;
-  scope.groupRows = savedGroup;
-  return color;
+  RDLEvalScope *pointScope = [scope scopeBy:^(RDLEvalScope *in) {
+    in.row = [rows firstObject];
+    in.groupRows = rows;
+  }];
+  return RDLChartColorHex(RDLResolveStyle(style, pointScope).color);
 }
 
 // The shapes Auto gives the series in turn.
@@ -3157,9 +3120,8 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
   NSArray *rows = ds.rows ?: @[];
   rows = RDLApplyFilters(rows, chart.filters, scope);
   rows = RDLApplySort(rows, chart.sortExpressions, scope);
-  RDLDataSet *savedSet = scope.dataSet;
   if (ds)
-    scope.dataSet = ds;
+    scope = [scope scopeBy:^(RDLEvalScope *in) { in.dataSet = ds; }];
   // ChartNoDataMessage, said in place of the plot when there are no rows to draw.
   if ([rows count] == 0 && chart.noDataMessage != nil && !chart.noDataMessageHidden) {
     lc.noDataMessage = [chart.noDataMessage evaluateTextInScope:scope] ?: @"";
@@ -3351,7 +3313,6 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
     categoryStep = xStep;
   }
   lc.categoryAxis = RDLLaidOutAxis(chart.categoryAxis, categoryStep, banded, scope);
-  scope.dataSet = savedSet;
 }
 
 + (NSArray *)rowsOfDataSet:(RDLDataSet *)dataSet filteredInScope:(RDLEvalScope *)scope {
@@ -3483,10 +3444,10 @@ static void RDLHideDuplicate(RDLTextbox *item, RDLLaidOutTextbox *laid, RDLEvalS
   RDLResolveBackgroundImage(li, li.style.backgroundImage, scope);
   // An item's own Language is in force for it and for everything it contains,
   // which is what makes a Language on a rectangle or a tablix cell mean
-  // anything. Put back before returning, because the scope outlives the item.
-  NSString *savedLanguage = scope.language;
+  // anything. The rest of this call works in a scope of its own, so there is
+  // nothing to put back on the way out -- and there were four ways out.
   if ([li.style.language length])
-    scope.language = li.style.language;
+    scope = [scope scopeBy:^(RDLEvalScope *inner) { inner.language = li.style.language; }];
   if (item.hyperlink != nil) {
     NSString *url = [item.hyperlink evaluateTextInScope:scope];
     if ([url length])
@@ -3537,7 +3498,6 @@ static void RDLHideDuplicate(RDLTextbox *item, RDLLaidOutTextbox *laid, RDLEvalS
                   onPage:page
                  clipTop:clipTop
               clipBottom:clipBottom];
-    scope.language = savedLanguage;
     return;
   } else if ([item isKindOfClass:[RDLUnsupportedItem class]]) {
     [self placeUnsupported:(RDLUnsupportedItem *)item
@@ -3547,7 +3507,6 @@ static void RDLHideDuplicate(RDLTextbox *item, RDLLaidOutTextbox *laid, RDLEvalS
                     onPage:page
                    clipTop:clipTop
                 clipBottom:clipBottom];
-    scope.language = savedLanguage;
     return;
   } else if ([item isKindOfClass:[RDLRectangle class]]) {
     [page.items addObject:li];
@@ -3559,11 +3518,9 @@ static void RDLHideDuplicate(RDLTextbox *item, RDLLaidOutTextbox *laid, RDLEvalS
                onPage:page
               clipTop:clipTop
            clipBottom:clipBottom];
-    scope.language = savedLanguage;
     return;
   }
   [page.items addObject:li];
-  scope.language = savedLanguage;
 }
 
 // A line of text where the subreport would have been: the spec's error text
@@ -3736,31 +3693,26 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
                   hLead:(CGFloat)hLead {
   if (y + inst.height < clipTop || y > clipBottom)
     return;
-  NSDictionary *savedRow = scope.row;
-  RDLDataSet *savedSet = scope.dataSet;
-  NSArray *savedGroup = scope.groupRows;
-  // Put back on the way out: a tablix nested in a cell sets these to its own
-  // rows' values, and the cells after it in the outer row read them.
-  NSInteger savedRowNumber = scope.rowNumber;
-  NSInteger savedRegionRowNumber = scope.regionRowNumber;
-  NSArray *savedScopes = scope.activeScopes;
-  NSInteger savedLevel = scope.recursionLevel;
-  NSArray *savedRecursive = scope.recursiveRows;
-  NSDictionary *savedVariables = scope.variableValues;
-  if (inst.variableValues)
-    scope.variableValues = inst.variableValues;
-  if (inst.row)
-    scope.row = inst.row;
-  // Set whether or not there is a row: a group header has no row of its own
-  // but is still inside the scopes that RowNumber, InScope and Level report.
-  scope.rowNumber = inst.rowNumber;
-  scope.regionRowNumber = inst.regionRowNumber;
-  scope.activeScopes = inst.activeScopes;
-  scope.recursionLevel = inst.recursionLevel;
-  scope.recursiveRows = inst.recursiveRows;
-  scope.dataSet = [scope.report dataSetNamed:tab.dataSetName] ?: savedSet;
-  if (inst.groupRows)
-    scope.groupRows = inst.groupRows;
+  // The instance's own scope for the whole of this call: a tablix nested in a
+  // cell used to set these and put them back, because the cells after it in the
+  // outer row read them.
+  RDLDataSet *outerSet = scope.dataSet;
+  scope = [scope scopeBy:^(RDLEvalScope *in) {
+    if (inst.variableValues)
+      in.variableValues = inst.variableValues;
+    if (inst.row)
+      in.row = inst.row;
+    // Set whether or not there is a row: a group header has no row of its own
+    // but is still inside the scopes that RowNumber, InScope and Level report.
+    in.rowNumber = inst.rowNumber;
+    in.regionRowNumber = inst.regionRowNumber;
+    in.activeScopes = inst.activeScopes;
+    in.recursionLevel = inst.recursionLevel;
+    in.recursiveRows = inst.recursiveRows;
+    in.dataSet = [in.report dataSetNamed:tab.dataSetName] ?: outerSet;
+    if (inst.groupRows)
+      in.groupRows = inst.groupRows;
+  }];
   for (RDLTablixCellInst *cell in inst.cells) {
     if (cell.skip)
       continue;
@@ -3784,22 +3736,20 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
         cellW = e - s;
       }
     }
-    NSDictionary *cellSavedRow = scope.row;
-    NSArray *cellSavedGroup = scope.groupRows;
-    NSDictionary *cellSavedNamed = scope.groupRowsByName;
-    NSArray *cellSavedRegion = scope.nestedRegionRows;
-    scope.groupRowsByName = RDLNamedRowsFor(inst, cell);
-    scope.nestedRegionRows = RDLRegionRowsFor(inst, cell);
-    scope.rowNumber = inst.rowNumber;
-    scope.regionRowNumber = inst.regionRowNumber;
-    scope.activeScopes = inst.activeScopes;
-    scope.recursionLevel = inst.recursionLevel;
-    scope.recursiveRows = inst.recursiveRows;
+    RDLEvalScope *cellScope = [scope scopeBy:^(RDLEvalScope *in) {
+      in.groupRowsByName = RDLNamedRowsFor(inst, cell);
+      in.nestedRegionRows = RDLRegionRowsFor(inst, cell);
+    }];
+    cellScope.rowNumber = inst.rowNumber;
+    cellScope.regionRowNumber = inst.regionRowNumber;
+    cellScope.activeScopes = inst.activeScopes;
+    cellScope.recursionLevel = inst.recursionLevel;
+    cellScope.recursiveRows = inst.recursiveRows;
     if (cell.colRows) {
       NSArray *base = inst.groupRows ?: (inst.row ? @[ inst.row ] : nil);
       NSArray *inter = RDLIntersectRows(base, cell.colRows);
-      scope.groupRows = inter;
-      scope.row = [inter firstObject];
+      cellScope.groupRows = inter;
+      cellScope.row = [inter firstObject];
     }
     CGFloat savedL = contents.left, savedT = contents.top, savedW = contents.width, savedH = contents.height;
     contents.left = 0;
@@ -3809,7 +3759,7 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
     [self placeItem:contents
             originX:(x0 + cellX)
             originY:y
-              scope:scope
+              scope:cellScope
              onPage:page
             clipTop:clipTop
          clipBottom:clipBottom];
@@ -3817,20 +3767,7 @@ static BOOL RDLSubreportHasNoRows(RDLReport *definition) {
     contents.top = savedT;
     contents.width = savedW;
     contents.height = savedH;
-    scope.row = cellSavedRow;
-    scope.groupRows = cellSavedGroup;
-    scope.groupRowsByName = cellSavedNamed;
-    scope.nestedRegionRows = cellSavedRegion;
   }
-  scope.row = savedRow;
-  scope.dataSet = savedSet;
-  scope.groupRows = savedGroup;
-  scope.rowNumber = savedRowNumber;
-  scope.regionRowNumber = savedRegionRowNumber;
-  scope.activeScopes = savedScopes;
-  scope.recursionLevel = savedLevel;
-  scope.recursiveRows = savedRecursive;
-  scope.variableValues = savedVariables;
 }
 
 // Horizontal pagination: compute column chunks for a tablix wider than the
@@ -4009,19 +3946,22 @@ static BOOL RDLRowOutsideSlice(CGFloat absY, CGFloat height, CGFloat sliceTop, C
     [page.items addObject:box];
   }
 
-  NSDictionary *savedPrev = scope.previousRow;
-  NSMutableDictionary *savedShown = scope.shownDuplicates;
-  scope.shownDuplicates = [NSMutableDictionary dictionary];
+  // Which duplicates have been shown is a fact about this page, so the walk
+  // below works in a scope of its own with an empty store: what it marks as
+  // shown does not follow the caller onto the next page.
+  RDLEvalScope *pageScope = [scope scopeBy:^(RDLEvalScope *in) {
+    in.shownDuplicates = [NSMutableDictionary dictionary];
+  }];
   if (repeatCount > 0) {
     CGFloat hy = bodyTop;
     for (NSUInteger i = 0; i < repeatCount; i++) {
       RDLTablixInst *r = insts[i];
-      [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:hy scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
+      [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:hy scope:pageScope onPage:page clipTop:bodyTop clipBottom:bodyBottom
                      chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
       hy += r.height;
     }
   }
-  NSDictionary *prev = savedPrev;
+  NSDictionary *prev = scope.previousRow;
   NSUInteger index = 0;
   for (RDLTablixInst *r in insts) {
     if (index++ < repeatCount) {
@@ -4035,10 +3975,10 @@ static BOOL RDLRowOutsideSlice(CGFloat absY, CGFloat height, CGFloat sliceTop, C
         prev = r.row;
       continue;
     }
-    scope.previousRow = prev;
+    pageScope.previousRow = prev;
     if (r.pieces == nil) {
       CGFloat pageY = bodyTop + (absY - sliceTop);
-      [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:pageY scope:scope onPage:page clipTop:bodyTop clipBottom:bodyBottom
+      [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:pageY scope:pageScope onPage:page clipTop:bodyTop clipBottom:bodyBottom
                      chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
     } else {
       // A split row: the piece that falls on this page, drawn so that the
@@ -4050,7 +3990,7 @@ static BOOL RDLRowOutsideSlice(CGFloat absY, CGFloat height, CGFloat sliceTop, C
           continue;
         CGFloat pageTop = bodyTop + (pieceTop - sliceTop);
         NSUInteger from = [page.items count];
-        [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:(pageTop - piece.contentTop) scope:scope onPage:page
+        [self placeTablixInst:r tab:(RDLTablix *)item x0:x0 y:(pageTop - piece.contentTop) scope:pageScope onPage:page
                        clipTop:bodyTop clipBottom:bodyBottom chunkX0:chunkX0 chunkX1:chunkX1 hLead:hLead];
         for (NSUInteger k = from; k < [page.items count]; k++) {
           RDLLaidOutItem *laid = page.items[k];
@@ -4063,8 +4003,6 @@ static BOOL RDLRowOutsideSlice(CGFloat absY, CGFloat height, CGFloat sliceTop, C
     if (r.row)
       prev = r.row;
   }
-  scope.previousRow = savedPrev;
-  scope.shownDuplicates = savedShown;
 }
 
 // Page-break shift for a body item positioned at y0 with height h. A break at
