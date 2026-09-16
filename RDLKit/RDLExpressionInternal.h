@@ -19,3 +19,9 @@ FOUNDATION_EXPORT NSDate *RDLDateLiteral(NSString *text);
 FOUNDATION_EXPORT RDLExprNode *RDLParse(NSString *src);
 FOUNDATION_EXPORT NSString *RDLPrint(RDLExprNode *a);
 FOUNDATION_EXPORT id RDLExec(RDLExprNode *ast, RDLEvalScope *scope);
+
+// The Code element lexes with the same lexer, keeping the line breaks Visual
+// Basic is written in. The tokens are RDLTok, whose `line` says where each was
+// written.
+@class RDLTok;
+FOUNDATION_EXPORT NSArray *RDLLexCode(NSString *src);

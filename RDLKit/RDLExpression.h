@@ -244,7 +244,11 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
   RDLExprTokenKindOperator,
   RDLExprTokenKindPunctuation,
   // A lexeme the lexer could not make sense of.
-  RDLExprTokenKindInvalid
+  RDLExprTokenKindInvalid,
+  // The end of a line. Visual Basic is written in lines -- a statement ends
+  // where its line does -- so the Code element's parser needs to see them. An
+  // expression is one line by construction and never meets one.
+  RDLExprTokenKindNewline
 };
 
 // One lexeme of an expression's source, with where it sits in it. Trivia is a

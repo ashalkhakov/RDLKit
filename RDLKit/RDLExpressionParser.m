@@ -22,6 +22,9 @@
 // the token stream reproduces the source byte for byte.
 @property (nonatomic, copy) NSString *text;
 @property (nonatomic, copy) NSString *leading;
+// Which line of the source it was written on, counting from 1. What the Code
+// element reports a problem against; an expression has only the one line.
+@property (nonatomic, assign) NSUInteger line;
 @end
 @implementation RDLTok
 @end
@@ -105,6 +108,13 @@ static void RDLTokAppend(NSMutableArray *out, RDLTok *t, NSString *src, NSUInteg
                           NSUInteger end, NSUInteger *lastEnd) {
   t.leading = [src substringWithRange:NSMakeRange(*lastEnd, start - *lastEnd)];
   t.text = [src substringWithRange:NSMakeRange(start, end - start)];
+  // The line it begins on: every break before it, including any in the trivia
+  // just skipped over.
+  NSUInteger line = 1;
+  for (NSUInteger i = 0; i < start; i++)
+    if ([src characterAtIndex:i] == '\n')
+      line += 1;
+  t.line = line;
   *lastEnd = end;
   [out addObject:t];
 }
@@ -381,7 +391,10 @@ NSDate *RDLDateLiteral(NSString *text) {
   return nil;
 }
 
-static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
+// `newlines` is the Code element's: a line break becomes a token rather than
+// whitespace, a line ending in " _" joins the next, and REM begins a comment as
+// an apostrophe does. Expressions pass NO and meet none of it.
+static NSArray *RDLLexTokens(NSString *src, NSString **outTrailing, BOOL newlines) {
   NSMutableArray *out = [NSMutableArray array];
   NSUInteger i = 0, n = src.length;
   NSUInteger lastEnd = 0;
@@ -390,11 +403,41 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
   while (i < n) {
     NSUInteger start = i;
     unichar c = [src characterAtIndex:i];
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+    if (c == '\n' || c == '\r') {
+      i += 1;
+      if (c == '\r' && i < n && [src characterAtIndex:i] == '\n')
+        i += 1;
+      if (newlines)
+        RDLTokAppend(out, RDLMkTok(RDLExprTokenKindNewline, @"\n", 0), src, start, i, &lastEnd);
+      continue;
+    }
+    if (c == ' ' || c == '\t') {
       i += 1;
       continue;
     }
+    // A line ending in " _" goes on on the next one, so neither the underscore
+    // nor the break it hides is a token.
+    if (newlines && c == '_') {
+      NSUInteger j = i + 1;
+      while (j < n && ([src characterAtIndex:j] == ' ' || [src characterAtIndex:j] == '\t'))
+        j += 1;
+      if (j < n && ([src characterAtIndex:j] == '\n' || [src characterAtIndex:j] == '\r')) {
+        i = j + 1;
+        if ([src characterAtIndex:j] == '\r' && i < n && [src characterAtIndex:i] == '\n')
+          i += 1;
+        lastEnd = i;
+        continue;
+      }
+    }
     if (c == '\'') {
+      while (i < n && [src characterAtIndex:i] != '\n')
+        i += 1;
+      continue;
+    }
+    // REM, which comments out the rest of the line as an apostrophe does.
+    if (newlines && (c == 'r' || c == 'R') && i + 3 <= n &&
+        [[src substringWithRange:NSMakeRange(i, 3)] caseInsensitiveCompare:@"rem"] == NSOrderedSame &&
+        (i + 3 == n || !RDLIsNameCharacter([src characterAtIndex:i + 3]))) {
       while (i < n && [src characterAtIndex:i] != '\n')
         i += 1;
       continue;
@@ -500,8 +543,17 @@ static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
   return out;
 }
 
+static NSArray *RDLLexKeepingTrivia(NSString *src, NSString **outTrailing) {
+  return RDLLexTokens(src, outTrailing, NO);
+}
+
 static NSArray *RDLLex(NSString *src) {
-  return RDLLexKeepingTrivia(src, NULL);
+  return RDLLexTokens(src, NULL, NO);
+}
+
+// The same lexer, for the Code element: line breaks kept.
+NSArray *RDLLexCode(NSString *src) {
+  return RDLLexTokens(src, NULL, YES);
 }
 
 #pragma mark - Parser
