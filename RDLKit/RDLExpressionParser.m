@@ -1097,23 +1097,24 @@ NSString *RDLPrint(RDLExprNode *a) {
   if ([source length] == 0)
     return out;
 
-  void (^add)(NSRange, RDLExprTokenKind) = ^(NSRange r, RDLExprTokenKind kind) {
+  void (^add)(NSRange, RDLExprTokenKind, NSUInteger) = ^(NSRange r, RDLExprTokenKind kind, NSUInteger line) {
     if (r.length == 0)
       return;
     RDLExprToken *tok = [[RDLExprToken alloc] init];
     tok.range = r;
     tok.kind = kind;
     tok.text = [source substringWithRange:r];
+    tok.line = line ?: 1;
     [out addObject:tok];
   };
 
   // Text that is not an expression has nothing to colour, and the leading "="
   // is punctuation the lexer never sees, because parsing starts after it.
   if (![self isExpressionSource:source]) {
-    add(NSMakeRange(0, [source length]), RDLExprTokenKindTrivia);
+    add(NSMakeRange(0, [source length]), RDLExprTokenKindTrivia, 1);
     return out;
   }
-  add(NSMakeRange(0, 1), RDLExprTokenKindPunctuation);
+  add(NSMakeRange(0, 1), RDLExprTokenKindPunctuation, 1);
 
   NSString *body = [source substringFromIndex:1];
   NSString *trailing = nil;
@@ -1122,12 +1123,45 @@ NSString *RDLPrint(RDLExprNode *a) {
   for (NSUInteger i = 0; i < [toks count]; i++) {
     RDLTok *t = toks[i];
     RDLTok *next = i + 1 < [toks count] ? toks[i + 1] : nil;
-    add(NSMakeRange(at, [t.leading length]), RDLExprTokenKindTrivia);
+    add(NSMakeRange(at, [t.leading length]), RDLExprTokenKindTrivia, t.line);
     at += [t.leading length];
-    add(NSMakeRange(at, [t.text length]), RDLKindOfToken(t, next));
+    add(NSMakeRange(at, [t.text length]), RDLKindOfToken(t, next), t.line);
     at += [t.text length];
   }
-  add(NSMakeRange(at, [trailing length]), RDLExprTokenKindTrivia);
+  add(NSMakeRange(at, [trailing length]), RDLExprTokenKindTrivia, 1);
+  return out;
+}
+
+// The same walk for a Code element. There is no leading "=" to skip, the lexer
+// is asked to keep line breaks, and a break stays the kind it is: RDLKindOfToken
+// only ever reclassifies a name.
++ (NSArray<RDLExprToken *> *)codeTokensForSource:(NSString *)source {
+  NSMutableArray *out = [NSMutableArray array];
+  if ([source length] == 0)
+    return out;
+  NSString *trailing = nil;
+  NSArray *toks = RDLLexTokens(source, &trailing, YES);
+  NSUInteger at = 0;
+  for (NSUInteger i = 0; i < [toks count]; i++) {
+    RDLTok *t = toks[i];
+    RDLTok *next = i + 1 < [toks count] ? toks[i + 1] : nil;
+    if ([t.leading length]) {
+      RDLExprToken *trivia = [[RDLExprToken alloc] init];
+      trivia.range = NSMakeRange(at, [t.leading length]);
+      trivia.kind = RDLExprTokenKindTrivia;
+      trivia.text = t.leading;
+      trivia.line = t.line;
+      [out addObject:trivia];
+      at += [t.leading length];
+    }
+    RDLExprToken *tok = [[RDLExprToken alloc] init];
+    tok.range = NSMakeRange(at, [t.text length]);
+    tok.kind = t.kind == RDLExprTokenKindNewline ? t.kind : RDLKindOfToken(t, next);
+    tok.text = t.text;
+    tok.line = t.line;
+    [out addObject:tok];
+    at += [t.text length];
+  }
   return out;
 }
 

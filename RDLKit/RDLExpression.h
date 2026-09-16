@@ -258,6 +258,9 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
 @property (nonatomic, assign) NSRange range;
 @property (nonatomic, assign) RDLExprTokenKind kind;
 @property (nonatomic, copy) NSString *text;
+// Which line of the source it was written on, counting from 1. Always 1 for an
+// expression, which is one line; the Code element's tokens say where they are.
+@property (nonatomic, assign) NSUInteger line;
 @end
 
 // A value as a date, or nil when it is not one. The one place text becomes a
@@ -301,6 +304,9 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 // deciding what a token should look like belongs to whoever is drawing it, and
 // RDLKit does not know about colours.
 + (NSArray<RDLExprToken *> *)tokensForSource:(NSString *)source;
+// The same, for a Code element: no leading "=", and the line breaks Visual
+// Basic is written in are tokens of their own.
++ (NSArray<RDLExprToken *> *)codeTokensForSource:(NSString *)source;
 @end
 
 // An RDL property that is either a literal or an expression that produces one.

@@ -1016,6 +1016,38 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
 
 // A report's Code runs, in the subset of Visual Basic report helper functions
 // are written in. Code.Grade(...) used to be an empty string.
+// The lexer the Code element uses is the expression lexer, told to keep what
+// Visual Basic is written in: lines. A statement ends where its line does, so a
+// break is a token; a line ending in " _" joins the next, and REM comments out
+// the rest of one. Every token says which line it came from, which is what a
+// problem in a report's code is reported against.
+- (void)testTheCodeLexerKeepsVisualBasicsLines {
+  NSArray<RDLExprToken *> *toks = [RDLExpr codeTokensForSource:
+      @"Dim a As Integer ' first\n"
+      @"REM a whole line\n"
+      @"a = 1 + _\n"
+      @"    2\n"];
+  NSMutableArray<NSString *> *shape = [NSMutableArray array];
+  for (RDLExprToken *t in toks)
+    if (t.kind != RDLExprTokenKindTrivia)
+      [shape addObject:t.kind == RDLExprTokenKindNewline
+                          ? @"\n"
+                          : [NSString stringWithFormat:@"%@@%lu", t.text, (unsigned long)t.line]];
+  NSString *got = [shape componentsJoinedByString:@" "];
+
+  // The comment and the REM line leave nothing behind; the continuation joins
+  // lines 3 and 4 into one statement, so there is no break between them.
+  NSString *want = @"Dim@1 a@1 As@1 Integer@1 \n \n a@3 =@3 1@3 +@3 2@4 \n";
+  if (![got isEqualToString:want])
+    XCTFail(@"the code lexed as:\n  %@\nwanted:\n  %@", got, want);
+
+  // An expression is one line by construction and never sees a break, even
+  // when its source has one in it.
+  for (RDLExprToken *t in [RDLExpr tokensForSource:@"=1 +\n2"])
+    if (t.kind == RDLExprTokenKindNewline)
+      XCTFail(@"%@", @"an expression should not be given line breaks to parse");
+}
+
 - (void)testTheReportsCodeRuns {
   RDLReport *r = [RDLReport emptyReportNamed:@"Coded"];
   r.code = @"Dim graded As Integer\n"
