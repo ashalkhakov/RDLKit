@@ -6,6 +6,18 @@
 
 #pragma mark - The parser
 
+// Words that begin a statement this kit does not run, or that can only close
+// one.
+static NSSet<NSString *> *RDLCodeReservedWords(void) {
+  return [NSSet setWithArray:@[
+    @"end", @"else", @"elseif", @"next", @"loop", @"case", @"wend", @"function", @"sub", @"try", @"catch",
+    @"finally", @"with", @"throw", @"goto", @"on", @"redim", @"erase", @"class", @"module", @"using", @"synclock",
+    @"raiseevent", @"addhandler", @"removehandler", @"option", @"imports", @"namespace", @"structure", @"enum",
+    @"property", @"get", @"set", @"let", @"resume", @"stop", @"error", @"public", @"private", @"friend",
+    @"protected", @"shared"
+  ]];
+}
+
 // Reading a module from the tokens the shared lexer made. Visual Basic is
 // written in lines, so a statement ends where its line does; everything else is
 // ordinary recursive descent over a cursor.

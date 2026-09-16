@@ -104,8 +104,6 @@ typedef NS_ENUM(NSInteger, RDLCodeFlow) {
 
 #pragma mark - Reading the text
 
-// The words that can only close a statement or begin one this kit does not
-// run, which is how the parser tells them from a name.
 NSString *RDLCodeTrimmed(NSString *text);
 NSString *RDLCodeAfter(NSString *text, NSString *phrase);
 NSString *RDLCodeLeadingName(NSString *text);
@@ -114,7 +112,6 @@ NSUInteger RDLCodeFindWord(NSString *text, NSString *word, NSUInteger from);
 NSUInteger RDLCodeClosingBracket(NSString *text, NSUInteger open);
 NSArray<NSString *> *RDLCodeSplitList(NSString *text);
 NSString *RDLCodeWithoutComment(NSString *line);
-NSSet<NSString *> *RDLCodeReservedWords(void);
 
 // Shared between the phases: the pieces the parser makes, and the value
 // handling the interpreter does with them.

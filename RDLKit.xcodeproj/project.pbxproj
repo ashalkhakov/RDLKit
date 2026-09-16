@@ -125,7 +125,6 @@
 		C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F23 /* RDLLinePainter.m */; };
 		D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */ = {isa = PBXBuildFile; fileRef = 5EBD968C905DB599112D8838 /* RDLMarkup.m */; };
 		C0DE00000000000000000A03 /* RDLCode.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000A02 /* RDLCode.m */; };
-		C0DE00000000000000000F31 /* RDLCodeLexer.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F30 /* RDLCodeLexer.m */; };
 		C0DE00000000000000000FD1 /* RDLCodeParser.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000FD0 /* RDLCodeParser.m */; };
 		C0DE00000000000000000FC1 /* RDLCodeAST.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000FC0 /* RDLCodeAST.m */; };
 		C0DE00000000000000000FA1 /* RDLExpressionParser.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000FA0 /* RDLExpressionParser.m */; };
@@ -514,7 +513,6 @@
 		5EBD968C905DB599112D8838 /* RDLMarkup.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMarkup.m; sourceTree = "<group>"; };
 		C0DE00000000000000000A01 /* RDLCode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCode.h; sourceTree = "<group>"; };
 		C0DE00000000000000000A02 /* RDLCode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCode.m; sourceTree = "<group>"; };
-		C0DE00000000000000000F30 /* RDLCodeLexer.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCodeLexer.m; sourceTree = "<group>"; };
 		C0DE00000000000000000FD0 /* RDLCodeParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCodeParser.m; sourceTree = "<group>"; };
 		C0DE00000000000000000FC0 /* RDLCodeAST.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCodeAST.m; sourceTree = "<group>"; };
 		C0DE00000000000000000FA0 /* RDLExpressionParser.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionParser.m; sourceTree = "<group>"; };
@@ -784,7 +782,6 @@
 				5EBD968C905DB599112D8838 /* RDLMarkup.m */,
 				C0DE00000000000000000A01 /* RDLCode.h */,
 				C0DE00000000000000000A02 /* RDLCode.m */,
-				C0DE00000000000000000F30 /* RDLCodeLexer.m */,
 				C0DE00000000000000000FD0 /* RDLCodeParser.m */,
 				C0DE00000000000000000FC0 /* RDLCodeAST.m */,
 				C0DE00000000000000000FA0 /* RDLExpressionParser.m */,
@@ -1300,7 +1297,6 @@
 				C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */,
 				D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */,
 				C0DE00000000000000000A03 /* RDLCode.m in Sources */,
-				C0DE00000000000000000F31 /* RDLCodeLexer.m in Sources */,
 				C0DE00000000000000000FD1 /* RDLCodeParser.m in Sources */,
 				C0DE00000000000000000FC1 /* RDLCodeAST.m in Sources */,
 				C0DE00000000000000000FA1 /* RDLExpressionParser.m in Sources */,
