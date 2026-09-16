@@ -2,6 +2,7 @@
 #import "RDLChartRenderer.h"
 #import "RDLTextAttributes.h"
 #import "RDLBorderPainter.h"
+#import "RDLLinePainter.h"
 #import "RDLReport.h"
 #import "RDLLayoutEngine.h"
 #import "RDLCompatibility.h"
@@ -19,20 +20,15 @@
 static const CGFloat kRDLDPI = 72.0;
 static const CGFloat kPageGap = 18.0;
 
+// A measurement in points, or a fallback when it says nothing. Still here for
+// the padding insets; the line drawing that used to share it has gone to
+// RDLLinePainter.
 static CGFloat RDLViewPt(RDLLength *length, CGFloat fallback) {
   CGFloat v = length ? [length points] : 0;
   return v > 0 ? v : fallback;
 }
 
-static void RDLSetLineDash(NSBezierPath *p, RDLBorderStyle style) {
-  if (style == RDLBorderStyleDashed) {
-    CGFloat dash[2] = {6, 4};
-    [p setLineDash:dash count:2 phase:0];
-  } else if (style == RDLBorderStyleDotted) {
-    CGFloat dash[2] = {2, 3};
-    [p setLineDash:dash count:2 phase:0];
-  }
-}
+
 
 // Font + text attributes for a resolved style (used both for the plain text
 // path and for each rich-text run merged over the textbox style).
@@ -296,23 +292,10 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
 
 - (void)drawItem:(RDLLaidOutItem *)it inRect:(NSRect)r {
   if ([it isKindOfClass:[RDLLaidOutLine class]]) {
-    RDLBorder *b = it.style.border;
-    NSString *lc = (b && b.color.length) ? b.color : it.style.color;
-    NSBezierPath *p = [NSBezierPath bezierPath];
-    if (it.h * kRDLDPI < 0.5) {
-      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-      [p lineToPoint:NSMakePoint(NSMaxX(r), NSMinY(r))];
-    } else if (it.w * kRDLDPI < 0.5) {
-      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-      [p lineToPoint:NSMakePoint(NSMinX(r), NSMaxY(r))];
-    } else {
-      [p moveToPoint:NSMakePoint(NSMinX(r), NSMinY(r))];
-      [p lineToPoint:NSMakePoint(NSMaxX(r), NSMaxY(r))];
-    }
-    [p setLineWidth:RDLViewPt(b.width, 1)];
-    RDLSetLineDash(p, b.style);
-    [RDLColorFromHex(lc) set];
-    [p stroke];
+    // Drawn by RDLLinePainter, which the designer canvas draws with too; this
+    // file used to hold the only copy that read the width, the dash and which
+    // way the line runs.
+    [RDLLinePainter drawLineOfStyle:it.style inRect:r width:it.w height:it.h scale:1.0];
     return;
   }
   if ([it isKindOfClass:[RDLLaidOutRectangle class]]) {

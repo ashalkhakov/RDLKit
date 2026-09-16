@@ -113,6 +113,71 @@
   }
 }
 
+// That the canvas draws a line the way the engine does. The painter knowing
+// the rule is not enough: the canvas has to hand it the item's own width and
+// height, since a line's rect alone cannot say which way it runs -- a vertical
+// line's rect is no points wide.
+//
+// The line is given a colour nothing else on the canvas draws in, and the
+// check counts that colour rather than dark pixels. Counting dark ones proved
+// useless: the hairline this replaced drew in the default ink, so the strip was
+// full of dark pixels whichever way the line went, and the check passed even
+// with the painter taken out.
+- (void)testTheCanvasDrawsALineTheWayItsBoxSaysItRuns {
+  for (NSNumber *vertical in @[ @YES, @NO ]) {
+    BOOL down = [vertical boolValue];
+    RDLReport *report = [RDLReport emptyReportNamed:@"Lines"];
+    RDLLine *line = [[RDLLine alloc] init];
+    line.name = down ? @"Down" : @"Across";
+    line.left = 0.5;
+    line.top = 0.5;
+    line.width = down ? 0 : 1.5;
+    line.height = down ? 1.5 : 0;
+    line.style.border = [RDLBorder solidColor:@"#ff0000"];
+    line.style.border.width = [RDLLength points:2];
+    [report.body.items addObject:line];
+
+    RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+    NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
+    RDLCanvasView *view =
+        [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) context:ctx];
+    [view setFrameSize:size];
+
+    // Where the line is, asked of the geometry rather than worked out again.
+    RDLPageGeometry *g = [RDLPageGeometry geometryForReport:report
+                                                paperOrigin:[RDLPageGeometry defaultPaperOrigin]];
+    NSRect lineRect = NSZeroRect;
+    if (![g findRectOfItem:line rect:&lineRect]) {
+      XCTFail(@"%@", @"the line should have a rect on the canvas");
+      return;
+    }
+
+    // A tall, narrow strip down from the line's top-left. A line running down
+    // inks nearly every row of it; one running across inks only the first few.
+    NSRect strip = NSMakeRect(NSMinX(lineRect) - 6, NSMinY(lineRect), 12, 60);
+    NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:strip];
+    [view cacheDisplayInRect:strip toBitmapImageRep:rep];
+
+    NSInteger inked = 0;
+    for (NSInteger row = 0; row < [rep pixelsHigh]; row++)
+      for (NSInteger col = 0; col < [rep pixelsWide]; col++) {
+        NSColor *c =
+            [[rep colorAtX:col y:row] colorUsingColorSpace:[NSColorSpace deviceRGBColorSpace]];
+        if ([c redComponent] > 0.5 && [c greenComponent] < 0.3 && [c blueComponent] < 0.3) {
+          inked++;
+          break;
+        }
+      }
+    NSInteger rows = [rep pixelsHigh];
+    if (down && inked < rows / 2)
+      XCTFail(@"a line with no width inked %ld of %ld rows; it is being drawn across",
+              (long)inked, (long)rows);
+    if (!down && inked > 5)
+      XCTFail(@"a line with no height inked %ld of %ld rows; it is being drawn down",
+              (long)inked, (long)rows);
+  }
+}
+
 - (void)testPageGeometry {
   RDLReport *r = [RDLReport emptyReportNamed:@"Geometry"];
   // Letter, 1in margins all round, so the arithmetic is easy to read.

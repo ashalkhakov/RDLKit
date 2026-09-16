@@ -35,3 +35,5 @@
 #import "RDLTextAttributes.h"
 // One drawing of a border, shared by the preview, the PDF and the canvas.
 #import "RDLBorderPainter.h"
+// One drawing of a Line, shared by the preview, the PDF and the canvas.
+#import "RDLLinePainter.h"

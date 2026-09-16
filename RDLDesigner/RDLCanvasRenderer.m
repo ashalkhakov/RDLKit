@@ -5,6 +5,7 @@
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
 #import "RDLBorderPainter.h"
+#import "RDLLinePainter.h"
 
 @implementation RDLCanvasOverlay
 - (instancetype)init {
@@ -421,8 +422,10 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
 - (void)drawItem:(RDLItem *)it inRect:(NSRect)r {
   BOOL sel = it == [_ctx selectedItem];
   if ([it isKindOfClass:[RDLLine class]]) {
-    [RDLColorFromHex(it.style.color) set];
-    NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
+    // The item's own width and height, not the rect: the rect is clamped to a
+    // point tall so a flat line can still be seen, which is the very thing the
+    // direction is read from.
+    [RDLLinePainter drawLineOfStyle:it.style inRect:r width:it.width height:it.height scale:1.0];
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
     [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
     [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:1.0];

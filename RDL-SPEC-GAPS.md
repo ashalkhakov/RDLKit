@@ -425,7 +425,11 @@ and one (`barcode.rdl`) has a default that is not among its valid values.
 renders a horizontal line and negative `Width` a vertical one; a positive
 sloped line is always drawn top-left → bottom-right, so the spec's
 other diagonal (negative size on one axis with a positive on the other)
-cannot be drawn. `KeepTogether`/`PageBreak` on a line are read and written.
+cannot be drawn. Which way a line runs is `RDLLinePainter`'s since P1.1,
+shared by the preview, PDF and the designer canvas. The HTML backend
+keeps its own, in SVG, and calls a box flat below 0.001in where the
+painter calls it flat below half a point: a line between those two
+heights is horizontal everywhere else and sloped in HTML. `KeepTogether`/`PageBreak` on a line are read and written.
 No `ActionInfo`.
 
 `Rectangle` is FULL as a container, including a nested `Tablix`; what

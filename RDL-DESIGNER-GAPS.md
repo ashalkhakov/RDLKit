@@ -98,10 +98,10 @@ The important findings:
    back, the root shape validates, style defaults are the spec's and are
    not materialised, placeholders are no longer stamped, and unsupported
    items open as placeholders.
-5. **The canvas does not draw what renders**: lines are always
-   horizontal hairlines and `ZIndex` is ignored, while the preview
-   honours both. Borders are no longer among them: the canvas, the
-   preview and PDF all draw through one `RDLBorderPainter` (P1.1).
+5. **The canvas does not draw what renders**: `ZIndex` is ignored, and
+   the preview honours it. Borders and lines are no longer among them:
+   the canvas, the preview and PDF draw both through one
+   `RDLBorderPainter` and one `RDLLinePainter` (P1.1).
 
 ## 3. What the designer constructs today
 
@@ -250,7 +250,7 @@ bin that moved since the previous audit.
 |---|---|---|
 | Image: pick an embedded image; import a file as embedded | UI | |
 | Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
-| Line width, style | UI + CANVAS | The canvas draws every line as a 1px horizontal rule. |
+| Line width, style | UI | The canvas draws a line at its border's width, colour and dash, running the way its box says (P1.1); *as audited* every line was a one-pixel rule along the top of its box, and a line with no width -- a vertical one -- drew nothing at all. Still no control for the width or the style: the inspector offers a line only a colour. |
 | Line: the other diagonal | MODEL | |
 | Rectangle padding, `PageBreak`, `KeepTogether` | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
 | Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
@@ -328,7 +328,7 @@ not yet keep that.
 | Bring to front / send to back; canvas z-order | None; the canvas ignores `ZIndex` |
 | Eight resize handles | Three (E, S, SE) |
 | Snap size, snap to item edges | Fixed 0.05in; grid toggle is visual only |
-| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; borders and all four sides of padding drawn as rendered since P1.1 |
+| Drawing lines, borders and padding as rendered | All three drawn as rendered since P1.1, through painters shared with the preview and PDF |
 | Properties grid showing every RDL property | Sectioned inspector for a fixed subset |
 | Report Data pane with drag-to-canvas | Palette drags into bands, not cells |
 | Grouping pane with context menus | Row Group / Column Group menus on the canvas, Group Properties…, and the tablix dialog's group lists |

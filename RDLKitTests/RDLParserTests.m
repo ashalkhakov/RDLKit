@@ -2787,6 +2787,36 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", @"and the left edge should still be off");
 }
 
+// Which way a Line runs. MS-RDL does not say so with a property: a horizontal
+// line is one with no height and a vertical one has no width, and a negative
+// size on either axis means the same as none. Everything that draws a line
+// needed this rule, and the designer canvas had no version of it at all -- it
+// drew a hairline along the top of the box whatever the file said.
+- (void)testALinesDirectionIsReadFromItsBox {
+  // No height: horizontal. A quarter inch of width is plenty of width.
+  if ([RDLLinePainter directionForWidth:0.25 height:0] != RDLLineDirectionHorizontal)
+    XCTFail(@"%@", @"a line with no height runs across");
+  // No width: vertical.
+  if ([RDLLinePainter directionForWidth:0 height:0.25] != RDLLineDirectionVertical)
+    XCTFail(@"%@", @"a line with no width runs down");
+  // Both: sloped.
+  if ([RDLLinePainter directionForWidth:0.25 height:0.25] != RDLLineDirectionSloped)
+    XCTFail(@"%@", @"a line with both runs corner to corner");
+
+  // A negative size is no size: the spec draws a horizontal line for a negative
+  // Height and a vertical one for a negative Width, and the parser keeps the
+  // sign, so the sign has to be read here rather than assumed away.
+  if ([RDLLinePainter directionForWidth:0.25 height:-0.25] != RDLLineDirectionHorizontal)
+    XCTFail(@"%@", @"a negative height is no height, so the line runs across");
+  if ([RDLLinePainter directionForWidth:-0.25 height:0.25] != RDLLineDirectionVertical)
+    XCTFail(@"%@", @"a negative width is no width, so the line runs down");
+
+  // Under half a point is no size either: a box that thin is a rule, not a
+  // slope so slight nobody could see it.
+  if ([RDLLinePainter directionForWidth:2.0 height:0.004] != RDLLineDirectionHorizontal)
+    XCTFail(@"%@", @"a box a third of a point tall is a horizontal rule");
+}
+
 // Which border is drawn along an edge. TopBorder and its siblings inherit from
 // Border one property at a time, so an edge stating only a width keeps the
 // default's style and colour, and an edge stating None draws nothing at all.

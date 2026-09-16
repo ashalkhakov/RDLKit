@@ -66,6 +66,7 @@
 		822F8F131161C58584227764 /* RDLInPlaceEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 15F2DE9F3205E7B493B22D39 /* RDLInPlaceEditor.m */; };
 		855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */ = {isa = PBXBuildFile; fileRef = 3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		C0DE00000000000000000F01 /* RDLBorderPainter.h in Headers */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F00 /* RDLBorderPainter.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C0DE00000000000000000F21 /* RDLLinePainter.h in Headers */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F20 /* RDLLinePainter.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		85E4D28A97D8150EB37E381B /* RDLNewReport.m in Sources */ = {isa = PBXBuildFile; fileRef = E7EE2913922B76161C121E0A /* RDLNewReport.m */; };
 		8832FC6A41582F52B597495E /* RDLItemFactory.m in Sources */ = {isa = PBXBuildFile; fileRef = 7B5800982DB92CA9D51B03CC /* RDLItemFactory.m */; };
 		8D92EA1642AFC3256F660C88 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
@@ -119,6 +120,7 @@
 		C6A2B39DFB62F224DEAF1976 /* RDLSelection.m in Sources */ = {isa = PBXBuildFile; fileRef = 34F661B42A6228C31982DF99 /* RDLSelection.m */; };
 		C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */ = {isa = PBXBuildFile; fileRef = F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */; };
 		C0DE00000000000000000F02 /* RDLBorderPainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F03 /* RDLBorderPainter.m */; };
+		C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F23 /* RDLLinePainter.m */; };
 		D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */ = {isa = PBXBuildFile; fileRef = 5EBD968C905DB599112D8838 /* RDLMarkup.m */; };
 		C0DE00000000000000000A03 /* RDLCode.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000A02 /* RDLCode.m */; };
 		C0DE00000000000000000B03 /* RDLParameterValues.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000B02 /* RDLParameterValues.m */; };
@@ -337,6 +339,7 @@
 		3ACD4FCE2926083C83034463 /* RDLKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RDLKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTextAttributes.h; sourceTree = "<group>"; };
 		C0DE00000000000000000F00 /* RDLBorderPainter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLBorderPainter.h; sourceTree = "<group>"; };
+		C0DE00000000000000000F20 /* RDLLinePainter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLLinePainter.h; sourceTree = "<group>"; };
 		3F5A5B18A1D85BFC4675D077 /* RDLNewReportPanel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLNewReportPanel.h; sourceTree = "<group>"; };
 		3FF932DD49FE9CA2225FCE16 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		48414B2813BA41DB411AC57A /* RDLPageGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPageGeometry.h; sourceTree = "<group>"; };
@@ -496,6 +499,7 @@
 		F6A6288C68C9B7B336B41990 /* RDLUpgrader.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpgrader.m; sourceTree = "<group>"; };
 		F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextAttributes.m; sourceTree = "<group>"; };
 		C0DE00000000000000000F03 /* RDLBorderPainter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLBorderPainter.m; sourceTree = "<group>"; };
+		C0DE00000000000000000F23 /* RDLLinePainter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLLinePainter.m; sourceTree = "<group>"; };
 		A13AD4356C474EBF4EE4401D /* RDLMarkup.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLMarkup.h; sourceTree = "<group>"; };
 		5EBD968C905DB599112D8838 /* RDLMarkup.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMarkup.m; sourceTree = "<group>"; };
 		C0DE00000000000000000A01 /* RDLCode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCode.h; sourceTree = "<group>"; };
@@ -754,8 +758,10 @@
 				3988A14CD9E1B0BA1FAC689B /* GNUmakefile */,
 				3F4EDB67286407E9A2344599 /* RDLTextAttributes.h */,
 				C0DE00000000000000000F00 /* RDLBorderPainter.h */,
+				C0DE00000000000000000F20 /* RDLLinePainter.h */,
 				F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */,
 				C0DE00000000000000000F03 /* RDLBorderPainter.m */,
+				C0DE00000000000000000F23 /* RDLLinePainter.m */,
 				A13AD4356C474EBF4EE4401D /* RDLMarkup.h */,
 				5EBD968C905DB599112D8838 /* RDLMarkup.m */,
 				C0DE00000000000000000A01 /* RDLCode.h */,
@@ -885,6 +891,7 @@
 				55796E92979CDE7C67678C07 /* RDLJSONPath.h in Headers */,
 				855523F8038FD7429053B6E1 /* RDLTextAttributes.h in Headers */,
 				C0DE00000000000000000F01 /* RDLBorderPainter.h in Headers */,
+				C0DE00000000000000000F21 /* RDLLinePainter.h in Headers */,
 				E1455B7A4E59E9EC65FE8340 /* RDLUpgrader.h in Headers */,
 				F02041FC1136A1CBE9435FF9 /* RDLChartRenderer.h in Headers */,
 				A23D0F96B518E64672B3277F /* RDLChecker.h in Headers */,
@@ -1266,6 +1273,7 @@
 				34F001DAEDD5019F6A314840 /* RDLJSONPath.m in Sources */,
 				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
 				C0DE00000000000000000F02 /* RDLBorderPainter.m in Sources */,
+				C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */,
 				D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */,
 				C0DE00000000000000000A03 /* RDLCode.m in Sources */,
 				C0DE00000000000000000B03 /* RDLParameterValues.m in Sources */,
