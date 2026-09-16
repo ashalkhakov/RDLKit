@@ -423,7 +423,12 @@ In rough order of how often a Report Builder user reaches for it:
    taking a length or an expression; and borders are a panel of their own
    on a text box and on a rectangle, stating the default and each edge
    separately, with the canvas drawing them through the same
-   `RDLBorderPainter` the preview and PDF use. Left: the same on a cell.
+   `RDLBorderPainter` the preview and PDF use. A cell is styled through what
+   it holds, since `TablixCell` has no `Style`: a text box or rectangle in a
+   cell through its own section, anything else in one -- and an empty cell --
+   through a Borders… button in the cell's section. An empty cell's borders go
+   on the blank text box Report Builder keeps in every cell, put there only
+   when the panel changes something and undone with the borders in one step.
 2. Common item properties: `Hidden`, `ToggleItem`, `Hyperlink`,
    `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
    front/back commands and canvas z-order.

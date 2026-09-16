@@ -652,8 +652,7 @@
 
 // A cell's style is the style of the item in it: MS-RDL has no style of its
 // own on TablixCell, so the padding fields and the borders panel reach a cell
-// through its text box, and there is nothing further to build for cells that
-// hold something. An empty cell has no item and so nothing to style yet.
+// through its text box. An empty cell is the next test.
 - (void)testACellIsStyledThroughTheItemInIt {
   RDLReport *report = [RDLSamples atelierInvoice];
   RDLTablix *tablix = nil;
@@ -712,6 +711,122 @@
     XCTFail(@"the cell's top edge reads %ld", (long)inCell.style.borderTop.style);
   if (![[[inCell.style borderForEdge:RDLBoxEdgeTop].width stringValue] isEqualToString:@"3pt"])
     XCTFail(@"%@", @"the cell's top edge should draw at the width it was given");
+}
+
+// An empty cell has nothing to carry a style, so its borders go on the blank
+// text box Report Builder keeps in every cell -- put there only when the panel
+// changes something, and taken away with the borders by a single undo. The
+// cell section offers the button wherever the contents' own section does not.
+- (void)testAnEmptyCellIsGivenBordersThroughABlankTextbox {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  if ([rows count] < 2 || [rows[1].cells count] < 2) {
+    XCTFail(@"%@", @"the sample should have a tablix of at least two rows and columns");
+    return;
+  }
+  // The fixture: one cell emptied, another holding an image, whose own section
+  // has no borders to offer.
+  RDLTablixCell *empty = rows[1].cells[0];
+  empty.item = nil;
+  RDLTablixCell *pictured = rows[1].cells[1];
+  RDLImage *image = [[RDLImage alloc] init];
+  image.name = @"CellPicture";
+  pictured.item = image;
+  RDLTextbox *text = nil;
+  for (RDLTablixCell *cell in rows[0].cells)
+    if (text == nil && [cell.item isKindOfClass:[RDLTextbox class]])
+      text = (RDLTextbox *)cell.item;
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  NSButton *button = [inspector valueForKey:@"cellBordersButton"];
+  if (button == nil || [button action] != @selector(editBorders:)) {
+    XCTFail(@"%@", @"the cell section's Borders… button should be connected to editBorders:");
+    return;
+  }
+  NSView *cellBox = [inspector valueForKey:@"cellBox"];
+  NSTextField *widthField = [inspector valueForKey:@"cellWidthField"];
+
+  // Shown for the image, whose section has no borders; hidden for a text box,
+  // whose section does -- and the section is no taller than what it shows.
+  [ctx.selection selectItem:image inBandWithKey:@"body"];
+  if ([cellBox isHidden] || [button isHidden])
+    XCTFail(@"%@", @"an image in a cell should be offered borders by the cell section");
+  if (NSMaxY([button frame]) > NSHeight([cellBox frame]))
+    XCTFail(@"%@", @"the button should fit inside the cell section");
+  CGFloat withButton = NSHeight([cellBox frame]);
+  NSRect fieldAt = [widthField frame];
+  if (text != nil) {
+    [ctx.selection selectItem:text inBandWithKey:@"body"];
+    if (![button isHidden])
+      XCTFail(@"%@", @"a text box in a cell has the button in its own section already");
+    if (NSHeight([cellBox frame]) > NSMinY([button frame]))
+      XCTFail(@"%@", @"a hidden button should leave no gap in the cell section");
+  }
+
+  [ctx.selection selectCellOfTablix:tablix
+                                row:(NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:1]
+                             column:(NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:0]
+                      inBandWithKey:@"body"];
+  if ([cellBox isHidden] || [button isHidden])
+    XCTFail(@"%@", @"an empty cell should be offered borders");
+  // Hiding the button and showing it again leaves the section as it was: the
+  // same height, and the width field where it started, inside the section.
+  if (NSHeight([cellBox frame]) != withButton)
+    XCTFail(@"the section is %.0f tall after showing the button again, not %.0f",
+            NSHeight([cellBox frame]), withButton);
+  if (!NSEqualRects([widthField frame], fieldAt))
+    XCTFail(@"the width field moved from %@ to %@", NSStringFromRect(fieldAt),
+            NSStringFromRect([widthField frame]));
+
+  // Opening the panel, and applying it untouched, leave the cell empty.
+  RDLBordersEditor *panel = [RDLBordersEditor editorForSelectedEmptyCellInContext:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an empty cell");
+    return;
+  }
+  if (![panel apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  if (empty.item != nil)
+    XCTFail(@"%@", @"a panel that changed nothing should put nothing in the cell");
+
+  // A border given: the cell now holds a blank text box that draws it.
+  [[panel valueForKey:@"defaultStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleSolid)];
+  [[panel valueForKey:@"defaultColorField"] setStringValue:@"#336699"];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply to an empty cell");
+  if (![empty.item isKindOfClass:[RDLTextbox class]]) {
+    XCTFail(@"the cell holds %@ rather than a text box", empty.item);
+    return;
+  }
+  RDLTextbox *blank = (RDLTextbox *)empty.item;
+  // Blank the way a file's blank cell is: an empty value, not a missing one,
+  // which the canvas would label "Textbox".
+  if (![blank.value isEqualToString:@""])
+    XCTFail(@"the cell's text box should have an empty value, not %@", blank.value);
+  if ([blank.style borderForEdge:RDLBoxEdgeBottom].style != RDLBorderStyleSolid ||
+      ![[blank.style borderForEdge:RDLBoxEdgeBottom].color isEqualToString:@"#336699"])
+    XCTFail(@"%@", @"the cell should draw the border it was given on every edge");
+  if (ctx.selection.item != blank)
+    XCTFail(@"%@", @"the new text box should be what is selected, so its own section shows");
+  if ([[tablix structuralProblems] count])
+    XCTFail(@"the table should stay consistent: %@", [tablix structuralProblems]);
+
+  // One undo takes the borders and the text box away together.
+  [ctx.document.undoManager undo];
+  if (empty.item != nil)
+    XCTFail(@"one undo should leave the cell empty again, not holding %@", empty.item);
+  // And with no empty cell selected there is no panel to open.
+  [ctx.selection selectItem:image inBandWithKey:@"body"];
+  if ([RDLBordersEditor editorForSelectedEmptyCellInContext:ctx] != nil)
+    XCTFail(@"%@", @"a cell that holds something is not an empty cell");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to

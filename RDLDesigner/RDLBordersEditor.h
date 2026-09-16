@@ -25,6 +25,14 @@
 // for an item that is not in this report.
 + (instancetype)editorForItem:(RDLItem *)item context:(RDLEditingContext *)context;
 
+// The same for the selected empty cell. A cell is styled through what is in
+// it, so the panel edits the blank text box Report Builder would have kept
+// there, and OK puts it in the cell -- in the same undoable step as the
+// borders -- only when something was changed. Cancel, or OK on an untouched
+// panel, leaves the cell empty. nil unless an empty cell is selected.
++ (BOOL)runForSelectedEmptyCellInContext:(RDLEditingContext *)context;
++ (instancetype)editorForSelectedEmptyCellInContext:(RDLEditingContext *)context;
+
 // What the panel holds. RDLBoxEdgeUnspecified is the default border, the one
 // the four edges fall back to; the others are the edges themselves. Never nil:
 // an edge that states nothing is an empty border, so the panel can tell

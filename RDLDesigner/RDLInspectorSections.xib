@@ -67,6 +67,7 @@
                 <outlet property="verticalPop" destination="verticalPop" id="verticalPopOutlet"/>
                 <outlet property="textBordersButton" destination="textBordersButton" id="textBordersButtonOutlet"/>
                 <outlet property="rectBordersButton" destination="rectBordersButton" id="rectBordersButtonOutlet"/>
+                <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
                 <outlet property="padLeftField" destination="padLeftField" id="padLeftFieldOutlet"/>
                 <outlet property="padLeftExprButton" destination="padLeftExprButton" id="padLeftExprButtonOutlet"/>
                 <outlet property="padRightField" destination="padRightField" id="padRightFieldOutlet"/>
@@ -507,7 +508,7 @@
             </subviews>
         </customView>
         <customView id="cellBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="48"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="76"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell2">
@@ -532,6 +533,17 @@
                         <outlet property="delegate" destination="-2" id="cellWidthFieldDelegate"/>
                     </connections>
                 </textField>
+                <button toolTip="The cell's default border and each edge on its own" id="cellBordersButton">
+                    <rect key="frame" x="10" y="48" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Borders…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cellBordersButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editBorders:" target="-2" id="cellBordersButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="textBox">

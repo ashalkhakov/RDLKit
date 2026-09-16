@@ -74,6 +74,17 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 - (NSString *)insertionDescription;
 - (void)deleteSelectedItem;
 
+// A cell has no style of its own: MS-RDL styles a cell through the item in its
+// CellContents, and Report Builder keeps a blank text box in every cell for
+// that. An empty cell here holds nothing, so styling one starts from that same
+// blank text box -- made, not yet put in the cell, so a panel can edit it and
+// only put it there when something was actually changed. nil unless an empty
+// cell is selected.
+- (RDLTextbox *)blankTextboxForSelectedCell;
+// Puts `item` into the selected empty cell, through the editor, and selects it.
+// NO, doing nothing, unless an empty cell is selected.
+- (BOOL)addItemToSelectedEmptyCell:(RDLItem *)item;
+
 // Item clipboard. The item travels as RDL XML on the general pasteboard, so it
 // survives between processes and pastes back as a genuine deep copy.
 - (BOOL)copySelectedItem;

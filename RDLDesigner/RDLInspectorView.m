@@ -47,6 +47,9 @@
 // path binding -- as are the tablix's row heights.
 @property (nonatomic, strong) IBOutlet NSView *cellBox;
 @property (nonatomic, strong) IBOutlet NSTextField *cellWidthField;
+// Borders for a cell whose contents have no section that offers them: an empty
+// cell, or an image, chart or other region in one.
+@property (nonatomic, strong) IBOutlet NSButton *cellBordersButton;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -582,8 +585,15 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // An item in a tablix cell: the column it is in, whose width is the cell's.
     NSUInteger cellRow = 0, cellColumn = 0;
     if (cell != nil && [cellTablix getRow:&cellRow column:&cellColumn ofCell:cell] &&
-        [self fillColumn:(NSInteger)cellColumn ofTablix:cellTablix])
+        [self fillColumn:(NSInteger)cellColumn ofTablix:cellTablix]) {
+      // A text box and a rectangle carry the button in their own sections, and
+      // a line's border is the line, edited in its section.
+      BOOL ownSectionHasBorders = [it isKindOfClass:[RDLTextbox class]] ||
+                                  [it isKindOfClass:[RDLRectangle class]] ||
+                                  [it isKindOfClass:[RDLLine class]];
+      [self showCellBorders:!ownSectionHasBorders];
       [boxes addObject:_cellBox];
+    }
     [self stackBoxes:boxes];
   } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && !_showsReportOnly) {
     // An empty cell: nothing in it to describe, so what is shown is the column
@@ -595,8 +605,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     NSMutableArray *boxes = [NSMutableArray array];
     NSInteger bodyColumn = [RDLTablixGeometry bodyColumnOf:sel.tablix
                                              forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
-    if (bodyColumn >= 0 && [self fillColumn:bodyColumn ofTablix:sel.tablix])
+    if (bodyColumn >= 0 && [self fillColumn:bodyColumn ofTablix:sel.tablix]) {
+      [self showCellBorders:YES];
       [boxes addObject:_cellBox];
+    }
     [self stackBoxes:boxes];
   } else if (band != nil) {
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
@@ -825,10 +837,27 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 - (void)editBorders:(id)sender {
   (void)sender;
   RDLItem *item = [_context selectedItem];
-  if (item == nil)
-    return;
-  if ([RDLBordersEditor runForItem:item context:_context])
+  BOOL accepted = item != nil ? [RDLBordersEditor runForItem:item context:_context]
+                              : [RDLBordersEditor runForSelectedEmptyCellInContext:_context];
+  if (accepted)
     [self reload];
+}
+
+// The cell section's Borders… button, shown only where the cell's contents
+// have no section of their own that offers it, and the section sized to match
+// so a hidden button leaves no gap.
+- (void)showCellBorders:(BOOL)shown {
+  [_cellBordersButton setHidden:!shown];
+  // The box grows and shrinks over the button, which is the topmost thing in
+  // it; everything else stays where the XIB put it. Left to autoresizing, a
+  // shrink moved the width field out of the box, and the next height worked
+  // out from the moved frames came out short.
+  [_cellBox setAutoresizesSubviews:NO];
+  NSRect button = [_cellBordersButton frame];
+  CGFloat gap = NSMinY(button) - NSMaxY([_cellWidthField frame]);
+  NSRect box = [_cellBox frame];
+  box.size.height = shown ? NSMaxY(button) + gap : NSMinY(button);
+  [_cellBox setFrame:box];
 }
 
 - (void)editExpression:(id)sender {

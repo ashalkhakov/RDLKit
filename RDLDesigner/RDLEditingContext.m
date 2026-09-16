@@ -181,6 +181,37 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   [_selection selectItem:item inBandWithKey:point.bandKey];
 }
 
+// The cell the selection points at, when that cell is empty. An item selected
+// in a cell also resolves to a cell, but that one is full.
+- (RDLInsertionPoint *)selectedEmptyCell {
+  RDLInsertionPoint *point = [self insertionPoint];
+  return point.cell != nil && point.cell.item == nil ? point : nil;
+}
+
+- (RDLTextbox *)blankTextboxForSelectedCell {
+  RDLInsertionPoint *point = [self selectedEmptyCell];
+  if (point == nil)
+    return nil;
+  RDLItem *item = [RDLItemFactory itemOfKind:@"Textbox" atPoint:point inReport:self.report];
+  if (![item isKindOfClass:[RDLTextbox class]])
+    return nil;
+  // Blank: the stand-in words a text box inserted from the menu gets would be
+  // text nobody asked for in a cell that was only being given a border. Empty
+  // rather than nil, which is how a blank cell reads from a file -- and a nil
+  // value is what the canvas labels with the element's name.
+  RDLTextbox *blank = (RDLTextbox *)item;
+  blank.value = @"";
+  return blank;
+}
+
+- (BOOL)addItemToSelectedEmptyCell:(RDLItem *)item {
+  RDLInsertionPoint *point = [self selectedEmptyCell];
+  if (point == nil || item == nil)
+    return NO;
+  [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+  return YES;
+}
+
 // A cell holds one report item, so putting a second thing in one means the
 // cell holds a Rectangle and both things go in that -- which is what Report
 // Builder does when you drop another item into a cell that already has a text

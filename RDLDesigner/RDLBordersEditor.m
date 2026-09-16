@@ -57,6 +57,8 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
 @implementation RDLBordersEditor {
   RDLItem *_item;
   RDLEditingContext *_context;
+  // _item is a blank text box for the selected empty cell, not yet in it.
+  BOOL _placesItemInCell;
 }
 
 // The controls of one row, looked up by the row's edge so the rest of the
@@ -158,8 +160,26 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
   return ed;
 }
 
++ (instancetype)editorForSelectedEmptyCellInContext:(RDLEditingContext *)context {
+  RDLTextbox *blank = [context blankTextboxForSelectedCell];
+  RDLBordersEditor *ed = [self editorForItem:blank context:context];
+  if (ed == nil)
+    return nil;
+  ed->_placesItemInCell = YES;
+  // The text box is the panel's business, not the person's: they chose a cell.
+  [ed.window setTitle:@"Borders — Cell"];
+  return ed;
+}
+
++ (BOOL)runForSelectedEmptyCellInContext:(RDLEditingContext *)context {
+  return [self runEditor:[self editorForSelectedEmptyCellInContext:context]];
+}
+
 + (BOOL)runForItem:(RDLItem *)item context:(RDLEditingContext *)context {
-  RDLBordersEditor *ed = [self editorForItem:item context:context];
+  return [self runEditor:[self editorForItem:item context:context]];
+}
+
++ (BOOL)runEditor:(RDLBordersEditor *)ed {
   if (ed == nil)
     return NO;
   NSModalResponse response = [NSApp runModalForWindow:ed.window];
@@ -201,6 +221,13 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
 
   // All five as one step: undo puts the whole panel back, not one edge of it.
   [_context.editor beginGroup:@"Borders"];
+  // A cell's blank text box goes in first, so the borders are written onto
+  // an item in the report -- and one undo takes both away again.
+  if (_placesItemInCell && ![_context addItemToSelectedEmptyCell:_item]) {
+    [_context.editor endGroup];
+    return NO;
+  }
+  _placesItemInCell = NO;
   for (NSUInteger i = 0; i < kRDLBorderRowCount; i++) {
     RDLBoxEdge edge = kRDLBorderRows[i];
     RDLBorder *border = [self borderForEdge:edge];
