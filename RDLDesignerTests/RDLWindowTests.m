@@ -3214,4 +3214,89 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
 }
 
 
+// Whether a parameter is asked for at all is a thing of its own: MS-RDL says
+// so by having a Prompt or not, and an empty prompt is still a prompt --
+// asked for with no words. Clearing the field used to remove the Prompt, which
+// quietly made the report unable to run with any other value.
+- (void)testAParameterCanBeAskedForWithNoWords {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Params"];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Culture";
+  p.dataType = RDLParameterDataTypeString;
+  p.prompt = @"Which culture?";
+  [report.parameters addObject:p];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLParameterInspectorView *inspector =
+      [[RDLParameterInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+  [inspector showParameter:p];
+  NSButton *asked = [inspector valueForKey:@"promptCheck"];
+  NSTextField *promptField = [inspector valueForKey:@"promptField"];
+  if ([asked state] != NSOnState || ![promptField isEnabled]) {
+    XCTFail(@"%@", @"a parameter with a prompt is asked for");
+    return;
+  }
+
+  // Emptied, it is still asked for -- with no words.
+  [promptField setStringValue:@""];
+  [inspector changed:promptField];
+  if (p.prompt == nil || [p.prompt length])
+    XCTFail(@"clearing the words should leave an empty prompt, not %@", p.prompt ?: @"(none)");
+
+  // Unticked, it is not asked for at all, and the field says so.
+  [asked setState:NSOffState];
+  [inspector changed:asked];
+  if (p.prompt != nil)
+    XCTFail(@"unticking should take the prompt away, not leave %@", p.prompt);
+  [inspector showParameter:p];
+  if ([[inspector valueForKey:@"promptCheck"] state] != NSOffState || [promptField isEnabled])
+    XCTFail(@"%@", @"a parameter that is not asked for shows as one");
+  [asked setState:NSOnState];
+  [inspector changed:asked];
+  if (p.prompt == nil)
+    XCTFail(@"%@", @"ticking it should ask for it again");
+}
+
+// A parameter whose default or accepted values come from a dataset is shown as
+// it is, not edited: what was typed could never be written, because the file
+// holds the reference instead.
+- (void)testAParameterReadingADatasetIsShownReadOnly {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Params"];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Region";
+  p.dataType = RDLParameterDataTypeString;
+  p.prompt = @"Which region?";
+  RDLDataSetReference *defaults = [[RDLDataSetReference alloc] init];
+  defaults.dataSetName = @"Regions";
+  defaults.valueField = @"Code";
+  p.defaultValuesReference = defaults;
+  RDLDataSetReference *valid = [[RDLDataSetReference alloc] init];
+  valid.dataSetName = @"Regions";
+  valid.valueField = @"Code";
+  valid.labelField = @"Name";
+  p.validValuesReference = valid;
+  [report.parameters addObject:p];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLParameterInspectorView *inspector =
+      [[RDLParameterInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+  [inspector showParameter:p];
+  NSTextField *defaultField = [inspector valueForKey:@"defaultField"];
+  NSTextView *validText = [inspector valueForKey:@"validText"];
+  NSTextField *reference = [inspector valueForKey:@"referenceLabel"];
+  if ([defaultField isEnabled] || [validText isEditable])
+    XCTFail(@"%@", @"values that come from a dataset are not typed over");
+  if ([[defaultField stringValue] rangeOfString:@"Regions"].location == NSNotFound ||
+      [[validText string] rangeOfString:@"Name"].location == NSNotFound ||
+      [[reference stringValue] length] == 0)
+    XCTFail(@"the pane should say what it reads: %@ / %@ / %@", [defaultField stringValue],
+            [validText string], [reference stringValue]);
+
+  // Typing into them anyway changes nothing, rather than being lost on save.
+  [defaultField setStringValue:@"North"];
+  [validText setString:@"North\nSouth"];
+  [inspector changed:defaultField];
+  if ([p.defaultValues count] || [p.validValues count] || p.defaultValuesReference != defaults)
+    XCTFail(@"%@", @"a reference should not be overwritten by what the pane shows");
+}
+
+
 @end

@@ -277,9 +277,7 @@ static NSArray *RDLFieldValues(NSString *field, NSArray *rows, RDLDataSet *dataS
     NSArray *rows = RDLReferencedRows(reference, scope, &ds);
     raw = rows ? RDLFieldValues(reference.valueField, rows, ds, scope) : nil;
   } else {
-    NSArray<RDLValue *> *written = [parameter.defaultValues count]
-                                       ? parameter.defaultValues
-                                       : (parameter.defaultValue ? @[ parameter.defaultValue ] : nil);
+    NSArray<RDLValue *> *written = parameter.defaultValues;
     NSMutableArray *values = [NSMutableArray array];
     for (RDLValue *value in written)
       [values addObject:[value evaluateInScope:scope] ?: [NSNull null]];

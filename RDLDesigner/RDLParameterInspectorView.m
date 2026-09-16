@@ -9,6 +9,12 @@
 @interface RDLParameterInspectorView () <NSTextFieldDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTextField *nameField, *promptField;
+// Whether the report asks for this parameter at all: MS-RDL says so by having
+// a Prompt or not, and an empty prompt is still a prompt.
+@property (nonatomic, strong) IBOutlet NSButton *promptCheck;
+// What a DefaultValue/ValidValues DataSetReference reads, for a parameter
+// whose values come from a dataset rather than from the file.
+@property (nonatomic, strong) IBOutlet NSTextField *referenceLabel;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *typePop;
 @property (nonatomic, strong) IBOutlet NSButton *nullableCheck, *multiCheck;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *defaultField;
@@ -16,6 +22,19 @@
 @property (nonatomic, strong) IBOutlet NSTextView *validText;
 @property (nonatomic, strong) IBOutlet NSTextField *empty;
 @end
+
+// A reference as the pane names it: the dataset, the field the value comes
+// from, and the field its label comes from.
+static NSString *RDLReferenceSummary(RDLDataSetReference *reference) {
+  NSMutableString *out = [NSMutableString stringWithFormat:@"%@", reference.dataSetName ?: @""];
+  if ([reference.valueField length])
+    [out appendFormat:@" (%@", reference.valueField];
+  if ([reference.valueField length] && [reference.labelField length])
+    [out appendFormat:@" shown as %@", reference.labelField];
+  if ([reference.valueField length])
+    [out appendString:@")"];
+  return out;
+}
 
 @implementation RDLParameterInspectorView {
   RDLEditingContext *_context;
@@ -44,25 +63,54 @@
   _parameter = parameter;
   _filling = YES;
   BOOL any = parameter != nil;
-  for (NSView *v in @[ _nameField, _promptField, _typePop, _nullableCheck, _multiCheck,
+  for (NSView *v in @[ _nameField, _promptField, _promptCheck, _typePop, _nullableCheck, _multiCheck,
                        _defaultField, _validScroll ])
     [v setHidden:!any];
   [_empty setHidden:any];
+  [_referenceLabel setHidden:!any];
   if (any) {
     [_nameField setStringValue:parameter.name ?: @""];
+    // An empty prompt is still a prompt: the parameter is asked for with no
+    // words. No prompt at all means it is never asked, and the report can only
+    // run on its default.
+    [_promptCheck setState:parameter.prompt != nil ? NSOnState : NSOffState];
+    [_promptField setEnabled:parameter.prompt != nil];
     [_promptField setStringValue:parameter.prompt ?: @""];
     NSString *type = RDLStringFromParameterDataType(parameter.dataType) ?: @"String";
     if ([_typePop itemWithTitle:type])
       [_typePop selectItemWithTitle:type];
     [_nullableCheck setState:parameter.nullable ? NSOnState : NSOffState];
     [_multiCheck setState:parameter.multiValue ? NSOnState : NSOffState];
-    [_defaultField setStringValue:[parameter.defaultValue source] ?: @""];
-    // One value a line: a list written on one line could not hold a value with
-    // a comma in it, and these are values rather than a sentence.
-    NSMutableArray *lines = [NSMutableArray array];
-    for (RDLValue *v in parameter.validValues)
-      [lines addObject:[v source] ?: @""];
+    // A parameter whose defaults or values come from a dataset is shown as it
+    // is and not edited: what was typed here could not be written, because the
+    // file holds the reference instead.
+    RDLDataSetReference *defaults = parameter.defaultValuesReference;
+    RDLDataSetReference *valid = parameter.validValuesReference;
+    [_defaultField setEnabled:defaults == nil];
+    [_validText setEditable:valid == nil];
+    NSMutableArray<NSString *> *lines = [NSMutableArray array];
+    if (defaults != nil) {
+      [_defaultField setStringValue:RDLReferenceSummary(defaults)];
+    } else {
+      [_defaultField setStringValue:[parameter.defaultValue source] ?: @""];
+    }
+    if (valid != nil) {
+      [lines addObject:RDLReferenceSummary(valid)];
+    } else {
+      // One value a line: a list written on one line could not hold a value
+      // with a comma in it, and these are values rather than a sentence.
+      for (RDLValue *v in parameter.validValues)
+        [lines addObject:[v source] ?: @""];
+    }
     [_validText setString:[lines componentsJoinedByString:@"\n"]];
+    NSMutableArray<NSString *> *read = [NSMutableArray array];
+    if (defaults != nil)
+      [read addObject:[NSString stringWithFormat:@"default from %@", RDLReferenceSummary(defaults)]];
+    if (valid != nil)
+      [read addObject:[NSString stringWithFormat:@"values from %@", RDLReferenceSummary(valid)]];
+    [_referenceLabel setStringValue:[read count] ? [NSString stringWithFormat:@"Read from the dataset: %@.",
+                                                                             [read componentsJoinedByString:@", "]]
+                                                 : @""];
   }
   _filling = NO;
 }
@@ -74,8 +122,11 @@
   if (_filling || _parameter == nil)
     return;
   RDLEditor *editor = _context.editor;
-  NSString *prompt = [_promptField stringValue];
-  [editor setValue:[prompt length] ? prompt : nil forKeyPath:@"prompt" ofParameter:_parameter];
+  // Asked for with no words, or not asked for at all -- which are different
+  // reports, and used to be the same the moment the field was cleared.
+  BOOL asked = [_promptCheck state] == NSOnState;
+  [_promptField setEnabled:asked];
+  [editor setValue:asked ? [_promptField stringValue] : nil forKeyPath:@"prompt" ofParameter:_parameter];
   RDLParameterDataType type = RDLParameterDataTypeFromString([_typePop titleOfSelectedItem]);
   if (type != RDLParameterDataTypeUnspecified)
     [editor setValue:@(type) forKeyPath:@"dataType" ofParameter:_parameter];
@@ -83,10 +134,14 @@
        ofParameter:_parameter];
   [editor setValue:@([_multiCheck state] == NSOnState) forKeyPath:@"multiValue"
        ofParameter:_parameter];
-  NSString *written = [_defaultField stringValue];
-  [editor setValue:[RDLValue valueWithSource:written] forKeyPath:@"defaultValue"
-       ofParameter:_parameter];
+  if (_parameter.defaultValuesReference == nil) {
+    NSString *written = [_defaultField stringValue];
+    [editor setValue:[RDLValue valueWithSource:written] forKeyPath:@"defaultValue"
+         ofParameter:_parameter];
+  }
 
+  if (_parameter.validValuesReference != nil)
+    return;
   NSMutableArray *values = [NSMutableArray array];
   for (NSString *line in [[_validText string] componentsSeparatedByString:@"\n"]) {
     NSString *one =

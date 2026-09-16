@@ -2584,4 +2584,38 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", [NSString stringWithFormat:@"an upgraded file keeps its designer state and not the old grammar: %@", upgraded]);
 }
 
+// A parameter's default is kept in one place. It used to be two -- a single
+// `defaultValue` and a `defaultValues` list -- and the writer, the checker and
+// the renderer read the list, so a default written to the other was silently
+// dropped on save.
+- (void)testAParametersDefaultIsKeptInOnePlace {
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Region";
+  p.dataType = RDLParameterDataTypeString;
+  p.prompt = @"Which region?";
+  p.defaultValue = [RDLValue literal:@"South"];
+  if ([p.defaultValues count] != 1 || ![[p.defaultValues.firstObject source] isEqualToString:@"South"])
+    XCTFail(@"setting the default should set the values it is the first of: %@", p.defaultValues);
+  [p.defaultValues setArray:@[ [RDLValue literal:@"North"], [RDLValue literal:@"South"] ]];
+  if (![[p.defaultValue source] isEqualToString:@"North"])
+    XCTFail(@"the default should be the first of the values: %@", [p.defaultValue source]);
+  p.defaultValue = nil;
+  if ([p.defaultValues count])
+    XCTFail(@"%@", @"clearing the default should leave no values behind");
+
+  // And what is set that way is written and read back.
+  RDLReport *r = [RDLReport emptyReportNamed:@"Params"];
+  p.defaultValue = [RDLValue valueWithSource:@"=User!Language"];
+  [r.parameters addObject:p];
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  NSError *err = nil;
+  RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
+  RDLParameter *back = [parsed.parameters firstObject];
+  if (back == nil)
+    XCTFail(@"the round trip should keep the parameter: %@", err.localizedDescription);
+  else if (![[back.defaultValue source] isEqualToString:@"=User!Language"] ||
+           [back.defaultValues count] != 1)
+    XCTFail(@"the default should survive the round trip: %@", [back.defaultValue source]);
+}
+
 @end

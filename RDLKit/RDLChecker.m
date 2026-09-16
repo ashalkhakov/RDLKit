@@ -970,7 +970,7 @@ static void RDLCheckParameterDefinition(RDLParameter *p, RDLReport *report, RDLS
   // AllowBlank is for String parameters only; for another type "" is not a
   // blank but not a value at all.
   BOOL text = p.dataType == RDLParameterDataTypeString || p.dataType == RDLParameterDataTypeUnspecified;
-  NSArray<RDLValue *> *defaults = [p.defaultValues count] ? p.defaultValues : (p.defaultValue ? @[ p.defaultValue ] : @[]);
+  NSArray<RDLValue *> *defaults = p.defaultValues;
   for (RDLValue *v in [defaults arrayByAddingObjectsFromArray:p.validValues]) {
     if (text && !p.allowBlank && ![v isExpression] && [[v source] length] == 0)
       RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"parameter-value", scope, nil,
@@ -1208,7 +1208,7 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
       for (RDLParameter *needed in sub.definition.parameters) {
         if ([passed containsObject:needed.name] || needed.nullable)
           continue;
-        if (needed.defaultValue != nil || [needed.defaultValues count])
+        if ([needed.defaultValues count])
           continue;
         RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"missing-subreport-parameter", scope,
                    nil,
@@ -1307,7 +1307,6 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
                                                                   p.name ?: @"(unnamed)"],
                                  nil);
     ps.parametersDeclaredBefore = declared;
-    RDLCheckValue(p.defaultValue, ps, run);
     for (RDLValue *v in p.defaultValues)
       RDLCheckValue(v, ps, run);
     for (RDLValue *v in p.validValues)
@@ -1425,7 +1424,7 @@ static NSDictionary *RDLObjCTypeForParameter(RDLParameterDataType t) {
     entry[@"rdlType"] = RDLStringFromParameterDataType(p.dataType) ?: @"String";
     entry[@"nullable"] = @(p.nullable);
     entry[@"multiValue"] = @(p.multiValue);
-    if (p.defaultValue != nil)
+    if ([p.defaultValues count])
       entry[@"default"] = [p.defaultValue source] ?: @"";
     if ([p.validValues count]) {
       NSMutableArray *vals = [NSMutableArray array];

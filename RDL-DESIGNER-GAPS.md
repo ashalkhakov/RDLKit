@@ -120,7 +120,7 @@ UI.
 | Report | Band `Style` | Body background only; a stale guard (`RDLReport.m`, body-only) disables it for header/footer though the writer emits any band's style |
 | Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | — |
 | Report | `Code`, `Variables` | — |
-| Report | Parameters | Navigator (add/remove) + inspector: name, prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line |
+| Report | Parameters | Navigator (add/remove) + inspector: name, "Asked for" and its prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line; values a `DataSetReference` supplies are shown, read-only |
 | Report | Data sources | Navigator + pane: JSON/XML/CSV; file beside the report or embedded content; CSV header row, delimiter, widths; connect string composed |
 | Report | Embedded images | — (the Image inspector accepts a name; none can be added) |
 | Data | Datasets: add, remove, rename (regions follow) | Yes |
@@ -196,7 +196,7 @@ bin that moved since the previous audit.
 | Parameter ordering | UI | Order matters for cascading and for the prompt pane; no move command. |
 | Valid values with labels | UI (was MODEL) | `validValueLabels` is keyed by value source, so editing a value's text loses its label. |
 | Multi-value defaults | UI + defect | The inspector writes only `defaultValue`; see §5. |
-| `DataSetReference` valid values and defaults | UI (was MODEL) | Shown as an empty list, and what is typed there is not written (§5). |
+| `DataSetReference` valid values and defaults | UI | Shown as what they read -- the dataset and its value and label fields -- and not typed over, since the file holds the reference. Editing the reference itself has no control. |
 | `MultiValue` value entry in the data pane | UI | One text field; with valid values, a single-select popup. |
 | `ReportParametersLayout` | MODEL | |
 | Data source kinds beyond JSON/XML/CSV | MODEL | Shown as JSON and rewritten on first edit (§5). |
@@ -349,9 +349,6 @@ matter more than missing features because they destroy work.
 
 | Trigger | What is lost | Fix |
 |---|---|---|
-| Edit the default of a loaded parameter | Not saved: the parser fills `defaultValues`, the inspector writes only `defaultValue`, and the writer and renderer prefer `defaultValues` *(by inspection)*. | Keep the two in sync in `RDLParameter`. |
-| A parameter with `DataSetReference` valid values or defaults | Shown as an empty list; what is typed there is never written, because the writer uses the reference *(by inspection)*. | Show the reference, read-only until it can be edited. |
-| Clear a parameter's Prompt | `Prompt` is removed, which makes the parameter never asked for and read-only (engine §6), with no warning. | Tell an empty prompt from an absent one. |
 | Open a chart of a type the popup lacks | Shows as Column; picking any entry changes its type. | Offer every type. |
 | Edit a chart's category field | Nested category and series groups are dropped. | Edit the first level only. |
 | Data source pane on a SQL/OLEDB source | Touching any control rewrites `DataProvider` and `ConnectString` (viewing alone does not). | Show unknown providers read-only. |
@@ -379,7 +376,13 @@ rebuild of a loaded tablix, with the reverted cell edits and the kept cells
 re-attached by old column index that rode on it (edits are now in place,
 §4.7); the cell popups that dropped CountDistinct and General/Justify (gone
 with the column spec from the inspector); group filters that bypassed undo
-and outlived Cancel (the tablix dialog edits a copy).
+and outlived Cancel (the tablix dialog edits a copy). A loaded parameter's
+edited default, dropped on save because the default was kept in two places at
+once (`defaultValues` is now the one place, and `defaultValue` is the first of
+them); typing over values a `DataSetReference` supplies, which could never be
+written (they are shown read-only); and clearing a prompt, which quietly made
+the parameter unaskable rather than asked for with no words ("Asked for" says
+which).
 
 ## 6. Designer priorities
 
@@ -392,8 +395,9 @@ and outlived Cancel (the tablix dialog edits a copy).
    with their members; groups around, inside and beside others, deleted and
    re-nested; totals; group properties. Left: rows on their own from the
    canvas, and Report Builder's uniform header depth (§4.7).
-2. Parameter default/`defaultValues` sync; `DataSetReference` lists shown
-   read-only; empty vs absent Prompt.
+2. Parameters — done: the default is kept in one place, so an edited one is
+   saved; `DataSetReference` defaults and values are shown read-only; and
+   "Asked for" tells an empty prompt from an absent one.
 3. Chart: every type in the popup; category edits that keep nested groups.
 4. Done: the cell popups went with the column spec; group filters go
    through `RDLEditor`, on the tablix dialog's copy.

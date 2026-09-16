@@ -1404,10 +1404,17 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 // the values written out.
 @property (nonatomic, strong) RDLDataSetReference *defaultValuesReference;
 @property (nonatomic, strong) RDLDataSetReference *validValuesReference;
-@property (nonatomic, strong) RDLValue *defaultValue;
 @property (nonatomic, assign) BOOL nullable;
 @property (nonatomic, assign) BOOL multiValue;
-@property (nonatomic, strong) NSMutableArray<RDLValue *> *defaultValues; // MultiValue defaults
+// DefaultValue/Values: what the parameter starts with -- all of them for a
+// MultiValue parameter, the first for any other. The one place a default is
+// kept.
+@property (nonatomic, strong) NSMutableArray<RDLValue *> *defaultValues;
+// The first of those, for the ordinary parameter that has one. Reading and
+// writing it reads and writes `defaultValues`, so the two cannot disagree --
+// which is what let an edited default be written to one and saved from the
+// other.
+@property (nonatomic, strong) RDLValue *defaultValue;
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *validValues;   // ValidValues/ParameterValues
 // The label each valid value is shown and reported under --
 // ParameterValue/Label -- keyed by the value's own source text. A map rather

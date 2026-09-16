@@ -2105,6 +2105,16 @@ static NSUInteger RDLSpanOf(NSInteger span) {
   return self;
 }
 
+- (RDLValue *)defaultValue {
+  return [_defaultValues firstObject];
+}
+
+- (void)setDefaultValue:(RDLValue *)value {
+  [_defaultValues removeAllObjects];
+  if (value != nil)
+    [_defaultValues addObject:value];
+}
+
 - (RDLValue *)labelForValidValue:(NSString *)value {
   return value ? _validValueLabels[value] : nil;
 }

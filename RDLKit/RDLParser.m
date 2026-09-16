@@ -1833,7 +1833,6 @@ static void RDLPutBackPreserved(NSXMLElement *root, RDLReport *report) {
                                         ? [RDLValue valueWithSource:@"=Nothing"]
                                         : ([RDLValue valueWithSource:RDLText((NSXMLElement *)vn)] ?: [RDLValue literal:@""])];
     }
-    rp.defaultValue = [rp.defaultValues firstObject];
     for (NSXMLNode *vn in [RDLChild(RDLChild(p, @"ValidValues"), @"ParameterValues") children]) {
       if (vn.kind != NSXMLElementKind)
         continue;
@@ -3039,8 +3038,7 @@ static void RDLAddChartAxes(NSXMLElement *parent, NSString *collectionName, NSAr
       RDLAdd(pe, @"Hidden", @"true");
     if (p.usedInQuery != RDLUsedInQueryUnspecified)
       RDLAdd(pe, @"UsedInQuery", RDLStringFromUsedInQuery(p.usedInQuery));
-    NSArray<RDLValue *> *defaults = [p.defaultValues count] ? p.defaultValues
-                                                            : (p.defaultValue ? @[ p.defaultValue ] : @[]);
+    NSArray<RDLValue *> *defaults = p.defaultValues;
     // A DefaultValue holds its values or where to read them, never neither.
     if (p.defaultValuesReference) {
       NSXMLElement *def = RDLEl(@"DefaultValue");
