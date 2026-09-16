@@ -3,35 +3,62 @@
 #import "RDLFilterEditor.h"
 #import "RDLPane.h"
 #import "RDLEditingContext.h"
+#import "RDLEditor.h"
 #import "RDLExpressionCell.h"
 #import "RDLExpressionEditor.h"
+#import "RDLItemFactory.h"
+#import "RDLTablixStructure.h"
 
-// Dragging between the three lists carries the field's name and which list it
-// came from, so a drop knows what to remove as well as what to add.
-static NSString * const RDLTablixFieldDragType = @"org.rdl.designer.tablix-field";
+// Dragging a group within its list carries the row it came from; dragging a
+// column onto a list carries the column.
+static NSString *const RDLTablixGroupDragType = @"org.rdl.designer.tablix-group";
+static NSString *const RDLTablixColumnDragType = @"org.rdl.designer.tablix-column";
+// A column added from the dialog, in inches: as wide as the scaffolding makes one.
+static const CGFloat kRDLDialogColumnWidth = 1.6;
+// How a group list shows a details group, which groups on nothing.
+static NSString *const kRDLDetailsTitle = @"(Details)";
+// How far each level of nesting indents a group in its list, in spaces.
+static const NSUInteger kRDLGroupIndent = 2;
+// What a group is added on when the dataset has no fields to offer.
+static NSString *const kRDLPlaceholderField = @"Field";
+// The words the Kind column offers.
+static NSString *const kRDLKindText = @"Text";
+static NSString *const kRDLKindSubreport = @"Subreport";
 
-// "=Sum(Fields!Amount.Value)" -> "Amount". The same recovery the parser does
-// when it infers a spec from a built tablix.
-static NSString *RDLFieldOfValue(NSString *value) {
-  NSRange bang = [value rangeOfString:@"Fields!"];
-  if (bang.location == NSNotFound)
-    return nil;
-  NSString *rest = [value substringFromIndex:NSMaxRange(bang)];
-  NSRange dot = [rest rangeOfString:@"."];
-  return dot.location == NSNotFound ? rest : [rest substringToIndex:dot.location];
+// The columns of the column table, by the identifiers RDLTablixEditor.xib gives
+// them.
+typedef NS_ENUM(NSInteger, RDLColumnField) {
+  RDLColumnFieldUnspecified = 0,
+  RDLColumnFieldHeading,
+  RDLColumnFieldValue,
+  RDLColumnFieldWidth,
+  RDLColumnFieldKind,
+  RDLColumnFieldReport,
+  RDLColumnFieldAlign,
+  RDLColumnFieldAggregate,
+};
+
+static RDLColumnField RDLColumnFieldFromIdentifier(NSString *identifier) {
+  NSDictionary<NSString *, NSNumber *> *fields = @{
+    @"header" : @(RDLColumnFieldHeading),
+    @"value" : @(RDLColumnFieldValue),
+    @"width" : @(RDLColumnFieldWidth),
+    @"kind" : @(RDLColumnFieldKind),
+    @"report" : @(RDLColumnFieldReport),
+    @"align" : @(RDLColumnFieldAlign),
+    @"aggregate" : @(RDLColumnFieldAggregate),
+  };
+  return (RDLColumnField)[fields[identifier ?: @""] integerValue];
 }
 
 @interface RDLTablixEditor () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *datasetPop;
-// The two group lists beside the columns, as Report Builder arranges them: a
-// field is in the row groups, in the column groups, or it is one of the columns
-// that are left. Dragging is how it moves between them.
+// The two group lists beside the columns, as Report Builder arranges them.
 @property (nonatomic, strong) IBOutlet NSTableView *rowGroupTable, *colGroupTable;
 @property (nonatomic, strong) IBOutlet NSButton *rowGroupAddButton, *rowGroupRemoveButton;
 @property (nonatomic, strong) IBOutlet NSButton *colGroupAddButton, *colGroupRemoveButton;
-@property (nonatomic, strong) NSMutableArray<NSString *> *rowGroups, *colGroups;
 @property (nonatomic, strong) IBOutlet NSButton *grandTotalCheck;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHField, *rowHField;
 @property (nonatomic, strong) IBOutlet NSButton *cancelButton;
@@ -39,53 +66,119 @@ static NSString *RDLFieldOfValue(NSString *value) {
 @property (nonatomic, strong) IBOutlet NSButton *groupFiltersButton;
 @property (nonatomic, strong) IBOutlet NSButton *addColumnButton, *removeColumnButton;
 @property (nonatomic, strong) IBOutlet NSButton *moveLeftButton, *moveRightButton;
-@property (nonatomic, strong) NSMutableArray<NSMutableDictionary *> *cols;
-@property (nonatomic, strong) RDLReport *report;
-// The tablix being edited, and its filters as the filter panel last left them
-// -- nil until that panel has been through, so an untouched dialog leaves the
-// filters exactly as they were rather than rewriting them with equal ones.
-@property (nonatomic, strong) RDLTablix *tablix;
-@property (nonatomic, copy) NSArray<RDLFilter *> *editedFilters;
+@property (nonatomic, readwrite, strong) RDLTablix *edited;
 @end
 
-@implementation RDLTablixEditor
-
-- (RDLDataSet *)selectedDataset {
-  RDLDataSet *ds = [_report dataSetNamed:[_datasetPop titleOfSelectedItem]];
-  return ds ?: _report.dataSets.firstObject;
+@implementation RDLTablixEditor {
+  RDLTablix *_tablix;
+  RDLReport *_report;
+  RDLEditingContext *_context;
 }
 
-- (void)datasetChanged:(id)sender {
-  (void)sender;
-  // The groups name fields of the dataset, so changing the dataset leaves the
-  // ones it does not have behind rather than carrying a dangling name.
-  NSArray *fields = [[self selectedDataset] fieldNames] ?: @[];
-  for (NSMutableArray *groups in @[ _rowGroups, _colGroups ]) {
-    NSMutableArray *keep = [NSMutableArray array];
-    for (NSString *field in groups)
-      if ([fields containsObject:field])
-        [keep addObject:field];
-    [groups setArray:keep];
+#pragma mark - What the copy has
+
+- (RDLDataSet *)dataSet {
+  return [_report dataSetNamed:_edited.dataSetName];
+}
+
+static void RDLCollectGroups(NSArray<RDLTablixMember *> *members, NSMutableArray<RDLTablixMember *> *into) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName length])
+      [into addObject:m];
+    RDLCollectGroups(m.members, into);
   }
-  [_rowGroupTable reloadData];
-  [_colGroupTable reloadData];
 }
 
-// Which list a table is, so one data source can serve all three.
-- (NSMutableArray *)listForTable:(NSTableView *)table {
-  if (table == _rowGroupTable)
-    return _rowGroups;
-  if (table == _colGroupTable)
-    return _colGroups;
-  return nil;  // the columns table holds specs, not field names
+- (NSArray<RDLTablixMember *> *)groupsAlong:(RDLTablixAxis)axis {
+  NSMutableArray<RDLTablixMember *> *groups = [NSMutableArray array];
+  RDLCollectGroups([RDLTablixStructure hierarchyOfTablix:_edited axis:axis].members, groups);
+  return groups;
 }
+
+- (NSArray<RDLTablixMember *> *)rowGroups {
+  return [self groupsAlong:RDLTablixAxisRows];
+}
+
+- (NSArray<RDLTablixMember *> *)columnGroups {
+  return [self groupsAlong:RDLTablixAxisColumns];
+}
+
+- (RDLTablixAxis)axisOfTable:(NSTableView *)table {
+  if (table == _rowGroupTable)
+    return RDLTablixAxisRows;
+  if (table == _colGroupTable)
+    return RDLTablixAxisColumns;
+  return RDLTablixAxisUnspecified;
+}
+
+// A group as its list shows it: indented as deep as it is nested among the
+// groups, and called by the field it groups on, or by its expression.
+- (NSString *)titleOfGroup:(RDLTablixMember *)group axis:(RDLTablixAxis)axis {
+  NSUInteger depth = 0;
+  for (RDLTablixMember *m in [[RDLTablixStructure hierarchyOfTablix:_edited axis:axis] pathToMember:group])
+    if (m != group && [m.groupName length])
+      depth += 1;
+  NSString *source = [group.groupExpressions.firstObject source];
+  NSString *shown = source == nil ? kRDLDetailsTitle : [RDLFilterEditor fieldNameInExpression:source] ?: source;
+  NSString *indent = [@"" stringByPaddingToLength:depth * kRDLGroupIndent withString:@" " startingAtIndex:0];
+  return [indent stringByAppendingString:shown];
+}
+
+// The first field of the dataset no group groups on, so + always does
+// something; which field it is can then be typed over in the list.
+- (NSString *)fieldToGroupBy {
+  NSMutableSet<NSString *> *used = [NSMutableSet set];
+  for (RDLTablixMember *group in [[self rowGroups] arrayByAddingObjectsFromArray:[self columnGroups]])
+    for (RDLValue *expression in group.groupExpressions) {
+      NSString *field = [RDLFilterEditor fieldNameInExpression:[expression source]];
+      if (field != nil)
+        [used addObject:field];
+    }
+  NSArray<NSString *> *fields = [[self dataSet] fieldNames];
+  for (NSString *field in fields)
+    if (![used containsObject:field])
+      return field;
+  return [fields firstObject] ?: kRDLPlaceholderField;
+}
+
+- (NSInteger)headingRow {
+  return [RDLTablixStructure headingRowOfTablix:_edited];
+}
+
+- (NSInteger)valueRow {
+  return [RDLTablixStructure valueRowOfTablix:_edited];
+}
+
+- (NSArray<NSNumber *> *)totalRows {
+  return [RDLTablixStructure totalRowsOfTablix:_edited];
+}
+
+- (RDLTablixCell *)cellInRow:(NSInteger)row column:(NSUInteger)column {
+  NSArray<RDLTablixRow *> *rows = _edited.tablixBody.rows;
+  if (row < 0 || (NSUInteger)row >= [rows count] || column >= [rows[(NSUInteger)row].cells count])
+    return nil;
+  return rows[(NSUInteger)row].cells[column];
+}
+
+- (RDLTextbox *)textboxInRow:(NSInteger)row column:(NSUInteger)column {
+  RDLItem *item = [self cellInRow:row column:column].item;
+  return [item isKindOfClass:[RDLTextbox class]] ? (RDLTextbox *)item : nil;
+}
+
+- (RDLTextbox *)newTextbox {
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = [RDLItemFactory uniqueNameWithPrefix:@"Textbox" inReport:_report besides:_edited];
+  box.value = @"";
+  return box;
+}
+
+#pragma mark - Building
 
 // Everything fixed about the panel -- the labels, the popup and field frames,
-// the five columns with their widths and their Align/Total combo lists, the
-// buttons and their actions -- is RDLTablixEditor.xib. What is left here is
-// what only the open report can supply: the dataset and field lists, and the
-// tablix's own values.
-- (void)buildPanelForTablix:(RDLTablix *)tab {
+// the columns with their widths and their Align/Total combo lists, the buttons
+// and their actions -- is RDLTablixEditor.xib. What is left here is what only
+// the open report can supply: the datasets, and the tablix's own values.
+- (void)buildPanel {
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLTablixEditor"
                                         bundle:[NSBundle bundleForClass:[self class]]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
@@ -98,91 +191,206 @@ static NSString *RDLFieldOfValue(NSString *value) {
   RDLSetToolbarIcon(_moveLeftButton, RDLToolbarGlyphMoveLeft);
   RDLSetToolbarIcon(_moveRightButton, RDLToolbarGlyphMoveRight);
 
-  [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", tab.name ?: @""]];
+  [_window setTitle:[NSString stringWithFormat:@"Tablix — %@", _tablix.name ?: @""]];
 
   for (RDLDataSet *ds in _report.dataSets)
     [_datasetPop addItemWithTitle:ds.name];
-  if (tab.dataSetName && [_datasetPop itemWithTitle:tab.dataSetName])
-    [_datasetPop selectItemWithTitle:tab.dataSetName];
+  if (_edited.dataSetName && [_datasetPop itemWithTitle:_edited.dataSetName])
+    [_datasetPop selectItemWithTitle:_edited.dataSetName];
   // The Value column takes an expression, so it gets the cell that shows one:
-  // coloured, and with f(x) to open the editor for that row. The other columns
-  // are plain text, a measurement and two popups, and stay as they are.
+  // coloured, and with f(x) to open the editor for that row.
   NSTableColumn *valueColumn = [_table tableColumnWithIdentifier:@"value"];
   RDLExpressionCell *cell = [[RDLExpressionCell alloc] init];
   [cell setEditable:YES];
-  [cell setFont:[[valueColumn dataCell] font] ?: [NSFont systemFontOfSize:11]];
+  [cell setFont:[[valueColumn dataCell] font] ?: [NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
   cell.buttonTarget = self;
   cell.buttonAction = @selector(editColumnExpression:);
   [valueColumn setDataCell:cell];
 
-  _rowGroups = [(tab.rowGroups ?: @[]) mutableCopy];
-  _colGroups = [(tab.columnGroups ?: @[]) mutableCopy];
-  for (NSTableView *t in @[ _rowGroupTable, _colGroupTable, _table ])
-    [t registerForDraggedTypes:@[ RDLTablixFieldDragType ]];
-  [_rowGroupTable reloadData];
-  [_colGroupTable reloadData];
-
-  [_grandTotalCheck setState:tab.showGrandTotal ? NSOnState : NSOffState];
-  [_headerHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.headerHeight]];
-  [_rowHField setStringValue:[NSString stringWithFormat:@"%.3f", tab.rowHeight]];
-  [_table reloadData];
+  for (NSTableView *t in @[ _rowGroupTable, _colGroupTable ])
+    [t registerForDraggedTypes:@[ RDLTablixGroupDragType, RDLTablixColumnDragType ]];
+  [self reloadAll];
 }
 
-// f(x) in a Value cell: the editor for that row's expression, written back
-// into the spec the table is showing.
+- (void)reloadAll {
+  [_rowGroupTable reloadData];
+  [_colGroupTable reloadData];
+  [_table reloadData];
+  [_grandTotalCheck setState:[RDLTablixStructure tablixHasTotalRow:_edited] ? NSOnState : NSOffState];
+  NSInteger heading = [self headingRow], value = [self valueRow];
+  [_headerHField setStringValue:heading >= 0 ? [NSString stringWithFormat:@"%.3f", _edited.tablixBody.rows[(NSUInteger)heading].height] : @""];
+  [_rowHField setStringValue:value >= 0 ? [NSString stringWithFormat:@"%.3f", _edited.tablixBody.rows[(NSUInteger)value].height] : @""];
+  [self syncFiltersButton];
+}
+
+- (void)datasetChanged:(id)sender {
+  (void)sender;
+  _edited.dataSetName = [_datasetPop titleOfSelectedItem];
+  [self reloadAll];
+}
+
+// f(x) in a Value cell: the editor for that column's value, written back into
+// the cell.
 - (void)editColumnExpression:(id)sender {
   (void)sender;
   NSInteger row = [_table clickedRow];
-  if (row < 0 || row >= (NSInteger)[_cols count])
+  RDLTextbox *box = row >= 0 ? [self textboxInRow:[self valueRow] column:(NSUInteger)row] : nil;
+  if (box == nil)
     return;
-  NSMutableDictionary *spec = _cols[(NSUInteger)row];
-  NSString *edited = [RDLExpressionEditor runForSource:spec[@"value"] ?: @""
+  NSString *edited = [RDLExpressionEditor runForSource:box.value ?: @""
                                                context:RDLExpressionContextText
                                                 report:_report];
   if (edited == nil)
     return;
-  spec[@"value"] = edited;
+  box.value = edited;
   [_table reloadData];
 }
 
-#pragma mark - Dragging between the lists
+#pragma mark - Groups
 
-// A field is in the row groups, in the column groups, or among the columns.
-// Dragging moves it, so the three lists always partition what the tablix uses
-// rather than letting the same field be a group and a column at once.
+- (RDLTablixMember *)selectedGroupIn:(NSTableView *)table {
+  NSArray<RDLTablixMember *> *groups = [self groupsAlong:[self axisOfTable:table]];
+  NSInteger row = [table selectedRow];
+  return row >= 0 && row < (NSInteger)[groups count] ? groups[(NSUInteger)row] : nil;
+}
+
+- (void)addGroupIn:(NSTableView *)table onField:(NSString *)field {
+  RDLTablixAxis axis = [self axisOfTable:table];
+  RDLTablixHierarchy *hierarchy = [RDLTablixStructure hierarchyOfTablix:_edited axis:axis];
+  RDLTablixMember *selected = [self selectedGroupIn:table];
+  // Inside the selected group when it groups something; around it -- or
+  // around the outermost group, or the last column -- otherwise.
+  RDLTablixMember *member = selected ?: [[self groupsAlong:axis] firstObject] ?: [[hierarchy leafMembers] lastObject];
+  RDLGroupPlacement placement = [selected.groupExpressions count] ? RDLGroupPlacementChild : RDLGroupPlacementParent;
+  RDLTablixMember *added =
+      [RDLTablixStructure addGroupWithExpression:[NSString stringWithFormat:@"=Fields!%@.Value", field]
+                                       placement:placement
+                                        toMember:member
+                                            axis:axis
+                                        inTablix:_edited
+                                          report:_report];
+  if (added == nil) {
+    NSBeep();
+    return;
+  }
+  [self reloadAll];
+  NSUInteger row = [[self groupsAlong:axis] indexOfObjectIdenticalTo:added];
+  if (row != NSNotFound)
+    [table selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+}
+
+- (void)removeGroupIn:(NSTableView *)table {
+  RDLTablixMember *selected = [self selectedGroupIn:table];
+  if (selected == nil ||
+      ![RDLTablixStructure deleteGroup:selected withLines:NO axis:[self axisOfTable:table] inTablix:_edited]) {
+    NSBeep();
+    return;
+  }
+  [self reloadAll];
+}
+
+- (void)addRowGroup:(id)sender {
+  (void)sender;
+  [self addGroupIn:_rowGroupTable onField:[self fieldToGroupBy]];
+}
+
+- (void)removeRowGroup:(id)sender {
+  (void)sender;
+  [self removeGroupIn:_rowGroupTable];
+}
+
+- (void)addColumnGroup:(id)sender {
+  (void)sender;
+  [self addGroupIn:_colGroupTable onField:[self fieldToGroupBy]];
+}
+
+- (void)removeColumnGroup:(id)sender {
+  (void)sender;
+  [self removeGroupIn:_colGroupTable];
+}
+
+// The order of a list is the nesting of its groups, so moving one is exchanging
+// it, a place at a time, with each group it passes -- which can only be done
+// along one chain of groups, each inside the one before.
+- (BOOL)moveGroup:(RDLTablixMember *)group toIndex:(NSUInteger)index axis:(RDLTablixAxis)axis {
+  NSArray<RDLTablixMember *> *groups = [self groupsAlong:axis];
+  NSUInteger from = [groups indexOfObjectIdenticalTo:group];
+  if (from == NSNotFound || [groups count] == 0)
+    return NO;
+  // The index is where it would go before it is taken out of the list.
+  NSUInteger to = MIN(index > from ? index - 1 : index, [groups count] - 1);
+  if (to == from)
+    return NO;
+  RDLTablixHierarchy *hierarchy = [RDLTablixStructure hierarchyOfTablix:_edited axis:axis];
+  for (NSUInteger i = MIN(from, to); i < MAX(from, to); i++)
+    if ([[hierarchy pathToMember:groups[i + 1]] indexOfObjectIdenticalTo:groups[i]] == NSNotFound ||
+        [groups[i].groupExpressions count] == 0 || [groups[i + 1].groupExpressions count] == 0)
+      return NO;
+  NSInteger step = to > from ? 1 : -1;
+  for (NSInteger i = (NSInteger)from; i != (NSInteger)to; i += step)
+    [RDLTablixStructure exchangeGroup:groups[(NSUInteger)i]
+                            withGroup:groups[(NSUInteger)(i + step)]
+                                 axis:axis
+                             inTablix:_edited];
+  [self reloadAll];
+  return YES;
+}
+
+- (BOOL)moveRowGroup:(RDLTablixMember *)group toIndex:(NSUInteger)index {
+  return [self moveGroup:group toIndex:index axis:RDLTablixAxisRows];
+}
+
+- (BOOL)moveColumnGroup:(RDLTablixMember *)group toIndex:(NSUInteger)index {
+  return [self moveGroup:group toIndex:index axis:RDLTablixAxisColumns];
+}
+
+// Typing in a group list regroups that group: on the field of that name, or on
+// what was typed as an expression. Emptied, it stops grouping.
+- (void)setGroupInTable:(NSTableView *)table row:(NSInteger)row typed:(NSString *)typed {
+  RDLTablixAxis axis = [self axisOfTable:table];
+  NSArray<RDLTablixMember *> *groups = [self groupsAlong:axis];
+  if (row < 0 || row >= (NSInteger)[groups count])
+    return;
+  RDLTablixMember *group = groups[(NSUInteger)row];
+  NSString *text = [typed stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  if ([text length] == 0) {
+    [RDLTablixStructure deleteGroup:group withLines:NO axis:axis inTablix:_edited];
+  } else {
+    NSString *source = [[[self dataSet] fieldNames] containsObject:text]
+                           ? [NSString stringWithFormat:@"=Fields!%@.Value", text]
+                           : text;
+    if (![RDLTablixStructure setName:group.groupName
+                         expressions:@[ [RDLValue valueWithSource:source] ]
+                             filters:group.filters
+                             ofGroup:group
+                                axis:axis
+                            inTablix:_edited
+                              report:_report])
+      NSBeep();
+  }
+  [self reloadAll];
+}
+
+#pragma mark - Dragging
 
 // As in the palette: the modern writer for macOS, the older one for GNUstep,
 // which declares only that. A missing optional delegate method is not an error
 // -- the drag just never starts -- so both are here.
-- (BOOL)tableView:(NSTableView *)tv
-    writeRowsWithIndexes:(NSIndexSet *)rows
-            toPasteboard:(NSPasteboard *)pasteboard {
-  NSString *field = [self fieldInTable:tv atRow:(NSInteger)[rows firstIndex]];
-  if ([field length] == 0)
-    return NO;
-  [pasteboard declareTypes:@[ RDLTablixFieldDragType ] owner:nil];
-  [pasteboard setString:field forType:RDLTablixFieldDragType];
+- (NSString *)dragTypeOfTable:(NSTableView *)tv {
+  return tv == _table ? RDLTablixColumnDragType : RDLTablixGroupDragType;
+}
+
+- (BOOL)tableView:(NSTableView *)tv writeRowsWithIndexes:(NSIndexSet *)rows toPasteboard:(NSPasteboard *)pasteboard {
+  NSString *type = [self dragTypeOfTable:tv];
+  [pasteboard declareTypes:@[ type ] owner:nil];
+  [pasteboard setString:[NSString stringWithFormat:@"%lu", (unsigned long)[rows firstIndex]] forType:type];
   return YES;
 }
 
 - (id<NSPasteboardWriting>)tableView:(NSTableView *)tv pasteboardWriterForRow:(NSInteger)row {
-  NSString *field = [self fieldInTable:tv atRow:row];
-  if ([field length] == 0)
-    return nil;
   NSPasteboardItem *item = [[NSPasteboardItem alloc] init];
-  [item setString:field forType:RDLTablixFieldDragType];
+  [item setString:[NSString stringWithFormat:@"%ld", (long)row] forType:[self dragTypeOfTable:tv]];
   return item;
-}
-
-// The name a row stands for. A group list holds names; the columns table holds
-// specs, and the name is the field its value reads.
-- (NSString *)fieldInTable:(NSTableView *)tv atRow:(NSInteger)row {
-  NSMutableArray *list = [self listForTable:tv];
-  if (list)
-    return row >= 0 && row < (NSInteger)[list count] ? list[(NSUInteger)row] : nil;
-  if (row < 0 || row >= (NSInteger)[_cols count])
-    return nil;
-  return RDLFieldOfValue(_cols[(NSUInteger)row][@"value"]) ?: _cols[(NSUInteger)row][@"header"];
 }
 
 - (NSDragOperation)tableView:(NSTableView *)tv
@@ -190,189 +398,42 @@ static NSString *RDLFieldOfValue(NSString *value) {
                  proposedRow:(NSInteger)row
        proposedDropOperation:(NSTableViewDropOperation)op {
   (void)op;
-  // Within a group list, a drop lands *between* two rows: the order of the
-  // list is the nesting of the groups -- outermost first -- so dragging one
-  // above another re-nests them, which is what Report Builder's Grouping pane
-  // is for. Groups cannot be re-nested by dragging anything on the canvas, so
-  // this is the only place it can be done.
-  if ([self listForTable:tv] != nil) {
+  if ([self axisOfTable:tv] == RDLTablixAxisUnspecified)
+    return NSDragOperationNone;
+  // Within its own list a group lands between two rows: that is re-nesting.
+  // A column dropped on a list groups on its field.
+  if ([info draggingSource] == tv) {
     [tv setDropRow:row dropOperation:NSTableViewDropAbove];
     return NSDragOperationMove;
   }
-  if ([[info draggingSource] isKindOfClass:[NSTableView class]] &&
-      [info draggingSource] == tv)
-    return NSDragOperationNone;  // the columns list is reordered by its buttons
-  [tv setDropRow:-1 dropOperation:NSTableViewDropOn];
-  return NSDragOperationMove;
+  return [info draggingSource] == _table ? NSDragOperationCopy : NSDragOperationNone;
 }
 
 - (BOOL)tableView:(NSTableView *)tv
        acceptDrop:(id<NSDraggingInfo>)info
               row:(NSInteger)row
     dropOperation:(NSTableViewDropOperation)op {
-  (void)row;
   (void)op;
-  NSString *field = [[info draggingPasteboard] stringForType:RDLTablixFieldDragType];
-  if ([field length] == 0)
-    return NO;
-  NSTableView *from = [info draggingSource];
-  if (![from isKindOfClass:[NSTableView class]])
-    return NO;
-
-  NSMutableArray *fromList = [self listForTable:from];
-  NSMutableArray *toList = [self listForTable:tv];
-
-  // Re-nesting inside one list: out of where it was and in above the row it
-  // was dropped on. The index is taken before the removal and corrected after,
-  // or a group dragged downwards lands one place short.
-  if (from == tv) {
-    if (toList == nil || ![self moveGroup:field inList:toList toRow:row])
+  NSPasteboard *pasteboard = [info draggingPasteboard];
+  RDLTablixAxis axis = [self axisOfTable:tv];
+  if ([info draggingSource] == tv) {
+    NSInteger from = [[pasteboard stringForType:RDLTablixGroupDragType] integerValue];
+    NSArray<RDLTablixMember *> *groups = [self groupsAlong:axis];
+    if (from < 0 || from >= (NSInteger)[groups count] || row < 0)
       return NO;
-    NSUInteger landed = [toList indexOfObject:field];
-    if (landed != NSNotFound)
-      [tv selectRowIndexes:[NSIndexSet indexSetWithIndex:landed] byExtendingSelection:NO];
-    return YES;
+    return [self moveGroup:groups[(NSUInteger)from] toIndex:(NSUInteger)row axis:axis];
   }
-
-  // Out of wherever it was ...
-  if (fromList) {
-    [fromList removeObject:field];
-  } else {
-    for (NSUInteger i = 0; i < [_cols count]; i++)
-      if ([[self fieldInTable:from atRow:(NSInteger)i] isEqualToString:field]) {
-        [_cols removeObjectAtIndex:i];
-        break;
-      }
-  }
-
-  // ... and into where it was dropped: at the row it landed on when that list
-  // is ordered, which a group list is.
-  if (toList) {
-    if (![toList containsObject:field]) {
-      NSUInteger to = row < 0 ? [toList count] : MIN((NSUInteger)row, [toList count]);
-      [toList insertObject:field atIndex:to];
-    }
-  } else {
-    [_cols addObject:[self specForField:field]];
-  }
-
-  [self reloadGroups];
-  return YES;
-}
-
-// Grouping by another field. The first field of the dataset that is not
-// already a group, so the button always does something; which field it is is
-// then typed over in the list, or dragged in from the columns.
-- (NSString *)fieldToGroupBy {
-  RDLDataSet *ds = [_report dataSetNamed:[_datasetPop titleOfSelectedItem]]
-                       ?: [_report.dataSets firstObject];
-  for (NSString *name in [ds fieldNames])
-    if (![_rowGroups containsObject:name] && ![_colGroups containsObject:name])
-      return name;
-  // A dataset that has run out of fields, or one this report never declared:
-  // a name the person is expected to replace beats a button that does nothing.
-  return @"Field";
-}
-
-- (void)reloadGroups {
-  [_rowGroupTable reloadData];
-  [_colGroupTable reloadData];
-  [_table reloadData];
-  [self syncFiltersButton];
-}
-
-- (void)addRowGroup:(id)sender {
-  RDL_UNUSED(sender);
-  [_rowGroups addObject:[self fieldToGroupBy]];
-  [self reloadGroups];
-  [_rowGroupTable selectRowIndexes:[NSIndexSet indexSetWithIndex:[_rowGroups count] - 1]
-              byExtendingSelection:NO];
-}
-
-- (void)removeRowGroup:(id)sender {
-  RDL_UNUSED(sender);
-  NSInteger row = [_rowGroupTable selectedRow];
-  if (row < 0 || row >= (NSInteger)[_rowGroups count])
-    return;
-  [_rowGroups removeObjectAtIndex:(NSUInteger)row];
-  [self reloadGroups];
-}
-
-- (void)addColumnGroup:(id)sender {
-  RDL_UNUSED(sender);
-  [_colGroups addObject:[self fieldToGroupBy]];
-  [self reloadGroups];
-  [_colGroupTable selectRowIndexes:[NSIndexSet indexSetWithIndex:[_colGroups count] - 1]
-              byExtendingSelection:NO];
-}
-
-- (void)removeColumnGroup:(id)sender {
-  RDL_UNUSED(sender);
-  NSInteger row = [_colGroupTable selectedRow];
-  if (row < 0 || row >= (NSInteger)[_colGroups count])
-    return;
-  [_colGroups removeObjectAtIndex:(NSUInteger)row];
-  [self reloadGroups];
-}
-
-// Re-nesting: the order of a group list is the order of the groups, outermost
-// first, so moving one up or down changes what is nested inside what. Its own
-// method because it is the whole of what dragging inside a list does, and
-// because a check can drive it without synthesising a drag.
-- (BOOL)moveGroup:(NSString *)field inList:(NSMutableArray *)list toRow:(NSInteger)row {
-  NSUInteger was = [list indexOfObject:field ?: @""];
-  if (was == NSNotFound)
+  if ([info draggingSource] != _table)
     return NO;
-  NSUInteger to = row < 0 ? [list count] : (NSUInteger)row;
-  // The row is where it would go *before* it is taken out, so dragging one
-  // downwards has to lose the place it vacated or it lands one short.
-  if (to > was)
-    to -= 1;
-  [list removeObjectAtIndex:was];
-  [list insertObject:field atIndex:MIN(to, [list count])];
-  [self reloadGroups];
+  NSInteger column = [[pasteboard stringForType:RDLTablixColumnDragType] integerValue];
+  NSString *field = column >= 0 ? [RDLFilterEditor fieldNameInExpression:[self textboxInRow:[self valueRow] column:(NSUInteger)column].value] : nil;
+  if (field == nil)
+    return NO;
+  [self addGroupIn:tv onField:field];
   return YES;
 }
 
-- (BOOL)moveRowGroup:(NSString *)field toIndex:(NSUInteger)index {
-  return [self moveGroup:field inList:_rowGroups toRow:(NSInteger)index];
-}
-
-- (BOOL)moveColumnGroup:(NSString *)field toIndex:(NSUInteger)index {
-  return [self moveGroup:field inList:_colGroups toRow:(NSInteger)index];
-}
-
-// A column made by dragging a field in. It aggregates when the tablix has
-// column groups: a crosstab has no details row, so every cell sits where a row
-// group meets a column group and a bare field there is not a value RDL can
-// produce. A grouped table keeps its details row, where the raw field belongs.
-- (NSMutableDictionary *)specForField:(NSString *)field {
-  NSMutableDictionary *spec = [@{
-    @"width" : @1.6,
-    @"header" : field,
-    @"value" : [NSString stringWithFormat:@"=Fields!%@.Value", field]
-  } mutableCopy];
-  if ([_colGroups count])
-    spec[@"aggregate"] = @"Sum";
-  return spec;
-}
-
-// Applied when the dialog is accepted, because the rule depends on the column
-// groups and those can change while the dialog is open.
-- (NSArray *)columnSpecsForSaving {
-  if ([_colGroups count] == 0)
-    return [_cols copy];
-  NSMutableArray *out = [NSMutableArray array];
-  for (NSDictionary *spec in _cols) {
-    NSMutableDictionary *copy = [spec mutableCopy];
-    if ([copy[@"aggregate"] length] == 0)
-      copy[@"aggregate"] = @"Sum";
-    [out addObject:copy];
-  }
-  return out;
-}
-
-#pragma mark - Column actions
+#pragma mark - Columns
 
 - (void)commitTableEditing {
   // Push any in-progress cell edit into the data source before acting.
@@ -381,39 +442,58 @@ static NSString *RDLFieldOfValue(NSString *value) {
     [w makeFirstResponder:_table];
 }
 
+- (NSInteger)selectedColumn {
+  NSInteger row = [_table selectedRow];
+  return row >= 0 && row < (NSInteger)[_edited.tablixBody.columns count] ? row : -1;
+}
+
+- (void)selectColumn:(NSUInteger)column {
+  [_table reloadData];
+  if (column < [_edited.tablixBody.columns count])
+    [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:column] byExtendingSelection:NO];
+}
+
+// A column after the selected one, or at the end, heading and showing the
+// dataset's first field, for the person to change.
 - (void)addColumn:(id)sender {
   (void)sender;
   [self commitTableEditing];
-  RDLDataSet *ds = [self selectedDataset];
-  NSString *field = [[ds fieldNames] firstObject] ?: @"Field";
-  [_cols addObject:[@{
-    @"width" : @1.6,
-    @"header" : field,
-    @"value" : [NSString stringWithFormat:@"=Fields!%@.Value", field]
-  } mutableCopy]];
-  [_table reloadData];
-  [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:[_cols count] - 1] byExtendingSelection:NO];
+  NSInteger selected = [self selectedColumn];
+  NSUInteger at = selected >= 0 ? (NSUInteger)selected + 1 : [_edited.tablixBody.columns count];
+  if (![RDLTablixStructure insertColumnAtIndex:at width:kRDLDialogColumnWidth inTablix:_edited report:_report]) {
+    NSBeep();
+    return;
+  }
+  NSString *field = [[[self dataSet] fieldNames] firstObject];
+  if (field != nil) {
+    [self textboxInRow:[self headingRow] column:at].value = field;
+    [self textboxInRow:[self valueRow] column:at].value = [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  }
+  [self reloadAll];
+  [self selectColumn:at];
 }
 
 - (void)removeColumn:(id)sender {
   (void)sender;
   [self commitTableEditing];
-  NSInteger row = [_table selectedRow];
-  if (row < 0 || row >= (NSInteger)[_cols count] || [_cols count] <= 1)
+  NSInteger selected = [self selectedColumn];
+  if (selected < 0 || ![RDLTablixStructure removeColumnAtIndex:(NSUInteger)selected inTablix:_edited]) {
+    NSBeep();
     return;
-  [_cols removeObjectAtIndex:(NSUInteger)row];
-  [_table reloadData];
+  }
+  [self reloadAll];
 }
 
 - (void)moveColumn:(NSInteger)delta {
   [self commitTableEditing];
-  NSInteger row = [_table selectedRow];
-  NSInteger dst = row + delta;
-  if (row < 0 || row >= (NSInteger)[_cols count] || dst < 0 || dst >= (NSInteger)[_cols count])
+  NSInteger from = [self selectedColumn];
+  NSInteger to = from + delta;
+  if (from < 0 || to < 0 || to >= (NSInteger)[_edited.tablixBody.columns count] ||
+      ![RDLTablixStructure moveColumnAtIndex:(NSUInteger)from toIndex:(NSUInteger)to inTablix:_edited]) {
+    NSBeep();
     return;
-  [_cols exchangeObjectAtIndex:(NSUInteger)row withObjectAtIndex:(NSUInteger)dst];
-  [_table reloadData];
-  [_table selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)dst] byExtendingSelection:NO];
+  }
+  [self selectColumn:(NSUInteger)to];
 }
 
 - (void)moveLeft:(id)sender {
@@ -426,90 +506,122 @@ static NSString *RDLFieldOfValue(NSString *value) {
   [self moveColumn:1];
 }
 
-// The filters are edited in their own panel and held here until this one is
-// accepted, so the whole dialog is still one undoable step and cancelling it
-// cancels them too.
+- (void)grandTotalChanged:(id)sender {
+  (void)sender;
+  BOOL wanted = [_grandTotalCheck state] == NSOnState;
+  if (wanted != [RDLTablixStructure tablixHasTotalRow:_edited]) {
+    BOOL done = wanted ? [RDLTablixStructure addTotalRowToTablix:_edited report:_report]
+                       : [RDLTablixStructure removeTotalRowFromTablix:_edited];
+    if (!done)
+      NSBeep();
+  }
+  [self reloadAll];
+}
+
+// What a column's total is: the aggregate its values are, when they are one --
+// a crosstab's are -- or the one its total rows use.
+- (NSString *)aggregateOfColumn:(NSUInteger)column {
+  NSString *aggregate =
+      [RDLTablixStructure aggregateOfExpression:[self textboxInRow:[self valueRow] column:column].value field:NULL];
+  for (NSNumber *row in [self totalRows])
+    aggregate = aggregate ?: [RDLTablixStructure aggregateOfExpression:[self textboxInRow:[row integerValue] column:column].value
+                                                                 field:NULL];
+  return aggregate;
+}
+
+// Totals a column with `function`: its values, when they are already an
+// aggregate, and its total rows. Cleared, values go back to showing the field
+// and total rows to showing nothing.
+- (void)setAggregate:(NSString *)function ofColumn:(NSUInteger)column {
+  RDLTextbox *value = [self textboxInRow:[self valueRow] column:column];
+  NSString *field = [RDLFilterEditor fieldNameInExpression:value.value];
+  BOOL aggregated = [RDLTablixStructure aggregateOfExpression:value.value field:&field] != nil;
+  if (field == nil)
+    return;
+  NSString *total = [function length] ? [NSString stringWithFormat:@"=%@(Fields!%@.Value)", function, field] : nil;
+  if (aggregated)
+    value.value = total ?: [NSString stringWithFormat:@"=Fields!%@.Value", field];
+  for (NSNumber *row in [self totalRows]) {
+    RDLTextbox *box = [self textboxInRow:[row integerValue] column:column];
+    if (total != nil)
+      box.value = total;
+    else if ([RDLTablixStructure aggregateOfExpression:box.value field:NULL] != nil)
+      box.value = @"";
+  }
+}
+
+// Heights typed into the two fields, applied to the heading row and the value
+// row when OK is pressed.
+- (void)applyHeights {
+  NSInteger heading = [self headingRow], value = [self valueRow];
+  double headingHeight = [[_headerHField stringValue] doubleValue], valueHeight = [[_rowHField stringValue] doubleValue];
+  if (heading >= 0 && headingHeight > 0)
+    [RDLTablixStructure setHeight:headingHeight ofRow:(NSUInteger)heading inTablix:_edited];
+  if (value >= 0 && valueHeight > 0)
+    [RDLTablixStructure setHeight:valueHeight ofRow:(NSUInteger)value inTablix:_edited];
+}
+
+#pragma mark - Filters
+
+// The tablix's filters, and the selected group's, edited on the copy: Cancel
+// takes both back with everything else.
 - (void)editFilters:(id)sender {
   (void)sender;
-  NSArray<RDLFilter *> *edited =
-      [RDLFilterEditor runForFilters:_editedFilters ?: _tablix.filters
-                               title:_tablix.name
-                              fields:[[self selectedDataset] fieldNames]
-                              report:_report];
+  NSArray<RDLFilter *> *edited = [RDLFilterEditor runForFilters:_edited.filters
+                                                          title:_edited.name
+                                                         fields:[[self dataSet] fieldNames]
+                                                         report:_report];
   if (edited == nil)
     return;
-  _editedFilters = edited;
+  [_edited.filters setArray:edited];
   [self syncFiltersButton];
 }
 
-// A group filters the rows inside it, after the region's own filters have run.
-// The group is chosen in one of the two lists beside the columns; its filters
-// live on the member the scaffolding builds for that field, which is why
-// -rdlGroupMemberForField: carries them across a rebuild.
+- (RDLTablixMember *)selectedGroup {
+  return [self selectedGroupIn:_rowGroupTable] ?: [self selectedGroupIn:_colGroupTable];
+}
+
 - (void)editGroupFilters:(id)sender {
   (void)sender;
-  NSString *field = [self selectedGroupField];
-  if (field == nil) {
+  RDLTablixMember *group = [self selectedGroup];
+  if (group == nil) {
     NSBeep();
     return;
   }
-  RDLTablixMember *member = [self groupMemberForField:field];
-  NSArray<RDLFilter *> *edited =
-      [RDLFilterEditor runForFilters:member.filters ?: @[]
-                               title:[NSString stringWithFormat:@"group by %@", field]
-                              fields:[[self selectedDataset] fieldNames]
-                              report:_report];
+  NSArray<RDLFilter *> *edited = [RDLFilterEditor runForFilters:group.filters
+                                                          title:group.groupName
+                                                         fields:[[self dataSet] fieldNames]
+                                                         report:_report];
   if (edited == nil)
     return;
-  // Written straight onto the member: the group hierarchy is not part of what
-  // the dialog rebuilds from its own fields, and a rebuild now keeps them.
-  [member.filters removeAllObjects];
-  [member.filters addObjectsFromArray:edited];
+  [group.filters setArray:edited];
   [self syncFiltersButton];
 }
 
-// Whichever of the two group lists has a selection; the row list wins when
-// both do, since that is the one most reports group by.
-- (NSString *)selectedGroupField {
-  NSInteger row = [_rowGroupTable selectedRow];
-  if (row >= 0 && row < (NSInteger)[_rowGroups count])
-    return _rowGroups[(NSUInteger)row];
-  NSInteger col = [_colGroupTable selectedRow];
-  if (col >= 0 && col < (NSInteger)[_colGroups count])
-    return _colGroups[(NSUInteger)col];
-  return nil;
-}
-
-- (RDLTablixMember *)groupMemberForField:(NSString *)field {
-  NSString *wanted = [NSString stringWithFormat:@"=Fields!%@.Value", field];
-  NSMutableArray<RDLTablixMember *> *pending = [NSMutableArray array];
-  [pending addObjectsFromArray:_tablix.rowHierarchy.members];
-  [pending addObjectsFromArray:_tablix.columnHierarchy.members];
-  while ([pending count]) {
-    RDLTablixMember *m = [pending firstObject];
-    [pending removeObjectAtIndex:0];
-    for (RDLValue *e in m.groupExpressions)
-      if ([[e source] isEqualToString:wanted])
-        return m;
-    [pending addObjectsFromArray:m.members];
-  }
-  return nil;
-}
-
-// The button says how many there are, because a filter is otherwise invisible
+// The buttons say how many there are, because a filter is otherwise invisible
 // from here and a report that returns no rows is a mystery worth one word.
 - (void)syncFiltersButton {
-  NSString *field = [self selectedGroupField];
-  RDLTablixMember *member = field ? [self groupMemberForField:field] : nil;
-  [_groupFiltersButton setEnabled:member != nil];
-  [_groupFiltersButton setTitle:[member.filters count]
+  RDLTablixMember *group = [self selectedGroup];
+  [_groupFiltersButton setEnabled:group != nil];
+  [_groupFiltersButton setTitle:[group.filters count]
                                     ? [NSString stringWithFormat:@"Filter this group (%lu)…",
-                                                                 (unsigned long)[member.filters count]]
+                                                                 (unsigned long)[group.filters count]]
                                     : @"Filter the selected group…"];
-  NSUInteger count = [(_editedFilters ?: _tablix.filters) count];
-  [_filtersButton setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…",
-                                                              (unsigned long)count]
-                                 : @"Filters…"];
+  NSUInteger count = [_edited.filters count];
+  [_filtersButton setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…", (unsigned long)count] : @"Filters…"];
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification *)note {
+  (void)note;
+  [self syncFiltersButton];
+}
+
+#pragma mark - Accepting
+
+- (BOOL)apply {
+  [self commitTableEditing];
+  [self applyHeights];
+  return [_context.editor replaceTablix:_tablix withEdited:_edited];
 }
 
 - (void)accept:(id)sender {
@@ -526,98 +638,125 @@ static NSString *RDLFieldOfValue(NSString *value) {
 #pragma mark - Table data source
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tv {
-  NSMutableArray *list = [self listForTable:tv];
-  if (list)
-    return (NSInteger)[list count];
-  (void)tv;
-  return (NSInteger)[_cols count];
+  RDLTablixAxis axis = [self axisOfTable:tv];
+  if (axis != RDLTablixAxisUnspecified)
+    return (NSInteger)[[self groupsAlong:axis] count];
+  return (NSInteger)[_edited.tablixBody.columns count];
 }
 
 - (id)tableView:(NSTableView *)tv objectValueForTableColumn:(NSTableColumn *)col row:(NSInteger)row {
-  NSMutableArray *list = [self listForTable:tv];
-  if (list)
-    return row >= 0 && row < (NSInteger)[list count] ? list[(NSUInteger)row] : @"";
-  (void)tv;
-  if (row < 0 || row >= (NSInteger)[_cols count])
+  RDLTablixAxis axis = [self axisOfTable:tv];
+  if (axis != RDLTablixAxisUnspecified) {
+    NSArray<RDLTablixMember *> *groups = [self groupsAlong:axis];
+    return row >= 0 && row < (NSInteger)[groups count] ? [self titleOfGroup:groups[(NSUInteger)row] axis:axis] : @"";
+  }
+  if (row < 0 || row >= (NSInteger)[_edited.tablixBody.columns count])
     return @"";
-  NSDictionary *c = _cols[(NSUInteger)row];
-  NSString *ident = [col identifier];
-  if ([ident isEqualToString:@"width"])
-    return [NSString stringWithFormat:@"%.2f", [c[@"width"] doubleValue]];
-  // An ordinary column shows text and says nothing about it; the word is here
-  // so the person can see what the choice is and change it.
-  if ([ident isEqualToString:@"kind"])
-    return [c[@"kind"] length] ? c[@"kind"] : @"Text";
-  return [c[ident] description] ?: @"";
+  NSUInteger column = (NSUInteger)row;
+  RDLItem *valueItem = [self cellInRow:[self valueRow] column:column].item;
+  switch (RDLColumnFieldFromIdentifier([col identifier])) {
+  case RDLColumnFieldHeading:
+    return [self textboxInRow:[self headingRow] column:column].value ?: @"";
+  case RDLColumnFieldValue:
+    return [self textboxInRow:[self valueRow] column:column].value ?: @"";
+  case RDLColumnFieldWidth:
+    return [NSString stringWithFormat:@"%.2f", _edited.tablixBody.columns[column].width];
+  case RDLColumnFieldKind:
+    // An ordinary column shows text and says nothing about it; the word is
+    // here so the person can see what the choice is and change it.
+    if (valueItem == nil || [valueItem isKindOfClass:[RDLTextbox class]])
+      return kRDLKindText;
+    return [valueItem isKindOfClass:[RDLSubreport class]] ? kRDLKindSubreport : [valueItem rdlElementName];
+  case RDLColumnFieldReport:
+    return [valueItem isKindOfClass:[RDLSubreport class]] ? [(RDLSubreport *)valueItem reportName] ?: @"" : @"";
+  case RDLColumnFieldAlign: {
+    RDLTextAlign align = [self textboxInRow:[self valueRow] column:column].style.textAlign;
+    return align == RDLTextAlignUnspecified ? @"" : RDLStringFromTextAlign(align);
+  }
+  case RDLColumnFieldAggregate:
+    return [self aggregateOfColumn:column] ?: @"";
+  case RDLColumnFieldUnspecified:
+    return @"";
+  }
+  return @"";
 }
 
 - (void)tableView:(NSTableView *)tv
     setObjectValue:(id)value
     forTableColumn:(NSTableColumn *)col
                row:(NSInteger)row {
-  // A group list holds field names, and typing one in is how a group is
-  // changed -- the lists used to be readable and nothing else, so the only way
-  // to group by anything was to drag a column into them.
-  NSMutableArray *list = [self listForTable:tv];
-  if (list) {
-    if (row < 0 || row >= (NSInteger)[list count])
-      return;
-    NSString *field = [[value description]
-        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    if ([field length] == 0)
-      [list removeObjectAtIndex:(NSUInteger)row];
-    else
-      list[(NSUInteger)row] = field;
-    [self reloadGroups];
+  if ([self axisOfTable:tv] != RDLTablixAxisUnspecified) {
+    [self setGroupInTable:tv row:row typed:[value description] ?: @""];
     return;
   }
-  if (row < 0 || row >= (NSInteger)[_cols count])
+  if (row < 0 || row >= (NSInteger)[_edited.tablixBody.columns count])
     return;
-  NSMutableDictionary *c = _cols[(NSUInteger)row];
-  NSString *ident = [col identifier];
+  NSUInteger column = (NSUInteger)row;
   NSString *s = [value description] ?: @"";
-  if ([ident isEqualToString:@"width"]) {
-    double w = [s doubleValue];
-    c[@"width"] = @(w > 0 ? w : 1.6);
-  } else if ([ident isEqualToString:@"kind"]) {
-    // Text is the absence of a kind, so choosing it takes the column back to
-    // an ordinary one -- and with it the report it named, which would
-    // otherwise sit in the file meaning nothing.
-    if ([s length] == 0 || [s caseInsensitiveCompare:@"Text"] == NSOrderedSame) {
-      [c removeObjectForKey:@"kind"];
-      [c removeObjectForKey:@"report"];
-    } else {
-      c[@"kind"] = s;
-      // A subreport column shows a report, not an expression: the value would
-      // be read by nothing and shown by nothing.
-      if ([s isEqualToString:@"Subreport"])
-        c[@"value"] = @"";
-    }
-  } else if ([s length] == 0 &&
-             ([ident isEqualToString:@"align"] || [ident isEqualToString:@"aggregate"] ||
-              [ident isEqualToString:@"report"])) {
-    [c removeObjectForKey:ident];
-  } else {
-    c[ident] = s;
+  NSInteger valueRow = [self valueRow];
+  RDLTablixCell *valueCell = [self cellInRow:valueRow column:column];
+  switch (RDLColumnFieldFromIdentifier([col identifier])) {
+  case RDLColumnFieldHeading: {
+    RDLTablixCell *heading = [self cellInRow:[self headingRow] column:column];
+    if (heading != nil && heading.item == nil)
+      heading.item = [self newTextbox];
+    if ([heading.item isKindOfClass:[RDLTextbox class]])
+      [(RDLTextbox *)heading.item setValue:s];
+    break;
   }
+  case RDLColumnFieldValue:
+    [self textboxInRow:valueRow column:column].value = s;
+    break;
+  case RDLColumnFieldWidth:
+    if ([s doubleValue] > 0)
+      [RDLTablixStructure setWidth:[s doubleValue] ofColumn:column inTablix:_edited];
+    break;
+  case RDLColumnFieldKind:
+    // Text is the absence of a kind, so choosing it takes the cell back to a
+    // textbox; a subreport column shows a report rather than an expression.
+    if ([s isEqualToString:kRDLKindSubreport] && ![valueCell.item isKindOfClass:[RDLSubreport class]]) {
+      RDLSubreport *subreport = [[RDLSubreport alloc] init];
+      subreport.name = [RDLItemFactory uniqueNameWithPrefix:@"Subreport" inReport:_report besides:_edited];
+      subreport.reportName = @"";
+      valueCell.item = subreport;
+    } else if (([s length] == 0 || [s isEqualToString:kRDLKindText]) && valueCell != nil &&
+               ![valueCell.item isKindOfClass:[RDLTextbox class]]) {
+      valueCell.item = [self newTextbox];
+    }
+    break;
+  case RDLColumnFieldReport:
+    if ([valueCell.item isKindOfClass:[RDLSubreport class]])
+      [(RDLSubreport *)valueCell.item setReportName:s];
+    break;
+  case RDLColumnFieldAlign: {
+    RDLTextAlign align = [s length] ? RDLTextAlignFromString(s) : RDLTextAlignUnspecified;
+    [self textboxInRow:[self headingRow] column:column].style.textAlign = align;
+    [self textboxInRow:valueRow column:column].style.textAlign = align;
+    break;
+  }
+  case RDLColumnFieldAggregate:
+    [self setAggregate:s ofColumn:column];
+    break;
+  case RDLColumnFieldUnspecified:
+    break;
+  }
+  [_table reloadData];
 }
 
 #pragma mark - Entry point
 
 + (instancetype)editorForTablix:(RDLTablix *)tablix context:(RDLEditingContext *)context {
-  if (tablix == nil || ![tablix isKindOfClass:[RDLTablix class]])
+  if (![tablix isKindOfClass:[RDLTablix class]])
+    return nil;
+  RDLTablix *copy = (RDLTablix *)[RDLEditor itemFromXMLString:[RDLEditor XMLStringForItem:tablix]];
+  if (![copy isKindOfClass:[RDLTablix class]])
     return nil;
   RDLTablixEditor *ed = [[RDLTablixEditor alloc] init];
-  ed.report = context.report;
-  NSMutableArray *cols = [NSMutableArray array];
-  for (NSDictionary *c in tablix.columnSpecs)
-    [cols addObject:[c mutableCopy]];
-  if ([cols count] == 0)
-    [cols addObject:[@{ @"width" : @1.6, @"header" : @"Field", @"value" : @"" } mutableCopy]];
-  ed.cols = cols;
-  ed.tablix = tablix;
-  [ed buildPanelForTablix:tablix];
-  [ed syncFiltersButton];
+  ed->_tablix = tablix;
+  ed->_report = context.report;
+  ed->_context = context;
+  ed.edited = copy;
+  [ed buildPanel];
   return ed;
 }
 
@@ -627,31 +766,9 @@ static NSString *RDLFieldOfValue(NSString *value) {
     return NO;
   [ed.window center];
   NSInteger code = [NSApp runModalForWindow:ed.window];
-  // Ordered out once, on both paths, after the session has ended -- the
-  // columns are read back out of `ed` below.
+  // Ordered out once, on both paths, after the session has ended.
   [ed.window orderOut:nil];
-  if (code != NSModalResponseOK)
-    return NO;
-
-  // One registration for the whole dialog. It has to be one: -rebuildTablix
-  // reads the groups, the heights AND the column spec together, so applying
-  // them as separate undoable steps would undo them one at a time and rebuild
-  // the body against a half-restored state.
-  [context.editor setTablixValues:@{
-    @"dataSetName" : [ed.datasetPop titleOfSelectedItem] ?: (tablix.dataSetName ?: @""),
-    @"rowGroups" : [ed.rowGroups copy] ?: @[],
-    @"columnGroups" : [ed.colGroups copy] ?: @[],
-    @"showGrandTotal" : @([ed.grandTotalCheck state] == NSOnState),
-    @"headerHeight" : @([[ed.headerHField stringValue] doubleValue]),
-    @"rowHeight" : @([[ed.rowHField stringValue] doubleValue]),
-    @"columnSpecs" : [ed columnSpecsForSaving],
-    // Only when the filter panel was actually opened and accepted: an
-    // untouched dialog must leave the filters alone, not replace them with
-    // equal ones and register an edit that changed nothing.
-    @"filters" : [(ed.editedFilters ?: tablix.filters) mutableCopy]
-  }
-                         ofTablix:tablix];
-  return YES;
+  return code == NSModalResponseOK && [ed apply];
 }
 
 @end

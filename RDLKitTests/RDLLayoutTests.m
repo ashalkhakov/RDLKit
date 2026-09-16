@@ -897,8 +897,8 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     for (RDLItem *it in parsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
-      XCTFail(@"%@", [NSString stringWithFormat:@"row groups round-trip %@", pt.rowGroups]);
+    if (![[pt.rowHierarchy.members[1].groupExpressions.firstObject source] isEqualToString:@"=Fields!Finish.Value"])
+      XCTFail(@"%@", @"the row group should round-trip");
     if ([pt.rowHierarchy.members[1].groupExpressions count] == 0)
       XCTFail(@"%@", @"parsed GroupExpressions empty");
     if (pt.rowHierarchy.members[1].header == nil)
@@ -1045,13 +1045,14 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     for (RDLItem *it in parsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
+    NSArray<RDLTablixMember *> *members = pt.rowHierarchy.members;
+    if ([members count] != 3 || ![[members[1].groupExpressions.firstObject source] isEqualToString:@"=Fields!Finish.Value"])
       XCTFail(@"%@", @"round-trip lost the row group");
-    if (!pt.showGrandTotal)
-      XCTFail(@"%@", @"round-trip lost showGrandTotal");
-    NSArray *pcols = pt.columnSpecs;
-    if (![pcols.lastObject[@"aggregate"] isEqualToString:@"Sum"])
-      XCTFail(@"%@", @"round-trip lost column aggregate");
+    if ([members.lastObject.groupName length] || [members.lastObject.members count])
+      XCTFail(@"%@", @"round-trip lost the grand total row");
+    RDLTextbox *sum = (RDLTextbox *)pt.tablixBody.rows.lastObject.cells.lastObject.item;
+    if (![sum.value isEqualToString:@"=Sum(Fields!Amount.Value)"])
+      XCTFail(@"%@", @"round-trip lost the column's total");
   }
 
   // Layout: grand total row shows dataset-wide Sum (all seven jobs = 3468).
@@ -1195,15 +1196,18 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     for (RDLItem *it in mparsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.columnGroups isEqualToArray:@[ @"Job" ]])
-      XCTFail(@"%@", [NSString stringWithFormat:@"round-trip column groups %@", pt.columnGroups]);
-    if (![pt.rowGroups isEqualToArray:@[ @"Finish" ]])
+    if (![[pt.columnHierarchy.members.firstObject.groupExpressions.firstObject source] isEqualToString:@"=Fields!Job.Value"])
+      XCTFail(@"%@", @"matrix round-trip lost the column group");
+    if (![[pt.rowHierarchy.members.firstObject.groupExpressions.firstObject source] isEqualToString:@"=Fields!Finish.Value"])
       XCTFail(@"%@", @"matrix round-trip lost the row group");
-    if (!pt.showGrandTotal)
-      XCTFail(@"%@", @"matrix round-trip lost showGrandTotal");
-    NSArray *pcols = pt.columnSpecs;
-    if (![pcols.firstObject[@"aggregate"] isEqualToString:@"Sum"])
-      XCTFail(@"%@", @"matrix round-trip lost measure aggregate");
+    if ([pt.rowHierarchy.members.lastObject.groupName length])
+      XCTFail(@"%@", @"matrix round-trip lost the grand total");
+    RDLTextbox *measure = (RDLTextbox *)pt.tablixBody.rows.firstObject.cells.firstObject.item;
+    RDLExprNode *call = [RDLExpr expressionWithSource:measure.value].root;
+    RDLExprNode *argument = [call.args firstObject];
+    if (call.kind != RDLExprNodeKindCall || argument.kind != RDLExprNodeKindField ||
+        ![argument.name isEqualToString:@"Amount"])
+      XCTFail(@"matrix round-trip lost the measure: %@", measure.value);
   }
 
   // Clearing the column group falls back to the plain table build.
@@ -1299,10 +1303,13 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     for (RDLItem *it in nparsed.body.items)
       if ([it isKindOfClass:[RDLTablix class]])
         pt = (RDLTablix *)it;
-    if (![pt.rowGroups isEqualToArray:(@[ @"Finish", @"Job" ])])
-      XCTFail(@"%@", [NSString stringWithFormat:@"nested round-trip row groups %@", pt.rowGroups]);
-    if (!pt.showGrandTotal)
-      XCTFail(@"%@", @"nested round-trip lost showGrandTotal");
+    RDLTablixMember *outer = pt.rowHierarchy.members[1];
+    RDLTablixMember *inner = outer.members.firstObject;
+    if (![[outer.groupExpressions.firstObject source] isEqualToString:@"=Fields!Finish.Value"] ||
+        ![[inner.groupExpressions.firstObject source] isEqualToString:@"=Fields!Job.Value"])
+      XCTFail(@"%@", @"nested round-trip should keep both group levels");
+    if ([pt.rowHierarchy.members.lastObject.groupName length])
+      XCTFail(@"%@", @"nested round-trip lost the grand total");
   }
 
   // Clearing the child group falls back to single-level grouping.
@@ -1360,43 +1367,214 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
   if ([tab.tablixBody.rows count] != 4)
     XCTFail(@"%@", @"-rebuildTablix should be idempotent");
 
-  // A report parsed from disk must arrive with a spec, not just a built body,
-  // so the designer can rebuild it without first reverse-engineering one.
+  // A report parsed from disk is its body and hierarchies: the builder's
+  // inputs are not guessed back from them, since nothing rebuilds a tablix
+  // that has a body.
   NSString *xml = [RDLWriter XMLStringFromReport:r];
   NSError *err = nil;
   RDLReport *parsed = [RDLParser reportFromXMLString:xml error:&err];
-  if (parsed == nil)
-    XCTFail(@"%@", [NSString stringWithFormat:@"rebuild round-trip parse failed: %@",
-                                               err.localizedDescription]);
-  else {
-    RDLTablix *pt = (RDLTablix *)nil;
-    for (RDLItem *it in parsed.body.items)
-      if ([it isKindOfClass:[RDLTablix class]])
-        pt = (RDLTablix *)it;
-    if ([pt.columnSpecs count] != 2)
-      XCTFail(@"%@", [NSString stringWithFormat:@"parser should infer columnSpecs, got %lu",
-                                                 (unsigned long)[pt.columnSpecs count]]);
-    if (![pt.columnSpecs.lastObject[@"aggregate"] isEqualToString:@"Sum"])
-      XCTFail(@"%@", @"inferred spec lost the column aggregate");
-    // And rebuilding a parsed item reproduces the same shape.
-    NSUInteger before = [pt.tablixBody.rows count];
-    [pt rebuildTablix];
-    if ([pt.tablixBody.rows count] != before)
-      XCTFail(@"%@", [NSString stringWithFormat:@"rebuild of a parsed item changed rows %lu -> %lu",
-                                                 (unsigned long)before,
-                                                 (unsigned long)[pt.tablixBody.rows count]]);
+  RDLTablix *pt = (RDLTablix *)nil;
+  for (RDLItem *it in parsed.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      pt = (RDLTablix *)it;
+  if (pt == nil)
+    XCTFail(@"%@", [NSString stringWithFormat:@"rebuild round-trip parse failed: %@", err.localizedDescription]);
+  else if (pt.columnSpecs != nil || pt.rowGroups != nil || pt.columnGroups != nil || pt.showGrandTotal ||
+           [pt.tablixBody.rows count] != [tab.tablixBody.rows count] ||
+           [pt.rowHierarchy.members count] != [tab.rowHierarchy.members count])
+    XCTFail(@"%@", @"a parsed tablix should be the body and hierarchies written, and no builder inputs");
+}
+
+// The body's rows and columns belong to the hierarchies' innermost members by
+// position alone, and a span covers the cells after it. Anything that edits a
+// tablix in place rather than rebuilding it works from these lookups, and
+// checks what it made against the structural problems.
+- (void)testTablixStructureLookups {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  tab.showGrandTotal = YES;
+  [tab rebuildTablix];
+  // Header, the Finish group around its details and its total, the grand total.
+  NSArray<RDLTablixMember *> *leaves = [tab.rowHierarchy leafMembers];
+  if ([leaves count] != [tab.tablixBody.rows count] || [leaves count] != 4)
+    XCTFail(@"%lu leaf members for %lu rows, want 4 and 4", (unsigned long)[leaves count],
+            (unsigned long)[tab.tablixBody.rows count]);
+  RDLTablixMember *group = tab.rowHierarchy.members[1];
+  RDLTablixMember *details = group.members.firstObject;
+  NSRange groupRows = [tab.rowHierarchy leafRangeOfMember:group];
+  if (groupRows.location != 1 || groupRows.length != 2)
+    XCTFail(@"the group should own body rows 1 and 2, not %@", NSStringFromRange(groupRows));
+  if ([tab.rowHierarchy leafRangeOfMember:tab.rowHierarchy.members.lastObject].location != 3)
+    XCTFail(@"%@", @"the grand total should own the last body row");
+  if (![[tab.rowHierarchy pathToMember:details] isEqualToArray:@[ group, details ]])
+    XCTFail(@"%@", @"the path to the details should go through the group");
+  if ([tab.rowHierarchy pathToMember:[[RDLTablixMember alloc] init]] != nil ||
+      [tab.rowHierarchy leafRangeOfMember:[[RDLTablixMember alloc] init]].location != NSNotFound)
+    XCTFail(@"%@", @"a member of no hierarchy should be found nowhere");
+  if ([[tab.columnHierarchy leafMembers] count] != [tab.tablixBody.columns count])
+    XCTFail(@"%@", @"a column leaf member for every body column");
+  // The way down to a leaf, and the header levels on the way.
+  if (![[tab.rowHierarchy pathToLeaf:1] isEqualToArray:@[ group, details ]] ||
+      ![[tab.rowHierarchy pathToLeaf:3] isEqualToArray:@[ tab.rowHierarchy.members.lastObject ]] ||
+      [tab.rowHierarchy pathToLeaf:4] != nil)
+    XCTFail(@"%@", @"the path to a leaf should go through what holds it, and past the last leaf there is none");
+  NSArray<NSNumber *> *levels = [tab.rowHierarchy headerLevelSizes];
+  if ([levels count] != 1 || [levels[0] doubleValue] != group.header.size ||
+      [[tab.columnHierarchy headerLevelSizes] count] != 0)
+    XCTFail(@"one row-header level as wide as the group's header, and no column-header level, not %@", levels);
+  if ([tab.rowHierarchy headerLevelOfMember:group] != 0 || [tab.rowHierarchy headerLevelOfMember:details] != 1 ||
+      [tab.rowHierarchy headerLevelOfMember:[[RDLTablixMember alloc] init]] != NSNotFound)
+    XCTFail(@"%@", @"the group's header should be the first level, and what is inside it at the next");
+  if ([tab.rowHierarchy memberWithHeaderAtLevel:0 onPathToLeaf:1] != group ||
+      [tab.rowHierarchy memberWithHeaderAtLevel:1 onPathToLeaf:1] != nil ||
+      [tab.rowHierarchy memberWithHeaderAtLevel:0 onPathToLeaf:0] != nil)
+    XCTFail(@"%@", @"beside the details the group's header is the first level; beside the heading row there is none");
+  NSSet<NSString *> *scopes = [r scopeNames];
+  if (![scopes containsObject:@"Jobs"] || ![scopes containsObject:tab.name] ||
+      ![scopes containsObject:group.groupName] || ![scopes containsObject:details.groupName] ||
+      [scopes containsObject:group.header.item.name])
+    XCTFail(@"the scopes should be the dataset, the region and its groups, not its textboxes: %@", scopes);
+  NSArray<RDLItem *> *nested = [tab itemsIncludingNested];
+  if (nested.firstObject != tab || ![nested containsObject:group.header.item] ||
+      ![nested containsObject:tab.tablixBody.rows[1].cells[0].item])
+    XCTFail(@"%@", @"a tablix's nested items should start with it and take in its headers and cells");
+  if ([[tab structuralProblems] count])
+    XCTFail(@"a rebuilt tablix should be consistent: %@", [tab structuralProblems]);
+  NSUInteger cellRow = 9, cellColumn = 9;
+  if (![tab getRow:&cellRow column:&cellColumn ofCell:tab.tablixBody.rows[2].cells[1]] || cellRow != 2 ||
+      cellColumn != 1)
+    XCTFail(@"the cell at row 2, column 1 should be found there, not at %lu, %lu", (unsigned long)cellRow,
+            (unsigned long)cellColumn);
+  if ([tab getRow:&cellRow column:&cellColumn ofCell:[[RDLTablixCell alloc] init]])
+    XCTFail(@"%@", @"a cell of no tablix should not be found");
+
+  // A header cell merged over both columns: the second is under it.
+  RDLTablixRow *header = tab.tablixBody.rows.firstObject;
+  header.cells[0].colSpan = 2;
+  header.cells[1].item = nil;
+  NSUInteger originRow = 9, originColumn = 9;
+  RDLTablixCell *covering = [tab cellCoveringRow:0 column:1 originRow:&originRow originColumn:&originColumn];
+  if (covering != header.cells[0] || originRow != 0 || originColumn != 0)
+    XCTFail(@"the merged cell should cover row 0, column 1, found it at %lu, %lu", (unsigned long)originRow,
+            (unsigned long)originColumn);
+  if ([tab cellCoveringRow:1 column:1 originRow:NULL originColumn:NULL] != tab.tablixBody.rows[1].cells[1])
+    XCTFail(@"%@", @"a cell under no span covers itself");
+  if ([tab cellCoveringRow:99 column:0 originRow:NULL originColumn:NULL] != nil)
+    XCTFail(@"%@", @"past the body nothing covers");
+  if ([[tab structuralProblems] count])
+    XCTFail(@"a span over an empty cell is consistent: %@", [tab structuralProblems]);
+
+  // And what is not.
+  NSString *consistent = [RDLWriter XMLStringFromReport:r];
+  NSDictionary<NSString *, void (^)(RDLTablix *)> *damages = @{
+    @"under the span" : ^(RDLTablix *t) {
+      t.tablixBody.rows[0].cells[1].item = [[RDLTextbox alloc] init];
+    },
+    @"leaf members" : ^(RDLTablix *t) {
+      [t.tablixBody.rows removeLastObject];
+    },
+    @"cells for" : ^(RDLTablix *t) {
+      [t.tablixBody.rows[2].cells removeLastObject];
+    },
+    @"spans past" : ^(RDLTablix *t) {
+      t.tablixBody.rows[3].cells[0].rowSpan = 2;
+    },
+    @"no rows" : ^(RDLTablix *t) {
+      [t.tablixBody.rows removeAllObjects];
+    },
+  };
+  for (NSString *want in damages) {
+    RDLTablix *damaged =
+        (RDLTablix *)[[RDLParser reportFromXMLString:consistent error:NULL].body.items firstObject];
+    if ([[damaged structuralProblems] count])
+      XCTFail(@"the written merged table should read back consistent: %@", [damaged structuralProblems]);
+    damages[want](damaged);
+    NSArray<NSString *> *problems = [damaged structuralProblems];
+    if ([[problems componentsJoinedByString:@"\n"] rangeOfString:want].location == NSNotFound)
+      XCTFail(@"damage saying '%@' should be reported: %@", want, problems);
   }
 
-  // An item with no stored spec (an RDL 2005 List becomes a Tablix) must still
-  // rebuild from whatever the body implies rather than wiping itself.
-  RDLTablix *noSpec = [[RDLTablix alloc] init];
-  noSpec.name = @"Listish";
-  noSpec.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"H", @"value" : @"=Fields!Job.Value"} ];
-  [noSpec rebuildTablix];
-  noSpec.columnSpecs = nil;
-  [noSpec rebuildTablix];
-  if ([noSpec.tablixBody.columns count] != 1)
-    XCTFail(@"%@", @"rebuild without a stored spec should fall back to the derived one");
+  // Every sample the designer offers is consistent.
+  NSString *samples = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"RDLDesigner/Samples"];
+  NSUInteger tablixes = 0;
+  for (NSString *name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:samples error:NULL]) {
+    if (![[name pathExtension] isEqualToString:@"rdl"])
+      continue;
+    NSString *xml = [NSString stringWithContentsOfFile:[samples stringByAppendingPathComponent:name]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    RDLReport *sample = [RDLParser reportFromXMLString:xml error:NULL];
+    for (RDLItem *item in [sample allItemsIncludingNested]) {
+      if (![item isKindOfClass:[RDLTablix class]])
+        continue;
+      tablixes += 1;
+      if ([[(RDLTablix *)item structuralProblems] count])
+        XCTFail(@"%@'s %@: %@", name, item.name, [(RDLTablix *)item structuralProblems]);
+    }
+  }
+  if (tablixes == 0)
+    XCTFail(@"%@", @"the samples should hold tablixes to check");
+}
+
+// A static member's TablixHeader is drawn beside the rows it heads, as a
+// group's is: the label of a subtotal, or of a band of fixed rows. It used to
+// be drawn for a group only, so an upgraded matrix's "Total" never showed.
+- (void)testAStaticMemberDrawsItsHeader {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Labels"];
+  RDLTablix *tab = [[RDLTablix alloc] init];
+  tab.name = @"Labels";
+  tab.tablixBody = [[RDLTablixBody alloc] init];
+  tab.rowHierarchy = [[RDLTablixHierarchy alloc] init];
+  tab.columnHierarchy = [[RDLTablixHierarchy alloc] init];
+  tab.width = 3;
+  tab.height = 0.9;
+  RDLTablixColumn *column = [[RDLTablixColumn alloc] init];
+  column.width = 2;
+  [tab.tablixBody.columns addObject:column];
+  RDLTablixMember *columnMember = [[RDLTablixMember alloc] init];
+  [tab.columnHierarchy.members addObject:columnMember];
+  RDLTextbox *(^box)(NSString *) = ^RDLTextbox *(NSString *text) {
+    RDLTextbox *t = [[RDLTextbox alloc] init];
+    t.name = text;
+    t.value = text;
+    return t;
+  };
+  for (NSString *text in @[ @"First", @"Second", @"Third" ]) {
+    RDLTablixRow *row = [[RDLTablixRow alloc] init];
+    row.height = 0.3;
+    RDLTablixCell *cell = [[RDLTablixCell alloc] init];
+    cell.item = box(text);
+    [row.cells addObject:cell];
+    [tab.tablixBody.rows addObject:row];
+  }
+  RDLTablixHeader *(^header)(NSString *) = ^RDLTablixHeader *(NSString *text) {
+    RDLTablixHeader *h = [[RDLTablixHeader alloc] init];
+    h.size = 1;
+    h.item = box(text);
+    return h;
+  };
+  // A static member with members of its own, heading both of their rows.
+  RDLTablixMember *both = [[RDLTablixMember alloc] init];
+  both.header = header(@"Both");
+  [both.members addObject:[[RDLTablixMember alloc] init]];
+  [both.members addObject:[[RDLTablixMember alloc] init]];
+  // And one with none, heading its own.
+  RDLTablixMember *alone = [[RDLTablixMember alloc] init];
+  alone.header = header(@"Alone");
+  [tab.rowHierarchy.members addObject:both];
+  [tab.rowHierarchy.members addObject:alone];
+  [r.body.items addObject:tab];
+  if ([[tab structuralProblems] count])
+    XCTFail(@"the fixture should be consistent: %@", [tab structuralProblems]);
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in page.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  for (NSString *want in @[ @"Both", @"Alone", @"First", @"Second", @"Third" ])
+    if (![texts containsObject:want])
+      XCTFail(@"%@ should be laid out, among %@", want, texts);
 }
 
 // HideIfNoRows on a static member: the column header the report says not to

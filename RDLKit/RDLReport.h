@@ -700,6 +700,9 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 // Items nested inside this one. Empty except on a Rectangle, so tree walks do
 // not have to ask what kind they are looking at.
 @property (nonatomic, readonly) NSArray<RDLItem *> *childItems;
+// This item and every item inside it, however deep: a container's children,
+// and a tablix's cells, corner and headers.
+- (NSArray<RDLItem *> *)itemsIncludingNested;
 // The report this item sits in, so an item can consult the page it has to fit
 // on. Weak: the report owns the item, never the other way round. Stamped by
 // -[RDLReport adoptItems], so it is nil on an item built in isolation and
@@ -1065,6 +1068,8 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 @property (nonatomic, copy) NSString *title;
 @end
 
+@class RDLTablixCell;
+
 @interface RDLTablix : RDLDataRegion
 @property (nonatomic, strong) RDLTablixBody *tablixBody;
 @property (nonatomic, strong) RDLTablixHierarchy *columnHierarchy;
@@ -1088,9 +1093,11 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 // is not drawn along the break. By default each page's part of it is boxed.
 @property (nonatomic, assign) BOOL omitBorderOnPageBreak;
 @property (nonatomic, strong) NSMutableArray *cornerRows; // NSArray of NSArray of RDLTablixCell
-// Designer convenience for a header + details table.
+// A builder for a new header + details table: what -rebuildTablix makes the
+// MS-RDL structures from. None of it is read from a file, and none of it is
+// kept in step with a tablix edited after it was built.
 //
-// `columnSpecs` is the authoritative, plainly stored spec — one dictionary per
+// `columnSpecs` is the plainly stored spec — one dictionary per
 // column, @{width, header, value, align?, aggregate?}. Assigning it has NO side
 // effect; call -rebuildTablix to project it onto the MS-RDL Tablix structures
 // (tablixBody, rowHierarchy, columnHierarchy, cornerRows). Splitting the two
@@ -1102,33 +1109,40 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 @property (nonatomic, assign) CGFloat rowHeight;
 // The row and column groups, outermost first. A crosstab is a tablix with at
 // least one of each; a grouped table has row groups only; a plain table has
-// neither. Report Builder shows exactly these two lists beside the columns
-// that are left, and this is that model.
+// neither. Builder inputs, like columnSpecs.
 @property (nonatomic, copy) NSArray<NSString *> *rowGroups;
 @property (nonatomic, copy) NSArray<NSString *> *columnGroups;
 @property (nonatomic, assign) BOOL showGrandTotal; // trailing static total row
-// The row-header columns this tablix renders to the left of its body: one per
-// level of dynamic row grouping, each as wide as that level's TablixHeader
-// says. Zero for an ungrouped table. Published because the designer draws the
-// same table the layout engine does, and a grouped one starts 1.2in to the
+// The row-header columns this tablix renders to the left of its body, one per
+// header level of its row hierarchy (-[RDLTablixHierarchy headerLevelSizes]).
+// None for an ungrouped table. Published because the designer draws the same
+// table the layout engine does, and a grouped one starts that much to the
 // right of where its body columns would otherwise put it.
 - (NSArray<NSNumber *> *)rowHeaderColumnWidths;
-// The header item of the row group at `level`, outermost first -- what is
-// written in that header column.
-- (RDLItem *)rowHeaderItemAtLevel:(NSUInteger)level;
-// The same along the other axis: a crosstab's column groups render a heading
-// row each, above the body and to the right of the corner. A table has none --
+// The same along the other axis: the heading rows a crosstab's column groups
+// render above the body and to the right of the corner. A table has none --
 // its headings are the first row of the body.
 - (NSArray<NSNumber *> *)columnHeaderRowHeights;
-- (RDLItem *)columnHeaderItemAtLevel:(NSUInteger)level;
-// Rebuild the Tablix structures from columnSpecs (falling back to the spec
-// derived from the current tablixBody when none is stored, e.g. an RDL 2005
-// List). Destroys any hand-made edits to tablixBody/hierarchies/cornerRows.
+// Build the Tablix structures -- body, hierarchies, corner -- from columnSpecs,
+// the groups, showGrandTotal and the heights, replacing whatever was there.
+// For making a new tablix; one read from a file is edited as it is.
 - (void)rebuildTablix;
-// Recover a columnSpecs array from an already-built tablixBody. Used by the
-// parser so a report loaded from disk arrives with a spec; the recovery is
-// lossy (the aggregate is read back out of "=Sum(Fields!X.Value)" text).
-- (void)inferColumnSpecsFromTablixBody;
+// Where a cell is in the body. NO when it is not one of this tablix's body cells.
+- (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell;
+// The cell whose area takes in body row `row`, column `column`: the cell at
+// that position, or the one above or to the left whose RowSpan or ColSpan
+// reaches over it, which is where `originRow` and `originColumn` then point.
+// nil past the body.
+- (RDLTablixCell *)cellCoveringRow:(NSUInteger)row
+                            column:(NSUInteger)column
+                         originRow:(NSUInteger *)originRow
+                      originColumn:(NSUInteger *)originColumn;
+// What does not add up in the structure MS-RDL matches by position: a body
+// with no rows or columns, a row without a cell for every column, a hierarchy
+// whose leaf members are not one per body row or column, a span reaching past
+// the body or over a cell that is not empty. Empty when it is consistent: what
+// anything that edits the structure checks itself against.
+- (NSArray<NSString *> *)structuralProblems;
 @end
 
 @interface RDLTablixColumn : NSObject
@@ -1215,10 +1229,40 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 @property (nonatomic, assign) BOOL fixedData;
 @property (nonatomic, assign) RDLKeepWithGroup keepWithGroup;
 @property (nonatomic, strong) NSMutableArray<RDLTablixMember *> *members;
+// The members of this one's subtree that own a row or column of the body, in
+// order: itself when it has no members of its own, else the innermost members
+// under it. MS-RDL matches body rows (or columns) to these by position alone.
+- (NSArray<RDLTablixMember *> *)leafMembers;
+// The same for sibling members, one after another.
++ (NSArray<RDLTablixMember *> *)leafMembersOf:(NSArray<RDLTablixMember *> *)members;
 @end
 
 @interface RDLTablixHierarchy : NSObject
 @property (nonatomic, strong) NSMutableArray<RDLTablixMember *> *members;
+// The members that own the body's rows -- for the row hierarchy -- or its
+// columns: leaf i owns body row or column i.
+- (NSArray<RDLTablixMember *> *)leafMembers;
+// The body rows or columns a member's leaves own; {NSNotFound, 0} when the
+// member is not in this hierarchy.
+- (NSRange)leafRangeOfMember:(RDLTablixMember *)member;
+// The members from the outermost down to `member`, which is last; nil when it
+// is not in this hierarchy.
+- (NSArray<RDLTablixMember *> *)pathToMember:(RDLTablixMember *)member;
+// The members from the outermost down to the leaf that owns body row or column
+// `leaf`, which is last; nil past the last leaf.
+- (NSArray<RDLTablixMember *> *)pathToLeaf:(NSUInteger)leaf;
+// The header levels, outermost first, each as big as the biggest TablixHeader
+// at that level. A level counts members with a header on the way down, so a
+// member without one adds none: these are the row-header columns (or the
+// column-header rows) the tablix renders.
+- (NSArray<NSNumber *> *)headerLevelSizes;
+// The level `member`'s header is at, or would be at: how many members above
+// it have a header. NSNotFound when it is not in this hierarchy.
+- (NSUInteger)headerLevelOfMember:(RDLTablixMember *)member;
+// The member on the way down to leaf `leaf` whose header is at `level`: what
+// heads that leaf's body row (or column) in that header column (or row). nil
+// when no member on the way has a header at that level.
+- (RDLTablixMember *)memberWithHeaderAtLevel:(NSUInteger)level onPathToLeaf:(NSUInteger)leaf;
 @end
 
 // PageSection (PageHeader / PageFooter) and Body.
@@ -1457,6 +1501,13 @@ FOUNDATION_EXPORT const CGFloat RDLDefaultColumnSpacing;
 - (RDLEmbeddedImage *)embeddedImageNamed:(NSString *)name;
 // The dataset with this name, or nil. Exact match, as RDL names are.
 - (RDLDataSet *)dataSetNamed:(NSString *)name;
+// Every name a scope goes by in this report -- its datasets, its data regions
+// and the groups in them -- which an aggregate's scope argument, InScope and
+// RowNumber may name, and which MS-RDL therefore requires to be unique.
+- (NSSet<NSString *> *)scopeNames;
+// The innermost tablix `item` is in -- in a cell, a header or the corner -- or
+// nil when it is in none.
+- (RDLTablix *)tablixHoldingItem:(RDLItem *)item;
 // The data source with this name, or nil. Datasets name one of these.
 - (RDLDataSource *)dataSourceNamed:(NSString *)name;
 // The parameter with this name, or nil. Expressions name these.

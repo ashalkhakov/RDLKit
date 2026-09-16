@@ -137,8 +137,8 @@ static NSString *RDLReportWithUnsupportedItems(void) {
     if (tab == nil)
       XCTFail(@"%@", @"tablix missing after round-trip");
     else {
-      if ([tab.columnSpecs count] != 2)
-        XCTFail(@"%@", [NSString stringWithFormat:@"tablix columns %lu", (unsigned long)[tab.columnSpecs count]]);
+      if ([tab.tablixBody.columns count] != 2)
+        XCTFail(@"%@", [NSString stringWithFormat:@"tablix columns %lu", (unsigned long)[tab.tablixBody.columns count]]);
       if ([tab.tablixBody.rows count] != 2)
         XCTFail(@"%@", @"tablixBody should have header + details rows");
       if ([tab.rowHierarchy.members count] != 2)
@@ -323,6 +323,89 @@ static NSString *RDLReportWithUnsupportedItems(void) {
     XCTFail(@"%@", @"rd:TypeName should be read back by local name");
 }
 
+// A 2005 Matrix with a subtotal on each axis: one measure cell, which every
+// subtotal reused.
+static NSString *RDLLegacyMatrixRDL(void) {
+  return @"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+         @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2005/01/reportdefinition\""
+         @"        Name=\"Pivot\">\n"
+         @"  <Width>6in</Width>\n"
+         @"  <DataSets><DataSet Name=\"Sales\"><Fields>"
+         @"    <Field Name=\"Region\"><DataField>Region</DataField></Field>"
+         @"    <Field Name=\"Year\"><DataField>Year</DataField></Field>"
+         @"    <Field Name=\"Amount\"><DataField>Amount</DataField></Field></Fields></DataSet></DataSets>\n"
+         @"  <Body><Height>2in</Height><ReportItems>\n"
+         @"    <Matrix Name=\"Pivot\">\n"
+         @"      <Corner><ReportItems><Textbox Name=\"CornerText\"><Value>Region</Value></Textbox></ReportItems></Corner>\n"
+         @"      <ColumnGroupings><ColumnGrouping><Height>0.25in</Height><DynamicColumns>\n"
+         @"        <Grouping Name=\"Years\"><GroupExpressions><GroupExpression>=Fields!Year.Value</GroupExpression>"
+         @"        </GroupExpressions></Grouping>\n"
+         @"        <ReportItems><Textbox Name=\"YearText\"><Value>=Fields!Year.Value</Value></Textbox></ReportItems>\n"
+         @"        <Subtotal><ReportItems><Textbox Name=\"YearTotal\"><Value>All years</Value></Textbox></ReportItems>"
+         @"        </Subtotal>\n"
+         @"      </DynamicColumns></ColumnGrouping></ColumnGroupings>\n"
+         @"      <RowGroupings><RowGrouping><Width>1in</Width><DynamicRows>\n"
+         @"        <Grouping Name=\"Regions\"><GroupExpressions><GroupExpression>=Fields!Region.Value</GroupExpression>"
+         @"        </GroupExpressions></Grouping>\n"
+         @"        <ReportItems><Textbox Name=\"RegionText\"><Value>=Fields!Region.Value</Value></Textbox></ReportItems>\n"
+         @"        <Subtotal><ReportItems><Textbox Name=\"RegionTotal\"><Value>All regions</Value></Textbox></ReportItems>"
+         @"        </Subtotal>\n"
+         @"      </DynamicRows></RowGrouping></RowGroupings>\n"
+         @"      <MatrixColumns><MatrixColumn><Width>1in</Width></MatrixColumn></MatrixColumns>\n"
+         @"      <MatrixRows><MatrixRow><Height>0.25in</Height><MatrixCells><MatrixCell><ReportItems>"
+         @"        <Textbox Name=\"Measure\"><Value>=Sum(Fields!Amount.Value)</Value></Textbox>"
+         @"      </ReportItems></MatrixCell></MatrixCells></MatrixRow></MatrixRows>\n"
+         @"    </Matrix>\n"
+         @"  </ReportItems></Body>\n"
+         @"</Report>\n";
+}
+
+// A 2005 subtotal reused the matrix's measure cell; 2010 matches every leaf
+// member to a body row and column of its own, and a tablix that does not is
+// one the designer cannot edit in place and Report Builder will not open. So
+// the upgrade gives each leaf its own copy of the measure row and column, and
+// the copies' items names of their own.
+- (void)testAMatrixSubtotalGetsItsOwnRowAndColumn {
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:RDLLegacyMatrixRDL() error:&err];
+  RDLTablix *pivot = (RDLTablix *)r.body.items.firstObject;
+  if (![pivot isKindOfClass:[RDLTablix class]]) {
+    XCTFail(@"the matrix should upgrade to a tablix: %@", err ?: [pivot class]);
+    return;
+  }
+  if ([[pivot structuralProblems] count])
+    XCTFail(@"the upgraded matrix should be consistent: %@", [pivot structuralProblems]);
+  if ([pivot.tablixBody.rows count] != 2 || [pivot.tablixBody.columns count] != 2)
+    XCTFail(@"a region and its subtotal by a year and its subtotal is 2 by 2, not %lu by %lu",
+            (unsigned long)[pivot.tablixBody.rows count], (unsigned long)[pivot.tablixBody.columns count]);
+  NSMutableSet<NSString *> *names = [NSMutableSet set];
+  NSUInteger items = 0;
+  for (RDLTablixRow *row in pivot.tablixBody.rows)
+    for (RDLTablixCell *cell in row.cells) {
+      items += 1;
+      [names addObject:cell.item.name ?: @""];
+      if (![[(RDLTextbox *)cell.item value] isEqualToString:@"=Sum(Fields!Amount.Value)"])
+        XCTFail(@"every cell should hold the measure, not %@", [(RDLTextbox *)cell.item value]);
+    }
+  if ([names count] != items || [names containsObject:@"CornerText"] || [names containsObject:@"RegionText"])
+    XCTFail(@"the measure's copies should be named apart from each other and the rest: %@", names);
+
+  RDLDataSet *ds = r.dataSets.firstObject;
+  ds.rows = @[
+    @{ @"Region" : @"North", @"Year" : @"2020", @"Amount" : @1 },
+    @{ @"Region" : @"North", @"Year" : @"2020", @"Amount" : @2 },
+    @{ @"Region" : @"South", @"Year" : @"2020", @"Amount" : @4 },
+  ];
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLGenerator pagesForReport:r parameters:@{}])
+    for (RDLLaidOutItem *it in page.items)
+      if ([RDLLaidText(it) length])
+        [texts addObject:RDLLaidText(it)];
+  for (NSString *want in @[ @"All regions", @"All years", @"3", @"4", @"7" ])
+    if (![texts containsObject:want])
+      XCTFail(@"the upgraded matrix should show %@ among %@", want, texts);
+}
+
 - (void)testUpgrader {
   NSError *err = nil;
 
@@ -441,9 +524,10 @@ static NSString *RDLReportWithUnsupportedItems(void) {
   if (![detail2.toggleItem isEqualToString:@"G1"] ||
       ![[detail2.hidden source] isEqualToString:@"true"])
     XCTFail(@"%@", @"the drill-down did not survive the round trip");
-  // The designer's own view of it: a grouped table.
-  if (![t.rowGroups isEqualToArray:@[ @"City" ]])
-    XCTFail(@"%@", [NSString stringWithFormat:@"row groups → %@", t.rowGroups]);
+  // A grouped table: the city group, with the drill-down inside it.
+  RDLTablixMember *city = [t.rowHierarchy.members lastObject];
+  if (![[city.groupExpressions.firstObject source] isEqualToString:@"=Fields!City.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"row group → %@", [city.groupExpressions.firstObject source]]);
 
   // And it has to actually lay out, which is the whole point.
   RDLDataSet *ds = r.dataSets.firstObject;

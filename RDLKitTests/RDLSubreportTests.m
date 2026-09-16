@@ -404,36 +404,25 @@ withIntermediateDirectories:YES
 
 #pragma mark - In a tablix
 
-// Rebuilding a tablix from its column specs is scaffolding: it writes the
-// header, the details row and the subtotals. A cell holding something the
-// specs have no words for was put there deliberately, and used to be replaced
-// by an empty text box -- so editing the columns of a master-detail table
-// silently deleted the subreport in it.
+// Building the columns again carries across what a column spec has no words
+// for: a subreport put into a detail cell stays, rather than being replaced by
+// an empty text box.
 - (void)testRebuildingTheColumnsKeepsASubreportCell {
-  RDLReport *report = [self manifestNaming:@"Crates" loader:NULL];
-  RDLTablix *tablix = nil;
-  for (RDLItem *item in report.body.items)
-    if ([item isKindOfClass:[RDLTablix class]])
-      tablix = (RDLTablix *)item;
-  if (tablix == nil) {
-    XCTFail(@"%@", @"the master report has a tablix");
-    return;
-  }
-  // What the editor shows for that column: not an empty value, but what the
-  // cell actually holds and which report it names.
-  NSDictionary *spec = [tablix.columnSpecs lastObject];
-  if (![spec[@"kind"] isEqualToString:@"Subreport"] ||
-      ![spec[@"report"] isEqualToString:@"Crates"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the column spec should say what it shows: %@",
-                                              spec]);
-
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.name = @"Rows";
+  tablix.width = 4;
+  tablix.columnSpecs = @[
+    @{@"width" : @2, @"header" : @"Name", @"value" : @"=Fields!Name.Value"},
+    @{@"width" : @2, @"header" : @"Detail", @"value" : @""}
+  ];
   [tablix rebuildTablix];
-  RDLSubreport *survivor = [self subreportIn:report];
-  if (survivor == nil)
+  RDLSubreport *sub = [[RDLSubreport alloc] init];
+  sub.name = @"Detail";
+  sub.reportName = @"Crates";
+  tablix.tablixBody.rows[1].cells[1].item = sub;
+  [tablix rebuildTablix];
+  if (tablix.tablixBody.rows[1].cells[1].item != sub)
     XCTFail(@"%@", @"rebuilding the columns must not throw the subreport away");
-  else if (![survivor.reportName isEqualToString:@"Crates"] ||
-           [survivor.parameters count] != 1)
-    XCTFail(@"%@", @"and it must be the same subreport, parameters and all");
 }
 
 // The other direction: a column turned into a subreport column becomes a real

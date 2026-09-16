@@ -1,4 +1,5 @@
 #import "RDLInspectorView.h"
+#import "RDLTablixStructure.h"
 #import "RDLChange.h"
 #import "RDLEditor.h"
 #import "RDLItemFactory.h"
@@ -27,13 +28,11 @@
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
-// The selected tablix column. A cell is an entry in columnSpecs rather than an
-// item, so these are applied by hand rather than through a key path binding.
+// The column of the selected cell. A column is part of the tablix's body rather
+// than an item's property, so it is applied by hand rather than through a key
+// path binding -- as are the tablix's row heights.
 @property (nonatomic, strong) IBOutlet NSView *cellBox;
-@property (nonatomic, strong) IBOutlet NSTextField *cellHeaderField, *cellWidthField;
-@property (nonatomic, strong) IBOutlet RDLExpressionField *cellValueField;
-@property (nonatomic, strong) IBOutlet NSPopUpButton *cellAlignPop, *cellAggPop;
-@property (nonatomic, strong) IBOutlet NSButton *cellExprButton;
+@property (nonatomic, strong) IBOutlet NSTextField *cellWidthField;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -145,7 +144,7 @@
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
                          _languageExprButton, _docLanguageExprButton,
-                         _rectBGExprButton, _sizeExprButton, _cellExprButton ])
+                         _rectBGExprButton, _sizeExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -346,10 +345,6 @@
   // Tablix.
   [_bindings bind:_tablixDatasetPop keyPath:@"dataSetName" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpTitle];
-  [_bindings bind:_tablixHeaderHField keyPath:@"headerHeight" scope:RDLFieldScopeItem
-             kind:RDLFieldKindNumber];
-  [_bindings bind:_tablixRowHField keyPath:@"rowHeight" scope:RDLFieldScopeItem
-             kind:RDLFieldKindNumber];
 
   // Band and report.
   [_bindings bind:_bandHField keyPath:@"height" scope:RDLFieldScopeBand
@@ -418,7 +413,7 @@
     @"footerHLabel" : @"Footer",
     @"marginLabel" : @"Margin",
     @"bandHeightLabel" : @"Height",
-    @"cellWidthLabel" : @"Width",
+    @"cellWidthLabel" : @"Column width",
     @"tablixHeaderLabel" : @"Header",
     @"tablixRowLabel" : @"Row"
   };
@@ -450,7 +445,8 @@
     // cell decides both. Offering the boxes would be offering to change
     // numbers nothing reads.
     RDLTablix *cellTablix = nil;
-    BOOL inCell = [report cellContainingItem:it tablix:&cellTablix] != nil;
+    RDLTablixCell *cell = [report cellContainingItem:it tablix:&cellTablix];
+    BOOL inCell = cell != nil;
     [_kindLabel setStringValue:inCell
                                    ? [NSString stringWithFormat:@"%@ · %@ · in %@",
                                                                 it.rdlElementName, it.name,
@@ -479,15 +475,18 @@
         [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
-      if ([self fillCellFromTablix:(RDLTablix *)it column:sel.tablixColumn])
-        [boxes addObject:_cellBox];
-        [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
+      [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
+      [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
+    // An item in a tablix cell: the column it is in, whose width is the cell's.
+    NSUInteger cellRow = 0, cellColumn = 0;
+    if (cell != nil && [cellTablix getRow:&cellRow column:&cellColumn ofCell:cell] &&
+        [self fillColumn:(NSInteger)cellColumn ofTablix:cellTablix])
+      [boxes addObject:_cellBox];
     [self stackBoxes:boxes];
   } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && !_showsReportOnly) {
     // An empty cell: nothing in it to describe, so what is shown is the column
-    // it belongs to -- its width, its heading, what its cells show -- and the
-    // label says where in the table it is.
+    // it belongs to -- its width -- and the label says where in the table it is.
     [_kindLabel setStringValue:[NSString stringWithFormat:@"Empty cell · %@ · row %ld, column %ld",
                                                           sel.tablix.name ?: @"table",
                                                           (long)sel.cellRow + 1,
@@ -495,7 +494,7 @@
     NSMutableArray *boxes = [NSMutableArray array];
     NSInteger bodyColumn = [RDLTablixGeometry bodyColumnOf:sel.tablix
                                              forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
-    if (bodyColumn >= 0 && [self fillCellFromTablix:sel.tablix column:bodyColumn])
+    if (bodyColumn >= 0 && [self fillColumn:bodyColumn ofTablix:sel.tablix])
       [boxes addObject:_cellBox];
     [self stackBoxes:boxes];
   } else if (band != nil) {
@@ -522,64 +521,70 @@
   _reloading = NO;
 }
 
-// The selected column's spec, or NO when the selection names no column -- in
-// which case the section is not shown at all rather than shown empty.
-- (BOOL)fillCellFromTablix:(RDLTablix *)tablix column:(NSInteger)column {
-  NSArray *specs = tablix.columnSpecs ?: @[];
-  if (column < 0 || column >= (NSInteger)[specs count])
+// The width of a tablix's body column, or NO when there is no such column --
+// in which case the section is not shown at all rather than shown empty. What
+// the column's cells show and how they align are the cells' own, and are edited
+// by selecting what is in them.
+// A measurement as the inspector shows it: in the report's unit.
+- (NSString *)stringFromInches:(CGFloat)inches {
+  return [NSString stringWithFormat:@"%.3f", RDLUnitsFromInches(inches, _context.report.unit)];
+}
+
+- (BOOL)fillColumn:(NSInteger)column ofTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixColumn *> *columns = tablix.tablixBody.columns;
+  if (column < 0 || column >= (NSInteger)[columns count])
     return NO;
-  NSDictionary *spec = specs[(NSUInteger)column];
-  [_cellHeaderField setStringValue:spec[@"header"] ?: @""];
-  [_cellValueField setStringValue:spec[@"value"] ?: @""];
-  [_cellWidthField setStringValue:[NSString stringWithFormat:@"%.3f",
-                                                            [spec[@"width"] doubleValue]]];
-  NSString *align = spec[@"align"] ?: @"Default";
-  [_cellAlignPop selectItemWithTitle:[_cellAlignPop itemWithTitle:align] ? align : @"Default"];
-  NSString *agg = spec[@"aggregate"] ?: @"None";
-  [_cellAggPop selectItemWithTitle:[_cellAggPop itemWithTitle:agg] ? agg : @"None"];
+  [_cellWidthField setStringValue:[self stringFromInches:columns[(NSUInteger)column].width]];
   return YES;
 }
 
-// One column changed: the whole spec array goes back, because that is the unit
-// -rebuildTablix reads and the unit the inverse restores.
-- (BOOL)applyCellControl:(id)sender {
-  RDLSelection *sel = _context.selection;
-  // The column is named either by a tablix selection (a click in its preview)
-  // or by an empty-cell selection; both edit the same column spec.
+// The two rows a tablix's columns are described by: the heading row and the
+// value row. A field is blank where the tablix has no such row -- a
+// crosstab's headings are its column groups' headers.
+- (void)fillRowHeightsOfTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  NSInteger heading = [RDLTablixStructure headingRowOfTablix:tablix];
+  NSInteger value = [RDLTablixStructure valueRowOfTablix:tablix];
+  [_tablixHeaderHField setStringValue:heading >= 0 ? [self stringFromInches:rows[(NSUInteger)heading].height] : @""];
+  [_tablixRowHField setStringValue:value >= 0 ? [self stringFromInches:rows[(NSUInteger)value].height] : @""];
+}
+
+// A height typed into one of them: that row's, set in place.
+- (BOOL)applyRowHeightControl:(id)sender {
+  if (sender != _tablixHeaderHField && sender != _tablixRowHField)
+    return NO;
   RDLItem *it = [_context selectedItem];
-  NSInteger column = sel.tablixColumn;
-  if (![it isKindOfClass:[RDLTablix class]] && sel.scope == RDLSelectionScopeTablixCell) {
-    it = sel.tablix;
-    column = [RDLTablixGeometry bodyColumnOf:sel.tablix
-                               forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
-  }
-  if (![it isKindOfClass:[RDLTablix class]] || column < 0)
-    return NO;
-  if (sender != _cellHeaderField && sender != _cellValueField && sender != _cellWidthField &&
-      sender != _cellAlignPop && sender != _cellAggPop)
-    return NO;
+  if (![it isKindOfClass:[RDLTablix class]])
+    return YES;
   RDLTablix *tablix = (RDLTablix *)it;
-  NSMutableArray *specs = [(tablix.columnSpecs ?: @[]) mutableCopy];
-  if (column >= (NSInteger)[specs count])
+  NSInteger row = sender == _tablixHeaderHField ? [RDLTablixStructure headingRowOfTablix:tablix]
+                                                : [RDLTablixStructure valueRowOfTablix:tablix];
+  CGFloat height = RDLInchesFromUnits([[(NSTextField *)sender stringValue] doubleValue], _context.report.unit);
+  if (row >= 0 && height > 0)
+    [_context.editor setTablixRow:(NSUInteger)row height:height ofTablix:tablix];
+  return YES;
+}
+
+// A column's width typed in: the column the selected cell item, or the selected
+// empty cell, is in -- set exactly, and in place.
+- (BOOL)applyCellControl:(id)sender {
+  if (sender != _cellWidthField)
     return NO;
-  NSMutableDictionary *spec = [specs[(NSUInteger)column] mutableCopy];
-  spec[@"header"] = [_cellHeaderField stringValue];
-  spec[@"value"] = [_cellValueField stringValue];
-  CGFloat width = [[_cellWidthField stringValue] doubleValue];
-  if (width > 0)
-    spec[@"width"] = @(width);
-  NSString *align = [_cellAlignPop titleOfSelectedItem];
-  if ([align isEqualToString:@"Default"])
-    [spec removeObjectForKey:@"align"];
-  else
-    spec[@"align"] = align;
-  NSString *agg = [_cellAggPop titleOfSelectedItem];
-  if ([agg isEqualToString:@"None"])
-    [spec removeObjectForKey:@"aggregate"];
-  else
-    spec[@"aggregate"] = agg;
-  specs[(NSUInteger)column] = spec;
-  [_context.editor setColumnSpecs:specs ofTablix:tablix];
+  RDLSelection *sel = _context.selection;
+  RDLTablix *tablix = nil;
+  NSInteger column = -1;
+  if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil) {
+    tablix = sel.tablix;
+    column = [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+  } else {
+    RDLTablixCell *cell = [_context.report cellContainingItem:[_context selectedItem] tablix:&tablix];
+    NSUInteger row = 0, bodyColumn = 0;
+    if (cell != nil && [tablix getRow:&row column:&bodyColumn ofCell:cell])
+      column = (NSInteger)bodyColumn;
+  }
+  CGFloat width = RDLInchesFromUnits([[_cellWidthField stringValue] doubleValue], _context.report.unit);
+  if (tablix != nil && column >= 0 && width > 0)
+    [_context.editor setTablixColumn:(NSUInteger)column width:width ofTablix:tablix];
   return YES;
 }
 
@@ -660,7 +665,7 @@
 
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
-  if ([self applyCellControl:sender])
+  if ([self applyCellControl:sender] || [self applyRowHeightControl:sender])
     return;
   if (sender == _marginField) {
     [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
@@ -690,7 +695,6 @@
   _languageField.expressionContext = RDLExpressionContextText;
   _docLanguageField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
-  _cellValueField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -705,7 +709,6 @@
   if (sender == _docLanguageExprButton) return _docLanguageField;
   if (sender == _rectBGExprButton) return _rectBGField;
   if (sender == _sizeExprButton) return _sizeField;
-  if (sender == _cellExprButton) return _cellValueField;
   return nil;
 }
 

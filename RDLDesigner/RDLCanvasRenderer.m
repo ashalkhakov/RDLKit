@@ -176,12 +176,12 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   }
 
   // Hovered cell highlight: shows which cell a click would select.
-  if (_overlay.hoverTablix == it && _overlay.hoverPart != RDLTablixPartNone &&
+  if (_overlay.hoverTablix == it && _overlay.hoverRow >= 0 && _overlay.hoverColumn >= 0 &&
       _overlay.editingItem == nil) {
     NSRect cell = [RDLTablixGeometry cellRectOf:it
                                        itemRect:r
-                                         column:_overlay.hoverColumn
-                                           part:_overlay.hoverPart
+                                            row:(NSUInteger)_overlay.hoverRow
+                                         column:(NSUInteger)_overlay.hoverColumn
                                            zoom:z];
     [[NSColor colorWithCalibratedRed:0.55 green:0.62 blue:0.85 alpha:0.18] set];
     NSRectFillUsingOperation(cell, NSCompositeSourceOver);
@@ -293,16 +293,11 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
 // outside the region per group, nested outwards, labelled with the field. Rows
 // bracket down the left, columns across the top, so a crosstab reads as the two
 // axes it is. Drawn only for the selected tablix -- it is orientation, not
-// decoration, and on every region at once it would be noise.
-// The group structure at a glance, the way Report Builder shows it: a bracket
-// outside the region per group, nested outwards, labelled with the field. Rows
-// bracket down the left, columns across the top, so a crosstab reads as the two
-// axes it is. Drawn only for the selected tablix -- it is orientation, not
 // decoration, and on every region at once it would be noise. Where each bracket
 // goes is RDLPageGeometry's, so it can be checked without drawing.
 static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
-  NSArray<NSString *> *rows = tablix.rowGroups ?: @[];
-  NSArray<NSString *> *cols = tablix.columnGroups ?: @[];
+  NSArray<NSString *> *rows = [RDLTablixGeometry groupBracketLabelsOf:tablix axis:RDLTablixAxisRows];
+  NSArray<NSString *> *cols = [RDLTablixGeometry groupBracketLabelsOf:tablix axis:RDLTablixAxisColumns];
   if ([rows count] == 0 && [cols count] == 0)
     return;
 
@@ -466,7 +461,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
                                  NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
     BOOL editorCoversThisText =
-        _overlay.editingItem == it && _overlay.editingCell == nil;
+        _overlay.editingItem == it;
     if (!editorCoversThisText) {
       RDLTextbox *tb = [it isKindOfClass:[RDLTextbox class]] ? (RDLTextbox *)it : nil;
       if ([tb.paragraphs count])

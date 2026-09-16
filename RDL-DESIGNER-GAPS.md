@@ -11,14 +11,19 @@ amounts:
 | Bin | Meaning | Cost |
 |---|---|---|
 | **UI** | The model already carries the property and the parser/writer round-trip it; only the inspector, a menu or an editor is missing. | Days each. Pure AppKit/GNUstep work, no engine change. |
-| **MODEL** | The engine does not represent the feature (NONE/DROP/REFUSE in the engine document). The designer cannot offer it until the engine does. | Engine work first (see the engine tiers), then UI. |
+| **MODEL** | The engine does not represent the feature (NONE in the engine document). The designer cannot offer it until the engine does. | Engine work first, then UI. |
 | **CANVAS** | Not an RDL feature at all — an editing affordance (multi-select, alignment, snapping, panels) that a Report Builder user expects. | Designer-only. |
 
 The measure is Report Builder, since a "drop-in replacement" designer is
 judged against the tool that produced the files people already have.
 
-Audited tree: branch `packaging` at `a4d8cfb`. Behaviours established
-only by reading code paths (no test or run) are marked *(by inspection)*.
+Audited tree: branch `rdlkit-gaps-p0` at `ede45d2`. This replaces the
+audit of `packaging` at `a4d8cfb`. Between the two the engine's P0 and P1
+work landed (`RDL-SPEC-GAPS.md` §13) while the designer's inspector,
+tablix and editor code stayed as it was, so most of what changed is the
+bin: a large share of the former MODEL rows are now UI. Behaviours
+established only by reading code paths (no test or run) are marked
+*(by inspection)*.
 
 ## 1. Method
 
@@ -29,74 +34,74 @@ inspectors (`RDLParameterInspectorView`, `RDLFieldInspectorView`,
 `RDLDataSourceView`), the palette of insertable items is `RDLItemFactory`,
 and the modal editors are `RDLTablixEditor`, `RDLRichTextEditor`,
 `RDLFilterEditor` and `RDLSubreportParametersEditor`. Those files, plus
-the menu (`MainMenu.xib`), the navigators (`RDLDatasetNavigator`,
+the menu (`MainMenu.xib`), the inspector sections
+(`RDLInspectorSections.xib`), the navigators (`RDLDatasetNavigator`,
 `RDLDataSourceNavigator`, `RDLParameterNavigator`), the data pane
-(`RDLDataView`, `RDLDatasetFieldsView`) and the expression editor
-(`RDLExpressionEditor`, `RDLExpressionHelper`), are the complete surface:
-if a property is not bound, inserted or edited by one of them, the
-designer cannot set it. The tables below were built by walking that
-surface and comparing it against the engine model (`RDLKit/RDLReport.h`)
-and the schema inventory in the engine document.
+(`RDLDataView`, `RDLDatasetFieldsView`), the canvas (`RDLCanvasView`,
+`RDLCanvasInteraction`, `RDLCanvasRenderer`, `RDLPageGeometry`) and the
+expression editor (`RDLExpressionEditor`, `RDLExpressionHelper`), are the
+complete surface: if a property is not bound, inserted or edited by one of
+them, the designer cannot set it. The tables below were built by walking
+that surface and comparing it against the engine model
+(`RDLKit/RDLReport.h`), the parser and writer (`RDLKit/RDLParser.m`) and
+the engine document.
 
 ## 2. Executive summary
 
-The designer today constructs a single-section report on Letter or A4
-portrait with a uniform margin; page header, body and footer bands with a
-body background; seven item kinds (Textbox, Line, Rectangle, Image, Chart,
-Tablix, Subreport) with position, size, font family/size/weight (italic
-through the font panel), colour, background, horizontal alignment,
-format and per-item language; rich text with per-run bold/italic/
-underline/strikethrough/font/size/colour and paragraph alignment; a
-tablix built from a column list with row and column groups nesting as
-deep as wanted, subtotals, a grand total, region and group filters, and
-cells that can hold any simple item or a subreport; a chart with one of
-seven types, a dataset, a title, a category/value pair and filters; a
-subreport with its parameter mapping, opened as its own document; JSON/XML/
-CSV data sources; datasets with a query, query and calculated fields,
-filters and loaded rows; report parameters with type, prompt, default
-and valid values; expressions with member completion. It has undo/redo,
-copy/paste/duplicate, zoom, a grid, an outline down to tablix cells, an
-in-place cell editor, a handle band for column drag and reorder, a
-paginated preview and PDF/HTML export.
+The designer constructs a single-section report on Letter or A4 portrait
+with a uniform margin; page header, body and footer bands with a body
+background; seven item kinds (Textbox, Line, Rectangle, Image, Chart,
+Tablix, Subreport) with position, size, font family/size/weight (Normal or
+Bold; italic through the font panel), colour, background (rectangles),
+horizontal alignment, format and per-item language; rich text with per-run
+bold/italic/underline/strikethrough/font/size/colour and paragraph
+alignment, which now carries paragraph indents, lists, style expressions
+and per-run hyperlinks through the editor unchanged; a tablix edited in
+place -- columns inserted, moved, resized and deleted; groups added around,
+inside and beside others, re-nested, renamed and deleted; totals; region
+and group filters -- whose cells hold any simple item or a subreport; a chart with one of seven types, a
+dataset, a title, a category/value pair and filters; a subreport with its
+parameter mapping, opened as its own document; JSON/XML/CSV data sources;
+datasets with a query, query and calculated fields, filters and loaded
+rows; report parameters with type, prompt, default and valid values;
+expressions with member completion. It opens 2005 to 2016 files, writes
+the 2016 shape, keeps what it does not read, and shows a GaugePanel, Map
+or CustomReportItem as a placeholder that is written back unchanged. It
+has undo/redo, copy/paste/duplicate, zoom, a grid, an outline down to
+tablix cells, an in-place cell editor, a handle band for column drag and
+reorder, a paginated preview and PDF/HTML export.
 
-Against the spec, the designer exposes roughly 60 of the ~100 element
-names the engine realises in full, and none of the 518 the engine never
-reads. The important findings:
+The important findings:
 
-1. **The largest block of missing designer features needs no engine
-   work.** Visibility (`Hidden`, `ToggleItem`), `Hyperlink`, `PageBreak`
-   and `ResetPageNumber`, `KeepTogether`, `CanGrow`, `VerticalAlign`,
-   `FontStyle`/`TextDecoration` as controls, per-edge padding, per-edge
-   borders, textbox background, `RepeatOnNewPage`, `NoRowsMessage`,
-   group sorts, tablix sort/repeat/fixed headers, `PrintOnFirstPage`/
-   `PrintOnLastPage`, per-edge page margins, free page sizes and
-   landscape, embedded images, chart subtype/series/legend/axes/palette,
-   parameter ordering and multi-value defaults — all in the model and in
-   the parser/writer already, missing only from the inspector. This is
-   the P0 list in §6.
-2. **The tablix projection is still lossy, but narrower.** A loaded
-   tablix gets `columnSpecs` inferred at load; column operations, the
-   inspector's column box, Return/Tab in-place editing, the grand-total
-   toggle and the modal editor regenerate the whole body and both
-   hierarchies from that projection. Direct cell edits (double-click,
-   in-cell item inspector) no longer rebuild, and non-textbox details
-   cells survive a rebuild; merged cells, per-cell styles, static
-   members, group sorts/page breaks/visibility, corner contents and
-   per-row heights do not (§4.7), and a matrix rebuild keeps nothing. Two
-   new defects: a direct cell edit is reverted by the *next* rebuild
-   because `columnSpecs` is not re-inferred, and kept cells are
-   re-attached by old column index after a column move (§5).
-3. **Round-tripping a third-party file is still not safe.** Saving
-   renames the report to the file's basename, drops every element the
-   parser does not read (the 518 from the engine document, plus `rd:`
-   state), writes the 2008 root shape under the 2010 namespace, and
-   materialises the kit's style defaults. The `CommandText`-replaced-by-
-   rows hazard is gone. A file from Report Builder that is opened,
-   touched and saved will not open in Report Builder again (§5).
-4. **Files with a GaugePanel, Map or CustomReportItem cannot be opened**,
-   because the parser refuses them. Subreports open, render and edit.
-5. **No embedded-image editing**, and parameters lack `Hidden`, valid-
-   value labels, ordering and multi-value defaults.
+1. **Editing a loaded tablix no longer destroys it** (fixed since the
+   previous audit). Every tablix edit -- on the canvas, in its menus, in
+   the inspector and in the tablix dialog -- changes the body and the
+   hierarchies in place and undoes from a snapshot of the tablix, so
+   merged cells, per-cell styles, row heights, static members, group
+   sorts, page breaks, visibility and the corner are kept. `columnSpecs`
+   and the group lists only build new tablixes; the parser no longer
+   infers them (§4.7).
+2. **The engine has overtaken the designer.** Page `Columns` and `Style`,
+   `ConsumeContainerWhitespace`, parameter `Hidden`/`AllowBlank`/labels/
+   dataset-driven lists, query parameters, collation, image `Database`,
+   `CanShrink`/`HideDuplicates`, `LineHeight`/`WritingMode`/shadows/
+   gradients/`Calendar`/numerals, ten more chart types and most chart
+   settings, report `Code` and `Variables`, nested data regions in cells
+   and rectangles — all now in the model, all with no designer control.
+3. **Several smaller edits still lose data** without a rebuild: a loaded
+   parameter's edited default is not saved; a chart of a newer type shows
+   as Column and changes type when touched, and editing its category
+   field drops nested groups; the data source pane rewrites a SQL/OLEDB
+   source; field undo does nothing (§5).
+4. **Most of the old round-trip hazards are fixed** in the engine: 2010/
+   2016 files open, unread elements and `rd:` state are kept and written
+   back, the root shape validates, style defaults are the spec's and are
+   not materialised, placeholders are no longer stamped, and unsupported
+   items open as placeholders.
+5. **The canvas does not draw what renders**: lines are always
+   horizontal hairlines, rectangles have no border, textboxes only the
+   default border, and `ZIndex` is ignored, while the preview honours all
+   of them.
 
 ## 3. What the designer constructs today
 
@@ -105,233 +110,217 @@ UI.
 
 | Area | Capability | UI today |
 |---|---|---|
-| Report | Name, Author, Description | Yes (name is overwritten on save, §5) |
-| Report | Language | Yes (literal or expression; placeholder is the host culture) |
+| Report | Name, Author, Description | Yes (name is overwritten from the file name on save, §5) |
+| Report | Language | Yes (literal or expression) |
 | Report | Unit (`rd:ReportUnitType`) | Popup: Inches, Centimeters; inspector fields and rulers follow it |
 | Report | Page size | Popup: Letter, A4 (portrait only) |
 | Report | Margins | One uniform value applied to all four edges |
 | Report | Header/body/footer heights | Yes |
 | Report | Header/footer `PrintOnFirstPage`/`PrintOnLastPage` | — |
-| Report | Body `Style/BackgroundColor` | Yes (body only; header/footer style —) |
-| Report | Parameters | Navigator (add/remove) + inspector: name, prompt, type, allows-blank (→ `Nullable`), several values, default (expression), valid values one per line |
+| Report | Band `Style` | Body background only; a stale guard (`RDLReport.m`, body-only) disables it for header/footer though the writer emits any band's style |
+| Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | — |
+| Report | `Code`, `Variables` | — |
+| Report | Parameters | Navigator (add/remove) + inspector: name, prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line |
 | Report | Data sources | Navigator + pane: JSON/XML/CSV; file beside the report or embedded content; CSV header row, delimiter, widths; connect string composed |
 | Report | Embedded images | — (the Image inspector accepts a name; none can be added) |
-| Data | Datasets: add (requires a source; offers to create one), remove, rename (regions follow) | Yes |
-| Data | Query (`CommandText`), data source popup, Load rows | Yes; `CommandText` survives save |
-| Data | Fields: name, kind (Query/Calculated), `DataField` or expression, type; add query field, add calculated field, remove | Yes (table + field inspector) |
+| Data | Datasets: add, remove, rename (regions follow) | Yes |
+| Data | Query (`CommandText`), data source popup, Load rows | Yes |
+| Data | Fields: name, kind, `DataField` or expression, type; add/remove | Yes (table + field inspector) |
 | Data | Dataset filters | Filters… (field or expression / 14 operators / values or expression) |
+| Data | Query parameters, collation and sensitivities | — |
 | Items | Insert Textbox, Line, Rectangle, Image, Chart, Tablix, Subreport | Yes (palette / Add Element…) |
-| Items | Insert into Rectangle | Textbox, Line, Rectangle, Image, Subreport (no data regions) |
-| Items | Insert into tablix cell | Same five; an empty cell takes the item, a second item wraps both in a Rectangle; deleting the last leaves the cell empty |
-| Items | Drag a field/parameter/global from the palette onto the canvas | Yes → bound textbox in a band |
-| Items | Position, size | Fields (in the report unit) + drag; snap fixed at 0.05in; hidden for in-cell items |
-| Items | ZIndex / front-back | — (kept from file at render; never written) |
-| Items | Name | Auto-assigned; shown, not editable |
-| Items | Visibility `Hidden` / `ToggleItem` | — |
-| Items | Actions (`Hyperlink`) | — |
-| Items | `PageBreak`, `ResetPageNumber`, `PageName`, `KeepTogether` | — |
-| Style | Font family, size | Yes (text or expression); Font… opens the font panel |
-| Style | Font weight | Popup: Normal / Bold (font panel also writes weight) |
-| Style | Font style (italic) | Font panel or rich-text editor only |
-| Style | Colour | Text field + colour well (expression allowed) |
-| Style | Background colour | Rectangle only (textbox —) |
+| Items | Insert into Rectangle or tablix cell | Textbox, Line, Rectangle, Image, Subreport (no data regions — a limit the engine lifted in P0.10, still enforced by `RDLItemFactory` and a test) |
+| Items | Drag a field/parameter/global onto the canvas | Yes → bound textbox in a band |
+| Items | Position, size | Fields + drag; snap fixed at 0.05in; hidden for in-cell items |
+| Items | ZIndex / front-back | — (written and honoured at render; the canvas ignores it) |
+| Items | Name | Shown, not editable |
+| Items | Visibility, Hyperlink, PageBreak, ResetPageNumber, PageName, KeepTogether | — |
+| Style | Font family, size, colour, format, language | Yes (text or expression) |
+| Style | Font weight | Popup: Normal / Bold (model has the full list) |
+| Style | Font style (italic), text decoration | Font panel / rich-text editor only |
+| Style | Background colour | Rectangle only |
 | Style | Text align | Popup: Left / Center / Right |
-| Style | Vertical align | — |
-| Style | Text decoration | Rich-text editor only |
-| Style | Format string, Language | Yes (text or expression) |
-| Style | Padding (4 edges) | — |
-| Style | Borders (default + 4 edges) | — (Line colour only) |
+| Style | Vertical align, padding, borders | — |
+| Style | Expressions | f(x) on 8 of the 27 style expressions |
 | Textbox | Value / expression | Yes; in-place double-click |
-| Textbox | Rich text | Modal editor with formatting bar (+ Justify) |
-| Textbox | `CanGrow` | — (in the model; default true) |
-| Image | Source (Embedded/External), Value, Sizing | Yes (no Database) |
-| Line | Colour | Yes; width/style — |
-| Subreport | `ReportName`, status (found / not loaded), Parameters… (name from the loaded definition, value, omit), Edit Subreport… opens the child beside the parent and offers to create it | Yes |
-| Tablix | Dataset, header/row heights (uniform) | Yes |
-| Tablix | Columns: header, value, width, Shows (Text/Subreport), Report, align, total (Sum/Avg/Count/CountDistinct/Min/Max) | Modal editor; context-menu insert/delete column; handle-band drag to reorder; border drag to resize |
-| Tablix | Row groups and column groups, N deep, drag to re-nest; grand total | Modal editor; Edit Group… on the canvas |
-| Tablix | Region filters; per-group filters | Modal editor (Filters…, Filter the selected group…) |
-| Tablix | Cell selection on canvas and in the outline; any simple item or subreport in a cell | Yes |
-| Tablix | Per-cell style, merged cells, static+dynamic column mixes, group sort/page break/visibility, per-row heights, corner, `RepeatOnNewPage`, `NoRowsMessage`, sort, fixed/repeat headers | — (most lost on rebuild, §4.7) |
-| Chart | Type (7), dataset, title, category field, value field, Filters… | Yes |
-| Chart | Subtype, series list, legend, axes, palette, labels, markers | — (all in the model) |
-| Expressions | Editor with categories, function picker, insert at caret, parse status; `!` member completion and function completion in fields | Yes |
-| Expressions | Semantic checking in the editor | — (`RDLChecker` runs only in the new-report wizard) |
+| Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
+| Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | — |
+| Image | Source, Value, Sizing | Embedded/External only; Value has no f(x) |
+| Line | Colour | Text field only (no well, no expression); width/style — |
+| Subreport | `ReportName`, status, Parameters…, Edit Subreport… | Yes; `NoRowsMessage`/`MergeTransactions`/`OmitBorderOnPageBreak` — |
+| Tablix | Dataset; heading-row and value-row heights | Yes, in place |
+| Tablix | Columns: heading, value, width, Shows, Report, align, total | Tablix dialog, column width field, context menu, handle band, border drag — each edits the body in place, one undo (§4.7) |
+| Tablix | Row and column groups: parent, child, adjacent, delete, re-nest; a total beside a group; grand total | Row Group / Column Group menus on any cell; tablix dialog |
+| Tablix | Group name, expressions and filters; region filters | Group Properties…; tablix dialog |
+| Tablix | Cell selection; any simple item or subreport in a cell | Yes |
+| Tablix | Per-cell border/background/padding, merged cells, static members, group sort/page break/visibility, per-row heights, corner, `NoRowsMessage`, sort, repeat/fixed headers | — |
+| Chart | Type, dataset, title, category field, value field, Filters… | 7 of 17 types |
+| Chart | Subtype, series, legend, axes, palette, labels, markers, no-data message | — |
+| Expressions | Editor with categories, function picker, parse status; completion | Yes; completion is a hard-coded list of ~90 names, not the engine catalogue |
+| Expressions | Semantic checking | — (`RDLChecker` runs only in the new-report wizard) |
 | Canvas | Selection | Single item (or one cell) |
-| Canvas | Resize handles | Three (E, S, SE); Shift+arrow resizes |
+| Canvas | Resize handles | Three (E, S, SE) |
 | Canvas | Align / distribute / same size / z-order | — |
-| Canvas | Snap control | Grid toggle is visual only; step fixed |
-| Canvas | Rulers, zoom 40–400%, grid | Yes |
+| Canvas | Rulers, zoom 40–400%, grid | Yes (grid toggle is visual only) |
 | Canvas | Outline (report → bands → items → tablix rows → cells) | Yes; no drag |
 | Canvas | Undo/redo, cut/copy/paste/duplicate/delete | Yes |
-| Files | NSDocument: Open `.rdl` (2005/2008/2010-root), scaffold from `.docx`, Samples | Yes |
-| Files | Save (2010 namespace, 2008 shape) | Yes |
-| Files | Preview (paged, no controls), Export PDF/HTML (by extension), Generator window | Yes |
+| Files | Open `.rdl` (2005–2016), scaffold from `.docx`, Samples | Yes; the parser's `warnings` are never shown |
+| Files | Save (2016 shape, unread elements kept) | Yes |
+| Files | Preview, Export PDF (menu) / HTML (by extension), Generator window | Yes; preview has no page navigation or print and does not load subreports |
 | Files | Source view | Read-only |
 
 ## 4. Gaps by spec area, with bin
 
-Each row is a spec feature the designer cannot construct. The bin says
-what stands in the way; "engine §" points at the engine document.
+Each row is a spec feature the designer cannot construct. "Was" notes a
+bin that moved since the previous audit.
 
 ### 4.1 Report and page
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Arbitrary `PageWidth`/`PageHeight`, landscape, Legal/Tabloid/A3/A5/custom | UI | `RDLEditor -setPageWidth:height:` exists; only the popup is limited. |
-| Per-edge margins | UI | Model has all four; editor has `-setUniformMargin:` only. |
-| `PrintOnFirstPage`/`PrintOnLastPage` | UI | Band property; not shown. Note the engine default is inverted (engine §3.4). |
-| Header/footer `Style` | UI | Only the body's background is bound. |
-| `Page/Style`, `Columns`, `ColumnSpacing`, `InteractiveHeight/Width` | MODEL | Engine NONE. |
-| `AutoRefresh`, `ConsumeContainerWhitespace`, `InitialPageName` | MODEL | Engine NONE. |
-| `ReportSections` (multi-section) | MODEL | Engine reads none (engine §3.1). The designer should stay single-section but the file must be written in the 2010 shape. |
-| `Code`, `Classes`, `Variables`, `CustomProperties` | MODEL | Engine NONE. The `Code` tab is standard in Report Builder. |
+| Arbitrary `PageWidth`/`PageHeight`, landscape, more paper sizes | UI | `RDLEditor -setPageWidth:height:` exists; only the popup is limited. |
+| Per-edge margins | UI | Model has all four; the editor has `-setUniformMargin:` only. |
+| `PrintOnFirstPage`/`PrintOnLastPage` | UI | Default false, as the spec has it. |
+| Header/footer `Style` | UI | Only a stale body-only guard blocks it. |
+| Page `Style`, `Columns`, `ColumnSpacing` | UI (was MODEL) | Engine FULL (columns PDF-only). |
+| `ConsumeContainerWhitespace`, `InitialPageName` | UI (was MODEL) | |
+| `Code`, `Variables` | UI (was MODEL) | No Code tab; the window's tabs are in `RDLDesignerWindow.xib`. |
+| `InteractiveHeight/Width`, `AutoRefresh`, `Classes`, `CustomProperties` | MODEL | Kept and written back unchanged. |
 
 ### 4.2 Data and parameters
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Parameter `Hidden`, `AllowBlank`, `UsedInQuery` | MODEL | Engine NONE (`AllowBlank` in the inspector today maps to `Nullable`, which is a different property). |
-| Parameter ordering | UI | Order matters for cascading and for the prompt pane; the navigator cannot reorder. |
-| Valid values with labels | MODEL (engine DROP) | `ParameterValue/Label` is not read; the inspector edits values only. |
-| Multi-value defaults | UI | The inspector writes a single `defaultValue`; the model holds `defaultValues`. See also §5. |
-| `DataSetReference` defaults / valid values, `ReportParametersLayout` | MODEL | |
-| Data source kinds beyond JSON/XML/CSV | MODEL | The pane shows an unknown provider as JSON and rewrites it on first edit (§5). |
+| Parameter `Hidden`, `AllowBlank` | UI (was MODEL) | "Allows blank" sets `Nullable`; relabel it and add both. |
+| Parameter `UsedInQuery` | UI | Round-trip only; low value. |
+| Parameter ordering | UI | Order matters for cascading and for the prompt pane; no move command. |
+| Valid values with labels | UI (was MODEL) | `validValueLabels` is keyed by value source, so editing a value's text loses its label. |
+| Multi-value defaults | UI + defect | The inspector writes only `defaultValue`; see §5. |
+| `DataSetReference` valid values and defaults | UI (was MODEL) | Shown as an empty list, and what is typed there is not written (§5). |
+| `MultiValue` value entry in the data pane | UI | One text field; with valid values, a single-select popup. |
+| `ReportParametersLayout` | MODEL | |
+| Data source kinds beyond JSON/XML/CSV | MODEL | Shown as JSON and rewritten on first edit (§5). |
 | `ConnectionProperties/Prompt`, `IntegratedSecurity` | MODEL | |
-| `Query/CommandType`, `Timeout`, `QueryParameters` | MODEL | |
-| Dataset collation/case/accent/kana/width sensitivity | MODEL | |
-| Shared data sources, shared datasets | MODEL | Out of scope. |
-| Embedded images: add from file, list, delete, rename | UI | Model has `embeddedImages`; nothing creates one. |
+| `QueryParameters` | UI (was MODEL) | Engine FULL. |
+| `CommandType`, `Timeout` | UI (was MODEL) | Round-trip only in the engine. |
+| Collation, case/accent/kana/width sensitivity | UI (was MODEL) | Engine FULL, with a visible effect on grouping and sorting. |
+| Embedded images: add from file, list, delete, rename | UI | Nothing in the designer refers to `embeddedImages`. |
 
 ### 4.3 Report items — common
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `Visibility/Hidden` (literal or expression) | UI | `RDLItem.hidden`; writer emits it. |
+| `Visibility/Hidden` | UI | |
 | `Visibility/ToggleItem` | UI (engine MODEL) | Authorable for SSRS; the preview cannot expand it. |
-| `ActionInfo/Hyperlink` | UI | `RDLItem.hyperlink`; written on Textbox/Image. |
-| `Drillthrough`, `BookmarkLink` | MODEL | Engine NONE. |
-| `PageBreak/BreakLocation`, `ResetPageNumber` | UI | On items and groups. |
-| `PageName` | UI now, MODEL for spec placement | Writer emits it under `PageBreak` (invalid); fix the writer first (engine §3.2). |
+| `ActionInfo/Hyperlink` | UI | |
+| `Drillthrough`, `BookmarkLink` | MODEL | |
+| `PageBreak/BreakLocation`, `Disabled`, `ResetPageNumber` | UI | |
+| `PageName` | UI | The writer now places it correctly. |
 | `KeepTogether` | UI | |
-| `ZIndex` | UI + MODEL | No front/back commands, and the writer never emits it (engine §7.1). |
-| `Name` editing | UI | Auto-named; users need to rename for `ReportItems!` references. |
-| `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | |
+| `ZIndex` | UI (was UI+MODEL) | Written and honoured at render; no front/back commands and the canvas ignores it. |
+| `Name` editing | UI | A rename must also update `ToggleItem` and `ReportItems!` references, and kept pieces found by name (§5). |
+| `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | Kept and written back. |
 
 ### 4.4 Style
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `FontStyle` (italic), `TextDecoration` as inspector controls | UI | Reachable only via the font panel / rich-text editor (which converts the box to runs). |
+| `FontStyle`, `TextDecoration` as inspector controls | UI | Font… also writes an explicit `FontStyle` Normal. |
 | `VerticalAlign` | UI | |
-| `PaddingLeft/Right/Top/Bottom` | UI | |
-| `Border` + per-edge borders (`Style`, `Width`, `Color`) | UI | The most requested tablix styling control. |
-| Textbox `BackgroundColor` | UI | Bound for Rectangle only. |
-| `FontWeight` beyond Normal/Bold | UI (engine PART) | Model has the full enum; popup shows two. |
-| `TextAlign` = General/Justify | UI | |
-| Style **expressions** on every property (not just font/size/colour/format/background/language) | UI | `RDLStyleExpressions` exists for all; the inspector wires six. |
-| `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundHatchType`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | MODEL | Engine NONE. |
-| `#aarrggbb` colours | MODEL | Engine misreads (engine §8.1). |
+| `PaddingLeft/Right/Top/Bottom` | UI | The canvas ignores bottom padding. |
+| `Border` + per-edge borders | UI | The canvas draws only the default border, as a thin frame. |
+| Textbox `BackgroundColor` | UI | The well exists in the rectangle section only. |
+| `FontWeight` beyond Normal/Bold | UI (engine PART) | Font… collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
+| `TextAlign` General/Justify | UI | Justify per paragraph in the rich-text editor only. |
+| Style expressions on every property | UI | 8 of 27 wired. |
+| `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | UI (was MODEL) | Engine FULL or PART. |
+| `BackgroundHatchType` | MODEL | |
 
 ### 4.5 Textbox and rich text
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `CanGrow` | UI | In the model (kit default true). |
-| `CanShrink`, `HideDuplicates`, `ToggleImage`, `UserSort` | MODEL | |
-| Per-run `Style` expressions, `MarkupType`, per-run `ActionInfo`/`ToolTip`/`Label` | MODEL | |
-| Paragraph indents, spacing, list styles | MODEL | The NSTextView could produce them; they would be dropped on save. |
-| Inspector "mixed" state for a rich textbox | UI | The item-level style and run styles can disagree; the inspector edits only the item level. |
+| `CanGrow` | UI | Spec default false. |
+| `CanShrink`, `HideDuplicates` | UI (was MODEL) | `HideDuplicates` names a scope, so it needs a dataset/group picker. |
+| `ToggleImage`, `UserSort` | MODEL | |
+| Per-run style expressions, `MarkupType`, run `ActionInfo`/`ToolTip`/`Label` | UI (was MODEL) | Kept through the editor; not editable. |
+| Paragraph indents, spacing, lists | UI (was MODEL) | Shown and kept in the editor; no ruler, list or indent controls. |
+| Inspector "mixed" state for a rich textbox | UI | An in-place plain edit also drops run styles (§5). |
 
-### 4.6 Image, Line, Rectangle
+### 4.6 Image, Line, Rectangle, Subreport
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Image: pick an embedded image from a list; import a file as embedded | UI | See embedded images above. |
-| Image `Source=Database`, `MIMEType` | MODEL | |
-| Line: width, style (dashed etc.) | UI | `style.border.width`/`.style` is the stroke; inspector shows colour only. |
-| Line: the other diagonal | MODEL/CANVAS | Engine normalises (engine §7.4). |
-| Rectangle: borders, padding, `PageBreak`, `KeepTogether` | UI | |
-| Rectangle: data regions inside | UI (engine PART) | `RDLItemFactory` forbids a tablix in a rectangle because layout drops nested tablixes (engine §11.4). Lift both together. |
-| `OmitBorderOnPageBreak` | MODEL (Subreport: UI) | |
+| Image: pick an embedded image; import a file as embedded | UI | |
+| Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
+| Line width, style | UI + CANVAS | The canvas draws every line as a 1px horizontal rule. |
+| Line: the other diagonal | MODEL | |
+| Rectangle borders, padding, `PageBreak`, `KeepTogether` | UI | |
+| Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
+| Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | |
 
 ### 4.7 Tablix
 
-The designer's tablix is a projection: `columnSpecs` (header, value,
-width, align, aggregate, kind/report), `rowGroups`/`columnGroups` (field
-names, any depth), `showGrandTotal`, `headerHeight`, `rowHeight`. The
-parser derives the projection at load (`groupChain:` keeps the first
-group per level and its first expression; `rdlDerivedColumns` reads
-widths, header/value text and the aggregate from the last row; a matrix
-reduces to one measure column). `-rebuildTablix` regenerates the whole
-`TablixBody`, both hierarchies and every textbox cell from it.
+A tablix is edited where it stands. `RDLTablixStructure` inserts, deletes
+and moves columns with their members, carrying merged cells across; adds a
+group around a member, inside it, or beside it with a row or column of its
+own; deletes a group with or without its rows; adds a total beside a
+group; exchanges two nested groups; and renames, regroups and filters one.
+`RDLEditor` snapshots the tablix before each edit and undoes by putting the
+snapshot back into the same object. The canvas menus, the inspector's
+column width and row heights, the column border drag, the handle band and
+the tablix dialog -- which edits a copy the same way and puts it in place
+on OK -- all go through it.
 
-**What triggers a rebuild:** the inspector's column box, Return/Tab
-in-place editing, column border drag, context-menu insert/delete,
-handle-band column drag, the grand-total toggle, the tablix editor's OK.
-**What does not:** the dataset popup, header/row height fields, cell
-contents (`setItem:inCell:` re-infers the projection instead), inspector
-edits of an in-cell item, a canvas double-click on a cell's textbox.
+`columnSpecs`, `rowGroups`, `columnGroups`, `showGrandTotal`,
+`headerHeight` and `rowHeight` build a new tablix (`-rebuildTablix`). The
+parser no longer recovers them from a file, and nothing rebuilds a tablix
+that has a body.
 
-**What survives a table rebuild:** non-textbox items in the details row
-(by column index), group filters whose field still matches, and tablix-
-level properties the rebuild does not touch (`filters`, `dataSetName`,
-`layoutDirection`, `groupsBeforeRowHeaders`, `repeatRowHeaders`, fixed
-headers). **What is lost:** merged cells, per-cell styles on textbox cells
-(only `textAlign` from the spec), per-row heights, corner contents,
-static members and extra rows, group sorts/page breaks/visibility/
-variables, header cell items, column-hierarchy static members. A matrix
-rebuild keeps no cell at all.
+A new group's header follows the kit builder's shape: only the branch
+edited gains or loses a header level, and a table's heading row keeps its
+label in the corner. Report Builder instead gives every leaf the same
+header depth, with headers of their own on static rows; the designer does
+not yet keep that.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Per-cell `Style` (borders, background, padding, font) | UI | Cell selection exists; the inspector for an in-cell textbox shows the standard text section, so font/colour/format per cell work today, but borders/padding/background do not (§4.4) and a rebuild reverts them. |
-| Merged cells (`ColSpan`/`RowSpan`) | UI | Model holds them; rebuild discards. |
-| More than one group at the same level; groups with several `GroupExpressions`; `Parent` (recursive) | UI | Model holds the full hierarchy; `groupChain:` keeps the first sibling and the first expression. |
-| Static rows/columns mixed with dynamic members | UI | Cannot be described by the projection. |
-| Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `RepeatOnNewPage`, `KeepWithGroup`, `KeepTogether`, `HideIfNoRows`, `FixedData` | UI | In the model; Edit Group… exposes filters only. |
-| Details `SortExpressions` | UI (engine PART) | |
-| Per-column widths are editable; per-row heights are not | UI | Rebuild sets header = `hh`, all other rows = `rh`. |
-| Tablix `NoRowsMessage`, `SortExpressions`, `KeepTogether`, `PageBreak`, `RepeatColumnHeaders`, `RepeatRowHeaders`, `FixedColumnHeaders`, `FixedRowHeaders`, `LayoutDirection`, `GroupsBeforeRowHeaders` | UI | All in the model; rebuild forces `repeatColumnHeaders=YES` and a default `noRowsMessage` when grouped. |
-| `TablixCorner` content | UI | Parsed; projection ignores it. |
-| Nested tablix in a cell | MODEL (engine drops it) | A subreport in a cell is the working substitute. |
-| Group `DomainScope`, `ReGroupExpressions`, `OmitBorderOnPageBreak`, `DataElement*` | MODEL | |
-| A "List" preset (one-cell tablix holding a rectangle, detail-grouped) | UI | Cells hold rectangles now; only the preset is missing. |
-| Row-group subtotals inside a crosstab; "Add Total" per group | UI | One row-group chain + one column group + grand total works. |
-
-The way out is to make the projection optional: keep `columnSpecs` as a
-*builder* for new tablixes and stop regenerating loaded ones — a tablix
-whose body contains anything the projection cannot express should be
-flagged on load and edited only through direct cell/member operations
-(`setItem:inCell:`, `setValue:forKeyPath:ofItem:` on cell items, and
-new member-level setters for group sort/visibility/page break). The
-cell-selection, outline and handle-band groundwork for that is already
-in place.
+| Per-cell `Style` (borders, background, padding) | UI | Font/colour/format per cell work through the in-cell textbox; the rest has no control. Kept by every edit. |
+| Merged cells (`ColSpan`/`RowSpan`) | UI | Kept, and carried across column and row edits; nothing merges or splits. |
+| Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `RepeatOnNewPage`, `KeepWithGroup`, `KeepTogether`, `HideIfNoRows`, `FixedData`, `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it; Group Properties edits the name, expressions and filters only. |
+| Details `SortExpressions` | UI (engine FULL) | |
+| Row heights other than the heading and value rows | UI | Kept; no control. |
+| Rows inserted or deleted on their own | UI (model has them) | The canvas menu offers columns; rows come with groups and totals. |
+| Tablix `NoRowsMessage`, `SortExpressions`, `KeepTogether`, `PageBreak`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | UI | |
+| `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
+| Nested tablix or chart in a cell | UI (was MODEL) | |
+| A "List" preset | UI | |
+| `DomainScope`, `ReGroupExpressions`, `DataElement*` | MODEL | |
 
 ### 4.8 Chart
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Subtype (Stacked, PercentStacked, Smooth, Exploded), Bubble | UI | Model enums; popup lists seven types. |
-| Multiple series, series grouping | UI | Model holds series and hierarchies; inspector edits series[0]/member[0]. |
-| Legend hidden/position, title, axis titles/min/max/interval, palette, markers, data labels | UI (engine PART) | Parsed and written; not in the inspector. |
-| Series `Style`, secondary axis, label text/position, axis intervals/grid/tick marks, 3D, strip lines, scale breaks, custom palettes, border skin, no-data message, further chart types | MODEL | Engine NONE (engine §9). |
+| Types beyond the seven: Bubble, Range, RangeColumn, RangeBar, Stock, Candlestick, Funnel, Pyramid, Polar, Radar; subtypes including Stepped | UI | A loaded chart of one of these shows as Column (§5). Range and Stock need High/Low (and Start/End) value fields. |
+| Multiple series, series grouping, per-series type | UI | The inspector edits series[0] and member[0]. |
+| Legend hidden/position/layout, title position, axis titles/min/max/interval/label interval/margin/grid lines/tick marks, palettes and custom colours, markers, data labels, secondary axis, series and point style, no-data message, X/Size values | UI (was partly MODEL) | Engine draws them. |
+| 3D, strip lines, scale breaks, border skin, empty points, BoxPlot/ErrorBar/TreeMap | MODEL | Kept and written back. |
 
 ### 4.9 Other report items
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | Model-only today. |
-| GaugePanel, Map, CustomReportItem | MODEL | Engine REFUSE. Preserve-as-placeholder is the realistic designer target. |
+| GaugePanel, Map, CustomReportItem | MODEL | Open as placeholders, drawn on the canvas and written back verbatim; no inspector section names the kind. |
 
 ### 4.10 Expressions
 
 | Feature | Bin | Notes |
 |---|---|---|
-| Semantic checking in the expression editor (unknown field, arity, scope, type) | UI | `RDLChecker` has 17 rule ids and runs only for the new-report wizard. The editor's status line reports parse status only. |
-| An errors pane for the whole report | UI | Same source. |
-| Completion of `ReportItems!`, `Variables!`, `Code.` | MODEL | Engine does not resolve them. |
-| Catalogue corrections (`Substring`, `Int`, `IIf`; add `Log10`; drop or implement the `Report` pseudo-functions) | UI | Catalogue text is designer-facing help. |
+| Semantic checking in the expression editor | UI | `RDLChecker` (19 rules) runs only in the new-report wizard; the status line reports parse status. |
+| An errors pane for the whole report; checking before save or export | UI | Export checks parameter problems only. |
+| Completion from `RDLExpressionCatalog` | UI | The completion list is separate and lacks most P1 functions. |
+| Completion of `ReportItems!`, `Variables!`, `Code.` | UI (was MODEL) | The engine resolves all three. |
+| Showing the parser's `warnings` on open | UI | Placeholders, kept pieces and undrawable chart kinds are recorded and never shown. |
 
 ### 4.11 Canvas and editing (CANVAS bin)
 
@@ -339,105 +328,122 @@ in place.
 |---|---|
 | Multi-select (shift-click, marquee), group move/resize | Single selection |
 | Align, distribute, same width/height | None |
-| Bring to front / send to back | None |
+| Bring to front / send to back; canvas z-order | None; the canvas ignores `ZIndex` |
 | Eight resize handles | Three (E, S, SE) |
-| Snap size, snap to item edges (smart guides) | Fixed 0.05in; grid toggle is visual only |
+| Snap size, snap to item edges | Fixed 0.05in; grid toggle is visual only |
+| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; no rectangle borders; default textbox border only |
 | Properties grid showing every RDL property | Sectioned inspector for a fixed subset |
-| Report Data pane with drag-to-canvas | Palette drags fields/parameters/globals into bands (not cells) |
-| Grouping pane with context menus | Modal tablix editor + Edit Group… |
+| Report Data pane with drag-to-canvas | Palette drags into bands, not cells |
+| Grouping pane with context menus | Row Group / Column Group menus on the canvas, Group Properties…, and the tablix dialog's group lists |
 | Drag-and-drop reordering in the outline | None |
 | Rulers with drag-out guides | Rulers only |
-| Print preview with page navigation, print | Preview is a page stack; no print |
+| Print preview with page navigation, print | Page stack; no print |
 | Editable source view | Read-only |
-| Validation errors pane | Only in the new-report wizard |
 
 ## 5. Round-trip hazards
 
 Behaviours that alter a file the user did not intend to change. These
 matter more than missing features because they destroy work.
 
+### Still present, worst first
+
 | Trigger | What is lost | Fix |
 |---|---|---|
-| Open any 2010/2016 file | Everything (body not read, engine §3.1). | Engine P0 #1. |
-| Open a 2008 file with a chart | All chart series (engine §3.3). | Engine P0 #2. |
-| Open a file with GaugePanel/Map/CRI | The file does not open. | Engine P0 #7, then designer preserve-as-placeholder. |
-| Rebuild of a loaded tablix (§4.7 triggers) | Merged cells, per-cell styles, static members, extra groups/expressions, group sorts/page breaks/visibility, corner, per-row heights; a matrix keeps nothing. | Stop rebuilding loaded tablixes; direct cell/member editing. |
-| Direct cell edit followed by any rebuild | The edit *(by inspection)*: double-click/in-place and in-cell inspector edits write the textbox directly and never re-infer `columnSpecs` (only `setItem:inCell:` does), so the next rebuild regenerates the cell from the stale projection. No test covers in-place editing. | Re-infer after direct edits, or stop rebuilding. |
-| Column insert/remove/move with a non-textbox details cell | The kept cell stays at its old index; a `kind=Subreport` spec that moved creates a second, parameterless subreport at the new index *(by inspection)*. | Key kept cells by identity, not index. |
-| Save | `Report/Name` becomes the file basename (`RDLDocument.m:105-112`, in `-setFileURL:`, after the write — so a Save As writes the old name and the rename lands on the next save). | Only set the name when it is empty. |
-| Save of a loaded parameter after editing its default | The parser fills `defaultValues` and sets `defaultValue` to the first; the inspector writes only `defaultValue`; the writer prefers `defaultValues` when non-empty, so the edit is not written *(by inspection)*. | Keep the two in sync in `RDLParameter`. |
-| Save | All 518 unread elements, `rd:` designer state (except `ReportUnitType`), `CustomProperties`, `DataElement*`, `ToolTip`, `Bookmark`, `DocumentMapLabel`, `ZIndex`, `KeepTogether`/`PageBreak` on Line/Image, paragraph list/indent properties, chart properties beyond the model… vanish. | (a) Keep unknown children as opaque `NSXMLElement` blobs per item and re-emit them, or (b) warn on open with a count of dropped elements. (a) is what a drop-in designer needs; (b) is the afternoon version. |
-| Save | Root shape is 2008 under the 2010 namespace; `PageName` under `PageBreak`; `Report/Name`, `Body/PrintOn*`, unprefixed `TypeName`. Fails Report Builder's schema validation. | Engine P0 #1 and #4. |
-| Save | Kit style defaults (Georgia, `#1a1916`, `Left`, 4/4/2/2) are materialised into every item that omitted them, and `CanGrow`/`PrintOn*`/`PageHeader`/`PageFooter` are written whether or not the source had them. | Adopt the spec defaults in the engine and write only what was set. |
-| Tabbing through the inspector | Placeholder values (`Georgia`, `10pt`, `#1a1916`, host language) are stamped into the item or report as real values on focus loss, dirtying the document *(by inspection)*. | Distinguish placeholder from value in `RDLInspectorFields`. |
-| Data source pane on a non-document provider | A `SQL`/`OLEDB` source displays as JSON; touching any control rewrites `DataProvider` and `ConnectString`. | Show unknown providers read-only. |
-| Undo of a field rename/retype/kind change | No-op: `setFields:ofDataSet:` snapshots a shallow copy while the views mutate the same `RDLField` objects *(by inspection)*. | Deep-copy the snapshot. |
-| Rich-text edit of a plain textbox | `Value` becomes `Paragraphs`; the item-level style and run styles can then disagree and the inspector edits only the item level. | "Mixed" state in the inspector. |
+| Edit the default of a loaded parameter | Not saved: the parser fills `defaultValues`, the inspector writes only `defaultValue`, and the writer and renderer prefer `defaultValues` *(by inspection)*. | Keep the two in sync in `RDLParameter`. |
+| A parameter with `DataSetReference` valid values or defaults | Shown as an empty list; what is typed there is never written, because the writer uses the reference *(by inspection)*. | Show the reference, read-only until it can be edited. |
+| Clear a parameter's Prompt | `Prompt` is removed, which makes the parameter never asked for and read-only (engine §6), with no warning. | Tell an empty prompt from an absent one. |
+| Open a chart of a type the popup lacks | Shows as Column; picking any entry changes its type. | Offer every type. |
+| Edit a chart's category field | Nested category and series groups are dropped. | Edit the first level only. |
+| Data source pane on a SQL/OLEDB source | Touching any control rewrites `DataProvider` and `ConnectString` (viewing alone does not). | Show unknown providers read-only. |
+| Undo of a field rename/retype/kind change | No-op: the views mutate the shared `RDLField` objects before `setFields:`, whose snapshot is a shallow copy *(by inspection)*. | Deep-copy the snapshot. |
+| Rename a dataset, source, field or parameter | Kept pieces are found by name path, so they are lost. | Rename the kept paths too. |
+| In-place plain edit of a rich textbox | `Paragraphs` are replaced and run styles dropped. | "Mixed" state; keep runs when the text is unchanged. |
+| Save | The report is renamed to the file's basename after the write, overwriting a name typed in the inspector. | Only name an unnamed report. |
 
-Two smaller ones: selecting an empty cell from the outline uses body
-coordinates where the selection expects grid coordinates, so grouped
-tables and crosstabs select the wrong cell *(by inspection)*; and
+Two smaller ones: selecting an empty cell from the outline passes body
+row/cell indices where the insertion point expects grid coordinates, so
+grouped tables and crosstabs pick the wrong cell or none; and
 Paste/Duplicate with a cell selected lands the item in the band, not the
-cell. Also note the designer Preview lays out the model as is — rows
-exist only after Load, Read data or a sample open, and subreports are
-loaded for export but not for Preview.
+cell *(both by inspection)*.
+
+### Fixed since the previous audit
+
+Opening 2010/2016 files; 2008 chart series; files with a GaugePanel, Map
+or CustomReportItem (now placeholders written back verbatim); unread
+elements and `rd:` state dropped on save (now kept, engine §3.6); the root
+shape failing Report Builder's validation; kit style defaults materialised
+into every item (now the spec's defaults, written only when set);
+placeholder values stamped by tabbing through the inspector (no longer
+reachable, though the placeholders still name the old defaults). Every
+rebuild of a loaded tablix, with the reverted cell edits and the kept cells
+re-attached by old column index that rode on it (edits are now in place,
+§4.7); the cell popups that dropped CountDistinct and General/Justify (gone
+with the column spec from the inspector); group filters that bypassed undo
+and outlived Cancel (the tablix dialog edits a copy).
 
 ## 6. Designer priorities
 
-Aligned to the engine tiers so that each designer step lands on an
-engine that can render what it authors.
+### P0 — stop destroying work
 
-### P0 — expose what the model already has (no engine dependency)
+1. **Tablix: edit loaded tablixes directly — done.** `columnSpecs` builds
+   new tablixes only; every edit changes the body and hierarchies in place,
+   undoable by a snapshot of the tablix: cell contents, column widths and
+   the heading and value rows' heights; columns inserted, deleted and moved
+   with their members; groups around, inside and beside others, deleted and
+   re-nested; totals; group properties. Left: rows on their own from the
+   canvas, and Report Builder's uniform header depth (§4.7).
+2. Parameter default/`defaultValues` sync; `DataSetReference` lists shown
+   read-only; empty vs absent Prompt.
+3. Chart: every type in the popup; category edits that keep nested groups.
+4. Done: the cell popups went with the column spec; group filters go
+   through `RDLEditor`, on the tablix dialog's copy.
+5. Unknown data providers read-only; deep-copied field undo; renames that
+   carry kept pieces; paste into a cell; outline cell coordinates; stop
+   renaming the report on save.
+
+### P1 — expose what the model already has
 
 In rough order of how often a Report Builder user reaches for it:
 
-1. Tablix: stop rebuilding loaded tablixes; fix the stale-`columnSpecs`
-   and kept-cell-index defects; per-cell borders/background/padding via
-   the existing cell selection (§4.7, §5).
-2. Borders and padding on every item; `VerticalAlign`; italic and
-   decoration controls; textbox background; full weight list;
-   General/Justify.
-3. Visibility (`Hidden` expression, `ToggleItem` picker) on items and
-   members; `Hyperlink`.
-4. Page setup: free-form size, orientation, four margins,
-   `PrintOnFirstPage`/`PrintOnLastPage`, header/footer style.
-5. Group properties beyond filters: sort, page break, visibility,
-   `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`; tablix
-   `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;
-   per-row heights; corner.
-6. Chart: subtype, bubble, series list, legend, titles, axis min/max/
-   interval/titles, palette, data labels, markers.
-7. Embedded images panel with file import; Image inspector picks from it.
-8. Parameters: ordering, multi-value defaults, and the `defaultValues`
-   sync; rename "Allows blank" to what it sets (`Nullable`).
-9. `CanGrow`, `KeepTogether`, `PageBreak`/`ResetPageNumber` on items;
-   front/back commands (once the engine writes `ZIndex`); item rename;
-   subreport `NoRowsMessage`.
-10. Expression editor: live `RDLChecker` with error spans; an errors
-    pane; catalogue corrections.
-11. Save hygiene: stop renaming the report; placeholder stamping; field
-    undo; unknown-provider guard; warn on open about dropped elements.
-
-### P1 — follows the engine's P1
-
-Style properties as the engine adds them (`WritingMode`, `LineHeight`,
-`Direction`, gradients, background images); paragraph indents/lists in
-the rich-text editor once the model carries them; `CanShrink`,
-`HideDuplicates`, `UserSort`, `ToggleImage`; `Drillthrough` and
-`BookmarkLink` editors; chart series style, secondary axis, intervals,
-more types; page `Columns`; dataset collation options; parameter
-`Hidden`/`AllowBlank`/labels/`DataSetReference`; `Code` tab; `Variables`;
-`CustomProperties` grid; nested tablix in cells once layout places it;
-write `ReportSections`.
+1. Style: borders and padding (default and per edge) on textbox,
+   rectangle and cell; textbox background; `VerticalAlign`; the full
+   weight list; italic and decoration; General/Justify; f(x) on every
+   style property.
+2. Common item properties: `Hidden`, `ToggleItem`, `Hyperlink`,
+   `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
+   front/back commands and canvas z-order.
+3. Page setup: free size, orientation, four margins, `Columns`/
+   `ColumnSpacing`, page `Style`, `PrintOnFirstPage`/`PrintOnLastPage`,
+   header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.
+4. Tablix and group properties (on top of P0.1): group sort, page break,
+   visibility, `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`;
+   tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;
+   merged cells; per-row heights; corner; details sort; data regions in
+   cells and rectangles; a List preset.
+5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
+   series list with per-series type and value axis, range/stock values.
+6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
+   defaults and data-pane entry.
+7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.
+8. Image: `Database`, `MIMEType`, embedded images panel with file import.
+9. Expressions: live `RDLChecker` in the editor, parser warnings on open,
+   completion from the catalogue including `ReportItems!`/`Variables!`/
+   `Code.`.
+10. Data: query parameters, collation and sensitivities.
+11. Further style (`LineHeight`, `WritingMode`, `Direction`, shadows,
+    gradients, background image, `Calendar`, numerals); rich-text
+    indent/list controls; report `Code` and `Variables` editors;
+    subreport `NoRowsMessage`/`OmitBorderOnPageBreak`.
 
 ### P2 — large designer projects
 
 Multi-select with align/distribute/same-size and eight handles; smart
-guides and snap size; a Report Data pane with drag-to-cell; a grouping
-pane replacing the modal editor; a full properties grid; unknown-element
-preservation; placeholder preservation for Gauge/Map/CRI; a List preset;
-drag reordering in the outline; editable source with re-parse; print;
-data binding and subreport loading in Preview.
+guides and snap size; canvas drawing that matches rendering (line slope,
+width and style; borders; padding); a Report Data pane with drag-to-cell;
+a grouping pane replacing the modal editor; a full properties grid; drag
+reordering in the outline; editable source with re-parse; print and page
+navigation in the preview, with data binding and subreport loading; a
+report-wide errors pane.
 
 ### P3 — matches the engine's P3
 

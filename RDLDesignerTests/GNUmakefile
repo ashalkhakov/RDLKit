@@ -25,6 +25,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLDocument.m \
   ../RDLDesigner/RDLEditingContext.m \
   ../RDLDesigner/RDLEditor.m \
+  ../RDLDesigner/RDLTablixStructure.m \
   ../RDLDesigner/RDLExpressionHelper.m \
   ../RDLDesigner/RDLInspectorFields.m \
   ../RDLDesigner/RDLItemFactory.m \
@@ -41,6 +42,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLExpressionCell.m \
   ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLFilterEditor.m \
+  ../RDLDesigner/RDLGroupPropertiesEditor.m \
   ../RDLDesigner/RDLToolbarIcons.m \
   ../RDLDesigner/RDLPane.m \
   ../RDLDesigner/RDLExpressionTheme.m \
@@ -75,6 +77,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLDesignerWindow.xib \
   ../RDLDesigner/RDLInspectorSections.xib \
   ../RDLDesigner/RDLFilterEditor.xib \
+  ../RDLDesigner/RDLGroupPropertiesEditor.xib \
   ../RDLDesigner/RDLDatasetNavigator.xib \
   ../RDLDesigner/RDLInsertPalette.xib \
   ../RDLDesigner/RDLDatasetFieldsView.xib \

@@ -190,76 +190,159 @@
     @{@"width" : @2.0, @"header" : @"A", @"value" : @"=Fields!A.Value"},
     @{@"width" : @1.0, @"header" : @"B", @"value" : @"=Fields!B.Value"},
   ];
+  [t rebuildTablix];
   NSRect r = NSMakeRect(100, 200, 3.0 * 72, 60);
 
-  if (fabs([RDLTablixGeometry headerHeightOf:t zoom:1.0] - 36.0) > 0.01)
-    XCTFail(@"%@", @"header height in points");
-  if (fabs([RDLTablixGeometry rowHeightOf:t zoom:1.0] - 18.0) > 0.01)
-    XCTFail(@"%@", @"row height in points");
-  // A tiny row must stay clickable rather than collapsing to nothing.
-  RDLTablix *tiny = [[RDLTablix alloc] init];
-  tiny.rowHeight = 0.001;
-  if ([RDLTablixGeometry rowHeightOf:tiny zoom:1.0] < 8.0)
-    XCTFail(@"%@", @"a very short row should still get a clickable minimum");
-
-  NSRect c0 = [RDLTablixGeometry cellRectOf:t itemRect:r column:0
-                                       part:RDLTablixPartHeader zoom:1.0];
+  // The grid is the body: its rows and its columns.
+  if ([RDLTablixGeometry rowCountOf:t] != [t.tablixBody.rows count] || [RDLTablixGeometry columnCountOf:t] != 2)
+    XCTFail(@"%@", @"a plain table's grid is its body's rows and columns");
+  NSRect c0 = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0 zoom:1.0];
   if (fabs(NSMinX(c0) - 100) > 0.01 || fabs(NSWidth(c0) - 144) > 0.01)
-    XCTFail(@"%@", @"first header cell spans the first column");
+    XCTFail(@"%@", @"the first cell spans the first column");
   if (fabs(NSMinY(c0) - 200) > 0.01 || fabs(NSHeight(c0) - 36) > 0.01)
-    XCTFail(@"%@", @"the header cell sits at the top of the item");
-  NSRect c1 = [RDLTablixGeometry cellRectOf:t itemRect:r column:1
-                                       part:RDLTablixPartValue zoom:1.0];
-  if (fabs(NSMinX(c1) - (100 + 144)) > 0.01)
-    XCTFail(@"%@", @"the second column starts after the first");
-  if (fabs(NSMinY(c1) - (200 + 36)) > 0.01)
-    XCTFail(@"%@", @"the value row sits below the header row");
+    XCTFail(@"%@", @"the heading row sits at the top of the item, as tall as it is");
+  NSRect c1 = [RDLTablixGeometry cellRectOf:t itemRect:r row:1 column:1 zoom:1.0];
+  if (fabs(NSMinX(c1) - (100 + 144)) > 0.01 || fabs(NSMinY(c1) - (200 + 36)) > 0.01 ||
+      fabs(NSHeight(c1) - 18) > 0.01)
+    XCTFail(@"%@", @"the second row's second cell comes after the first column, below the heading");
+  // A very short row still gets a clickable height.
+  CGFloat was = t.tablixBody.rows[1].height;
+  t.tablixBody.rows[1].height = 0.001;
+  if ([RDLTablixGeometry heightOfRow:1 of:t zoom:1.0] < 8.0)
+    XCTFail(@"%@", @"a very short row should still get a clickable minimum");
+  t.tablixBody.rows[1].height = was;
 
-  // Cell hit testing.
-  NSUInteger col = 99;
-  RDLTablixPart part = RDLTablixPartNone;
-  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 210)
-                          column:&col part:&part zoom:1.0])
-    XCTFail(@"%@", @"a point in the header row should hit a cell");
-  else if (col != 0 || part != RDLTablixPartHeader)
-    XCTFail(@"%@", @"expected column 0, header");
-  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(250, 245)
-                          column:&col part:&part zoom:1.0])
-    XCTFail(@"%@", @"a point in the value row should hit a cell");
-  else if (col != 1 || part != RDLTablixPartValue)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected column 1, value; got %lu %ld",
-                                               (unsigned long)col, (long)part]);
-  // Below the two preview rows is not an editable cell.
-  if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 258)
-                         column:NULL part:NULL zoom:1.0])
-    XCTFail(@"%@", @"below the preview rows should not be a cell");
-  if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(10, 10)
-                         column:NULL part:NULL zoom:1.0])
+  // Hit testing.
+  NSUInteger row = 99, column = 99;
+  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(110, 210) row:&row column:&column zoom:1.0] ||
+      row != 0 || column != 0)
+    XCTFail(@"a point in the heading's first cell should hit it, not %lu, %lu", (unsigned long)row,
+            (unsigned long)column);
+  if (![RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(250, 245) row:&row column:&column zoom:1.0] ||
+      row != 1 || column != 1)
+    XCTFail(@"a point in the second row's second cell should hit it, not %lu, %lu", (unsigned long)row,
+            (unsigned long)column);
+  if ([RDLTablixGeometry tablix:t itemRect:r point:NSMakePoint(10, 10) row:NULL column:NULL zoom:1.0])
     XCTFail(@"%@", @"a point outside the item should not be a cell");
 
-  // Internal column borders only. The last column's right edge belongs to the
-  // item's east resize handle, so dragging there must resize the item.
+  // Borders between body columns only. The last column's right edge belongs
+  // to the item's east resize handle, so dragging there must resize the item.
   NSUInteger border = 99;
-  if (![RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(244, 210)
-                          column:&border zoom:1.0])
-    XCTFail(@"%@", @"the border between column 0 and 1 should be draggable");
-  else if (border != 0)
-    XCTFail(@"%@", @"the draggable border belongs to the column on its left");
-  if ([RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(NSMaxX(r), 210)
-                         column:NULL zoom:1.0])
+  if (![RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:&border zoom:1.0] ||
+      border != 0)
+    XCTFail(@"%@", @"the border between the two columns belongs to the one on its left");
+  if ([RDLTablixGeometry tablix:t itemRect:r columnBorderAtPoint:NSMakePoint(NSMaxX(r), 210) column:NULL zoom:1.0])
     XCTFail(@"%@", @"the last column's right edge is the item's east handle, not a border");
-  // A single-column tablix has no internal borders at all.
   RDLTablix *one = [[RDLTablix alloc] init];
   one.columnSpecs = @[ @{@"width" : @2.0, @"header" : @"A", @"value" : @""} ];
-  if ([RDLTablixGeometry tablix:one itemRect:r columnBorderAtPoint:NSMakePoint(244, 210)
-                         column:NULL zoom:1.0])
+  [one rebuildTablix];
+  if ([RDLTablixGeometry tablix:one itemRect:r columnBorderAtPoint:NSMakePoint(244, 210) column:NULL zoom:1.0])
     XCTFail(@"%@", @"a single-column tablix has no internal border");
+  // A grouped table's row-header column is its group's, not a column to drag.
+  RDLTablix *grouped = [[RDLTablix alloc] init];
+  grouped.name = @"Jobs";
+  grouped.headerHeight = 0.5;
+  grouped.rowHeight = 0.25;
+  grouped.rowGroups = @[ @"Finish" ];
+  grouped.columnSpecs = @[
+    @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{@"width" : @1.0, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
+  ];
+  [grouped rebuildTablix];
+  CGFloat header = [[grouped rowHeaderColumnWidths].firstObject doubleValue] * 72;
+  NSRect g = NSMakeRect(100, 200, 6.0 * 72, 60);
+  if ([RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(100 + header, 210) column:NULL zoom:1.0])
+    XCTFail(@"%@", @"the edge of a row-header column is not a column border");
+  CGFloat between = 100 + header + grouped.tablixBody.columns[0].width * 72;
+  if (![RDLTablixGeometry tablix:grouped itemRect:g columnBorderAtPoint:NSMakePoint(between, 210) column:&border zoom:1.0] ||
+      border != 0)
+    XCTFail(@"%@", @"the border after a grouped table's first body column is that column's");
 
   // Zoom scales the grid.
-  NSRect z = [RDLTablixGeometry cellRectOf:t itemRect:r column:0
-                                      part:RDLTablixPartHeader zoom:2.0];
+  NSRect z = [RDLTablixGeometry cellRectOf:t itemRect:r row:0 column:0 zoom:2.0];
   if (fabs(NSWidth(z) - 288) > 0.01 || fabs(NSHeight(z) - 72) > 0.01)
     XCTFail(@"%@", @"zoom should scale the cell grid");
+}
+
+// A header is its member's: drawn beside the first row that member spans --
+// every group's, not only the first one found -- and the cell a group command
+// is asked from names the member it acts on.
+- (void)testHeaderCellsBelongToTheirMembers {
+  RDLTablix *grouped = [[RDLTablix alloc] init];
+  grouped.name = @"Jobs";
+  grouped.headerHeight = 0.5;
+  grouped.rowHeight = 0.25;
+  grouped.rowGroups = @[ @"Finish" ];
+  grouped.columnSpecs = @[
+    @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
+    @{@"width" : @1.0, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value"},
+  ];
+  [grouped rebuildTablix];
+  RDLTablixMember *heading = grouped.rowHierarchy.members[0];
+  RDLTablixMember *finish = grouped.rowHierarchy.members[1];
+  RDLTablixMember *details = finish.members[0];
+  RDLTablixMember *beside = [RDLTablixStructure addGroupWithExpression:@"=Fields!Job.Value"
+                                                             placement:RDLGroupPlacementAfter
+                                                              toMember:finish
+                                                                  axis:RDLTablixAxisRows
+                                                              inTablix:grouped
+                                                                report:nil];
+  if (beside == nil || [[grouped structuralProblems] count]) {
+    XCTFail(@"the fixture should take a second group: %@", [grouped structuralProblems]);
+    return;
+  }
+  NSUInteger finishRow = [RDLTablixGeometry gridRowOf:grouped
+                                           forBodyRow:[grouped.rowHierarchy leafRangeOfMember:finish].location];
+  NSUInteger besideRow = [RDLTablixGeometry gridRowOf:grouped
+                                           forBodyRow:[grouped.rowHierarchy leafRangeOfMember:beside].location];
+  if ([RDLTablixGeometry itemOf:grouped inRow:finishRow column:0] != finish.header.item ||
+      [RDLTablixGeometry itemOf:grouped inRow:finishRow + 1 column:0] != nil ||
+      [RDLTablixGeometry itemOf:grouped inRow:besideRow column:0] != beside.header.item)
+    XCTFail(@"%@", @"each group's header should be drawn once, beside its own first row");
+  RDLTablixCell *corner = [grouped.cornerRows.firstObject firstObject];
+  if (corner.item == nil || [RDLTablixGeometry itemOf:grouped inRow:0 column:0] != corner.item)
+    XCTFail(@"%@", @"beside the heading row, where no member has a header, the corner");
+  // The brackets say what the groups group on, a level of nesting each.
+  NSArray<NSString *> *labels = [RDLTablixGeometry groupBracketLabelsOf:grouped axis:RDLTablixAxisRows];
+  if (![labels isEqualToArray:@[ @"Finish / Job" ]] ||
+      [[RDLTablixGeometry groupBracketLabelsOf:grouped axis:RDLTablixAxisColumns] count])
+    XCTFail(@"the row brackets should name both groups side by side, and there should be no column bracket: %@", labels);
+
+  NSUInteger bodyColumn = [RDLTablixGeometry gridColumnOf:grouped forBodyColumn:0];
+  NSUInteger detailRow = [RDLTablixGeometry gridRowOf:grouped
+                                           forBodyRow:[grouped.rowHierarchy leafRangeOfMember:details].location];
+  if ([RDLTablixGeometry groupMemberOf:grouped gridRow:finishRow gridColumn:0 axis:RDLTablixAxisRows] != finish)
+    XCTFail(@"%@", @"a group's header cell should name that group");
+  if ([RDLTablixGeometry groupMemberOf:grouped gridRow:detailRow gridColumn:bodyColumn axis:RDLTablixAxisRows] != details)
+    XCTFail(@"%@", @"a detail cell should name the details group around it");
+  if ([RDLTablixGeometry groupMemberOf:grouped gridRow:0 gridColumn:bodyColumn axis:RDLTablixAxisRows] != heading)
+    XCTFail(@"%@", @"a cell of the heading row, in no group, should name the heading's own member");
+  if ([RDLTablixGeometry groupMemberOf:grouped gridRow:detailRow gridColumn:bodyColumn axis:RDLTablixAxisColumns] !=
+          grouped.columnHierarchy.members[0] ||
+      [RDLTablixGeometry groupMemberOf:grouped gridRow:detailRow gridColumn:0 axis:RDLTablixAxisColumns] != nil)
+    XCTFail(@"%@", @"along the columns, a body cell names its column's member, and a row header none");
+  // A subtotal row is the group's, though its own member groups nothing.
+  RDLTablixMember *subtotal = finish.members[1];
+  NSUInteger subtotalRow = [RDLTablixGeometry gridRowOf:grouped
+                                             forBodyRow:[grouped.rowHierarchy leafRangeOfMember:subtotal].location];
+  if ([RDLTablixGeometry groupMemberOf:grouped gridRow:subtotalRow gridColumn:bodyColumn axis:RDLTablixAxisRows] != finish)
+    XCTFail(@"%@", @"a cell of a group's subtotal row should name the group around it");
+
+  // A column group heads its column in a heading row above the body.
+  RDLTablixMember *amount = grouped.columnHierarchy.members[1];
+  RDLTablixMember *across = [RDLTablixStructure addGroupWithExpression:@"=Fields!Finish.Value"
+                                                             placement:RDLGroupPlacementParent
+                                                              toMember:amount
+                                                                  axis:RDLTablixAxisColumns
+                                                              inTablix:grouped
+                                                                report:nil];
+  NSUInteger amountColumn = [RDLTablixGeometry gridColumnOf:grouped forBodyColumn:1];
+  if (across == nil || [RDLTablixGeometry headerRowCountOf:grouped] != 1 ||
+      [RDLTablixGeometry itemOf:grouped inRow:0 column:amountColumn] != across.header.item ||
+      [RDLTablixGeometry itemOf:grouped inRow:0 column:amountColumn - 1] != nil)
+    XCTFail(@"%@", @"a column group's header should be drawn over its own column, in the heading row");
+  if (![[RDLTablixGeometry groupBracketLabelsOf:grouped axis:RDLTablixAxisColumns] isEqualToArray:@[ @"Finish" ]])
+    XCTFail(@"%@", @"a column group should get a bracket of its own");
 }
 
 @end

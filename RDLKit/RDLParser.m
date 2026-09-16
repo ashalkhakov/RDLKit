@@ -396,41 +396,7 @@ static RDLValue *RDLParsePageName(NSXMLElement *el) {
   return RDLValueFromElement(RDLChild(el, @"PageName"));
 }
 
-// First member (depth-first) carrying group expressions — the outer group.
-// The field a member groups on, or nil when it is static or groups on
-// something that is not a plain field reference.
-static NSString *RDLGroupField(RDLTablixMember *member) {
-  if ([member.groupExpressions count] == 0)
-    return nil;
-  NSString *ex = [member.groupExpressions[0] source];
-  NSRange r = [ex rangeOfString:@"Fields!"];
-  if (r.location == NSNotFound)
-    return nil;
-  NSString *rest = [ex substringFromIndex:r.location + 7];
-  NSRange dot = [rest rangeOfString:@"."];
-  return dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
-}
 
-// The chain of dynamic groups down a hierarchy, outermost first -- which is
-// exactly what rowGroups and columnGroups are. A hierarchy nests each group
-// inside the one before it, so the chain is found by descending rather than by
-// searching: the first dynamic member at this level, then its own chain. The
-// static members around it (a header row, a subtotal, a grand total) group on
-// nothing and are stepped over.
-- (NSArray<NSString *> *)groupChain:(NSArray<RDLTablixMember *> *)members {
-  for (RDLTablixMember *mm in members) {
-    NSString *field = RDLGroupField(mm);
-    if (field) {
-      NSMutableArray *chain = [NSMutableArray arrayWithObject:field];
-      [chain addObjectsFromArray:[self groupChain:mm.members]];
-      return chain;
-    }
-    NSArray *nested = [self groupChain:mm.members];
-    if ([nested count])
-      return nested;
-  }
-  return @[];
-}
 
 
 
@@ -1322,8 +1288,6 @@ static RDLItem *RDLItemForElementName(NSString *name) {
     NSXMLElement *ch = RDLChild(el, @"TablixColumnHierarchy");
     if (ch)
       tablix.columnHierarchy = [self parseHierarchy:ch];
-    // Designer convenience: any dynamic column group means crosstab (matrix).
-    tablix.columnGroups = [self groupChain:tablix.columnHierarchy.members];
     NSXMLElement *rh = RDLChild(el, @"TablixRowHierarchy");
     if (rh)
       tablix.rowHierarchy = [self parseHierarchy:rh];
@@ -1338,20 +1302,9 @@ static RDLItem *RDLItemForElementName(NSString *name) {
       [synth.members addObject:dMem];
       tablix.rowHierarchy = synth;
     }
-    // Every level of it, not the first two: the hierarchy nests as deep as it
-    // was written, and the scaffolding builds it back to the same depth.
-    tablix.rowGroups = [self groupChain:tablix.rowHierarchy.members];
-    // Designer convenience: a trailing static top-level member is a grand
-    // total row (see -[RDLItem rdlBuildTable:...]).
-    RDLTablixMember *lastMem = tablix.rowHierarchy.members.lastObject;
-    if ([tablix.rowHierarchy.members count] >= 2 && lastMem != nil &&
-        [lastMem.groupName length] == 0 && [lastMem.groupExpressions count] == 0 &&
-        [lastMem.members count] == 0)
-      tablix.showGrandTotal = YES;
-    // Recover the designer column spec now that the groups and showGrandTotal
-    // are known (the recovery reads them), so an item loaded from disk carries
-    // a spec and -rebuildTablix has something authoritative to build from.
-    [tablix inferColumnSpecsFromTablixBody];
+    // A tablix read from a file is its body and hierarchies. What builds a new
+    // one -- columnSpecs, rowGroups, columnGroups, showGrandTotal -- is not
+    // guessed back from them: nothing rebuilds a tablix that has a body.
   } else if ([item isKindOfClass:[RDLChart class]]) {
     // A Rectangle this designer promoted to a chart: RDLRectangleIsChart
     // spotted its RDLDesigner.* custom properties. Real <Chart> elements are handled

@@ -400,9 +400,9 @@ static void RDLUpgradeTable(NSXMLElement *table) {
 // that the single 2005 measure cell belongs to.
 //
 // A Subtotal is a sibling of the group it totals, at the same level, and adds
-// a leaf without adding a body row -- which is fine, because the layout engine
-// reuses the last row once it runs out, and for a matrix that row is exactly
-// the measure cell a subtotal wants.
+// a leaf. 2005 had no body row or column for it -- the subtotal reused the
+// matrix's measure cell -- while 2010 matches every leaf to one, so
+// RDLGiveEveryLeafItsOwnLine adds them once the hierarchies are built.
 static NSXMLElement *RDLMatrixMember(NSXMLElement *grouping, NSString *dynamicName,
                                       NSString *sizeName, NSArray<NSXMLElement *> *nested) {
   NSXMLElement *dynamic = RDLKid(grouping, dynamicName);
@@ -463,7 +463,86 @@ static NSXMLElement *RDLMatrixHierarchy(NSXMLElement *matrix, NSString *hierarch
   return hierarchy;
 }
 
+// Every Name a report item carries in the document, so copies can be named
+// apart from them.
+static void RDLCollectNames(NSXMLElement *el, NSMutableSet<NSString *> *names) {
+  NSString *name = [[el attributeForName:@"Name"] stringValue];
+  if ([name length])
+    [names addObject:name];
+  for (NSXMLElement *kid in RDLElems(el))
+    RDLCollectNames(kid, names);
+}
+
+// A copy of an element whose named descendants -- the report items in cells --
+// are renamed apart from every name already in use, as a report item's name
+// must be unique in the report.
+static NSXMLElement *RDLRenamedCopy(NSXMLElement *el, NSMutableSet<NSString *> *names) {
+  NSXMLElement *copy = [el copy];
+  NSMutableArray<NSXMLElement *> *pending = [NSMutableArray arrayWithObject:copy];
+  while ([pending count]) {
+    NSXMLElement *e = [pending lastObject];
+    [pending removeLastObject];
+    NSXMLNode *attribute = [e attributeForName:@"Name"];
+    NSString *base = [attribute stringValue];
+    if ([base length]) {
+      NSString *name = base;
+      for (NSUInteger n = 2; [names containsObject:name]; n++)
+        name = [NSString stringWithFormat:@"%@_%lu", base, (unsigned long)n];
+      [names addObject:name];
+      [attribute setStringValue:name];
+    }
+    [pending addObjectsFromArray:RDLElems(e)];
+  }
+  return copy;
+}
+
+// How many members of a 2010 hierarchy own a body row or column: those with no
+// members of their own.
+static NSUInteger RDLLeafMemberCount(NSXMLElement *parent) {
+  NSUInteger count = 0;
+  for (NSXMLElement *member in RDLKids(RDLKid(parent, @"TablixMembers"), @"TablixMember")) {
+    NSUInteger inner = RDLLeafMemberCount(member);
+    count += inner > 0 ? inner : 1;
+  }
+  return count;
+}
+
+// A 2005 matrix with subtotals has fewer body rows and columns than its 2010
+// hierarchies have leaves: every subtotal reused the measure cell. When there
+// is one measure row (or column) to reuse, each leaf gets its own copy of it,
+// which is what the subtotal showed, and the tablix is one 2010 accepts. A
+// matrix with several static rows or columns cannot be matched up this way and
+// is left as it is.
+static void RDLGiveEveryLeafItsOwnLine(NSXMLElement *body, NSXMLElement *columnHierarchy,
+                                        NSXMLElement *rowHierarchy, NSMutableSet<NSString *> *names) {
+  NSXMLElement *columns = RDLKid(body, @"TablixColumns");
+  NSXMLElement *rows = RDLKid(body, @"TablixRows");
+  NSUInteger columnLeaves = RDLLeafMemberCount(columnHierarchy);
+  NSArray<NSXMLElement *> *columnList = RDLKids(columns, @"TablixColumn");
+  BOOL oneCellEach = YES;
+  for (NSXMLElement *row in RDLKids(rows, @"TablixRow"))
+    oneCellEach = oneCellEach && [RDLKids(RDLKid(row, @"TablixCells"), @"TablixCell") count] == 1;
+  if ([columnList count] == 1 && columnLeaves > 1 && oneCellEach) {
+    for (NSUInteger i = 1; i < columnLeaves; i++)
+      [columns addChild:[columnList[0] copy]];
+    for (NSXMLElement *row in RDLKids(rows, @"TablixRow")) {
+      NSXMLElement *cells = RDLKid(row, @"TablixCells");
+      NSXMLElement *measure = RDLKid(cells, @"TablixCell");
+      for (NSUInteger i = 1; i < columnLeaves; i++)
+        [cells addChild:RDLRenamedCopy(measure, names)];
+    }
+  }
+  NSUInteger rowLeaves = RDLLeafMemberCount(rowHierarchy);
+  NSArray<NSXMLElement *> *rowList = RDLKids(rows, @"TablixRow");
+  if ([rowList count] == 1 && rowLeaves > 1) {
+    for (NSUInteger i = 1; i < rowLeaves; i++)
+      [rows addChild:RDLRenamedCopy(rowList[0], names)];
+  }
+}
+
 static void RDLUpgradeMatrix(NSXMLElement *matrix) {
+  NSMutableSet<NSString *> *names = [NSMutableSet set];
+  RDLCollectNames(RDLRootOf(matrix), names);
   NSXMLElement *body = RDLNew(@"TablixBody");
   NSXMLElement *columns = RDLNew(@"TablixColumns");
   for (NSXMLElement *col in RDLKids(RDLKid(matrix, @"MatrixColumns"), @"MatrixColumn")) {
@@ -513,6 +592,10 @@ static void RDLUpgradeMatrix(NSXMLElement *matrix) {
   if (RDLKid(matrix, @"Height") == nil)
     height = RDLSumExtent(RDLElems(rowsEl), @"Height");
   RDLFillDataSetName(matrix, RDLRootOf(matrix));
+
+  // After measuring: the copies are what 2010 needs to match its leaves, not
+  // rows and columns the 2005 matrix was drawn with.
+  RDLGiveEveryLeafItsOwnLine(body, colHierarchy, rowHierarchy, names);
 
   for (NSString *gone in @[ @"MatrixColumns", @"MatrixRows", @"ColumnGroupings", @"RowGroupings", @"Corner" ])
     [RDLKid(matrix, gone) detach];

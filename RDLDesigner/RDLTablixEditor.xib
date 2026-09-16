@@ -66,6 +66,9 @@
                             <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
                             <font key="font" metaFont="system"/>
                         </buttonCell>
+                        <connections>
+                            <action selector="grandTotalChanged:" target="-2" id="grandTotalCheckAction"/>
+                        </connections>
                     </button>
                     <textField focusRingType="none" verticalHuggingPriority="750" id="rowGroupTableLabel">
                         <rect key="frame" x="198" y="478" width="208" height="14"/>
@@ -91,7 +94,7 @@
                                     <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                     <tableColumns>
                                         <tableColumn identifier="field" width="168" minWidth="40" maxWidth="1000" id="rowGroupTableCol">
-                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Field">
+                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Group on">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                             </tableHeaderCell>
@@ -142,7 +145,7 @@
                                     <color key="gridColor" name="gridColor" catalog="System" colorSpace="catalog"/>
                                     <tableColumns>
                                         <tableColumn identifier="field" width="168" minWidth="40" maxWidth="1000" id="colGroupTableCol">
-                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Field">
+                                            <tableHeaderCell key="headerCell" lineBreakMode="truncatingTail" borderStyle="border" alignment="left" title="Group on">
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                             </tableHeaderCell>
@@ -169,7 +172,7 @@
                             <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         </tableHeaderView>
                     </scrollView>
-                    <button toolTip="Group by another field" id="rowGroupAddButton">
+                    <button toolTip="Group what the selected group holds on another field" id="rowGroupAddButton">
                         <rect key="frame" x="198" y="374" width="26" height="20"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="square" title="+" bezelStyle="shadowlessSquare" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="rowGroupAddButtonCell">
@@ -180,7 +183,7 @@
                             <action selector="addRowGroup:" target="-2" id="rowGroupAddAction"/>
                         </connections>
                     </button>
-                    <button toolTip="Stop grouping by the selected field" id="rowGroupRemoveButton">
+                    <button toolTip="Stop the selected grouping, keeping its rows" id="rowGroupRemoveButton">
                         <rect key="frame" x="228" y="374" width="26" height="20"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="square" title="−" bezelStyle="shadowlessSquare" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="rowGroupRemoveButtonCell">
@@ -191,7 +194,7 @@
                             <action selector="removeRowGroup:" target="-2" id="rowGroupRemoveAction"/>
                         </connections>
                     </button>
-                    <button toolTip="Group by another field" id="colGroupAddButton">
+                    <button toolTip="Group what the selected group holds on another field" id="colGroupAddButton">
                         <rect key="frame" x="418" y="374" width="26" height="20"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="square" title="+" bezelStyle="shadowlessSquare" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="colGroupAddButtonCell">
@@ -202,7 +205,7 @@
                             <action selector="addColumnGroup:" target="-2" id="colGroupAddAction"/>
                         </connections>
                     </button>
-                    <button toolTip="Stop grouping by the selected field" id="colGroupRemoveButton">
+                    <button toolTip="Stop the selected grouping, keeping its columns" id="colGroupRemoveButton">
                         <rect key="frame" x="448" y="374" width="26" height="20"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <buttonCell key="cell" type="square" title="−" bezelStyle="shadowlessSquare" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="colGroupRemoveButtonCell">

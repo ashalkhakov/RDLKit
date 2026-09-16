@@ -10,6 +10,7 @@ RDLDesigner_OBJC_FILES = \
   RDLSelection.m \
   RDLDocument.m \
   RDLEditor.m \
+  RDLTablixStructure.m \
   RDLItemFactory.m \
   RDLPageGeometry.m \
   RDLRichTextCodec.m \
@@ -37,6 +38,7 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionCell.m \
   RDLExpressionField.m \
   RDLFilterEditor.m \
+  RDLGroupPropertiesEditor.m \
   RDLSubreportParametersEditor.m \
   RDLToolbarIcons.m \
   RDLPane.m \
@@ -88,6 +90,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLGeneratorWindow.xib \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
+  RDLGroupPropertiesEditor.xib \
   RDLSubreportParametersEditor.xib \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \

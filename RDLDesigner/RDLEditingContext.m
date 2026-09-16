@@ -231,16 +231,13 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   RDLTablixCell *cell = [self.report cellContainingItem:item tablix:&tablix];
   if (cell != nil) {
     NSInteger row = -1, column = -1;
-    NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
-    for (NSUInteger r = 0; r < [rows count]; r++) {
-      NSUInteger at = [rows[r].cells indexOfObjectIdenticalTo:cell];
-      if (at != NSNotFound) {
-        // In grid terms, which is what a selection holds: a crosstab's
-        // column-heading rows and a grouped tablix's row-header columns come
-        // before the body's own.
-        row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:r];
-        column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:at];
-      }
+    NSUInteger bodyRow = 0, bodyColumn = 0;
+    if ([tablix getRow:&bodyRow column:&bodyColumn ofCell:cell]) {
+      // In grid terms, which is what a selection holds: a crosstab's
+      // column-heading rows and a grouped tablix's row-header columns come
+      // before the body's own.
+      row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:bodyRow];
+      column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn];
     }
     [_editor setItem:nil inCell:cell ofTablix:tablix];
     [_selection selectCellOfTablix:tablix row:row column:column inBandWithKey:_selection.bandKey];

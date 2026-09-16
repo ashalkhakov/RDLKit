@@ -1,4 +1,5 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
+#import "RDLTablixStructure.h"
 #import "RDLDataView.h"
 #import "RDLSelection.h"
 #import "RDLDocument.h"
@@ -295,108 +296,188 @@ static RDLReport *RDLGroupedJobs(void) {
   RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
   RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
   RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
-  NSUInteger baseCols = [tab.columnSpecs count];
+  NSUInteger baseCols = [tab.tablixBody.columns count];
 
-  // Insert a column: the spec grows, the body rebuilds, the item widens, and
-  // all of that is a single undo step.
+  // Insert a column: the body gains one, the item widens, and all of that is a
+  // single undo step.
   CGFloat baseWidth = tab.width;
   [ed insertTablixColumnAtIndex:1 ofTablix:tab];
-  if ([tab.columnSpecs count] != baseCols + 1)
-    XCTFail(@"%@", @"insert column should grow the spec");
   if ([tab.tablixBody.columns count] != baseCols + 1)
-    XCTFail(@"%@", @"insert column should rebuild the body");
+    XCTFail(@"%@", @"insert column should add a column to the body");
   if (fabs(tab.width - (baseWidth + 1.2)) > 0.0001)
     XCTFail(@"%@", @"insert column should widen the tablix");
   [doc.undoManager undo];
-  if ([tab.columnSpecs count] != baseCols)
-    XCTFail(@"%@", @"one undo should revert the whole column insert");
-  if (fabs(tab.width - baseWidth) > 0.0001)
-    XCTFail(@"%@", @"undo should restore the tablix width too");
-  if ([tab.tablixBody.columns count] != baseCols)
-    XCTFail(@"%@", @"undo should rebuild the body back");
+  if ([tab.tablixBody.columns count] != baseCols || fabs(tab.width - baseWidth) > 0.0001)
+    XCTFail(@"%@", @"one undo should revert the whole column insert, width and all");
 
   // Delete a column, and refuse to delete the last one.
   [ed removeTablixColumnAtIndex:0 ofTablix:tab];
-  if ([tab.columnSpecs count] != baseCols - 1)
-    XCTFail(@"%@", @"delete column should shrink the spec");
+  if ([tab.tablixBody.columns count] != baseCols - 1)
+    XCTFail(@"%@", @"delete column should take a column away");
   [doc.undoManager undo];
-  if ([tab.columnSpecs count] != baseCols)
+  if ([tab.tablixBody.columns count] != baseCols)
     XCTFail(@"%@", @"undo should restore the deleted column");
-  [ed setColumnSpecs:@[ @{@"width" : @2.0, @"header" : @"Only", @"value" : @""} ] ofTablix:tab];
+  for (NSUInteger tries = 0; tries < baseCols && [tab.tablixBody.columns count] > 1; tries++)
+    [ed removeTablixColumnAtIndex:0 ofTablix:tab];
   [ed removeTablixColumnAtIndex:0 ofTablix:tab];
-  if ([tab.columnSpecs count] != 1)
+  if ([tab.tablixBody.columns count] != 1)
     XCTFail(@"%@", @"the last column must not be deletable");
 
-  // Column width, snapped, one step with the item width.
+  // Column width and row height, exactly as given (a drag snaps before it
+  // asks), each one step with the item's size.
   RDLReport *r2 = RDLGroupedJobs();
   RDLDocument *doc2 = [[RDLDocument alloc] initWithReport:r2];
   RDLEditor *ed2 = [[RDLEditor alloc] initWithDocument:doc2];
   RDLTablix *tab2 = (RDLTablix *)r2.body.items.firstObject;
   [ed2 setTablixColumn:0 width:3.13 ofTablix:tab2];
-  if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 3.15) > 0.0001)
-    XCTFail(@"%@", [NSString stringWithFormat:@"column width should snap, got %@",
-                                               tab2.columnSpecs[0][@"width"]]);
+  if (fabs(tab2.tablixBody.columns[0].width - 3.13) > 0.0001)
+    XCTFail(@"the editor should set the width it is given, got %.3f", tab2.tablixBody.columns[0].width);
   [doc2.undoManager undo];
-  if (fabs([tab2.columnSpecs[0][@"width"] doubleValue] - 2.8) > 0.0001)
+  if (fabs(tab2.tablixBody.columns[0].width - 2.8) > 0.0001)
     XCTFail(@"%@", @"one undo should revert the column resize");
-
-  // The modal tablix editor changes the groups AND the column spec at once.
-  // Those must undo as ONE unit: -rebuildTablix reads both, so undoing them
-  // separately would restore the spec, rebuild against the still-new groups,
-  // then revert the groups with no rebuild -- leaving the body inconsistent.
-  RDLReport *r3 = RDLGroupedJobs();
-  RDLDocument *doc3 = [[RDLDocument alloc] initWithReport:r3];
-  RDLEditor *ed3 = [[RDLEditor alloc] initWithDocument:doc3];
-  RDLTablix *tab3 = (RDLTablix *)r3.body.items.firstObject;
-  NSArray *specsBefore = tab3.columnSpecs;
-  NSArray *groupsBefore = tab3.rowGroups;
-  // The row hierarchy is what distinguishes the two states: grouped gives
-  // header + group (2 members), flat-with-total gives header + details + total
-  // (3). The body row COUNT happens to be 3 either way, which is exactly the
-  // kind of coincidence that would hide this bug.
-  NSUInteger membersBefore = [tab3.rowHierarchy.members count];
-  [ed3 setTablixValues:@{
-    @"rowGroups" : @[],
-    @"showGrandTotal" : @YES,
-    @"columnSpecs" : @[
-      @{@"width" : @2.0, @"header" : @"Job", @"value" : @"=Fields!Job.Value"},
-      @{@"width" : @2.0, @"header" : @"Amt", @"value" : @"=Fields!Amount.Value",
-        @"aggregate" : @"Sum"},
-    ]
-  }
-              ofTablix:tab3];
-  if ([tab3.rowGroups count] != 0 || !tab3.showGrandTotal)
-    XCTFail(@"%@", @"combined tablix apply did not take effect");
-  if ([tab3.rowHierarchy.members count] == membersBefore)
-    XCTFail(@"%@", @"combined tablix apply should have rebuilt the row hierarchy");
-  [doc3.undoManager undo];
-  if (![tab3.rowGroups isEqualToArray:groupsBefore])
-    XCTFail(@"%@", @"undo should restore the row groups");
-  if (![tab3.columnSpecs isEqualToArray:specsBefore])
-    XCTFail(@"%@", @"undo should restore the column spec");
-  // The restored body must agree with the restored grouping, rather than being
-  // a rebuild made against half-reverted state.
-  if ([tab3.rowHierarchy.members count] != membersBefore)
-    XCTFail(@"%@", [NSString stringWithFormat:
-                                  @"restored hierarchy should match the restored groups: %lu vs %lu members",
-                                  (unsigned long)[tab3.rowHierarchy.members count],
-                                  (unsigned long)membersBefore]);
-  RDLTablixMember *restoredGroup = [tab3.rowHierarchy.members count] > 1
-                                       ? tab3.rowHierarchy.members[1]
-                                       : nil;
-  if ([restoredGroup.groupExpressions count] == 0 ||
-      [[restoredGroup.groupExpressions[0] source]
-          rangeOfString:[groupsBefore firstObject]].location == NSNotFound)
-    XCTFail(@"%@", @"the restored group member should group by the restored field");
+  CGFloat rowWas = tab2.tablixBody.rows[1].height, heightWas = tab2.height;
+  [ed2 setTablixRow:1 height:0.6 ofTablix:tab2];
+  if (fabs(tab2.tablixBody.rows[1].height - 0.6) > 1e-6 || fabs(tab2.height - (heightWas + 0.6 - rowWas)) > 1e-6)
+    XCTFail(@"%@", @"a row's height should be what is given, and the tablix that much taller");
+  [doc2.undoManager undo];
+  if (fabs(tab2.tablixBody.rows[1].height - rowWas) > 1e-6)
+    XCTFail(@"%@", @"one undo should revert the row resize");
 
   // Grand total toggles and untoggles.
-  BOOL before = tab2.showGrandTotal;
+  BOOL before = [RDLTablixStructure tablixHasTotalRow:tab2];
   [ed2 toggleGrandTotalOfTablix:tab2];
-  if (tab2.showGrandTotal == before)
+  if ([RDLTablixStructure tablixHasTotalRow:tab2] == before)
     XCTFail(@"%@", @"grand total should toggle");
   [doc2.undoManager undo];
-  if (tab2.showGrandTotal != before)
-    XCTFail(@"%@", @"undo should restore the grand total setting");
+  if ([RDLTablixStructure tablixHasTotalRow:tab2] != before)
+    XCTFail(@"%@", @"undo should restore the grand total");
+}
+
+// A tablix is edited where it stands. Rebuilding it from its column list, which
+// is what inserting, deleting and moving a column and toggling the total used
+// to do, threw away what the list cannot describe: a merged heading, a cell's
+// own style, a row's height. Each edit here keeps those, stays consistent, and
+// undoes in one step.
+- (void)testEditingATablixInPlaceKeepsWhatARebuildLost {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixBody *body = tab.tablixBody;
+  NSUInteger columns = [body.columns count];
+  if (columns < 2 || [[tab structuralProblems] count]) {
+    XCTFail(@"the fixture should be a consistent table of two columns or more: %@", [tab structuralProblems]);
+    return;
+  }
+  NSArray<RDLTablixMember *> *leaves = [tab.rowHierarchy leafMembers];
+  NSUInteger detailRow = NSNotFound;
+  for (NSUInteger i = 0; i < [leaves count]; i++)
+    if ([leaves[i].groupName length] && [leaves[i].members count] == 0)
+      detailRow = i;
+  if (detailRow == NSNotFound) {
+    XCTFail(@"%@", @"the fixture should have a details row");
+    return;
+  }
+  // What a rebuild could not keep: a heading merged over two columns, a detail
+  // cell's own background, a taller detail row.
+  RDLTablixRow *heading = body.rows[0];
+  RDLItem *mergedHeading = heading.cells[0].item;
+  heading.cells[0].colSpan = 2;
+  heading.cells[1].item = nil;
+  RDLItem *styled = body.rows[detailRow].cells[1].item;
+  styled.style.backgroundColor = @"#ffeeaa";
+  // The name an inserted cell would otherwise take first.
+  styled.name = @"Textbox1";
+  body.rows[detailRow].height = 0.5;
+  CGFloat width = tab.width;
+
+  // Inside the merged heading: the heading widens over the new column.
+  [ed insertTablixColumnAtIndex:1 ofTablix:tab];
+  if ([body.columns count] != columns + 1 || [[tab structuralProblems] count])
+    XCTFail(@"inserting should add a consistent column: %@", [tab structuralProblems]);
+  if (heading.cells[0].colSpan != 3 || heading.cells[1].item != nil || heading.cells[0].item != mergedHeading)
+    XCTFail(@"%@", @"the merged heading should reach over the inserted column");
+  if (body.rows[detailRow].cells[2].item != styled || ![styled.style.backgroundColor isEqualToString:@"#ffeeaa"] ||
+      body.rows[detailRow].height != 0.5)
+    XCTFail(@"%@", @"the styled cell and the row height should be where they were, as they were");
+  if (fabs(tab.width - (width + 1.2)) > 1e-6)
+    XCTFail(@"the tablix should be 1.2in wider, not %.3f", tab.width - width);
+  NSMutableSet<NSString *> *names = [NSMutableSet set];
+  NSUInteger named = 0;
+  for (RDLItem *item in [r allItemsIncludingNested]) {
+    named += 1;
+    [names addObject:item.name ?: @""];
+  }
+  if ([names count] != named)
+    XCTFail(@"%@", @"the inserted cells should take names nothing else has");
+
+  [doc.undoManager undo];
+  body = tab.tablixBody;
+  if ([body.columns count] != columns || [[tab structuralProblems] count] || body.rows[0].cells[0].colSpan != 2 ||
+      body.rows[detailRow].height != 0.5 ||
+      ![body.rows[detailRow].cells[1].item.style.backgroundColor isEqualToString:@"#ffeeaa"])
+    XCTFail(@"%@", @"one undo should put the table back as it was, merge, style and height");
+  if (fabs(tab.width - width) > 1e-6)
+    XCTFail(@"%@", @"undo should restore the width");
+
+  // Deleting the column a merged heading starts in: the heading carries on in
+  // the next column it covered.
+  NSString *headingText = [(RDLTextbox *)body.rows[0].cells[0].item value];
+  [ed removeTablixColumnAtIndex:0 ofTablix:tab];
+  body = tab.tablixBody;
+  if ([body.columns count] != columns - 1 || [[tab structuralProblems] count])
+    XCTFail(@"deleting should leave a consistent table: %@", [tab structuralProblems]);
+  if (![[(RDLTextbox *)body.rows[0].cells[0].item value] isEqualToString:headingText] ||
+      body.rows[0].cells[0].colSpan > 1)
+    XCTFail(@"%@", @"the merged heading should move to the column it still covers");
+  [doc.undoManager undo];
+  body = tab.tablixBody;
+
+  // A column cannot be moved out from under a merged heading.
+  NSUInteger before = [body.columns count];
+  [ed moveTablixColumnAtIndex:1 toIndex:0 ofTablix:tab];
+  if (body.rows[0].cells[0].colSpan != 2 || [body.columns count] != before)
+    XCTFail(@"%@", @"a move that splits a merged cell should do nothing");
+
+  // Without the merge, the styled column moves with its style.
+  RDLReport *r2 = RDLGroupedJobs();
+  RDLDocument *doc2 = [[RDLDocument alloc] initWithReport:r2];
+  RDLEditor *ed2 = [[RDLEditor alloc] initWithDocument:doc2];
+  RDLTablix *tab2 = (RDLTablix *)r2.body.items.firstObject;
+  RDLItem *first = tab2.tablixBody.rows[detailRow].cells[0].item;
+  first.style.color = @"#aa0000";
+  [ed2 moveTablixColumnAtIndex:0 toIndex:1 ofTablix:tab2];
+  if (tab2.tablixBody.rows[detailRow].cells[1].item != first || [[tab2 structuralProblems] count])
+    XCTFail(@"%@", @"the moved column should take its styled cell with it");
+  [doc2.undoManager undo];
+  if (![tab2.tablixBody.rows[detailRow].cells[0].item.style.color isEqualToString:@"#aa0000"])
+    XCTFail(@"%@", @"undoing the move should put the styled cell back first");
+
+  // The total row: a Sum of each numeric field the details show, and gone again.
+  RDLDataSet *ds = [r2 dataSetNamed:tab2.dataSetName];
+  for (RDLField *field in ds.fields)
+    field.dataType = RDLFieldDataTypeString;
+  NSString *numeric = nil;
+  for (RDLTablixCell *cell in tab2.tablixBody.rows[detailRow].cells) {
+    RDLExprNode *node = [RDLExpr expressionWithSource:[(RDLTextbox *)cell.item value]].root;
+    if (node.kind == RDLExprNodeKindField && cell != tab2.tablixBody.rows[detailRow].cells[0])
+      numeric = node.name;
+  }
+  [ds fieldNamed:numeric].dataType = RDLFieldDataTypeInteger;
+  if ([RDLTablixStructure tablixHasTotalRow:tab2])
+    [ed2 toggleGrandTotalOfTablix:tab2];
+  NSUInteger rows = [tab2.tablixBody.rows count];
+  [ed2 toggleGrandTotalOfTablix:tab2];
+  RDLTablixRow *total = [tab2.tablixBody.rows lastObject];
+  NSString *sum = [NSString stringWithFormat:@"=Sum(Fields!%@.Value)", numeric];
+  NSArray *values = [total.cells valueForKeyPath:@"item.value"];
+  if ([tab2.tablixBody.rows count] != rows + 1 || ![RDLTablixStructure tablixHasTotalRow:tab2] ||
+      ![values.firstObject isEqualToString:@"Total"] || ![values containsObject:sum] ||
+      [[tab2 structuralProblems] count])
+    XCTFail(@"the total row should say Total and sum %@: %@", numeric, values);
+  [ed2 toggleGrandTotalOfTablix:tab2];
+  if ([tab2.tablixBody.rows count] != rows || [RDLTablixStructure tablixHasTotalRow:tab2])
+    XCTFail(@"%@", @"toggling again should take the total row away");
 }
 
 - (void)testSelection {
@@ -593,7 +674,7 @@ static RDLReport *RDLGroupedJobs(void) {
   if ([r.body.items count] != 2)
     XCTFail(@"%@", @"undo should remove the pasted copy");
 
-  // A tablix survives the round trip with its spec, since the carrier goes
+  // A tablix survives the round trip, body and groups, since the carrier goes
   // through the real writer and parser.
   RDLReport *jobs = RDLGroupedJobs();
   RDLTablix *tab = (RDLTablix *)jobs.body.items.firstObject;
@@ -601,11 +682,10 @@ static RDLReport *RDLGroupedJobs(void) {
       (RDLTablix *)[RDLEditor itemFromXMLString:[RDLEditor XMLStringForItem:tab]];
   if (![tabCopy isKindOfClass:[RDLTablix class]])
     XCTFail(@"%@", @"a copied tablix should still be a Tablix");
-  if ([tabCopy.columnSpecs count] != [tab.columnSpecs count])
-    XCTFail(@"%@", [NSString stringWithFormat:@"copied tablix specs %lu vs %lu",
-                                               (unsigned long)[tabCopy.columnSpecs count],
-                                               (unsigned long)[tab.columnSpecs count]]);
-  if (![tabCopy.rowGroups isEqualToArray:@[ @"Finish" ]])
+  if ([tabCopy.tablixBody.columns count] != [tab.tablixBody.columns count] ||
+      [tabCopy.tablixBody.rows count] != [tab.tablixBody.rows count])
+    XCTFail(@"%@", @"a copied tablix should keep its body");
+  if (![tabCopy.rowHierarchy.members[1].groupName isEqualToString:tab.rowHierarchy.members[1].groupName])
     XCTFail(@"%@", @"a copied tablix should keep its row group");
 }
 
@@ -1364,6 +1444,502 @@ static RDLReport *RDLGroupedJobs(void) {
   if (announced != 2)
     XCTFail(@"%@", [NSString stringWithFormat:@"%lu announcements, expected 2",
                                               (unsigned long)announced]);
+}
+
+#pragma mark - Groups
+
+// Every text a report lays out, in order.
+static NSArray<NSString *> *RDLLaidOutTexts(RDLReport *report) {
+  NSMutableArray<NSString *> *texts = [NSMutableArray array];
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report paramValues:nil])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        [texts addObject:[(RDLLaidOutTextbox *)item text] ?: @""];
+  return texts;
+}
+
+static NSUInteger RDLTimesShown(NSArray<NSString *> *texts, NSString *wanted) {
+  NSUInteger n = 0;
+  for (NSString *text in texts)
+    if ([text isEqualToString:wanted])
+      n += 1;
+  return n;
+}
+
+// The first member that groups on something.
+static RDLTablixMember *RDLFirstGroupIn(NSArray<RDLTablixMember *> *members) {
+  for (RDLTablixMember *m in members)
+    if ([m.groupExpressions count])
+      return m;
+  return nil;
+}
+
+static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
+  CGFloat total = 0;
+  for (NSNumber *size in [hierarchy headerLevelSizes])
+    total += [size doubleValue];
+  return total;
+}
+
+// A parent group goes around the group it is added to, and everything that
+// group held -- its rows, their heights, the members that own them -- is still
+// there, as it was, one header column further in.
+- (void)testAParentGroupGoesAroundTheRowsAsTheyWere {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  if (finish == nil || [[tab structuralProblems] count] || [tab.tablixBody.rows count] < 2) {
+    XCTFail(@"the fixture should be a consistent table grouped by finish: %@", [tab structuralProblems]);
+    return;
+  }
+  RDLTablixRow *detail = tab.tablixBody.rows[1];
+  detail.height = 0.5;
+  NSArray<RDLTablixMember *> *leaves = [tab.rowHierarchy leafMembers];
+  CGFloat width = tab.width, headers = RDLHeaderExtentOf(tab.rowHierarchy);
+  NSArray<NSString *> *before = RDLLaidOutTexts(r);
+
+  RDLTablixMember *job = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                          placement:RDLGroupPlacementParent
+                                           toMember:finish
+                                               axis:RDLTablixAxisRows
+                                           ofTablix:tab];
+  if (job == nil || [[tab structuralProblems] count]) {
+    XCTFail(@"adding a parent group should leave a consistent table: %@", [tab structuralProblems]);
+    return;
+  }
+  NSArray<RDLTablixMember *> *path = [tab.rowHierarchy pathToMember:finish];
+  if ([path count] != 2 || path[0] != job)
+    XCTFail(@"%@", @"the new group should hold the group it was added to");
+  if (![job.groupName isEqualToString:@"Job"] ||
+      ![[(RDLTextbox *)job.header.item value] isEqualToString:@"=Fields!Job.Value"])
+    XCTFail(@"the group should be named after its field and head its rows with it, not %@", job.groupName);
+  if (![[tab.rowHierarchy leafMembers] isEqualToArray:leaves] || tab.tablixBody.rows[1] != detail ||
+      detail.height != 0.5)
+    XCTFail(@"%@", @"the rows and the members that own them should be as they were");
+  if (fabs(tab.width - (width + RDLHeaderExtentOf(tab.rowHierarchy) - headers)) > 1e-6 ||
+      RDLHeaderExtentOf(tab.rowHierarchy) <= headers)
+    XCTFail(@"the tablix should be wider by its new header column, not by %.3f", tab.width - width);
+  NSArray<NSString *> *after = RDLLaidOutTexts(r);
+  if (RDLTimesShown(before, @"Oil") != 1 || RDLTimesShown(after, @"Oil") != 3)
+    XCTFail(@"grouped by job first, the three oiled jobs should each head their finish: %lu, then %lu",
+            (unsigned long)RDLTimesShown(before, @"Oil"), (unsigned long)RDLTimesShown(after, @"Oil"));
+
+  [doc.undoManager undo];
+  RDLTablixMember *restored = RDLFirstGroupIn(tab.rowHierarchy.members);
+  if (![restored.groupName isEqualToString:finish.groupName] || [[tab structuralProblems] count] ||
+      fabs(tab.width - width) > 1e-6 || tab.tablixBody.rows[1].height != 0.5)
+    XCTFail(@"%@", @"one undo should put the table back as it was");
+}
+
+// A child group goes inside, around the details; the subtotal row the outer
+// group keeps after them stays the outer group's. Where there is nothing
+// grouped to go around, nothing happens.
+- (void)testAChildGroupGoesAroundWhatTheGroupHolds {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  RDLTablixMember *heading = tab.rowHierarchy.members.firstObject;
+  if ([finish.members count] != 2 || [heading.groupName length]) {
+    XCTFail(@"%@", @"the fixture's group should hold its details and a subtotal, after a heading row");
+    return;
+  }
+  RDLTablixMember *details = finish.members[0], *subtotal = finish.members[1];
+  NSArray<NSString *> *before = RDLLaidOutTexts(r);
+
+  // Refused, and nothing changes: inside the details or the heading there is
+  // nothing to group, and a member has to be the tablix's own.
+  NSString *xml = [RDLEditor XMLStringForItem:tab];
+  NSArray *refusals = @[
+    @[ details, @(RDLGroupPlacementChild), @(RDLTablixAxisRows) ],
+    @[ heading, @(RDLGroupPlacementChild), @(RDLTablixAxisRows) ],
+    @[ finish, @(RDLGroupPlacementUnspecified), @(RDLTablixAxisRows) ],
+    @[ [[RDLTablixMember alloc] init], @(RDLGroupPlacementParent), @(RDLTablixAxisRows) ],
+    @[ finish, @(RDLGroupPlacementParent), @(RDLTablixAxisColumns) ],
+  ];
+  for (NSArray *refusal in refusals)
+    if ([ed addGroupWithExpression:@"=Fields!Job.Value"
+                         placement:(RDLGroupPlacement)[refusal[1] integerValue]
+                          toMember:refusal[0]
+                              axis:(RDLTablixAxis)[refusal[2] integerValue]
+                          ofTablix:tab] != nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"a group should not be added by %@", refusal]);
+  if (![[RDLEditor XMLStringForItem:tab] isEqualToString:xml] || [doc.undoManager canUndo])
+    XCTFail(@"%@", @"a refused group should change nothing and leave nothing to undo");
+
+  RDLTablixMember *job = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                          placement:RDLGroupPlacementChild
+                                           toMember:finish
+                                               axis:RDLTablixAxisRows
+                                           ofTablix:tab];
+  if (job == nil || [[tab structuralProblems] count]) {
+    XCTFail(@"adding a child group should leave a consistent table: %@", [tab structuralProblems]);
+    return;
+  }
+  if ([finish.members count] != 2 || finish.members[0] != job || finish.members[1] != subtotal ||
+      [job.members count] != 1 || job.members[0] != details)
+    XCTFail(@"%@", @"the child group should go around the details, and the subtotal stay after it");
+  NSArray<NSString *> *after = RDLLaidOutTexts(r);
+  if (RDLTimesShown(before, @"Desk") != 1 || RDLTimesShown(after, @"Desk") != 2 ||
+      RDLTimesShown(after, @"Oil") != 1)
+    XCTFail(@"%@", @"each job should head its own details, inside the one heading for its finish");
+}
+
+// A group beside another has a row of its own, where it goes, and moves
+// nothing that was there out of its members.
+- (void)testAnAdjacentGroupHasARowOfItsOwn {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  NSUInteger rows = [tab.tablixBody.rows count];
+  CGFloat height = tab.height;
+  NSArray<NSString *> *before = RDLLaidOutTexts(r);
+
+  RDLTablixMember *below = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                            placement:RDLGroupPlacementAfter
+                                             toMember:finish
+                                                 axis:RDLTablixAxisRows
+                                             ofTablix:tab];
+  RDLTablixBody *body = tab.tablixBody;
+  if (below == nil || [[tab structuralProblems] count] || [body.rows count] != rows + 1) {
+    XCTFail(@"an adjacent group should add a consistent row: %@", [tab structuralProblems]);
+    return;
+  }
+  if ([tab.rowHierarchy.members lastObject] != below || [tab.rowHierarchy leafRangeOfMember:below].location != rows)
+    XCTFail(@"%@", @"the group should come after the one it was added beside, owning the new last row");
+  if (below.header.size != finish.header.size)
+    XCTFail(@"%@", @"a group beside another should head its row in a header as wide");
+  for (RDLTablixCell *cell in body.rows[rows].cells)
+    if (![cell.item isKindOfClass:[RDLTextbox class]] || [[(RDLTextbox *)cell.item value] length])
+      XCTFail(@"%@", @"the new row should hold empty textboxes");
+  if (body.rows[rows].height != body.rows[rows - 1].height || fabs(tab.height - height - body.rows[rows].height) > 1e-6)
+    XCTFail(@"%@", @"the new row should be as high as the one beside it, and the tablix that much higher");
+  if (RDLTimesShown(RDLLaidOutTexts(r), @"Desk") != RDLTimesShown(before, @"Desk") + 1)
+    XCTFail(@"%@", @"the new group should head its own row with each job");
+
+  [doc.undoManager undo];
+  RDLTablixMember *again = RDLFirstGroupIn(tab.rowHierarchy.members);
+  RDLTablixCell *merged = tab.tablixBody.rows[0].cells[0];
+  merged.rowSpan = 2;
+  tab.tablixBody.rows[1].cells[0].item = nil;
+  RDLTablixMember *above = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                            placement:RDLGroupPlacementBefore
+                                             toMember:again
+                                                 axis:RDLTablixAxisRows
+                                             ofTablix:tab];
+  body = tab.tablixBody;
+  if (above == nil || [[tab structuralProblems] count] || tab.rowHierarchy.members[1] != above ||
+      [tab.rowHierarchy leafRangeOfMember:above].location != 1 || [body.rows count] != rows + 1 ||
+      [tab.rowHierarchy leafRangeOfMember:again].location != 2)
+    XCTFail(@"%@", @"a group before another should take the place of its first row, and move it down one");
+  if (merged.rowSpan != 3 || body.rows[1].cells[0].item != nil || body.rows[1].cells[1].item == nil)
+    XCTFail(@"%@", @"a merged cell reaching over the new row should cover it, and the rest of the row be cells");
+}
+
+// Deleting only the group leaves what it held where it was; deleting it with
+// its rows takes those too -- but never every row, and never the only member
+// inside another group.
+- (void)testDeletingAGroupKeepsItsRowsOrTakesThem {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *heading = tab.rowHierarchy.members.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  NSArray<RDLTablixRow *> *rows = [tab.tablixBody.rows copy];
+  NSArray<RDLTablixMember *> *held = [finish.members copy];
+  CGFloat width = tab.width, headers = RDLHeaderExtentOf(tab.rowHierarchy);
+
+  if (![ed deleteGroup:finish withLines:NO axis:RDLTablixAxisRows ofTablix:tab] || [[tab structuralProblems] count]) {
+    XCTFail(@"deleting only the group should leave a consistent table: %@", [tab structuralProblems]);
+    return;
+  }
+  NSArray *expected = [@[ heading ] arrayByAddingObjectsFromArray:held];
+  if (![tab.rowHierarchy.members isEqualToArray:expected] || ![tab.tablixBody.rows isEqualToArray:rows])
+    XCTFail(@"%@", @"what the group held should take its place, and every row stay");
+  if (fabs(tab.width - (width - headers)) > 1e-6 || [[tab.rowHierarchy headerLevelSizes] count])
+    XCTFail(@"the group's header column should go with it: %.3f wide", tab.width);
+  [doc.undoManager undo];
+
+  finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  if (![ed deleteGroup:finish withLines:YES axis:RDLTablixAxisRows ofTablix:tab] ||
+      [[tab structuralProblems] count] || [tab.rowHierarchy.members count] != 1 ||
+      [tab.tablixBody.rows count] != 1)
+    XCTFail(@"deleting the group with its rows should leave the heading row alone: %@", [tab structuralProblems]);
+  [doc.undoManager undo];
+
+  finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  RDLTablixMember *details = finish.members[0];
+  RDLTablixCell *reaching = tab.tablixBody.rows[1].cells[0];
+  RDLItem *carried = reaching.item;
+  reaching.rowSpan = 2;
+  tab.tablixBody.rows[2].cells[0].item = nil;
+  if (![ed deleteGroup:details withLines:YES axis:RDLTablixAxisRows ofTablix:tab] ||
+      [[tab structuralProblems] count] || [finish.members count] != 1 || [tab.tablixBody.rows count] != 2)
+    XCTFail(@"deleting the details with their row should leave the subtotal: %@", [tab structuralProblems]);
+  if (tab.tablixBody.rows[1].cells[0].item != carried || tab.tablixBody.rows[1].cells[0].rowSpan > 1)
+    XCTFail(@"%@", @"a merged cell starting in the deleted row should carry on in the row it still covers");
+  [doc.undoManager undo];
+
+  // Refused: a member that is not a group; the only member inside a group;
+  // the last rows the tablix has.
+  finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  heading = tab.rowHierarchy.members.firstObject;
+  if ([ed deleteGroup:heading withLines:NO axis:RDLTablixAxisRows ofTablix:tab])
+    XCTFail(@"%@", @"a static member is not a group to delete");
+  RDLTablixMember *job = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                          placement:RDLGroupPlacementChild
+                                           toMember:finish
+                                               axis:RDLTablixAxisRows
+                                           ofTablix:tab];
+  details = job.members.firstObject;
+  if ([ed deleteGroup:details withLines:YES axis:RDLTablixAxisRows ofTablix:tab])
+    XCTFail(@"%@", @"the only member inside a group should not go with its row");
+  RDLTablixMember *outer = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                            placement:RDLGroupPlacementParent
+                                             toMember:heading
+                                                 axis:RDLTablixAxisRows
+                                             ofTablix:tab];
+  if (![job.groupName isEqualToString:@"Job"] || ![outer.groupName isEqualToString:@"Job1"])
+    XCTFail(@"two groups on the same field should be named apart, not %@ and %@", job.groupName, outer.groupName);
+  [ed deleteGroup:finish withLines:YES axis:RDLTablixAxisRows ofTablix:tab];
+  if ([tab.tablixBody.rows count] != 1 || [ed deleteGroup:outer withLines:YES axis:RDLTablixAxisRows ofTablix:tab])
+    XCTFail(@"%@", @"a group holding every row should not take them all");
+  if ([[tab structuralProblems] count])
+    XCTFail(@"the refusals should leave the table consistent: %@", [tab structuralProblems]);
+}
+
+// A total beside a group totals what the group shows, labelled in the group's
+// header column, and keeps with the group on the page.
+- (void)testATotalBesideAGroupTotalsWhatItShows {
+  RDLReport *r = RDLGroupedJobs();
+  [[r dataSetNamed:@"Jobs"] fieldNamed:@"Amount"].dataType = RDLFieldDataTypeInteger;
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  NSUInteger rows = [tab.tablixBody.rows count];
+  NSUInteger amount = [tab.tablixBody.columns count] - 1;
+  // The subtotal row says nothing, so what the total finds is the detail's
+  // field.
+  RDLTextbox *subtotal = (RDLTextbox *)tab.tablixBody.rows[rows - 1].cells[amount].item;
+  subtotal.value = @"";
+
+  if ([ed addTotalBesideGroup:finish.members[0] after:YES axis:RDLTablixAxisRows ofTablix:tab] != nil)
+    XCTFail(@"%@", @"the details group groups on nothing, so there is nothing to total beside it");
+  RDLTablixMember *total = [ed addTotalBesideGroup:finish after:YES axis:RDLTablixAxisRows ofTablix:tab];
+  RDLTablixBody *body = tab.tablixBody;
+  if (total == nil || [[tab structuralProblems] count] || [body.rows count] != rows + 1) {
+    XCTFail(@"a total should add a consistent row: %@", [tab structuralProblems]);
+    return;
+  }
+  if ([tab.rowHierarchy.members lastObject] != total || [total.groupName length] ||
+      total.keepWithGroup != RDLKeepWithGroupBefore)
+    XCTFail(@"%@", @"the total should be a static member after the group, kept with it");
+  if (![[(RDLTextbox *)total.header.item value] isEqualToString:@"Total"] || total.header.size != finish.header.size)
+    XCTFail(@"%@", @"the total should say so in the group's header column");
+  NSString *sum = [(RDLTextbox *)body.rows[rows].cells[amount].item value];
+  if (![sum isEqualToString:@"=Sum(Fields!Amount.Value)"] ||
+      [[(RDLTextbox *)body.rows[rows].cells[0].item value] length])
+    XCTFail(@"the total should sum the amount and leave the job empty, not show %@", sum);
+  if (RDLTimesShown(RDLLaidOutTexts(r), @"3468") != 1)
+    XCTFail(@"%@", @"the total should show the sum of every job");
+  [doc.undoManager undo];
+
+  // An aggregate is taken as it is: it aggregates over whatever it is in.
+  finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  subtotal = (RDLTextbox *)tab.tablixBody.rows[rows - 1].cells[amount].item;
+  subtotal.value = @"=Max(Fields!Amount.Value)";
+  RDLTablixMember *first = [ed addTotalBesideGroup:finish after:NO axis:RDLTablixAxisRows ofTablix:tab];
+  if (first == nil || [[tab structuralProblems] count] || tab.rowHierarchy.members[1] != first ||
+      first.keepWithGroup != RDLKeepWithGroupAfter || [tab.rowHierarchy leafRangeOfMember:finish].location != 2)
+    XCTFail(@"%@", @"a total before the group should come first, kept with the group after it");
+  NSRange owned = [tab.rowHierarchy leafRangeOfMember:first];
+  NSString *copied = [(RDLTextbox *)tab.tablixBody.rows[owned.location].cells[amount].item value];
+  if (![copied isEqualToString:@"=Max(Fields!Amount.Value)"])
+    XCTFail(@"the total should take the subtotal's aggregate as it is, not %@", copied);
+}
+
+// Along the other axis the same edits make a crosstab: a column group heads
+// its columns in a row above the body, and a group beside it has a column.
+- (void)testColumnGroupsHeadTheirColumns {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  NSArray<RDLTablixMember *> *leaves = [tab.columnHierarchy leafMembers];
+  if ([leaves count] != 2 || [[tab.columnHierarchy headerLevelSizes] count]) {
+    XCTFail(@"%@", @"the fixture should have two plain columns");
+    return;
+  }
+  CGFloat width = tab.width, height = tab.height;
+  NSUInteger lacquer = RDLTimesShown(RDLLaidOutTexts(r), @"Lacquer");
+
+  RDLTablixMember *finish = [ed addGroupWithExpression:@"=Fields!Finish.Value"
+                                             placement:RDLGroupPlacementParent
+                                              toMember:leaves[1]
+                                                  axis:RDLTablixAxisColumns
+                                              ofTablix:tab];
+  if (finish == nil || [[tab structuralProblems] count]) {
+    XCTFail(@"a column group should leave a consistent tablix: %@", [tab structuralProblems]);
+    return;
+  }
+  if (tab.columnHierarchy.members[1] != finish || finish.members[0] != leaves[1] ||
+      [[tab.columnHierarchy headerLevelSizes] count] != 1 || fabs(tab.width - width) > 1e-6 ||
+      fabs(tab.height - (height + RDLHeaderExtentOf(tab.columnHierarchy))) > 1e-6)
+    XCTFail(@"%@", @"the column group should go around its column, heading it in a row above the body");
+  if (RDLTimesShown(RDLLaidOutTexts(r), @"Lacquer") <= lacquer)
+    XCTFail(@"%@", @"each finish should head a column of its own");
+
+  CGFloat grouped = tab.width;
+  RDLTablixMember *beside = [ed addGroupWithExpression:@"=Fields!Job.Value"
+                                             placement:RDLGroupPlacementAfter
+                                              toMember:finish
+                                                  axis:RDLTablixAxisColumns
+                                              ofTablix:tab];
+  if (beside == nil || [[tab structuralProblems] count] || [tab.tablixBody.columns count] != 3 ||
+      fabs(tab.width - (grouped + tab.tablixBody.columns[2].width)) > 1e-6)
+    XCTFail(@"a column group beside another should add a column: %@", [tab structuralProblems]);
+  if (![ed deleteGroup:beside withLines:YES axis:RDLTablixAxisColumns ofTablix:tab] ||
+      [tab.tablixBody.columns count] != 2 || fabs(tab.width - grouped) > 1e-6)
+    XCTFail(@"%@", @"deleting it with its column should take the column away again");
+}
+
+// Renamed and regrouped in one step, which undoes in one; a name another scope
+// already goes by is refused.
+- (void)testAGroupsNameAndExpressionsChangeTogether {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  NSString *was = finish.groupName;
+  RDLFilter *filter = [[RDLFilter alloc] init];
+  filter.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  filter.oper = RDLFilterOperatorGreaterThan;
+  [filter.values addObject:[RDLValue literal:@"100"]];
+
+  for (NSString *taken in @[ @"Jobs", @"JobsByFinish", @"" ])
+    if ([ed setName:taken
+            expressions:@[ [RDLValue valueWithSource:@"=Fields!Job.Value"] ]
+                filters:@[]
+                ofGroup:finish
+                   axis:RDLTablixAxisRows
+               ofTablix:tab])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the name '%@' is not the group's to take", taken]);
+  if ([ed setName:@"ByNothing" expressions:@[] filters:@[] ofGroup:finish axis:RDLTablixAxisRows ofTablix:tab])
+    XCTFail(@"%@", @"a group holding other members has to group on something");
+
+  if (![ed setName:@"ByJob"
+          expressions:@[ [RDLValue valueWithSource:@"=Fields!Job.Value"] ]
+              filters:@[ filter ]
+              ofGroup:finish
+                 axis:RDLTablixAxisRows
+             ofTablix:tab] ||
+      ![finish.groupName isEqualToString:@"ByJob"] || [finish.filters count] != 1 ||
+      ![[finish.groupExpressions.firstObject source] isEqualToString:@"=Fields!Job.Value"])
+    XCTFail(@"%@", @"the group should take its new name, expression and filter together");
+  [doc.undoManager undo];
+  finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  if (![finish.groupName isEqualToString:was] || [finish.filters count] ||
+      ![[finish.groupExpressions.firstObject source] isEqualToString:@"=Fields!Finish.Value"])
+    XCTFail(@"%@", @"one undo should put the group back as it was");
+}
+
+// Two nested groups trade what they group on, headers and all, so the one that
+// was outer is inner; a details group, or two groups side by side, do not.
+- (void)testExchangingGroupsReNestsThem {
+  RDLReport *r = RDLGroupedJobs();
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  RDLTablixMember *finish = RDLFirstGroupIn(tab.rowHierarchy.members);
+  RDLTablixMember *job = [RDLTablixStructure addGroupWithExpression:@"=Fields!Job.Value"
+                                                          placement:RDLGroupPlacementChild
+                                                           toMember:finish
+                                                               axis:RDLTablixAxisRows
+                                                           inTablix:tab
+                                                             report:r];
+  RDLTablixMember *details = job.members.firstObject;
+  RDLItem *finishHeader = finish.header.item, *jobHeader = job.header.item;
+  NSString *finishName = finish.groupName, *jobName = job.groupName;
+  if (RDLTimesShown(RDLLaidOutTexts(r), @"Oil") != 1) {
+    XCTFail(@"%@", @"grouped by finish first, the oiled jobs should share one heading");
+    return;
+  }
+  if ([RDLTablixStructure exchangeGroup:job withGroup:details axis:RDLTablixAxisRows inTablix:tab])
+    XCTFail(@"%@", @"the details group groups on nothing to exchange");
+  if (![RDLTablixStructure exchangeGroup:finish withGroup:job axis:RDLTablixAxisRows inTablix:tab]) {
+    XCTFail(@"%@", @"a group and one inside it should exchange");
+    return;
+  }
+  if (![finish.groupName isEqualToString:jobName] || ![job.groupName isEqualToString:finishName] ||
+      finish.header.item != jobHeader || job.header.item != finishHeader ||
+      tab.rowHierarchy.members[1] != finish || finish.members.firstObject != job || job.members.firstObject != details)
+    XCTFail(@"%@", @"the definitions and headers should trade places, and the members stay put");
+  if (RDLTimesShown(RDLLaidOutTexts(r), @"Oil") != 3 || [[tab structuralProblems] count])
+    XCTFail(@"%@", @"grouped by job first, each oiled job should head its own finish");
+  RDLTablixMember *beside = [RDLTablixStructure addGroupWithExpression:@"=Fields!Amount.Value"
+                                                             placement:RDLGroupPlacementAfter
+                                                              toMember:finish
+                                                                  axis:RDLTablixAxisRows
+                                                              inTablix:tab
+                                                                report:r];
+  if ([RDLTablixStructure exchangeGroup:finish withGroup:beside axis:RDLTablixAxisRows inTablix:tab])
+    XCTFail(@"%@", @"groups side by side are not nested, and do not exchange");
+}
+
+// The aggregate an expression is, read by parsing it: RDL is case-insensitive
+// about both the function and the field, and a sum with arithmetic on it is
+// not an aggregate to total with.
+- (void)testAnAggregateIsReadByParsing {
+  NSDictionary<NSString *, NSArray *> *cases = @{
+    @"=Sum(Fields!Amount.Value)" : @[ @"Sum", @"Amount" ],
+    @"=avg(fields!Hours.value)" : @[ @"Avg", @"Hours" ],
+    @"=Count(Fields!Job.Value, \"Jobs\")" : @[ @"Count", @"" ],
+    @"=Sum(Fields!Amount.Value) + 1" : @[ @"", @"" ],
+    @"=Fields!Amount.Value" : @[ @"", @"" ],
+    @"=Format(Sum(Fields!Amount.Value), \"N2\")" : @[ @"", @"" ],
+    @"Sum" : @[ @"", @"" ],
+  };
+  for (NSString *expression in cases) {
+    NSString *field = @"unset";
+    NSString *function = [RDLTablixStructure aggregateOfExpression:expression field:&field];
+    if (![function ?: @"" isEqualToString:cases[expression][0]] || ![field ?: @"" isEqualToString:cases[expression][1]])
+      XCTFail(@"%@ should read as %@ of %@, not %@ of %@", expression, cases[expression][0], cases[expression][1],
+              function, field);
+  }
+}
+
+// A tablix edited apart from the report goes in as one undoable step, dataset
+// filters and all; an unchanged copy changes nothing and records nothing.
+- (void)testReplacingATablixWithItsEditedCopyIsOneStep {
+  RDLReport *r = RDLGroupedJobs();
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:r];
+  RDLEditor *ed = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTablix *tab = (RDLTablix *)r.body.items.firstObject;
+  NSString *before = [RDLEditor XMLStringForItem:tab];
+  RDLTablix *copy = (RDLTablix *)[RDLEditor itemFromXMLString:before];
+  if ([ed replaceTablix:tab withEdited:copy] || [doc.undoManager canUndo])
+    XCTFail(@"%@", @"an unchanged copy should change nothing and leave nothing to undo");
+
+  RDLTablixMember *finish = RDLFirstGroupIn(copy.rowHierarchy.members);
+  [RDLTablixStructure addTotalBesideGroup:finish after:YES axis:RDLTablixAxisRows inTablix:copy report:r];
+  RDLFilter *filter = [[RDLFilter alloc] init];
+  filter.expression = [RDLValue valueWithSource:@"=Fields!Amount.Value"];
+  filter.oper = RDLFilterOperatorGreaterThan;
+  [filter.values addObject:[RDLValue literal:@"100"]];
+  [copy.filters addObject:filter];
+  NSUInteger members = [tab.rowHierarchy.members count];
+  if (![ed replaceTablix:tab withEdited:copy] || [tab.rowHierarchy.members count] != members + 1 ||
+      [tab.filters count] != 1 || [r.body.items firstObject] != tab || [[tab structuralProblems] count])
+    XCTFail(@"%@", @"the copy's total and filter should be the tablix's, in the same tablix");
+  [doc.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:tab] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the tablix back as it was");
 }
 
 @end

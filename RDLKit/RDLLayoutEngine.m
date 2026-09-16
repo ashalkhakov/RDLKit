@@ -413,35 +413,7 @@ static NSString *RDLLocaleIdentifierOfCollation(NSString *collation) {
 @implementation RDLLayoutEngine
 
 static NSInteger RDLLeafCount(NSArray<RDLTablixMember *> *members) {
-  NSInteger n = 0;
-  for (RDLTablixMember *m in members) {
-    if ([m.members count])
-      n += RDLLeafCount(m.members);
-    else
-      n += 1;
-  }
-  return n;
-}
-
-// The widths of the row-header columns, outermost first: at each level of
-// members that have a header, the widest header there.
-static void RDLCollectHeaderLevels(NSArray<RDLTablixMember *> *members, NSUInteger level,
-                                   NSMutableArray<NSNumber *> *widths) {
-  for (RDLTablixMember *m in members) {
-    NSUInteger inner = level;
-    if (m.header != nil) {
-      while ([widths count] <= level)
-        [widths addObject:@0];
-      widths[level] = @(MAX([widths[level] doubleValue], m.header.size));
-      inner = level + 1;
-    }
-    RDLCollectHeaderLevels(m.members, inner, widths);
-  }
-}
-static NSArray<NSNumber *> *RDLHeaderLevelWidths(NSArray<RDLTablixMember *> *members) {
-  NSMutableArray *widths = [NSMutableArray array];
-  RDLCollectHeaderLevels(members, 0, widths);
-  return widths;
+  return (NSInteger)[[RDLTablixMember leafMembersOf:members] count];
 }
 
 static CGFloat RDLHeaderWidth(NSArray<RDLTablixMember *> *members) {
@@ -1901,6 +1873,31 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
                                 NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames,
                                 BOOL dataIsEmpty);
 
+// A member's TablixHeader, beside the rows it heads: a cell in the header column
+// at its level, as tall as all of those rows together and measured against
+// them. A group's heads each of its instances; a static member's -- a subtotal's
+// label, say -- heads its own rows.
+static void RDLPrependMemberHeader(RDLTablixMember *m, NSArray<RDLTablixInst *> *insts, CGFloat headerX,
+                                   CGFloat headerW, NSArray *regionRows) {
+  if (m.header == nil || [insts count] == 0)
+    return;
+  CGFloat height = 0;
+  for (RDLTablixInst *ci in insts)
+    height += ci.height;
+  RDLTablixCellInst *hc = [[RDLTablixCellInst alloc] init];
+  hc.xRel = headerX;
+  hc.width = m.header.size > 0 ? m.header.size : headerW;
+  hc.height = height;
+  hc.item = m.header.item;
+  hc.rowHeader = YES;
+  hc.regionRows = regionRows;
+  hc.rowSpan = (NSInteger)[insts count];
+  RDLTablixInst *first = insts[0];
+  NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
+  [cells addObjectsFromArray:first.cells];
+  first.cells = cells;
+}
+
 static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *currentRows, CGFloat headerX,
                                 NSInteger leafStart, RDLTablix *tab, RDLEvalScope *scope, CGFloat headerW,
                                 NSArray<RDLColPlanEntry *> *plan, NSArray<NSString *> *scopeNames,
@@ -1978,24 +1975,8 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
           partIndex += 1;
           continue;
         }
-        CGFloat groupH = 0;
-        for (RDLTablixInst *ci in childInsts)
-          groupH += ci.height;
         RDLTablixInst *first = childInsts[0];
-        if (m.header) {
-          RDLTablixCellInst *hc = [[RDLTablixCellInst alloc] init];
-          hc.xRel = headerX;
-          hc.width = m.header.size > 0 ? m.header.size : headerW;
-          hc.height = groupH;
-          hc.item = m.header.item;
-          hc.rowHeader = YES;
-          hc.regionRows = part;
-          // Beside every row of its group: measured and sized against them.
-          hc.rowSpan = (NSInteger)[childInsts count];
-          NSMutableArray *cells = [NSMutableArray arrayWithObject:hc];
-          [cells addObjectsFromArray:first.cells];
-          first.cells = cells;
-        }
+        RDLPrependMemberHeader(m, childInsts, headerX, headerW, part);
         if (m.keepTogether)
           first.keepTogetherCount = MAX(first.keepTogetherCount, [childInsts count]);
         RDLPageBreakLocation brk =
@@ -2061,15 +2042,17 @@ static NSArray *RDLWalkMembers(NSArray<RDLTablixMember *> *list, NSArray *curren
     if (nested) {
       NSArray *childInsts = RDLWalkMembers(m.members, currentRows, childX, leaf, tab, scope,
                                             headerW, plan, innerScopes, dataIsEmpty);
+      RDLPrependMemberHeader(m, childInsts, headerX, headerW, currentRows);
       [out addObjectsFromArray:childInsts];
       leaf += count;
       continue;
     }
 
     RDLTablixRow *br = leaf < (NSInteger)[body.rows count] ? body.rows[leaf] : body.rows.lastObject;
-    [out addObjectsFromArray:RDLEmitRuns(m, br, currentRows, NO, [currentRows firstObject], currentRows, tab,
-                                          innerScopes,
-                                          headerW, plan)];
+    NSArray *runs = RDLEmitRuns(m, br, currentRows, NO, [currentRows firstObject], currentRows, tab, innerScopes,
+                                headerW, plan);
+    RDLPrependMemberHeader(m, runs, headerX, headerW, currentRows);
+    [out addObjectsFromArray:runs];
     leaf += 1;
   }
   return out;
@@ -2442,7 +2425,7 @@ static NSArray<RDLTablixInst *> *RDLExpandTablix(RDLTablix *tab, RDLReport *repo
       headerInst = headerInst ?: [walked firstObject];
       beside = headerInst ? @[ headerInst ] : @[];
     }
-    NSArray<NSNumber *> *levels = RDLHeaderLevelWidths(tab.rowHierarchy.members);
+    NSArray<NSNumber *> *levels = [tab.rowHierarchy headerLevelSizes];
     NSUInteger cornerCount = MIN([tab.cornerRows count], [beside count]);
     for (NSUInteger r = 0; r < cornerCount; r++) {
       RDLTablixInst *inst = beside[r];

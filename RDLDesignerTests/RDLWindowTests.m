@@ -3,6 +3,11 @@
 // The designer window itself: its panes, which navigator and inspector each
 // holds, the preview's rulers and zoom, the menu, and what a drag from the
 // palette lands as.
+#import "RDLCanvasInteraction.h"
+#import "RDLInPlaceEditor.h"
+#import "RDLGroupPropertiesEditor.h"
+#import "RDLItemFactory.h"
+#import "RDLEditor.h"
 #import "RDLDesignerTestSupport.h"
 #import "RDLDataSourceNavigator.h"
 #import "RDLAppDelegate.h"
@@ -44,6 +49,8 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 
 @interface RDLWindowTests : RDLDesignerTestCase
 @end
+static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
+
 @implementation RDLWindowTests
 
 // A maximised window used to leave the whole designer sitting at the top of
@@ -645,13 +652,6 @@ static NSTabView *_centerTabViewOf(id wc) {
 // The zoom control and the rulers. Both read the context rather than keeping
 // their own copy of the zoom, so zooming from the menu has to move the popup
 // and re-measure the rulers -- which is the part that silently would not.
-// Clicking a cell of a scaffolded tablix selects the column as well as the
-// region, and the inspector edits that column's spec. A cell is not an item of
-// its own -- it is an entry in columnSpecs -- so the cell travels with the item
-// selection rather than replacing it.
-// The tablix editor's three lists, and the rule about aggregates. Checked
-// through the lists rather than by dragging: dragging is AppKit's, the
-// partition and the rule are ours.
 // The crosstab sample is the one that exercises groups on both axes, so it is
 // checked as a shape and not only as something that lays out: the hierarchies
 // nest as deep as the sample says, and its measure aggregates, which is the
@@ -1825,7 +1825,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   for (RDLItem *item in report.body.items)
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
-  NSString *first = tablix.columnSpecs[0][@"header"];
+  NSString *first = RDLHeadingsOf(tablix)[0];
   NSRect rect = NSZeroRect;
   [[canvas geometry] findRectOfItem:tablix rect:&rect];
   CGFloat x = NSMinX(rect);
@@ -1846,7 +1846,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   }
   // And undo works, which is what the open group broke.
   [ctx.document.undoManager undo];
-  if (![tablix.columnSpecs[0][@"header"] isEqualToString:first])
+  if (![RDLHeadingsOf(tablix)[0] isEqualToString:first])
     XCTFail(@"%@", @"undo should put the column back where it was");
 }
 
@@ -1854,47 +1854,38 @@ static NSTabView *_centerTabViewOf(id wc) {
 
 // Groups are re-nested by dragging one above another in its list -- the order
 // of the list is the order of the groups, outermost first -- which is what
-// Report Builder's Grouping pane does and the only place it can be done: a
-// group's handle on the canvas is a bracket, not something you drag.
+// Report Builder's Grouping pane does. Each group keeps what it groups on and
+// the header that shows it; the members, rows and columns stay put.
 - (void)testGroupsCanBeReNestedByDraggingInTheList {
   RDLReport *report = [RDLSamples regionalSales];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLTablix *matrix = nil;
-  for (RDLItem *item in report.body.items)
-    if ([item isKindOfClass:[RDLTablix class]])
-      matrix = (RDLTablix *)item;
+  RDLTablix *matrix = RDLFirstTablixOf(report);
   RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:matrix context:ctx];
-  if (editor == nil || [editor.rowGroups count] < 2) {
+  NSArray *was = [[editor rowGroups] valueForKey:@"groupName"];
+  if (editor == nil || [was count] < 2) {
     XCTFail(@"%@", @"the crosstab nests two row groups, which is what re-nesting needs");
     return;
   }
-  NSString *outer = editor.rowGroups[0];
-  NSString *inner = editor.rowGroups[1];
-
-  // Drop the inner one above the outer one: they swap.
-  if (![editor moveRowGroup:inner toIndex:0])
-    XCTFail(@"%@", @"the inner group should move");
-  if (![editor.rowGroups[0] isEqualToString:inner] ||
-      ![editor.rowGroups[1] isEqualToString:outer])
-    XCTFail(@"%@", [NSString stringWithFormat:@"re-nesting did not take: %@", editor.rowGroups]);
+  if (![editor moveRowGroup:[editor rowGroups][1] toIndex:0] ||
+      ![[[editor rowGroups] valueForKey:@"groupName"] isEqualToArray:@[ was[1], was[0] ]])
+    XCTFail(@"re-nesting did not take: %@", [[editor rowGroups] valueForKey:@"groupName"]);
+  RDLTablixMember *outer = [editor rowGroups][0];
+  if (![[(RDLTextbox *)outer.header.item value] isEqualToString:[outer.groupExpressions.firstObject source]])
+    XCTFail(@"%@", @"a group's header should go with it");
 
   // And back the other way: dropping below has to account for the place the
   // group vacates, or it lands one short of where it was let go.
-  if (![editor moveRowGroup:inner toIndex:2])
-    XCTFail(@"%@", @"and back again");
-  if (![editor.rowGroups[0] isEqualToString:outer] ||
-      ![editor.rowGroups[1] isEqualToString:inner])
-    XCTFail(@"%@", [NSString stringWithFormat:@"dragging downwards landed wrong: %@",
-                                              editor.rowGroups]);
+  if (![editor moveRowGroup:[editor rowGroups][0] toIndex:2] ||
+      ![[[editor rowGroups] valueForKey:@"groupName"] isEqualToArray:was])
+    XCTFail(@"dragging downwards landed wrong: %@", [[editor rowGroups] valueForKey:@"groupName"]);
 
   // Column groups are the same list in the other direction.
-  if ([editor.colGroups count] >= 2) {
-    NSString *secondColumn = editor.colGroups[1];
-    [editor moveColumnGroup:secondColumn toIndex:0];
-    if (![editor.colGroups[0] isEqualToString:secondColumn])
-      XCTFail(@"%@", @"column groups re-nest the same way");
-  }
-  [[editor valueForKey:@"window"] close];
+  NSArray *columns = [[editor columnGroups] valueForKey:@"groupName"];
+  if ([columns count] >= 2 && (![editor moveColumnGroup:[editor columnGroups][1] toIndex:0] ||
+                               ![[[editor columnGroups] valueForKey:@"groupName"] isEqualToArray:@[ columns[1], columns[0] ]]))
+    XCTFail(@"%@", @"column groups re-nest the same way");
+  if (![[RDLFirstTablixOf(report).rowHierarchy.members.firstObject groupName] isEqualToString:was[0]])
+    XCTFail(@"%@", @"the report's tablix should not change before OK");
 }
 
 // A crosstab's columns are its groups: the row-header columns belong to the row
@@ -1942,7 +1933,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   [ctx.selection selectItem:matrix inBandWithKey:@"body"];
   NSRect rect = NSZeroRect;
   [[canvas geometry] findRectOfItem:matrix rect:&rect];
-  NSArray *before = matrix.columnSpecs;
+  NSString *before = [RDLEditor XMLStringForItem:matrix];
   CGFloat x = NSMinX(rect);
   for (NSUInteger i = 0; i < 2; i++)
     x += [RDLTablixGeometry widthOfBodyColumn:i of:matrix zoom:ctx.zoom];
@@ -1952,7 +1943,7 @@ static NSTabView *_centerTabViewOf(id wc) {
                                            NSEventTypeLeftMouseDragged, 1)];
   [canvas mouseUp:RDLMouseEventInView(canvas, NSMakePoint(x + 6, NSMinY(rect) - 6),
                                       NSEventTypeLeftMouseUp, 1)];
-  if (![matrix.columnSpecs isEqualToArray:before])
+  if (![[RDLEditor XMLStringForItem:matrix] isEqualToString:before])
     XCTFail(@"%@", @"dragging a group handle must not rearrange anything");
   if ([ctx.document.undoManager groupingLevel] != 0)
     XCTFail(@"%@", @"and it must not leave an undo group open");
@@ -1977,7 +1968,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   for (RDLItem *item in report.body.items)
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
-  NSString *first = tablix.columnSpecs[0][@"header"];
+  NSString *first = RDLHeadingsOf(tablix)[0];
   // A column handle is only there once the region has been selected.
   [ctx.selection selectItem:tablix inBandWithKey:@"body"];
 
@@ -1999,14 +1990,12 @@ static NSTabView *_centerTabViewOf(id wc) {
   [canvas mouseDragged:RDLMouseEventInView(canvas, drop, NSEventTypeLeftMouseDragged, 1)];
   [canvas mouseUp:RDLMouseEventInView(canvas, drop, NSEventTypeLeftMouseUp, 1)];
 
-  if ([tablix.columnSpecs[0][@"header"] isEqualToString:first]) {
-    XCTFail(@"%@", [NSString stringWithFormat:@"dragging the handle did not move the column: %@",
-                                              [tablix.columnSpecs valueForKey:@"header"]]);
+  if ([RDLHeadingsOf(tablix)[0] isEqualToString:first]) {
+    XCTFail(@"dragging the handle did not move the column: %@", RDLHeadingsOf(tablix));
     return;
   }
-  if (![tablix.columnSpecs[2][@"header"] isEqualToString:first])
-    XCTFail(@"%@", [NSString stringWithFormat:@"it landed in the wrong place: %@",
-                                              [tablix.columnSpecs valueForKey:@"header"]]);
+  if (![RDLHeadingsOf(tablix)[2] isEqualToString:first])
+    XCTFail(@"it landed in the wrong place: %@", RDLHeadingsOf(tablix));
 }
 
 // A grouped tablix renders a header column per level of grouping to the left
@@ -2019,15 +2008,16 @@ static NSTabView *_centerTabViewOf(id wc) {
   for (RDLItem *item in report.body.items)
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
-  if ([tablix.rowGroups count] == 0) {
+  NSArray<NSString *> *groups = [RDLTablixGeometry groupBracketLabelsOf:tablix axis:RDLTablixAxisRows];
+  if ([groups count] == 0) {
     XCTFail(@"%@", @"the sample groups its rows, which is the point of it");
     return;
   }
   NSUInteger headers = [RDLTablixGeometry headerColumnCountOf:tablix];
-  if (headers != [tablix.rowGroups count]) {
+  if (headers != [groups count]) {
     XCTFail(@"%@", [NSString stringWithFormat:@"%lu header columns for %lu groups",
                                               (unsigned long)headers,
-                                              (unsigned long)[tablix.rowGroups count]]);
+                                              (unsigned long)[groups count]]);
     return;
   }
   // The grid is the header columns and then the body's own.
@@ -2056,12 +2046,12 @@ static NSTabView *_centerTabViewOf(id wc) {
   for (RDLItem *item in report.body.items)
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
-  NSArray *before = tablix.columnSpecs;
+  NSArray<NSString *> *before = RDLHeadingsOf(tablix);
   if ([before count] < 3) {
     XCTFail(@"%@", @"the invoice has several columns");
     return;
   }
-  NSString *movedHeader = before[0][@"header"];
+  NSString *movedHeader = before[0];
 
   RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
                                                             zoom:1.0
@@ -2106,11 +2096,10 @@ static NSTabView *_centerTabViewOf(id wc) {
                               toIndex:(NSUInteger)[RDLTablixGeometry bodyColumnOf:tablix
                                                                     forGridColumn:target]
                              ofTablix:tablix];
-  if (![tablix.columnSpecs[2][@"header"] isEqualToString:movedHeader])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the column should have moved: %@",
-                                              [tablix.columnSpecs valueForKey:@"header"]]);
+  if (![RDLHeadingsOf(tablix)[2] isEqualToString:movedHeader])
+    XCTFail(@"the column should have moved: %@", RDLHeadingsOf(tablix));
   [ctx.document.undoManager undo];
-  if (![tablix.columnSpecs[0][@"header"] isEqualToString:movedHeader])
+  if (![RDLHeadingsOf(tablix)[0] isEqualToString:movedHeader])
     XCTFail(@"%@", @"and one undo should put it back");
 }
 
@@ -2276,55 +2265,49 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"zoom out should reach the minimum again");
 }
 
-// The Edit Tablix dialog's group lists were readable and nothing else: the
-// only way to group by a field was to drag a column into them, and there was
-// no way at all to stop grouping. They now add, rename and remove.
+// The Edit Tablix dialog's group lists add, regroup and remove: + groups on a
+// field no group uses yet, typing a field's name into a list regroups on it,
+// and − stops grouping while keeping the rows.
 - (void)testTheTablixDialogEditsTheGroups {
   RDLReport *report = [RDLSamples harborManifest];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLTablix *tablix = nil;
-  for (RDLItem *item in report.body.items)
-    if ([item isKindOfClass:[RDLTablix class]])
-      tablix = (RDLTablix *)item;
+  RDLTablix *tablix = RDLFirstTablixOf(report);
   RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:tablix context:ctx];
   if (editor == nil) {
     XCTFail(@"%@", @"the tablix editor did not load");
     return;
   }
-  NSUInteger before = [editor.rowGroups count];
+  NSUInteger before = [[editor rowGroups] count];
   [editor addRowGroup:nil];
-  if ([editor.rowGroups count] != before + 1) {
-    XCTFail(@"%@", @"the + beside the row groups should add one");
+  NSTableView *rowTable = [editor valueForKey:@"rowGroupTable"];
+  NSInteger added = [rowTable selectedRow];
+  if ([[editor rowGroups] count] != before + 1 || added < 0) {
+    XCTFail(@"%@", @"the + beside the row groups should add one, and select it");
     return;
   }
-  // It starts on a field of the dataset, and can be typed over.
-  NSTableView *rowTable = [editor valueForKey:@"rowGroupTable"];
   // Through the data source protocol, which is how the table itself writes a
   // typed-in value back.
-  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)editor;
-  [source tableView:rowTable
-       setObjectValue:@"Port"
-       forTableColumn:[[rowTable tableColumns] firstObject]
-                  row:(NSInteger)before];
-  if (![[editor.rowGroups lastObject] isEqualToString:@"Port"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"typing a field into the list should group by it: "
-                                              @"%@", editor.rowGroups]);
-  [rowTable selectRowIndexes:[NSIndexSet indexSetWithIndex:before] byExtendingSelection:NO];
+  [(id<NSTableViewDataSource>)editor tableView:rowTable
+                                setObjectValue:@"Port"
+                                forTableColumn:[[rowTable tableColumns] firstObject]
+                                           row:added];
+  RDLTablixMember *group = [editor rowGroups][(NSUInteger)added];
+  if (![[group.groupExpressions.firstObject source] isEqualToString:@"=Fields!Port.Value"])
+    XCTFail(@"typing a field into the list should group on it, not on %@", [group.groupExpressions.firstObject source]);
+  [rowTable selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)added] byExtendingSelection:NO];
   [editor removeRowGroup:nil];
-  if ([editor.rowGroups count] != before)
-    XCTFail(@"%@", @"the − should stop grouping by the selected field");
+  if ([[editor rowGroups] count] != before || [[editor.edited structuralProblems] count])
+    XCTFail(@"%@", @"the − should stop grouping and keep the rows");
 
   // Column groups, the same way -- that is what makes a crosstab.
-  NSUInteger columns = [editor.colGroups count];
+  NSUInteger columns = [[editor columnGroups] count];
   [editor addColumnGroup:nil];
-  if ([editor.colGroups count] != columns + 1)
-    XCTFail(@"%@", @"the + beside the column groups should add one");
   NSTableView *colTable = [editor valueForKey:@"colGroupTable"];
-  [colTable selectRowIndexes:[NSIndexSet indexSetWithIndex:columns] byExtendingSelection:NO];
+  if ([[editor columnGroups] count] != columns + 1 || [colTable selectedRow] < 0)
+    XCTFail(@"%@", @"the + beside the column groups should add one");
   [editor removeColumnGroup:nil];
-  if ([editor.colGroups count] != columns)
+  if ([[editor columnGroups] count] != columns)
     XCTFail(@"%@", @"and the − should take it away again");
-  [[editor valueForKey:@"window"] close];
 }
 
 // Selecting something is asking to see its settings. The right pane is two
@@ -2939,5 +2922,296 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([rows.rows count] != 1)
     XCTFail(@"%@", [NSString stringWithFormat:@"given N, the query should narrow: %lu rows", (unsigned long)[rows.rows count]]);
 }
+
+
+#pragma mark - A tablix is edited cell by cell
+
+// The first tablix of a report.
+static RDLTablix *RDLFirstTablixOf(RDLReport *report) {
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      return (RDLTablix *)item;
+  return nil;
+}
+
+// What heads each column: the text of the tablix's heading row, left to right.
+static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix) {
+  NSMutableArray<NSString *> *headings = [NSMutableArray array];
+  for (RDLTablixCell *cell in tablix.tablixBody.rows.firstObject.cells)
+    [headings addObject:[cell.item isKindOfClass:[RDLTextbox class]] ? [(RDLTextbox *)cell.item value] ?: @"" : @""];
+  return headings;
+}
+
+// The middle of the grid cell that a body cell is, in the canvas.
+static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteger bodyRow, NSUInteger bodyColumn,
+                                    CGFloat zoom) {
+  NSRect cell = [RDLTablixGeometry cellRectOf:tablix
+                                     itemRect:itemRect
+                                          row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:bodyRow]
+                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn]
+                                         zoom:zoom];
+  return NSMakePoint(NSMidX(cell), NSMidY(cell));
+}
+
+// An empty cell picked in the outline is the cell picked: the outline counts
+// in the body, a selection in the grid, and a crosstab puts heading rows and
+// header columns ahead of the body -- so the body's numbers named another cell.
+- (void)testTheOutlineSelectsAnEmptyCellWhereItIsInTheGrid {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSOutlineView *outline = [wc valueForKey:@"outline"];
+  id outlineSource = [wc valueForKey:@"outlineSource"];
+  RDLTablix *matrix = RDLFirstTablixOf(report);
+  NSUInteger bodyRow = [matrix.tablixBody.rows count] - 1, bodyColumn = [matrix.tablixBody.columns count] - 1;
+  if ([RDLTablixGeometry headerRowCountOf:matrix] == 0 && [RDLTablixGeometry headerColumnCountOf:matrix] == 0) {
+    XCTFail(@"%@", @"the crosstab should have heading rows or header columns ahead of its body");
+    return;
+  }
+  RDLTablixCell *cell = matrix.tablixBody.rows[bodyRow].cells[bodyColumn];
+  [ctx.editor setItem:nil inCell:cell ofTablix:matrix];
+  NSInteger nodeRow = -1;
+  for (NSInteger row = 0; row < [outline numberOfRows] && nodeRow < 0; row++) {
+    id node = [outline itemAtRow:row];
+    if ([node valueForKey:@"tablix"] == matrix && [node valueForKey:@"item"] == nil &&
+        [[node valueForKey:@"row"] integerValue] == (NSInteger)bodyRow &&
+        [[node valueForKey:@"column"] integerValue] == (NSInteger)bodyColumn)
+      nodeRow = row;
+    if ([outline isExpandable:node])
+      [outline expandItem:node];
+  }
+  if (nodeRow < 0) {
+    XCTFail(@"%@", @"the emptied cell should be in the outline");
+    return;
+  }
+  [outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)nodeRow] byExtendingSelection:NO];
+  [outlineSource outlineViewSelectionDidChange:nil];
+  NSInteger wantRow = (NSInteger)[RDLTablixGeometry gridRowOf:matrix forBodyRow:bodyRow];
+  NSInteger wantColumn = (NSInteger)[RDLTablixGeometry gridColumnOf:matrix forBodyColumn:bodyColumn];
+  if (ctx.selection.scope != RDLSelectionScopeTablixCell || ctx.selection.cellRow != wantRow ||
+      ctx.selection.cellColumn != wantColumn)
+    XCTFail(@"the outline should select grid row %ld, column %ld, not %ld, %ld", (long)wantRow, (long)wantColumn,
+            (long)ctx.selection.cellRow, (long)ctx.selection.cellColumn);
+  if ([RDLItemFactory insertionPointInReport:report selection:ctx.selection].cell != cell)
+    XCTFail(@"%@", @"what is inserted next should go in the cell picked");
+}
+
+// A double-click in a cell edits what is in it, as itself: the column list is
+// not rewritten and nothing is rebuilt, so the cell next to it is the same
+// cell after the edit. Tab goes on to the next textbox of the table, and Return
+// on the table as a whole edits its first.
+- (void)testDoubleClickingACellEditsWhatIsInIt {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  NSRect rect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:tablix rect:&rect] || [tablix.tablixBody.rows count] < 2 ||
+      [tablix.tablixBody.columns count] < 2) {
+    XCTFail(@"%@", @"the invoice should have a table of two rows and columns or more on the canvas");
+    return;
+  }
+  RDLItem *content = tablix.tablixBody.rows[1].cells[1].item;
+  RDLItem *beside = tablix.tablixBody.rows[1].cells[0].item;
+  if (![content isKindOfClass:[RDLTextbox class]]) {
+    XCTFail(@"%@", @"the invoice's second row should have a textbox in its second column");
+    return;
+  }
+  NSPoint p = RDLCanvasPointOfCell(tablix, rect, 1, 1, ctx.zoom);
+  // The first click takes the table; the double-click reaches the cell.
+  [canvas mouseDown:RDLMouseEventInView(canvas, p, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, p, NSEventTypeLeftMouseUp, 1)];
+  [canvas mouseDown:RDLMouseEventInView(canvas, p, NSEventTypeLeftMouseDown, 2)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, p, NSEventTypeLeftMouseUp, 2)];
+  RDLInPlaceEditor *editor = [canvas valueForKey:@"inPlaceEditor"];
+  if (editor.editingItem != content) {
+    XCTFail(@"the double-click should edit the cell's textbox, not %@", editor.editingItem);
+    return;
+  }
+  NSMutableArray<RDLItem *> *boxes = [NSMutableArray array];
+  for (RDLTablixRow *row in tablix.tablixBody.rows)
+    for (RDLTablixCell *each in row.cells)
+      if ([each.item isKindOfClass:[RDLTextbox class]])
+        [boxes addObject:each.item];
+  RDLItem *next = boxes[([boxes indexOfObjectIdenticalTo:content] + 1) % [boxes count]];
+
+  NSTextField *field = [editor valueForKey:@"editorField"];
+  [field setStringValue:@"=Fields!Edited.Value"];
+  NSNotification *tab = [NSNotification notificationWithName:NSControlTextDidEndEditingNotification
+                                                      object:field
+                                                    userInfo:@{ @"NSTextMovement" : @(NSTabTextMovement) }];
+  [editor performSelector:@selector(controlTextDidEndEditing:) withObject:tab];
+  if (![[(RDLTextbox *)content value] isEqualToString:@"=Fields!Edited.Value"])
+    XCTFail(@"the cell's textbox should say what was typed, not %@", [(RDLTextbox *)content value]);
+  if (tablix.tablixBody.rows[1].cells[0].item != beside || tablix.tablixBody.rows[1].cells[1].item != content)
+    XCTFail(@"%@", @"editing a cell should leave the table as it was, not rebuild it");
+  if (editor.editingItem != next)
+    XCTFail(@"Tab should go on to the next textbox, %@, not %@", next.name, editor.editingItem.name);
+  [editor commit];
+
+  [editor beginEditingItem:tablix];
+  if (editor.editingItem == nil || [report cellContainingItem:editor.editingItem tablix:NULL] == nil)
+    XCTFail(@"%@", @"Return on a table should edit the textbox in its first cell");
+  [editor commit];
+}
+
+// Dragging the border between two columns resizes the one on its left, where
+// it stands, snapped to the grid, in one undo step.
+- (void)testDraggingAColumnBorderResizesTheColumn {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:tablix rect:&rect];
+  CGFloat was = tablix.tablixBody.columns[0].width;
+  CGFloat border = NSMinX(rect);
+  NSUInteger headers = [RDLTablixGeometry headerColumnCountOf:tablix];
+  for (NSUInteger c = 0; c <= headers; c++)
+    border += [RDLTablixGeometry widthOfBodyColumn:c of:tablix zoom:ctx.zoom];
+  CGFloat y = NSMinY(rect) + 4;
+  // Off the grid by a little: what is dropped is snapped.
+  CGFloat moved = 0.33 * RDLPointsPerInch * ctx.zoom;
+  [canvas mouseDown:RDLMouseEventInView(canvas, NSMakePoint(border, y), NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, NSMakePoint(border + moved, y), NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, NSMakePoint(border + moved, y), NSEventTypeLeftMouseUp, 1)];
+  CGFloat want = [RDLEditor snap:was + 0.33];
+  if (fabs(tablix.tablixBody.columns[0].width - want) > 1e-6)
+    XCTFail(@"the column should be %.3fin wide, not %.3f", want, tablix.tablixBody.columns[0].width);
+  if ([[tablix structuralProblems] count] || [ctx.document.undoManager groupingLevel] != 0)
+    XCTFail(@"%@", @"the drag should leave the table consistent and the undo stack closed");
+  [ctx.document.undoManager undo];
+  if (fabs(tablix.tablixBody.columns[0].width - was) > 1e-6)
+    XCTFail(@"%@", @"one undo should put the column back");
+}
+
+// The context menu of what is in a cell acts on the table the cell is in --
+// what is selected is the cell's item, not the table -- and on its column.
+- (void)testTheMenuOfWhatIsInACellActsOnItsTable {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:tablix rect:&rect];
+  NSPoint p = RDLCanvasPointOfCell(tablix, rect, 1, 1, ctx.zoom);
+  NSMenu *menu = [canvas menuForEvent:RDLMouseEventInView(canvas, p, NSEventTypeRightMouseDown, 1)];
+  NSMenuItem *insert = [menu itemWithTitle:@"Insert Column After"];
+  if (insert == nil || [insert representedObject] != tablix) {
+    XCTFail(@"the menu of a cell's item should offer its table's columns: %@", [menu itemArray]);
+    return;
+  }
+  if ([menu itemWithTitle:@"Edit Rich Text…"] == nil)
+    XCTFail(@"%@", @"and what the textbox itself offers");
+  NSUInteger columns = [tablix.tablixBody.columns count];
+  [NSApp sendAction:[insert action] to:[insert target] from:insert];
+  if ([tablix.tablixBody.columns count] != columns + 1 || [[tablix structuralProblems] count])
+    XCTFail(@"%@", @"Insert Column After should insert a column into the cell's table");
+}
+
+// The cell under the pointer is the grid's, row and column.
+- (void)testHoveringOverACellNamesItInTheGrid {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:tablix rect:&rect];
+  NSPoint p = RDLCanvasPointOfCell(tablix, rect, 1, 1, ctx.zoom);
+  [canvas mouseMoved:RDLMouseEventInView(canvas, p, NSEventTypeMouseMoved, 0)];
+  RDLCanvasInteraction *interaction = [canvas valueForKey:@"interaction"];
+  NSInteger wantRow = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:1];
+  NSInteger wantColumn = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:1];
+  if (interaction.hoverTablix != tablix || interaction.hoverRow != wantRow || interaction.hoverColumn != wantColumn)
+    XCTFail(@"the hovered cell should be grid row %ld, column %ld, not %ld, %ld", (long)wantRow, (long)wantColumn,
+            (long)interaction.hoverRow, (long)interaction.hoverColumn);
+}
+
+
+// The menu of a group's header offers that group's commands, and the menu of a
+// detail cell a group around it -- on a field of the dataset, picked from the
+// menu -- and a column group; each does what it says.
+- (void)testTheMenuOfACellAddsGroupsAndTotals {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  RDLTablixMember *(^firstGroup)(void) = ^RDLTablixMember * {
+    for (RDLTablixMember *m in tablix.rowHierarchy.members)
+      if ([m.groupExpressions count] && m.header != nil)
+        return m;
+    return nil;
+  };
+  RDLTablixMember *group = firstGroup();
+  NSString *field = [[[report dataSetNamed:tablix.dataSetName] fieldNames] firstObject];
+  if (group == nil || field == nil || [[tablix structuralProblems] count]) {
+    XCTFail(@"the workshop sample should be a consistent table grouped with a header: %@",
+            [tablix structuralProblems]);
+    return;
+  }
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:tablix rect:&rect];
+  NSUInteger first = [tablix.rowHierarchy leafRangeOfMember:group].location;
+  NSUInteger headerColumn = [tablix.rowHierarchy headerLevelOfMember:group];
+  NSRect header = [RDLTablixGeometry cellRectOf:tablix
+                                       itemRect:rect
+                                            row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:first]
+                                         column:headerColumn
+                                           zoom:ctx.zoom];
+  NSMenu *menu = [canvas menuForEvent:RDLMouseEventInView(canvas, NSMakePoint(NSMidX(header), NSMidY(header)),
+                                                          NSEventTypeRightMouseDown, 1)];
+  NSMenu *rowGroup = [[menu itemWithTitle:@"Row Group"] submenu];
+  NSMenuItem *total = [rowGroup itemWithTitle:@"Add Total After"];
+  if (total == nil || [[total representedObject] valueForKey:@"member"] != group ||
+      [rowGroup itemWithTitle:@"Group Properties…"] == nil) {
+    XCTFail(@"the menu of a group's header should offer that group's commands: %@", [menu itemArray]);
+    return;
+  }
+  NSUInteger members = [tablix.rowHierarchy.members count];
+  [NSApp sendAction:[total action] to:[total target] from:total];
+  if ([tablix.rowHierarchy.members count] != members + 1 || [[tablix structuralProblems] count])
+    XCTFail(@"%@", @"Add Total After should put a total beside the group");
+  [ctx.document.undoManager undo];
+
+  group = firstGroup();
+  RDLTablixMember *details = [tablix.rowHierarchy pathToLeaf:first].lastObject;
+  NSUInteger depth = [[tablix.rowHierarchy pathToMember:details] count];
+  NSRect cell = [RDLTablixGeometry cellRectOf:tablix
+                                     itemRect:rect
+                                          row:[RDLTablixGeometry gridRowOf:tablix forBodyRow:first]
+                                       column:[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:0]
+                                         zoom:ctx.zoom];
+  menu = [canvas menuForEvent:RDLMouseEventInView(canvas, NSMakePoint(NSMidX(cell), NSMidY(cell)),
+                                                  NSEventTypeRightMouseDown, 1)];
+  rowGroup = [[menu itemWithTitle:@"Row Group"] submenu];
+  NSMenuItem *parent = [[[rowGroup itemWithTitle:@"Add Parent Group"] submenu] itemWithTitle:field];
+  NSMenuItem *column = [[[[[menu itemWithTitle:@"Column Group"] submenu] itemWithTitle:@"Add Parent Group"] submenu]
+      itemWithTitle:field];
+  if (parent == nil || [[parent representedObject] valueForKey:@"member"] != details || column == nil) {
+    XCTFail(@"the menu of a detail cell should offer groups around it on the dataset's fields: %@", [menu itemArray]);
+    return;
+  }
+  if ([rowGroup itemWithTitle:@"Add Child Group"] != nil || [rowGroup itemWithTitle:@"Add Total After"] != nil)
+    XCTFail(@"%@", @"the details group groups on nothing, so nothing goes inside it or totals it");
+  [NSApp sendAction:[parent action] to:[parent target] from:parent];
+  if ([[tablix.rowHierarchy pathToMember:details] count] != depth + 1 || [[tablix structuralProblems] count])
+    XCTFail(@"%@", @"the field picked should group the details' rows");
+  [NSApp sendAction:[column action] to:[column target] from:column];
+  if ([[tablix.columnHierarchy headerLevelSizes] count] != 1 || [[tablix structuralProblems] count])
+    XCTFail(@"%@", @"and the column group should head the first column");
+}
+
 
 @end

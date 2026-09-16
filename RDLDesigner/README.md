@@ -3,7 +3,7 @@
 **Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. One source tree for **Cocoa** (macOS) and **GNUstep** — both are CI jobs, and
 the Linux build ships as an AppImage. No Swift, no UIKit. Every window, panel and the menu bar is a plain **XIB**; only the parts that depend on the open report stay in code.
 
-`../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columnSpecs` + `-rebuildTablix`, with `rowGroups` / `columnGroups` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. A column group alongside a row group builds a crosstab (matrix): a dynamic `TablixColumnHierarchy` group with the first column as the aggregated measure. The spec is stored plainly and projected onto the MS-RDL structures on demand, so the order in which the properties are set no longer matters. Grouping prepends a 1.2in row-header column that no column spec budgeted for, so `-rebuildTablix` takes that width back out of the columns in proportion rather than growing the tablix past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. The "Edit Tablix…" inspector button opens the modal editor.
+`../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. A tablix on the canvas is edited where it stands: columns, groups and totals change the MS-RDL `TablixBody` and hierarchies in place (`RDLTablixStructure`), each as one undoable step, so what a loaded file has that the designer does not show is kept. A new tablix is built from `columnSpecs` + `-rebuildTablix` (with `rowGroups` / `columnGroups` / `showGrandTotal`), which takes the row headers' width out of the columns rather than growing past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. The "Edit Tablix…" inspector button opens the modal editor.
 
 RDLDesigner.app’s welcome screen opens either this designer or the generator window.
 Choosing the designer asks first where the report comes from — a blank page, or
@@ -170,12 +170,10 @@ Deleting a cell's contents empties the cell rather than removing anything from
 a band, and the empty cell stays selected — it is drawn framed, and it is where
 the next element goes.
 
-The column scaffolding (`columnSpecs` + `-rebuildTablix`) still exists for
-laying out a header + details + subtotal table quickly, and it no longer
-destroys what it cannot describe: a cell holding a subreport, an image or a
-rectangle of items is carried across a rebuild rather than replaced by an empty
-text box. A column can also say it *shows* a subreport (`kind` / `report` in
-the spec, **Shows** and **Report** in the tablix editor), which is how a
+The column scaffolding (`columnSpecs` + `-rebuildTablix`) builds a new
+header + details + subtotal table quickly; a tablix that has a body is never
+rebuilt. A column can say it *shows* a subreport (**Shows** and **Report** in
+the tablix dialog), which puts a subreport in its value cell -- how a
 master-detail column is made without touching the cell by hand.
 
 ## Subreports

@@ -3,15 +3,6 @@
 #import "RDLSelection.h"
 #import "RDLEditor.h"
 
-static void RDLCollectNames(NSArray *items, NSMutableSet *names) {
-  for (RDLItem *it in items) {
-    if (it.name)
-      [names addObject:it.name];
-    if ([it.childItems count])
-      RDLCollectNames(it.childItems, names);
-  }
-}
-
 // Depth-first search for `target`, reporting the Rectangle that holds it.
 static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
                                RDLItem **outParent) {
@@ -152,10 +143,27 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 
 #pragma mark - Naming
 
-+ (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report {
+// Every name in use, including those of items in tablix cells, corners and
+// group headers, which -childItems does not list: a name taken there is taken.
+static NSMutableSet *RDLUsedNames(RDLReport *report) {
   NSMutableSet *used = [NSMutableSet set];
-  for (NSString *k in [RDLReport bandKeys])
-    RDLCollectNames([report bandWithKey:k].items, used);
+  for (RDLItem *it in [report allItemsIncludingNested])
+    if (it.name)
+      [used addObject:it.name];
+  return used;
+}
+
++ (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report {
+  return [self uniqueNameWithPrefix:prefix inReport:report besides:nil];
+}
+
++ (NSString *)uniqueNameWithPrefix:(NSString *)prefix
+                          inReport:(RDLReport *)report
+                           besides:(RDLItem *)item {
+  NSMutableSet *used = RDLUsedNames(report);
+  for (RDLItem *it in [item itemsIncludingNested])
+    if (it.name)
+      [used addObject:it.name];
   NSString *base = [prefix length] ? prefix : @"Item";
   NSInteger i = 1;
   while ([used containsObject:[NSString stringWithFormat:@"%@%ld", base, (long)i]])
@@ -164,9 +172,7 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 }
 
 + (void)renameTreeUniquely:(RDLItem *)item inReport:(RDLReport *)report {
-  NSMutableSet *used = [NSMutableSet set];
-  for (NSString *k in [RDLReport bandKeys])
-    RDLCollectNames([report bandWithKey:k].items, used);
+  NSMutableSet *used = RDLUsedNames(report);
   [self renameTree:item usedNames:used];
 }
 

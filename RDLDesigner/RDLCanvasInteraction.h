@@ -28,10 +28,11 @@
 - (instancetype)initWithContext:(RDLEditingContext *)context hostView:(NSView *)hostView;
 @property (nonatomic, weak) id<RDLCanvasInteractionHost> host;
 
-// The cell the pointer is over, for the discoverability highlight.
+// The cell the pointer is over, for the discoverability highlight: which
+// tablix, and the row and column of its grid (-1 when none).
 @property (nonatomic, readonly, strong) RDLItem *hoverTablix;
-@property (nonatomic, readonly, assign) NSUInteger hoverColumn;
-@property (nonatomic, readonly, assign) RDLTablixPart hoverPart;
+@property (nonatomic, readonly, assign) NSInteger hoverRow;
+@property (nonatomic, readonly, assign) NSInteger hoverColumn;
 // A column being dragged by its handle: which tablix, and the grid column the
 // drop would land in. -1 when no column is being dragged.
 @property (nonatomic, readonly, strong) RDLTablix *dragTablix;

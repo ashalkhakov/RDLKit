@@ -11,6 +11,7 @@
 // with the previous value, so NSUndoManager derives redo for free.
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
+#import "RDLTablixStructure.h"
 
 @class RDLDocument;
 @class RDLItem;
@@ -113,10 +114,10 @@
 - (void)setRows:(NSArray *)rows fields:(NSArray *)fields ofDataSet:(RDLDataSet *)dataSet;
 
 // --- Tablix ---------------------------------------------------------------
-// All of these go through columnSpecs + -rebuildTablix, so the inverse is
-// simply the previous spec, and the ordering hazard of the old implicit
-// rebuild-on-set does not arise.
-- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix;
+// Every edit here changes the body and hierarchies in place
+// (RDLTablixStructure), with the tablix as it was kept for undo, so what a
+// file has that the designer does not show is kept. Row and column indices are
+// the body's.
 // What one cell of a tablix holds: an item, or nil to empty it. MS-RDL's
 // CellContents holds 0 or 1 report items, so this is the whole of a cell's
 // contents -- a cell that has to hold more holds a Rectangle, and the items go
@@ -124,13 +125,8 @@
 - (void)setItem:(RDLItem *)item
          inCell:(RDLTablixCell *)cell
        ofTablix:(RDLTablix *)tablix;
-// Apply several tablix properties and rebuild ONCE, as a single inverse.
-// Necessary rather than convenient: the rebuild reads columnSpecs, rowGroups,
-// columnGroups, showGrandTotal and the heights together, so setting them
-// through separate undoable steps would undo them one at a time and rebuild
-// against a half-restored state. Values may be NSNull to mean nil.
-- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix;
 - (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix;
+- (void)setTablixRow:(NSUInteger)index height:(CGFloat)height ofTablix:(RDLTablix *)tablix;
 - (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 // Reorder: the column at `from` ends up at `to`, taking its heading, its value
@@ -139,6 +135,33 @@
                         toIndex:(NSUInteger)to
                        ofTablix:(RDLTablix *)tablix;
 - (void)toggleGrandTotalOfTablix:(RDLTablix *)tablix;
+// Groups, each one undoable step, and each as RDLTablixStructure describes it.
+// A member is one of the tablix's own at the time; after an undo the tablix
+// holds new ones, looked up again the way the first was.
+- (RDLTablixMember *)addGroupWithExpression:(NSString *)expression
+                                  placement:(RDLGroupPlacement)placement
+                                   toMember:(RDLTablixMember *)member
+                                       axis:(RDLTablixAxis)axis
+                                   ofTablix:(RDLTablix *)tablix;
+- (BOOL)deleteGroup:(RDLTablixMember *)member
+          withLines:(BOOL)withLines
+               axis:(RDLTablixAxis)axis
+           ofTablix:(RDLTablix *)tablix;
+- (RDLTablixMember *)addTotalBesideGroup:(RDLTablixMember *)member
+                                   after:(BOOL)after
+                                    axis:(RDLTablixAxis)axis
+                                ofTablix:(RDLTablix *)tablix;
+- (BOOL)setName:(NSString *)name
+    expressions:(NSArray<RDLValue *> *)expressions
+        filters:(NSArray<RDLFilter *> *)filters
+        ofGroup:(RDLTablixMember *)member
+           axis:(RDLTablixAxis)axis
+       ofTablix:(RDLTablix *)tablix;
+// A tablix edited apart from the report -- a dialog's working copy, made with
+// +XMLStringForItem: and +itemFromXMLString: -- put in the place of the one it
+// copies, as one undoable step: its body, hierarchies, corner, size, dataset
+// and filters. NO, recording nothing, when the copy is no different.
+- (BOOL)replaceTablix:(RDLTablix *)tablix withEdited:(RDLTablix *)edited;
 
 // --- Rich text ------------------------------------------------------------
 // Sets `value` and `paragraphs` together from an attributed string, as one

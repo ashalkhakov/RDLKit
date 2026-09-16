@@ -871,6 +871,17 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   }
   return self;
 }
+
+- (NSArray<RDLTablixMember *> *)leafMembers {
+  return [self.members count] ? [RDLTablixMember leafMembersOf:self.members] : @[ self ];
+}
+
++ (NSArray<RDLTablixMember *> *)leafMembersOf:(NSArray<RDLTablixMember *> *)members {
+  NSMutableArray<RDLTablixMember *> *leaves = [NSMutableArray array];
+  for (RDLTablixMember *m in members)
+    [leaves addObjectsFromArray:[m leafMembers]];
+  return leaves;
+}
 @end
 
 @implementation RDLFilter
@@ -906,6 +917,109 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   }
   return self;
 }
+
+- (NSArray<RDLTablixMember *> *)leafMembers {
+  return [RDLTablixMember leafMembersOf:self.members];
+}
+
+// Where `target` sits among `members`: its leaves' range, counting on from
+// `*start`, and the path down to it. NO when it is not among them.
+static BOOL RDLFindMember(NSArray<RDLTablixMember *> *members, RDLTablixMember *target, NSUInteger *start,
+                          NSMutableArray<RDLTablixMember *> *path, NSRange *range) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger count = [[m leafMembers] count];
+    [path addObject:m];
+    if (m == target) {
+      *range = NSMakeRange(*start, count);
+      return YES;
+    }
+    NSUInteger inner = *start;
+    if (RDLFindMember(m.members, target, &inner, path, range))
+      return YES;
+    [path removeLastObject];
+    *start += count;
+  }
+  return NO;
+}
+
+- (NSRange)leafRangeOfMember:(RDLTablixMember *)member {
+  NSUInteger start = 0;
+  NSRange range = NSMakeRange(NSNotFound, 0);
+  RDLFindMember(self.members, member, &start, [NSMutableArray array], &range);
+  return range;
+}
+
+- (NSArray<RDLTablixMember *> *)pathToMember:(RDLTablixMember *)member {
+  NSUInteger start = 0;
+  NSRange range = NSMakeRange(NSNotFound, 0);
+  NSMutableArray<RDLTablixMember *> *path = [NSMutableArray array];
+  return RDLFindMember(self.members, member, &start, path, &range) ? path : nil;
+}
+
+// Down to the leaf `*remaining` leaves further on, counting it off as members
+// are passed.
+static BOOL RDLFindLeaf(NSArray<RDLTablixMember *> *members, NSUInteger *remaining,
+                        NSMutableArray<RDLTablixMember *> *path) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger count = [[m leafMembers] count];
+    if (*remaining >= count) {
+      *remaining -= count;
+      continue;
+    }
+    [path addObject:m];
+    return [m.members count] == 0 || RDLFindLeaf(m.members, remaining, path);
+  }
+  return NO;
+}
+
+- (NSArray<RDLTablixMember *> *)pathToLeaf:(NSUInteger)leaf {
+  NSUInteger remaining = leaf;
+  NSMutableArray<RDLTablixMember *> *path = [NSMutableArray array];
+  return RDLFindLeaf(self.members, &remaining, path) ? path : nil;
+}
+
+static void RDLCollectHeaderLevels(NSArray<RDLTablixMember *> *members, NSUInteger level,
+                                   NSMutableArray<NSNumber *> *sizes) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger inner = level;
+    if (m.header != nil) {
+      while ([sizes count] <= level)
+        [sizes addObject:@0];
+      sizes[level] = @(MAX([sizes[level] doubleValue], m.header.size));
+      inner = level + 1;
+    }
+    RDLCollectHeaderLevels(m.members, inner, sizes);
+  }
+}
+
+- (NSArray<NSNumber *> *)headerLevelSizes {
+  NSMutableArray<NSNumber *> *sizes = [NSMutableArray array];
+  RDLCollectHeaderLevels(self.members, 0, sizes);
+  return sizes;
+}
+
+- (NSUInteger)headerLevelOfMember:(RDLTablixMember *)member {
+  NSArray<RDLTablixMember *> *path = [self pathToMember:member];
+  if (path == nil)
+    return NSNotFound;
+  NSUInteger level = 0;
+  for (NSUInteger i = 0; i + 1 < [path count]; i++)
+    if (path[i].header != nil)
+      level += 1;
+  return level;
+}
+
+- (RDLTablixMember *)memberWithHeaderAtLevel:(NSUInteger)level onPathToLeaf:(NSUInteger)leaf {
+  NSUInteger at = 0;
+  for (RDLTablixMember *m in [self pathToLeaf:leaf]) {
+    if (m.header == nil)
+      continue;
+    if (at == level)
+      return m;
+    at += 1;
+  }
+  return nil;
+}
 @end
 
 // One column of the designer table, resolved once per build.
@@ -925,7 +1039,15 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 @implementation RDLColSpec
 @end
 
+static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
+
 @implementation RDLItem
+
+- (NSArray<RDLItem *> *)itemsIncludingNested {
+  NSMutableArray *items = [NSMutableArray array];
+  RDLCollectNested(@[ self ], items);
+  return items;
+}
 
 - (instancetype)init {
   self = [super init];
@@ -1186,13 +1308,6 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 
 @end
 
-// CellContents may hold any report item; everything this file builds and reads
-// back puts a textbox there.
-static NSString *RDLCellValue(RDLTablixCell *cell) {
-  RDLItem *it = cell.item;
-  return [it isKindOfClass:[RDLTextbox class]] ? [(RDLTextbox *)it value] : nil;
-}
-
 @implementation RDLTablix {
   CGFloat _stashHeaderH;
   CGFloat _stashRowH;
@@ -1255,92 +1370,6 @@ static NSString *RDLCellValue(RDLTablixCell *cell) {
   }
   if ([_tablixBody.rows count] > 1)
     _tablixBody.rows[1].height = h;
-}
-
-// "=Sum(Fields!Amount.Value)" → aggregate "Sum". Returns nil when the value
-// is not a plain aggregate call.
-static NSString *RDLAggregateOfValue(NSString *value) {
-  if (![value hasPrefix:@"="])
-    return nil;
-  NSRange paren = [value rangeOfString:@"("];
-  if (paren.location == NSNotFound || paren.location < 2)
-    return nil;
-  NSString *fn = [value substringWithRange:NSMakeRange(1, paren.location - 1)];
-  static NSSet *known = nil;
-  if (known == nil)
-    known = [NSSet setWithArray:@[ @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ]];
-  return [known containsObject:fn] ? fn : nil;
-}
-
-// Recover the designer column spec from a built tablixBody. Lossy: the
-// aggregate and (for a matrix) the header are read back out of the cell
-// expression text. Used by -inferColumnSpecsFromTablixBody and as the
-// fallback for items that never had a spec stored (e.g. an RDL 2005 List).
-- (NSArray *)rdlDerivedColumns {
-  if ([_tablixBody.columns count] == 0)
-    return @[];
-  if ([self rdlIsMatrix]) {
-    // Matrix: one measure column; recover the designer spec from the data cell.
-    RDLItem *cell = _tablixBody.rows.firstObject.cells.firstObject.item;
-    NSString *val = RDLCellValue(_tablixBody.rows.firstObject.cells.firstObject) ?: @"";
-    NSMutableDictionary *col = [NSMutableDictionary dictionary];
-    col[@"width"] = @(_tablixBody.columns[0].width);
-    col[@"header"] = @"";
-    col[@"value"] = val;
-    if (cell.style.textAlign != RDLTextAlignUnspecified)
-      col[@"align"] = RDLStringFromTextAlign(cell.style.textAlign);
-    NSString *agg = RDLAggregateOfValue(val);
-    if (agg) {
-      col[@"aggregate"] = agg;
-      NSRange bang = [val rangeOfString:@"Fields!"];
-      if (bang.location != NSNotFound) {
-        NSString *rest = [val substringFromIndex:bang.location + 7];
-        NSRange dot = [rest rangeOfString:@"."];
-        NSString *field = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
-        col[@"header"] = field;
-        col[@"value"] = [NSString stringWithFormat:@"=Fields!%@.Value", field];
-      }
-    }
-    return @[ col ];
-  }
-  RDLTablixRow *header = _tablixBody.rows.firstObject;
-  RDLTablixRow *detail = [_tablixBody.rows count] > 1 ? _tablixBody.rows[1] : header;
-  // Aggregate metadata lives in the subtotal / grand total rows, if present.
-  RDLTablixRow *aggRow = [_tablixBody.rows count] > 2 ? _tablixBody.rows.lastObject : nil;
-  NSMutableArray *cols = [NSMutableArray array];
-  NSUInteger n = [_tablixBody.columns count];
-  for (NSUInteger i = 0; i < n; i++) {
-    CGFloat w = _tablixBody.columns[i].width;
-    NSMutableDictionary *col = [NSMutableDictionary dictionary];
-    col[@"width"] = @(w);
-    col[@"header"] = @"";
-    col[@"value"] = @"";
-    if (i < [header.cells count] && RDLCellValue(header.cells[i]))
-      col[@"header"] = RDLCellValue(header.cells[i]);
-    if (detail && i < [detail.cells count]) {
-      RDLItem *dItem = detail.cells[i].item;
-      if (RDLCellValue(detail.cells[i]))
-        col[@"value"] = RDLCellValue(detail.cells[i]);
-      if (dItem.style.textAlign != RDLTextAlignUnspecified)
-        col[@"align"] = RDLStringFromTextAlign(dItem.style.textAlign);
-      // What the cell holds, when it is not the text box a column spec
-      // describes. A subreport is the one this designer can also build, so it
-      // names the report as well; anything else is recorded by kind alone, so
-      // that a rebuild knows to leave it where it is.
-      if (![dItem isKindOfClass:[RDLTextbox class]] && dItem != nil) {
-        col[@"kind"] = [dItem rdlElementName] ?: @"";
-        if ([dItem isKindOfClass:[RDLSubreport class]])
-          col[@"report"] = [(RDLSubreport *)dItem reportName] ?: @"";
-      }
-    }
-    if (aggRow && i < [aggRow.cells count]) {
-      NSString *agg = RDLAggregateOfValue(RDLCellValue(aggRow.cells[i]) ?: @"");
-      if (agg)
-        col[@"aggregate"] = agg;
-    }
-    [cols addObject:col];
-  }
-  return cols;
 }
 
 // One header column per row group: a crosstab nested three deep needs three,
@@ -1431,66 +1460,116 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 }
 
 
-// The members that render a header of their own, outermost first: one per
-// level of a hierarchy that carries a TablixHeader with a size. This mirrors
-// the layout engine's RDLHeaderWidth, which sums exactly those -- a details
-// member has no header and takes up no room, and a static total member has
-// none either.
-static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *members) {
-  NSMutableArray *chain = [NSMutableArray array];
-  NSArray<RDLTablixMember *> *level = members;
-  while ([level count]) {
-    RDLTablixMember *widest = nil;
-    for (RDLTablixMember *m in level)
-      if (m.header.size > 0 && (widest == nil || m.header.size > widest.header.size))
-        widest = m;
-    if (widest != nil) {
-      [chain addObject:widest];
-      level = widest.members;
-      continue;
-    }
-    // Nothing at this level renders a header; the levels inside it may.
-    NSMutableArray *next = [NSMutableArray array];
-    for (RDLTablixMember *m in level)
-      [next addObjectsFromArray:m.members];
-    level = next;
-  }
-  return chain;
-}
-
 - (NSArray<NSNumber *> *)rowHeaderColumnWidths {
-  NSMutableArray *widths = [NSMutableArray array];
-  for (RDLTablixMember *m in RDLHeaderMembers(self.rowHierarchy.members))
-    [widths addObject:@(m.header.size)];
-  return widths;
-}
-
-- (RDLItem *)rowHeaderItemAtLevel:(NSUInteger)level {
-  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.rowHierarchy.members);
-  return level < [members count] ? members[level].header.item : nil;
+  return [self.rowHierarchy headerLevelSizes] ?: @[];
 }
 
 - (NSArray<NSNumber *> *)columnHeaderRowHeights {
-  NSMutableArray *heights = [NSMutableArray array];
-  for (RDLTablixMember *m in RDLHeaderMembers(self.columnHierarchy.members))
-    [heights addObject:@(m.header.size)];
-  return heights;
-}
-
-- (RDLItem *)columnHeaderItemAtLevel:(NSUInteger)level {
-  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.columnHierarchy.members);
-  return level < [members count] ? members[level].header.item : nil;
+  return [self.columnHierarchy headerLevelSizes] ?: @[];
 }
 
 - (void)rebuildTablix {
-  NSArray *specs = _columnSpecs ?: [self rdlDerivedColumns];
+  NSArray *specs = _columnSpecs ?: @[];
   [self rdlBuildTable:[self rdlSpecsFittingWidth:specs]
           headerHeight:self.headerHeight
              rowHeight:self.rowHeight];
 }
 
-- (void)inferColumnSpecsFromTablixBody {
-  _columnSpecs = [[self rdlDerivedColumns] copy];
+// How many rows or columns a cell's span covers: a span of 0 or 1 is itself.
+static NSUInteger RDLSpanOf(NSInteger span) {
+  return span > 1 ? (NSUInteger)span : 1;
+}
+
+- (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
+  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+  for (NSUInteger r = 0; cell != nil && r < [rows count]; r++) {
+    NSUInteger at = [rows[r].cells indexOfObjectIdenticalTo:cell];
+    if (at == NSNotFound)
+      continue;
+    if (row)
+      *row = r;
+    if (column)
+      *column = at;
+    return YES;
+  }
+  return NO;
+}
+
+- (RDLTablixCell *)cellCoveringRow:(NSUInteger)row
+                            column:(NSUInteger)column
+                         originRow:(NSUInteger *)originRow
+                      originColumn:(NSUInteger *)originColumn {
+  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+  if (row >= [rows count] || column >= [rows[row].cells count])
+    return nil;
+  NSUInteger foundRow = row, foundColumn = column;
+  for (NSUInteger r = 0; r <= row; r++) {
+    NSArray<RDLTablixCell *> *cells = rows[r].cells;
+    for (NSUInteger c = 0; c <= column && c < [cells count]; c++) {
+      if (r == row && c == column)
+        continue;
+      RDLTablixCell *cell = cells[c];
+      NSUInteger down = RDLSpanOf(cell.rowSpan), across = RDLSpanOf(cell.colSpan);
+      if ((down > 1 || across > 1) && r + down > row && c + across > column) {
+        foundRow = r;
+        foundColumn = c;
+      }
+    }
+  }
+  if (originRow)
+    *originRow = foundRow;
+  if (originColumn)
+    *originColumn = foundColumn;
+  return rows[foundRow].cells[foundColumn];
+}
+
+- (NSArray<NSString *> *)structuralProblems {
+  NSMutableArray<NSString *> *problems = [NSMutableArray array];
+  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+  NSUInteger columns = [self.tablixBody.columns count];
+  if ([rows count] == 0)
+    [problems addObject:@"the body has no rows"];
+  if (columns == 0)
+    [problems addObject:@"the body has no columns"];
+  // A hierarchy with no members is one the writer and the layout make up, a
+  // static member per row or column, so it cannot disagree with the body.
+  NSUInteger rowLeaves = [[self.rowHierarchy leafMembers] count];
+  if ([self.rowHierarchy.members count] && rowLeaves != [rows count])
+    [problems addObject:[NSString stringWithFormat:@"the row hierarchy has %lu leaf members for %lu body rows",
+                                                   (unsigned long)rowLeaves, (unsigned long)[rows count]]];
+  NSUInteger columnLeaves = [[self.columnHierarchy leafMembers] count];
+  if ([self.columnHierarchy.members count] && columnLeaves != columns)
+    [problems addObject:[NSString stringWithFormat:@"the column hierarchy has %lu leaf members for %lu body columns",
+                                                   (unsigned long)columnLeaves, (unsigned long)columns]];
+  for (NSUInteger r = 0; r < [rows count]; r++) {
+    NSArray<RDLTablixCell *> *cells = rows[r].cells;
+    if ([cells count] != columns)
+      [problems addObject:[NSString stringWithFormat:@"body row %lu has %lu cells for %lu columns", (unsigned long)r,
+                                                     (unsigned long)[cells count], (unsigned long)columns]];
+    for (NSUInteger c = 0; c < [cells count]; c++) {
+      RDLTablixCell *cell = cells[c];
+      NSUInteger down = RDLSpanOf(cell.rowSpan), across = RDLSpanOf(cell.colSpan);
+      if (down == 1 && across == 1)
+        continue;
+      if (r + down > [rows count] || c + across > columns) {
+        [problems addObject:[NSString stringWithFormat:@"the cell at body row %lu, column %lu spans past the body",
+                                                       (unsigned long)r, (unsigned long)c]];
+        continue;
+      }
+      for (NSUInteger rr = r; rr < r + down; rr++)
+        for (NSUInteger cc = c; cc < c + across; cc++) {
+          if (rr == r && cc == c)
+            continue;
+          RDLTablixCell *covered = cc < [rows[rr].cells count] ? rows[rr].cells[cc] : nil;
+          if (covered.item != nil || RDLSpanOf(covered.rowSpan) > 1 || RDLSpanOf(covered.colSpan) > 1)
+            [problems addObject:[NSString stringWithFormat:@"body row %lu, column %lu is under the span of the cell at "
+                                                           @"row %lu, column %lu but is not empty",
+                                                           (unsigned long)rr, (unsigned long)cc, (unsigned long)r,
+                                                           (unsigned long)c]];
+        }
+    }
+  }
+  return problems;
 }
 
 
@@ -2175,6 +2254,56 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   return nil;
 }
 
+static void RDLCollectTablixGroupNames(NSArray<RDLTablixMember *> *members, NSMutableSet<NSString *> *names) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName length])
+      [names addObject:m.groupName];
+    RDLCollectTablixGroupNames(m.members, names);
+  }
+}
+
+static void RDLCollectChartGroupNames(NSArray<RDLChartMember *> *members, NSMutableSet<NSString *> *names) {
+  for (RDLChartMember *m in members) {
+    if ([m.groupName length])
+      [names addObject:m.groupName];
+    RDLCollectChartGroupNames(m.members, names);
+  }
+}
+
+- (RDLTablix *)tablixHoldingItem:(RDLItem *)item {
+  RDLTablix *holder = nil;
+  // Outer items come before what is inside them, so the last tablix holding
+  // the item is the innermost.
+  for (RDLItem *candidate in [self allItemsIncludingNested])
+    if (candidate != item && [candidate isKindOfClass:[RDLTablix class]] &&
+        [[candidate itemsIncludingNested] indexOfObjectIdenticalTo:item] != NSNotFound)
+      holder = (RDLTablix *)candidate;
+  return holder;
+}
+
+- (NSSet<NSString *> *)scopeNames {
+  NSMutableSet<NSString *> *names = [NSMutableSet set];
+  for (RDLDataSet *ds in self.dataSets)
+    if ([ds.name length])
+      [names addObject:ds.name];
+  for (RDLItem *item in [self allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLDataRegion class]])
+      continue;
+    if ([item.name length])
+      [names addObject:item.name];
+    if ([item isKindOfClass:[RDLTablix class]]) {
+      RDLTablix *tablix = (RDLTablix *)item;
+      RDLCollectTablixGroupNames(tablix.rowHierarchy.members, names);
+      RDLCollectTablixGroupNames(tablix.columnHierarchy.members, names);
+    } else if ([item isKindOfClass:[RDLChart class]]) {
+      RDLChart *chart = (RDLChart *)item;
+      RDLCollectChartGroupNames(chart.categoryMembers, names);
+      RDLCollectChartGroupNames(chart.seriesMembers, names);
+    }
+  }
+  return names;
+}
+
 + (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
   return [bandKey isEqualToString:@"body"];
 }
@@ -2220,8 +2349,6 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
 // use -childItems (adoption, the designer outline) want the items a person can
 // see and move. So the tablix is opened here, once, rather than at every call
 // site that needs the whole tree.
-static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
-
 static void RDLCollectHeaderItems(NSArray<RDLTablixMember *> *members, NSMutableArray *into) {
   for (RDLTablixMember *m in members) {
     if (m.header.item)

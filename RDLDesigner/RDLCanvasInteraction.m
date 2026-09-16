@@ -27,8 +27,8 @@
   BOOL _nudging;
   // Hovered tablix cell.
   RDLItem *_hoverTablix;
-  NSUInteger _hoverCol;
-  RDLTablixPart _hoverPart;
+  NSInteger _hoverRow;
+  NSInteger _hoverCol;
   // A double-click's edit starts on mouse-up (see -mouseUp:).
   RDLItem *_pendingEditItem;
   NSPoint _pendingEditPoint;
@@ -40,6 +40,8 @@
     _ctx = context;
     _hostView = hostView;
     _dragColumnTarget = -1;
+    _hoverRow = -1;
+    _hoverCol = -1;
   }
   return self;
 }
@@ -48,12 +50,12 @@
   return _hoverTablix;
 }
 
-- (NSUInteger)hoverColumn {
-  return _hoverCol;
+- (NSInteger)hoverRow {
+  return _hoverRow;
 }
 
-- (RDLTablixPart)hoverPart {
-  return _hoverPart;
+- (NSInteger)hoverColumn {
+  return _hoverCol;
 }
 
 - (void)mouseDown:(NSEvent *)event {
@@ -68,11 +70,8 @@
   NSRect itemRect = NSZeroRect;
   RDLItem *hit = [[_host interactionGeometry] itemAtPoint:p kind:&kind bandKey:&bandKey rect:&itemRect];
   if (hit) {
-    // A click inside a scaffolded tablix selects the cell as well as the
-    // region, so the inspector can show that column rather than the whole
-    // table. A click elsewhere in it selects the tablix with no cell.
-    NSUInteger cellCol = 0;
-    RDLTablixPart cellPart = RDLTablixPartNone;
+    // In the tablix being worked in, a click in an empty cell selects that
+    // cell; what is in a cell is hit as itself, and selected as any item is.
     NSUInteger gridRow = 0, gridCol = 0;
     if (hit == [_ctx engagedTablix] &&
         [RDLTablixGeometry tablix:(RDLTablix *)hit
@@ -91,19 +90,7 @@
       _dragKind = nil;
       return;
     }
-    if ([hit isKindOfClass:[RDLTablix class]] &&
-        [RDLTablixGeometry tablix:(RDLTablix *)hit
-                         itemRect:itemRect
-                            point:p
-                           column:&cellCol
-                             part:&cellPart
-                             zoom:_ctx.zoom])
-      [_ctx.selection selectItem:hit
-                   inBandWithKey:bandKey
-                          column:(NSInteger)cellCol
-                            part:cellPart];
-    else
-      [_ctx.selection selectItem:hit inBandWithKey:bandKey];
+    [_ctx.selection selectItem:hit inBandWithKey:bandKey];
     if ([event clickCount] >= 2) {
       // The edit starts from mouseUp: -- the reliable Cocoa pattern -- so
       // remember what was hit for the second click's release to act on.
@@ -160,7 +147,7 @@
       _dragActive = NO;
       _dragStart = p;
       _dragColIndex = borderCol;
-      _origColW = [[(RDLTablix *)hit columnSpecs][borderCol][@"width"] doubleValue];
+      _origColW = ((RDLTablix *)hit).tablixBody.columns[borderCol].width;
       return;
     }
     _dragKind = kind;
@@ -229,7 +216,7 @@
     [_host interactionNeedsRedraw];
   } else if ([_dragKind isEqualToString:@"tabcol"])
     [_ctx.editor setTablixColumn:_dragColIndex
-                           width:_origColW + dx
+                           width:[RDLEditor snap:_origColW + dx]
                         ofTablix:(RDLTablix *)[_ctx selectedItem]];
 }
 
@@ -341,11 +328,11 @@
 // which raised an unrecognized selector on every exit.
 - (void)mouseExited {
   [[NSCursor arrowCursor] set];
-  if (_hoverTablix == nil && _hoverPart == RDLTablixPartNone)
+  if (_hoverTablix == nil)
     return;
   _hoverTablix = nil;
-  _hoverCol = 0;
-  _hoverPart = RDLTablixPartNone;
+  _hoverRow = -1;
+  _hoverCol = -1;
   [_host interactionNeedsRedraw];
 }
 
@@ -353,8 +340,7 @@
   NSPoint p = [_hostView convertPoint:[event locationInWindow] fromView:nil];
   CGFloat z = _ctx.zoom;
   RDLItem *hoverTab = nil;
-  NSUInteger hoverCol = 0;
-  RDLTablixPart hoverPart = RDLTablixPartNone;
+  NSInteger hoverRow = -1, hoverCol = -1;
   BOOL onBorder = NO;
 
   // Only the region being worked in. A cell highlight or a column-resize
@@ -373,21 +359,20 @@
       onBorder = YES;
       break;
     }
-    NSUInteger col = 0;
-    RDLTablixPart part = RDLTablixPartNone;
-    if ([RDLTablixGeometry tablix:it itemRect:ir point:p column:&col part:&part zoom:z]) {
+    NSUInteger row = 0, column = 0;
+    if ([RDLTablixGeometry tablix:it itemRect:ir point:p row:&row column:&column zoom:z]) {
       hoverTab = it;
-      hoverCol = col;
-      hoverPart = part;
+      hoverRow = (NSInteger)row;
+      hoverCol = (NSInteger)column;
       break;
     }
   }
 
   [onBorder ? [NSCursor resizeLeftRightCursor] : [NSCursor arrowCursor] set];
-  if (hoverTab != _hoverTablix || hoverCol != _hoverCol || hoverPart != _hoverPart) {
+  if (hoverTab != _hoverTablix || hoverRow != _hoverRow || hoverCol != _hoverCol) {
     _hoverTablix = hoverTab;
+    _hoverRow = hoverRow;
     _hoverCol = hoverCol;
-    _hoverPart = hoverPart;
     [_host interactionNeedsRedraw];
   }
 }

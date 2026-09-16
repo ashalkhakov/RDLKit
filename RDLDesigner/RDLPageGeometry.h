@@ -13,6 +13,7 @@
 // model, so it is safe to build one per draw.
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
+#import "RDLTablixStructure.h"
 
 @class RDLBand;
 @class RDLItem;
@@ -31,16 +32,6 @@ extern NSString * const RDLHandleCell;
 extern NSString * const RDLHandleSouthEast;
 extern NSString * const RDLHandleEast;
 extern NSString * const RDLHandleSouth;
-
-// Which row of a tablix's preview a point fell in, as returned by
-// +tablix:itemRect:point:column:part:. An enumeration rather than the two
-// strings this was: the vocabulary is fixed, and a mistyped comparison against
-// a string is a branch that never runs and that nothing diagnoses.
-typedef NS_ENUM(NSInteger, RDLTablixPart) {
-  RDLTablixPartNone = 0,
-  RDLTablixPartHeader,
-  RDLTablixPartValue
-};
 
 // One band's placement, paired with its key so callers never have to index two
 // parallel arrays (a previous source of drift).
@@ -164,8 +155,23 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
            row:(NSUInteger *)outRow
         column:(NSUInteger *)outColumn
           zoom:(CGFloat)zoom;
-// The item in that cell, or nil for an empty one.
+// The item in that cell, or nil for an empty one. In a header column or
+// heading row, the header of the member at that level, beside the first body
+// row or column the member spans.
 + (RDLItem *)itemOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
+// The member along `axis` a grid cell belongs to, for the commands that add,
+// delete and edit groups: in a header cell, the member whose header it is;
+// elsewhere on a body row (or column), the innermost group around it, or its
+// own member when no group is. nil for a cell on no row (or column) of the
+// body -- a heading row has no row member.
+// What each group bracket along `axis` says, outermost first: at each depth of
+// nesting, what its groups group on -- a field by name, anything else as it is
+// written. A details group, which groups on nothing, has no bracket.
++ (NSArray<NSString *> *)groupBracketLabelsOf:(RDLTablix *)tablix axis:(RDLTablixAxis)axis;
++ (RDLTablixMember *)groupMemberOf:(RDLTablix *)tablix
+                           gridRow:(NSUInteger)row
+                        gridColumn:(NSUInteger)column
+                              axis:(RDLTablixAxis)axis;
 // The TablixCell at that place in the grid, or nil when the column is a
 // row-header column -- those belong to the row hierarchy, not to the body.
 + (RDLTablixCell *)cellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
@@ -182,20 +188,6 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
 // Builder says the same thing with the shape of the handle: a group handle is
 // drawn as a bracket, a movable column's as a grip.
 + (BOOL)tablix:(RDLTablix *)tablix columnIsMovable:(NSUInteger)column;
-+ (CGFloat)headerHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-+ (CGFloat)rowHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-+ (NSRect)cellRectOf:(RDLTablix *)tablix
-            itemRect:(NSRect)itemRect
-              column:(NSUInteger)column
-                part:(RDLTablixPart)part
-                zoom:(CGFloat)zoom;
-// The column and part under `point`, or NO outside the editable grid.
-+ (BOOL)tablix:(RDLTablix *)tablix
-      itemRect:(NSRect)itemRect
-         point:(NSPoint)point
-        column:(NSUInteger *)outColumn
-          part:(RDLTablixPart *)outPart
-          zoom:(CGFloat)zoom;
 // The column whose handle in the band above the grid is under `point`, for
 // picking a column up. NO anywhere else -- the band down the left and the
 // corner move the whole region.

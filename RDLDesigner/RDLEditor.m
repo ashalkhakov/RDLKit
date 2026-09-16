@@ -1,3 +1,4 @@
+#import "RDLTablixStructure.h"
 #import "RDLEditor.h"
 #import "RDLChange.h"
 #import "RDLKit.h"
@@ -83,6 +84,13 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
     [[self undo] endUndoGrouping];
     [_groupRegistered removeAllObjects];
   }
+}
+
+// Whether an open group has already recorded an inverse for this token, without
+// claiming it: what a caller checks before paying for an inverse it may not need.
+- (BOOL)hasRegisteredInverseFor:(id)object token:(NSString *)token {
+  return _groupDepth > 0 &&
+         [_groupRegistered containsObject:[NSString stringWithFormat:@"%p|%@", object, token]];
 }
 
 // NO when an open group has already recorded an inverse for this token, in
@@ -498,21 +506,6 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
 
 #pragma mark - Tablix
 
-- (void)setColumnSpecs:(NSArray *)specs ofTablix:(RDLTablix *)tablix {
-  if (![tablix isKindOfClass:[RDLTablix class]])
-    return;
-  NSArray *old = tablix.columnSpecs;
-  if (RDLValuesEqual(old, specs))
-    return;
-  [self beginGroup:@"Edit Table"];
-  if ([self shouldRegisterInverseFor:tablix token:@"columnSpecs"])
-    [[self undoProxy] setColumnSpecs:old ofTablix:tablix];
-  tablix.columnSpecs = specs;
-  [tablix rebuildTablix];
-  [self endGroup];
-  [self noteChange:[RDLChange itemChange:tablix keys:@[ @"columnSpecs" ] bandKey:nil]];
-}
-
 - (void)setItem:(RDLItem *)item inCell:(RDLTablixCell *)cell ofTablix:(RDLTablix *)tablix {
   if (cell == nil || ![tablix isKindOfClass:[RDLTablix class]] || cell.item == item)
     return;
@@ -520,9 +513,6 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self beginGroup:item ? @"Put in Cell" : @"Empty Cell"];
   [[self undoProxy] setItem:old inCell:cell ofTablix:tablix];
   cell.item = item;
-  // The spec the designer edits describes the columns, so it is recovered from
-  // the body rather than left saying what the cell used to hold.
-  [tablix inferColumnSpecsFromTablixBody];
   [_document.report adoptItems];
   [self endGroup];
   // A structural change: the item is somewhere it was not, which the outline
@@ -530,103 +520,202 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
 }
 
-- (void)setTablixValues:(NSDictionary<NSString *, id> *)values ofTablix:(RDLTablix *)tablix {
-  if (![tablix isKindOfClass:[RDLTablix class]] || [values count] == 0)
-    return;
-  NSMutableDictionary *old = [NSMutableDictionary dictionary];
-  BOOL changed = NO;
-  for (NSString *keyPath in values) {
-    id current = [tablix valueForKeyPath:keyPath];
-    old[keyPath] = current ?: [NSNull null];
-    id wanted = values[keyPath];
-    if (wanted == [NSNull null])
-      wanted = nil;
-    if (!RDLValuesEqual(current, wanted))
-      changed = YES;
-  }
-  if (!changed)
-    return;
-  [self beginGroup:@"Edit Table"];
-  if ([self shouldRegisterInverseFor:tablix token:@"tablixValues"])
-    [[self undoProxy] setTablixValues:old ofTablix:tablix];
-  for (NSString *keyPath in values) {
-    id wanted = values[keyPath];
-    [tablix setValue:(wanted == [NSNull null] ? nil : wanted) forKeyPath:keyPath];
-  }
-  [tablix rebuildTablix];
+// The width a column inserted from the canvas starts at, in inches.
+static const CGFloat kRDLInsertedColumnWidth = 1.2;
+static NSString * const kRDLStructureToken = @"structure";
+
+// A structural edit of a tablix: the tablix as it was, kept as XML for undo,
+// then the change, which may decline. One snapshot per open group, so a column
+// border dragged across many events costs one and undoes in one step.
+- (BOOL)changeStructureOfTablix:(RDLTablix *)tablix action:(NSString *)action change:(BOOL (^)(void))change {
+  if (![tablix isKindOfClass:[RDLTablix class]])
+    return NO;
+  NSString *before = [self hasRegisteredInverseFor:tablix token:kRDLStructureToken]
+                         ? nil
+                         : [RDLEditor XMLStringForItem:tablix];
+  if (!change())
+    return NO;
+  [self beginGroup:action];
+  if (before != nil && [self shouldRegisterInverseFor:tablix token:kRDLStructureToken])
+    [[self undoProxy] restoreStructureOfTablix:tablix fromXML:before];
   [self endGroup];
-  [self noteChange:[RDLChange itemChange:tablix keys:[values allKeys] bandKey:nil]];
+  [_document.report adoptItems];
+  [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
+  return YES;
 }
 
-- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix {
-  NSArray *specs = tablix.columnSpecs;
-  if (index >= [specs count])
+// What a structural edit, or a dialog's copy, may have changed, from one tablix
+// into another -- into the same object, so what points at the tablix still
+// does.
+static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
+  into.tablixBody = from.tablixBody;
+  into.rowHierarchy = from.rowHierarchy;
+  into.columnHierarchy = from.columnHierarchy;
+  into.cornerRows = from.cornerRows;
+  into.width = from.width;
+  into.height = from.height;
+  into.dataSetName = from.dataSetName;
+  into.filters = from.filters;
+}
+
+// Undo of a structural edit: the tablix as it was, put back into the same one.
+- (void)restoreStructureOfTablix:(RDLTablix *)tablix fromXML:(NSString *)xml {
+  RDLTablix *saved = (RDLTablix *)[RDLEditor itemFromXMLString:xml];
+  if (![saved isKindOfClass:[RDLTablix class]] || ![tablix isKindOfClass:[RDLTablix class]])
     return;
-  NSMutableArray *next = [specs mutableCopy];
-  NSMutableDictionary *col = [next[index] mutableCopy];
-  col[@"width"] = @([RDLEditor snap:MAX(0.2, width)]);
-  next[index] = col;
-  CGFloat total = 0;
-  for (NSDictionary *c in next)
-    total += [c[@"width"] doubleValue];
-  // The item is exactly as wide as its columns; one group so one undo.
-  [self beginGroup:@"Resize Column"];
-  [self setColumnSpecs:next ofTablix:tablix];
-  [self setValue:@(total) forKeyPath:@"width" ofItem:tablix];
+  [self beginGroup:nil];
+  [[self undoProxy] restoreStructureOfTablix:tablix fromXML:[RDLEditor XMLStringForItem:tablix]];
+  RDLTransplantTablix(tablix, saved);
+  [_document.report adoptItems];
   [self endGroup];
+  [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
+}
+
+// Exactly the width given: a width typed in the inspector is meant as typed,
+// and the canvas snaps the one a drag makes before it gets here.
+- (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix {
+  [self changeStructureOfTablix:tablix
+                         action:@"Resize Column"
+                         change:^BOOL {
+                           return [RDLTablixStructure setWidth:width ofColumn:index inTablix:tablix];
+                         }];
+}
+
+- (void)setTablixRow:(NSUInteger)index height:(CGFloat)height ofTablix:(RDLTablix *)tablix {
+  [self changeStructureOfTablix:tablix
+                         action:@"Resize Row"
+                         change:^BOOL {
+                           return [RDLTablixStructure setHeight:height ofRow:index inTablix:tablix];
+                         }];
 }
 
 - (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
-  if (![tablix isKindOfClass:[RDLTablix class]])
-    return;
-  NSMutableArray *next = [tablix.columnSpecs mutableCopy] ?: [NSMutableArray array];
-  NSUInteger i = MIN(index, [next count]);
-  [next insertObject:@{ @"width" : @1.2, @"header" : @"Column", @"value" : @"" } atIndex:i];
-  [self beginGroup:@"Insert Column"];
-  [self setColumnSpecs:next ofTablix:tablix];
-  [self setValue:@(tablix.width + 1.2) forKeyPath:@"width" ofItem:tablix];
-  [self endGroup];
+  RDLReport *report = _document.report;
+  [self changeStructureOfTablix:tablix
+                         action:@"Insert Column"
+                         change:^BOOL {
+                           return [RDLTablixStructure insertColumnAtIndex:index
+                                                                    width:kRDLInsertedColumnWidth
+                                                                 inTablix:tablix
+                                                                   report:report];
+                         }];
 }
 
 - (void)moveTablixColumnAtIndex:(NSUInteger)from
                         toIndex:(NSUInteger)to
                        ofTablix:(RDLTablix *)tablix {
-  NSArray *specs = tablix.columnSpecs;
-  if (![tablix isKindOfClass:[RDLTablix class]] || from >= [specs count] || from == to)
-    return;
-  NSMutableArray *next = [specs mutableCopy];
-  id spec = next[from];
-  [next removeObjectAtIndex:from];
-  [next insertObject:spec atIndex:MIN(to, [next count])];
-  [self beginGroup:@"Move Column"];
-  [self setColumnSpecs:next ofTablix:tablix];
-  [self endGroup];
+  [self changeStructureOfTablix:tablix
+                         action:@"Move Column"
+                         change:^BOOL {
+                           return [RDLTablixStructure moveColumnAtIndex:from toIndex:to inTablix:tablix];
+                         }];
 }
 
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
-  NSArray *specs = tablix.columnSpecs;
-  // A tablix with no columns renders nothing, so the last one stays.
-  if (index >= [specs count] || [specs count] <= 1)
-    return;
-  CGFloat width = [specs[index][@"width"] doubleValue];
-  NSMutableArray *next = [specs mutableCopy];
-  [next removeObjectAtIndex:index];
-  [self beginGroup:@"Delete Column"];
-  [self setColumnSpecs:next ofTablix:tablix];
-  [self setValue:@(MAX(0.2, tablix.width - width)) forKeyPath:@"width" ofItem:tablix];
-  [self endGroup];
+  [self changeStructureOfTablix:tablix
+                         action:@"Delete Column"
+                         change:^BOOL {
+                           return [RDLTablixStructure removeColumnAtIndex:index inTablix:tablix];
+                         }];
 }
 
 - (void)toggleGrandTotalOfTablix:(RDLTablix *)tablix {
-  if (![tablix isKindOfClass:[RDLTablix class]])
-    return;
-  [self beginGroup:@"Grand Total"];
-  if ([self shouldRegisterInverseFor:tablix token:@"showGrandTotal"])
-    [[self undoProxy] toggleGrandTotalOfTablix:tablix];
-  tablix.showGrandTotal = !tablix.showGrandTotal;
-  [tablix rebuildTablix];
-  [self endGroup];
-  [self noteChange:[RDLChange itemChange:tablix keys:@[ @"showGrandTotal" ] bandKey:nil]];
+  RDLReport *report = _document.report;
+  [self changeStructureOfTablix:tablix
+                         action:@"Grand Total"
+                         change:^BOOL {
+                           return [RDLTablixStructure tablixHasTotalRow:tablix]
+                                      ? [RDLTablixStructure removeTotalRowFromTablix:tablix]
+                                      : [RDLTablixStructure addTotalRowToTablix:tablix report:report];
+                         }];
+}
+
+- (RDLTablixMember *)addGroupWithExpression:(NSString *)expression
+                                  placement:(RDLGroupPlacement)placement
+                                   toMember:(RDLTablixMember *)member
+                                       axis:(RDLTablixAxis)axis
+                                   ofTablix:(RDLTablix *)tablix {
+  RDLReport *report = _document.report;
+  __block RDLTablixMember *added = nil;
+  [self changeStructureOfTablix:tablix
+                         action:@"Add Group"
+                         change:^BOOL {
+                           added = [RDLTablixStructure addGroupWithExpression:expression
+                                                                    placement:placement
+                                                                     toMember:member
+                                                                         axis:axis
+                                                                     inTablix:tablix
+                                                                       report:report];
+                           return added != nil;
+                         }];
+  return added;
+}
+
+- (BOOL)deleteGroup:(RDLTablixMember *)member
+          withLines:(BOOL)withLines
+               axis:(RDLTablixAxis)axis
+           ofTablix:(RDLTablix *)tablix {
+  return [self changeStructureOfTablix:tablix
+                                action:@"Delete Group"
+                                change:^BOOL {
+                                  return [RDLTablixStructure deleteGroup:member
+                                                               withLines:withLines
+                                                                    axis:axis
+                                                                inTablix:tablix];
+                                }];
+}
+
+- (RDLTablixMember *)addTotalBesideGroup:(RDLTablixMember *)member
+                                   after:(BOOL)after
+                                    axis:(RDLTablixAxis)axis
+                                ofTablix:(RDLTablix *)tablix {
+  RDLReport *report = _document.report;
+  __block RDLTablixMember *added = nil;
+  [self changeStructureOfTablix:tablix
+                         action:@"Add Total"
+                         change:^BOOL {
+                           added = [RDLTablixStructure addTotalBesideGroup:member
+                                                                     after:after
+                                                                      axis:axis
+                                                                  inTablix:tablix
+                                                                    report:report];
+                           return added != nil;
+                         }];
+  return added;
+}
+
+- (BOOL)setName:(NSString *)name
+    expressions:(NSArray<RDLValue *> *)expressions
+        filters:(NSArray<RDLFilter *> *)filters
+        ofGroup:(RDLTablixMember *)member
+           axis:(RDLTablixAxis)axis
+       ofTablix:(RDLTablix *)tablix {
+  RDLReport *report = _document.report;
+  return [self changeStructureOfTablix:tablix
+                                action:@"Group Properties"
+                                change:^BOOL {
+                                  return [RDLTablixStructure setName:name
+                                                         expressions:expressions
+                                                             filters:filters
+                                                             ofGroup:member
+                                                                axis:axis
+                                                            inTablix:tablix
+                                                              report:report];
+                                }];
+}
+
+- (BOOL)replaceTablix:(RDLTablix *)tablix withEdited:(RDLTablix *)edited {
+  if (![edited isKindOfClass:[RDLTablix class]] || edited == tablix)
+    return NO;
+  NSString *copy = [RDLEditor XMLStringForItem:edited];
+  return [self changeStructureOfTablix:tablix
+                                action:@"Edit Table"
+                                change:^BOOL {
+                                  if ([copy isEqualToString:[RDLEditor XMLStringForItem:tablix]])
+                                    return NO;
+                                  RDLTransplantTablix(tablix, edited);
+                                  return YES;
+                                }];
 }
 
 #pragma mark - Rich text

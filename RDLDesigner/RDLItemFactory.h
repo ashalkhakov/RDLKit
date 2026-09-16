@@ -56,6 +56,11 @@
 + (void)applyDefaultsTo:(RDLItem *)item report:(RDLReport *)report;
 
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report;
+// The same, kept apart from `item` and everything in it as well: an item being
+// edited away from the report, such as a dialog's working copy of a tablix.
++ (NSString *)uniqueNameWithPrefix:(NSString *)prefix
+                          inReport:(RDLReport *)report
+                           besides:(RDLItem *)item;
 + (void)renameTreeUniquely:(RDLItem *)item inReport:(RDLReport *)report;
 
 // Human-readable band name, for insertion descriptions and section headers.

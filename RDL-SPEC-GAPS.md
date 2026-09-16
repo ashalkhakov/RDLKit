@@ -196,6 +196,11 @@ The audit's findings here are fixed (P0.2, P0.11):
   into `ActionInfo/Actions`.
 - **2005 `List/Sorting`** is carried into the rewritten tablix's
   `SortExpressions`.
+- **A 2005 matrix with subtotals** gets a body row or column for every
+  leaf its 2010 hierarchies have. In 2005 each subtotal reused the measure
+  cell; a copy of it, renamed apart, now takes each subtotal's place. *As
+  audited* the rewritten tablix had fewer body rows and columns than
+  leaves, which 2010 does not allow.
 - The chart reader uses the 2008+ `Type`/`Subtype` vocabulary (§9).
 
 ### 3.4 Defaults — fixed (P0.3)
@@ -446,7 +451,7 @@ realisation has real limits.
 | `Group/Variables` | FULL | Worked out for each group instance and read as `Variables!` inside it (P1.1). |
 | `Group/DomainScope`, `ReGroupExpressions` | NONE | |
 | `TablixMember/SortExpressions` | FULL | A group sorts in each instance's own scope, so by an aggregate; the Details member's own sort and filters apply (P0.9). |
-| `TablixMember/TablixHeader/{Size,CellContents}` | FULL | A group's row-header cell is one cell as tall as the whole group, measured against all of its rows, and is not repeated when the group spans pages. |
+| `TablixMember/TablixHeader/{Size,CellContents}` | FULL | A group's row-header cell is one cell as tall as the whole group, measured against all of its rows, and is not repeated when the group spans pages. A static member's header -- a total's label -- is drawn beside its own rows, at any depth; *as audited* it was not drawn. |
 | `TablixMember/Visibility/Hidden` | FULL | Per group instance and per detail row, with aggregates over that instance's rows; a static member's in the scope of the group around it (P0.9). `ToggleItem` MODEL. |
 | `TablixMember/HideIfNoRows` | FULL | Hidden when the groups beside the member have no instances left after their filters, or the dataset is empty (P0.9). |
 | `TablixMember/RepeatOnNewPage` | FULL | The tablix's leading header rows are drawn again on each continuation page, with room left for them (P0.8). |

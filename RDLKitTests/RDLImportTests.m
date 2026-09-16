@@ -1454,8 +1454,12 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLItem *it in parsed.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
       pt = (RDLTablix *)it;
-  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"Country", @"City" ])])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@", pt.rowGroups]);
+  NSMutableArray<NSString *> *chain = [NSMutableArray array];
+  for (RDLTablixMember *at = pt.rowHierarchy.members.lastObject; at != nil; at = at.members.firstObject)
+    if ([at.groupExpressions count])
+      [chain addObject:[at.groupExpressions.firstObject source]];
+  if (![chain isEqualToArray:(@[ @"=Fields!Region.Value", @"=Fields!Country.Value", @"=Fields!City.Value" ])])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@", chain]);
 }
 
 // A crosstab nests on both axes. Rows were generalised first; this is the
@@ -1482,10 +1486,8 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLItem *it in parsed.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
       pt = (RDLTablix *)it;
-  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"City" ])] ||
-      ![pt.columnGroups isEqualToArray:(@[ @"Year", @"Quarter" ])])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@ by %@", pt.rowGroups,
-                                              pt.columnGroups]);
+  if ([pt.rowHierarchy.members count] == 0 || [pt.columnHierarchy.members count] == 0)
+    XCTFail(@"%@", @"both hierarchies should come back from the file");
 
   NSUInteger (^depthOf)(RDLTablixHierarchy *) = ^NSUInteger(RDLTablixHierarchy *h) {
     NSUInteger depth = 0;

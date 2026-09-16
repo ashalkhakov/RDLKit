@@ -292,10 +292,13 @@ static id RDLNodeKeyForItem(RDLItem *item) {
     [sel selectBandWithKey:node.bandKey];
   else if (node.kind == RDLNodeTablixCell && node.item == nil)
     // An empty cell: there is nothing in it to select, and the cell is still
-    // where the next element goes.
+    // where the next element goes. The node counts in the body; a selection
+    // counts in the grid, which puts a crosstab's heading rows and a grouped
+    // table's header columns first.
     [sel selectCellOfTablix:node.tablix
-                        row:node.row
-                     column:node.column
+                        row:(NSInteger)[RDLTablixGeometry gridRowOf:node.tablix forBodyRow:(NSUInteger)node.row]
+                     column:(NSInteger)[RDLTablixGeometry gridColumnOf:node.tablix
+                                                         forBodyColumn:(NSUInteger)node.column]
               inBandWithKey:node.bandKey];
   else
     [sel selectItem:node.item inBandWithKey:node.bandKey];

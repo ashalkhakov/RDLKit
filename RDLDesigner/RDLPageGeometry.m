@@ -375,6 +375,8 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
 
 // The preview never draws a row thinner than this, or it stops being clickable.
 static const CGFloat kMinPreviewRowHeight = 12.0;
+// How wide a column the canvas draws for a tablix with neither body nor specs.
+static const CGFloat kUnbuiltColumnWidth = 60.0;
 
 + (NSUInteger)headerRowCountOf:(RDLTablix *)tablix {
   return [[tablix columnHeaderRowHeights] count];
@@ -433,7 +435,10 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
   NSArray<RDLTablixColumn *> *columns = tablix.tablixBody.columns;
   if (index < [columns count] && columns[index].width > 0)
     return columns[index].width * RDLPointsPerInch * zoom;
-  return [self widthOfColumn:index in:(tablix.columnSpecs ?: @[]) zoom:zoom];
+  // A tablix not built yet is described by its column specs.
+  NSArray *specs = tablix.columnSpecs ?: @[];
+  return index < [specs count] ? [specs[index][@"width"] doubleValue] * RDLPointsPerInch * zoom
+                               : kUnbuiltColumnWidth;
 }
 
 + (NSRect)cellRectOf:(RDLTablix *)tablix
@@ -509,99 +514,90 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
   return (NSUInteger)body < [cells count] ? cells[(NSUInteger)body] : nil;
 }
 
+// A header is drawn once, beside the first body row or column its member
+// spans, and the cells beside the rest are left to it.
++ (RDLItem *)headerItemIn:(RDLTablixHierarchy *)hierarchy level:(NSUInteger)level leaf:(NSUInteger)leaf {
+  RDLTablixMember *member = [hierarchy memberWithHeaderAtLevel:level onPathToLeaf:leaf];
+  return member != nil && [hierarchy leafRangeOfMember:member].location == leaf ? member.header.item : nil;
+}
+
+static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUInteger depth,
+                                  NSMutableArray<NSMutableArray<NSString *> *> *levels) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger inner = depth;
+    NSString *source = [m.groupExpressions.firstObject source];
+    if (source != nil) {
+      while ([levels count] <= depth)
+        [levels addObject:[NSMutableArray array]];
+      NSString *label = [RDLTablixStructure fieldReadByExpression:source] ?: source;
+      if (![levels[depth] containsObject:label])
+        [levels[depth] addObject:label];
+      inner = depth + 1;
+    }
+    RDLCollectGroupLabels(m.members, inner, levels);
+  }
+}
+
++ (NSArray<NSString *> *)groupBracketLabelsOf:(RDLTablix *)tablix axis:(RDLTablixAxis)axis {
+  NSMutableArray<NSMutableArray<NSString *> *> *levels = [NSMutableArray array];
+  RDLCollectGroupLabels([RDLTablixStructure hierarchyOfTablix:tablix axis:axis].members, 0, levels);
+  NSMutableArray<NSString *> *labels = [NSMutableArray array];
+  for (NSArray<NSString *> *level in levels)
+    [labels addObject:[level componentsJoinedByString:@" / "]];
+  return labels;
+}
+
++ (RDLTablixMember *)groupMemberOf:(RDLTablix *)tablix
+                           gridRow:(NSUInteger)row
+                        gridColumn:(NSUInteger)column
+                              axis:(RDLTablixAxis)axis {
+  RDLTablixHierarchy *hierarchy = [RDLTablixStructure hierarchyOfTablix:tablix axis:axis];
+  BOOL rows = axis == RDLTablixAxisRows;
+  NSInteger bodyRow = [self bodyRowOf:tablix forGridRow:row];
+  NSInteger bodyColumn = [self bodyColumnOf:tablix forGridColumn:column];
+  NSInteger line = rows ? bodyRow : bodyColumn;
+  if (hierarchy == nil || line < 0)
+    return nil;
+  // In the headers along the axis: the member whose header this is.
+  NSInteger across = rows ? bodyColumn : bodyRow;
+  if (across < 0) {
+    RDLTablixMember *heading = [hierarchy memberWithHeaderAtLevel:rows ? column : row onPathToLeaf:(NSUInteger)line];
+    if (heading != nil)
+      return heading;
+  }
+  NSArray<RDLTablixMember *> *path = [hierarchy pathToLeaf:(NSUInteger)line];
+  for (RDLTablixMember *member in [path reverseObjectEnumerator])
+    if ([member.groupName length])
+      return member;
+  return [path lastObject];
+}
+
 + (RDLItem *)itemOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column {
   NSUInteger headerRows = [self headerRowCountOf:tablix];
   NSUInteger headerCols = [self headerColumnCountOf:tablix];
-  // The first row that holds data rather than headings: a crosstab's headings
-  // are the rows above the body, a table's are the body's own first row.
-  NSUInteger firstDataRow = headerRows > 0 ? headerRows : 1;
-
   if (row < headerRows) {
     // A column-heading row. Over the header columns it is the corner; over the
-    // body it is the group whose values head the columns.
+    // body, the header of the column member at that level.
     if (column < headerCols) {
       NSArray *corner = row < [tablix.cornerRows count] ? tablix.cornerRows[row] : nil;
       RDLTablixCell *cell = column < [corner count] ? corner[column] : nil;
       return cell.item;
     }
-    return column == headerCols ? [tablix columnHeaderItemAtLevel:row] : nil;
+    return [self headerItemIn:tablix.columnHierarchy level:row leaf:column - headerCols];
   }
   if (column < headerCols) {
-    // A row-header column: the corner in a table's heading row, the group's
-    // own header against the first data row, and nothing beside the subtotal
-    // rows under it -- those belong to the group.
-    if (headerRows == 0 && row == 0) {
+    // A row-header column: the header of the row member at that level -- and
+    // in a table's heading row, where no member has one, the corner.
+    RDLItem *header = [self headerItemIn:tablix.rowHierarchy level:column leaf:row - headerRows];
+    if (header == nil && headerRows == 0 && row == 0) {
       NSArray *corner = [tablix.cornerRows firstObject];
       RDLTablixCell *cell = column < [corner count] ? corner[column] : nil;
       return cell.item;
     }
-    return row == firstDataRow ? [tablix rowHeaderItemAtLevel:column] : nil;
+    return header;
   }
   RDLTablixCell *cell = [self cellOf:tablix inRow:row column:column];
   return cell.item;
-}
-
-+ (CGFloat)headerHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom {
-  return MAX(kMinPreviewRowHeight, tablix.headerHeight * RDLPointsPerInch * zoom);
-}
-
-+ (CGFloat)rowHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom {
-  return MAX(kMinPreviewRowHeight, tablix.rowHeight * RDLPointsPerInch * zoom);
-}
-
-+ (CGFloat)widthOfColumn:(NSUInteger)index in:(NSArray *)specs zoom:(CGFloat)zoom {
-  if (index >= [specs count])
-    return 60;
-  return [specs[index][@"width"] doubleValue] * RDLPointsPerInch * zoom;
-}
-
-+ (NSRect)cellRectOf:(RDLTablix *)tablix
-            itemRect:(NSRect)itemRect
-              column:(NSUInteger)column
-                part:(RDLTablixPart)part
-                zoom:(CGFloat)zoom {
-  NSArray *specs = tablix.columnSpecs ?: @[];
-  CGFloat x = NSMinX(itemRect);
-  for (NSUInteger i = 0; i < column && i < [specs count]; i++)
-    x += [self widthOfColumn:i in:specs zoom:zoom];
-  CGFloat w = [self widthOfColumn:column in:specs zoom:zoom];
-  CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
-  BOOL header = part == RDLTablixPartHeader;
-  return NSMakeRect(x, header ? NSMinY(itemRect) : NSMinY(itemRect) + hh, w,
-                    header ? hh : [self rowHeightOf:tablix zoom:zoom]);
-}
-
-+ (BOOL)tablix:(RDLTablix *)tablix
-      itemRect:(NSRect)itemRect
-         point:(NSPoint)point
-        column:(NSUInteger *)outColumn
-          part:(RDLTablixPart *)outPart
-          zoom:(CGFloat)zoom {
-  NSArray *specs = tablix.columnSpecs ?: @[];
-  if ([specs count] == 0 || !NSPointInRect(point, itemRect))
-    return NO;
-  CGFloat hh = [self headerHeightOf:tablix zoom:zoom];
-  CGFloat rh = [self rowHeightOf:tablix zoom:zoom];
-  RDLTablixPart part;
-  if (point.y < NSMinY(itemRect) + hh)
-    part = RDLTablixPartHeader;
-  else if (point.y < NSMinY(itemRect) + hh + rh)
-    part = RDLTablixPartValue;
-  else
-    return NO; // below the preview rows: not an editable cell
-  CGFloat x = NSMinX(itemRect);
-  for (NSUInteger i = 0; i < [specs count]; i++) {
-    CGFloat w = [self widthOfColumn:i in:specs zoom:zoom];
-    if (point.x >= x && point.x < x + w) {
-      if (outColumn)
-        *outColumn = i;
-      if (outPart)
-        *outPart = part;
-      return YES;
-    }
-    x += w;
-  }
-  return NO;
 }
 
 // Which column of the grid a horizontal position falls in, counting from the
@@ -657,20 +653,26 @@ static const CGFloat kMinPreviewRowHeight = 12.0;
     columnBorderAtPoint:(NSPoint)point
                  column:(NSUInteger *)outColumn
                    zoom:(CGFloat)zoom {
-  NSArray *specs = tablix.columnSpecs ?: @[];
-  if ([specs count] < 2)
+  NSUInteger headers = [self headerColumnCountOf:tablix];
+  NSUInteger columns = [self columnCountOf:tablix];
+  if (columns < headers + 2)
     return NO;
-  CGFloat gridBottom = NSMinY(itemRect) + [self headerHeightOf:tablix zoom:zoom] +
-                       [self rowHeightOf:tablix zoom:zoom];
+  CGFloat gridBottom = NSMinY(itemRect);
+  NSUInteger rows = [self rowCountOf:tablix];
+  for (NSUInteger r = 0; r < rows; r++)
+    gridBottom += [self heightOfRow:r of:tablix zoom:zoom];
   if (point.y < NSMinY(itemRect) || point.y > gridBottom)
     return NO;
   CGFloat x = NSMinX(itemRect);
-  // Stop before the last column: its right edge is the item's east handle.
-  for (NSUInteger i = 0; i + 1 < [specs count]; i++) {
-    x += [self widthOfColumn:i in:specs zoom:zoom];
+  for (NSUInteger c = 0; c < headers; c++)
+    x += [self widthOfBodyColumn:c of:tablix zoom:zoom];
+  // Between body columns only: the last one's right edge is the item's east
+  // handle, and a row-header column is as wide as its group says.
+  for (NSUInteger c = headers; c + 1 < columns; c++) {
+    x += [self widthOfBodyColumn:c of:tablix zoom:zoom];
     if (fabs(point.x - x) <= kColumnBorderSlop) {
       if (outColumn)
-        *outColumn = i;
+        *outColumn = c - headers;
       return YES;
     }
   }

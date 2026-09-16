@@ -67,16 +67,6 @@ extern NSString * const RDLSelectionDidChangeNotification;
 - (void)selectDataSource:(RDLDataSource *)source;
 - (void)selectParameter:(RDLParameter *)parameter;
 
-// A cell of a scaffolded tablix: the tablix is the selected item, and these say
-// which of its columns and which row of the preview was clicked. A cell is not
-// an item of its own -- it is an entry in the tablix's columnSpecs -- so it
-// travels with the item selection rather than replacing it.
-@property (nonatomic, readonly, assign) NSInteger tablixColumn;  // -1 when none
-@property (nonatomic, readonly, assign) RDLTablixPart tablixPart;
-- (void)selectItem:(RDLItem *)item
-    inBandWithKey:(NSString *)bandKey
-           column:(NSInteger)column
-             part:(RDLTablixPart)part;
 
 // An empty cell of a tablix: which tablix, and where in its grid.
 @property (nonatomic, readonly, strong) RDLTablix *tablix;
