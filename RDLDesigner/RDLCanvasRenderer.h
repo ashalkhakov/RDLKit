@@ -10,6 +10,7 @@
 @class RDLEditingContext;
 @class RDLItem;
 @class RDLPageGeometry;
+@class RDLStyle;
 
 // The transient view state the renderer cannot get from the model: which cell
 // the pointer is over, and which text is currently hidden behind an editor.
@@ -35,4 +36,11 @@
 - (void)drawGeometry:(RDLPageGeometry *)geometry
              overlay:(RDLCanvasOverlay *)overlay
               bounds:(NSRect)bounds;
+
+// Where a text box's text goes inside its box: the canvas's own small inset,
+// plus the style's Padding on each of the four sides, at `zoom`. Its own
+// method rather than four lines inside the drawing, so that what it works out
+// can be checked without painting anything -- the bottom side used to be left
+// out, and nothing could see that.
++ (NSRect)textRectForStyle:(RDLStyle *)style inRect:(NSRect)rect zoom:(CGFloat)zoom;
 @end

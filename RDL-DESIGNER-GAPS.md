@@ -226,8 +226,8 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `PaddingLeft/Right/Top/Bottom` | UI | The canvas ignores bottom padding. |
-| `Border` + per-edge borders | UI | The canvas draws each edge in its own style, width and colour through `RDLBorderPainter`, the one the preview and PDF use, so a rectangle is bordered and a thick or dashed edge looks like itself (P1.1). No control for the per-edge ones yet. |
+| `PaddingLeft/Right/Top/Bottom` | — | Four fields, each taking a length or an expression, and the canvas insets text by all four sides at zoom (P1.1). |
+| `Border` + per-edge borders | UI | The canvas draws each edge in its own style, width and colour through `RDLBorderPainter`, the one the preview and PDF use, so a rectangle is bordered and a thick or dashed edge looks like itself (P1.1). Each edge is stated in the Borders… panel, which is also how a cell is bordered, since `TablixCell` has no `Style` of its own (P1.1). |
 | `FontWeight` beyond Normal/Bold | UI (engine PART) | The popup offers every weight; Font… still collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
 | Style expressions on every property | UI | 9 of 27 wired. |
 | `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | UI (was MODEL) | Engine FULL or PART. |
@@ -282,7 +282,7 @@ not yet keep that.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Per-cell `Style` (borders, background, padding) | UI | Font/colour/format per cell work through the in-cell textbox; the rest has no control. Kept by every edit. |
+| Per-cell `Style` (borders, background, padding) | UI | All of it works through the in-cell textbox, which is where MS-RDL keeps it: `TablixCell` has no `Style` of its own, so the text section -- background, padding and the Borders… panel -- is what styles a cell (P1.1). An empty cell holds no item and so has nothing to style until something is put in it. Kept by every edit. |
 | Merged cells (`ColSpan`/`RowSpan`) | UI | Kept, and carried across column and row edits; nothing merges or splits. |
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `RepeatOnNewPage`, `KeepWithGroup`, `KeepTogether`, `HideIfNoRows`, `FixedData`, `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it; Group Properties edits the name, expressions and filters only. |
 | Details `SortExpressions` | UI (engine FULL) | |
@@ -328,7 +328,7 @@ not yet keep that.
 | Bring to front / send to back; canvas z-order | None; the canvas ignores `ZIndex` |
 | Eight resize handles | Three (E, S, SE) |
 | Snap size, snap to item edges | Fixed 0.05in; grid toggle is visual only |
-| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; borders drawn as rendered since P1.1 |
+| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; borders and all four sides of padding drawn as rendered since P1.1 |
 | Properties grid showing every RDL property | Sectioned inspector for a fixed subset |
 | Report Data pane with drag-to-canvas | Palette drags into bands, not cells |
 | Grouping pane with context menus | Row Group / Column Group menus on the canvas, Group Properties…, and the tablix dialog's group lists |

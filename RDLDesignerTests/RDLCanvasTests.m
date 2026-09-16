@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDesignerTestSupport.h"
+#import "RDLCanvasRenderer.h"
 
 
 
@@ -16,6 +17,43 @@
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
+// Where the text sits inside a text box on the canvas. All four sides of
+// Padding count, and they scale with the zoom like everything else drawn. The
+// bottom one used to be left out: text ran to the bottom edge on the canvas
+// and stopped short of it everywhere else.
+- (void)testTheTextRectTakesPaddingOnAllFourSides {
+  RDLStyle *style = [[RDLStyle alloc] init];
+  style.paddingLeft = [RDLLength points:4];
+  style.paddingRight = [RDLLength points:6];
+  style.paddingTop = [RDLLength points:8];
+  style.paddingBottom = [RDLLength points:10];
+
+  // The canvas insets text by 2pt across and 1pt down before any Padding.
+  NSRect text = [RDLCanvasRenderer textRectForStyle:style
+                                             inRect:NSMakeRect(0, 0, 200, 100)
+                                               zoom:1];
+  NSRect want = NSMakeRect(2 + 4, 1 + 8, 200 - 4 - 4 - 6, 100 - 2 - 8 - 10);
+  if (!NSEqualRects(text, want))
+    XCTFail(@"the text rect is %@, expected %@", NSStringFromRect(text), NSStringFromRect(want));
+
+  // Padding is a measurement on the page, so it grows with the zoom; the
+  // canvas's own inset does not.
+  NSRect zoomed = [RDLCanvasRenderer textRectForStyle:style
+                                               inRect:NSMakeRect(0, 0, 400, 200)
+                                                 zoom:2];
+  NSRect wantZoomed = NSMakeRect(2 + 8, 1 + 16, 400 - 4 - 8 - 12, 200 - 2 - 16 - 20);
+  if (!NSEqualRects(zoomed, wantZoomed))
+    XCTFail(@"at zoom 2 the text rect is %@, expected %@", NSStringFromRect(zoomed),
+            NSStringFromRect(wantZoomed));
+
+  // A style that asks for no padding still gets the canvas's own inset.
+  NSRect bare = [RDLCanvasRenderer textRectForStyle:[[RDLStyle alloc] init]
+                                             inRect:NSMakeRect(0, 0, 200, 100)
+                                               zoom:1];
+  if (!NSEqualRects(bare, NSMakeRect(2, 1, 196, 98)))
+    XCTFail(@"an unpadded text rect is %@", NSStringFromRect(bare));
+}
+
 - (void)testPageGeometry {
   RDLReport *r = [RDLReport emptyReportNamed:@"Geometry"];
   // Letter, 1in margins all round, so the arithmetic is easy to read.

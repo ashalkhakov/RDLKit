@@ -650,6 +650,70 @@
     XCTFail(@"%@", @"the edges nobody touched should still state nothing");
 }
 
+// A cell's style is the style of the item in it: MS-RDL has no style of its
+// own on TablixCell, so the padding fields and the borders panel reach a cell
+// through its text box, and there is nothing further to build for cells that
+// hold something. An empty cell has no item and so nothing to style yet.
+- (void)testACellIsStyledThroughTheItemInIt {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  RDLTextbox *inCell = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  if (tablix == nil) {
+    XCTFail(@"%@", @"the sample should have a tablix");
+    return;
+  }
+  for (RDLTablixRow *row in tablix.tablixBody.rows)
+    for (RDLTablixCell *cell in row.cells)
+      if (inCell == nil && [cell.item isKindOfClass:[RDLTextbox class]])
+        inCell = (RDLTextbox *)cell.item;
+  if (inCell == nil) {
+    XCTFail(@"%@", @"the sample's tablix should have a text box in a cell");
+    return;
+  }
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:inCell inBandWithKey:@"body"];
+
+  // The text section is shown for an item in a cell, which is what carries the
+  // padding fields and the Borders… button; the geometry section is not, since
+  // the cell decides where the item is.
+  if ([[inspector valueForKey:@"textBox"] isHidden])
+    XCTFail(@"%@", @"a text box in a cell should show the text section");
+  if (![[inspector valueForKey:@"geoBox"] isHidden])
+    XCTFail(@"%@", @"an item in a cell has no geometry of its own to offer");
+  if ([[inspector valueForKey:@"cellBox"] isHidden])
+    XCTFail(@"%@", @"and the cell's own section should be shown beside it");
+
+  // Padding reaches it like any other text box.
+  NSTextField *left = [inspector valueForKey:@"padLeftField"];
+  [left setStringValue:@"4pt"];
+  [inspector changed:left];
+  if (![[inCell.style.paddingLeft stringValue] isEqualToString:@"4pt"])
+    XCTFail(@"the cell's padding reads %@", [inCell.style.paddingLeft stringValue]);
+
+  // And so does the borders panel, edge by edge.
+  RDLBordersEditor *panel = [RDLBordersEditor editorForItem:inCell context:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an item in a cell");
+    return;
+  }
+  [[panel valueForKey:@"topStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleDouble)];
+  [[panel valueForKey:@"topWidthField"] setStringValue:@"3pt"];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply to a cell's text box");
+  if (inCell.style.borderTop.style != RDLBorderStyleDouble)
+    XCTFail(@"the cell's top edge reads %ld", (long)inCell.style.borderTop.style);
+  if (![[[inCell.style borderForEdge:RDLBoxEdgeTop].width stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"%@", @"the cell's top edge should draw at the width it was given");
+}
+
 // A property of two values is a box to tick: what off and on mean is the
 // binding's, so the model keeps its own vocabulary and the pane shows a state.
 - (void)testACheckboxBindsATwoValuedProperty {

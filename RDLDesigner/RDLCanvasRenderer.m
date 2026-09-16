@@ -26,6 +26,18 @@ static const CGFloat kRDLHandleGripStep = 3.0;
 static const CGFloat kRDLBracketLabelSize = 8.0;
 static const CGFloat kRDLBracketLabelGap = 2.0;
 
+// A text box's text is drawn just inside its box, so a border does not sit on
+// top of the first glyph. This is the canvas's own breathing room, on top of
+// whatever Padding the style asks for.
+static const CGFloat kRDLTextInsetX = 2.0;
+static const CGFloat kRDLTextInsetY = 1.0;
+
+// One side of a style's Padding, in points at the canvas's zoom. The same
+// conversion was written out once per side, and the bottom one was missing.
+static CGFloat RDLCanvasPadding(RDLLength *length, CGFloat zoom) {
+  return [length inches] * RDLPointsPerInch * zoom;
+}
+
 // The canvas is the one place that draws text at a scale other than 1: its
 // zoom. Everything else about the translation is shared (RDLTextAttributes).
 static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CGFloat zoom) {
@@ -398,6 +410,16 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
 // The same item, drawn where something else decides it goes: a tablix cell,
 // whose contents take the cell's rect because MS-RDL ignores an item's own box
 // inside CellContents.
++ (NSRect)textRectForStyle:(RDLStyle *)style inRect:(NSRect)rect zoom:(CGFloat)zoom {
+  CGFloat padL = RDLCanvasPadding(style.paddingLeft, zoom);
+  CGFloat padT = RDLCanvasPadding(style.paddingTop, zoom);
+  CGFloat padR = RDLCanvasPadding(style.paddingRight, zoom);
+  CGFloat padB = RDLCanvasPadding(style.paddingBottom, zoom);
+  return NSMakeRect(NSMinX(rect) + kRDLTextInsetX + padL, NSMinY(rect) + kRDLTextInsetY + padT,
+                    NSWidth(rect) - 2 * kRDLTextInsetX - padL - padR,
+                    NSHeight(rect) - 2 * kRDLTextInsetY - padT - padB);
+}
+
 - (void)drawItem:(RDLItem *)it inRect:(NSRect)r {
   BOOL sel = it == [_ctx selectedItem];
   if ([it isKindOfClass:[RDLLine class]]) {
@@ -447,11 +469,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     // padding and the attributed value.
     [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
     [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:_ctx.zoom];
-    CGFloat padL = [it.style.paddingLeft inches] * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padT = [it.style.paddingTop inches] * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padR = [it.style.paddingRight inches] * RDLPointsPerInch * _ctx.zoom;
-    NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
-                                 NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
+    NSRect textRect = [RDLCanvasRenderer textRectForStyle:it.style inRect:r zoom:_ctx.zoom];
     BOOL editorCoversThisText =
         _overlay.editingItem == it;
     if (!editorCoversThisText) {
