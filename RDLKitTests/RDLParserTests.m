@@ -2718,4 +2718,117 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", @"renaming what no kept piece sits under should leave them alone");
 }
 
+// The same rule through a whole file: what an edge states must survive being
+// read and written again, and what it does not state must not be invented on
+// the way out. A TopBorder giving only a width used to be read as None -- so
+// the width was ignored and the default's drawn instead -- and was then left
+// out of the saved file altogether.
+- (void)testAnEdgeKeepsWhatItStatesAcrossASave {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/"
+      @"reportdefinition\">"
+      @"  <Body><Height>2in</Height><ReportItems>"
+      @"    <Textbox Name=\"Edged\"><Value>Edged</Value>"
+      @"      <Top>0in</Top><Left>0in</Left><Width>2in</Width><Height>0.25in</Height>"
+      @"      <Style>"
+      @"        <Border><Style>Solid</Style><Color>#336699</Color></Border>"
+      @"        <TopBorder><Width>5pt</Width></TopBorder>"
+      @"        <LeftBorder><Style>None</Style></LeftBorder>"
+      @"      </Style>"
+      @"    </Textbox>"
+      @"  </ReportItems></Body>"
+      @"  <Page><PageWidth>8.5in</PageWidth></Page>"
+      @"</Report>";
+  NSError *err = nil;
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:&err];
+  if (r == nil) {
+    XCTFail(@"the file should open: %@", err);
+    return;
+  }
+  RDLStyle *style = [(RDLItem *)[r.body.items firstObject] style];
+
+  // The top edge gives a width and nothing else, so it draws at that width in
+  // the default's style and colour.
+  RDLBorder *top = [style borderForEdge:RDLBoxEdgeTop];
+  if (top.style != RDLBorderStyleSolid || fabs([top.width points] - 5) > 0.001)
+    XCTFail(@"the top edge should be solid at 5pt, got style %ld at %@", (long)top.style,
+            [top.width stringValue]);
+  if (![top.color isEqualToString:@"#336699"])
+    XCTFail(@"and take the default's colour, got %@", top.color);
+  // The left edge says None out loud, so the default does not show through it.
+  if ([style borderForEdge:RDLBoxEdgeLeft] != nil)
+    XCTFail(@"%@", @"the left edge was turned off and should draw nothing");
+
+  NSString *out = [RDLWriter XMLStringFromReport:r];
+  NSRange open = [out rangeOfString:@"<TopBorder>"];
+  NSRange close = [out rangeOfString:@"</TopBorder>"];
+  if (open.location == NSNotFound || close.location == NSNotFound) {
+    XCTFail(@"%@", @"the top edge should still be in the saved file");
+    return;
+  }
+  NSRange inner = NSMakeRange(NSMaxRange(open), close.location - NSMaxRange(open));
+  NSString *written = [out substringWithRange:inner];
+  if ([written rangeOfString:@"<Width>5pt</Width>"].location == NSNotFound)
+    XCTFail(@"the width it stated should be written, got %@", written);
+  for (NSString *invented in @[ @"<Style>", @"<Color>" ])
+    if ([written rangeOfString:invented].location != NSNotFound)
+      XCTFail(@"%@ was written into an edge that never stated it: %@", invented, written);
+  if ([out rangeOfString:@"<LeftBorder><Style>None</Style></LeftBorder>"].location == NSNotFound &&
+      [out rangeOfString:@"None"].location == NSNotFound)
+    XCTFail(@"%@", @"an edge turned off should stay turned off in the saved file");
+
+  // And it all still reads the same way the second time around.
+  RDLReport *again = [RDLParser reportFromXMLString:out error:NULL];
+  RDLStyle *back = [(RDLItem *)[again.body.items firstObject] style];
+  RDLBorder *backTop = [back borderForEdge:RDLBoxEdgeTop];
+  if (backTop.style != RDLBorderStyleSolid || fabs([backTop.width points] - 5) > 0.001)
+    XCTFail(@"%@", @"the reopened top edge should still be solid at 5pt");
+  if ([back borderForEdge:RDLBoxEdgeLeft] != nil)
+    XCTFail(@"%@", @"and the left edge should still be off");
+}
+
+// Which border is drawn along an edge. TopBorder and its siblings inherit from
+// Border one property at a time, so an edge stating only a width keeps the
+// default's style and colour, and an edge stating None draws nothing at all.
+// Every backend needed this rule, each carried its own copy of it, and none of
+// the copies got the width-only edge right.
+- (void)testAnEdgeResolvesAgainstTheDefaultPropertyByProperty {
+  RDLStyle *s = [[RDLStyle alloc] init];
+  if ([s borderForEdge:RDLBoxEdgeTop] != nil)
+    XCTFail(@"%@", @"a style with no borders draws none");
+
+  s.border = [RDLBorder solidColor:@"#111111"];
+  for (NSNumber *edge in @[ @(RDLBoxEdgeTop), @(RDLBoxEdgeBottom), @(RDLBoxEdgeLeft), @(RDLBoxEdgeRight) ]) {
+    RDLBorder *drawn = [s borderForEdge:(RDLBoxEdge)[edge integerValue]];
+    if (drawn.style != RDLBorderStyleSolid || ![drawn.color isEqualToString:@"#111111"])
+      XCTFail(@"every edge should take the default border, edge %@ drew %@", edge, drawn.color);
+  }
+
+  // An edge with a style of its own draws that style, and still takes the
+  // colour it said nothing about from the default.
+  s.borderTop = [[RDLBorder alloc] init];
+  s.borderTop.style = RDLBorderStyleGroove;
+  RDLBorder *top = [s borderForEdge:RDLBoxEdgeTop];
+  if (top.style != RDLBorderStyleGroove)
+    XCTFail(@"%@", @"an edge with a style of its own draws that style");
+  if (![top.color isEqualToString:@"#111111"])
+    XCTFail(@"an edge takes the colour it did not state from the default, drew %@", top.color);
+
+  // The case all three backends lost: an edge giving only a width was read as
+  // None, so it drew the default's 1pt rather than the 5pt it asked for.
+  s.borderRight = [[RDLBorder alloc] init];
+  s.borderRight.width = [RDLLength points:5];
+  RDLBorder *right = [s borderForEdge:RDLBoxEdgeRight];
+  if (right.style != RDLBorderStyleSolid)
+    XCTFail(@"%@", @"an edge stating only a width keeps the default's style");
+  if (fabs([right.width points] - 5) > 0.001)
+    XCTFail(@"the edge's own width should be drawn, drew %@", [right.width stringValue]);
+
+  // None out loud is not the same as saying nothing: the default does not show
+  // through an edge that has been turned off.
+  s.borderLeft = [RDLBorder none];
+  if ([s borderForEdge:RDLBoxEdgeLeft] != nil)
+    XCTFail(@"%@", @"an edge that says None draws nothing, default or not");
+}
+
 @end

@@ -33,3 +33,5 @@
 // Style -> AppKit text attributes, shared with the designer canvas and its
 // rich-text codec because RDLView's preview needs the same translation.
 #import "RDLTextAttributes.h"
+// One drawing of a border, shared by the preview, the PDF and the canvas.
+#import "RDLBorderPainter.h"

@@ -99,9 +99,9 @@ The important findings:
    not materialised, placeholders are no longer stamped, and unsupported
    items open as placeholders.
 5. **The canvas does not draw what renders**: lines are always
-   horizontal hairlines, rectangles have no border, textboxes only the
-   default border, and `ZIndex` is ignored, while the preview honours all
-   of them.
+   horizontal hairlines and `ZIndex` is ignored, while the preview
+   honours both. Borders are no longer among them: the canvas, the
+   preview and PDF all draw through one `RDLBorderPainter` (P1.1).
 
 ## 3. What the designer constructs today
 
@@ -141,7 +141,7 @@ UI.
 | Style | Background colour | Textbox and rectangle |
 | Style | Text align | Popup, all five including General and Justify |
 | Style | Vertical align | Popup: Top / Middle / Bottom |
-| Style | Padding, borders | — |
+| Style | Padding, borders | Four padding sides, each a length or an f(x); a Borders… panel stating the default and each edge, on a text box and on a rectangle |
 | Style | Expressions | f(x) on 9 of the 27 style expressions |
 | Textbox | Value / expression | Yes; in-place double-click |
 | Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
@@ -227,7 +227,7 @@ bin that moved since the previous audit.
 | Spec feature | Bin | Notes |
 |---|---|---|
 | `PaddingLeft/Right/Top/Bottom` | UI | The canvas ignores bottom padding. |
-| `Border` + per-edge borders | UI | The canvas draws only the default border, as a thin frame. |
+| `Border` + per-edge borders | UI | The canvas draws each edge in its own style, width and colour through `RDLBorderPainter`, the one the preview and PDF use, so a rectangle is bordered and a thick or dashed edge looks like itself (P1.1). No control for the per-edge ones yet. |
 | `FontWeight` beyond Normal/Bold | UI (engine PART) | The popup offers every weight; Font… still collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
 | Style expressions on every property | UI | 9 of 27 wired. |
 | `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | UI (was MODEL) | Engine FULL or PART. |
@@ -252,7 +252,7 @@ bin that moved since the previous audit.
 | Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
 | Line width, style | UI + CANVAS | The canvas draws every line as a 1px horizontal rule. |
 | Line: the other diagonal | MODEL | |
-| Rectangle borders, padding, `PageBreak`, `KeepTogether` | UI | |
+| Rectangle padding, `PageBreak`, `KeepTogether` | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
 | Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
 | Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | |
 
@@ -328,7 +328,7 @@ not yet keep that.
 | Bring to front / send to back; canvas z-order | None; the canvas ignores `ZIndex` |
 | Eight resize handles | Three (E, S, SE) |
 | Snap size, snap to item edges | Fixed 0.05in; grid toggle is visual only |
-| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; no rectangle borders; default textbox border only |
+| Drawing lines, borders and padding as rendered | Lines horizontal hairlines; borders drawn as rendered since P1.1 |
 | Properties grid showing every RDL property | Sectioned inspector for a fixed subset |
 | Report Data pane with drag-to-canvas | Palette drags into bands, not cells |
 | Grouping pane with context menus | Row Group / Column Group menus on the canvas, Group Properties…, and the tablix dialog's group lists |
@@ -417,9 +417,13 @@ In rough order of how often a Report Builder user reaches for it:
 1. Style: borders and padding (default and per edge) on textbox,
    rectangle and cell; f(x) on every style property. Done: a text box has
    the background the engine paints for it, `VerticalAlign`, italic and
-   text decoration; and the weight and alignment popups hold their whole
+   text decoration; the weight and alignment popups hold their whole
    vocabulary, so a file that says SemiBold or Justify is no longer shown
-   -- and written back -- as Normal or Left.
+   -- and written back -- as Normal or Left; padding is four fields, each
+   taking a length or an expression; and borders are a panel of their own
+   on a text box and on a rectangle, stating the default and each edge
+   separately, with the canvas drawing them through the same
+   `RDLBorderPainter` the preview and PDF use. Left: the same on a cell.
 2. Common item properties: `Hidden`, `ToggleItem`, `Hyperlink`,
    `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
    front/back commands and canvas z-order.

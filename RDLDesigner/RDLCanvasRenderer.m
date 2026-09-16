@@ -4,6 +4,7 @@
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
+#import "RDLBorderPainter.h"
 
 @implementation RDLCanvasOverlay
 - (instancetype)init {
@@ -403,10 +404,8 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     [RDLColorFromHex(it.style.color) set];
     NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
-    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
-      [RDLColorFromHex(it.style.backgroundColor) set];
-      NSRectFill(r);
-    }
+    [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
+    [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:_ctx.zoom];
     for (RDLItem *child in it.childItems)
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it isKindOfClass:[RDLTablix class]]) {
@@ -446,15 +445,8 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
   } else {
     // Textbox (and unknown kinds): full WYSIWYG preview — background, border,
     // padding and the attributed value.
-    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
-      [RDLColorFromHex(it.style.backgroundColor) set];
-      NSRectFill(r);
-    }
-    RDLBorder *b = it.style.border;
-    if (b && b.style != RDLBorderStyleUnspecified && b.style != RDLBorderStyleNone) {
-      [RDLColorFromHex(b.color) set];
-      NSFrameRect(r);
-    }
+    [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
+    [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:_ctx.zoom];
     CGFloat padL = [it.style.paddingLeft inches] * RDLPointsPerInch * _ctx.zoom;
     CGFloat padT = [it.style.paddingTop inches] * RDLPointsPerInch * _ctx.zoom;
     CGFloat padR = [it.style.paddingRight inches] * RDLPointsPerInch * _ctx.zoom;

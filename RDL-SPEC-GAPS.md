@@ -543,7 +543,7 @@ included since P1.3 (§7.2).
 
 | Element | Status | Detail |
 |---|---|---|
-| `Border`, `TopBorder`, `BottomBorder`, `LeftBorder`, `RightBorder` / `{Color,Style,Width}` | FULL | Every style in both backends; `Double`, `Groove`, `Ridge`, `Inset` and `Outset` are drawn in PDF too (P1.2). |
+| `Border`, `TopBorder`, `BottomBorder`, `LeftBorder`, `RightBorder` / `{Color,Style,Width}` | FULL | Every style in both backends; `Double`, `Groove`, `Ridge`, `Inset` and `Outset` are drawn in PDF too (P1.2). An edge inherits from `Border` one property at a time, so one giving only a `Width` keeps the default's style and colour, and one giving `Style` `None` draws nothing rather than letting the default through (P1.1). Nothing a file did not state is invented on the way back out. *As audited* an edge that gave only a `Width` was read as `None`: it drew the default's width instead of its own and was left out of the saved file altogether, and every border parsed carried an invented 1pt and `#1a1916` -- which is what chart gridlines and `Line` items were drawn in. |
 | `BackgroundColor`, `Color` | FULL | Named colours, `#rrggbb`, `#rgb` and `#aarrggbb`, alpha first (P1.2). *As audited* `#aarrggbb` lost its alpha and the wrong digits made the colour, and `#rgb` fell back to the default ink. |
 | `FontFamily`, `FontSize`, `FontStyle` | FULL | |
 | `FontWeight` | PART | Full vocabulary parsed (plus non-spec `SemiBold`/`Heavy`/`ExtraBold`); rendered as bold for Bold/Bolder/600+ and normal otherwise. |

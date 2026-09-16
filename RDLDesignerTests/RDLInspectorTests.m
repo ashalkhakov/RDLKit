@@ -3,6 +3,7 @@
 // The element inspector: what its fields are bound to, in both directions, and
 // that its hand-written sections do not overlap.
 #import "RDLDesignerTestSupport.h"
+#import "RDLBordersEditor.h"
 
 
 
@@ -524,6 +525,129 @@
   // What a text box does show: its geometry and its own settings.
   if ([[inspector valueForKey:@"geoBox"] isHidden] || [[inspector valueForKey:@"textBox"] isHidden])
     XCTFail(@"%@", @"a text box shows the geometry and text sections");
+}
+
+// Padding, in the real inspector rather than a field made for the check: the
+// four outlets have to be connected in the XIB and bound to the right side, or
+// the section shows boxes that quietly do nothing. The engine has drawn padding
+// all along and the inspector never showed it.
+- (void)testThePaddingFieldsAreConnectedAndBindBothWays {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Padded"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Padded";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  box.style.paddingLeft = [RDLLength points:6];
+  [report.body.items addObject:box];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  for (NSString *name in @[ @"padLeftField", @"padRightField", @"padTopField", @"padBottomField",
+                            @"padLeftExprButton", @"padRightExprButton", @"padTopExprButton",
+                            @"padBottomExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+
+  // Model -> field, on the side that was set and not on the others.
+  NSTextField *left = [inspector valueForKey:@"padLeftField"];
+  if (![[left stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"the left padding shows %@", [left stringValue]);
+  // A side nobody set still holds the 2pt MS-RDL gives every style, so that is
+  // what the field shows: the box says what the item has, not what is left
+  // over once the defaults are taken away.
+  NSTextField *top = [inspector valueForKey:@"padTopField"];
+  if (![[top stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"an unset padding should show the 2pt default, shows %@", [top stringValue]);
+
+  // Field -> model, as a length rather than the string that was typed.
+  [top setStringValue:@"3pt"];
+  [inspector changed:top];
+  if (![box.style.paddingTop isKindOfClass:[RDLLength class]])
+    XCTFail(@"%@", @"a string was written where an RDLLength belongs");
+  if (![[box.style.paddingTop stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"the top padding reads %@", [box.style.paddingTop stringValue]);
+  // And the other sides were left where they were.
+  if (![[box.style.paddingRight stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"the right padding moved to %@", [box.style.paddingRight stringValue]);
+  if (![[box.style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"the left padding moved to %@", [box.style.paddingLeft stringValue]);
+
+  // Each side takes an expression too, which belongs in the expressions and
+  // not in the measurement.
+  NSTextField *bottom = [inspector valueForKey:@"padBottomField"];
+  [bottom setStringValue:@"=IIf(Fields!Tight.Value, \"1pt\", \"6pt\")"];
+  [inspector changed:bottom];
+  if (box.style.expressions.paddingBottom == nil)
+    XCTFail(@"%@", @"the expression was not written to style.expressions.paddingBottom");
+  if (box.style.paddingBottom != nil)
+    XCTFail(@"%@", @"the measurement survived the expression");
+}
+
+// The borders panel says what each edge states, not what it ends up drawing:
+// an edge that gives only a width shows that width and no style, because the
+// style it draws in is the default's and is not the edge's to claim. Leaving
+// it blank is how an edge says nothing, which is not the same as None.
+- (void)testTheBordersPanelStatesEachEdgeAndAppliesTogether {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Edged"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Edged";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  box.style.border = [RDLBorder solidColor:@"#336699"];
+  box.style.borderTop = [[RDLBorder alloc] init];
+  box.style.borderTop.width = [RDLLength points:5];
+  [report.body.items addObject:box];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLBordersEditor *panel = [RDLBordersEditor editorForItem:box context:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an item in the report");
+    return;
+  }
+
+  // The default states a style and a colour; the top edge states only a width.
+  RDLBorder *shownDefault = [panel borderForEdge:RDLBoxEdgeUnspecified];
+  if (shownDefault.style != RDLBorderStyleSolid ||
+      ![shownDefault.color isEqualToString:@"#336699"])
+    XCTFail(@"the default row shows style %ld colour %@", (long)shownDefault.style,
+            shownDefault.color);
+  RDLBorder *shownTop = [panel borderForEdge:RDLBoxEdgeTop];
+  if (shownTop.style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"an edge that states no style should show none, not the default's");
+  if (![[shownTop.width stringValue] isEqualToString:@"5pt"])
+    XCTFail(@"the top row shows width %@", [shownTop.width stringValue]);
+  // An edge that states nothing at all stays blank.
+  if ([panel borderForEdge:RDLBoxEdgeRight].style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"an edge nobody set should state nothing");
+
+  // Applying an untouched panel changes nothing and records nothing.
+  if (![panel apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  if (box.style.borderRight != nil)
+    XCTFail(@"%@", @"an edge nobody set should not be written just by opening the panel");
+  if (box.style.borderTop.style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"and the top edge should still state only its width");
+
+  // Turn the left edge off: None is a style, so it is written, and the item's
+  // other edges are left as they were.
+  [[panel valueForKey:@"leftStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleNone)];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply");
+  if (box.style.borderLeft.style != RDLBorderStyleNone)
+    XCTFail(@"the left edge reads %ld", (long)box.style.borderLeft.style);
+  if ([box.style borderForEdge:RDLBoxEdgeLeft] != nil)
+    XCTFail(@"%@", @"an edge turned off draws nothing, whatever the default says");
+  if ([box.style borderForEdge:RDLBoxEdgeTop].style != RDLBorderStyleSolid)
+    XCTFail(@"%@", @"the top edge should still draw in the default's style");
+  if (box.style.borderRight != nil)
+    XCTFail(@"%@", @"the edges nobody touched should still state nothing");
 }
 
 // A property of two values is a box to tick: what off and on mean is the

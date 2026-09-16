@@ -140,19 +140,23 @@ static RDLLength *RDLParseLength(NSXMLElement *parent, NSString *name, RDLExpr *
 - (RDLBorder *)parseBorder:(NSXMLElement *)el {
   if (el == nil)
     return [RDLBorder none];
+  // Each of Style, Width and Color is left alone when the element does not
+  // state it, so -borderForEdge: can tell "not stated here" from "stated as
+  // None" and take the rest from Border. Filling them in with None and 1pt
+  // lost an edge that gave only a width: it drew the default's width, and was
+  // then dropped altogether on the way out.
   RDLBorder *b = [[RDLBorder alloc] init];
-  b.style = RDLBorderStyleNone;
   RDLBorderExpressions *ex = [[RDLBorderExpressions alloc] init];
   RDL_PARSE_ENUM_OR_EXPR(b.style, ex.style, @"Style", RDLBorderStyleFromString,
                           RDLText(RDLChild(el, @"Style")));
   RDLExpr *widthExpr = nil;
-  b.width = RDLParseLength(el, @"Width", &widthExpr) ?: [RDLLength points:1];
+  b.width = RDLParseLength(el, @"Width", &widthExpr);
   ex.width = widthExpr;
   NSString *c = RDLText(RDLChild(el, @"Color"));
   if ([RDLExpr isExpressionSource:c])
     ex.color = [RDLExpr expressionWithSource:c];
   else
-    b.color = [c length] ? c : @"#1a1916";
+    b.color = [c length] ? c : nil;
   if (![ex isEmpty])
     b.expressions = ex;
   return b;
@@ -1966,18 +1970,25 @@ static void RDLAddAttr(NSXMLElement *el, NSString *name, NSString *value) {
 static NSXMLElement *RDLBorderElement(NSString *tag, RDLBorder *b) {
   if (b == nil)
     return nil;
-  // A computed Style means the border may become visible at layout time, so it
-  // has to be written even though the constant says None.
-  BOOL visible = b.style != RDLBorderStyleUnspecified && b.style != RDLBorderStyleNone;
-  if (!visible && b.expressions.style == nil)
+  // Whatever the border states is written, and nothing it does not: an edge
+  // giving only a width is a border, and saying None out loud is not the same
+  // as saying nothing. Style, Width and Color used to be filled in from
+  // defaults, which invented values the file never had and threw away the
+  // width-only edges entirely.
+  NSString *style = b.expressions.style ? [b.expressions.style source]
+                    : (b.style != RDLBorderStyleUnspecified ? RDLStringFromBorderStyle(b.style) : nil);
+  NSString *width = b.expressions.width ? [b.expressions.width source] : [b.width stringValue];
+  NSString *color = b.expressions.color ? [b.expressions.color source]
+                                        : ([b.color length] ? b.color : nil);
+  if (style == nil && width == nil && color == nil)
     return nil;
   NSXMLElement *el = RDLEl(tag);
-  RDLAdd(el, @"Style", b.expressions.style ? [b.expressions.style source]
-                                            : RDLStringFromBorderStyle(b.style));
-  RDLAdd(el, @"Width", b.expressions.width ? [b.expressions.width source]
-                                            : ([b.width stringValue] ?: @"1pt"));
-  RDLAdd(el, @"Color", b.expressions.color ? [b.expressions.color source]
-                                            : (b.color ?: @"#1a1916"));
+  if (style)
+    RDLAdd(el, @"Style", style);
+  if (width)
+    RDLAdd(el, @"Width", width);
+  if (color)
+    RDLAdd(el, @"Color", color);
   return el;
 }
 
@@ -2178,7 +2189,7 @@ static void RDLAddStyle(NSXMLElement *parent, RDLStyle *s) {
     RDLAdd(el, @"Direction", [s.expressions.direction source]);
   else if (s.direction != RDLLayoutDirectionUnspecified)
     RDLAdd(el, @"Direction", RDLStringFromLayoutDirection(s.direction));
-  if (s.border && s.border.style != RDLBorderStyleNone) {
+  if (s.border) {
     NSXMLElement *b = RDLBorderElement(@"Border", s.border);
     if (b)
       [el addChild:b];

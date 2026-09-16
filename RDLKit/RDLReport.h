@@ -561,6 +561,15 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 - (BOOL)isEmpty;
 @end
 
+// Which edge of a box a border is on.
+typedef NS_ENUM(NSInteger, RDLBoxEdge) {
+  RDLBoxEdgeUnspecified = 0,
+  RDLBoxEdgeTop,
+  RDLBoxEdgeBottom,
+  RDLBoxEdgeLeft,
+  RDLBoxEdgeRight,
+};
+
 @interface RDLBorder : NSObject
 @property (nonatomic, assign) RDLBorderStyle style;
 @property (nonatomic, strong) RDLLength *width;
@@ -612,6 +621,10 @@ typedef NS_ENUM(NSInteger, RDLLengthUnit) {
 @property (nonatomic, assign) NSInteger numeralVariant;
 @property (nonatomic, strong) RDLBorder *border;
 @property (nonatomic, strong) RDLBorder *borderLeft, *borderRight, *borderTop, *borderBottom;
+// What is drawn along one edge: that edge's own border when it has a style to
+// draw, the default `border` when it has not, and nil when neither draws --
+// which is the rule every backend needs and each used to carry its own copy of.
+- (RDLBorder *)borderForEdge:(RDLBoxEdge)edge;
 // nil on a style with no computed property; see RDLStyleExpressions.
 @property (nonatomic, strong) RDLStyleExpressions *expressions;
 + (instancetype)defaultStyle;

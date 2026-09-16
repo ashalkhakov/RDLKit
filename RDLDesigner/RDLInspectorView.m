@@ -1,4 +1,5 @@
 #import "RDLInspectorView.h"
+#import "RDLBordersEditor.h"
 #import "RDLTablixStructure.h"
 #import "RDLChange.h"
 #import "RDLEditor.h"
@@ -31,6 +32,12 @@
 // offer; how its text sits in the box; whether it is italic; and what is drawn
 // through or under it.
 @property (nonatomic, strong) IBOutlet RDLExpressionField *textBGField;
+// The four sides of a text box's padding, each its own length or expression.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *padLeftField, *padRightField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *padTopField, *padBottomField;
+@property (nonatomic, strong) IBOutlet NSButton *padLeftExprButton, *padRightExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *padTopExprButton, *padBottomExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *textBordersButton, *rectBordersButton;
 @property (nonatomic, strong) IBOutlet NSButton *textBGExprButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *verticalPop, *decorationPop;
 @property (nonatomic, strong) IBOutlet NSButton *italicCheck;
@@ -151,7 +158,9 @@
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
                          _languageExprButton, _docLanguageExprButton,
-                         _rectBGExprButton, _sizeExprButton, _textBGExprButton ])
+                         _rectBGExprButton, _sizeExprButton, _textBGExprButton,
+                         _padLeftExprButton, _padRightExprButton, _padTopExprButton,
+                         _padBottomExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -327,6 +336,17 @@
       placeholder:nil];
   [_bindings bind:_textBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
+  // Padding, which the engine has always drawn and the inspector never showed:
+  // 2pt a side is what a style that says nothing gets, so that is what the
+  // empty field means rather than none.
+  [_bindings bind:_padLeftField keyPath:@"style.paddingLeft" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padRightField keyPath:@"style.paddingRight" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padTopField keyPath:@"style.paddingTop" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padBottomField keyPath:@"style.paddingBottom" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
   [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
@@ -769,7 +789,23 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _rectBGExprButton) return _rectBGField;
   if (sender == _textBGExprButton) return _textBGField;
   if (sender == _sizeExprButton) return _sizeField;
+  if (sender == _padLeftExprButton) return _padLeftField;
+  if (sender == _padRightExprButton) return _padRightField;
+  if (sender == _padTopExprButton) return _padTopField;
+  if (sender == _padBottomExprButton) return _padBottomField;
   return nil;
+}
+
+// The borders of the selected item: the default and the four edges, in a panel
+// of their own because there are fifteen values behind them and the section
+// has room for a button.
+- (void)editBorders:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (item == nil)
+    return;
+  if ([RDLBordersEditor runForItem:item context:_context])
+    [self reload];
 }
 
 - (void)editExpression:(id)sender {

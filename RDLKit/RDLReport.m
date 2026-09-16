@@ -736,12 +736,45 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   s.paddingRight = [RDLLength points:2];
   s.paddingTop = [RDLLength points:2];
   s.paddingBottom = [RDLLength points:2];
-  s.border = [RDLBorder none];
-  s.borderLeft = [RDLBorder none];
-  s.borderRight = [RDLBorder none];
-  s.borderTop = [RDLBorder none];
-  s.borderBottom = [RDLBorder none];
+  // No borders, said by saying nothing about them: an unstated border draws
+  // exactly as a None one does. Stating None here gave every item that never
+  // mentioned a border five of them, each carrying a width and a colour, and
+  // a save then wrote all of that into a file that had never said any of it.
   return s;
+}
+
+// A border with something to draw: one that is unspecified, or says None, is
+// not drawn and does not hide the default underneath it.
+- (RDLBorder *)borderForEdge:(RDLBoxEdge)edge {
+  RDLBorder *own = nil;
+  switch (edge) {
+  case RDLBoxEdgeTop:
+    own = _borderTop;
+    break;
+  case RDLBoxEdgeBottom:
+    own = _borderBottom;
+    break;
+  case RDLBoxEdgeLeft:
+    own = _borderLeft;
+    break;
+  case RDLBoxEdgeRight:
+    own = _borderRight;
+    break;
+  case RDLBoxEdgeUnspecified:
+    break;
+  }
+  // TopBorder and its siblings inherit from Border one property at a time, so
+  // an edge that gives only a width keeps the default's style and colour. An
+  // edge that says None draws nothing: that is a border of style None, not an
+  // edge with nothing to say, and the default does not show through it.
+  RDLBorderStyle style = own.style != RDLBorderStyleUnspecified ? own.style : _border.style;
+  if (style == RDLBorderStyleUnspecified || style == RDLBorderStyleNone)
+    return nil;
+  RDLBorder *resolved = [[RDLBorder alloc] init];
+  resolved.style = style;
+  resolved.width = own.width ?: _border.width;
+  resolved.color = [own.color length] ? own.color : _border.color;
+  return resolved;
 }
 
 + (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base {

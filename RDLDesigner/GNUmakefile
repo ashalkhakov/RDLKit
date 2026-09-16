@@ -39,6 +39,7 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionField.m \
   RDLFilterEditor.m \
   RDLGroupPropertiesEditor.m \
+  RDLBordersEditor.m \
   RDLSubreportParametersEditor.m \
   RDLToolbarIcons.m \
   RDLPane.m \
@@ -91,6 +92,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
   RDLGroupPropertiesEditor.xib \
+  RDLBordersEditor.xib \
   RDLSubreportParametersEditor.xib \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \

@@ -1,6 +1,7 @@
 #import "RDLView.h"
 #import "RDLChartRenderer.h"
 #import "RDLTextAttributes.h"
+#import "RDLBorderPainter.h"
 #import "RDLReport.h"
 #import "RDLLayoutEngine.h"
 #import "RDLCompatibility.h"
@@ -33,71 +34,6 @@ static void RDLSetLineDash(NSBezierPath *p, RDLBorderStyle style) {
   }
 }
 
-static void RDLStrokeSegment(NSPoint a, NSPoint b, CGFloat width, RDLBorderStyle style,
-                             NSColor *color) {
-  NSBezierPath *p = [NSBezierPath bezierPath];
-  [p moveToPoint:a];
-  [p lineToPoint:b];
-  [p setLineWidth:width];
-  RDLSetLineDash(p, style);
-  [color set];
-  [p stroke];
-}
-
-static NSPoint RDLOffsetPoint(NSPoint p, NSPoint inward, CGFloat by) {
-  return NSMakePoint(p.x + inward.x * by, p.y + inward.y * by);
-}
-
-// One edge of a box's border. `inward` points into the box, and `leading` is
-// YES for the top and left edges, which the three-dimensional styles shade
-// against the bottom and right: Double draws two thin lines, Groove and Ridge a
-// dark and a light half, Inset and Outset the whole edge darker or lighter.
-// They used to be drawn as a plain solid line.
-static void RDLStrokeBorderEdge(NSPoint a, NSPoint b, NSPoint inward, BOOL leading, RDLBorder *border,
-                                RDLBorder *fallback) {
-  RDLBorder *use =
-      (border && border.style != RDLBorderStyleUnspecified &&
-       border.style != RDLBorderStyleNone) ? border : fallback;
-  if (use == nil || use.style == RDLBorderStyleUnspecified || use.style == RDLBorderStyleNone)
-    return;
-  CGFloat width = RDLViewPt(use.width, 1);
-  NSColor *color = RDLColorFromHex(use.color);
-  NSColor *dark = [color blendedColorWithFraction:0.45 ofColor:[NSColor blackColor]] ?: color;
-  NSColor *light = [color blendedColorWithFraction:0.55 ofColor:[NSColor whiteColor]] ?: color;
-  switch (use.style) {
-  case RDLBorderStyleDouble: {
-    CGFloat third = width / 3;
-    RDLStrokeSegment(RDLOffsetPoint(a, inward, -third), RDLOffsetPoint(b, inward, -third), third,
-                     RDLBorderStyleSolid, color);
-    RDLStrokeSegment(RDLOffsetPoint(a, inward, third), RDLOffsetPoint(b, inward, third), third,
-                     RDLBorderStyleSolid, color);
-    break;
-  }
-  case RDLBorderStyleGroove:
-  case RDLBorderStyleRidge: {
-    BOOL groove = use.style == RDLBorderStyleGroove;
-    NSColor *outer = (groove == leading) ? dark : light;
-    NSColor *inner = (groove == leading) ? light : dark;
-    CGFloat half = width / 2;
-    RDLStrokeSegment(RDLOffsetPoint(a, inward, -half / 2), RDLOffsetPoint(b, inward, -half / 2), half,
-                     RDLBorderStyleSolid, outer);
-    RDLStrokeSegment(RDLOffsetPoint(a, inward, half / 2), RDLOffsetPoint(b, inward, half / 2), half,
-                     RDLBorderStyleSolid, inner);
-    break;
-  }
-  case RDLBorderStyleInset:
-  case RDLBorderStyleWindowInset:
-    RDLStrokeSegment(a, b, width, RDLBorderStyleSolid, leading ? dark : light);
-    break;
-  case RDLBorderStyleOutset:
-    RDLStrokeSegment(a, b, width, RDLBorderStyleSolid, leading ? light : dark);
-    break;
-  default:
-    RDLStrokeSegment(a, b, width, use.style, color);
-    break;
-  }
-}
-
 // Font + text attributes for a resolved style (used both for the plain text
 // path and for each rich-text run merged over the textbox style).
 // Text attribute translation and rich-run assembly live in RDLTextAttributes,
@@ -113,21 +49,11 @@ static NSAttributedString *RDLSpansAttributed(RDLLaidOutTextbox *it) {
                                                    scale:1.0];
 }
 
+// Every border is drawn by RDLBorderPainter, which the designer canvas draws
+// with too. This file used to hold the only copy, so what the canvas showed
+// and what was exported were two different pictures.
 static void RDLDrawBorders(NSRect r, RDLStyle *s) {
-  if (s == nil)
-    return;
-  RDLBorder *all =
-      (s.border && s.border.style != RDLBorderStyleUnspecified &&
-       s.border.style != RDLBorderStyleNone) ? s.border : nil;
-  // The view is flipped: the top edge is at the smaller y, and inward is down.
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMinY(r)),
-                      NSMakePoint(0, 1), YES, s.borderTop, all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMaxY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)),
-                      NSMakePoint(0, -1), NO, s.borderBottom, all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMinX(r), NSMinY(r)), NSMakePoint(NSMinX(r), NSMaxY(r)),
-                      NSMakePoint(1, 0), YES, s.borderLeft, all);
-  RDLStrokeBorderEdge(NSMakePoint(NSMaxX(r), NSMinY(r)), NSMakePoint(NSMaxX(r), NSMaxY(r)),
-                      NSMakePoint(-1, 0), NO, s.borderRight, all);
+  [RDLBorderPainter drawBorderOfStyle:s inRect:r scale:1];
 }
 
 // Overline, which the text system has no attribute for: a line over each line
