@@ -123,6 +123,7 @@
 		C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F23 /* RDLLinePainter.m */; };
 		D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */ = {isa = PBXBuildFile; fileRef = 5EBD968C905DB599112D8838 /* RDLMarkup.m */; };
 		C0DE00000000000000000A03 /* RDLCode.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000A02 /* RDLCode.m */; };
+		C0DE00000000000000000F31 /* RDLCodeText.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F30 /* RDLCodeText.m */; };
 		C0DE00000000000000000B03 /* RDLParameterValues.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000B02 /* RDLParameterValues.m */; };
 		C0DE00000000000000000E03 /* RDLTablixStructure.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000E02 /* RDLTablixStructure.m */; };
 		C0DE00000000000000000E04 /* RDLTablixStructure.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000E02 /* RDLTablixStructure.m */; };
@@ -314,6 +315,7 @@
 		27ECA835280D45B396FB5C44 /* RDLGenerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLGenerator.h; sourceTree = "<group>"; };
 		25562BAA8166DD7538CC60FA /* RDLDataProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDataProvider.h; sourceTree = "<group>"; };
 		28D4EAA738757128CB5DE2EF /* RDLDataProviderInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLDataProviderInternal.h; sourceTree = "<group>"; };
+		C0DE00000000000000000F40 /* RDLCodeInternal.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCodeInternal.h; sourceTree = "<group>"; };
 		7D6DCC59A96A905535ACA39E /* RDLCSVDataProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCSVDataProvider.h; sourceTree = "<group>"; };
 		5B10000000000000000001A1 /* RDLSubreportLoader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSubreportLoader.h; sourceTree = "<group>"; };
 		BAAC3B561D3DDFFC8DD657F2 /* RDLXMLDataProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLXMLDataProvider.h; sourceTree = "<group>"; };
@@ -504,6 +506,7 @@
 		5EBD968C905DB599112D8838 /* RDLMarkup.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMarkup.m; sourceTree = "<group>"; };
 		C0DE00000000000000000A01 /* RDLCode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLCode.h; sourceTree = "<group>"; };
 		C0DE00000000000000000A02 /* RDLCode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCode.m; sourceTree = "<group>"; };
+		C0DE00000000000000000F30 /* RDLCodeText.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCodeText.m; sourceTree = "<group>"; };
 		C0DE00000000000000000E01 /* RDLTablixStructure.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTablixStructure.h; sourceTree = "<group>"; };
 		C0DE00000000000000000E02 /* RDLTablixStructure.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTablixStructure.m; sourceTree = "<group>"; };
 		C0DE00000000000000000B01 /* RDLParameterValues.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLParameterValues.h; sourceTree = "<group>"; };
@@ -733,6 +736,7 @@
 				27ECA835280D45B396FB5C44 /* RDLGenerator.h */,
 				25562BAA8166DD7538CC60FA /* RDLDataProvider.h */,
 				28D4EAA738757128CB5DE2EF /* RDLDataProviderInternal.h */,
+				C0DE00000000000000000F40 /* RDLCodeInternal.h */,
 				7D6DCC59A96A905535ACA39E /* RDLCSVDataProvider.h */,
 				5B10000000000000000001A1 /* RDLSubreportLoader.h */,
 				BAAC3B561D3DDFFC8DD657F2 /* RDLXMLDataProvider.h */,
@@ -766,6 +770,7 @@
 				5EBD968C905DB599112D8838 /* RDLMarkup.m */,
 				C0DE00000000000000000A01 /* RDLCode.h */,
 				C0DE00000000000000000A02 /* RDLCode.m */,
+				C0DE00000000000000000F30 /* RDLCodeText.m */,
 				C0DE00000000000000000B01 /* RDLParameterValues.h */,
 				C0DE00000000000000000B02 /* RDLParameterValues.m */,
 				C0DE00000000000000000D01 /* RDLNumber.h */,
@@ -1276,6 +1281,7 @@
 				C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */,
 				D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */,
 				C0DE00000000000000000A03 /* RDLCode.m in Sources */,
+				C0DE00000000000000000F31 /* RDLCodeText.m in Sources */,
 				C0DE00000000000000000B03 /* RDLParameterValues.m in Sources */,
 				C0DE00000000000000000D03 /* RDLNumber.m in Sources */,
 				C0DE00000000000000000C03 /* RDLDataEvaluation.m in Sources */,

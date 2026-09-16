@@ -53,6 +53,7 @@ RDLKit_OBJC_FILES = \
   RDLLinePainter.m \
   RDLMarkup.m \
   RDLCode.m \
+  RDLCodeText.m \
   RDLParameterValues.m \
   RDLNumber.m \
   RDLDataEvaluation.m
