@@ -7,25 +7,6 @@
 
 #pragma mark - Token / AST
 
-@interface RDLTok : NSObject
-// The published kind, not a string of its own: a mistyped comparison against
-// "num" is a branch that never runs and that nothing diagnoses, and the lexer
-// is the one place that decides what a lexeme is. Identifier here covers every
-// name; whether one is a function or the head of a Fields! reference is decided
-// afterwards, from the catalogue and the token that follows.
-@property (nonatomic, assign) RDLExprTokenKind kind;
-@property (nonatomic, copy) NSString *s;   // decoded value (string escapes resolved)
-// A literal's value, in the type VB gives it: a number of its type, or a date.
-@property (nonatomic, strong) id value;
-// Losslessness: `text` is the exact lexeme as written and `leading` is the
-// whitespace and comments that preceded it, so concatenating leading+text over
-// the token stream reproduces the source byte for byte.
-@property (nonatomic, copy) NSString *text;
-@property (nonatomic, copy) NSString *leading;
-// Which line of the source it was written on, counting from 1. What the Code
-// element reports a problem against; an expression has only the one line.
-@property (nonatomic, assign) NSUInteger line;
-@end
 @implementation RDLTok
 @end
 
@@ -117,6 +98,15 @@ static void RDLTokAppend(NSMutableArray *out, RDLTok *t, NSString *src, NSUInteg
   t.line = line;
   *lastEnd = end;
   [out addObject:t];
+}
+
+RDLTok *RDLCodeMakeToken(RDLExprTokenKind kind, NSString *text) {
+  RDLTok *t = [[RDLTok alloc] init];
+  t.kind = kind;
+  t.s = text;
+  t.text = text;
+  t.leading = @" ";
+  return t;
 }
 
 static RDLTok *RDLMkTok(RDLExprTokenKind kind, NSString *s, id value) {
@@ -1135,6 +1125,23 @@ NSString *RDLPrint(RDLExprNode *a) {
 // The same walk for a Code element. There is no leading "=" to skip, the lexer
 // is asked to keep line breaks, and a break stays the kind it is: RDLKindOfToken
 // only ever reclassifies a name.
+// An expression built from part of a token stream somebody else lexed: what the
+// Code element hands over for the expression inside a statement. The tokens are
+// already the right ones, so nothing is re-lexed and no text is rebuilt to be
+// read a second time.
++ (instancetype)expressionWithTokens:(NSArray *)tokens range:(NSRange)range {
+  RDLExpr *e = [[RDLExpr alloc] init];
+  e->_prefix = @"=";
+  e->_trailing = @"";
+  e->_toks = [tokens subarrayWithRange:range];
+  RDLExpressionParser *p = [[RDLExpressionParser alloc] init];
+  p.toks = e->_toks;
+  p.i = 0;
+  e->_ast = [p parse];
+  e->_complete = p.i >= [p.toks count];
+  return e;
+}
+
 + (NSArray<RDLExprToken *> *)codeTokensForSource:(NSString *)source {
   NSMutableArray *out = [NSMutableArray array];
   if ([source length] == 0)

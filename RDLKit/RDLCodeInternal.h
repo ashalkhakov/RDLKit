@@ -104,9 +104,8 @@ typedef NS_ENUM(NSInteger, RDLCodeFlow) {
 
 #pragma mark - Reading the text
 
-// Plain string work, knowing nothing of the pieces above: trimming, finding a
-// character or a word outside quotes and brackets, splitting a list, dropping
-// a comment. Shared by the reader, which is the only caller.
+// The words that can only close a statement or begin one this kit does not
+// run, which is how the parser tells them from a name.
 NSString *RDLCodeTrimmed(NSString *text);
 NSString *RDLCodeAfter(NSString *text, NSString *phrase);
 NSString *RDLCodeLeadingName(NSString *text);
