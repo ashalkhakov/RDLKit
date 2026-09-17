@@ -81,6 +81,12 @@ FOUNDATION_EXPORT NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *local
 // answering to the key, and finding out which is worth remembering: callers in
 // a loop resolve the key once and fetch many times. Declared here because the
 // evaluator and the runtime library both ask, and the parser implements it.
+// The instructions a node compiles to, kept on the node so a row loop compiles
+// it once. Atomic: a report's nodes may be read from more than one thread.
+@interface RDLExprNode ()
+@property (atomic, strong) id compiledChunk;
+@end
+
 @interface RDLExprNode (RDLRowReading)
 - (id)valueFromRow:(id)row key:(NSString *)key;
 @end

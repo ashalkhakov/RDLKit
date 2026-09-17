@@ -5,6 +5,7 @@
 // elsewhere -- this is only what the language can do once it is running.
 #import "RDLExpressionInternal.h"
 #import "RDLValueBoxing.h"
+#import "RDLBytecode.h"
 #import "RDLCode.h"
 #import "RDLExpressionCatalog.h"
 #import "RDLReport.h"
@@ -2229,7 +2230,6 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope);
 //
 // One function each, rather than arms of one long chain: the evaluator's job is
 // to find the right one and call it, and nothing else.
-typedef id (*RDLFunctionHandler)(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope);
 
 static id RDLArg(NSArray *vals, NSUInteger i) {
   return i < [vals count] ? vals[i] : nil;
@@ -3370,12 +3370,14 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope) 
   return nil;
 }
 
+id RDLExecChild(RDLExprNode *ast, RDLEvalScope *scope);
+
 // union, which needs the scope rather than only its arguments' values.
-static id RDLFormUnion(RDLExprNode *ast, RDLEvalScope *scope) {
+static id RDLFormUnionTree(RDLExprNode *ast, RDLEvalScope *scope) {
 
     NSMutableArray *out = [NSMutableArray array];
     for (RDLExprNode *arg in ast.args) {
-      id v = RDLExec(arg, scope);
+      id v = RDLExecChild(arg, scope);
       NSArray *items = [v isKindOfClass:[NSArray class]] ? v : (v ? @[ v ] : @[]);
       for (id item in items)
         if (![out containsObject:item])
@@ -3385,9 +3387,9 @@ static id RDLFormUnion(RDLExprNode *ast, RDLEvalScope *scope) {
 }
 
 // inscope, which needs the scope rather than only its arguments' values.
-static id RDLFormInScope(RDLExprNode *ast, RDLEvalScope *scope) {
+static id RDLFormInScopeTree(RDLExprNode *ast, RDLEvalScope *scope) {
 
-    NSString *want = [ast.args count] ? RDLStr(RDLExec(ast.args[0], scope)) : @"";
+    NSString *want = [ast.args count] ? RDLStr(RDLExecChild(ast.args[0], scope)) : @"";
     for (NSString *name in scope.activeScopes)
       if ([name caseInsensitiveCompare:want] == NSOrderedSame)
         return RDLYes(YES);
@@ -3395,7 +3397,7 @@ static id RDLFormInScope(RDLExprNode *ast, RDLEvalScope *scope) {
 }
 
 // level, which needs the scope rather than only its arguments' values.
-static id RDLFormLevel(RDLExprNode *ast, RDLEvalScope *scope) {
+static id RDLFormLevelTree(RDLExprNode *ast, RDLEvalScope *scope) {
 
     NSArray *scopes = scope.activeScopes ?: @[];
     // Inside a recursive hierarchy Level() is the depth in the tree, not the
@@ -3406,18 +3408,18 @@ static id RDLFormLevel(RDLExprNode *ast, RDLEvalScope *scope) {
                                        : RDLDouble((double)MAX((NSInteger)[scopes count] - 1, 0));
     if (scope.recursionLevel >= 0 && [scopes count]) {
       NSString *innermost = [scopes lastObject];
-      NSString *asked = RDLStr(RDLExec(ast.args[0], scope));
+      NSString *asked = RDLStr(RDLExecChild(ast.args[0], scope));
       if ([innermost caseInsensitiveCompare:asked] == NSOrderedSame)
         return RDLDouble((double)scope.recursionLevel);
     }
-    NSString *want = RDLStr(RDLExec(ast.args[0], scope));
+    NSString *want = RDLStr(RDLExecChild(ast.args[0], scope));
     for (NSUInteger i = 0; i < [scopes count]; i++)
       if ([scopes[i] caseInsensitiveCompare:want] == NSOrderedSame)
         return RDLDouble((double)i);
     return RDLDouble(-1.0);
 }
 
-id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
+id RDLExecTree(RDLExprNode *ast, RDLEvalScope *scope) {
   if (ast == nil)
     return @"";
   if (ast.kind == RDLExprNodeKindLiteral)
@@ -3461,15 +3463,15 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     // settle it.
     if (op == RDLExprOperatorAndAlso || op == RDLExprOperatorOrElse) {
       BOOL orElse = op == RDLExprOperatorOrElse;
-      id left = RDLBooleanOperand(RDLExec(ast.args[0], scope));
+      id left = RDLBooleanOperand(RDLExecChild(ast.args[0], scope));
       if (RDLIsError(left))
         return left;
       if ([left boolValue] == orElse)
         return RDLYes(orElse);
-      return RDLBooleanOperand([ast.args count] > 1 ? RDLExec(ast.args[1], scope) : nil);
+      return RDLBooleanOperand([ast.args count] > 1 ? RDLExecChild(ast.args[1], scope) : nil);
     }
-    id a = RDLExec(ast.args[0], scope);
-    id b = [ast.args count] > 1 ? RDLExec(ast.args[1], scope) : nil;
+    id a = RDLExecChild(ast.args[0], scope);
+    id b = [ast.args count] > 1 ? RDLExecChild(ast.args[1], scope) : nil;
     return RDLOperate(op, a, b);
   }
   if (ast.kind == RDLExprNodeKindCall) {
@@ -3479,7 +3481,7 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     if (scope.codeLocals && [scope.report.codeModule hasFunctionNamed:n]) {
       NSMutableArray *arguments = [NSMutableArray array];
       for (RDLExprNode *arg in ast.args)
-        [arguments addObject:RDLExec(arg, scope) ?: [NSNull null]];
+        [arguments addObject:RDLExecChild(arg, scope) ?: [NSNull null]];
       return [scope.report.codeModule callFunctionNamed:n arguments:arguments scope:scope];
     }
     // Union(a, b): the two sets together, in order, without repeats. A set
@@ -3489,18 +3491,18 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     // Level("Name"): how deep that scope is. -1 for a scope we are not in,
     // which is what RDL returns.
     if ([n isEqualToString:@"union"])
-      return RDLFormUnion(ast, scope);
+      return RDLFormUnionTree(ast, scope);
     if ([n isEqualToString:@"inscope"])
-      return RDLFormInScope(ast, scope);
+      return RDLFormInScopeTree(ast, scope);
     if ([n isEqualToString:@"level"])
-      return RDLFormLevel(ast, scope);
+      return RDLFormLevelTree(ast, scope);
     // IIf, Switch and Choose are functions: every argument is worked out before
     // one is chosen, so an error in a branch not taken is still the result, as
     // it is in SSRS -- IIf(x <> 0, y / x, 0) is #Error when x is 0.
     if ([n isEqualToString:@"iif"] || [n isEqualToString:@"switch"] || [n isEqualToString:@"choose"]) {
       NSMutableArray *given = [NSMutableArray arrayWithCapacity:[ast.args count]];
       for (RDLExprNode *arg in ast.args) {
-        id v = RDLExec(arg, scope);
+        id v = RDLExecChild(arg, scope);
         if (RDLIsError(v))
           return v;
         [given addObject:v ?: [NSNull null]];
@@ -3564,11 +3566,11 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
       if ([ast.args count] == 0)
         return nil;
       RDLEvalScope *before = [scope scopeBy:^(RDLEvalScope *s) { s.row = scope.previousRow; }];
-      return RDLExec(ast.args[0], before);
+      return RDLExecChild(ast.args[0], before);
     }
     if ([n isEqualToString:@"join"]) {
-      id arr = [ast.args count] ? RDLExec(ast.args[0], scope) : nil;
-      NSString *delim = [ast.args count] > 1 ? RDLStr(RDLExec(ast.args[1], scope)) : @" ";
+      id arr = [ast.args count] ? RDLExecChild(ast.args[0], scope) : nil;
+      NSString *delim = [ast.args count] > 1 ? RDLStr(RDLExecChild(ast.args[1], scope)) : @" ";
       NSArray *list = [arr isKindOfClass:[NSArray class]] ? arr : (RDLIsNothing(arr) ? @[] : @[ arr ]);
       NSMutableArray *parts = [NSMutableArray array];
       for (id x in list)
@@ -3577,7 +3579,7 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     }
     NSMutableArray *vals = [NSMutableArray array];
     for (RDLExprNode *c in ast.args) {
-      id v = RDLExec(c, scope);
+      id v = RDLExecChild(c, scope);
       [vals addObject:v ?: [NSNull null]];
     }
     for (id v in vals)
@@ -3588,7 +3590,7 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   if (ast.kind == RDLExprNodeKindMember || ast.kind == RDLExprNodeKindMethod) {
     NSMutableArray *vals = [NSMutableArray array];
     for (RDLExprNode *c in ast.args) {
-      id v = RDLExec(c, scope);
+      id v = RDLExecChild(c, scope);
       if (RDLIsError(v))
         return v;
       [vals addObject:v ?: [NSNull null]];
@@ -3619,6 +3621,248 @@ id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
     return RDLMemberOfValue(target, ast.name ?: @"", rest, scope);
   }
   return @"";
+}
+
+#pragma mark - What the machine calls
+
+RDLFunctionHandler RDLFunctionHandlerNamed(NSString *lowercaseName) {
+  if (lowercaseName == nil)
+    return NULL;
+  return (RDLFunctionHandler)[RDLFunctionTable()[lowercaseName] pointerValue];
+}
+
+RDLForm RDLFormNamed(NSString *lowercaseName) {
+  static NSDictionary<NSString *, NSNumber *> *forms;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    NSMutableDictionary *all = [@{
+      @"iif" : @(RDLFormIIf), @"switch" : @(RDLFormSwitch), @"choose" : @(RDLFormChoose),
+      @"now" : @(RDLFormNow), @"today" : @(RDLFormToday),
+      @"timeofday" : @(RDLFormClock), @"timer" : @(RDLFormClock),
+      @"datestring" : @(RDLFormClock), @"timestring" : @(RDLFormClock),
+      @"join" : @(RDLFormJoin), @"union" : @(RDLFormUnion),
+      @"inscope" : @(RDLFormInScope), @"level" : @(RDLFormLevel),
+      @"runningvalue" : @(RDLFormRunningValue),
+      @"lookup" : @(RDLFormLookup), @"lookupset" : @(RDLFormLookup), @"multilookup" : @(RDLFormLookup),
+      @"previous" : @(RDLFormPrevious),
+    } mutableCopy];
+    for (NSString *n in @[ @"sum", @"count", @"countdistinct", @"avg", @"first", @"last", @"min", @"max",
+                           @"countrows", @"stdev", @"stdevp", @"var", @"varp", @"aggregate", @"rownumber" ])
+      all[n] = @(RDLFormAggregate);
+    forms = [all copy];
+  });
+  return lowercaseName ? (RDLForm)[forms[lowercaseName] intValue] : RDLFormUnspecified;
+}
+
+id RDLLoadReference(RDLOpcode opcode, RDLExprNode *node, RDLEvalScope *scope) {
+  switch (opcode) {
+  case RDLOpcodeLoadField:
+    return RDLEvaluateField(scope, node);
+  case RDLOpcodeLoadParameter:
+    return RDLParam(scope, node.name, node.prop);
+  case RDLOpcodeLoadGlobal:
+    return RDLGlobal(scope, node.name);
+  case RDLOpcodeLoadUser:
+    return RDLUser(scope, node.name);
+  // Another textbox's value, as the layout recorded it when it placed that
+  // textbox.
+  case RDLOpcodeLoadReportItem:
+    return RDLOutOfCollection(scope.reportItemValues[node.name ?: @""]);
+  // A report or group variable, as layout worked it out for this scope.
+  case RDLOpcodeLoadVariable:
+    return RDLOutOfCollection(scope.variableValues[node.name ?: @""]);
+  default:
+    return nil;
+  }
+}
+
+// A bare name. Inside the report's code it is a local variable, one of the
+// module's own, or one of its functions called without brackets; anywhere else,
+// and failing those, it is the name itself.
+id RDLLoadName(NSString *name, RDLEvalScope *scope) {
+  if (scope.codeLocals) {
+    NSString *key = [name lowercaseString] ?: @"";
+    id local = scope.codeLocals[key];
+    if (local)
+      return local == [NSNull null] ? nil : local;
+    RDLCodeModule *module = scope.report.codeModule;
+    id shared = nil;
+    if ([module readVariableNamed:key value:&shared scope:scope])
+      return shared;
+    if ([module hasFunctionNamed:key])
+      return [module callFunctionNamed:key arguments:@[] scope:scope];
+  }
+  return name;
+}
+
+// Inside the report's code its own functions come first: one may share a name
+// with a function of the expression language.
+BOOL RDLIsCodeFunction(NSString *lowercaseName, RDLEvalScope *scope) {
+  return scope.codeLocals != nil && [scope.report.codeModule hasFunctionNamed:lowercaseName];
+}
+
+id RDLCallCodeFunction(NSString *lowercaseName, NSArray *vals, RDLEvalScope *scope) {
+  return [scope.report.codeModule callFunctionNamed:lowercaseName arguments:vals scope:scope];
+}
+
+id RDLCallLibrary(NSString *name, NSArray *vals, RDLEvalScope *scope) {
+  return RDLCall(name, vals, nil, scope);
+}
+
+static id RDLArgumentAt(NSArray *vals, NSUInteger i) {
+  id v = i < [vals count] ? vals[i] : nil;
+  return v == [NSNull null] ? nil : v;
+}
+
+// IIf, Switch and Choose are functions: every argument is worked out before one
+// is chosen, so an error in a branch not taken is still the result, as it is in
+// SSRS -- IIf(x <> 0, y / x, 0) is #Error when x is 0. The machine has already
+// given up at the first argument that failed.
+static id RDLChoose(RDLForm form, NSArray *vals) {
+  if (form == RDLFormIIf) {
+    id condition = RDLBooleanOperand(RDLArgumentAt(vals, 0));
+    if (RDLIsError(condition))
+      return condition;
+    return [condition boolValue] ? RDLArgumentAt(vals, 1) : RDLArgumentAt(vals, 2);
+  }
+  if (form == RDLFormSwitch) {
+    if ([vals count] % 2 == 1)
+      return [RDLExprError errorWithMessage:@"Argument 'VarExpr' must have an even number of elements."];
+    for (NSUInteger i = 0; i + 1 < [vals count]; i += 2) {
+      id condition = RDLBooleanOperand(RDLArgumentAt(vals, i));
+      if (RDLIsError(condition))
+        return condition;
+      if ([condition boolValue])
+        return RDLArgumentAt(vals, i + 1);
+    }
+    return nil;
+  }
+  // Choose takes the whole part of its index, and gives Nothing out of range.
+  id index = RDLValueConvertedTo(RDLArgumentAt(vals, 0), RDLConversionTargetDouble);
+  if (RDLIsError(index))
+    return index;
+  double whole = trunc([index doubleValue]);
+  if (whole >= 1 && whole < (double)[vals count])
+    return RDLArgumentAt(vals, (NSUInteger)whole);
+  return nil;
+}
+
+id RDLCallForm(RDLForm form, NSString *lowercaseName, NSArray *vals, RDLEvalScope *scope) {
+  switch (form) {
+  case RDLFormIIf:
+  case RDLFormSwitch:
+  case RDLFormChoose:
+    return RDLChoose(form, vals);
+  case RDLFormNow:
+    return scope.executionTime ?: [NSDate date];
+  case RDLFormToday: {
+    NSDate *d = scope.executionTime ?: [NSDate date];
+    NSCalendar *cal = [NSCalendar currentCalendar];
+    NSDateComponents *c = [cal components:NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit fromDate:d];
+    return [cal dateFromComponents:c];
+  }
+  case RDLFormClock:
+    return RDLClockValue(lowercaseName, scope.executionTime ?: [NSDate date]);
+  case RDLFormJoin: {
+    id arr = RDLArgumentAt(vals, 0);
+    NSString *delim = [vals count] > 1 ? RDLStr(RDLArgumentAt(vals, 1)) : @" ";
+    NSArray *list = [arr isKindOfClass:[NSArray class]] ? arr : (RDLIsNothing(arr) ? @[] : @[ arr ]);
+    NSMutableArray *parts = [NSMutableArray array];
+    for (id x in list)
+      [parts addObject:RDLStr(x)];
+    return [parts componentsJoinedByString:delim];
+  }
+  // Union(a, b): the sets together, in order, without repeats. A set here is
+  // what LookupSet returns, an array.
+  case RDLFormUnion: {
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSUInteger i = 0; i < [vals count]; i++) {
+      id v = RDLArgumentAt(vals, i);
+      NSArray *items = [v isKindOfClass:[NSArray class]] ? v : (v ? @[ v ] : @[]);
+      for (id item in items)
+        if (![out containsObject:item])
+          [out addObject:item];
+    }
+    return out;
+  }
+  // InScope("Name"): is that scope one of the ones we are inside?
+  case RDLFormInScope: {
+    NSString *want = [vals count] ? RDLStr(RDLArgumentAt(vals, 0)) : @"";
+    for (NSString *name in scope.activeScopes)
+      if ([name caseInsensitiveCompare:want] == NSOrderedSame)
+        return RDLYes(YES);
+    return RDLYes(NO);
+  }
+  // Level(): how deep the innermost scope is, counting the dataset as 0.
+  // Level("Name"): how deep that scope is, -1 for one we are not in. Inside a
+  // recursive hierarchy it is the depth in the tree, which is what a report
+  // indents by.
+  case RDLFormLevel: {
+    NSArray *scopes = scope.activeScopes ?: @[];
+    if ([vals count] == 0)
+      return scope.recursionLevel >= 0 ? RDLDouble((double)scope.recursionLevel)
+                                       : RDLDouble((double)MAX((NSInteger)[scopes count] - 1, 0));
+    NSString *want = RDLStr(RDLArgumentAt(vals, 0));
+    if (scope.recursionLevel >= 0 && [scopes count] &&
+        [[scopes lastObject] caseInsensitiveCompare:want] == NSOrderedSame)
+      return RDLDouble((double)scope.recursionLevel);
+    for (NSUInteger i = 0; i < [scopes count]; i++)
+      if ([scopes[i] caseInsensitiveCompare:want] == NSOrderedSame)
+        return RDLDouble((double)i);
+    return RDLDouble(-1.0);
+  }
+  default:
+    return nil;
+  }
+}
+
+id RDLCallLazyForm(RDLForm form, NSString *lowercaseName, NSArray<RDLExprNode *> *args, RDLEvalScope *scope) {
+  switch (form) {
+  case RDLFormAggregate:
+    return RDLExecAgg(lowercaseName, args, scope);
+  case RDLFormRunningValue:
+    return RDLExecRunningValue(args, scope);
+  case RDLFormLookup:
+    return RDLExecLookup(lowercaseName, args, scope);
+  // Previous(expr): the expression on the row before.
+  case RDLFormPrevious: {
+    if (scope.previousRow == nil || [args count] == 0)
+      return nil;
+    RDLEvalScope *before = [scope scopeBy:^(RDLEvalScope *s) { s.row = scope.previousRow; }];
+    return RDLExec(args[0], before);
+  }
+  default:
+    return nil;
+  }
+}
+
+id RDLCallMember(NSString *dottedName, NSArray *vals, RDLEvalScope *scope) {
+  // Inside the report's code, word.Substring(0, 1) whose first part is a
+  // variable reads members of the variable's value; the parser cannot tell a
+  // variable from a class, so it is told apart here.
+  NSArray<NSString *> *parts = [dottedName componentsSeparatedByString:@"."];
+  if (scope.codeLocals && [parts count] > 1) {
+    NSString *key = [parts[0] lowercaseString];
+    id value = scope.codeLocals[key];
+    BOOL found = value != nil;
+    if (found)
+      value = value == [NSNull null] ? nil : value;
+    else
+      found = [scope.report.codeModule readVariableNamed:key value:&value scope:scope];
+    if (found) {
+      for (NSUInteger i = 1; i < [parts count]; i++)
+        value = RDLMemberOfValue(value, parts[i], i + 1 == [parts count] ? vals : @[], scope);
+      return value;
+    }
+  }
+  return RDLStaticMember(dottedName, vals, scope);
+}
+
+// A member of the first value, given the rest.
+id RDLCallMethod(NSString *name, NSArray *vals, RDLEvalScope *scope) {
+  id target = RDLArgumentAt(vals, 0);
+  NSArray *rest = [vals count] > 1 ? [vals subarrayWithRange:NSMakeRange(1, [vals count] - 1)] : @[];
+  return RDLMemberOfValue(target, name, rest, scope);
 }
 
 NSLocale *RDLLocaleForLanguage(NSString *language) {

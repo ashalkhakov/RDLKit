@@ -122,6 +122,8 @@
 		C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */ = {isa = PBXBuildFile; fileRef = F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */; };
 		C0DE00000000000000000F52 /* RDLValueBoxing.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F53 /* RDLValueBoxing.m */; };
 		C0DE00000000000000000FE0 /* RDLExpressionLibrary.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000FE1 /* RDLExpressionLibrary.m */; };
+		C0DE00000000000000001B03 /* RDLCompiler.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001B02 /* RDLCompiler.m */; };
+		C0DE00000000000000001B05 /* RDLVirtualMachine.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001B04 /* RDLVirtualMachine.m */; };
 		C0DE00000000000000000F02 /* RDLBorderPainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F03 /* RDLBorderPainter.m */; };
 		C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000F23 /* RDLLinePainter.m */; };
 		D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */ = {isa = PBXBuildFile; fileRef = 5EBD968C905DB599112D8838 /* RDLMarkup.m */; };
@@ -509,6 +511,9 @@
 		F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextAttributes.m; sourceTree = "<group>"; };
 		C0DE00000000000000000F53 /* RDLValueBoxing.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLValueBoxing.m; sourceTree = "<group>"; };
 		C0DE00000000000000000FE1 /* RDLExpressionLibrary.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExpressionLibrary.m; sourceTree = "<group>"; };
+		C0DE00000000000000001B01 /* RDLBytecode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLBytecode.h; sourceTree = "<group>"; };
+		C0DE00000000000000001B02 /* RDLCompiler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCompiler.m; sourceTree = "<group>"; };
+		C0DE00000000000000001B04 /* RDLVirtualMachine.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLVirtualMachine.m; sourceTree = "<group>"; };
 		C0DE00000000000000000F03 /* RDLBorderPainter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLBorderPainter.m; sourceTree = "<group>"; };
 		C0DE00000000000000000F23 /* RDLLinePainter.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLLinePainter.m; sourceTree = "<group>"; };
 		A13AD4356C474EBF4EE4401D /* RDLMarkup.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLMarkup.h; sourceTree = "<group>"; };
@@ -779,6 +784,9 @@
 				F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */,
 				C0DE00000000000000000F53 /* RDLValueBoxing.m */,
 				C0DE00000000000000000FE1 /* RDLExpressionLibrary.m */,
+				C0DE00000000000000001B01 /* RDLBytecode.h */,
+				C0DE00000000000000001B02 /* RDLCompiler.m */,
+				C0DE00000000000000001B04 /* RDLVirtualMachine.m */,
 				C0DE00000000000000000F03 /* RDLBorderPainter.m */,
 				C0DE00000000000000000F23 /* RDLLinePainter.m */,
 				A13AD4356C474EBF4EE4401D /* RDLMarkup.h */,
@@ -1297,6 +1305,8 @@
 				C7672FC0C1C9128C5B0534F7 /* RDLTextAttributes.m in Sources */,
 				C0DE00000000000000000F52 /* RDLValueBoxing.m in Sources */,
 				C0DE00000000000000000FE0 /* RDLExpressionLibrary.m in Sources */,
+				C0DE00000000000000001B03 /* RDLCompiler.m in Sources */,
+				C0DE00000000000000001B05 /* RDLVirtualMachine.m in Sources */,
 				C0DE00000000000000000F02 /* RDLBorderPainter.m in Sources */,
 				C0DE00000000000000000F22 /* RDLLinePainter.m in Sources */,
 				D9CD4DEA52169E6BD39D61BF /* RDLMarkup.m in Sources */,

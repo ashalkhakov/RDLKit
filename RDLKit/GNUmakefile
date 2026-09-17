@@ -52,6 +52,8 @@ RDLKit_OBJC_FILES = \
   RDLTextAttributes.m \
   RDLValueBoxing.m \
   RDLExpressionLibrary.m \
+  RDLCompiler.m \
+  RDLVirtualMachine.m \
   RDLBorderPainter.m \
   RDLLinePainter.m \
   RDLMarkup.m \
