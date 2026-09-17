@@ -18,7 +18,7 @@
 }
 @end
 
-@interface RDLDataView () <NSTextFieldDelegate>
+@interface RDLDataView () <NSTextFieldDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) NSView *stack;
 @end
 
@@ -29,6 +29,12 @@
   // the control the person is still using -- which is why a popup's choice
   // appeared not to take and a field needed Return to commit.
   BOOL _applyingParameter;
+  // The controls a parameter of several values is given by, and whose they
+  // are, from the last reload: each checkbox with the value it gives, and each
+  // list with its parameter's place.
+  NSMutableArray<NSButton *> *_choiceButtons;
+  NSMutableArray<NSString *> *_choiceValues;
+  NSMapTable<NSTextView *, NSNumber *> *_valueLists;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame document:(RDLDocument *)document {
@@ -116,6 +122,9 @@ static BOOL RDLLaterParameterReadsADataSet(NSArray<RDLParameter *> *parameters, 
   if (_reloading)
     return;
   _reloading = YES;
+  _choiceButtons = [NSMutableArray array];
+  _choiceValues = [NSMutableArray array];
+  _valueLists = [NSMapTable strongToStrongObjectsMapTable];
   NSArray *subs = [_stack.subviews copy];
   for (NSView *v in subs)
     [v removeFromSuperview];
@@ -156,7 +165,9 @@ static BOOL RDLLaterParameterReadsADataSet(NSArray<RDLParameter *> *parameters, 
     [_stack addSubview:l];
     y += 16;
     NSString *current = doc.paramValues[p.name] ?: RDLParameterValueText(state.value);
-    if (state.validValues) {
+    if (p.multiValue) {
+      y = [self addSeveralValuesOf:p state:state tag:tag atY:y];
+    } else if (state.validValues) {
       // A parameter that lists what it accepts is chosen from, not typed into
       // -- which is what ValidValues is for, and what stops a typo rendering
       // an empty report. Each is shown by its label and gives its value.
@@ -235,6 +246,88 @@ static BOOL RDLLaterParameterReadsADataSet(NSArray<RDLParameter *> *parameters, 
   [_stack setFrame:NSMakeRect(0, 0, NSWidth(self.bounds), MAX(y + 12, NSHeight(self.bounds)))];
   [self setFrameSize:_stack.frame.size];
   _reloading = NO;
+}
+
+// A parameter of several values is asked for as a report server asks: a box to
+// tick for each value it accepts, or a list to write them in, one a line.
+// Returns where the next control goes.
+- (CGFloat)addSeveralValuesOf:(RDLParameter *)p state:(RDLParameterValue *)state tag:(NSInteger)tag atY:(CGFloat)y {
+  NSArray<NSString *> *current = _document.multiParamValues[p.name];
+  if (current == nil) {
+    NSMutableArray<NSString *> *texts = [NSMutableArray array];
+    id value = state.value;
+    for (id each in [value isKindOfClass:[NSArray class]] ? value : (value ? @[ value ] : @[]))
+      [texts addObject:RDLParameterValueText(each)];
+    current = texts;
+  }
+  if (state.validValues) {
+    for (RDLParameterChoice *choice in state.validValues) {
+      NSString *text = RDLParameterValueText(choice.value);
+      NSButton *box = [[NSButton alloc] initWithFrame:NSMakeRect(10, y, 220, 18)];
+      [box setButtonType:NSSwitchButton];
+      [box setTitle:choice.label ?: text];
+      [box setFont:[NSFont userFontOfSize:11]];
+      [box setState:[current containsObject:text] ? NSOnState : NSOffState];
+      [box setTag:tag];
+      [box setTarget:self];
+      [box setAction:@selector(severalValuesChanged:)];
+      [_stack addSubview:box];
+      [_choiceButtons addObject:box];
+      [_choiceValues addObject:text];
+      y += 20;
+    }
+    return y + 8;
+  }
+  NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(10, y, 220, 60)];
+  [scroll setBorderType:NSBezelBorder];
+  [scroll setHasVerticalScroller:YES];
+  NSTextView *list = [[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, 204, 60)];
+  [list setRichText:NO];
+  [list setFont:[NSFont userFontOfSize:11]];
+  [list setString:[current componentsJoinedByString:@"\n"]];
+  [list setDelegate:self];
+  [list setToolTip:@"One value a line"];
+  [scroll setDocumentView:list];
+  [_stack addSubview:scroll];
+  [_valueLists setObject:@(tag) forKey:list];
+  return y + 66;
+}
+
+- (void)severalValuesChanged:(id)sender {
+  if (_reloading)
+    return;
+  NSArray<RDLParameter *> *params = _document.report.parameters;
+  NSMutableArray<NSString *> *values = [NSMutableArray array];
+  NSInteger i = -1;
+  if ([sender isKindOfClass:[NSTextView class]]) {
+    NSNumber *tag = [_valueLists objectForKey:sender];
+    if (tag == nil)
+      return;
+    i = [tag integerValue];
+    for (NSString *line in [[(NSTextView *)sender string] componentsSeparatedByString:@"\n"]) {
+      NSString *value = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+      if ([value length])
+        [values addObject:value];
+    }
+  } else if ([sender isKindOfClass:[NSButton class]]) {
+    i = [(NSButton *)sender tag];
+    // Every box of the same parameter, ticked, in the order the report lists them.
+    for (NSUInteger b = 0; b < [_choiceButtons count]; b++)
+      if ([_choiceButtons[b] tag] == i && [_choiceButtons[b] state] == NSOnState)
+        [values addObject:_choiceValues[b]];
+  }
+  if (i < 0 || i >= (NSInteger)[params count])
+    return;
+  _applyingParameter = YES;
+  [_document setParamValues:values forName:[params[(NSUInteger)i] name]];
+  _applyingParameter = NO;
+  if (RDLLaterParameterReadsADataSet(params, i))
+    [self performSelector:@selector(reload) withObject:nil afterDelay:0];
+}
+
+- (void)textDidEndEditing:(NSNotification *)note {
+  [self severalValuesChanged:[note object]];
+  [self performSelector:@selector(reload) withObject:nil afterDelay:0];
 }
 
 // A parameter's value, from whichever control was offered for it: a popup

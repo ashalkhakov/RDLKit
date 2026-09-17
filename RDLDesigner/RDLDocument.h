@@ -36,6 +36,12 @@
 // are the bindings the user is trying out, so editing them is not a document
 // edit and does not dirty the file.
 @property (nonatomic, readonly, copy) NSDictionary<NSString *, NSString *> *paramValues;
+// The same for a parameter of several values: each value as text, in order.
+// A parameter is in one of the two, never both.
+@property (nonatomic, readonly, copy) NSDictionary<NSString *, NSArray<NSString *> *> *multiParamValues;
+// Both, as a render is given them: text for a parameter of one value, an array
+// of text for one of several -- what RDLParameterValues reads.
+- (NSDictionary<NSString *, id> *)suppliedParameters;
 
 - (instancetype)initWithReport:(RDLReport *)report;
 
@@ -58,6 +64,7 @@
 
 - (void)syncParamValuesFromReport;
 - (void)setParamValue:(NSString *)value forName:(NSString *)name;
+- (void)setParamValues:(NSArray<NSString *> *)values forName:(NSString *)name;
 // The report's parameters worked out from the values given so far: defaults
 // where none is given, the valid values to choose from, and what is wrong.
 - (RDLParameterValues *)parameterValues;

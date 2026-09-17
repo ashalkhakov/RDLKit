@@ -562,7 +562,7 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
     [nib instantiateWithOwner:self topLevelObjects:NULL];
   }
   _previewView.report = _context.report;
-  _previewView.paramValues = _context.document.paramValues;
+  _previewView.paramValues = [_context.document suppliedParameters];
   _previewView.documentBinder = [_context.document dataBinder];
   [_previewView reloadLayout];
   [_previewWindow makeKeyAndOrderFront:nil];

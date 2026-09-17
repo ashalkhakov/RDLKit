@@ -78,7 +78,7 @@
 
 - (void)reloadPreview {
   _preview.report = _reportDocument.report;
-  _preview.paramValues = _reportDocument.paramValues;
+  _preview.paramValues = [_reportDocument suppliedParameters];
   _preview.documentBinder = [_reportDocument dataBinder];
   [_preview reloadLayout];
 }

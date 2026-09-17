@@ -48,6 +48,7 @@ NSString *const RDLReportDocumentType = @"rdl";
     [self setFileType:RDLReportDocumentType];
 
     _paramValues = @{};
+    _multiParamValues = @{};
     [self syncParamValuesFromReport];
   }
   return self;
@@ -189,12 +190,19 @@ NSString *const RDLReportDocumentType = @"rdl";
 // not as the text of its source.
 - (void)syncParamValuesFromReport {
   _paramValues = @{};
+  _multiParamValues = @{};
+}
+
+- (NSDictionary<NSString *, id> *)suppliedParameters {
+  NSMutableDictionary<NSString *, id> *supplied = [NSMutableDictionary dictionaryWithDictionary:_paramValues ?: @{}];
+  [supplied addEntriesFromDictionary:_multiParamValues ?: @{}];
+  return supplied;
 }
 
 // Evaluating the data sources as it goes: a parameter's list may come from a
 // query that reads the parameters before it.
 - (RDLParameterValues *)parameterValues {
-  return [[[RDLDataEvaluation alloc] initWithReport:_report binder:[self dataBinder]] evaluateWithParameters:_paramValues
+  return [[[RDLDataEvaluation alloc] initWithReport:_report binder:[self dataBinder]] evaluateWithParameters:[self suppliedParameters]
                                                                                                 environment:nil];
 }
 
@@ -204,12 +212,37 @@ NSString *const RDLReportDocumentType = @"rdl";
   return binder;
 }
 
+// A parameter's value is in one of the two dictionaries, so giving it in one
+// takes it out of the other.
+static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
+  if (values[key] == nil)
+    return values;
+  NSMutableDictionary *without = [values mutableCopy];
+  [without removeObjectForKey:key];
+  return without;
+}
+
 - (void)setParamValue:(NSString *)value forName:(NSString *)name {
   if ([name length] == 0)
     return;
   NSMutableDictionary *pv = [_paramValues mutableCopy] ?: [NSMutableDictionary dictionary];
   pv[name] = value ?: @"";
   _paramValues = pv;
+  _multiParamValues = RDLWithoutKey(_multiParamValues, name);
+  [self parameterValuesDidChange];
+}
+
+- (void)setParamValues:(NSArray<NSString *> *)values forName:(NSString *)name {
+  if ([name length] == 0)
+    return;
+  NSMutableDictionary *pv = [_multiParamValues mutableCopy] ?: [NSMutableDictionary dictionary];
+  pv[name] = [values copy] ?: @[];
+  _multiParamValues = pv;
+  _paramValues = RDLWithoutKey(_paramValues, name);
+  [self parameterValuesDidChange];
+}
+
+- (void)parameterValuesDidChange {
   // A query that reads the parameter reads the new value before anything is
   // shown with it.
   [self parameterValues];
@@ -228,7 +261,7 @@ NSString *const RDLReportDocumentType = @"rdl";
   BOOL ok = [binder bindReport:_report error:error];
   // The sources that read the parameters, for the values given so far.
   RDLDataEvaluation *evaluation = [[RDLDataEvaluation alloc] initWithReport:_report binder:binder];
-  [evaluation evaluateWithParameters:_paramValues environment:nil];
+  [evaluation evaluateWithParameters:[self suppliedParameters] environment:nil];
   // A subreport is data too, in the sense that matters here: nothing shows
   // until its definition has been found and its own sources read.
   NSMutableArray *all = [[binder notes] mutableCopy] ?: [NSMutableArray array];
@@ -332,7 +365,7 @@ NSString *const RDLReportDocumentType = @"rdl";
   RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
   environment.documentBinder = [self dataBinder];
   return [RDLGenerator renderReport:_report
-                         parameters:_paramValues
+                         parameters:[self suppliedParameters]
                        usingBackend:backend
                         environment:environment];
 }

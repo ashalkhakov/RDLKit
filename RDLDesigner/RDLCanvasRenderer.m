@@ -463,7 +463,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
     // gets exported.
     RDLLaidOutChart *preview = [RDLLayoutEngine laidOutChart:(RDLChart *)it
                                                     inReport:_ctx.report
-                                                 paramValues:_ctx.document.paramValues];
+                                                 paramValues:[_ctx.document suppliedParameters]];
     [RDLChartRenderer drawChart:preview inRect:r];
   } else {
     // Textbox (and unknown kinds): full WYSIWYG preview — background, border,

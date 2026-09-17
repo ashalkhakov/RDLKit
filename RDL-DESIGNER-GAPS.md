@@ -204,7 +204,7 @@ bin that moved since the previous audit.
 | Valid values with labels | Done | Available values are edited in a list panel with a label column and set with their labels as one step; the pane lists them, "value — label". |
 | Multi-value defaults | Done | A parameter of several values has its defaults as a list, edited in the list panel; the field sums them up and is never written back as a value. |
 | `DataSetReference` valid values and defaults | UI | Shown as what they read -- the dataset and its value and label fields -- and not typed over, since the file holds the reference. Editing the reference itself has no control. |
-| `MultiValue` value entry in the data pane | UI | One text field; with valid values, a single-select popup. |
+| `MultiValue` value entry in the data pane | Done | A box to tick for each value accepted, or a list written one a line; previews and exports are given the array. |
 | `ReportParametersLayout` | MODEL | |
 | Data source kinds beyond JSON/XML/CSV | MODEL | Shown as JSON and rewritten on first edit (§5). |
 | `ConnectionProperties/Prompt`, `IntegratedSecurity` | MODEL | |
@@ -476,7 +476,7 @@ In rough order of how often a Report Builder user reaches for it:
    Left for later: nested groupings, and the styles beside those set here.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
-   Done: all but the data pane's entry of several values.
+   Done: all of it.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.
 8. Image: `Database`, `MIMEType`, embedded images panel with file import.
 9. Expressions: live `RDLChecker` in the editor, parser warnings on open,

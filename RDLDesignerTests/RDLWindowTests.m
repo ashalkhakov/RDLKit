@@ -1369,6 +1369,71 @@ static NSTabView *_centerTabViewOf(id wc) {
   [[NSFileManager defaultManager] removeItemAtPath:csv error:NULL];
 }
 
+// A parameter of several values is given several: a box ticked for each value
+// it accepts, or a list written one a line when it accepts anything -- and the
+// report is rendered with all of them.
+- (void)testSeveralValuesAreGivenInTheDataPane {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Kilns"];
+  RDLParameter *kilns = [[RDLParameter alloc] init];
+  kilns.name = @"Kilns";
+  kilns.prompt = @"Which kilns?";
+  kilns.dataType = RDLParameterDataTypeString;
+  kilns.multiValue = YES;
+  for (NSString *code in @[ @"N", @"S", @"E" ])
+    [kilns.validValues addObject:[RDLValue literal:code]];
+  kilns.validValueLabels[@"N"] = [RDLValue literal:@"North"];
+  kilns.validValueLabels[@"S"] = [RDLValue literal:@"South"];
+  [kilns.defaultValues addObject:[RDLValue literal:@"N"]];
+  RDLParameter *tags = [[RDLParameter alloc] init];
+  tags.name = @"Tags";
+  tags.prompt = @"Tags";
+  tags.dataType = RDLParameterDataTypeString;
+  tags.multiValue = YES;
+  [tags.defaultValues addObject:[RDLValue literal:@"glaze"]];
+  [report.parameters addObjectsFromArray:@[ kilns, tags ]];
+  RDLTextbox *joined = [[RDLTextbox alloc] init];
+  joined.name = @"Joined";
+  joined.value = @"=Join(Parameters!Kilns.Value, \"+\") & \"/\" & Join(Parameters!Tags.Value, \"+\")";
+  joined.width = 3;
+  joined.height = 0.3;
+  [report.body.items addObject:joined];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  RDLDataView *pane = [[RDLDataView alloc] initWithFrame:NSMakeRect(0, 0, 240, 600) document:doc];
+
+  NSMutableArray<NSButton *> *boxes = [NSMutableArray array];
+  NSTextView *list = nil;
+  for (NSView *v in [[[pane subviews] firstObject] subviews]) {
+    if ([v isKindOfClass:[NSButton class]])
+      [boxes addObject:(NSButton *)v];
+    if ([v isKindOfClass:[NSScrollView class]] && [[(NSScrollView *)v documentView] isKindOfClass:[NSTextView class]])
+      list = [(NSScrollView *)v documentView];
+  }
+  if (![[boxes valueForKey:@"title"] isEqualToArray:(@[ @"North", @"South", @"E" ])] || list == nil) {
+    XCTFail(@"the pane should offer a box for each kiln and a list for the tags, offers %@ and %@",
+            [boxes valueForKey:@"title"], list);
+    return;
+  }
+  if ([boxes[0] state] != NSOnState || [boxes[1] state] != NSOffState || ![[list string] isEqualToString:@"glaze"])
+    XCTFail(@"%@", @"the defaults should be ticked and listed");
+  [boxes[2] setState:NSOnState];
+  [pane severalValuesChanged:boxes[2]];
+  [list setString:@"slip\n\n  bisque \n"];
+  [pane severalValuesChanged:list];
+  if (![doc.multiParamValues[@"Kilns"] isEqualToArray:(@[ @"N", @"E" ])] ||
+      ![doc.multiParamValues[@"Tags"] isEqualToArray:(@[ @"slip", @"bisque" ])] || doc.paramValues[@"Kilns"] != nil)
+    XCTFail(@"the values should be given as ticked and listed, are %@", doc.multiParamValues);
+  RDLParameterValue *given = [[doc parameterValues] valueNamed:@"Kilns"];
+  if (![given.value isEqual:(@[ @"N", @"E" ])] || given.problem != RDLParameterProblemUnspecified)
+    XCTFail(@"the report should read both kilns, reads %@ (%@)", given.value, given.problemDescription);
+  NSString *printed = nil;
+  for (RDLLaidOutPage *page in [RDLLayoutEngine pagesForReport:report paramValues:[doc suppliedParameters]])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]])
+        printed = [(RDLLaidOutTextbox *)item text];
+  if (![printed isEqualToString:@"N+E/slip+bisque"])
+    XCTFail(@"the report should print every value given, prints %@", printed);
+}
+
 // Changing a parameter in the generator shows up in what it renders: the value
 // is applied when it is given, and the preview is laid out again with it.
 - (void)testAParameterAppliesToWhatTheGeneratorRenders {
