@@ -2272,6 +2272,10 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   return _codeModule;
 }
 
+- (NSArray<NSString *> *)codeProblems {
+  return [self codeModule].problems ?: @[];
+}
+
 - (NSArray<NSString *> *)codeFunctionNames {
   return [self codeModule].functionNames ?: @[];
 }

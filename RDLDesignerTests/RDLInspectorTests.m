@@ -8,6 +8,8 @@
 #import "RDLChartSeriesEditor.h"
 #import "RDLValueListEditor.h"
 #import "RDLEmbeddedImagesEditor.h"
+#import "RDLVariablesEditor.h"
+#import "RDLCodeEditor.h"
 
 
 
@@ -1746,6 +1748,55 @@ static NSData *RDLTinyPNG(void) {
   [ctx.document.undoManager undo];
   if (sub.mergeTransactions)
     XCTFail(@"%@", @"undo should take the last setting back");
+}
+
+// The report's variables and code, each in a panel: variables named, valued and
+// made writable, a clash or a bad name refused; code read as it is written,
+// saying what cannot be read. Both saved.
+- (void)testTheReportsVariablesAndCodeAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Coded"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLVariablesEditor *panel = [RDLVariablesEditor editorForVariables:report.variables
+                                                               title:nil
+                                                            writable:YES
+                                                              report:report];
+  if ([[panel valueForKey:@"table"] numberOfColumns] != 3)
+    XCTFail(@"%@", @"a report's variables should offer a Writable column");
+  [panel addVariable:nil];
+  [panel addVariable:nil];
+  [panel setName:@"Rate" value:@"=4 * 2" writable:YES atRow:0];
+  [panel setName:@"rate" value:@"=Variables!Rate.Value + 1" writable:NO atRow:1];
+  if ([panel validate])
+    XCTFail(@"%@", @"two variables of one name should be refused");
+  [panel setName:@"2nd" value:@"1" writable:NO atRow:1];
+  if ([panel validate])
+    XCTFail(@"%@", @"a name a report cannot use should be refused");
+  [panel setName:@"Doubled" value:@"=Variables!Rate.Value * 2" writable:NO atRow:1];
+  if (![panel validate] || [panel.variables count] != 2 || !panel.variables[0].writable)
+    XCTFail(@"%@", @"two sound variables should be kept, the first writable");
+  [ctx.editor setReportValue:[panel.variables mutableCopy] forKeyPath:@"variables"];
+
+  RDLCodeEditor *code = [RDLCodeEditor editorForCode:nil title:nil];
+  code.code = @"Public Function Twice(ByVal n As Integer) As Integer\n  Return n * 2\nEnd Function\n";
+  if ([code.problems count] || ![code.status isEqualToString:@"1 function to call."])
+    XCTFail(@"sound code should read clean, says %@ (%@)", code.status, code.problems);
+  code.code = @"Public Function Broken(\n";
+  if ([code.problems count] == 0 || [code.status length] == 0)
+    XCTFail(@"%@", @"code that cannot be read should say so");
+  code.code = @"Public Function Twice(ByVal n As Integer) As Integer\n  Return n * 2\nEnd Function\n";
+  [ctx.editor setReportValue:code.code forKeyPath:@"code"];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (!RDLVariablesEqual(back.variables, report.variables) || ![[back codeFunctionNames] isEqualToArray:@[ @"Twice" ]])
+    XCTFail(@"%@", @"the variables and the code should survive a save");
+  [ctx.document.undoManager undo];
+  if (report.code != nil)
+    XCTFail(@"%@", @"undo should take the code away");
+
+  // A group's variables have no Writable column.
+  RDLVariablesEditor *group = [RDLVariablesEditor editorForVariables:@[] title:nil writable:NO report:report];
+  if ([[group valueForKey:@"table"] numberOfColumns] != 2)
+    XCTFail(@"%@", @"a group's variables should not offer a Writable column");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to

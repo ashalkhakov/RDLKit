@@ -1537,6 +1537,9 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // The functions the report's code gives expressions to call as Code.Name, in
 // order of name; empty when it has no code.
 - (NSArray<NSString *> *)codeFunctionNames;
+// What in the report's code could not be read, one line each; empty when all
+// of it could, or there is none.
+- (NSArray<NSString *> *)codeProblems;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, strong) RDLPage *page;
 @property (nonatomic, strong) RDLBand *pageHeader;

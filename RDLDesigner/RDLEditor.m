@@ -3,6 +3,7 @@
 #import "RDLItemFactory.h"
 #import "RDLPlainTextEdit.h"
 #import "RDLSortEditor.h"
+#import "RDLVariablesEditor.h"
 #import "RDLChange.h"
 #import "RDLKit.h"
 #import "RDLDocument.h"
@@ -1214,7 +1215,7 @@ static void RDLTransplantChart(RDLChart *into, RDLChart *from) {
 
 NSArray<NSString *> *RDLGroupSettingKeys(void) {
   return @[ @"sortExpressions", @"pageBreak", @"resetPageNumber", @"pageBreakDisabled", @"pageName", @"hidden",
-            @"toggleItem", @"keepTogether" ];
+            @"toggleItem", @"keepTogether", @"variables" ];
 }
 
 // Two settings the same, the way the file would say them: an expression by its
@@ -1224,8 +1225,11 @@ static BOOL RDLSettingsEqual(id a, id b) {
     return YES;
   if ([a isKindOfClass:[RDLValue class]] || [b isKindOfClass:[RDLValue class]])
     return [([(RDLValue *)a source] ?: @"") isEqualToString:([(RDLValue *)b source] ?: @"")];
-  if ([a isKindOfClass:[NSArray class]] || [b isKindOfClass:[NSArray class]])
-    return RDLSortExpressionsEqual(a ?: @[], b ?: @[]);
+  if ([a isKindOfClass:[NSArray class]] || [b isKindOfClass:[NSArray class]]) {
+    id first = [a firstObject] ?: [b firstObject];
+    return [first isKindOfClass:[RDLVariable class]] ? RDLVariablesEqual(a ?: @[], b ?: @[])
+                                                      : RDLSortExpressionsEqual(a ?: @[], b ?: @[]);
+  }
   if ([a isKindOfClass:[NSString class]] || [b isKindOfClass:[NSString class]])
     return [([a length] ? a : @"") isEqualToString:([b length] ? b : @"")];
   return [a isEqual:b];

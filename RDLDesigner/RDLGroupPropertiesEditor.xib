@@ -10,6 +10,7 @@
             <connections>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
                 <outlet property="sortingButton" destination="sortingButton" id="sortingButtonOutlet"/>
+                <outlet property="variablesButton" destination="variablesButton" id="variablesButtonOutlet"/>
                 <outlet property="pageBreakPop" destination="pageBreakPop" id="pageBreakPopOutlet"/>
                 <outlet property="resetPageNumberCheck" destination="resetPageNumberCheck" id="resetPageNumberCheckOutlet"/>
                 <outlet property="pageBreakDisabledField" destination="pageBreakDisabledField" id="pageBreakDisabledFieldOutlet"/>
@@ -147,6 +148,17 @@
                         </buttonCell>
                         <connections>
                             <action selector="editSorting:" target="-2" id="sortingButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Values worked out for each instance of the group, read as Variables!Name.Value" id="variablesButton">
+                        <rect key="frame" x="96" y="66" width="150" height="24"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="square" title="Variables…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="variablesButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editVariables:" target="-2" id="variablesButtonAction"/>
                         </connections>
                     </button>
                     <textField focusRingType="none" verticalHuggingPriority="750" id="pageBreakLabel">

@@ -123,7 +123,7 @@ UI.
 | Report | Header/footer `PrintOnFirstPage`/`PrintOnLastPage` | Yes, in the band's section |
 | Report | Band `Style` | Background on every band; the engine paints the page header's and footer's as it does the body's |
 | Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | Yes; the page's Style as a background colour only |
-| Report | `Code`, `Variables` | — |
+| Report | `Code`, `Variables` | Yes |
 | Report | Parameters | Navigator (add, remove, reorder) + inspector: name, "Asked for" and its prompt, type, "Allows null", "Allows blank", "Hidden", several values, default (expression) or defaults (a list), available values with labels (a list); values a `DataSetReference` supplies are shown, read-only |
 | Report | Data sources | Navigator + pane: JSON/XML/CSV; file beside the report or embedded content; CSV header row, delimiter, widths; connect string composed |
 | Report | Embedded images | — (the Image inspector accepts a name; none can be added) |
@@ -191,7 +191,7 @@ bin that moved since the previous audit.
 | Header/footer `Style` | UI | Only a stale body-only guard blocks it. |
 | Page `Style`, `Columns`, `ColumnSpacing` | UI (was MODEL) | Engine FULL (columns PDF-only). |
 | `ConsumeContainerWhitespace`, `InitialPageName` | UI (was MODEL) | |
-| `Code`, `Variables` | UI (was MODEL) | No Code tab; the window's tabs are in `RDLDesignerWindow.xib`. |
+| `Code`, `Variables` | Done | Code… and Variables…, in the report's section: code checked as it is written, variables named, valued and made writable. |
 | `InteractiveHeight/Width`, `AutoRefresh`, `Classes`, `CustomProperties` | MODEL | Kept and written back unchanged. |
 
 ### 4.2 Data and parameters
@@ -292,7 +292,7 @@ not yet keep that.
 | Merged cells (`ColSpan`/`RowSpan`) | Done | Merge with the cell to the right or below, and Split Cell, on the canvas; kept and carried across column and row edits. A merge stays within plain rows or columns under one parent. |
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `KeepTogether` | Done | In Group Properties, applied with the name, expressions and filters as one step; sorting through a panel shared with the tablix. |
 | Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData` | Done | For a row or column that is no group's, in the canvas's This Row and This Column menus. |
-| Group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. |
+| Group `Variables` | Done | Group Properties' Variables…, the same panel, applied with the rest of the group. |
 | Details `SortExpressions` | Done (engine FULL) | Through the details group's Group Properties, when the details group is named, as Report Builder names it. |
 | Row heights other than the heading and value rows | Done | The cell section's Row height, for the row the selected cell is in. |
 | Rows inserted or deleted on their own | Done | Insert Row Above/Below and Delete Row on the canvas, beside the row clicked and inside its group; a group's own row goes with the group. |
@@ -465,8 +465,8 @@ In rough order of how often a Report Builder user reaches for it:
    Done: all of it -- the corner, the tablix's section, sorting, Group
    Properties' page breaks and visibility, rows on their own, merged cells,
    any row's height, a row's and a column's own settings, data regions in
-   cells and rectangles, and the List. A group's Variables are left for
-   the report Variables editor below, whose table they can share.
+   cells and rectangles, and the List. A group's Variables share the
+   report's Variables panel (P1.11).
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
    Done: subtype, palette, legend, the title's position and the no-data

@@ -6,6 +6,7 @@
 #import "RDLExpressionEditor.h"
 #import "RDLFilterEditor.h"
 #import "RDLSortEditor.h"
+#import "RDLVariablesEditor.h"
 #import "RDLPane.h"
 #import "RDLToolbarIcons.h"
 
@@ -17,6 +18,8 @@
 @property (nonatomic, strong) IBOutlet NSButton *filtersButton;
 // Its sort, page breaks and visibility.
 @property (nonatomic, strong) IBOutlet NSButton *sortingButton, *resetPageNumberCheck, *keepTogetherCheck;
+// Its variables, worked out for each instance.
+@property (nonatomic, strong) IBOutlet NSButton *variablesButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *pageBreakPop, *togglePop;
 @property (nonatomic, strong) IBOutlet NSTextField *pageBreakDisabledField, *pageNameField, *hiddenField;
 @property (nonatomic, strong) IBOutlet NSButton *pageBreakDisabledExprButton, *pageNameExprButton, *hiddenExprButton;
@@ -28,6 +31,7 @@
   RDLTablix *_tablix;
   RDLEditingContext *_context;
   NSArray<RDLSortExpression *> *_sorts;
+  NSArray<RDLVariable *> *_variables;
 }
 
 + (instancetype)editorForGroup:(RDLTablixMember *)group
@@ -47,6 +51,7 @@
     [ed->_expressions addObject:[expression source] ?: @""];
   ed->_filters = [group.filters copy];
   ed->_sorts = [group.sortExpressions copy] ?: @[];
+  ed->_variables = [group.variables copy] ?: @[];
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLGroupPropertiesEditor"
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
@@ -58,6 +63,7 @@
   [ed prepareTable];
   [ed syncFiltersButton];
   [ed fillSettingsFrom:group];
+  [ed syncVariablesButton];
   for (NSButton *button in @[ ed.pageBreakDisabledExprButton, ed.pageNameExprButton, ed.hiddenExprButton ])
     RDLSetToolbarIcon(button, RDLToolbarGlyphExpression);
   return ed;
@@ -172,6 +178,7 @@ static RDLValue *RDLValueInField(NSTextField *field) {
   settings.pageName = RDLValueInField(_pageNameField);
   settings.hidden = RDLValueInField(_hiddenField);
   settings.toggleItem = [_togglePop indexOfSelectedItem] > 0 ? [_togglePop titleOfSelectedItem] : nil;
+  settings.variables = [_variables mutableCopy];
   return settings;
 }
 
@@ -185,6 +192,33 @@ static RDLValue *RDLValueInField(NSTextField *field) {
     return;
   _sorts = [edited copy];
   [self syncSortingButton];
+}
+
+- (void)editVariables:(id)sender {
+  (void)sender;
+  NSArray<RDLVariable *> *edited =
+      [RDLVariablesEditor runForVariables:_variables
+                                    title:[NSString stringWithFormat:@"Variables — %@", [self name]]
+                                 writable:NO
+                                   report:_context.report];
+  if (edited == nil)
+    return;
+  self.variables = edited;
+}
+
+- (void)setVariables:(NSArray<RDLVariable *> *)variables {
+  _variables = [variables copy] ?: @[];
+  [self syncVariablesButton];
+}
+
+- (NSArray<RDLVariable *> *)variables {
+  return _variables;
+}
+
+- (void)syncVariablesButton {
+  NSUInteger count = [_variables count];
+  [_variablesButton setTitle:count ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)count]
+                                   : @"Variables…"];
 }
 
 - (void)setSortExpressions:(NSArray<RDLSortExpression *> *)sorts {

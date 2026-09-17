@@ -35,11 +35,14 @@
 @property (nonatomic, copy) NSArray<RDLFilter *> *filters;
 // The group's sort as the sort panel last left it.
 @property (nonatomic, copy) NSArray<RDLSortExpression *> *sortExpressions;
+// Its variables as the variables panel last left them.
+@property (nonatomic, copy) NSArray<RDLVariable *> *variables;
 
 - (void)addExpression:(id)sender;
 - (void)removeExpression:(id)sender;
 - (void)editFilters:(id)sender;
 - (void)editSorting:(id)sender;
+- (void)editVariables:(id)sender;
 
 // What OK does. NO, changing nothing, when the editor refuses what the panel
 // holds -- a name another dataset, data region or group already has, or a

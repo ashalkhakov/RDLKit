@@ -15,6 +15,8 @@
 #import "RDLValueListEditor.h"
 #import "RDLEmbeddedImages.h"
 #import "RDLEmbeddedImagesEditor.h"
+#import "RDLCodeEditor.h"
+#import "RDLVariablesEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -116,8 +118,8 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
 // The report's own pictures to show, and what kind a field's bytes are.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
-// The report's own pictures, in a panel of their own.
-@property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton;
+// The report's own pictures, code and variables, each in a panel of its own.
+@property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton, *reportCodeButton, *reportVariablesButton;
 // What a subreport shows with no rows, and how it breaks and reads.
 @property (nonatomic, strong) IBOutlet RDLExpressionField *subreportNoRowsField;
 @property (nonatomic, strong) IBOutlet NSButton *subreportNoRowsExprButton, *subreportOmitBorderCheck;
@@ -897,6 +899,9 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [_embeddedImagesButton setTitle:pictures ? [NSString stringWithFormat:@"Embedded Images (%lu)…",
                                                                           (unsigned long)pictures]
                                              : @"Embedded Images…"];
+    NSUInteger variables = [report.variables count];
+    [_reportVariablesButton setTitle:variables ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)variables]
+                                               : @"Variables…"];
     [self stackBoxes:@[ _docBox, _paperBox ]];
   }
 
@@ -978,6 +983,32 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [_context.editor setValue:[_imageEmbeddedPop titleOfSelectedItem] forKeyPath:@"value" ofItem:it];
   [self reload];
   return YES;
+}
+
+- (void)editReportCode:(id)sender {
+  (void)sender;
+  RDLReport *report = _context.report;
+  NSString *edited = [RDLCodeEditor runForCode:report.code
+                                         title:[NSString stringWithFormat:@"Code — %@", report.name ?: @"Report"]];
+  NSString *code = [edited length] ? edited : nil;
+  if (edited == nil || code == report.code || [code isEqualToString:report.code])
+    return;
+  [_context.editor setReportValue:code forKeyPath:@"code"];
+  [self reload];
+}
+
+- (void)editReportVariables:(id)sender {
+  (void)sender;
+  RDLReport *report = _context.report;
+  NSArray<RDLVariable *> *edited =
+      [RDLVariablesEditor runForVariables:report.variables
+                                    title:[NSString stringWithFormat:@"Variables — %@", report.name ?: @"Report"]
+                                 writable:YES
+                                   report:report];
+  if (edited == nil || RDLVariablesEqual(edited, report.variables))
+    return;
+  [_context.editor setReportValue:[edited mutableCopy] forKeyPath:@"variables"];
+  [self reload];
 }
 
 - (void)editEmbeddedImages:(id)sender {

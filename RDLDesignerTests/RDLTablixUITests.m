@@ -664,7 +664,7 @@
 }
 
 // The group panel also sorts the group, breaks pages at it, names those pages,
-// hides it and says what toggles it -- applied with the rest as one step, and
+// hides it, says what toggles it and gives it variables -- applied with the rest as one step, and
 // not at all when the name is refused.
 - (void)testTheGroupPropertiesPanelSetsPagesSortAndVisibility {
   RDLReport *report = [RDLSamples workshopByFinish];
@@ -682,7 +682,7 @@
                                                                     ofTablix:tablix
                                                                      context:ctx];
   for (NSString *name in @[ @"sortingButton", @"pageBreakPop", @"resetPageNumberCheck", @"pageBreakDisabledField",
-                            @"pageNameField", @"hiddenField", @"togglePop", @"keepTogetherCheck" ])
+                            @"pageNameField", @"hiddenField", @"togglePop", @"keepTogetherCheck", @"variablesButton" ])
     if ([panel valueForKey:name] == nil) {
       XCTFail(@"%@ is not connected in the XIB", name);
       return;
@@ -705,6 +705,12 @@
   panel.sortExpressions = @[ sort ];
   if (![[[panel valueForKey:@"sortingButton"] title] isEqualToString:@"Sorting (1)…"])
     XCTFail(@"the sorting button says %@", [[panel valueForKey:@"sortingButton"] title]);
+  RDLVariable *pieces = [[RDLVariable alloc] init];
+  pieces.name = @"FinishPieces";
+  pieces.value = [RDLValue valueWithSource:@"=Sum(Fields!Pieces.Value)"];
+  panel.variables = @[ pieces ];
+  if (![[[panel valueForKey:@"variablesButton"] title] isEqualToString:@"Variables (1)…"])
+    XCTFail(@"the variables button says %@", [[panel valueForKey:@"variablesButton"] title]);
   [[panel valueForKey:@"resetPageNumberCheck"] setState:NSOnState];
   [[panel valueForKey:@"keepTogetherCheck"] setState:NSOnState];
   [[panel valueForKey:@"pageBreakDisabledField"] setStringValue:@"=Globals!PageNumber = 1"];
@@ -719,8 +725,9 @@
       ![[group.pageName source] isEqualToString:@"=Fields!Finish.Value"] ||
       ![[group.hidden source] isEqualToString:@"=Parameters!Brief.Value"] ||
       ![group.toggleItem isEqualToString:toggler] || [group.sortExpressions count] != 1 ||
-      group.sortExpressions[0].direction != RDLSortDirectionDescending)
-    XCTFail(@"%@", @"the group should take its sort, page break and visibility");
+      group.sortExpressions[0].direction != RDLSortDirectionDescending || [group.variables count] != 1 ||
+      ![group.variables[0].name isEqualToString:@"FinishPieces"])
+    XCTFail(@"%@", @"the group should take its sort, page break, visibility and variables");
   [ctx.document.undoManager undo];
   if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:before])
     XCTFail(@"%@", @"one undo should put the tablix back as it was");

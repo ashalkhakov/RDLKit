@@ -50,6 +50,8 @@
                 <outlet property="imageImportButton" destination="imageImportButton" id="imageImportButtonOutlet"/>
                 <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
                 <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
+                <outlet property="reportCodeButton" destination="reportCodeButton" id="reportCodeButtonOutlet"/>
+                <outlet property="reportVariablesButton" destination="reportVariablesButton" id="reportVariablesButtonOutlet"/>
                 <outlet property="subreportNoRowsField" destination="subreportNoRowsField" id="subreportNoRowsFieldOutlet"/>
                 <outlet property="subreportNoRowsExprButton" destination="subreportNoRowsExprButton" id="subreportNoRowsExprButtonOutlet"/>
                 <outlet property="subreportOmitBorderCheck" destination="subreportOmitBorderCheck" id="subreportOmitBorderCheckOutlet"/>
@@ -200,7 +202,7 @@
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
         <customView id="docBox">
-            <rect key="frame" x="0.0" y="0.0" width="260" height="362"/>
+            <rect key="frame" x="0.0" y="0.0" width="260" height="390"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
@@ -390,6 +392,28 @@
                     </buttonCell>
                     <connections>
                         <action selector="editEmbeddedImages:" target="-2" id="embeddedImagesButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Functions the report&apos;s expressions call as Code.Name" id="reportCodeButton">
+                    <rect key="frame" x="10" y="362" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Code…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="reportCodeButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editReportCode:" target="-2" id="reportCodeButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Values worked out once for the report, read as Variables!Name.Value" id="reportVariablesButton">
+                    <rect key="frame" x="136" y="362" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Variables…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="reportVariablesButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editReportVariables:" target="-2" id="reportVariablesButtonAction"/>
                     </connections>
                 </button>
             </subviews>
