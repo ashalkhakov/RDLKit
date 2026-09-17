@@ -47,6 +47,7 @@ RDLDesigner_OBJC_FILES = \
   RDLVariablesEditor.m \
   RDLCodeEditor.m \
   RDLStylePanel.m \
+  RDLPreviewWindow.m \
   RDLProblemsView.m \
   RDLSourceView.m \
   RDLSnapGuides.m \

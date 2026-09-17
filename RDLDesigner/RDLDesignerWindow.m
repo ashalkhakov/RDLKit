@@ -1,6 +1,7 @@
 #import "RDLDesignerWindow.h"
 #import "RDLChange.h"
 #import "RDLSelection.h"
+#import "RDLPreviewWindow.h"
 #import "RDLSourceView.h"
 #import "RDLCanvasView.h"
 #import "RDLEditingContext.h"
@@ -94,9 +95,8 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSView *parameterNavigatorHost, *parameterInspectorHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
-// RDLPreviewWindow.xib
-@property (nonatomic, strong) IBOutlet NSWindow *previewWindow;
-@property (nonatomic, strong) IBOutlet RDLView *previewView;
+// The report as it comes out, in a window of its own.
+@property (nonatomic, strong) RDLPreviewWindow *preview;
 // RDLAddElementPanel.xib -- reloaded per use, since its height depends on how
 // many element kinds the selection allows.
 @property (nonatomic, strong) IBOutlet NSWindow *palettePanel;
@@ -600,16 +600,9 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 
 - (void)showPreview:(id)sender {
   (void)sender;
-  if (_previewWindow == nil) {
-    NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLPreviewWindow"
-                                          bundle:[NSBundle bundleForClass:[self class]]];
-    [nib instantiateWithOwner:self topLevelObjects:NULL];
-  }
-  _previewView.report = _context.report;
-  _previewView.paramValues = [_context.document suppliedParameters];
-  _previewView.documentBinder = [_context.document dataBinder];
-  [_previewView reloadLayout];
-  [_previewWindow makeKeyAndOrderFront:nil];
+  if (_preview == nil)
+    _preview = [[RDLPreviewWindow alloc] initWithContext:_context];
+  [_preview show];
 }
 
 // The bar draws icons rather than labels, so each pane gets a lettered badge

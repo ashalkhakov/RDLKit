@@ -79,6 +79,11 @@
 - (RDLDataBinder *)dataBinder;
 
 
+// Whether reading this document's data may fetch remote (http/https)
+// documents. Set by the last read, so anything that renders again -- a
+// preview, an export -- does it on the terms the reader already agreed to.
+@property (nonatomic, assign) BOOL fetchesRemoteDocuments;
+
 // Read every data source the report names -- all of them, not the first: a
 // report with three datasets needs three, and one that fails should not stop
 // the others. `notes` comes back with a line per source that could not be

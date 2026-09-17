@@ -17,6 +17,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLPreviewWindow.h"
 #import "RDLProblemsView.h"
 #import "RDLSourceView.h"
 #import "RDLOutlineDataSource.h"
@@ -896,6 +897,88 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
                   atPoint:NSMakePoint(2, 2)])
     XCTFail(@"%@", @"a drop outside the bands should be refused");
+}
+
+// The preview: the report as it comes out, walked through page by page, with
+// what could not be read said rather than left to be puzzled over, and a print
+// operation that is paginated rather than one tall image.
+- (void)testThePreviewWalksThroughThePagesAndPrints {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Long"];
+  report.page.pageWidth = 8.5;
+  report.page.pageHeight = 3;  // short pages, so a few lines make several
+  report.page.topMargin = 0.25;
+  report.page.bottomMargin = 0.25;
+  for (NSUInteger i = 0; i < 60; i++) {
+    RDLTextbox *line = [[RDLTextbox alloc] init];
+    line.name = [NSString stringWithFormat:@"Line%lu", (unsigned long)i + 1];
+    line.value = [NSString stringWithFormat:@"Line %lu", (unsigned long)i + 1];
+    line.left = 0.5;
+    line.top = 0.5 * i;
+    line.width = 3;
+    line.height = 0.3;
+    [report.body.items addObject:line];
+  }
+  report.body.height = 30;  // enough pages that the window has to scroll through them
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLPreviewWindow *preview = [[RDLPreviewWindow alloc] initWithContext:ctx];
+  if (preview == nil || preview.window == nil) {
+    XCTFail(@"%@", @"the preview window did not load");
+    return;
+  }
+  [preview refresh];
+  if (preview.pageCount < 2) {
+    XCTFail(@"a report taller than its page should come out as several, came out as %lu",
+            (unsigned long)preview.pageCount);
+    return;
+  }
+  if ([preview.status rangeOfString:@"Page 1 of"].location == NSNotFound)
+    XCTFail(@"the bar should say which page is showing, says %@", preview.status);
+
+  // Walking through it, and not past either end.
+  [preview goToNextPage:nil];
+  if (preview.pageIndex != 1)
+    XCTFail(@"next should show page 2, shows %lu", (unsigned long)preview.pageIndex + 1);
+  [preview goToLastPage:nil];
+  if (preview.pageIndex != preview.pageCount - 1)
+    XCTFail(@"%@", @"last should show the last page");
+  [preview goToNextPage:nil];
+  if (preview.pageIndex != preview.pageCount - 1)
+    XCTFail(@"%@", @"there is nothing after the last page");
+  if ([preview.status rangeOfString:[NSString stringWithFormat:@"of %lu",
+                                                               (unsigned long)preview.pageCount]]
+          .location == NSNotFound)
+    XCTFail(@"the bar should say how many pages there are, says %@", preview.status);
+  [preview goToPreviousPage:nil];
+  if (preview.pageIndex != preview.pageCount - 2)
+    XCTFail(@"%@", @"previous should step back one");
+  [preview goToFirstPage:nil];
+  if (preview.pageIndex != 0)
+    XCTFail(@"%@", @"first should go back to the beginning");
+
+  // Printing is the document's, paginated: one printed page per laid-out page.
+  NSPrintOperation *op = [ctx.document printOperationWithSettings:@{} error:NULL];
+  NSRange pages = NSMakeRange(0, 0);
+  if (op == nil || ![[op view] knowsPageRange:&pages]) {
+    XCTFail(@"%@", @"the document should print as a paginated document");
+    return;
+  }
+  if (pages.length != preview.pageCount)
+    XCTFail(@"printing should be %lu pages, is %lu", (unsigned long)preview.pageCount,
+            (unsigned long)pages.length);
+
+  // A report whose data is not there says so rather than rendering silence.
+  RDLDataSource *missing = [[RDLDataSource alloc] init];
+  missing.name = @"Missing";
+  missing.dataProvider = @"JSON";
+  missing.connectString = @"Document=nowhere-at-all.json";
+  [report.dataSources addObject:missing];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Nothing";
+  ds.dataSourceName = @"Missing";
+  [report.dataSets addObject:ds];
+  [preview refresh];
+  if ([preview.notes length] == 0)
+    XCTFail(@"%@", @"a document that is not there should be reported");
 }
 
 // A field dropped on a table goes in the cell it was dropped on -- which is

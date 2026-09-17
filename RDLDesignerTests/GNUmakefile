@@ -51,6 +51,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLVariablesEditor.m \
   ../RDLDesigner/RDLCodeEditor.m \
   ../RDLDesigner/RDLStylePanel.m \
+  ../RDLDesigner/RDLPreviewWindow.m \
   ../RDLDesigner/RDLProblemsView.m \
   ../RDLDesigner/RDLSourceView.m \
   ../RDLDesigner/RDLSnapGuides.m \
@@ -98,6 +99,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLVariablesEditor.xib \
   ../RDLDesigner/RDLCodeEditor.xib \
   ../RDLDesigner/RDLStylePanel.xib \
+  ../RDLDesigner/RDLPreviewWindow.xib \
   ../RDLDesigner/RDLProblemsView.xib \
   ../RDLDesigner/RDLSourceView.xib \
   ../RDLDesigner/RDLChartAxisEditor.xib \

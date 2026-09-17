@@ -76,9 +76,14 @@
                                 <menu key="submenu" title="Samples" id="samplesMenu"/>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="fileSep3"/>
-                            <menuItem title="Preview" keyEquivalent="p" id="previewItem">
+                            <menuItem title="Preview" keyEquivalent="P" id="previewItem">
                                 <connections>
                                     <action selector="preview:" target="-2" id="previewAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Print…" keyEquivalent="p" id="printItem">
+                                <connections>
+                                    <action selector="printDocument:" target="-1" id="printAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Export PDF…" keyEquivalent="e" id="exportItem">

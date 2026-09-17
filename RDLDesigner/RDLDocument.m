@@ -11,12 +11,6 @@
 // spelled out at each call site.
 NSString *const RDLReportDocumentType = @"rdl";
 
-@interface RDLDocument ()
-// Whether the last reading of the data sources was allowed to fetch remote
-// documents, which is what evaluating them again for new parameter values may do.
-@property (nonatomic, assign) BOOL fetchesRemoteDocuments;
-@end
-
 @implementation RDLDocument
 
 // A report is saved when the person says so. In-place autosaving would write
@@ -364,6 +358,25 @@ static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
   if ([base length] == 0)
     base = [_report.name length] ? _report.name : @"report";
   return [base stringByAppendingPathExtension:backend.pathExtension];
+}
+
+// Printing is NSDocument's, which is how the File menu, Cmd-P and the print
+// panel all reach it. The report is laid out into a view of its own for the
+// occasion -- the preview's view belongs to the preview window, which may not
+// be open -- with its subreports found first, as any render needs.
+- (NSPrintOperation *)printOperationWithSettings:(NSDictionary<NSPrintInfoAttributeKey, id> *)settings
+                                           error:(NSError **)error {
+  RDL_UNUSED(error);
+  [self loadSubreports];
+  RDLView *view = [[RDLView alloc] initWithFrame:NSZeroRect];
+  view.report = _report;
+  view.paramValues = [self suppliedParameters];
+  view.documentBinder = [self dataBinder];
+  [view reloadLayout];
+  NSPrintInfo *info = [[self printInfo] copy] ?: [NSPrintInfo sharedPrintInfo];
+  if ([settings count])
+    [[info dictionary] addEntriesFromDictionary:settings];
+  return [view printOperationWithPrintInfo:info];
 }
 
 - (NSData *)exportDataUsingBackend:(id<RDLBackend>)backend {

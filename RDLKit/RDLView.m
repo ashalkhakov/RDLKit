@@ -17,6 +17,10 @@
 @interface RDLPrintView : RDLView
 @end
 
+@interface RDLView (RDLPrinting)
+- (RDLPrintView *)printViewWithInfo:(NSPrintInfo **)outInfo fromInfo:(NSPrintInfo *)given;
+@end
+
 static const CGFloat kRDLDPI = 72.0;
 static const CGFloat kPageGap = 18.0;
 
@@ -419,15 +423,40 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   }
 }
 
-- (NSData *)PDFData {
+- (NSRect)rectOfPageAtIndex:(NSUInteger)index {
+  CGFloat y = 0;
+  for (NSUInteger i = 0; i < [self.pages count]; i++) {
+    RDLLaidOutPage *page = self.pages[i];
+    NSRect r = NSMakeRect(0, y, page.width * kRDLDPI, page.height * kRDLDPI);
+    if (i == index)
+      return r;
+    y += page.height * kRDLDPI + kPageGap;
+  }
+  return NSZeroRect;
+}
+
+- (NSUInteger)indexOfPageAtY:(CGFloat)y {
+  CGFloat bottom = 0;
+  for (NSUInteger i = 0; i < [self.pages count]; i++) {
+    bottom += [self.pages[i] height] * kRDLDPI + kPageGap;
+    if (y < bottom)
+      return i;
+  }
+  return [self.pages count] ? [self.pages count] - 1 : 0;
+}
+
+// The print view the paginated output is drawn by, and the print settings that
+// suit it: one printed page per laid-out page, at the report's own page size.
+// Shared by the PDF an export makes and the operation a print runs, so the two
+// are the same document on different paper.
+- (RDLPrintView *)printViewWithInfo:(NSPrintInfo **)outInfo fromInfo:(NSPrintInfo *)given {
   if ([self.pages count] == 0)
     [self reloadLayout];
-
   RDLPrintView *printView = [[RDLPrintView alloc] initWithFrame:NSZeroRect];
   printView.pages = self.pages;
   [printView sizeToPages];
 
-  NSPrintInfo *info = [[NSPrintInfo alloc] initWithDictionary:@{}];
+  NSPrintInfo *info = given ? [given copy] : [[NSPrintInfo alloc] initWithDictionary:@{}];
   RDLLaidOutPage *first = [self.pages firstObject];
   if (first)
     [info setPaperSize:NSMakeSize(first.width * kRDLDPI, first.height * kRDLDPI)];
@@ -437,7 +466,14 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   [info setRightMargin:0];
   [info setTopMargin:0];
   [info setBottomMargin:0];
+  if (outInfo)
+    *outInfo = info;
+  return printView;
+}
 
+- (NSData *)PDFData {
+  NSPrintInfo *info = nil;
+  RDLPrintView *printView = [self printViewWithInfo:&info fromInfo:nil];
   NSMutableData *data = [NSMutableData data];
   NSPrintOperation *op = [NSPrintOperation PDFOperationWithView:printView
                                                      insideRect:printView.bounds
@@ -445,6 +481,12 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
                                                       printInfo:info];
   [op runOperation];
   return data;
+}
+
+- (NSPrintOperation *)printOperationWithPrintInfo:(NSPrintInfo *)info {
+  NSPrintInfo *settings = nil;
+  RDLPrintView *printView = [self printViewWithInfo:&settings fromInfo:info];
+  return [NSPrintOperation printOperationWithView:printView printInfo:settings];
 }
 
 @end
