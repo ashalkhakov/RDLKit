@@ -4,13 +4,15 @@ LIBRARY_NAME = RDLKit
 RDLKit_NEEDS_GUI = yes
 RDLKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
 RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
+# The Visual Basic implementation -- the expression language, the report's
+# code, and the runtime library both call -- is a directory of its own.
+RDLKit_INCLUDE_DIRS += -IVisualBasic
 RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \
   RDLReport.h \
   RDLReferenceSites.h \
   RDLParser.h \
-  RDLExpression.h \
   RDLLayoutEngine.h \
   RDLView.h \
   RDLBackend.h \
@@ -22,11 +24,9 @@ RDLKit_HEADER_FILES = \
   RDLCSVDataProvider.h \
   RDLSubreportLoader.h \
   RDLTextAttributes.h \
-  RDLValueBoxing.h \
   RDLBorderPainter.h \
   RDLLinePainter.h \
   RDLParameterValues.h \
-  RDLNumber.h \
   RDLDataEvaluation.h
 RDLKit_OBJC_FILES = \
   RDLReport.m \
@@ -43,8 +43,8 @@ RDLKit_OBJC_FILES = \
   RDLZipArchive.m \
   RDLDocxReader.m \
   RDLImporter.m \
-  RDLExpression.m \
-  RDLExpressionCatalog.m \
+  VisualBasic/RDLExpression.m \
+  VisualBasic/RDLExpressionCatalog.m \
   RDLLayoutEngine.m \
   RDLView.m \
   RDLHTMLBackend.m \
@@ -57,28 +57,28 @@ RDLKit_OBJC_FILES = \
   RDLCSVDataProvider.m \
   RDLSubreportLoader.m \
   RDLTextAttributes.m \
-  RDLValueBoxing.m \
-  RDLConversions.m \
-  RDLReferences.m \
-  RDLAggregates.m \
-  RDLDateFormats.m \
-  RDLVisualBasicText.m \
-  RDLVisualBasicDates.m \
-  RDLFunctionTable.m \
-  RDLDotNetMembers.m \
-  RDLForms.m \
+  VisualBasic/RDLValueBoxing.m \
+  VisualBasic/RDLConversions.m \
+  VisualBasic/RDLReferences.m \
+  VisualBasic/RDLAggregates.m \
+  VisualBasic/RDLDateFormats.m \
+  VisualBasic/RDLVisualBasicText.m \
+  VisualBasic/RDLVisualBasicDates.m \
+  VisualBasic/RDLFunctionTable.m \
+  VisualBasic/RDLDotNetMembers.m \
+  VisualBasic/RDLForms.m \
   RDLReferenceSites.m \
-  RDLCompiler.m \
-  RDLVirtualMachine.m \
+  VisualBasic/RDLCompiler.m \
+  VisualBasic/RDLVirtualMachine.m \
   RDLBorderPainter.m \
   RDLLinePainter.m \
   RDLMarkup.m \
-  RDLCode.m \
-  RDLCodeAST.m \
-  RDLCodeParser.m \
-  RDLExpressionParser.m \
+  VisualBasic/RDLCode.m \
+  VisualBasic/RDLCodeAST.m \
+  VisualBasic/RDLCodeParser.m \
+  VisualBasic/RDLExpressionParser.m \
   RDLParameterValues.m \
-  RDLNumber.m \
+  VisualBasic/RDLNumber.m \
   RDLDataEvaluation.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever
@@ -110,3 +110,18 @@ ADDITIONAL_LDFLAGS += -fsanitize=undefined
 endif
 
 include $(GNUSTEP_MAKEFILES)/library.make
+
+# The language's public headers, installed beside the rest rather than in a
+# VisualBasic directory: RDLKit.h imports them by name, as the Xcode
+# framework, which flattens its headers, has them.
+VISUAL_BASIC_PUBLIC_HEADERS = RDLExpression.h RDLExpressionCatalog.h RDLNumber.h RDLValueBoxing.h
+
+after-install::
+	$(ECHO_NOTHING)for file in $(VISUAL_BASIC_PUBLIC_HEADERS); do \
+	  $(INSTALL_DATA) VisualBasic/$$file $(GNUSTEP_HEADERS)/RDLKit/$$file; \
+	done$(END_ECHO)
+
+after-uninstall::
+	$(ECHO_NOTHING)for file in $(VISUAL_BASIC_PUBLIC_HEADERS); do \
+	  rm -f $(GNUSTEP_HEADERS)/RDLKit/$$file; \
+	done$(END_ECHO)
