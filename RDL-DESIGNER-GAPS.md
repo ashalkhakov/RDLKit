@@ -297,7 +297,7 @@ not yet keep that.
 | Tablix `NoRowsMessage`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | Done | A section of the tablix's own. |
 | Tablix `SortExpressions` | Done | Sorting… in the tablix's section. |
 | `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
-| Nested tablix or chart in a cell | UI (was MODEL) | |
+| Nested tablix or chart in a cell | Done | Inserted, pasted and drawn in a cell or a rectangle like any other item. A new region with no dataset to bind gets an empty one of its own. |
 | A "List" preset | UI | |
 | `DomainScope`, `ReGroupExpressions`, `DataElement*` | MODEL | |
 

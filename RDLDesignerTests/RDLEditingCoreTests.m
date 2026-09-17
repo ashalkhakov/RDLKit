@@ -568,18 +568,19 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", [NSString stringWithFormat:@"sibling description %@",
                                                [p localizedDescription]]);
 
-  // A Rectangle selected: insert inside, and data regions are refused there.
+  // A Rectangle selected: insert inside, whatever the kind -- a data region
+  // included, as MS-RDL allows.
   RDLRectangle *box = (RDLRectangle *)r.body.items[1];
   [sel selectItem:box inBandWithKey:@"body"];
   p = [RDLItemFactory insertionPointInReport:r selection:sel];
   if (p.container != box || p.items != box.items)
     XCTFail(@"%@", @"selecting a Rectangle should insert into it");
   NSArray *allowed = [RDLItemFactory elementKindsAllowedAt:p];
-  if ([allowed containsObject:@"Tablix"] || [allowed containsObject:@"Chart"])
-    XCTFail(@"%@", @"a Rectangle must not accept data regions");
+  if (![allowed containsObject:@"Tablix"] || ![allowed containsObject:@"Chart"])
+    XCTFail(@"%@", @"a Rectangle should accept data regions");
   if (![RDLItemFactory kind:@"Textbox" isAllowedAt:p])
     XCTFail(@"%@", @"a Rectangle should accept a Textbox");
-  if ([RDLItemFactory kind:@"Tablix" isAllowedAt:p])
+  if (![RDLItemFactory kind:@"Tablix" isAllowedAt:p])
     XCTFail(@"%@", @"kind:isAllowedAt: should agree with the allowed list");
   if (![[p localizedDescription] isEqualToString:@"inside Box"])
     XCTFail(@"%@", [NSString stringWithFormat:@"container description %@",
@@ -745,21 +746,21 @@ static RDLReport *RDLGroupedJobs(void) {
   if (!([ctx.report.body.items count] == bodyCount - 1))
     XCTFail(@"%@", @"context: undo removes the added item");
 
-  // 4. A Rectangle refuses data regions.
+  // 4. A Rectangle takes every kind, a data region included.
   [ctx addItemOfKind:@"Rectangle"];
   RDLRectangle *rect = (RDLRectangle *)[ctx selectedItem];
   if (!([rect isKindOfClass:[RDLRectangle class]]))
     XCTFail(@"%@", @"context: added a Rectangle");
-  // Everything but the data regions: a Rectangle may hold a subreport, which
-  // is a reference to another report rather than a region bound to data.
-  if (!([[ctx allowedElementKinds] count] == 5))
-    XCTFail(@"%@", @"context: a Rectangle allows the simple kinds and a subreport");
+  if (!([[ctx allowedElementKinds] count] == 7))
+    XCTFail(@"%@", @"context: a Rectangle allows every kind");
   NSUInteger before = [ctx.report.body.items count];
   [ctx addItemOfKind:@"Tablix"];
-  if (!([ctx.report.body.items count] == before))
-    XCTFail(@"%@", @"context: a Tablix must not go into a Rectangle");
+  if (!([ctx.report.body.items count] == before) || !([rect.items count] == 1) ||
+      ![[rect.items firstObject] isKindOfClass:[RDLTablix class]])
+    XCTFail(@"%@", @"context: a Tablix goes inside the Rectangle");
+  [ctx.selection selectItem:rect inBandWithKey:@"body"];
   [ctx addItemOfKind:@"Textbox"];
-  if (!([rect.items count] == 1))
+  if (!([rect.items count] == 2))
     XCTFail(@"%@", @"context: a Textbox goes inside the Rectangle");
 
   // 5. New elements land next to the selection, not at the end of the band.
@@ -812,8 +813,8 @@ static RDLReport *RDLGroupedJobs(void) {
   if (!([ctx.report.body.items count] == n))
     XCTFail(@"%@", @"context: one undo removes the paste");
 
-  // A data region cannot live in a Rectangle, so pasting one with a
-  // Rectangle selected must fall back to the band rather than vanish.
+  // A data region pasted with a Rectangle selected goes inside it, as any
+  // other item does.
   [ctx.selection selectReport];
   [ctx addItemOfKind:@"Tablix"];
   RDLTablix *tablix = (RDLTablix *)[ctx selectedItem];
@@ -825,10 +826,10 @@ static RDLReport *RDLGroupedJobs(void) {
   rectKids = [rect.items count];
   n = [ctx.report.body.items count];
   [ctx pasteItem];
-  if (!([rect.items count] == rectKids))
-    XCTFail(@"%@", @"context: a pasted Tablix must not enter the Rectangle");
-  if (!([ctx.report.body.items count] == n + 1))
-    XCTFail(@"%@", @"context: a pasted Tablix falls back to the band");
+  if (!([rect.items count] == rectKids + 1))
+    XCTFail(@"%@", @"context: a pasted Tablix goes into the Rectangle");
+  if (!([ctx.report.body.items count] == n))
+    XCTFail(@"%@", @"context: and not into the band as well");
 
   // 7. Duplicate does not disturb the pasteboard.
   [ctx.selection selectItem:first inBandWithKey:@"body"];
@@ -2092,6 +2093,69 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   [r.body.items addObject:tablix];
   if ([editor canMoveItem:cell.item inStacking:RDLStackingMoveToBack])
     XCTFail(@"%@", @"what fills a cell has nothing to be stacked with");
+}
+
+
+// A table or a chart goes into a tablix cell and a rectangle, as MS-RDL
+// allows, and is drawn there; a region the factory could bind to nothing gets
+// an empty dataset of its own, undone with it.
+- (void)testDataRegionsGoInsideCellsAndRectangles {
+  RDLReport *bare = [RDLReport emptyReportNamed:@"Bare"];
+  [bare.dataSets removeAllObjects];
+  RDLEditingContext *bareCtx = [[RDLEditingContext alloc] initWithReport:bare];
+  [bareCtx.selection selectReport];
+  [bareCtx addItemOfKind:@"Tablix"];
+  RDLTablix *lonely = (RDLTablix *)[bareCtx selectedItem];
+  if (![lonely.dataSetName length] || [bare dataSetNamed:lonely.dataSetName] == nil)
+    XCTFail(@"a table in a report with no dataset should get one of its own, not %@", lonely.dataSetName);
+  [bareCtx.document.undoManager undo];
+  if ([bare.dataSets count] != 0 || [bare.body.items count] != 0)
+    XCTFail(@"%@", @"one undo should take the table and its dataset away");
+
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *outer = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      outer = (RDLTablix *)it;
+  RDLTablixCell *cell = outer.tablixBody.rows[0].cells[0];
+  cell.item = nil;
+  [ctx.selection selectCellOfTablix:outer
+                                row:(NSInteger)[RDLTablixGeometry gridRowOf:outer forBodyRow:0]
+                             column:(NSInteger)[RDLTablixGeometry gridColumnOf:outer forBodyColumn:0]
+                      inBandWithKey:@"body"];
+  [ctx addItemOfKind:@"Tablix"];
+  if (![cell.item isKindOfClass:[RDLTablix class]] || [[outer structuralProblems] count])
+    XCTFail(@"a table should fill the cell and leave its tablix consistent: %@", [outer structuralProblems]);
+  RDLRectangle *panel = [[RDLRectangle alloc] init];
+  panel.name = @"Panel";
+  panel.width = 4;
+  panel.height = 3;
+  [report.body.items addObject:panel];
+  [ctx.selection selectItem:panel inBandWithKey:@"body"];
+  [ctx addItemOfKind:@"Chart"];
+  if (![[panel.items firstObject] isKindOfClass:[RDLChart class]])
+    XCTFail(@"%@", @"a chart should go inside the rectangle");
+
+  // Both kept by a save.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  BOOL nestedTable = NO, nestedChart = NO;
+  for (RDLItem *it in [back allItemsIncludingNested]) {
+    if ([it isKindOfClass:[RDLTablix class]] && it != [back.body.items firstObject])
+      nestedTable = nestedTable || [back cellContainingItem:it tablix:NULL] != nil;
+    if ([it isKindOfClass:[RDLChart class]])
+      nestedChart = YES;
+  }
+  if (!nestedTable || !nestedChart)
+    XCTFail(@"the nested table (%d) and chart (%d) should survive a save", nestedTable, nestedChart);
+
+  // And drawn where they are.
+  NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
+  RDLCanvasView *view = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) context:ctx];
+  NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:[view bounds]];
+  [view cacheDisplayInRect:[view bounds] toBitmapImageRep:rep];
+  if (rep == nil)
+    XCTFail(@"%@", @"the canvas should draw a report with nested regions");
 }
 
 @end

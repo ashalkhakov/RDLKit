@@ -130,10 +130,10 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 #pragma mark - Policy
 
 + (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point {
-  // A subreport goes wherever a simple item goes -- MS-RDL allows one in a
-  // Rectangle and in a tablix cell, which is where master-detail puts it.
-  if (point.cell != nil || point.container != nil)
-    return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Subreport" ];
+  // Everything goes everywhere: MS-RDL allows a data region in a Rectangle
+  // and in a tablix cell as much as a subreport, and the engine lays a region
+  // out wherever it is -- a table per group, a chart per row.
+  (void)point;
   return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart", @"Subreport" ];
 }
 

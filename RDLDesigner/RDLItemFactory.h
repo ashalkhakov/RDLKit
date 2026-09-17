@@ -39,7 +39,7 @@
 + (RDLInsertionPoint *)insertionPointInReport:(RDLReport *)report
                                     selection:(RDLSelection *)selection;
 
-// A Rectangle may only hold simple report items; data regions need band level.
+// What may be inserted where: every kind, in a band, a rectangle or a cell.
 + (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point;
 + (BOOL)kind:(NSString *)kind isAllowedAt:(RDLInsertionPoint *)point;
 

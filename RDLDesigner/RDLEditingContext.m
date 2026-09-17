@@ -158,6 +158,28 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   return [[self insertionPoint] localizedDescription];
 }
 
+// A data region the factory could bind to nothing gets a dataset of its own,
+// empty, reading from the report's first source if it has one: a region
+// pointing at no dataset falls back to whichever is first when the report
+// gains one, which is some other region's. In the same step as the insertion.
+- (void)giveDataSetTo:(RDLItem *)item {
+  if (![item isKindOfClass:[RDLDataRegion class]])
+    return;
+  RDLDataRegion *region = (RDLDataRegion *)item;
+  if ([region.dataSetName length] && [self.report dataSetNamed:region.dataSetName])
+    return;
+  NSString *base = [NSString stringWithFormat:@"%@Data", item.name ?: @"Region"];
+  NSString *name = base;
+  for (NSUInteger i = 2; [self.report dataSetNamed:name] != nil; i++)
+    name = [NSString stringWithFormat:@"%@%lu", base, (unsigned long)i];
+  RDLDataSet *dataSet = [[RDLDataSet alloc] init];
+  dataSet.name = name;
+  dataSet.dataSourceName = [[self.report.dataSources firstObject] name];
+  dataSet.fields = @[];
+  [_editor addDataSet:dataSet];
+  region.dataSetName = name;
+}
+
 - (void)addItemOfKind:(NSString *)kind {
   RDLInsertionPoint *point = [self insertionPoint];
   if (![RDLItemFactory kind:kind isAllowedAt:point])
@@ -165,8 +187,11 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   RDLItem *item = [RDLItemFactory itemOfKind:kind atPoint:point inReport:self.report];
   if (item == nil)
     return;
+  [_editor beginGroup:[NSString stringWithFormat:@"Add %@", kind]];
+  [self giveDataSetTo:item];
   if (point.cell != nil) {
     [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+    [_editor endGroup];
     return;
   }
   // Insert directly after the selection when there is one, so the new element
@@ -178,6 +203,7 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
       index = at + 1;
   }
   [_editor insertItem:item into:point.items bandKey:point.bandKey atIndex:index];
+  [_editor endGroup];
   [_selection selectItem:item inBandWithKey:point.bandKey];
 }
 
