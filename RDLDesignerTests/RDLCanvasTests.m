@@ -289,6 +289,13 @@ paperOrigin:NSMakePoint(0, 0)];
   if (![bandKey isEqualToString:@"pageHeader"])
     XCTFail(@"%@", @"hit testing should report the band");
 
+  // Grips belong to the item showing them: on anything else that corner is
+  // just the item, since a grip straddles the edge and would take clicks from
+  // whatever lies beside it.
+  hit = [g itemAtPoint:NSMakePoint(NSMaxX(hr) - 1, NSMaxY(hr) - 1) kind:&kind bandKey:NULL rect:NULL];
+  if (hit != header || ![kind isEqualToString:RDLHandleMove])
+    XCTFail(@"an item with no grips shown offers none, offers %@", kind);
+  g.itemWithHandles = header;
   hit = [g itemAtPoint:NSMakePoint(NSMaxX(hr), NSMaxY(hr)) kind:&kind bandKey:NULL rect:NULL];
   if (hit != header || ![kind isEqualToString:RDLHandleSouthEast])
     XCTFail(@"%@", @"the bottom-right corner is the south-east handle");
@@ -669,6 +676,94 @@ paperOrigin:NSMakePoint(0, 0)];
   [canvas alignRightEdges:nil];
   if (fabs((boxes[0].left + boxes[0].width) - (boxes[2].left + boxes[2].width)) > 0.001)
     XCTFail(@"%@", @"the right edges should meet");
+}
+
+
+// Eight grips, not three: a corner moves two edges, a side one, and the ones
+// on the top and the left move the item as they resize it.
+- (void)testAnItemIsResizedFromAnyOfItsEightHandles {
+  if ([RDLHandleKinds() count] != 8)
+    XCTFail(@"there should be eight grips, there are %lu", (unsigned long)[RDLHandleKinds() count]);
+  NSRect box = NSMakeRect(2, 2, 4, 3);
+  // Each grip sits where its name says.
+  NSDictionary<NSString *, NSValue *> *middles = @{
+    RDLHandleNorthWest : [NSValue valueWithPoint:NSMakePoint(2, 2)],
+    RDLHandleNorth : [NSValue valueWithPoint:NSMakePoint(4, 2)],
+    RDLHandleNorthEast : [NSValue valueWithPoint:NSMakePoint(6, 2)],
+    RDLHandleWest : [NSValue valueWithPoint:NSMakePoint(2, 3.5)],
+    RDLHandleEast : [NSValue valueWithPoint:NSMakePoint(6, 3.5)],
+    RDLHandleSouthWest : [NSValue valueWithPoint:NSMakePoint(2, 5)],
+    RDLHandleSouth : [NSValue valueWithPoint:NSMakePoint(4, 5)],
+    RDLHandleSouthEast : [NSValue valueWithPoint:NSMakePoint(6, 5)],
+  };
+  for (NSString *kind in middles) {
+    NSRect grip = RDLHandleRectOfKind(kind, box);
+    NSPoint want = [middles[kind] pointValue];
+    if (fabs(NSMidX(grip) - want.x) > 0.001 || fabs(NSMidY(grip) - want.y) > 0.001)
+      XCTFail(@"the %@ grip should sit at %@, sits at %@", kind, NSStringFromPoint(want),
+              NSStringFromPoint(NSMakePoint(NSMidX(grip), NSMidY(grip))));
+  }
+  // Dragging the north-west corner up and left grows the box both ways and
+  // moves its origin; the south-east one only grows it.
+  NSRect nw = RDLRectResizedByHandle(box, RDLHandleNorthWest, NSMakeSize(-1, -1), 0.05);
+  if (!NSEqualRects(nw, NSMakeRect(1, 1, 5, 4)))
+    XCTFail(@"the north-west corner should give (1,1,5,4), gives %@", NSStringFromRect(nw));
+  NSRect se = RDLRectResizedByHandle(box, RDLHandleSouthEast, NSMakeSize(1, 1), 0.05);
+  if (!NSEqualRects(se, NSMakeRect(2, 2, 5, 4)))
+    XCTFail(@"the south-east corner should give (2,2,5,4), gives %@", NSStringFromRect(se));
+  // A side moves one edge only.
+  NSRect west = RDLRectResizedByHandle(box, RDLHandleWest, NSMakeSize(1, 5), 0.05);
+  if (!NSEqualRects(west, NSMakeRect(3, 2, 3, 3)))
+    XCTFail(@"the west side should give (3,2,3,3), gives %@", NSStringFromRect(west));
+  // And a box is never dragged inside out.
+  NSRect squashed = RDLRectResizedByHandle(box, RDLHandleNorthWest, NSMakeSize(99, 99), 0.05);
+  if (NSWidth(squashed) <= 0 || NSHeight(squashed) <= 0 || NSMaxX(squashed) != NSMaxX(box))
+    XCTFail(@"a squashed box should keep its far edges and a size: %@", NSStringFromRect(squashed));
+
+  // On the canvas: a drag from the north-west grip moves and resizes in one
+  // undo step.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Handles"];
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Box";
+  item.left = 1;
+  item.top = 1;
+  item.width = 2;
+  item.height = 1;
+  [report.body.items addObject:item];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900) context:ctx];
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, 900)
+                                                 styleMask:NSTitledWindowMask
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:YES];
+  [[window contentView] addSubview:canvas];
+  [ctx.selection selectItem:item inBandWithKey:@"body"];
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:item rect:&rect];
+  NSEvent *(^at)(NSPoint, NSEventType) = ^NSEvent *(NSPoint p, NSEventType type) {
+    return [NSEvent mouseEventWithType:type
+                              location:[canvas convertPoint:NSMakePoint(p.x * ctx.zoom, p.y * ctx.zoom) toView:nil]
+                         modifierFlags:0
+                             timestamp:0
+                          windowNumber:[window windowNumber]
+                               context:nil
+                           eventNumber:0
+                            clickCount:1
+                              pressure:1];
+  };
+  NSPoint corner = NSMakePoint(NSMinX(rect), NSMinY(rect));
+  [canvas mouseDown:at(corner, NSEventTypeLeftMouseDown)];
+  [canvas mouseDragged:at(NSMakePoint(corner.x - RDLPointsPerInch / 2, corner.y - RDLPointsPerInch / 2),
+                         NSEventTypeLeftMouseDragged)];
+  [canvas mouseUp:at(NSMakePoint(corner.x - RDLPointsPerInch / 2, corner.y - RDLPointsPerInch / 2),
+                    NSEventTypeLeftMouseUp)];
+  if (fabs(item.left - 0.5) > 0.001 || fabs(item.top - 0.5) > 0.001 || fabs(item.width - 2.5) > 0.001 ||
+      fabs(item.height - 1.5) > 0.001)
+    XCTFail(@"the corner drag should move and grow the box: %g %g %g %g", item.left, item.top,
+            item.width, item.height);
+  [ctx.document.undoManager undo];
+  if (fabs(item.left - 1) > 0.001 || fabs(item.width - 2) > 0.001)
+    XCTFail(@"%@", @"one undo should put the box back");
 }
 
 @end

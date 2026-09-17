@@ -500,12 +500,9 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
     // inspector is showing: with several selected, the first of them.
     if (it != [_ctx selectedItem])
       return;
-    NSRect handles[3] = {
-        NSMakeRect(NSMaxX(r) - 3, NSMaxY(r) - 3, 6, 6),
-        NSMakeRect(NSMaxX(r) - 3, NSMidY(r) - 3, 6, 6),
-        NSMakeRect(NSMidX(r) - 3, NSMaxY(r) - 3, 6, 6)};
-    for (int i = 0; i < 3; i++)
-      NSRectFill(handles[i]);
+    // The eight grips, where the hit test looks for them.
+    for (NSString *kind in RDLHandleKinds())
+      NSRectFill(NSInsetRect(RDLHandleRectOfKind(kind, r), 1, 1));
   }
 }
 

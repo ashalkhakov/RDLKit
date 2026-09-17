@@ -219,6 +219,7 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
   // in changes with the selection, which does not invalidate the geometry --
   // nothing about the page has moved.
   _geometry.engagedTablix = [_context engagedTablix];
+  _geometry.itemWithHandles = [_context selectedItem];
   return _geometry;
 }
 

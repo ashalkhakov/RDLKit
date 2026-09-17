@@ -24,6 +24,11 @@ NSRect RDLTablixHandleRect(NSRect itemRect) {
 }
 
 NSString * const RDLHandleCell = @"cell";
+NSString * const RDLHandleNorthWest = @"nw";
+NSString * const RDLHandleNorth = @"n";
+NSString * const RDLHandleNorthEast = @"ne";
+NSString * const RDLHandleWest = @"w";
+NSString * const RDLHandleSouthWest = @"sw";
 NSString * const RDLHandleSouthEast = @"se";
 NSString * const RDLDragMarquee = @"marquee";
 
@@ -204,15 +209,64 @@ static const CGFloat kRDLBracketGap = 3;
 
 #pragma mark - Hit testing
 
-// Which part of `rect` the point is on: a resize handle, the body, or nothing.
-static NSString *RDLHandleAt(NSRect r, NSPoint p) {
+NSArray<NSString *> *RDLHandleKinds(void) {
+  // Corners before sides: a corner grip overlaps the two sides it lies
+  // between, and taking hold of it means both edges.
+  return @[ RDLHandleNorthWest, RDLHandleNorthEast, RDLHandleSouthWest, RDLHandleSouthEast,
+            RDLHandleNorth, RDLHandleSouth, RDLHandleWest, RDLHandleEast ];
+}
+
+NSRect RDLHandleRectOfKind(NSString *kind, NSRect r) {
   CGFloat h = kHandleSize;
-  if (NSPointInRect(p, NSMakeRect(NSMaxX(r) - h / 2, NSMaxY(r) - h / 2, h, h)))
-    return RDLHandleSouthEast;
-  if (NSPointInRect(p, NSMakeRect(NSMaxX(r) - h / 2, NSMidY(r) - h / 2, h, h)))
-    return RDLHandleEast;
-  if (NSPointInRect(p, NSMakeRect(NSMidX(r) - h / 2, NSMaxY(r) - h / 2, h, h)))
-    return RDLHandleSouth;
+  CGFloat x = NSMidX(r), y = NSMidY(r);
+  if ([kind isEqualToString:RDLHandleNorthWest] || [kind isEqualToString:RDLHandleWest] ||
+      [kind isEqualToString:RDLHandleSouthWest])
+    x = NSMinX(r);
+  else if ([kind isEqualToString:RDLHandleNorthEast] || [kind isEqualToString:RDLHandleEast] ||
+           [kind isEqualToString:RDLHandleSouthEast])
+    x = NSMaxX(r);
+  if ([kind isEqualToString:RDLHandleNorthWest] || [kind isEqualToString:RDLHandleNorth] ||
+      [kind isEqualToString:RDLHandleNorthEast])
+    y = NSMinY(r);
+  else if ([kind isEqualToString:RDLHandleSouthWest] || [kind isEqualToString:RDLHandleSouth] ||
+           [kind isEqualToString:RDLHandleSouthEast])
+    y = NSMaxY(r);
+  return NSMakeRect(x - h / 2, y - h / 2, h, h);
+}
+
+NSRect RDLRectResizedByHandle(NSRect r, NSString *kind, NSSize delta, CGFloat least) {
+  BOOL west = [kind isEqualToString:RDLHandleNorthWest] || [kind isEqualToString:RDLHandleWest] ||
+              [kind isEqualToString:RDLHandleSouthWest];
+  BOOL east = [kind isEqualToString:RDLHandleNorthEast] || [kind isEqualToString:RDLHandleEast] ||
+              [kind isEqualToString:RDLHandleSouthEast];
+  BOOL north = [kind isEqualToString:RDLHandleNorthWest] || [kind isEqualToString:RDLHandleNorth] ||
+               [kind isEqualToString:RDLHandleNorthEast];
+  BOOL south = [kind isEqualToString:RDLHandleSouthWest] || [kind isEqualToString:RDLHandleSouth] ||
+               [kind isEqualToString:RDLHandleSouthEast];
+  // Never smaller than `least`, so a box is never dragged inside out.
+  if (west) {
+    CGFloat x = MIN(NSMinX(r) + delta.width, NSMaxX(r) - least);
+    r.size.width = NSMaxX(r) - x;
+    r.origin.x = x;
+  } else if (east) {
+    r.size.width = MAX(NSWidth(r) + delta.width, least);
+  }
+  if (north) {
+    CGFloat y = MIN(NSMinY(r) + delta.height, NSMaxY(r) - least);
+    r.size.height = NSMaxY(r) - y;
+    r.origin.y = y;
+  } else if (south) {
+    r.size.height = MAX(NSHeight(r) + delta.height, least);
+  }
+  return r;
+}
+
+// Which part of `rect` the point is on: a resize handle, the body, or nothing.
+// Only the item showing grips offers them.
+static NSString *RDLHandleAt(NSRect r, NSPoint p, BOOL hasHandles) {
+  for (NSString *kind in hasHandles ? RDLHandleKinds() : @[])
+    if (NSPointInRect(p, RDLHandleRectOfKind(kind, r)))
+      return kind;
   if (NSPointInRect(p, r))
     return RDLHandleMove;
   return nil;
@@ -256,7 +310,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
         *outRect = r;
       return it;
     }
-    NSString *kind = RDLHandleAt(r, point);
+    NSString *kind = RDLHandleAt(r, point, it == _itemWithHandles);
     if (kind) {
       if (outKind)
         *outKind = kind;

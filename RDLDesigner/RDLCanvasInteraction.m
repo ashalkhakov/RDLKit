@@ -43,6 +43,11 @@
   BOOL _marqueeAdds;
 }
 
+// The smallest box a drag makes, in inches, so a grip pulled past the far edge
+// does not turn the item inside out. The editor clamps the result again, to
+// what an item may measure at all.
+static const CGFloat kRDLLeastItemSize = 0.05;
+
 // What a click means when it lands on something: with Shift or Command held,
 // the item joins the selection or leaves it; without, it becomes the selection.
 static BOOL RDLEventToggles(NSEvent *event) {
@@ -248,13 +253,16 @@ static BOOL RDLEventToggles(NSEvent *event) {
       [_ctx.editor moveItem:_dragItems[i] toLeft:was.x + dx top:was.y + dy];
     }
   }
-  else if ([_dragKind isEqualToString:@"se"])
-    [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW + dx height:_origH + dy];
-  else if ([_dragKind isEqualToString:@"e"])
-    [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW + dx height:_origH];
-  else if ([_dragKind isEqualToString:@"s"])
-    [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW height:_origH + dy];
-  else if ([_dragKind isEqualToString:@"tabmove"]) {
+  else if ([RDLHandleKinds() containsObject:_dragKind]) {
+    // The box the grip makes, in inches: a corner moves two edges, a side one,
+    // and the ones on the top and the left move the item as they resize it.
+    NSRect was = NSMakeRect(_origLeft, _origTop, _origW, _origH);
+    NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy), kRDLLeastItemSize);
+    RDLItem *item = [_ctx selectedItem];
+    if (NSMinX(now) != NSMinX(was) || NSMinY(now) != NSMinY(was))
+      [_ctx.editor moveItem:item toLeft:NSMinX(now) top:NSMinY(now)];
+    [_ctx.editor resizeItem:item toWidth:NSWidth(now) height:NSHeight(now)];
+  } else if ([_dragKind isEqualToString:@"tabmove"]) {
     // Nothing is committed while the mouse is down: the drop decides where the
     // column goes, and a half-way rearrangement of every other column on the
     // way is neither useful nor undoable as one step. What is shown meanwhile

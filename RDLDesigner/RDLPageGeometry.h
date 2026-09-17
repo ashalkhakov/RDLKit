@@ -38,9 +38,25 @@ FOUNDATION_EXPORT NSRect RDLRectBetween(NSPoint a, NSPoint b);
 // cell decides where it is and how big it is -- so the canvas must not offer
 // to change them.
 extern NSString * const RDLHandleCell;
-extern NSString * const RDLHandleSouthEast;
+// The eight grips round an item's box, named by the side or corner they are
+// on: a corner moves two edges, a side one, and the ones on the top and the
+// left move the item as they resize it.
+extern NSString * const RDLHandleNorthWest;
+extern NSString * const RDLHandleNorth;
+extern NSString * const RDLHandleNorthEast;
+extern NSString * const RDLHandleWest;
 extern NSString * const RDLHandleEast;
+extern NSString * const RDLHandleSouthWest;
 extern NSString * const RDLHandleSouth;
+extern NSString * const RDLHandleSouthEast;
+// Where each grip sits on `rect`, in the order they are drawn and hit-tested:
+// the four corners first, so a corner wins over the sides it touches.
+FOUNDATION_EXPORT NSArray<NSString *> *RDLHandleKinds(void);
+FOUNDATION_EXPORT NSRect RDLHandleRectOfKind(NSString *kind, NSRect rect);
+// The box a drag from `kind` makes of `rect` when the pointer has moved by
+// `delta`, never smaller than `least` -- which is in the rect's own units,
+// since the canvas resizes in inches and draws in points.
+FOUNDATION_EXPORT NSRect RDLRectResizedByHandle(NSRect rect, NSString *kind, NSSize delta, CGFloat least);
 
 // One band's placement, paired with its key so callers never have to index two
 // parallel arrays (a previous source of drift).
@@ -60,6 +76,10 @@ extern NSString * const RDLHandleSouth;
 // not drawn, and an invisible target over a neighbouring item is exactly what
 // this avoids.
 @property (nonatomic, strong) RDLTablix *engagedTablix;
+// The item whose grips are drawn, and so the only item whose grips can be
+// taken hold of: a grip straddles its edge, and one on an item nobody can see
+// grips would steal clicks from whatever lies beside it.
+@property (nonatomic, strong) RDLItem *itemWithHandles;
 @property (nonatomic, readonly, assign) NSRect paperRect;
 // Paper plus the surrounding margin the canvas leaves around it.
 @property (nonatomic, readonly, assign) NSSize canvasSize;
