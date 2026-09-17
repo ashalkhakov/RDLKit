@@ -1520,6 +1520,64 @@
     XCTFail(@"%@", @"undo should take the colours away");
 }
 
+// A text box grows and shrinks, and hides a value repeated from the row
+// before within a dataset or group it names -- which it is offered by name,
+// and not the data regions, which it cannot name.
+- (void)testATextBoxGrowsShrinksAndHidesDuplicates {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLTablixMember *group = nil;
+  for (RDLTablixMember *member in [tablix.rowHierarchy leafMembers])
+    for (RDLTablixMember *m in [tablix.rowHierarchy pathToMember:member])
+      if (group == nil && [m.groupName length])
+        group = m;
+  RDLTextbox *textbox = (RDLTextbox *)[tablix.tablixBody.rows lastObject].cells[0].item;
+  if (![textbox isKindOfClass:[RDLTextbox class]] || group == nil) {
+    XCTFail(@"%@", @"the sample should have a grouped table with a text box in its last row");
+    return;
+  }
+  [ctx.selection selectItem:textbox inBandWithKey:@"body"];
+  if ([[inspector valueForKey:@"textOptionsBox"] isHidden])
+    XCTFail(@"%@", @"a text box should show its options");
+  NSButton *grow = [inspector valueForKey:@"canGrowCheck"];
+  NSButton *shrink = [inspector valueForKey:@"canShrinkCheck"];
+  BOOL grew = textbox.canGrow;
+  [grow setState:grew ? NSOffState : NSOnState];
+  [inspector changed:grow];
+  [shrink setState:NSOnState];
+  [inspector changed:shrink];
+  NSPopUpButton *scopes = [inspector valueForKey:@"hideDuplicatesPop"];
+  NSArray<NSString *> *offered = [scopes itemTitles];
+  if (![offered containsObject:group.groupName] || ![offered containsObject:tablix.dataSetName] ||
+      [offered containsObject:tablix.name] || [scopes indexOfSelectedItem] != 0)
+    XCTFail(@"the scopes should be the datasets and groups, and none chosen; offers %@", offered);
+  [scopes selectItemWithTitle:group.groupName];
+  [inspector changed:scopes];
+  if (textbox.canGrow == grew || !textbox.canShrink || ![textbox.hideDuplicates isEqualToString:group.groupName])
+    XCTFail(@"%@", @"the options should be written to the text box");
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTextbox *saved = (RDLTextbox *)[back itemNamed:textbox.name inBand:NULL];
+  if (saved == nil)
+    for (RDLItem *it in [back allItemsIncludingNested])
+      if ([it.name isEqualToString:textbox.name])
+        saved = (RDLTextbox *)it;
+  if (saved.canGrow == grew || !saved.canShrink || ![saved.hideDuplicates isEqualToString:group.groupName])
+    XCTFail(@"%@", @"the options should survive a save");
+  [ctx.document.undoManager undo];
+  if (textbox.hideDuplicates != nil)
+    XCTFail(@"%@", @"undo should show every value again");
+  [scopes selectItemAtIndex:0];
+  if ([scopes indexOfSelectedItem] != 0)
+    XCTFail(@"%@", @"the popup should come back to showing every value");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

@@ -131,6 +131,11 @@
 @property (nonatomic, strong) IBOutlet NSView *tablixOptionsBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *noRowsMessageField;
 @property (nonatomic, strong) IBOutlet NSButton *noRowsMessageExprButton;
+// A text box's growing and shrinking, and the scope within which a value
+// repeated from the row before is hidden.
+@property (nonatomic, strong) IBOutlet NSView *textOptionsBox;
+@property (nonatomic, strong) IBOutlet NSButton *canGrowCheck, *canShrinkCheck;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *hideDuplicatesPop;
 // A chart's own settings: how its series combine, its colours, where its title
 // and legend go, and what it says with no data.
 @property (nonatomic, strong) IBOutlet NSView *chartOptionsBox;
@@ -230,8 +235,8 @@
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox, _cellBox, _nameBox, _visibilityBox,
-                 _linkBox, _keepBox, _pageBox ];
+                 _textOptionsBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
+                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
@@ -445,6 +450,10 @@
                            @[ @"omitBorderCheck", @"omitBorderOnPageBreak" ] ])
     [_bindings bind:[self valueForKey:pair[0]] keyPath:pair[1] scope:RDLFieldScopeItem
                kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_canGrowCheck keyPath:@"canGrow" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_canShrinkCheck keyPath:@"canShrink" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
   [_bindings bind:_printOnFirstPageCheck keyPath:@"printOnFirstPage" scope:RDLFieldScopeBand
              kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
   [_bindings bind:_printOnLastPageCheck keyPath:@"printOnLastPage" scope:RDLFieldScopeBand
@@ -786,7 +795,9 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // their contents depend on it rather than being fixed at build time.
     if ([it isKindOfClass:[RDLTextbox class]]) {
       [boxes addObject:_textBox];
-        [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+      [boxes addObject:_textOptionsBox];
+      [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+      [self rebuildHideDuplicatesPopFor:(RDLTextbox *)it];
     } else if ([it isKindOfClass:[RDLLine class]]) {
       [boxes addObject:_lineBox];
     } else if ([it isKindOfClass:[RDLRectangle class]]) {
@@ -881,6 +892,38 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 // The text boxes that could toggle `it`: every one in the report but itself,
 // by name, after None. A ToggleItem naming something else -- a text box the
 // report no longer has -- is listed too, so showing it does not lose it.
+// The scopes a text box can hide repeated values within: the report's
+// datasets and groups, by name, and whatever the file names that is not one.
+- (void)rebuildHideDuplicatesPopFor:(RDLTextbox *)textbox {
+  [_hideDuplicatesPop removeAllItems];
+  [_hideDuplicatesPop addItemWithTitle:@"Nothing: show every value"];
+  NSMutableArray<NSString *> *scopes = [NSMutableArray array];
+  NSSet<NSString *> *regions = [NSSet setWithArray:[[[_context.report allItemsIncludingNested]
+      filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id item, NSDictionary *bindings) {
+        (void)bindings;
+        return [item isKindOfClass:[RDLDataRegion class]];
+      }]] valueForKey:@"name"]];
+  for (NSString *scope in [[[_context.report scopeNames] allObjects] sortedArrayUsingSelector:@selector(compare:)])
+    if (![regions containsObject:scope])
+      [scopes addObject:scope];
+  NSString *current = textbox.hideDuplicates;
+  if ([current length] && ![scopes containsObject:current])
+    [scopes addObject:current];
+  for (NSString *scope in scopes)
+    [[_hideDuplicatesPop menu] addItemWithTitle:scope action:NULL keyEquivalent:@""];
+  [_hideDuplicatesPop selectItemAtIndex:[current length] ? (NSInteger)[scopes indexOfObject:current] + 1 : 0];
+}
+
+- (BOOL)applyHideDuplicatesControl:(id)sender item:(RDLItem *)it {
+  if (sender != _hideDuplicatesPop || ![it isKindOfClass:[RDLTextbox class]])
+    return NO;
+  NSString *scope = [_hideDuplicatesPop indexOfSelectedItem] > 0 ? [_hideDuplicatesPop titleOfSelectedItem] : nil;
+  NSString *was = [(RDLTextbox *)it hideDuplicates];
+  if (!(scope == was || [scope isEqualToString:was]))
+    [_context.editor setValue:scope forKeyPath:@"hideDuplicates" ofItem:it];
+  return YES;
+}
+
 - (void)rebuildTogglePopFor:(RDLItem *)it {
   [_toggleItemPop removeAllItems];
   [_toggleItemPop addItemWithTitle:@"None"];
@@ -1105,7 +1148,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
   if ([self applyCellControl:sender] || [self applyRowHeightControl:sender] ||
-      [self applyToggleControl:sender item:it])
+      [self applyToggleControl:sender item:it] || [self applyHideDuplicatesControl:sender item:it])
     return;
   [self applyPaperControl:sender];
 }

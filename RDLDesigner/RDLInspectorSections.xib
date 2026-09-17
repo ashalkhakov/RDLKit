@@ -71,6 +71,10 @@
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
                 <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
+                <outlet property="textOptionsBox" destination="textOptionsBox" id="textOptionsBoxOutlet"/>
+                <outlet property="canGrowCheck" destination="canGrowCheck" id="canGrowCheckOutlet"/>
+                <outlet property="canShrinkCheck" destination="canShrinkCheck" id="canShrinkCheckOutlet"/>
+                <outlet property="hideDuplicatesPop" destination="hideDuplicatesPop" id="hideDuplicatesPopOutlet"/>
                 <outlet property="chartOptionsBox" destination="chartOptionsBox" id="chartOptionsBoxOutlet"/>
                 <outlet property="chartSubtypePop" destination="chartSubtypePop" id="chartSubtypePopOutlet"/>
                 <outlet property="chartPalettePop" destination="chartPalettePop" id="chartPalettePopOutlet"/>
@@ -723,6 +727,54 @@
                         <action selector="changed:" target="-2" id="printOnLastPageCheckAction"/>
                     </connections>
                 </button>
+            </subviews>
+        </customView>
+        <customView id="textOptionsBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="76"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <button toolTip="Whether the box grows taller to fit its text" id="canGrowCheck">
+                    <rect key="frame" x="10" y="4" width="114" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Can grow" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="canGrowCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="canGrowCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Whether the box shrinks to fit its text" id="canShrinkCheck">
+                    <rect key="frame" x="136" y="4" width="114" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Can shrink" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="canShrinkCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="canShrinkCheckAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblHideDuplicates">
+                    <rect key="frame" x="10" y="30" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Hide a value repeated from the row before, within" id="lblHideDuplicatesCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="A dataset or group within which a value the same as the one before is left out" id="hideDuplicatesPop">
+                    <rect key="frame" x="10" y="46" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="hideDuplicatesPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="hideDuplicatesPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="hideDuplicatesPopAction"/>
+                    </connections>
+                </popUpButton>
             </subviews>
         </customView>
         <customView id="chartOptionsBox">

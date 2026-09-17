@@ -133,7 +133,7 @@ UI.
 | Data | Dataset filters | Filters… (field or expression / 14 operators / values or expression) |
 | Data | Query parameters, collation and sensitivities | — |
 | Items | Insert Textbox, Line, Rectangle, Image, Chart, Tablix, Subreport | Yes (palette / Add Element…) |
-| Items | Insert into Rectangle or tablix cell | Textbox, Line, Rectangle, Image, Subreport (no data regions — a limit the engine lifted in P0.10, still enforced by `RDLItemFactory` and a test) |
+| Items | Insert into Rectangle or tablix cell | Every kind, data regions included |
 | Items | Drag a field/parameter/global onto the canvas | Yes → bound textbox in a band |
 | Items | Position, size | Fields + drag; snap fixed at 0.05in; hidden for in-cell items |
 | Items | ZIndex / front-back | — (written and honoured at render; the canvas ignores it) |
@@ -149,7 +149,7 @@ UI.
 | Style | Expressions | f(x) on 9 of the 27 style expressions |
 | Textbox | Value / expression | Yes; in-place double-click |
 | Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
-| Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | — |
+| Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | Yes |
 | Image | Source, Value, Sizing | Embedded/External only; Value has no f(x) |
 | Line | Colour, thickness, dash | Ink, thickness (with f(x)) and a dash list of None/Dotted/Dashed/Solid, all three on the border the line is drawn with (P1.1). No colour well, and no expression on the ink or the dash. |
 | Subreport | `ReportName`, status, Parameters…, Edit Subreport… | Yes; `NoRowsMessage`/`MergeTransactions`/`OmitBorderOnPageBreak` — |
@@ -243,8 +243,7 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `CanGrow` | UI | Spec default false. |
-| `CanShrink`, `HideDuplicates` | UI (was MODEL) | `HideDuplicates` names a scope, so it needs a dataset/group picker. |
+| `CanGrow`, `CanShrink`, `HideDuplicates` | Done | The text box's options section; repeated values are hidden within a dataset or group picked by name. |
 | `ToggleImage`, `UserSort` | MODEL | |
 | Per-run style expressions, `MarkupType`, run `ActionInfo`/`ToolTip`/`Label` | UI (was MODEL) | Kept through the editor; not editable. |
 | Paragraph indents, spacing, lists | UI (was MODEL) | Shown and kept in the editor; no ruler, list or indent controls. |
@@ -477,7 +476,7 @@ In rough order of how often a Report Builder user reaches for it:
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
    Done: all of it.
-7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.
+7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`. Done.
 8. Image: `Database`, `MIMEType`, embedded images panel with file import.
 9. Expressions: live `RDLChecker` in the editor, parser warnings on open,
    completion from the catalogue including `ReportItems!`/`Variables!`/
