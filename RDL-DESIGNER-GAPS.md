@@ -330,7 +330,8 @@ not yet keep that.
 | Feature | Bin | Notes |
 |---|---|---|
 | Semantic checking in the expression editor | Done | The editor checks the expression as it is written, against the dataset the item reads, and says the first problem and how many more. |
-| An errors pane for the whole report; checking before save or export | UI | Export checks parameter problems only. |
+| An errors pane for the whole report | Done | The Problems tab: everything RDLChecker finds, errors first, each row leading to what it is about, checked again as the report changes. |
+| Checking before save or export | UI | Export checks parameter problems only. |
 | Completion from `RDLExpressionCatalog` | Done | Every function the catalogue lists completes, with the language's own words. |
 | Completion of `ReportItems!`, `Variables!`, `Code.` | Done | Text boxes, report and group variables, and the code's functions (not its subs), in completion and in the editor's picker. |
 | Showing the parser's `warnings` on open | Done | Said once in a sheet when the window opens: the first eight as sentences and a count of the rest. |
@@ -500,6 +501,8 @@ a grouping pane replacing the modal editor; a full properties grid; drag
 reordering in the outline; editable source with re-parse; print and page
 navigation in the preview, with data binding and subreport loading; a
 report-wide errors pane.
+
+Done: the errors pane, as the left pane's Problems tab.
 
 ### P3 — matches the engine's P3
 

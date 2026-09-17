@@ -309,6 +309,10 @@
 		611AD764BDEFE0B6717F4F33 /* RDLMigration2008.m in Sources */ = {isa = PBXBuildFile; fileRef = EFE8C64980075081596BC4B5 /* RDLMigration2008.m */; };
 		9412C602DD236B7DD82B9366 /* RDLMigration2010.m in Sources */ = {isa = PBXBuildFile; fileRef = 0B62C60175108DC93648591A /* RDLMigration2010.m */; };
 		D6627D0594A725B37226D7FF /* RDLUpgraderRepairs.m in Sources */ = {isa = PBXBuildFile; fileRef = 43CEC6B322C51E22EBE8D05C /* RDLUpgraderRepairs.m */; };
+		A94D5ADEA56B3F6E6C89B9F4 /* RDLProblemsView.m in Sources */ = {isa = PBXBuildFile; fileRef = F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */; };
+		B6B7CD157690D1986C0E45A1 /* RDLProblemsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */; };
+		B5B8648EE3C969F76D5931E7 /* RDLProblemsView.m in Sources */ = {isa = PBXBuildFile; fileRef = F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */; };
+		3909301127020DFAF9384DB2 /* RDLProblemsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -647,6 +651,9 @@
 		EFE8C64980075081596BC4B5 /* RDLMigration2008.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2008.m; sourceTree = "<group>"; };
 		0B62C60175108DC93648591A /* RDLMigration2010.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2010.m; sourceTree = "<group>"; };
 		43CEC6B322C51E22EBE8D05C /* RDLUpgraderRepairs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpgraderRepairs.m; sourceTree = "<group>"; };
+		2E114B48550391EB427D2967 /* RDLProblemsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLProblemsView.h; sourceTree = "<group>"; };
+		F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLProblemsView.m; sourceTree = "<group>"; };
+		13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLProblemsView.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -870,6 +877,9 @@
 				F05064A40710BB2A343D63B7 /* RDLStylePanel.h */,
 				594AF7538A8824886341645D /* RDLStylePanel.m */,
 				65B5D62EC5CCC1AEDA4F2673 /* RDLStylePanel.xib */,
+				2E114B48550391EB427D2967 /* RDLProblemsView.h */,
+				F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */,
+				13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1267,6 +1277,7 @@
 				68D54DA6130BE09B7215F8F2 /* RDLVariablesEditor.xib in Resources */,
 				8C9272DC1070E484E6B1F77A /* RDLCodeEditor.xib in Resources */,
 				BCB81A843A4B6DABCF7327DC /* RDLStylePanel.xib in Resources */,
+				3909301127020DFAF9384DB2 /* RDLProblemsView.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1309,6 +1320,7 @@
 				4BAEBADAEAF9F16B31633C3D /* RDLVariablesEditor.xib in Resources */,
 				9B3291C2316B2BBE08AA13A3 /* RDLCodeEditor.xib in Resources */,
 				F3EBBC2F011CBAE5CED1F5EF /* RDLStylePanel.xib in Resources */,
+				B6B7CD157690D1986C0E45A1 /* RDLProblemsView.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1405,6 +1417,7 @@
 				E5008894616A4468A567B2B3 /* RDLVariablesEditor.m in Sources */,
 				5C5DA4998CE2C8EE0335C889 /* RDLCodeEditor.m in Sources */,
 				8B562660F1ED9721D7672B15 /* RDLStylePanel.m in Sources */,
+				A94D5ADEA56B3F6E6C89B9F4 /* RDLProblemsView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1483,6 +1496,7 @@
 				7967EE35BA9D6718827904FF /* RDLVariablesEditor.m in Sources */,
 				CD435E0DBE4DAC360B27EC72 /* RDLCodeEditor.m in Sources */,
 				FB5180CD8C03DBD53D549D68 /* RDLStylePanel.m in Sources */,
+				B5B8648EE3C969F76D5931E7 /* RDLProblemsView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

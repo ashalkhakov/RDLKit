@@ -26,6 +26,10 @@ typedef NS_ENUM(NSInteger, RDLDiagnosticSeverity) {
 @property (nonatomic, copy) NSString *message;
 // Where in the report, in a form a person can find: "Body / Textbox 'Total' / Value".
 @property (nonatomic, copy) NSString *path;
+// The report item the complaint is about, by name, so what is looking at the
+// report can show it; nil when it is about the report itself, a dataset or a
+// parameter rather than something drawn.
+@property (nonatomic, copy) NSString *itemName;
 // The expression the complaint is about, as it was written.
 @property (nonatomic, copy) NSString *source;
 // "unknown-field", "unknown-function", "arity", "type", "scope", "syntax",

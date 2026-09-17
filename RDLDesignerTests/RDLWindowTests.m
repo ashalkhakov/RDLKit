@@ -17,6 +17,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLProblemsView.h"
 #import "RDLValueListEditor.h"
 #import "RDLDatasetOptionsEditor.h"
 #import "RDLParameterNavigator.h"
@@ -401,7 +402,7 @@ static NSTabView *_centerTabViewOf(id wc) {
     return;
   }
   // Outline, Datasets, Insert on the left; Report and Attributes on the right.
-  if ([[leftBar tabBarItems] count] != 3 || [[rightBar tabBarItems] count] != 2)
+  if ([[leftBar tabBarItems] count] != 4 || [[rightBar tabBarItems] count] != 2)
     XCTFail(@"%@", [NSString stringWithFormat:@"the bars hold %lu and %lu items",
                                               (unsigned long)[[leftBar tabBarItems] count],
                                               (unsigned long)[[rightBar tabBarItems] count]]);
@@ -1524,6 +1525,76 @@ static NSTabView *_centerTabViewOf(id wc) {
   [ctx.document.undoManager undo];
   if (![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
     XCTFail(@"%@", @"an untouched panel should record nothing");
+}
+
+// The problems pane lists what is wrong with the whole report, errors first,
+// says how many, takes a row to what it is about, and follows the report as it
+// is edited.
+- (void)testTheProblemsPaneListsAndLeadsToWhatIsWrong {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Broken"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  ds.dataSourceName = @"Inline";
+  [ds setFieldNames:@[ @"Amount" ]];
+  [report.dataSets addObject:ds];
+  RDLTextbox *sound = [[RDLTextbox alloc] init];
+  sound.name = @"Sound";
+  sound.value = @"=Sum(Fields!Amount.Value)";
+  sound.width = 2;
+  sound.height = 0.3;
+  RDLTextbox *broken = [[RDLTextbox alloc] init];
+  broken.name = @"Broken";
+  broken.value = @"=Fields!Nope.Value";
+  broken.top = 0.5;
+  broken.width = 2;
+  broken.height = 0.3;
+  [report.body.items addObjectsFromArray:@[ sound, broken ]];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLProblemsView *pane = [[RDLProblemsView alloc] initWithFrame:NSMakeRect(0, 0, 260, 300) context:ctx];
+
+  RDLDiagnostic *first = [pane.problems firstObject];
+  if ([pane.problems count] == 0 || first.severity != RDLDiagnosticSeverityError ||
+      ![first.itemName isEqualToString:@"Broken"] || [pane.status rangeOfString:@"error"].location == NSNotFound)
+    XCTFail(@"the field that is not there should be listed first: %@ / %@", pane.status,
+            [pane.problems valueForKey:@"message"]);
+  NSTableView *table = [pane valueForKey:@"table"];
+  if ([table numberOfRows] != (NSInteger)[pane.problems count])
+    XCTFail(@"%@", @"the table should show a row for each problem");
+
+  // A row leads to what it is about.
+  [table selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+  [pane rowClicked:table];
+  if ([ctx selectedItem] != broken)
+    XCTFail(@"choosing the problem should select the text box, selects %@", [ctx selectedItem].name);
+
+  // Put right, the pane says so -- after the report is edited, not before.
+  [ctx.editor setValue:@"=Sum(Fields!Amount.Value)" forKeyPath:@"value" ofItem:broken];
+  [pane check];
+  if ([pane.problems count] || [pane.status rangeOfString:@"Nothing"].location == NSNotFound)
+    XCTFail(@"a sound report should report nothing, says %@ (%@)", pane.status,
+            [pane.problems valueForKey:@"message"]);
+  // Errors come before warnings, whatever order the checker walks in.
+  RDLTextbox *late = [[RDLTextbox alloc] init];
+  late.name = @"Late";
+  late.value = @"=Frobnicate(1)";
+  late.top = 1;
+  late.width = 2;
+  late.height = 0.3;
+  [report.body.items addObject:late];
+  // A language no machine here knows is a warning, wherever it is walked.
+  report.language = [RDLValue literal:@"zz-ZZ"];
+  [pane check];
+  BOOL sawWarningBeforeError = NO, sawWarning = NO;
+  for (RDLDiagnostic *d in pane.problems) {
+    sawWarning = sawWarning || d.severity == RDLDiagnosticSeverityWarning;
+    if (sawWarning && d.severity == RDLDiagnosticSeverityError)
+      sawWarningBeforeError = YES;
+  }
+  if ([pane.problems count] < 2 || sawWarningBeforeError)
+    XCTFail(@"errors should come before warnings: %@", [pane.problems valueForKey:@"message"]);
 }
 
 // Changing a parameter in the generator shows up in what it renders: the value

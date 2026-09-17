@@ -15,6 +15,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLDataSourceNavigator.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLProblemsView.h"
 #import "RDLParameterNavigator.h"
 #import "RDLDataSourceView.h"
 #import "RDLDatasetFieldsView.h"
@@ -81,6 +82,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
 @property (nonatomic, strong) IBOutlet NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
+@property (nonatomic, strong) IBOutlet NSView *problemsHost;
+// What is wrong with the report, listed beside the ways into it.
+@property (nonatomic, strong) RDLProblemsView *problemsView;
 // Data sources sit above the datasets, which is the order they are made in: a
 // source says where data comes from, and a dataset then names one.
 @property (nonatomic, strong) IBOutlet NSView *dataSourceNavigatorHost, *dataSourceHost;
@@ -726,6 +730,10 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _reportInspector.showsReportOnly = YES;
   RDLFillHost(_reportInspectorHost, _reportInspector);
 
+  // What is wrong with the whole report, beside the ways into it.
+  _problemsView = [[RDLProblemsView alloc] initWithFrame:[_problemsHost bounds] context:_context];
+  RDLFillHost(_problemsHost, _problemsView);
+
   _datasetNavigator = [[RDLDatasetNavigator alloc] initWithFrame:[_datasetNavigatorHost bounds]
                                                          context:_context];
   _datasetNavigator.delegate = self;
@@ -894,6 +902,7 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
     @[ @"I", @"Insert", @0.32, @0.60, @0.53 ],
+    @[ @"P", @"Problems", @0.72, @0.42, @0.40 ],
   ]);
   // Report first -- page size and margins, which belong to the document rather
   // than to anything in it -- then the attributes of whatever is selected.

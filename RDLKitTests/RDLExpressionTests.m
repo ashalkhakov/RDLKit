@@ -528,6 +528,34 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     XCTFail(@"%@", [NSString stringWithFormat:@"evaluate → %@", [e evaluateTextInScope:scope]]);
 }
 
+// A complaint about something drawn names it, so what shows the report can
+// show what the complaint is about.
+- (void)testDiagnosticsNameTheItemTheyAreAbout {
+  RDLReport *r = RDLCheckableReport();
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Total";
+  box.value = @"=Fields!Nope.Value";
+  box.width = 2;
+  box.height = 0.3;
+  [r.body.items addObject:box];
+  RDLDiagnostic *found = nil;
+  for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+    if ([d.rule isEqualToString:@"unknown-field"])
+      found = d;
+  if (![found.itemName isEqualToString:@"Total"])
+    XCTFail(@"the complaint should name the text box, names %@ at %@", found.itemName, found.path);
+  // What is not about anything drawn names nothing.
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Year2";
+  p.prompt = @"Year";
+  p.dataType = RDLParameterDataTypeInteger;
+  p.defaultValue = [RDLValue valueWithSource:@"=Fields!Nope.Value"];
+  [r.parameters addObject:p];
+  for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+    if ([d.path rangeOfString:@"Parameter"].location != NSNotFound && [d.itemName length])
+      XCTFail(@"a parameter's complaint should name no item, names %@", d.itemName);
+}
+
 // One expression checked where it would be written -- against a dataset
 // named, or the report's only one -- as an editor asks while it is typed.
 - (void)testOneExpressionIsChecked {

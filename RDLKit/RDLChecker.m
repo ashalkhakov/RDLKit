@@ -447,6 +447,8 @@ static NSSet *RDLKnownGlobals(void) {
 // parameter's default and valid values are worked out in the order the
 // parameters are declared, so they see only those before it.
 @property (nonatomic, copy) NSSet<NSString *> *parametersDeclaredBefore;
+// The innermost report item being checked, by name; nil outside one.
+@property (nonatomic, copy) NSString *itemName;
 @end
 @implementation RDLScope
 - (RDLType *)record {
@@ -466,6 +468,7 @@ static void RDLReportDiagnostic(RDLCheckRun *run, RDLDiagnosticSeverity sev, NSS
   d.severity = sev;
   d.rule = rule;
   d.path = scope.path;
+  d.itemName = scope.itemName;
   d.source = source;
   d.message = message;
   [run.out addObject:d];
@@ -480,6 +483,7 @@ static RDLScope *RDLScopeOfDataSet(RDLDataSet *dataSet, RDLScope *outer) {
   s.table = RDLTableType(RDLRecordOfDataSet(dataSet));
   s.path = outer.path;
   s.insideBody = outer.insideBody;
+  s.itemName = outer.itemName;
   return s;
 }
 
@@ -905,6 +909,7 @@ static RDLScope *RDLSubScope(RDLScope *outer, NSString *step, RDLDataSet *ds) {
   s.path = [outer.path length] ? [NSString stringWithFormat:@"%@ / %@", outer.path, step] : step;
   s.insideBody = outer.insideBody;
   s.parametersDeclaredBefore = outer.parametersDeclaredBefore;
+  s.itemName = outer.itemName;
   return s;
 }
 
@@ -1082,6 +1087,7 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
       ds = [outer.report dataSetNamed:name];
       if (ds == nil) {
         RDLScope *s = RDLSubScope(outer, step, nil);
+        s.itemName = item.name;
         RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"unknown-dataset", s, nil,
                    [NSString stringWithFormat:@"no dataset named '%@'", name]);
       }
@@ -1091,6 +1097,7 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
     }
   }
   RDLScope *scope = RDLSubScope(outer, step, ds);
+  scope.itemName = item.name;
 
   RDLCheckValue(item.hidden, scope, run);
   RDLCheckValue(item.hyperlink, scope, run);
