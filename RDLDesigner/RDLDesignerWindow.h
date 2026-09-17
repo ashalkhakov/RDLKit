@@ -6,6 +6,7 @@
 #import "RDLDatasetFieldsView.h"
 
 @class RDLEditingContext;
+@class RDLReport;
 @class RDLSubreport;
 
 // The navigators' delegate. Two things in a report are edited rather than
@@ -17,6 +18,10 @@
                                                   RDLDatasetFieldsViewDelegate>
 @property (nonatomic, readonly, strong) RDLEditingContext *context;
 - (instancetype)initWithContext:(RDLEditingContext *)context;
+// What reading a report noted -- parts kept to write back but not edited
+// here, placeholders for items this kit does not draw -- as a message to show
+// once the window is open. nil when reading it noted nothing.
++ (NSString *)openingNotesForReport:(RDLReport *)report;
 - (void)showPreview:(id)sender;
 - (void)toggleDesignPreview:(id)sender;
 - (void)exportPDF:(id)sender;

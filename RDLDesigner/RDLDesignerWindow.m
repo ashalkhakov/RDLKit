@@ -98,8 +98,13 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSButton *paletteCancelButton;
 @end
 
+// How many of a report's notes the opening message lists before it counts
+// the rest.
+static const NSUInteger kRDLOpeningNotesShown = 8;
+
 @implementation RDLDesignerWindow {
   BOOL _sourceNeedsRewrite;
+  BOOL _presentedOpeningNotes;
   RDLExpressionFieldEditor *_fieldEditor;
 }
 
@@ -230,6 +235,40 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
   [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
   [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
+  // Once the window is on screen, not while it is being put there.
+  [self performSelector:@selector(presentOpeningNotes) withObject:nil afterDelay:0];
+}
+
++ (NSString *)openingNotesForReport:(RDLReport *)report {
+  NSArray<NSString *> *notes = report.warnings;
+  if ([notes count] == 0)
+    return nil;
+  NSMutableArray<NSString *> *lines = [NSMutableArray array];
+  for (NSString *note in notes) {
+    if ([lines count] == kRDLOpeningNotesShown)
+      break;
+    NSString *sentence = [note length] ? [[[note substringToIndex:1] uppercaseString]
+                                             stringByAppendingString:[note substringFromIndex:1]]
+                                       : note;
+    [lines addObject:[NSString stringWithFormat:@"• %@", sentence]];
+  }
+  if ([notes count] > kRDLOpeningNotesShown)
+    [lines addObject:[NSString stringWithFormat:@"… and %lu more.",
+                                                (unsigned long)([notes count] - kRDLOpeningNotesShown)]];
+  return [lines componentsJoinedByString:@"\n"];
+}
+
+// What reading the report noted, said once, on a window someone can see.
+- (void)presentOpeningNotes {
+  NSString *notes = [RDLDesignerWindow openingNotesForReport:_context.report];
+  if (_presentedOpeningNotes || notes == nil || ![[self window] isVisible])
+    return;
+  _presentedOpeningNotes = YES;
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:@"Some of this report is kept as it was written"];
+  [alert setInformativeText:notes];
+  [alert addButtonWithTitle:@"OK"];
+  [alert beginSheetModalForWindow:[self window] completionHandler:nil];
 }
 
 // The outline mirrors the report tree, so it only needs rebuilding when the

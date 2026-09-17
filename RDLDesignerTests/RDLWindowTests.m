@@ -1434,6 +1434,30 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"the report should print every value given, prints %@", printed);
 }
 
+// What reading a report noted is said when it opens: each note as a sentence,
+// the first few of many and a count of the rest; nothing for a report that
+// read cleanly.
+- (void)testWhatReadingNotedIsSaid {
+  if ([RDLDesignerWindow openingNotesForReport:[RDLSamples atelierInvoice]] != nil)
+    XCTFail(@"%@", @"a sample that reads cleanly has nothing to say");
+  NSString *xml = @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition\">"
+                  @"<ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+                  @"<GaugePanel Name=\"Dial\"><Top>0in</Top><Left>0in</Left><Height>1in</Height><Width>1in</Width>"
+                  @"</GaugePanel></ReportItems></Body><Width>6in</Width><Page/></ReportSection></ReportSections></Report>";
+  RDLReport *gauged = [RDLParser reportFromXMLString:xml error:NULL];
+  NSString *notes = [RDLDesignerWindow openingNotesForReport:gauged];
+  if ([gauged.warnings count] == 0 || ![notes hasPrefix:@"• "] ||
+      [notes rangeOfString:@"Dial"].location == NSNotFound)
+    XCTFail(@"the gauge kept as a placeholder should be said, notes read %@ from %@", notes, gauged.warnings);
+  RDLReport *noisy = [RDLReport emptyReportNamed:@"Noisy"];
+  for (NSUInteger i = 0; i < 11; i++)
+    [noisy.warnings addObject:[NSString stringWithFormat:@"note %lu", (unsigned long)i]];
+  NSString *many = [RDLDesignerWindow openingNotesForReport:noisy];
+  if ([[many componentsSeparatedByString:@"\n"] count] != 9 || ![many hasSuffix:@"and 3 more."] ||
+      ![many hasPrefix:@"• Note 0"])
+    XCTFail(@"eight notes and a count of the rest should be said, reads %@", many);
+}
+
 // Changing a parameter in the generator shows up in what it renders: the value
 // is applied when it is given, and the preview is laid out again with it.
 - (void)testAParameterAppliesToWhatTheGeneratorRenders {

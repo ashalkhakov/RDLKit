@@ -332,7 +332,7 @@ not yet keep that.
 | An errors pane for the whole report; checking before save or export | UI | Export checks parameter problems only. |
 | Completion from `RDLExpressionCatalog` | UI | The completion list is separate and lacks most P1 functions. |
 | Completion of `ReportItems!`, `Variables!`, `Code.` | UI (was MODEL) | The engine resolves all three. |
-| Showing the parser's `warnings` on open | UI | Placeholders, kept pieces and undrawable chart kinds are recorded and never shown. |
+| Showing the parser's `warnings` on open | Done | Said once in a sheet when the window opens: the first eight as sentences and a count of the rest. |
 
 ### 4.11 Canvas and editing (CANVAS bin)
 
