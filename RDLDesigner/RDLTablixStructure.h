@@ -80,6 +80,11 @@ typedef NS_ENUM(NSInteger, RDLGroupPlacement) {
                  apply:(BOOL)apply;
 // A merged cell back into cells of its own, each it uncovers holding an empty
 // text box. NO for a cell that is not merged.
+// The corner cell at a corner row and column, made -- with every other cell
+// the corner is short of, one row per level of column headings and one cell
+// per level of row headers -- when the file wrote none. nil past the corner.
++ (RDLTablixCell *)makeCornerCellAtRow:(NSUInteger)row column:(NSUInteger)column inTablix:(RDLTablix *)tablix;
+
 + (BOOL)splitCellAtRow:(NSUInteger)row
                 column:(NSUInteger)column
               inTablix:(RDLTablix *)tablix

@@ -178,6 +178,13 @@ FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
 // The TablixCell at that place in the grid, or nil when the column is a
 // row-header column -- those belong to the row hierarchy, not to the body.
 + (RDLTablixCell *)cellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
+// Whether a grid position is the corner's -- over the row-header columns, in a
+// column-heading row, or in a table's heading row where no row member has a
+// header -- and which corner row it is. The corner column is the grid column.
++ (BOOL)tablix:(RDLTablix *)tablix isCornerAtRow:(NSUInteger)row column:(NSUInteger)column cornerRow:(NSUInteger *)outRow;
+// The corner cell there, or nil when the position is not the corner's or the
+// file wrote no cell for it.
++ (RDLTablixCell *)cornerCellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
 // Which body column a grid column is, or -1 for a row-header column. The grid
 // counts the header columns first, and everything that edits a column spec
 // counts only the body's.

@@ -189,8 +189,8 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
     return;
   [_editor beginGroup:[NSString stringWithFormat:@"Add %@", RDLTitleOfItemKind(kind)]];
   [self giveDataSetTo:item];
-  if (point.cell != nil) {
-    [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+  if (point.cellTablix != nil) {
+    [self addItem:item toCell:[self cellAtPoint:point] ofTablix:point.cellTablix bandKey:point.bandKey];
     [_editor endGroup];
     return;
   }
@@ -219,7 +219,17 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
 // in a cell also resolves to a cell, but that one is full.
 - (RDLInsertionPoint *)selectedEmptyCell {
   RDLInsertionPoint *point = [self insertionPoint];
-  return point.cell != nil && point.cell.item == nil ? point : nil;
+  return point.cellTablix != nil && point.cell.item == nil ? point : nil;
+}
+
+// The cell a point is in -- made first, for a corner the file wrote no cell
+// for. Call inside the undo group of what goes in it.
+- (RDLTablixCell *)cellAtPoint:(RDLInsertionPoint *)point {
+  if (point.cell != nil || point.cornerRow < 0)
+    return point.cell;
+  return [_editor makeCornerCellAtRow:(NSUInteger)point.cornerRow
+                               column:(NSUInteger)point.cornerColumn
+                             ofTablix:point.cellTablix];
 }
 
 - (RDLTextbox *)blankTextboxForSelectedCell {
@@ -242,7 +252,9 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   RDLInsertionPoint *point = [self selectedEmptyCell];
   if (point == nil || item == nil)
     return NO;
-  [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+  [_editor beginGroup:nil];
+  [self addItem:item toCell:[self cellAtPoint:point] ofTablix:point.cellTablix bandKey:point.bandKey];
+  [_editor endGroup];
   return YES;
 }
 
@@ -303,6 +315,10 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
       // before the body's own.
       row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:bodyRow];
       column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn];
+    } else if ([tablix getCornerRow:&bodyRow column:&bodyColumn ofCell:cell]) {
+      // The corner is the grid's top left, row for row and column for column.
+      row = (NSInteger)bodyRow;
+      column = (NSInteger)bodyColumn;
     }
     [_editor setItem:nil inCell:cell ofTablix:tablix];
     [_selection selectCellOfTablix:tablix row:row column:column inBandWithKey:_selection.bandKey];
@@ -359,9 +375,9 @@ static NSString * const kRDLItemPboardType = @"com.rdlkit.item-xml";
   [RDLItemFactory renameTreeUniquely:item inReport:self.report];
   // Into the cell, when that is what is selected: a cell holds one item, and
   // where it sits is the cell's business, so there is nothing to offset.
-  if (point.cell != nil) {
+  if (point.cellTablix != nil) {
     [_editor beginGroup:@"Paste"];
-    [_editor setItem:item inCell:point.cell ofTablix:point.cellTablix];
+    [_editor setItem:item inCell:[self cellAtPoint:point] ofTablix:point.cellTablix];
     [_editor endGroup];
     [_selection selectItem:item inBandWithKey:point.bandKey];
     return;

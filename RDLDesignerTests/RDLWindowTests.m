@@ -3054,6 +3054,49 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   [editor commit];
 }
 
+// The corner's text box is typed into like a body cell's, and Tab goes on
+// from it to the body's first, and back.
+- (void)testTheCornerIsTypedIntoInPlace {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *matrix = RDLFirstTablixOf(report);
+  RDLItem *corner = [RDLTablixGeometry itemOf:matrix inRow:0 column:0];
+  RDLItem *first = nil;
+  for (RDLTablixRow *row in matrix.tablixBody.rows)
+    for (RDLTablixCell *cell in row.cells)
+      if (first == nil && [cell.item isKindOfClass:[RDLTextbox class]])
+        first = cell.item;
+  if (![corner isKindOfClass:[RDLTextbox class]] || first == nil) {
+    XCTFail(@"%@", @"the matrix should have a text box in its corner and its body");
+    return;
+  }
+  RDLInPlaceEditor *editor = [canvas valueForKey:@"inPlaceEditor"];
+  [editor beginEditingItem:corner];
+  if (editor.editingItem != corner) {
+    XCTFail(@"the corner's text box should be edited, not %@", editor.editingItem);
+    return;
+  }
+  NSTextField *field = [editor valueForKey:@"editorField"];
+  [field setStringValue:@"Where \\ When"];
+  NSNotification *tab = [NSNotification notificationWithName:NSControlTextDidEndEditingNotification
+                                                      object:field
+                                                    userInfo:@{ @"NSTextMovement" : @(NSTabTextMovement) }];
+  [editor performSelector:@selector(controlTextDidEndEditing:) withObject:tab];
+  if (![[(RDLTextbox *)corner value] isEqualToString:@"Where \\ When"])
+    XCTFail(@"the corner should say what was typed, not %@", [(RDLTextbox *)corner value]);
+  if (editor.editingItem != first)
+    XCTFail(@"Tab should go on from the corner to %@, not %@", first.name, editor.editingItem.name);
+  NSNotification *back = [NSNotification notificationWithName:NSControlTextDidEndEditingNotification
+                                                       object:[editor valueForKey:@"editorField"]
+                                                     userInfo:@{ @"NSTextMovement" : @(NSBacktabTextMovement) }];
+  [editor performSelector:@selector(controlTextDidEndEditing:) withObject:back];
+  if (editor.editingItem != corner)
+    XCTFail(@"Shift-Tab should come back to the corner, not %@", editor.editingItem.name);
+  [editor commit];
+}
+
 // Dragging the border between two columns resizes the one on its left, where
 // it stands, snapped to the grid, in one undo step.
 - (void)testDraggingAColumnBorderResizesTheColumn {

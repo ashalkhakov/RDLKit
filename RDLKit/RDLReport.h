@@ -1142,6 +1142,8 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 - (void)rebuildTablix;
 // Where a cell is in the body. NO when it is not one of this tablix's body cells.
 - (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell;
+// Where a cell is in the corner. NO when it is not one of this tablix's corner cells.
+- (BOOL)getCornerRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell;
 // The cell whose area takes in body row `row`, column `column`: the cell at
 // that position, or the one above or to the left whose RowSpan or ColSpan
 // reaches over it, which is where `originRow` and `originColumn` then point.
@@ -1583,10 +1585,10 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // is called that.
 - (RDLTablixMember *)tablixMemberNamed:(NSString *)name;
 // The tablix cell whose contents are this item, and the tablix it belongs to.
-// A cell holds its item rather than listing it among -childItems, so this is
-// how anything holding an item finds out that it lives in one -- which decides
-// whether it can be moved (it cannot: the cell places it) and what deleting it
-// means (the cell is emptied, not the tablix).
+// A cell -- in the body or the corner -- holds its item rather than listing it
+// among -childItems, so this is how anything holding an item finds out that it
+// lives in one -- which decides whether it can be moved (it cannot: the cell
+// places it) and what deleting it means (the cell is emptied, not the tablix).
 - (RDLTablixCell *)cellContainingItem:(RDLItem *)item tablix:(RDLTablix **)outTablix;
 @end
 

@@ -1525,10 +1525,10 @@ static NSUInteger RDLSpanOf(NSInteger span) {
   return span > 1 ? (NSUInteger)span : 1;
 }
 
-- (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
-  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+static BOOL RDLFindCellInRows(NSArray<NSArray<RDLTablixCell *> *> *rows, RDLTablixCell *cell,
+                              NSUInteger *row, NSUInteger *column) {
   for (NSUInteger r = 0; cell != nil && r < [rows count]; r++) {
-    NSUInteger at = [rows[r].cells indexOfObjectIdenticalTo:cell];
+    NSUInteger at = [rows[r] indexOfObjectIdenticalTo:cell];
     if (at == NSNotFound)
       continue;
     if (row)
@@ -1538,6 +1538,14 @@ static NSUInteger RDLSpanOf(NSInteger span) {
     return YES;
   }
   return NO;
+}
+
+- (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
+  return RDLFindCellInRows([self.tablixBody.rows valueForKey:@"cells"], cell, row, column);
+}
+
+- (BOOL)getCornerRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
+  return RDLFindCellInRows(self.cornerRows, cell, row, column);
 }
 
 - (RDLTablixCell *)cellCoveringRow:(NSUInteger)row
@@ -2522,8 +2530,11 @@ static RDLTablixMember *RDLMemberNamedIn(NSArray<RDLTablixMember *> *members, NS
     if (![candidate isKindOfClass:[RDLTablix class]])
       continue;
     RDLTablix *tablix = (RDLTablix *)candidate;
+    NSMutableArray<NSArray<RDLTablixCell *> *> *rows = [NSMutableArray arrayWithArray:tablix.cornerRows ?: @[]];
     for (RDLTablixRow *row in tablix.tablixBody.rows)
-      for (RDLTablixCell *cell in row.cells)
+      [rows addObject:row.cells ?: @[]];
+    for (NSArray<RDLTablixCell *> *row in rows)
+      for (RDLTablixCell *cell in row)
         if (cell.item == item) {
           if (outTablix)
             *outTablix = tablix;

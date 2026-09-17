@@ -1,5 +1,6 @@
 #import "RDLTablixStructure.h"
 #import "RDLItemFactory.h"
+#import "RDLPageGeometry.h"
 
 // The narrowest a column can be made, in inches, and the lowest a row.
 static const CGFloat kRDLMinimumColumnWidth = 0.2;
@@ -486,6 +487,24 @@ static BOOL RDLLinesArePlainSiblings(RDLTablix *tablix, RDLTablixAxis axis, NSUI
   neighbour.rowSpan = 0;
   neighbour.colSpan = 0;
   return YES;
+}
+
++ (RDLTablixCell *)makeCornerCellAtRow:(NSUInteger)row column:(NSUInteger)column inTablix:(RDLTablix *)tablix {
+  NSUInteger rows = MAX([RDLTablixGeometry headerRowCountOf:tablix], 1);
+  NSUInteger columns = [RDLTablixGeometry headerColumnCountOf:tablix];
+  if (row >= rows || column >= columns)
+    return nil;
+  if (tablix.cornerRows == nil)
+    tablix.cornerRows = [NSMutableArray array];
+  for (NSUInteger r = 0; r < rows; r++) {
+    if (r >= [tablix.cornerRows count])
+      [tablix.cornerRows addObject:[NSMutableArray array]];
+    NSMutableArray *cells = [tablix.cornerRows[r] mutableCopy];
+    while ([cells count] < columns)
+      [cells addObject:[[RDLTablixCell alloc] init]];
+    tablix.cornerRows[r] = cells;
+  }
+  return tablix.cornerRows[row][column];
 }
 
 + (BOOL)splitCellAtRow:(NSUInteger)row

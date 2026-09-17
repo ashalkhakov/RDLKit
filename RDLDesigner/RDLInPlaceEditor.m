@@ -149,14 +149,19 @@
   [_ctx.editor setPlainValue:text ofItem:it];
 }
 
-// The textbox after `item` among the cells of the tablix it is in, row by row,
-// or the one before it, coming round at the ends; nil when `item` is not in a
-// cell, or is the only textbox there.
+// The textbox after `item` among the cells of the tablix it is in -- the
+// corner's, then the body's, row by row -- or the one before it, coming round
+// at the ends; nil when `item` is not in a cell, or is the only textbox there.
 - (RDLTextbox *)textboxBeside:(RDLItem *)item forward:(BOOL)forward {
   RDLTablix *tablix = nil;
   if ([_ctx.report cellContainingItem:item tablix:&tablix] == nil)
     return nil;
   NSMutableArray<RDLItem *> *boxes = [NSMutableArray array];
+  // The corner first: it is the grid's top left.
+  for (NSArray<RDLTablixCell *> *row in tablix.cornerRows)
+    for (RDLTablixCell *cell in row)
+      if ([cell.item isKindOfClass:[RDLTextbox class]])
+        [boxes addObject:cell.item];
   for (RDLTablixRow *row in tablix.tablixBody.rows)
     for (RDLTablixCell *cell in row.cells)
       if ([cell.item isKindOfClass:[RDLTextbox class]])

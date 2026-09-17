@@ -25,6 +25,8 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 @interface RDLInsertionPoint ()
 @property (nonatomic, strong) RDLTablixCell *cell;
 @property (nonatomic, strong) RDLTablix *cellTablix;
+@property (nonatomic, assign) NSInteger cornerRow;
+@property (nonatomic, assign) NSInteger cornerColumn;
 @property (nonatomic, copy) NSString *bandKey;
 @property (nonatomic, strong) RDLItem *container;
 @property (nonatomic, strong) RDLItem *sibling;
@@ -32,8 +34,16 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 @end
 
 @implementation RDLInsertionPoint
+- (instancetype)init {
+  if ((self = [super init])) {
+    _cornerRow = -1;
+    _cornerColumn = -1;
+  }
+  return self;
+}
+
 - (NSString *)localizedDescription {
-  if (_cell != nil)
+  if (_cell != nil || _cornerRow >= 0)
     return [NSString stringWithFormat:@"into a cell of %@", _cellTablix.name ?: @"the table"];
   if (_container)
     return [NSString stringWithFormat:@"inside %@", _container.name ?: @"the rectangle"];
@@ -66,13 +76,23 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
       selection.cellRow >= 0 && selection.cellColumn >= 0) {
     // The selection holds where in the grid the person clicked; the body cell
     // is that, less the row-header columns a grouped tablix draws first.
-    RDLTablixCell *cell = [RDLTablixGeometry cellOf:selection.tablix
-                                              inRow:(NSUInteger)selection.cellRow
-                                             column:(NSUInteger)selection.cellColumn];
-    if (cell != nil) {
+    // Over the row headers, it is the corner's.
+    NSUInteger gridRow = (NSUInteger)selection.cellRow, gridColumn = (NSUInteger)selection.cellColumn;
+    NSUInteger cornerRow = 0;
+    BOOL corner = [RDLTablixGeometry tablix:selection.tablix
+                              isCornerAtRow:gridRow
+                                     column:gridColumn
+                                  cornerRow:&cornerRow];
+    RDLTablixCell *cell = corner ? [RDLTablixGeometry cornerCellOf:selection.tablix inRow:gridRow column:gridColumn]
+                                 : [RDLTablixGeometry cellOf:selection.tablix inRow:gridRow column:gridColumn];
+    if (cell != nil || corner) {
       p.bandKey = key;
       p.cell = cell;
       p.cellTablix = selection.tablix;
+      if (cell == nil) {
+        p.cornerRow = (NSInteger)cornerRow;
+        p.cornerColumn = (NSInteger)gridColumn;
+      }
       p.items = [report bandWithKey:key].items;  // never nil; unused for a cell
       return p;
     }

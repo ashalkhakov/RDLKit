@@ -693,9 +693,18 @@ static NSUInteger RDLStackingTarget(NSUInteger at, NSUInteger count, RDLStacking
 - (void)setItem:(RDLItem *)item inCell:(RDLTablixCell *)cell ofTablix:(RDLTablix *)tablix {
   if (cell == nil || ![tablix isKindOfClass:[RDLTablix class]] || cell.item == item)
     return;
+  // The inverse names the cell by where it is: undoing or redoing a structural
+  // edit puts copies of the cells back, and the cell object is gone by then.
+  NSUInteger row = 0, column = 0;
+  BOOL corner = NO;
+  if (![tablix getRow:&row column:&column ofCell:cell]) {
+    corner = YES;
+    if (![tablix getCornerRow:&row column:&column ofCell:cell])
+      return;
+  }
   RDLItem *old = cell.item;
   [self beginGroup:item ? @"Put in Cell" : @"Empty Cell"];
-  [[self undoProxy] setItem:old inCell:cell ofTablix:tablix];
+  [[self undoProxy] setItem:old inCellAtRow:row column:column corner:corner ofTablix:tablix];
   cell.item = item;
   [_document.report adoptItems];
   [self endGroup];
@@ -726,6 +735,30 @@ static NSString * const kRDLStructureToken = @"structure";
   [_document.report adoptItems];
   [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
   return YES;
+}
+
+- (void)setItem:(RDLItem *)item
+    inCellAtRow:(NSUInteger)row
+         column:(NSUInteger)column
+         corner:(BOOL)corner
+       ofTablix:(RDLTablix *)tablix {
+  NSArray *cells = corner ? (row < [tablix.cornerRows count] ? tablix.cornerRows[row] : nil)
+                          : (row < [tablix.tablixBody.rows count] ? tablix.tablixBody.rows[row].cells : nil);
+  [self setItem:item inCell:column < [cells count] ? cells[column] : nil ofTablix:tablix];
+}
+
+- (RDLTablixCell *)makeCornerCellAtRow:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix {
+  NSArray *written = row < [tablix.cornerRows count] ? tablix.cornerRows[row] : nil;
+  if (column < [written count])
+    return written[column];
+  __block RDLTablixCell *cell = nil;
+  [self changeStructureOfTablix:tablix
+                         action:@"Add Corner"
+                         change:^BOOL {
+                           cell = [RDLTablixStructure makeCornerCellAtRow:row column:column inTablix:tablix];
+                           return cell != nil;
+                         }];
+  return cell;
 }
 
 // What a structural edit, or a dialog's copy, may have changed, from one tablix

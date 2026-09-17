@@ -296,7 +296,7 @@ not yet keep that.
 | Rows inserted or deleted on their own | Done | Insert Row Above/Below and Delete Row on the canvas, beside the row clicked and inside its group; a group's own row goes with the group. |
 | Tablix `NoRowsMessage`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | Done | A section of the tablix's own. |
 | Tablix `SortExpressions` | Done | Sorting… in the tablix's section. |
-| `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
+| `TablixCorner` content | Done | Selected, typed into, deleted and filled like a body cell; an unwritten corner gets its cells when something goes in. |
 | Nested tablix or chart in a cell | Done | Inserted, pasted and drawn in a cell or a rectangle like any other item. A new region with no dataset to bind gets an empty one of its own. |
 | A "List" preset | Done | Insert → List: one cell holding a rectangle, repeated by a details group. |
 | `DomainScope`, `ReGroupExpressions`, `DataElement*` | MODEL | |
@@ -454,7 +454,7 @@ In rough order of how often a Report Builder user reaches for it:
    tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;
    merged cells; per-row heights; corner; details sort; data regions in
    cells and rectangles; a List preset.
-   Done: all of it but the corner's content and a column's own settings --
+   Done: all of it but a column's own settings -- the corner,
    the tablix's section, sorting, Group Properties' page breaks and
    visibility, rows on their own, merged cells, any row's height, a row's
    own settings, data regions in cells and rectangles, and the List.

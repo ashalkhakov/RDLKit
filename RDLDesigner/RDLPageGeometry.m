@@ -567,30 +567,45 @@ static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUIntege
   return [path lastObject];
 }
 
++ (BOOL)tablix:(RDLTablix *)tablix isCornerAtRow:(NSUInteger)row column:(NSUInteger)column cornerRow:(NSUInteger *)outRow {
+  NSUInteger headerRows = [self headerRowCountOf:tablix];
+  if (column >= [self headerColumnCountOf:tablix])
+    return NO;
+  // Over the row-header columns, in a column-heading row.
+  if (row < headerRows) {
+    if (outRow)
+      *outRow = row;
+    return YES;
+  }
+  // A table's heading row, where no row member has a header of its own.
+  RDLTablixHierarchy *rowHierarchy = tablix.rowHierarchy;
+  if (headerRows == 0 && row == 0 && [rowHierarchy memberWithHeaderAtLevel:column onPathToLeaf:0] == nil) {
+    if (outRow)
+      *outRow = 0;
+    return YES;
+  }
+  return NO;
+}
+
++ (RDLTablixCell *)cornerCellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column {
+  NSUInteger cornerRow = 0;
+  if (![self tablix:tablix isCornerAtRow:row column:column cornerRow:&cornerRow])
+    return nil;
+  NSArray *corner = cornerRow < [tablix.cornerRows count] ? tablix.cornerRows[cornerRow] : nil;
+  return column < [corner count] ? corner[column] : nil;
+}
+
 + (RDLItem *)itemOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column {
   NSUInteger headerRows = [self headerRowCountOf:tablix];
   NSUInteger headerCols = [self headerColumnCountOf:tablix];
-  if (row < headerRows) {
-    // A column-heading row. Over the header columns it is the corner; over the
-    // body, the header of the column member at that level.
-    if (column < headerCols) {
-      NSArray *corner = row < [tablix.cornerRows count] ? tablix.cornerRows[row] : nil;
-      RDLTablixCell *cell = column < [corner count] ? corner[column] : nil;
-      return cell.item;
-    }
+  if ([self tablix:tablix isCornerAtRow:row column:column cornerRow:NULL])
+    return [self cornerCellOf:tablix inRow:row column:column].item;
+  // Over the body, a column-heading row holds the header of the column member
+  // at that level; a row-header column, the row member's.
+  if (row < headerRows)
     return [self headerItemIn:tablix.columnHierarchy level:row leaf:column - headerCols];
-  }
-  if (column < headerCols) {
-    // A row-header column: the header of the row member at that level -- and
-    // in a table's heading row, where no member has one, the corner.
-    RDLItem *header = [self headerItemIn:tablix.rowHierarchy level:column leaf:row - headerRows];
-    if (header == nil && headerRows == 0 && row == 0) {
-      NSArray *corner = [tablix.cornerRows firstObject];
-      RDLTablixCell *cell = column < [corner count] ? corner[column] : nil;
-      return cell.item;
-    }
-    return header;
-  }
+  if (column < headerCols)
+    return [self headerItemIn:tablix.rowHierarchy level:column leaf:row - headerRows];
   RDLTablixCell *cell = [self cellOf:tablix inRow:row column:column];
   return cell.item;
 }

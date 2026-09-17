@@ -1072,4 +1072,84 @@
     XCTFail(@"%@", @"a crosstab should show no heading row height, and its value row's");
 }
 
+static RDLTablix *RDLFirstTablixIn(RDLReport *report) {
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      return (RDLTablix *)it;
+  return nil;
+}
+
+// The corner is cells like any other: what is in it is selected, deleted and
+// put back like a body cell's contents, and an empty corner -- none written
+// at all, as a file may have it -- takes a new text box, growing the cells it
+// needs, all in one undoable step.
+- (void)testTheCornerIsEditedLikeACell {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *matrix = RDLFirstTablixIn(report);
+  NSUInteger headerRows = [RDLTablixGeometry headerRowCountOf:matrix];
+  NSUInteger headerCols = [RDLTablixGeometry headerColumnCountOf:matrix];
+  if (headerRows == 0 || headerCols == 0)
+    XCTFail(@"the sample should be a crosstab, reads %lu by %lu", (unsigned long)headerRows, (unsigned long)headerCols);
+  RDLItem *corner = [RDLTablixGeometry itemOf:matrix inRow:0 column:0];
+  RDLTablix *owner = nil;
+  if (corner == nil || [report cellContainingItem:corner tablix:&owner] == nil || owner != matrix)
+    XCTFail(@"%@", @"the corner's text box should be found in its cell");
+
+  // Deleted, it leaves the corner cell empty and selected.
+  [ctx.selection selectItem:corner inBandWithKey:@"body"];
+  [ctx deleteSelectedItem];
+  if ([RDLTablixGeometry itemOf:matrix inRow:0 column:0] != nil)
+    XCTFail(@"%@", @"deleting the corner's text box should empty the corner");
+  if (ctx.selection.scope != RDLSelectionScopeTablixCell || ctx.selection.cellRow != 0 || ctx.selection.cellColumn != 0)
+    XCTFail(@"the emptied corner should be selected, reads %ld, %ld", (long)ctx.selection.cellRow,
+            (long)ctx.selection.cellColumn);
+  [ctx.document.undoManager undo];
+  if ([RDLTablixGeometry itemOf:matrix inRow:0 column:0] != corner)
+    XCTFail(@"%@", @"undo should put the corner's text box back");
+
+  // No corner at all: a text box inserted there makes one.
+  matrix.cornerRows = [NSMutableArray array];
+  NSString *before = [RDLEditor XMLStringForItem:matrix];
+  NSUInteger lastRow = headerRows - 1, lastCol = headerCols - 1;
+  [ctx.selection selectCellOfTablix:matrix row:(NSInteger)lastRow column:(NSInteger)lastCol inBandWithKey:@"body"];
+  if (![[ctx allowedElementKinds] containsObject:@(RDLItemKindTextbox)])
+    XCTFail(@"%@", @"an empty corner should take a text box");
+  [ctx addItemOfKind:RDLItemKindTextbox];
+  RDLItem *added = [RDLTablixGeometry itemOf:matrix inRow:lastRow column:lastCol];
+  if (![added isKindOfClass:[RDLTextbox class]] || [matrix.cornerRows count] != headerRows ||
+      [matrix.cornerRows[lastRow] count] != headerCols || [[matrix structuralProblems] count])
+    XCTFail(@"the corner should hold the new text box, reads %@ in %lu rows, problems %@", added,
+            (unsigned long)[matrix.cornerRows count], [matrix structuralProblems]);
+  if (ctx.selectedItem != added)
+    XCTFail(@"%@", @"the new text box should be selected");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:matrix] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should take the corner away again");
+  [ctx.document.undoManager redo];
+  if (![[RDLTablixGeometry itemOf:matrix inRow:lastRow column:lastCol] isKindOfClass:[RDLTextbox class]])
+    XCTFail(@"%@", @"redo should put the text box back in the corner");
+}
+
+// A cell's contents changed after a structural edit, and both undone and
+// redone: the structural redo puts copies of the cells back, and the contents'
+// redo has to find its cell among them.
+- (void)testRedoingACellsContentsAfterAStructuralEditFindsTheCell {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = RDLFirstTablixIn(report);
+  if (![ctx.editor mergeTablixCellAtRow:0 column:0 along:RDLTablixAxisColumns ofTablix:tablix])
+    XCTFail(@"%@", @"two heading cells should merge");
+  RDLItem *first = tablix.tablixBody.rows[0].cells[0].item;
+  [ctx.selection selectItem:first inBandWithKey:@"body"];
+  [ctx deleteSelectedItem];
+  NSString *after = [RDLEditor XMLStringForItem:tablix];
+  [ctx.document.undoManager undo];
+  [ctx.document.undoManager undo];
+  [ctx.document.undoManager redo];
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:after])
+    XCTFail(@"%@", @"redoing both should leave the merged cell empty again");
+}
+
 @end

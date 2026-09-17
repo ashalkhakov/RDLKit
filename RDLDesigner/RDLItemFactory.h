@@ -42,6 +42,10 @@ FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
 // which is what Report Builder does when a second item is put in a cell.
 @property (nonatomic, readonly, strong) RDLTablixCell *cell;
 @property (nonatomic, readonly, strong) RDLTablix *cellTablix;
+// A corner position the file wrote no cell for, as a corner row and column, or
+// -1 -- in which case `cell` is nil and the cell is made when something goes in.
+@property (nonatomic, readonly, assign) NSInteger cornerRow;
+@property (nonatomic, readonly, assign) NSInteger cornerColumn;
 // The Rectangle that will hold the new item, or nil to insert at band level.
 @property (nonatomic, readonly, strong) RDLItem *container;
 // The selected item the new one should follow, when there is one.
