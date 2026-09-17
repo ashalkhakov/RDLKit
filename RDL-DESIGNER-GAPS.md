@@ -219,7 +219,7 @@ bin that moved since the previous audit.
 | `PageName` | Done | On a rectangle, a tablix and a chart. |
 | `KeepTogether` | Done | On a text box, a subreport, a rectangle, a tablix and a chart. |
 | `ZIndex` | UI (was UI+MODEL) | Written and honoured at render; no front/back commands and the canvas ignores it. |
-| `Name` editing | UI | An item rename must also update `ToggleItem` and `ReportItems!` references. Renaming a dataset, source, field or parameter carries the pieces kept under it (§5). |
+| `Name` editing | Done | In the inspector, for every item including one in a cell. `ReportItems!` references in any expression and every `ToggleItem` follow the rename, and one undo puts them back; a name RDL does not accept, or another item's, is refused. Not followed: a data region named as an aggregate's scope, which is a string (`Sum(x, "Table1")`). Renaming a dataset, source, field or parameter carries the pieces kept under it (§5). |
 | `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | Kept and written back. |
 
 ### 4.4 Style
@@ -430,8 +430,9 @@ In rough order of how often a Report Builder user reaches for it:
    `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
    front/back commands and canvas z-order. Done: the first six, in inspector
    sections shown for the kinds MS-RDL gives each to (not yet looked at in
-   dark mode, for the reason `2fa0db1` records). Left: rename, which has to
-   carry `ReportItems!` and `ToggleItem` references, and z-order.
+   dark mode, for the reason `2fa0db1` records). Rename is done too, carrying
+   `ReportItems!` and `ToggleItem` references (`RDLReferenceSites` finds
+   them). Left: z-order.
 3. Page setup: free size, orientation, four margins, `Columns`/
    `ColumnSpacing`, page `Style`, `PrintOnFirstPage`/`PrintOnLastPage`,
    header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.

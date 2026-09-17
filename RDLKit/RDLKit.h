@@ -7,6 +7,8 @@
 #import "RDLUpgrader.h"
 #import "RDLChartRenderer.h"
 #import "RDLChecker.h"
+// Where a report refers to its items by name, for renaming them.
+#import "RDLReferenceSites.h"
 #import "RDLZipArchive.h"
 #import "RDLDocxReader.h"
 #import "RDLImporter.h"

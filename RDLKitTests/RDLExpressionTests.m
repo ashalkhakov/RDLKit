@@ -3252,4 +3252,107 @@ static NSString *RDLDecimalCaseText(NSArray<NSString *> *p) {
     XCTFail(@"%@", @"a Decimal that rounds past the largest should be the overflow VB throws");
 }
 
+
+// Renaming a report item has to follow it everywhere it is named: in any
+// expression -- a value, a run, a style, a visibility, a group, a variable --
+// in any band, inside rectangles and tablix cells, and in every ToggleItem.
+// Found by token, so a string that happens to say ReportItems!Total, and a name
+// that only starts the same, are left alone.
+- (void)testAReportItemsReferencesAreFoundAndRenamed {
+  RDLExpr *e = [RDLExpr expressionWithSource:
+      @"=ReportItems!Total.Value &  reportitems!Total.Value + \"ReportItems!Total\" & ReportItems!Totals.Value & Fields!Total.Value"];
+  NSString *renamed = [e sourceRenamingReferenceIn:@"ReportItems" from:@"Total" to:@"Sum"];
+  if (![renamed isEqualToString:
+          @"=ReportItems!Sum.Value &  reportitems!Sum.Value + \"ReportItems!Total\" & ReportItems!Totals.Value & Fields!Total.Value"])
+    XCTFail(@"renamed to %@", renamed);
+  if ([[RDLExpr expressionWithSource:@"=Fields!Total.Value"] sourceRenamingReferenceIn:@"ReportItems"
+                                                                                   from:@"Total"
+                                                                                     to:@"Sum"] != nil)
+    XCTFail(@"%@", @"an expression that does not refer to it should say so");
+
+  NSString *ref = @"=ReportItems!Total.Value";
+  RDLReport *r = [RDLReport emptyReportNamed:@"Refs"];
+  RDLTextbox *total = [[RDLTextbox alloc] init];
+  total.name = @"Total";
+  total.value = @"=Sum(Fields!A.Value)";
+  RDLTextbox *header = [[RDLTextbox alloc] init];
+  header.value = ref;
+  [r.pageHeader.items addObject:header];
+  RDLTextbox *rich = [[RDLTextbox alloc] init];
+  RDLTextRun *run = [[RDLTextRun alloc] init];
+  run.value = ref;
+  run.toolTip = [RDLValue valueWithSource:ref];
+  RDLParagraph *paragraph = [[RDLParagraph alloc] init];
+  paragraph.runs = [@[ run ] mutableCopy];
+  rich.paragraphs = [@[ paragraph ] mutableCopy];
+  rich.value = ref;
+  rich.style.expressions = [[RDLStyleExpressions alloc] init];
+  rich.style.expressions.color = [RDLExpr expressionWithSource:@"=IIf(ReportItems!Total.Value > 1, \"Red\", \"Black\")"];
+  RDLRectangle *panel = [[RDLRectangle alloc] init];
+  panel.hidden = [RDLValue valueWithSource:@"=ReportItems!Total.Value = 0"];
+  panel.toggleItem = @"Total";
+  RDLImage *picture = [[RDLImage alloc] init];
+  picture.hyperlink = [RDLValue valueWithSource:@"=\"#\" & ReportItems!Total.Value"];
+  panel.items = [@[ picture ] mutableCopy];
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.tablixBody = [[RDLTablixBody alloc] init];
+  RDLTablixRow *row = [[RDLTablixRow alloc] init];
+  RDLTablixCell *cell = [[RDLTablixCell alloc] init];
+  RDLTextbox *inCell = [[RDLTextbox alloc] init];
+  inCell.value = ref;
+  cell.item = inCell;
+  row.cells = [@[ cell ] mutableCopy];
+  tablix.tablixBody.rows = [@[ row ] mutableCopy];
+  tablix.rowHierarchy = [[RDLTablixHierarchy alloc] init];
+  RDLTablixMember *member = [[RDLTablixMember alloc] init];
+  member.toggleItem = @"Total";
+  member.groupExpressions = [@[ [RDLValue literal:@"ReportItems!Total"], [RDLValue valueWithSource:ref] ] mutableCopy];
+  tablix.rowHierarchy.members = [@[ member ] mutableCopy];
+  RDLTextbox *other = [[RDLTextbox alloc] init];
+  other.value = @"=ReportItems!Totals.Value";
+  other.toggleItem = @"Totals";
+  [r.body.items addObjectsFromArray:@[ total, rich, panel, tablix, other ]];
+  RDLVariable *variable = [[RDLVariable alloc] init];
+  variable.name = @"Doubled";
+  variable.value = [RDLValue valueWithSource:@"=ReportItems!Total.Value * 2"];
+  r.variables = [@[ variable ] mutableCopy];
+
+  NSUInteger changed = 0;
+  for (RDLReferenceSite *site in [r referenceSites]) {
+    id next = [site valueRenamingReportItem:@"Total" to:@"Sum"];
+    if (next) {
+      [site setValue:next];
+      changed += 1;
+    }
+  }
+  NSString *want = @"=ReportItems!Sum.Value";
+  NSDictionary<NSString *, NSString *> *seen = @{
+    @"page header" : header.value ?: @"",
+    @"run" : run.value ?: @"",
+    @"run tooltip" : [run.toolTip source] ?: @"",
+    @"text box" : rich.value ?: @"",
+    @"cell" : inCell.value ?: @"",
+    @"group expression" : [member.groupExpressions[1] source] ?: @"",
+  };
+  for (NSString *where in seen)
+    if (![seen[where] isEqualToString:want])
+      XCTFail(@"the %@ reads %@", where, seen[where]);
+  if (![[rich.style.expressions.color source] isEqualToString:@"=IIf(ReportItems!Sum.Value > 1, \"Red\", \"Black\")"])
+    XCTFail(@"the style reads %@", [rich.style.expressions.color source]);
+  if (![[panel.hidden source] isEqualToString:@"=ReportItems!Sum.Value = 0"] ||
+      ![[picture.hyperlink source] isEqualToString:@"=\"#\" & ReportItems!Sum.Value"])
+    XCTFail(@"the rectangle reads %@ and its image %@", [panel.hidden source], [picture.hyperlink source]);
+  if (![[variable.value source] isEqualToString:@"=ReportItems!Sum.Value * 2"])
+    XCTFail(@"the variable reads %@", [variable.value source]);
+  if (![panel.toggleItem isEqualToString:@"Sum"] || ![member.toggleItem isEqualToString:@"Sum"])
+    XCTFail(@"the toggles read %@ and %@", panel.toggleItem, member.toggleItem);
+  // What was not a reference to it is as it was.
+  if (![[member.groupExpressions[0] source] isEqualToString:@"ReportItems!Total"] ||
+      ![other.value isEqualToString:@"=ReportItems!Totals.Value"] || ![other.toggleItem isEqualToString:@"Totals"] ||
+      ![total.value isEqualToString:@"=Sum(Fields!A.Value)"])
+    XCTFail(@"%@", @"what did not refer to Total should not have changed");
+  if (changed != 12)
+    XCTFail(@"%lu places changed, not 12", (unsigned long)changed);
+}
+
 @end

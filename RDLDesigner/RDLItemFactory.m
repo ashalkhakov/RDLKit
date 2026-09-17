@@ -157,6 +157,21 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
   return [self uniqueNameWithPrefix:prefix inReport:report besides:nil];
 }
 
++ (BOOL)isValidName:(NSString *)name {
+  if ([name length] == 0 || ![[NSCharacterSet letterCharacterSet] characterIsMember:[name characterAtIndex:0]])
+    return NO;
+  NSMutableCharacterSet *allowed = [NSMutableCharacterSet alphanumericCharacterSet];
+  [allowed addCharactersInString:@"_"];
+  return [name rangeOfCharacterFromSet:[allowed invertedSet]].location == NSNotFound;
+}
+
++ (BOOL)name:(NSString *)name isTakenInReport:(RDLReport *)report besides:(RDLItem *)item {
+  for (RDLItem *it in [report allItemsIncludingNested])
+    if (it != item && [it.name isEqualToString:name])
+      return YES;
+  return NO;
+}
+
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix
                           inReport:(RDLReport *)report
                            besides:(RDLItem *)item {

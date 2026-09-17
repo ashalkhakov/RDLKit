@@ -56,6 +56,11 @@
 + (void)applyDefaultsTo:(RDLItem *)item report:(RDLReport *)report;
 
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report;
+// A name RDL accepts for a report item: a letter, then letters, digits and
+// underscores -- what an expression can write after ReportItems!.
++ (BOOL)isValidName:(NSString *)name;
+// Whether an item in the report, other than `item`, already has `name`.
++ (BOOL)name:(NSString *)name isTakenInReport:(RDLReport *)report besides:(RDLItem *)item;
 // The same, kept apart from `item` and everything in it as well: an item being
 // edited away from the report, such as a dialog's working copy of a tablix.
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix

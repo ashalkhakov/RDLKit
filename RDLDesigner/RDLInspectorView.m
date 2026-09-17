@@ -109,7 +109,7 @@
 // What every report item has, in the sections that apply to its kind: whether
 // it shows and what toggles it; a link (a text box's or an image's); keeping it
 // on one page; and the page breaks and page name of a region or rectangle.
-@property (nonatomic, strong) IBOutlet NSView *visibilityBox, *linkBox, *keepBox, *pageBox;
+@property (nonatomic, strong) IBOutlet NSView *nameBox, *visibilityBox, *linkBox, *keepBox, *pageBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *hiddenField, *hyperlinkField;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *pageBreakDisabledField, *pageNameField;
 @property (nonatomic, strong) IBOutlet NSButton *hiddenExprButton, *hyperlinkExprButton;
@@ -186,8 +186,8 @@
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _tablixBox, _cellBox, _visibilityBox, _linkBox,
-                 _keepBox, _pageBox ];
+                 _subreportBox, _chartBox, _tablixBox, _cellBox, _nameBox, _visibilityBox,
+                 _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
@@ -591,8 +591,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
                                    : [NSString stringWithFormat:@"%@ · %@", it.rdlElementName,
                                                                 it.name]];
     [_nameField setStringValue:it.name ?: @""];
-    NSMutableArray *boxes = inCell ? [NSMutableArray array]
-                                   : [NSMutableArray arrayWithObject:_geoBox];
+    // Its name, which an item in a cell has too; its geometry, which it does not.
+    NSMutableArray *boxes = [NSMutableArray arrayWithObject:_nameBox];
+    if (!inCell)
+      [boxes addObject:_geoBox];
     // The dataset popups are populated from the report before filling, since
     // their contents depend on it rather than being fixed at build time.
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -840,6 +842,17 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 
   // The rest are composites: each writes more than one property and must undo
   // as a single step.
+  if (sender == _nameField && it != nil) {
+    // A name that is not an RDL name, or is another item's, is refused and the
+    // field goes back to the name the item has.
+    NSString *name = [[_nameField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (![editor renameItem:it to:name]) {
+      NSBeep();
+      [_nameField setStringValue:it.name ?: @""];
+    }
+    return;
+  }
   if (sender == _valueField && it != nil) {
     // -controlTextDidEndEditing: fires whenever the field resigns first
     // responder, not only when something was typed, and opening the rich-text

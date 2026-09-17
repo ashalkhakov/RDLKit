@@ -1,6 +1,7 @@
-#import "RDLPlainTextEdit.h"
 #import "RDLTablixStructure.h"
 #import "RDLEditor.h"
+#import "RDLItemFactory.h"
+#import "RDLPlainTextEdit.h"
 #import "RDLChange.h"
 #import "RDLKit.h"
 #import "RDLDocument.h"
@@ -29,6 +30,10 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   }
   return nil;
 }
+
+@interface RDLEditor (RDLRenaming)
+- (void)replaceValueAtSite:(RDLReferenceSite *)site with:(id)value;
+@end
 
 @implementation RDLEditor {
   NSInteger _groupDepth;
@@ -407,6 +412,39 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   for (RDLBand *band in [report allBands])
     RDLRenameDataSetInItems(band.items, old, name);
   [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+}
+
+#pragma mark - Renaming an item
+
+- (BOOL)renameItem:(RDLItem *)item to:(NSString *)name {
+  RDLReport *report = _document.report;
+  NSString *old = item.name;
+  if (item == nil || report == nil)
+    return NO;
+  if ([name isEqualToString:old])
+    return YES;
+  if (![RDLItemFactory isValidName:name] || [RDLItemFactory name:name isTakenInReport:report besides:item])
+    return NO;
+  [self beginGroup:@"Rename"];
+  [self setValue:name forKeyPath:@"name" ofItem:item];
+  if ([old length])
+    for (RDLReferenceSite *site in [report referenceSites]) {
+      id renamed = [site valueRenamingReportItem:old to:name];
+      if (renamed)
+        [self replaceValueAtSite:site with:renamed];
+    }
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+  return YES;
+}
+
+// Undone by putting back exactly what was there, rather than by renaming back:
+// a reference to the new name that was already in the report before the rename
+// is not the rename's to change.
+- (void)replaceValueAtSite:(RDLReferenceSite *)site with:(id)value {
+  [[self undoProxy] replaceValueAtSite:site with:[site value]];
+  [site setValue:value];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
 }
 

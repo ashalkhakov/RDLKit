@@ -319,6 +319,12 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 // The same, for a Code element: no leading "=", and the line breaks Visual
 // Basic is written in are tokens of their own.
 + (NSArray<RDLExprToken *> *)codeTokensForSource:(NSString *)source;
+// The source with every reference to `name` in a collection -- ReportItems!Total
+// for collection "ReportItems", say -- naming `newName` instead, and nothing
+// else changed: spacing, case and comments stay as they were written. Text in a
+// string is not a reference, and neither is a name that only starts the same.
+// nil when the expression refers to no such name.
+- (NSString *)sourceRenamingReferenceIn:(NSString *)collection from:(NSString *)name to:(NSString *)newName;
 @end
 
 // An RDL property that is either a literal or an expression that produces one.

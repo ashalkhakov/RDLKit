@@ -1063,6 +1063,34 @@ NSString *RDLPrint(RDLExprNode *a) {
   return e;
 }
 
+// A reference is the parser's: a name, "!", and the name of the thing -- which
+// is exactly a run of three tokens, so it is found in the tokens without
+// matching text. A string is one token, so nothing inside one is found.
+- (NSString *)sourceRenamingReferenceIn:(NSString *)collection from:(NSString *)name to:(NSString *)newName {
+  if ([collection length] == 0 || [name length] == 0 || [newName length] == 0)
+    return nil;
+  BOOL renamed = NO;
+  NSMutableString *out = [NSMutableString stringWithString:_prefix ?: @""];
+  for (NSUInteger i = 0; i < [_toks count]; i++) {
+    RDLTok *t = _toks[i];
+    NSString *text = t.text ?: @"";
+    if (i >= 2) {
+      RDLTok *head = _toks[i - 2], *bang = _toks[i - 1];
+      if (head.kind == RDLExprTokenKindIdentifier &&
+          [head.s caseInsensitiveCompare:collection] == NSOrderedSame &&
+          bang.kind == RDLExprTokenKindPunctuation && [bang.s isEqualToString:@"!"] &&
+          [t.s isEqualToString:name]) {
+        text = newName;
+        renamed = YES;
+      }
+    }
+    [out appendString:t.leading ?: @""];
+    [out appendString:text];
+  }
+  [out appendString:_trailing ?: @""];
+  return renamed ? out : nil;
+}
+
 - (NSString *)source {
   NSMutableString *out = [NSMutableString stringWithString:_prefix ?: @""];
   for (RDLTok *t in _toks) {

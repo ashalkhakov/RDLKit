@@ -39,6 +39,11 @@
 // work. A no-op assignment is dropped: it registers no undo and posts nothing,
 // which matters because AppKit re-sends a field's value on every focus change.
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofItem:(RDLItem *)item;
+// An item's new name, with everything that named it following it -- a
+// ReportItems! reference in any expression, in any band, and a ToggleItem --
+// as one step that undoes. NO, changing nothing, for a name RDL does not accept
+// or that another item already has.
+- (BOOL)renameItem:(RDLItem *)item to:(NSString *)name;
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofBandWithKey:(NSString *)bandKey;
 - (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath;
 

@@ -944,6 +944,70 @@
     XCTFail(@"%@", @"a line shows only visibility");
 }
 
+// An item renamed in the inspector takes its references with it: a text box in
+// the page header reading ReportItems!Total, and a toggle naming it. A name RDL
+// does not accept, or another item's, is refused and the field shows the name
+// again; one undo puts every reference back. An item in a tablix cell has no
+// geometry of its own, but it has a name.
+- (void)testRenamingAnItemRenamesWhatRefersToIt {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Renamed"];
+  RDLTextbox *total = [[RDLTextbox alloc] init];
+  total.name = @"Total";
+  total.value = @"=Sum(Fields!A.Value)";
+  RDLTextbox *detail = [[RDLTextbox alloc] init];
+  detail.name = @"Detail";
+  detail.toggleItem = @"Total";
+  detail.value = @"=\"of \" & ReportItems!Total.Value";
+  RDLTextbox *footer = [[RDLTextbox alloc] init];
+  footer.name = @"Footer";
+  footer.value = @"=ReportItems!Total.Value";
+  [report.body.items addObjectsFromArray:@[ total, detail ]];
+  [report.pageFooter.items addObject:footer];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  NSTextField *nameField = [inspector valueForKey:@"nameField"];
+  if (![nameField isEditable])
+    XCTFail(@"%@", @"the name field should be editable");
+  [ctx.selection selectItem:total inBandWithKey:@"body"];
+
+  // Refused: not a name, and a name another item has.
+  for (NSString *refused in @[ @"Grand total", @"2nd", @"Detail" ]) {
+    [nameField setStringValue:refused];
+    [inspector changed:nameField];
+    if (![total.name isEqualToString:@"Total"] || ![[nameField stringValue] isEqualToString:@"Total"])
+      XCTFail(@"%@ should be refused, and the field show Total again", refused);
+  }
+
+  [nameField setStringValue:@"GrandTotal"];
+  [inspector changed:nameField];
+  if (![total.name isEqualToString:@"GrandTotal"])
+    XCTFail(@"the item is called %@", total.name);
+  if (![detail.toggleItem isEqualToString:@"GrandTotal"] ||
+      ![detail.value isEqualToString:@"=\"of \" & ReportItems!GrandTotal.Value"] ||
+      ![footer.value isEqualToString:@"=ReportItems!GrandTotal.Value"])
+    XCTFail(@"the references read %@, %@ and %@", detail.toggleItem, detail.value, footer.value);
+
+  [ctx.document.undoManager undo];
+  if (![total.name isEqualToString:@"Total"] || ![detail.toggleItem isEqualToString:@"Total"] ||
+      ![footer.value isEqualToString:@"=ReportItems!Total.Value"])
+    XCTFail(@"%@", @"one undo should put the name and every reference back");
+
+  // A text box in a cell shows its name, and not its geometry.
+  RDLReport *sample = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in sample.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLItem *inCell = tablix.tablixBody.rows[0].cells[0].item;
+  RDLEditingContext *sampleCtx = [[RDLEditingContext alloc] initWithReport:sample];
+  RDLInspectorView *sampleInspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                      context:sampleCtx];
+  [sampleCtx.selection selectItem:inCell inBandWithKey:@"body"];
+  if ([[sampleInspector valueForKey:@"nameBox"] isHidden] || ![[sampleInspector valueForKey:@"geoBox"] isHidden])
+    XCTFail(@"%@", @"an item in a cell should show its name and not its geometry");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

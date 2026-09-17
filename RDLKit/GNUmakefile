@@ -8,6 +8,7 @@ RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \
   RDLReport.h \
+  RDLReferenceSites.h \
   RDLParser.h \
   RDLExpression.h \
   RDLLayoutEngine.h \
@@ -60,6 +61,7 @@ RDLKit_OBJC_FILES = \
   RDLFunctionTable.m \
   RDLDotNetMembers.m \
   RDLForms.m \
+  RDLReferenceSites.m \
   RDLCompiler.m \
   RDLVirtualMachine.m \
   RDLBorderPainter.m \
