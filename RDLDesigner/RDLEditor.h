@@ -124,6 +124,10 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // points at. Undoable like every other edit, and a structure change, because
 // what a dataset holds is what every region bound to it renders.
 - (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet;
+// A dataset's query parameters, command type, timeout, collation and
+// sensitivities, from a scratch dataset holding them, as one step. NO,
+// recording nothing, when they are as they were.
+- (BOOL)setOptionsOfDataSet:(RDLDataSet *)dataSet from:(RDLDataSet *)options;
 - (void)setProvider:(NSString *)provider
       connectString:(NSString *)connectString
        ofDataSource:(RDLDataSource *)source;

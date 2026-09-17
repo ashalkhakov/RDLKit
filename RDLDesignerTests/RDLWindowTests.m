@@ -18,6 +18,7 @@
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLValueListEditor.h"
+#import "RDLDatasetOptionsEditor.h"
 #import "RDLParameterNavigator.h"
 #import "RDLGeneratorWindow.h"
 #import "RDLDataSourceView.h"
@@ -1456,6 +1457,73 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([[many componentsSeparatedByString:@"\n"] count] != 9 || ![many hasSuffix:@"and 3 more."] ||
       ![many hasPrefix:@"• Note 0"])
     XCTFail(@"eight notes and a count of the rest should be said, reads %@", many);
+}
+
+// A dataset's properties: its query's parameters, named after the report's
+// and reading them, what the query is and how long it may run, and how its
+// text is compared -- applied as one step, a clash or a bad timeout refused.
+- (void)testADatasetsPropertiesAreSet {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Queried"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Kilns";
+  [report.dataSources addObject:source];
+  RDLDataSet *firings = [[RDLDataSet alloc] init];
+  firings.name = @"Firings";
+  firings.dataSourceName = @"Kilns";
+  firings.commandText = @"select * from firings where region = @Region";
+  [report.dataSets addObject:firings];
+  RDLParameter *region = [[RDLParameter alloc] init];
+  region.name = @"Region";
+  region.prompt = @"Region";
+  region.dataType = RDLParameterDataTypeString;
+  [report.parameters addObject:region];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSString *before = [RDLWriter XMLStringFromReport:report];
+
+  RDLDatasetOptionsEditor *panel = [RDLDatasetOptionsEditor editorForDataSet:firings context:ctx];
+  [panel addParameter:nil];
+  [panel addParameter:nil];
+  NSArray<RDLQueryParameter *> *given = panel.options.queryParameters;
+  if ([given count] != 2 || ![given[0].name isEqualToString:@"Region"] ||
+      ![[given[0].value source] isEqualToString:@"=Parameters!Region.Value"] || [given[1].name length] == 0)
+    XCTFail(@"the first should pass the report's parameter, the second be named apart; reads %@",
+            [given valueForKey:@"name"]);
+  [panel setName:@"REGION" value:@"1" type:RDLParameterDataTypeInteger atRow:1];
+  if ([panel apply] || ![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"two query parameters of one name should be refused");
+  [panel setName:@"Minimum" value:@"1" type:RDLParameterDataTypeInteger atRow:1];
+  NSTextField *timeout = [panel valueForKey:@"timeoutField"];
+  [timeout setStringValue:@"a minute"];
+  if ([panel apply])
+    XCTFail(@"%@", @"a timeout that is no number should be refused");
+  [timeout setStringValue:@"30"];
+  [(NSTextField *)[panel valueForKey:@"collationField"] setStringValue:@"Latin1_General"];
+  [(NSPopUpButton *)[panel valueForKey:@"casePop"] selectItemWithTitle:@"Yes"];
+  [(NSPopUpButton *)[panel valueForKey:@"accentPop"] selectItemWithTitle:@"No"];
+  [(NSPopUpButton *)[panel valueForKey:@"commandTypePop"] selectItemWithTitle:@"Stored procedure"];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+  if ([firings.queryParameters count] != 2 || firings.queryParameters[1].dataType != RDLParameterDataTypeInteger ||
+      firings.timeout != 30 || ![firings.collation isEqualToString:@"Latin1_General"] ||
+      firings.caseSensitivity != RDLAutoBooleanTrue || firings.accentSensitivity != RDLAutoBooleanFalse ||
+      firings.kanatypeSensitivity != RDLAutoBooleanUnspecified || firings.commandType != RDLCommandTypeStoredProcedure)
+    XCTFail(@"%@", @"the dataset should be set as the panel had it, leaving what was not chosen unsaid");
+  NSString *after = [RDLWriter XMLStringFromReport:report];
+  RDLDataSet *saved = [[RDLParser reportFromXMLString:after error:NULL] dataSetNamed:@"Firings"];
+  if ([saved.queryParameters count] != 2 || saved.timeout != 30 || saved.caseSensitivity != RDLAutoBooleanTrue ||
+      ![saved.collation isEqualToString:@"Latin1_General"] || saved.commandType != RDLCommandTypeStoredProcedure)
+    XCTFail(@"%@", @"the properties should survive a save");
+  [ctx.document.undoManager undo];
+  if (![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the dataset back");
+  [ctx.document.undoManager redo];
+  if (![[RDLWriter XMLStringFromReport:report] isEqualToString:after])
+    XCTFail(@"%@", @"redo should set it again");
+  // An untouched panel records nothing: undo still takes back the edit above.
+  [[RDLDatasetOptionsEditor editorForDataSet:firings context:ctx] apply];
+  [ctx.document.undoManager undo];
+  if (![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"an untouched panel should record nothing");
 }
 
 // Changing a parameter in the generator shows up in what it renders: the value

@@ -208,9 +208,9 @@ bin that moved since the previous audit.
 | `ReportParametersLayout` | MODEL | |
 | Data source kinds beyond JSON/XML/CSV | MODEL | Shown as JSON and rewritten on first edit (§5). |
 | `ConnectionProperties/Prompt`, `IntegratedSecurity` | MODEL | |
-| `QueryParameters` | UI (was MODEL) | Engine FULL. |
-| `CommandType`, `Timeout` | UI (was MODEL) | Round-trip only in the engine. |
-| Collation, case/accent/kana/width sensitivity | UI (was MODEL) | Engine FULL, with a visible effect on grouping and sorting. |
+| `QueryParameters` | Done | Dataset Properties, from the dataset pane: named, valued -- a new one passes a report parameter of its name -- and typed. |
+| `CommandType`, `Timeout` | Done | Dataset Properties. |
+| Collation, case/accent/kana/width sensitivity | Done | Dataset Properties, with whether subtotal rows are read as details; what is not chosen stays unsaid. |
 | Embedded images: add from file, list, delete, rename | Done | See §4.6. |
 
 ### 4.3 Report items — common
@@ -483,7 +483,7 @@ In rough order of how often a Report Builder user reaches for it:
    completion from the catalogue including `ReportItems!`/`Variables!`/
    `Code.`.
    Done: all three.
-10. Data: query parameters, collation and sensitivities.
+10. Data: query parameters, collation and sensitivities. Done.
 11. Further style (`LineHeight`, `WritingMode`, `Direction`, shadows,
     gradients, background image, `Calendar`, numerals); rich-text
     indent/list controls; report `Code` and `Variables` editors;

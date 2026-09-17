@@ -442,6 +442,49 @@ static NSString *RDLRenamed(NSDictionary<NSString *, NSString *> *renames, NSStr
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
 }
 
+// Whether two datasets' options -- everything -setOptionsOfDataSet:from: sets
+// -- are the same.
+static BOOL RDLDataSetOptionsEqual(RDLDataSet *a, RDLDataSet *b) {
+  if (a.commandType != b.commandType || a.timeout != b.timeout || a.caseSensitivity != b.caseSensitivity ||
+      a.accentSensitivity != b.accentSensitivity || a.kanatypeSensitivity != b.kanatypeSensitivity ||
+      a.widthSensitivity != b.widthSensitivity || a.interpretSubtotalsAsDetails != b.interpretSubtotalsAsDetails ||
+      !(a.collation == b.collation || [a.collation isEqualToString:b.collation]) ||
+      [a.queryParameters count] != [b.queryParameters count])
+    return NO;
+  for (NSUInteger i = 0; i < [a.queryParameters count]; i++) {
+    RDLQueryParameter *x = a.queryParameters[i], *y = b.queryParameters[i];
+    if (![x.name ?: @"" isEqualToString:y.name ?: @""] || x.dataType != y.dataType ||
+        ![[x.value source] ?: @"" isEqualToString:[y.value source] ?: @""])
+      return NO;
+  }
+  return YES;
+}
+
+static void RDLCopyDataSetOptions(RDLDataSet *into, RDLDataSet *from) {
+  into.queryParameters = [from.queryParameters copy] ?: @[];
+  into.commandType = from.commandType;
+  into.timeout = from.timeout;
+  into.collation = from.collation;
+  into.caseSensitivity = from.caseSensitivity;
+  into.accentSensitivity = from.accentSensitivity;
+  into.kanatypeSensitivity = from.kanatypeSensitivity;
+  into.widthSensitivity = from.widthSensitivity;
+  into.interpretSubtotalsAsDetails = from.interpretSubtotalsAsDetails;
+}
+
+- (BOOL)setOptionsOfDataSet:(RDLDataSet *)dataSet from:(RDLDataSet *)options {
+  if (dataSet == nil || options == nil || RDLDataSetOptionsEqual(dataSet, options))
+    return NO;
+  RDLDataSet *was = [[RDLDataSet alloc] init];
+  RDLCopyDataSetOptions(was, dataSet);
+  RDLCopyDataSetOptions(dataSet, options);
+  [self beginGroup:@"Dataset Properties"];
+  [[self undoProxy] setOptionsOfDataSet:dataSet from:was];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+  return YES;
+}
+
 - (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet {
   if (dataSet == nil || [dataSet.commandText isEqualToString:query])
     return;
