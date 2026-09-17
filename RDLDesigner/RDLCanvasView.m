@@ -359,6 +359,114 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
   [_context moveSelectedItemInStacking:RDLStackingMoveToBack];
 }
 
+// Lining up, sizing and spreading out what is selected: which command means
+// which, in one place, so the actions below and the menu validation agree.
+static RDLAlignEdge RDLAlignEdgeForAction(SEL action) {
+  if (action == @selector(alignLeftEdges:))
+    return RDLAlignEdgeLeft;
+  if (action == @selector(alignHorizontalCenters:))
+    return RDLAlignEdgeHorizontalCenter;
+  if (action == @selector(alignRightEdges:))
+    return RDLAlignEdgeRight;
+  if (action == @selector(alignTopEdges:))
+    return RDLAlignEdgeTop;
+  if (action == @selector(alignVerticalCenters:))
+    return RDLAlignEdgeVerticalCenter;
+  if (action == @selector(alignBottomEdges:))
+    return RDLAlignEdgeBottom;
+  return RDLAlignEdgeUnspecified;
+}
+
+static RDLSizeMatch RDLSizeMatchForAction(SEL action) {
+  if (action == @selector(makeSameWidth:))
+    return RDLSizeMatchWidth;
+  if (action == @selector(makeSameHeight:))
+    return RDLSizeMatchHeight;
+  if (action == @selector(makeSameSize:))
+    return RDLSizeMatchBoth;
+  return RDLSizeMatchUnspecified;
+}
+
+static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
+  if (action == @selector(distributeHorizontally:))
+    return RDLDistributeAxisHorizontal;
+  if (action == @selector(distributeVertically:))
+    return RDLDistributeAxisVertical;
+  return RDLDistributeAxisUnspecified;
+}
+
+// One method for each, since a menu item names an action: each says which
+// arrangement it is and leaves the work to the editor.
+- (void)arrange:(SEL)action {
+  NSArray<RDLItem *> *items = _context.selection.items;
+  RDLAlignEdge edge = RDLAlignEdgeForAction(action);
+  if (edge != RDLAlignEdgeUnspecified) {
+    [_context.editor alignItems:items toEdge:edge];
+    return;
+  }
+  RDLSizeMatch match = RDLSizeMatchForAction(action);
+  if (match != RDLSizeMatchUnspecified) {
+    [_context.editor sizeItems:items like:match];
+    return;
+  }
+  [_context.editor distributeItems:items along:RDLDistributeAxisForAction(action)];
+}
+
+- (void)alignLeftEdges:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)alignHorizontalCenters:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)alignRightEdges:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)alignTopEdges:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)alignVerticalCenters:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)alignBottomEdges:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)makeSameWidth:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)makeSameHeight:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)makeSameSize:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)distributeHorizontally:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
+- (void)distributeVertically:(id)sender {
+  RDL_UNUSED(sender);
+  [self arrange:_cmd];
+}
+
 // Select All on the canvas widens the selection to the current band instead
 // of beeping (item → its band, otherwise → body).
 - (void)selectAll:(id)sender {
@@ -377,6 +485,14 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
   RDLStackingMove move = RDLStackingMoveForAction(a);
   if (move != RDLStackingMoveUnspecified)
     return [_context canMoveSelectedItemInStacking:move];
+  // Two items to line up or size alike; three to spread out, since the two at
+  // the ends stay where they are.
+  NSUInteger selected = [_context.selection.items count];
+  if (RDLAlignEdgeForAction(a) != RDLAlignEdgeUnspecified ||
+      RDLSizeMatchForAction(a) != RDLSizeMatchUnspecified)
+    return selected >= 2;
+  if (RDLDistributeAxisForAction(a) != RDLDistributeAxisUnspecified)
+    return selected >= 3;
   return YES;
 }
 

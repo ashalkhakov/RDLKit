@@ -151,6 +151,79 @@
                                     <action selector="sendToBack:" target="-1" id="sendToBackItemAction"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Align" id="alignMenuItem">
+                                <menu key="submenu" title="Align" id="alignMenuItemMenu">
+                                    <items>
+                            <menuItem title="Left Edges" keyEquivalent="" id="alignLeftItem">
+                                <connections>
+                                    <action selector="alignLeftEdges:" target="-1" id="alignLeftItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Centres" keyEquivalent="" id="alignCentresItem">
+                                <connections>
+                                    <action selector="alignHorizontalCenters:" target="-1" id="alignCentresItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Right Edges" keyEquivalent="" id="alignRightItem">
+                                <connections>
+                                    <action selector="alignRightEdges:" target="-1" id="alignRightItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Top Edges" keyEquivalent="" id="alignTopItem">
+                                <connections>
+                                    <action selector="alignTopEdges:" target="-1" id="alignTopItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Middles" keyEquivalent="" id="alignMiddlesItem">
+                                <connections>
+                                    <action selector="alignVerticalCenters:" target="-1" id="alignMiddlesItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Bottom Edges" keyEquivalent="" id="alignBottomItem">
+                                <connections>
+                                    <action selector="alignBottomEdges:" target="-1" id="alignBottomItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Make Same Size" id="sameSizeMenuItem">
+                                <menu key="submenu" title="Make Same Size" id="sameSizeMenuItemMenu">
+                                    <items>
+                            <menuItem title="Width" keyEquivalent="" id="sameWidthItem">
+                                <connections>
+                                    <action selector="makeSameWidth:" target="-1" id="sameWidthItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Height" keyEquivalent="" id="sameHeightItem">
+                                <connections>
+                                    <action selector="makeSameHeight:" target="-1" id="sameHeightItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Both" keyEquivalent="" id="sameSizeItem">
+                                <connections>
+                                    <action selector="makeSameSize:" target="-1" id="sameSizeItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Distribute" id="distributeMenuItem">
+                                <menu key="submenu" title="Distribute" id="distributeMenuItemMenu">
+                                    <items>
+                            <menuItem title="Across" keyEquivalent="" id="distributeAcrossItem">
+                                <connections>
+                                    <action selector="distributeHorizontally:" target="-1" id="distributeAcrossItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Down" keyEquivalent="" id="distributeDownItem">
+                                <connections>
+                                    <action selector="distributeVertically:" target="-1" id="distributeDownItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="editSep2"/>
                             <menuItem title="Add Element…" keyEquivalent="A" id="addElementItem">
                                 <connections>

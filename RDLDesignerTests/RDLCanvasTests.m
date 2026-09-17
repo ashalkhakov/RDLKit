@@ -602,4 +602,73 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"one undo should bring all three back");
 }
 
+
+// Lined up, sized and spread out: each follows the first item selected, each
+// is one undo step, and the commands are off until enough is selected.
+- (void)testSelectedItemsAreAlignedSizedAndSpread {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Arranged"];
+  NSMutableArray<RDLTextbox *> *boxes = [NSMutableArray array];
+  CGFloat lefts[3] = {1.0, 2.0, 5.0};
+  CGFloat tops[3] = {1.0, 1.5, 2.5};
+  CGFloat widths[3] = {1.0, 0.5, 0.75};
+  for (NSUInteger i = 0; i < 3; i++) {
+    RDLTextbox *box = [[RDLTextbox alloc] init];
+    box.name = [NSString stringWithFormat:@"Box%lu", (unsigned long)i + 1];
+    box.left = lefts[i];
+    box.top = tops[i];
+    box.width = widths[i];
+    box.height = 0.5;
+    [report.body.items addObject:box];
+    [boxes addObject:box];
+  }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900) context:ctx];
+  NSMenuItem *(^menuItem)(SEL) = ^NSMenuItem *(SEL action) {
+    return [[NSMenuItem alloc] initWithTitle:@"x" action:action keyEquivalent:@""];
+  };
+
+  // Nothing to arrange with one selected.
+  [ctx.selection selectItem:boxes[0] inBandWithKey:@"body"];
+  if ([canvas validateMenuItem:menuItem(@selector(alignLeftEdges:))])
+    XCTFail(@"%@", @"one item alone has nothing to line up with");
+
+  [ctx.selection selectItems:boxes inBandWithKey:@"body"];
+  if (![canvas validateMenuItem:menuItem(@selector(alignLeftEdges:))] ||
+      ![canvas validateMenuItem:menuItem(@selector(distributeHorizontally:))])
+    XCTFail(@"%@", @"three selected can be lined up and spread out");
+
+  [canvas alignTopEdges:nil];
+  if (fabs(boxes[1].top - 1.0) > 0.001 || fabs(boxes[2].top - 1.0) > 0.001 ||
+      fabs(boxes[0].top - 1.0) > 0.001)
+    XCTFail(@"all three should sit at the first's top: %g %g", boxes[1].top, boxes[2].top);
+  [ctx.document.undoManager undo];
+  if (fabs(boxes[2].top - 2.5) > 0.001)
+    XCTFail(@"%@", @"one undo should put the tops back");
+
+  [canvas makeSameWidth:nil];
+  if (fabs(boxes[1].width - 1.0) > 0.001 || fabs(boxes[2].width - 1.0) > 0.001 ||
+      fabs(boxes[2].height - 0.5) > 0.001)
+    XCTFail(@"all three should take the first's width and keep their height: %g %g", boxes[1].width,
+            boxes[2].width);
+
+  // Spread out: the ends stay, and the gaps between the three are equal.
+  [ctx.selection selectItems:boxes inBandWithKey:@"body"];
+  [canvas distributeHorizontally:nil];
+  CGFloat gapLeft = boxes[1].left - (boxes[0].left + boxes[0].width);
+  CGFloat gapRight = boxes[2].left - (boxes[1].left + boxes[1].width);
+  if (fabs(boxes[0].left - 1.0) > 0.001 || fabs(boxes[2].left - 5.0) > 0.001 ||
+      fabs(gapLeft - gapRight) > 0.051)
+    XCTFail(@"the gaps should match: %g and %g, ends at %g and %g", gapLeft, gapRight, boxes[0].left,
+            boxes[2].left);
+  [ctx.document.undoManager undo];
+  if (fabs(boxes[1].left - 2.0) > 0.001)
+    XCTFail(@"%@", @"one undo should put the middle one back");
+
+  // Aligning to the right edge moves the others' right edges to the first's.
+  [ctx.selection selectItems:@[ boxes[2], boxes[0] ] inBandWithKey:@"body"];
+  [canvas alignRightEdges:nil];
+  if (fabs((boxes[0].left + boxes[0].width) - (boxes[2].left + boxes[2].width)) > 0.001)
+    XCTFail(@"%@", @"the right edges should meet");
+}
+
 @end

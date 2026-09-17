@@ -502,7 +502,10 @@ reordering in the outline; editable source with re-parse; print and page
 navigation in the preview, with data binding and subreport loading; a
 report-wide errors pane.
 
-Done: the errors pane, as the left pane's Problems tab.
+Done: the errors pane, as the left pane's Problems tab; multi-select
+with Shift-click and a marquee, moved, nudged and deleted together,
+with align, make-same-size and distribute in the Edit menu. Eight
+handles, smart guides and snap size are still to come.
 
 ### P3 — matches the engine's P3
 

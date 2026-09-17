@@ -660,6 +660,111 @@ static NSUInteger RDLStackingTarget(NSUInteger at, NSUInteger count, RDLStacking
 
 #pragma mark - Geometry
 
+#pragma mark - Arranging several items
+
+// Where an item sits along the edge in question, and what moving it there
+// means: aligning sets one coordinate, so each edge is a pair of small
+// functions over the item's box.
+static CGFloat RDLEdgeOf(RDLItem *item, RDLAlignEdge edge) {
+  switch (edge) {
+  case RDLAlignEdgeLeft:
+    return item.left;
+  case RDLAlignEdgeHorizontalCenter:
+    return item.left + item.width / 2;
+  case RDLAlignEdgeRight:
+    return item.left + item.width;
+  case RDLAlignEdgeTop:
+    return item.top;
+  case RDLAlignEdgeVerticalCenter:
+    return item.top + item.height / 2;
+  case RDLAlignEdgeBottom:
+    return item.top + item.height;
+  case RDLAlignEdgeUnspecified:
+    break;
+  }
+  return 0;
+}
+
+static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
+  return edge == RDLAlignEdgeTop || edge == RDLAlignEdgeVerticalCenter || edge == RDLAlignEdgeBottom;
+}
+
+- (BOOL)alignItems:(NSArray<RDLItem *> *)items toEdge:(RDLAlignEdge)edge {
+  if ([items count] < 2 || edge == RDLAlignEdgeUnspecified)
+    return NO;
+  RDLItem *anchor = [items firstObject];
+  CGFloat to = RDLEdgeOf(anchor, edge);
+  BOOL vertical = RDLEdgeIsVertical(edge);
+  [self beginGroup:@"Align"];
+  BOOL any = NO;
+  for (RDLItem *item in items) {
+    if (item == anchor)
+      continue;
+    CGFloat delta = to - RDLEdgeOf(item, edge);
+    if (delta == 0)
+      continue;
+    [self moveItem:item
+            toLeft:vertical ? item.left : item.left + delta
+               top:vertical ? item.top + delta : item.top];
+    any = YES;
+  }
+  [self endGroup];
+  return any;
+}
+
+- (BOOL)sizeItems:(NSArray<RDLItem *> *)items like:(RDLSizeMatch)match {
+  if ([items count] < 2 || match == RDLSizeMatchUnspecified)
+    return NO;
+  RDLItem *anchor = [items firstObject];
+  [self beginGroup:@"Make Same Size"];
+  BOOL any = NO;
+  for (RDLItem *item in items) {
+    if (item == anchor)
+      continue;
+    CGFloat width = match == RDLSizeMatchHeight ? item.width : anchor.width;
+    CGFloat height = match == RDLSizeMatchWidth ? item.height : anchor.height;
+    if (width == item.width && height == item.height)
+      continue;
+    [self resizeItem:item toWidth:width height:height];
+    any = YES;
+  }
+  [self endGroup];
+  return any;
+}
+
+// The gaps between them made equal: the two furthest apart stay where they
+// are, and the rest are spread between them in the order they lie, not the
+// order they were selected in.
+- (BOOL)distributeItems:(NSArray<RDLItem *> *)items along:(RDLDistributeAxis)axis {
+  if ([items count] < 3 || axis == RDLDistributeAxisUnspecified)
+    return NO;
+  BOOL horizontal = axis == RDLDistributeAxisHorizontal;
+  NSArray<RDLItem *> *inOrder = [items sortedArrayUsingComparator:^NSComparisonResult(RDLItem *a, RDLItem *b) {
+    CGFloat x = horizontal ? a.left : a.top, y = horizontal ? b.left : b.top;
+    return x < y ? NSOrderedAscending : (x > y ? NSOrderedDescending : NSOrderedSame);
+  }];
+  RDLItem *first = [inOrder firstObject], *last = [inOrder lastObject];
+  // The room left over once the items themselves are taken out of the span,
+  // shared equally between them.
+  CGFloat span = horizontal ? (last.left + last.width) - first.left : (last.top + last.height) - first.top;
+  CGFloat used = 0;
+  for (RDLItem *item in inOrder)
+    used += horizontal ? item.width : item.height;
+  CGFloat gap = ([inOrder count] - 1) > 0 ? (span - used) / ([inOrder count] - 1) : 0;
+  [self beginGroup:@"Distribute"];
+  BOOL any = NO;
+  CGFloat at = horizontal ? first.left + first.width + gap : first.top + first.height + gap;
+  for (NSUInteger i = 1; i + 1 < [inOrder count]; i++) {
+    RDLItem *item = inOrder[i];
+    CGFloat was = horizontal ? item.left : item.top;
+    [self moveItem:item toLeft:horizontal ? at : item.left top:horizontal ? item.top : at];
+    any = any || (horizontal ? item.left : item.top) != was;
+    at += (horizontal ? item.width : item.height) + gap;
+  }
+  [self endGroup];
+  return any;
+}
+
 - (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top {
   if (item == nil)
     return;

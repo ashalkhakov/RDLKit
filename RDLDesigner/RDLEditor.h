@@ -69,6 +69,40 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofBandWithKey:(NSString *)bandKey;
 - (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath;
 
+// Which edge or middle several items are lined up on, and along which axis
+// they are spread out, as the Arrange menu offers them.
+typedef NS_ENUM(NSInteger, RDLAlignEdge) {
+  RDLAlignEdgeUnspecified = 0,
+  RDLAlignEdgeLeft,
+  RDLAlignEdgeHorizontalCenter,
+  RDLAlignEdgeRight,
+  RDLAlignEdgeTop,
+  RDLAlignEdgeVerticalCenter,
+  RDLAlignEdgeBottom,
+};
+
+typedef NS_ENUM(NSInteger, RDLSizeMatch) {
+  RDLSizeMatchUnspecified = 0,
+  RDLSizeMatchWidth,
+  RDLSizeMatchHeight,
+  RDLSizeMatchBoth,
+};
+
+typedef NS_ENUM(NSInteger, RDLDistributeAxis) {
+  RDLDistributeAxisUnspecified = 0,
+  RDLDistributeAxisHorizontal,
+  RDLDistributeAxisVertical,
+};
+
+// Several items lined up on the first of them, given the first's size, or
+// spread evenly between the two furthest apart -- each as one undoable step.
+// NO, changing nothing, when there are too few to arrange or they are arranged
+// that way already. The first item is the one the others follow, which is how
+// Report Builder and every drawing program do it.
+- (BOOL)alignItems:(NSArray<RDLItem *> *)items toEdge:(RDLAlignEdge)edge;
+- (BOOL)sizeItems:(NSArray<RDLItem *> *)items like:(RDLSizeMatch)match;
+- (BOOL)distributeItems:(NSArray<RDLItem *> *)items along:(RDLDistributeAxis)axis;
+
 // --- Geometry -------------------------------------------------------------
 // Snapped and clamped. Both coordinates move as one undo step.
 - (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top;
