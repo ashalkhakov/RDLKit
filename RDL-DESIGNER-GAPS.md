@@ -506,7 +506,10 @@ Done: the errors pane, as the left pane's Problems tab; multi-select
 with Shift-click and a marquee, moved, nudged and deleted together,
 with align, make-same-size and distribute in the Edit menu; eight
 handles; smart guides, which line a drag up with the edges, middles and
-sizes near it.
+sizes near it; drag reordering in the outline, which also moves an item
+into a rectangle or another band. The canvas has drawn what the
+backends draw since P1.1 -- lines, borders and padding through the same
+painters.
 
 ### P3 — matches the engine's P3
 

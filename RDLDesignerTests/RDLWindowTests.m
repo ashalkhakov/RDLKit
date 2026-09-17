@@ -18,6 +18,7 @@
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLProblemsView.h"
+#import "RDLOutlineDataSource.h"
 #import "RDLValueListEditor.h"
 #import "RDLDatasetOptionsEditor.h"
 #import "RDLParameterNavigator.h"
@@ -1595,6 +1596,101 @@ static NSTabView *_centerTabViewOf(id wc) {
   }
   if ([pane.problems count] < 2 || sawWarningBeforeError)
     XCTFail(@"errors should come before warnings: %@", [pane.problems valueForKey:@"message"]);
+}
+
+// The outline reorders by dragging: a row dropped among another band's items
+// moves it there, one dropped among its own siblings changes their order, and
+// a rectangle cannot be dropped into itself.
+- (void)testTheOutlineReordersByDragging {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Outlined"];
+  RDLRectangle *box = [[RDLRectangle alloc] init];
+  box.name = @"Box";
+  box.width = 3;
+  box.height = 2;
+  RDLTextbox *first = [[RDLTextbox alloc] init];
+  first.name = @"First";
+  first.width = 1;
+  first.height = 0.3;
+  RDLTextbox *second = [[RDLTextbox alloc] init];
+  second.name = @"Second";
+  second.top = 0.5;
+  second.width = 1;
+  second.height = 0.3;
+  [report.body.items addObjectsFromArray:@[ box, first, second ]];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  NSOutlineView *outline = [[NSOutlineView alloc] initWithFrame:NSMakeRect(0, 0, 220, 400)];
+  NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"name"];
+  [outline addTableColumn:column];
+  [outline setOutlineTableColumn:column];
+  RDLOutlineDataSource *source = [[RDLOutlineDataSource alloc] initWithOutlineView:outline context:ctx];
+  [source reload];
+
+  // The nodes for the body, the rectangle and the two text boxes.
+  id root = [source outlineView:outline child:0 ofItem:nil];
+  id bodyNode = nil, boxNode = nil, firstNode = nil, secondNode = nil;
+  for (NSInteger i = 0; i < [source outlineView:outline numberOfChildrenOfItem:root]; i++) {
+    id band = [source outlineView:outline child:i ofItem:root];
+    if ([[band valueForKey:@"bandKey"] isEqualToString:@"body"])
+      bodyNode = band;
+  }
+  for (NSInteger i = 0; i < [source outlineView:outline numberOfChildrenOfItem:bodyNode]; i++) {
+    id node = [source outlineView:outline child:i ofItem:bodyNode];
+    id item = [node valueForKey:@"item"];
+    if (item == box)
+      boxNode = node;
+    else if (item == first)
+      firstNode = node;
+    else if (item == second)
+      secondNode = node;
+  }
+  if (bodyNode == nil || boxNode == nil || firstNode == nil || secondNode == nil) {
+    XCTFail(@"%@", @"the outline should have a node for the body and for each item in it");
+    return;
+  }
+
+  // Dragged into the rectangle: the body keeps two items and the rectangle has one.
+  NSPasteboard *board = [NSPasteboard pasteboardWithUniqueName];
+  if (![source outlineView:outline writeItems:@[ secondNode ] toPasteboard:board])
+    XCTFail(@"%@", @"an item's row should be draggable");
+  if ([source outlineView:outline validateDrop:nil proposedItem:boxNode proposedChildIndex:0] !=
+      NSDragOperationMove)
+    XCTFail(@"%@", @"a rectangle should take a dropped item");
+  if ([source outlineView:outline validateDrop:nil proposedItem:boxNode
+            proposedChildIndex:NSOutlineViewDropOnItemIndex] != NSDragOperationNone)
+    XCTFail(@"%@", @"a drop onto a row rather than between two is not a move");
+  [source outlineView:outline acceptDrop:nil item:boxNode childIndex:0];
+  if ([report.body.items count] != 2 || [box.items count] != 1 || box.items[0] != second)
+    XCTFail(@"the text box should have moved into the rectangle: body %lu, box %lu",
+            (unsigned long)[report.body.items count], (unsigned long)[box.items count]);
+  [ctx.document.undoManager undo];
+  if ([report.body.items count] != 3 || [box.items count] != 0)
+    XCTFail(@"%@", @"one undo should put it back in the body");
+
+  // Dragged among its own siblings: the order changes.
+  [source reload];
+  [source outlineView:outline writeItems:@[ firstNode ] toPasteboard:board];
+  [source outlineView:outline acceptDrop:nil item:bodyNode childIndex:3];
+  if ([report.body.items lastObject] != first)
+    XCTFail(@"the first should now be last: %@", [report.body.items valueForKey:@"name"]);
+
+  // A rectangle cannot be dropped into itself.
+  [source reload];
+  [source outlineView:outline writeItems:@[ boxNode ] toPasteboard:board];
+  if ([source outlineView:outline validateDrop:nil proposedItem:boxNode proposedChildIndex:0] !=
+      NSDragOperationNone)
+    XCTFail(@"%@", @"a rectangle should not take itself");
+  // Nor through the editor, whatever asks: a rectangle inside itself is a
+  // rectangle out of the report.
+  if ([ctx.editor moveItem:box into:box.items bandKey:@"body" atIndex:0] ||
+      [report.body.items indexOfObjectIdenticalTo:box] == NSNotFound)
+    XCTFail(@"%@", @"the editor should refuse to put a rectangle inside itself");
+  RDLRectangle *inside = [[RDLRectangle alloc] init];
+  inside.name = @"Inside";
+  inside.width = 1;
+  inside.height = 0.3;
+  [box.items addObject:inside];
+  if ([ctx.editor moveItem:box into:inside.items bandKey:@"body" atIndex:0])
+    XCTFail(@"%@", @"nor inside something it holds");
 }
 
 // Changing a parameter in the generator shows up in what it renders: the value

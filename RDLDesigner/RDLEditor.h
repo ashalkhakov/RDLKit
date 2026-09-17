@@ -133,6 +133,14 @@ typedef NS_ENUM(NSInteger, RDLDistributeAxis) {
            atIndex:(NSUInteger)index;
 - (void)addItem:(RDLItem *)item into:(NSMutableArray *)container bandKey:(NSString *)bandKey;
 - (BOOL)removeItem:(RDLItem *)item;
+// An item taken out of wherever it is and put into `container` at `index`, as
+// one undoable step: what dragging a row of the outline onto another band, or
+// in among its siblings, means. NO when it is already there, or when the
+// container is the item's own -- a rectangle cannot be put inside itself.
+- (BOOL)moveItem:(RDLItem *)item
+            into:(NSMutableArray *)container
+         bandKey:(NSString *)bandKey
+         atIndex:(NSUInteger)index;
 // The array that holds `item` — a band's items or a Rectangle's children.
 - (NSMutableArray *)containerOfItem:(RDLItem *)item bandKey:(NSString **)outBandKey;
 

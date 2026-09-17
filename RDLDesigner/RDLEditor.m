@@ -916,6 +916,43 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
   [self insertItem:item into:container bandKey:bandKey atIndex:[container count]];
 }
 
+// Whether `item` is `container`'s own list, or one inside it: dropping a
+// rectangle into itself, or into something it holds, would take it out of the
+// report altogether.
+static BOOL RDLContainerIsWithin(NSMutableArray *container, RDLItem *item) {
+  if (item.childItems == container)
+    return YES;
+  for (RDLItem *child in item.childItems)
+    if (RDLContainerIsWithin(container, child))
+      return YES;
+  return NO;
+}
+
+- (BOOL)moveItem:(RDLItem *)item
+            into:(NSMutableArray *)container
+         bandKey:(NSString *)bandKey
+         atIndex:(NSUInteger)index {
+  NSString *wasBand = nil;
+  NSMutableArray *from = [self containerOfItem:item bandKey:&wasBand];
+  if (item == nil || container == nil || from == nil || RDLContainerIsWithin(container, item))
+    return NO;
+  NSUInteger was = [from indexOfObjectIdenticalTo:item];
+  NSUInteger to = MIN(index, [container count]);
+  // Dropping an item just after itself, or where it already is, is not a move.
+  if (from == container && (to == was || to == was + 1))
+    return NO;
+  [self beginGroup:@"Move"];
+  [[self undoProxy] moveItem:item into:from bandKey:wasBand atIndex:was];
+  [from removeObjectAtIndex:was];
+  // Taking it out of the same list shifts everything after it down one.
+  if (from == container && to > was)
+    to -= 1;
+  [container insertObject:item atIndex:MIN(to, [container count])];
+  [self endGroup];
+  [self noteChange:[RDLChange structureChange:nil bandKey:bandKey ?: wasBand]];
+  return YES;
+}
+
 - (BOOL)removeItem:(RDLItem *)item {
   NSString *bandKey = nil;
   NSMutableArray *container = [self containerOfItem:item bandKey:&bandKey];

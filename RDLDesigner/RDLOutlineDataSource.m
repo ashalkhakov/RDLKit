@@ -53,8 +53,15 @@ static id RDLNodeKeyForItem(RDLItem *item) {
   return [NSValue valueWithPointer:(__bridge const void *)item];
 }
 
+// The outline's own drag type: what is carried is a row of this outline, and
+// nothing outside the designer should think it can take it.
+static NSString *const RDLOutlineDragType = @"RDLOutlineRow";
+
 @implementation RDLOutlineDataSource {
   NSOutlineView *_outlineView;
+  // The rows being dragged. The pasteboard carries only a mark, since what is
+  // dragged is report items, which nothing else can read anyway.
+  NSArray<RDLOutlineNode *> *_draggedNodes;
   RDLEditingContext *_ctx;
   RDLOutlineNode *_rootNode;
   NSMutableDictionary *_nodesByKey;
@@ -70,6 +77,7 @@ static id RDLNodeKeyForItem(RDLItem *item) {
   self = [super init];
   if (self) {
     _outlineView = outlineView;
+    [outlineView registerForDraggedTypes:@[ RDLOutlineDragType ]];
     _ctx = context;
     _nodesByKey = [NSMutableDictionary dictionary];
     [outlineView setDataSource:self];
@@ -230,6 +238,84 @@ static id RDLNodeKeyForItem(RDLItem *item) {
   [_outlineView expandItem:node];
   for (RDLOutlineNode *child in node.children)
     [self expandAllFrom:child];
+}
+
+#pragma mark - Dragging
+
+// Where a node's children live: a band's items, or a Rectangle's. nil for
+// anything that is not a list of items -- a tablix's grid is arranged by the
+// canvas and the tablix panel, not by dragging rows about.
+- (NSMutableArray *)itemListOfNode:(RDLOutlineNode *)node bandKey:(NSString **)outBandKey {
+  if (node == nil || node.kind == RDLNodeReport)
+    return nil;
+  if (outBandKey)
+    *outBandKey = node.bandKey;
+  if (node.kind == RDLNodeBand)
+    return [_ctx.report bandWithKey:node.bandKey].items;
+  if (node.kind == RDLNodeItem && [node.item isKindOfClass:[RDLRectangle class]])
+    return [(RDLRectangle *)node.item items];
+  return nil;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline
+         writeItems:(NSArray *)items
+       toPasteboard:(NSPasteboard *)pasteboard {
+  RDL_UNUSED(outline);
+  NSMutableArray<RDLOutlineNode *> *nodes = [NSMutableArray array];
+  for (RDLOutlineNode *node in items)
+    if (node.kind == RDLNodeItem && node.item != nil)
+      [nodes addObject:node];
+  if ([nodes count] == 0)
+    return NO;
+  _draggedNodes = nodes;
+  [pasteboard declareTypes:@[ RDLOutlineDragType ] owner:self];
+  [pasteboard setString:@"row" forType:RDLOutlineDragType];
+  return YES;
+}
+
+- (NSDragOperation)outlineView:(NSOutlineView *)outline
+                  validateDrop:(id<NSDraggingInfo>)info
+                  proposedItem:(id)item
+            proposedChildIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  // Onto a row rather than between two of them: the outline would put the item
+  // inside whatever was pointed at, which for anything but a rectangle or a
+  // band is not somewhere items go.
+  if (index == NSOutlineViewDropOnItemIndex)
+    return NSDragOperationNone;
+  NSMutableArray *into = [self itemListOfNode:item bandKey:NULL];
+  if (into == nil || [_draggedNodes count] == 0)
+    return NSDragOperationNone;
+  for (RDLOutlineNode *node in _draggedNodes)
+    if ([node.item isKindOfClass:[RDLRectangle class]] && into == [(RDLRectangle *)node.item items])
+      return NSDragOperationNone;
+  return NSDragOperationMove;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline
+         acceptDrop:(id<NSDraggingInfo>)info
+               item:(id)item
+         childIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  NSString *bandKey = nil;
+  NSMutableArray *into = [self itemListOfNode:item bandKey:&bandKey];
+  if (into == nil || [_draggedNodes count] == 0)
+    return NO;
+  NSUInteger at = index < 0 ? [into count] : (NSUInteger)index;
+  BOOL moved = NO;
+  [_ctx.editor beginGroup:@"Move"];
+  for (RDLOutlineNode *node in _draggedNodes) {
+    if ([_ctx.editor moveItem:node.item into:into bandKey:bandKey atIndex:at])
+      moved = YES;
+    // Each after the last, so several dragged together keep their order.
+    at = MIN([into indexOfObjectIdenticalTo:node.item] + 1, [into count]);
+  }
+  [_ctx.editor endGroup];
+  _draggedNodes = nil;
+  [self reload];
+  return moved;
 }
 
 #pragma mark - NSOutlineViewDataSource
