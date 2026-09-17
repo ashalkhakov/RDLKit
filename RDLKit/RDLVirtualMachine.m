@@ -434,66 +434,8 @@ done:
 
 #pragma mark - The way in
 
-// The old evaluator's children are worked out by the machine, and only the
-// machine: comparing at every level would compare each subtree over and over.
-id RDLExecChild(RDLExprNode *ast, RDLEvalScope *scope);
-
-id RDLExecChild(RDLExprNode *ast, RDLEvalScope *scope) {
+id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
   if (ast == nil)
     return @"";
   return RDLRunChunk(RDLChunkForNode(ast), scope);
-}
-
-// RDL_EXPRESSION_ORACLE=<path>: evaluate every expression the old way as well,
-// and write down each one where the two disagree. Temporary: goes with the old
-// evaluator.
-static NSString *RDLOracleLog(void) {
-  static NSString *path;
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{
-    const char *given = getenv("RDL_EXPRESSION_ORACLE");
-    path = given && *given ? [NSString stringWithUTF8String:given] : nil;
-  });
-  return path;
-}
-
-static BOOL RDLOracleAgrees(id a, id b) {
-  if (a == b)
-    return YES;
-  if (a == nil || b == nil)
-    return NO;
-  if ([a isKindOfClass:[NSDate class]] && [b isKindOfClass:[NSDate class]])
-    return fabs([(NSDate *)a timeIntervalSinceDate:b]) < 5;  // Now, read twice
-  if ([a isKindOfClass:[RDLExprError class]] && [b isKindOfClass:[RDLExprError class]])
-    return [[(RDLExprError *)a message] isEqualToString:[(RDLExprError *)b message]];
-  if ([a class] != [b class])
-    return NO;
-  return [a isEqual:b] || [[a description] isEqualToString:[b description]];
-}
-
-static void RDLOracleRecord(RDLExprNode *ast, id machine, id tree) {
-  NSString *line = [NSString stringWithFormat:@"%@\tmachine=%@ <%@>\ttree=%@ <%@>\n", RDLPrint(ast), machine,
-                                              [machine class], tree, [tree class]];
-  @synchronized([NSFileManager class]) {
-    NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:RDLOracleLog()];
-    if (h == nil) {
-      [[NSData data] writeToFile:RDLOracleLog() atomically:NO];
-      h = [NSFileHandle fileHandleForWritingAtPath:RDLOracleLog()];
-    }
-    [h seekToEndOfFile];
-    [h writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
-    [h closeFile];
-  }
-}
-
-id RDLExec(RDLExprNode *ast, RDLEvalScope *scope) {
-  id value = RDLExecChild(ast, scope);
-  // The report's code keeps state, so evaluating its calls twice would change
-  // what they return; those reports are left to the render comparison.
-  if (ast != nil && RDLOracleLog() != nil && scope.report.codeModule == nil) {
-    id tree = RDLExecTree(ast, scope);
-    if (!RDLOracleAgrees(value, tree))
-      RDLOracleRecord(ast, value, tree);
-  }
-  return value;
 }

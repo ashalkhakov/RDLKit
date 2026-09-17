@@ -364,7 +364,7 @@ FOUNDATION_EXPORT NSString *RDLHostLanguage(void);
 // English. An empty code is known: it means "the machine's own".
 FOUNDATION_EXPORT BOOL RDLLanguageIsKnown(NSString *language);
 
-// VB-style RDL expressions: tokenize → AST (translation) → execute.
+// VB-style RDL expressions: tokens, a tree, bytecode, and a stack machine that runs it.
 // How a value is written as text: its Format, and the culture, calendar and
 // digits a style writes it in. A NumeralLanguage left unset is the Language.
 @interface RDLTextFormatting : NSObject

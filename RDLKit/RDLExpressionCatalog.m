@@ -40,9 +40,9 @@ NSString *RDLExpressionContextDescription(RDLExpressionContext context) {
 @implementation RDLExpressionCatalog
 
 // Built once, and the one place any of this is written down. Every name here
-// is one RDLExec dispatches on; the list was taken from that switch rather
-// than from the RDL specification, so the picker cannot offer a function this
-// evaluator does not have.
+// is one the evaluator answers to -- a form the compiler knows, or a function
+// of the runtime library -- rather than one taken from the RDL specification,
+// so the picker cannot offer a function this evaluator does not have.
 //
 // The order the categories come out in is the order of the last column below,
 // first appearance first. It is a reading order -- what a report author

@@ -207,7 +207,3 @@ FOUNDATION_EXPORT id RDLCallMethod(NSString *name, NSArray *vals, RDLEvalScope *
 // Assigned, converted to the variable's type; what was stored.
 - (id)storeVariableAt:(NSInteger)index value:(id)value scope:(RDLEvalScope *)scope;
 @end
-
-// The tree-walking evaluator the machine replaces, kept only to check the
-// machine against while the two are compared. Goes when they have agreed.
-FOUNDATION_EXPORT id RDLExecTree(RDLExprNode *ast, RDLEvalScope *scope);
