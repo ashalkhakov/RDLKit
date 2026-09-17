@@ -66,6 +66,8 @@
                 <outlet property="textBordersButton" destination="textBordersButton" id="textBordersButtonOutlet"/>
                 <outlet property="rectBordersButton" destination="rectBordersButton" id="rectBordersButtonOutlet"/>
                 <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
+                <outlet property="cellRowHeightLabel" destination="cellRowHeightLabel" id="cellRowHeightLabelOutlet"/>
+                <outlet property="cellRowHeightField" destination="cellRowHeightField" id="cellRowHeightFieldOutlet"/>
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
                 <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
@@ -978,7 +980,7 @@
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblCell2">
-                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <rect key="frame" x="10" y="4" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Column width in" id="lblCell2Cell">
                         <font key="font" metaFont="smallSystem"/>
@@ -1010,6 +1012,27 @@
                         <action selector="editBorders:" target="-2" id="cellBordersButtonAction"/>
                     </connections>
                 </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="cellRowHeightLabel">
+                    <rect key="frame" x="136" y="4" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Row height" id="cellRowHeightLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How tall the row this cell is in is" focusRingType="none" id="cellRowHeightField">
+                    <rect key="frame" x="136" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="cellRowHeightFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="cellRowHeightFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="cellRowHeightFieldDelegate"/>
+                    </connections>
+                </textField>
             </subviews>
         </customView>
         <customView id="visibilityBox">

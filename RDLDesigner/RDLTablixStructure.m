@@ -387,6 +387,51 @@ static NSString *RDLTotalFor(RDLItem *item, RDLDataSet *dataSet) {
   return YES;
 }
 
+// The row hierarchy's members are the columns' in the other direction, so a
+// row goes in and out the way a column does.
++ (BOOL)insertRowAtIndex:(NSUInteger)index
+                  height:(CGFloat)height
+                inTablix:(RDLTablix *)tablix
+                  report:(RDLReport *)report {
+  if (!RDLIsConsistent(tablix) || index > [tablix.tablixBody.rows count])
+    return NO;
+  RDLTablixHierarchy *hierarchy = tablix.rowHierarchy;
+  if ([hierarchy.members count]) {
+    NSArray<RDLTablixMember *> *leaves = [hierarchy leafMembers];
+    BOOL after = index >= [leaves count];
+    RDLTablixMember *neighbour = after ? [leaves lastObject] : leaves[index];
+    NSMutableArray<RDLTablixMember *> *siblings = RDLSiblingsOf(neighbour, hierarchy);
+    NSUInteger at = [siblings indexOfObjectIdenticalTo:neighbour];
+    [siblings insertObject:[[RDLTablixMember alloc] init] atIndex:after ? at + 1 : at];
+  }
+  RDLInsertLine(tablix, RDLTablixAxisRows, index, height, report);
+  return YES;
+}
+
++ (BOOL)removeRowAtIndex:(NSUInteger)index inTablix:(RDLTablix *)tablix {
+  NSUInteger rowCount = [tablix.tablixBody.rows count];
+  if (!RDLIsConsistent(tablix) || rowCount <= 1 || index >= rowCount)
+    return NO;
+  RDLTablixHierarchy *hierarchy = tablix.rowHierarchy;
+  RDLTablixMember *leaf = nil;
+  NSMutableArray<RDLTablixMember *> *siblings = nil;
+  if ([hierarchy.members count]) {
+    leaf = [hierarchy leafMembers][index];
+    siblings = RDLSiblingsOf(leaf, hierarchy);
+    // A group with no row left is not a group; delete the group instead.
+    if ([siblings count] == 1 && siblings != hierarchy.members)
+      return NO;
+    // Nor is a group's own row, the one its instances repeat: that goes with
+    // the group.
+    if ([leaf.groupName length])
+      return NO;
+  }
+  RDLRemoveLine(tablix, RDLTablixAxisRows, index);
+  if (leaf != nil)
+    [siblings removeObjectIdenticalTo:leaf];
+  return YES;
+}
+
 // Whether a merged cell reaches across the line between columns `left` and
 // `left + 1`.
 static BOOL RDLSpanCrosses(RDLTablix *tablix, NSUInteger left) {

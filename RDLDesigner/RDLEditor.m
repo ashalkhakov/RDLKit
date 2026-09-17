@@ -785,6 +785,30 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
                          }];
 }
 
+- (BOOL)insertTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
+  RDLReport *report = _document.report;
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  if ([rows count] == 0)
+    return NO;
+  CGFloat height = rows[MIN(index, [rows count] - 1)].height;
+  return [self changeStructureOfTablix:tablix
+                                action:@"Insert Row"
+                                change:^BOOL {
+                                  return [RDLTablixStructure insertRowAtIndex:index
+                                                                       height:height
+                                                                     inTablix:tablix
+                                                                       report:report];
+                                }];
+}
+
+- (BOOL)removeTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix {
+  return [self changeStructureOfTablix:tablix
+                                action:@"Delete Row"
+                                change:^BOOL {
+                                  return [RDLTablixStructure removeRowAtIndex:index inTablix:tablix];
+                                }];
+}
+
 - (void)moveTablixColumnAtIndex:(NSUInteger)from
                         toIndex:(NSUInteger)to
                        ofTablix:(RDLTablix *)tablix {

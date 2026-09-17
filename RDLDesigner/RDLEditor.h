@@ -165,6 +165,9 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 - (void)setTablixColumn:(NSUInteger)index width:(CGFloat)width ofTablix:(RDLTablix *)tablix;
 - (void)setTablixRow:(NSUInteger)index height:(CGFloat)height ofTablix:(RDLTablix *)tablix;
 - (void)insertTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+// A row on its own, as tall as the row it goes beside; and one taken away.
+- (BOOL)insertTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+- (BOOL)removeTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 // Reorder: the column at `from` ends up at `to`, taking its heading, its value
 // and its width with it. What dragging a column's handle on the canvas does.

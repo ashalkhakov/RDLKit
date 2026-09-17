@@ -51,6 +51,8 @@
 // Borders for a cell whose contents have no section that offers them: an empty
 // cell, or an image, chart or other region in one.
 @property (nonatomic, strong) IBOutlet NSButton *cellBordersButton;
+// The height of the row the cell is in, whichever row that is.
+@property (nonatomic, strong) IBOutlet NSTextField *cellRowHeightField, *cellRowHeightLabel;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
@@ -636,6 +638,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     @"topMarginLabel" : @"Top",
     @"bottomMarginLabel" : @"Bottom",
     @"columnSpacingLabel" : @"Spacing",
+    @"cellRowHeightLabel" : @"Row height",
     @"bandHeightLabel" : @"Height",
     @"cellWidthLabel" : @"Column width",
     @"tablixHeaderLabel" : @"Header",
@@ -712,6 +715,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     NSUInteger cellRow = 0, cellColumn = 0;
     if (cell != nil && [cellTablix getRow:&cellRow column:&cellColumn ofCell:cell] &&
         [self fillColumn:(NSInteger)cellColumn ofTablix:cellTablix]) {
+      [self fillRow:(NSInteger)cellRow ofTablix:cellTablix];
       // A text box and a rectangle carry the button in their own sections, and
       // a line's border is the line, edited in its section.
       BOOL ownSectionHasBorders = [it isKindOfClass:[RDLTextbox class]] ||
@@ -732,6 +736,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     NSInteger bodyColumn = [RDLTablixGeometry bodyColumnOf:sel.tablix
                                              forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
     if (bodyColumn >= 0 && [self fillColumn:bodyColumn ofTablix:sel.tablix]) {
+      [self fillRow:[RDLTablixGeometry bodyRowOf:sel.tablix forGridRow:(NSUInteger)MAX(sel.cellRow, 0)]
+           ofTablix:sel.tablix];
       [self showCellBorders:YES];
       [boxes addObject:_cellBox];
     }
@@ -825,6 +831,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   return YES;
 }
 
+- (void)fillRow:(NSInteger)row ofTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  [_cellRowHeightField setStringValue:row >= 0 && row < (NSInteger)[rows count]
+                                          ? [self stringFromInches:rows[(NSUInteger)row].height]
+                                          : @""];
+}
+
 // The two rows a tablix's columns are described by: the heading row and the
 // value row. A field is blank where the tablix has no such row -- a
 // crosstab's headings are its column groups' headers.
@@ -855,23 +868,30 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 // A column's width typed in: the column the selected cell item, or the selected
 // empty cell, is in -- set exactly, and in place.
 - (BOOL)applyCellControl:(id)sender {
-  if (sender != _cellWidthField)
+  if (sender != _cellWidthField && sender != _cellRowHeightField)
     return NO;
   RDLSelection *sel = _context.selection;
   RDLTablix *tablix = nil;
-  NSInteger column = -1;
+  NSInteger column = -1, row = -1;
   if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil) {
     tablix = sel.tablix;
     column = [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+    row = [RDLTablixGeometry bodyRowOf:tablix forGridRow:(NSUInteger)MAX(sel.cellRow, 0)];
   } else {
     RDLTablixCell *cell = [_context.report cellContainingItem:[_context selectedItem] tablix:&tablix];
-    NSUInteger row = 0, bodyColumn = 0;
-    if (cell != nil && [tablix getRow:&row column:&bodyColumn ofCell:cell])
+    NSUInteger bodyRow = 0, bodyColumn = 0;
+    if (cell != nil && [tablix getRow:&bodyRow column:&bodyColumn ofCell:cell]) {
       column = (NSInteger)bodyColumn;
+      row = (NSInteger)bodyRow;
+    }
   }
-  CGFloat width = RDLInchesFromUnits([[_cellWidthField stringValue] doubleValue], _context.report.unit);
-  if (tablix != nil && column >= 0 && width > 0)
-    [_context.editor setTablixColumn:(NSUInteger)column width:width ofTablix:tablix];
+  CGFloat size = RDLInchesFromUnits([[(NSTextField *)sender stringValue] doubleValue], _context.report.unit);
+  if (tablix == nil || size <= 0)
+    return YES;
+  if (sender == _cellWidthField && column >= 0)
+    [_context.editor setTablixColumn:(NSUInteger)column width:size ofTablix:tablix];
+  else if (sender == _cellRowHeightField && row >= 0)
+    [_context.editor setTablixRow:(NSUInteger)row height:size ofTablix:tablix];
   return YES;
 }
 

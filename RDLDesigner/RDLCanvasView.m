@@ -433,6 +433,18 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
                                   tag:col]];
     [m addItem:[NSMenuItem separatorItem]];
   }
+  NSInteger bodyRow = gridRow >= 0 ? [RDLTablixGeometry bodyRowOf:tab forGridRow:(NSUInteger)gridRow] : -1;
+  if (bodyRow >= 0) {
+    [m addItem:[self tablixMenuItem:@"Insert Row Above" action:@selector(ctxInsertRowAbove:) tag:bodyRow]];
+    [m addItem:[self tablixMenuItem:@"Insert Row Below" action:@selector(ctxInsertRowBelow:) tag:bodyRow]];
+    RDLTablixMember *leaf = [tab.rowHierarchy.members count] &&
+                                    bodyRow < (NSInteger)[[tab.rowHierarchy leafMembers] count]
+                                ? [tab.rowHierarchy leafMembers][(NSUInteger)bodyRow]
+                                : nil;
+    if ([tab.tablixBody.rows count] > 1 && [leaf.groupName length] == 0)
+      [m addItem:[self tablixMenuItem:@"Delete Row" action:@selector(ctxDeleteRow:) tag:bodyRow]];
+    [m addItem:[NSMenuItem separatorItem]];
+  }
   if (gridRow >= 0 && gridColumn >= 0) {
     BOOL any = NO;
     for (NSNumber *axis in @[ @(RDLTablixAxisRows), @(RDLTablixAxisColumns) ]) {
@@ -592,6 +604,18 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
 - (void)ctxDeleteColumn:(NSMenuItem *)mi {
   [_context.editor removeTablixColumnAtIndex:(NSUInteger)[mi tag]
                                     ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxInsertRowAbove:(NSMenuItem *)mi {
+  [_context.editor insertTablixRowAtIndex:(NSUInteger)[mi tag] ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxInsertRowBelow:(NSMenuItem *)mi {
+  [_context.editor insertTablixRowAtIndex:(NSUInteger)[mi tag] + 1 ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxDeleteRow:(NSMenuItem *)mi {
+  [_context.editor removeTablixRowAtIndex:(NSUInteger)[mi tag] ofTablix:[self tablixOfMenuItem:mi]];
 }
 
 - (void)ctxToggleGrandTotal:(NSMenuItem *)mi {

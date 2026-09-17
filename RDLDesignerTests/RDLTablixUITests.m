@@ -8,6 +8,7 @@
 #import "RDLTablixStructure.h"
 #import "RDLGroupPropertiesEditor.h"
 #import "RDLSortEditor.h"
+#import "RDLInspectorView.h"
 
 
 
@@ -739,6 +740,60 @@
     XCTFail(@"%@", @"accepting an untouched panel should change nothing");
   [[panel valueForKey:@"window"] close];
   [[idle valueForKey:@"window"] close];
+}
+
+// A row on its own, from the canvas's menu: inserted beside the row clicked,
+// inside whatever group that row is in, with a text box in each cell; deleted
+// where it is not a group's own row. Each is one step, and a cell's row
+// height is its own field.
+- (void)testRowsAreInsertedAndDeletedOnTheirOwn {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  NSUInteger rows = [tablix.tablixBody.rows count];
+  NSUInteger leaves = [[tablix.rowHierarchy leafMembers] count];
+  NSString *before = [RDLEditor XMLStringForItem:tablix];
+  CGFloat height = tablix.height;
+
+  // Below the heading row.
+  if (![ctx.editor insertTablixRowAtIndex:1 ofTablix:tablix])
+    XCTFail(@"%@", @"a row should go in below the heading");
+  if ([tablix.tablixBody.rows count] != rows + 1 || [[tablix.rowHierarchy leafMembers] count] != leaves + 1)
+    XCTFail(@"%@", @"the body and the hierarchy should each gain a row");
+  RDLTablixRow *added = tablix.tablixBody.rows[1];
+  if ([added.cells count] != [tablix.tablixBody.columns count] ||
+      ![added.cells[0].item isKindOfClass:[RDLTextbox class]])
+    XCTFail(@"%@", @"the new row should have a text box in each cell");
+  if (tablix.height <= height || [[tablix structuralProblems] count])
+    XCTFail(@"the tablix should grow and stay consistent: %@", [tablix structuralProblems]);
+
+  // Its height, from the cell section.
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1200) context:ctx];
+  [ctx.selection selectItem:added.cells[0].item inBandWithKey:@"body"];
+  NSTextField *rowHeight = [inspector valueForKey:@"cellRowHeightField"];
+  [rowHeight setStringValue:@"0.6"];
+  [inspector changed:rowHeight];
+  if (fabs(tablix.tablixBody.rows[1].height - 0.6) > 1e-6)
+    XCTFail(@"the row is %g tall", tablix.tablixBody.rows[1].height);
+
+  // Deleted again, and a group's own row refused.
+  if (![ctx.editor removeTablixRowAtIndex:1 ofTablix:tablix] || [tablix.tablixBody.rows count] != rows)
+    XCTFail(@"%@", @"the row should come out again");
+  NSArray<RDLTablixMember *> *leafMembers = [tablix.rowHierarchy leafMembers];
+  for (NSUInteger i = 0; i < [leafMembers count]; i++)
+    if ([leafMembers[i].groupName length] &&
+        [ctx.editor removeTablixRowAtIndex:i ofTablix:tablix])
+      XCTFail(@"%@", @"a group's own row goes with the group, not on its own");
+
+  // Three steps, all undone.
+  [ctx.document.undoManager undo];
+  [ctx.document.undoManager undo];
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:before])
+    XCTFail(@"%@", @"undoing should put the tablix back as it was");
 }
 
 // The dialog edits a copy with the edits the canvas makes, so OK keeps what

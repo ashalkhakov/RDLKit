@@ -291,8 +291,8 @@ not yet keep that.
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `KeepTogether` | Done | In Group Properties, applied with the name, expressions and filters as one step; sorting through a panel shared with the tablix. |
 | Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData`; group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. What a member row does is Report Builder's Advanced Mode row pane, which the designer does not have. |
 | Details `SortExpressions` | Done (engine FULL) | Through the details group's Group Properties, when the details group is named, as Report Builder names it. |
-| Row heights other than the heading and value rows | UI | Kept; no control. |
-| Rows inserted or deleted on their own | UI (model has them) | The canvas menu offers columns; rows come with groups and totals. |
+| Row heights other than the heading and value rows | Done | The cell section's Row height, for the row the selected cell is in. |
+| Rows inserted or deleted on their own | Done | Insert Row Above/Below and Delete Row on the canvas, beside the row clicked and inside its group; a group's own row goes with the group. |
 | Tablix `NoRowsMessage`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | Done | A section of the tablix's own. |
 | Tablix `SortExpressions` | Done | Sorting… in the tablix's section. |
 | `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |

@@ -57,6 +57,15 @@ typedef NS_ENUM(NSInteger, RDLGroupPlacement) {
 // To `to`, counted once it has been taken out; not when a merged cell covers it
 // or the place it would go, or when it would leave its group.
 + (BOOL)moveColumnAtIndex:(NSUInteger)from toIndex:(NSUInteger)to inTablix:(RDLTablix *)tablix;
+// A body row on its own, beside the row at `index` among its siblings in the
+// row hierarchy -- inside the same group, outside any group of its own -- with
+// an empty text box in each cell, a merged cell it falls in growing over it.
+// And a row taken away, where it is not the only row of a group.
++ (BOOL)insertRowAtIndex:(NSUInteger)index
+                  height:(CGFloat)height
+                inTablix:(RDLTablix *)tablix
+                  report:(RDLReport *)report;
++ (BOOL)removeRowAtIndex:(NSUInteger)index inTablix:(RDLTablix *)tablix;
 
 // The total row at the end of a grouped tablix: a static row member after the
 // groups, with a body row of its own.
