@@ -17,10 +17,11 @@ typedef NS_ENUM(NSInteger, RDLSchemaVersion) {
 // XML tree is rewritten before anything reads a model out of it, so RDLParser
 // and RDLReport.h only ever have to know one shape.
 //
-// What that means concretely is that `Table` and `Matrix` become `Tablix` --
-// their rows, cells and groupings restructured into TablixBody plus a row and
-// column hierarchy -- along with the smaller renamings the older schemas used.
-// Documents that are already 2010 or 2016 are left alone.
+// The upgrade is a sequence of migrations, each from one schema to the next,
+// each in a file of its own (RDLMigration<year>.m): 2005 to 2008 is where
+// `Table`, `Matrix` and `List` become `Tablix` and the chart is redesigned,
+// 2008 to 2010 where a report grows sections. What this kit's own older files
+// said that no schema has is put right afterwards (RDLUpgraderRepairs.m).
 //
 // Nothing here parses; it only moves XML around. Deciding what an element
 // means stays in RDLParser.
@@ -29,9 +30,14 @@ typedef NS_ENUM(NSInteger, RDLSchemaVersion) {
 // The schema the document is written against, from its root namespace.
 + (RDLSchemaVersion)versionOfDocument:(NSXMLDocument *)document;
 
-// Rewrites `document` in place. Returns the version it was upgraded *from*,
-// so a caller can report what it did; RDLSchemaVersion2010 or 2016 means
-// nothing needed doing.
+// The grammar the document is really written in: what it declares, or older
+// where it holds what only an older grammar has. What the upgrade starts from.
++ (RDLSchemaVersion)grammarOfDocument:(NSXMLDocument *)document;
+
+// Rewrites `document` in place, one schema to the next -- 2003 to 2005, 2005
+// to 2008, 2008 to 2010, 2010 to 2016 -- from the grammar it is in. Returns the
+// version it declared, so a caller can report what it did;
+// RDLSchemaVersion2010 or 2016 means it claimed to need nothing.
 + (RDLSchemaVersion)upgradeDocument:(NSXMLDocument *)document;
 
 @end

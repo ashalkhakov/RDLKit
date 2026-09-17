@@ -32,6 +32,12 @@ RDLKit_OBJC_FILES = \
   RDLReport.m \
   RDLParser.m \
   RDLUpgrader.m \
+  RDLUpgraderSupport.m \
+  RDLMigration2003.m \
+  RDLMigration2005.m \
+  RDLMigration2008.m \
+  RDLMigration2010.m \
+  RDLUpgraderRepairs.m \
   RDLChartRenderer.m \
   RDLChecker.m \
   RDLZipArchive.m \

@@ -303,6 +303,12 @@
 		F3EBBC2F011CBAE5CED1F5EF /* RDLStylePanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 65B5D62EC5CCC1AEDA4F2673 /* RDLStylePanel.xib */; };
 		FB5180CD8C03DBD53D549D68 /* RDLStylePanel.m in Sources */ = {isa = PBXBuildFile; fileRef = 594AF7538A8824886341645D /* RDLStylePanel.m */; };
 		BCB81A843A4B6DABCF7327DC /* RDLStylePanel.xib in Resources */ = {isa = PBXBuildFile; fileRef = 65B5D62EC5CCC1AEDA4F2673 /* RDLStylePanel.xib */; };
+		EBDB6B7BAAD741364346EB8F /* RDLUpgraderSupport.m in Sources */ = {isa = PBXBuildFile; fileRef = 3A3A679B918A2A4795A5DCA1 /* RDLUpgraderSupport.m */; };
+		B5403D08F125593BE0DED433 /* RDLMigration2003.m in Sources */ = {isa = PBXBuildFile; fileRef = EEECA8C7529972964D0F57B7 /* RDLMigration2003.m */; };
+		2D911A0813AB8633A25EB002 /* RDLMigration2005.m in Sources */ = {isa = PBXBuildFile; fileRef = 74D769DAEB90F8CC3C4C0FBF /* RDLMigration2005.m */; };
+		611AD764BDEFE0B6717F4F33 /* RDLMigration2008.m in Sources */ = {isa = PBXBuildFile; fileRef = EFE8C64980075081596BC4B5 /* RDLMigration2008.m */; };
+		9412C602DD236B7DD82B9366 /* RDLMigration2010.m in Sources */ = {isa = PBXBuildFile; fileRef = 0B62C60175108DC93648591A /* RDLMigration2010.m */; };
+		D6627D0594A725B37226D7FF /* RDLUpgraderRepairs.m in Sources */ = {isa = PBXBuildFile; fileRef = 43CEC6B322C51E22EBE8D05C /* RDLUpgraderRepairs.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -561,6 +567,7 @@
 		F7064FFF1DCC05FBB4A90EDD /* RDLTextAttributes.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextAttributes.m; sourceTree = "<group>"; };
 		C0DE00000000000000000F53 /* RDLValueBoxing.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLValueBoxing.m; sourceTree = "<group>"; };
 		C0DE00000000000000001B06 /* RDLRuntimeLibrary.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLRuntimeLibrary.h; sourceTree = "<group>"; };
+		C0DE00000000000000001C01 /* RDLUpgraderSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLUpgraderSupport.h; sourceTree = "<group>"; };
 		C0DE00000000000000001B01 /* RDLBytecode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLBytecode.h; sourceTree = "<group>"; };
 		C0DE00000000000000001B02 /* RDLCompiler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLCompiler.m; sourceTree = "<group>"; };
 		C0DE00000000000000001B04 /* RDLVirtualMachine.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLVirtualMachine.m; sourceTree = "<group>"; };
@@ -634,6 +641,12 @@
 		F05064A40710BB2A343D63B7 /* RDLStylePanel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLStylePanel.h; sourceTree = "<group>"; };
 		594AF7538A8824886341645D /* RDLStylePanel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLStylePanel.m; sourceTree = "<group>"; };
 		65B5D62EC5CCC1AEDA4F2673 /* RDLStylePanel.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLStylePanel.xib; sourceTree = "<group>"; };
+		3A3A679B918A2A4795A5DCA1 /* RDLUpgraderSupport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpgraderSupport.m; sourceTree = "<group>"; };
+		EEECA8C7529972964D0F57B7 /* RDLMigration2003.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2003.m; sourceTree = "<group>"; };
+		74D769DAEB90F8CC3C4C0FBF /* RDLMigration2005.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2005.m; sourceTree = "<group>"; };
+		EFE8C64980075081596BC4B5 /* RDLMigration2008.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2008.m; sourceTree = "<group>"; };
+		0B62C60175108DC93648591A /* RDLMigration2010.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLMigration2010.m; sourceTree = "<group>"; };
+		43CEC6B322C51E22EBE8D05C /* RDLUpgraderRepairs.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpgraderRepairs.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -908,6 +921,7 @@
 				C0DE00000000000000000F53 /* RDLValueBoxing.m */,
 				C0DE00000000000000001B01 /* RDLBytecode.h */,
 				C0DE00000000000000001B06 /* RDLRuntimeLibrary.h */,
+				C0DE00000000000000001C01 /* RDLUpgraderSupport.h */,
 				C0DE00000000000000001B02 /* RDLCompiler.m */,
 				C0DE00000000000000001B04 /* RDLVirtualMachine.m */,
 				C0DE00000000000000000F03 /* RDLBorderPainter.m */,
@@ -948,6 +962,12 @@
 				6A4E5F6E1A14E1FF0FCE8CD9 /* RDLForms.m */,
 				C5F9F2D496D37F5207A8E078 /* RDLReferenceSites.h */,
 				3EE0F558290B255167D1C54A /* RDLReferenceSites.m */,
+				3A3A679B918A2A4795A5DCA1 /* RDLUpgraderSupport.m */,
+				EEECA8C7529972964D0F57B7 /* RDLMigration2003.m */,
+				74D769DAEB90F8CC3C4C0FBF /* RDLMigration2005.m */,
+				EFE8C64980075081596BC4B5 /* RDLMigration2008.m */,
+				0B62C60175108DC93648591A /* RDLMigration2010.m */,
+				43CEC6B322C51E22EBE8D05C /* RDLUpgraderRepairs.m */,
 			);
 			path = RDLKit;
 			sourceTree = "<group>";
@@ -1507,6 +1527,12 @@
 				9229A03D6FB9F96FF7502978 /* RDLDotNetMembers.m in Sources */,
 				A2D5FEE497DE8F9306BAD54D /* RDLForms.m in Sources */,
 				242798F0C370CC15BF86141E /* RDLReferenceSites.m in Sources */,
+				EBDB6B7BAAD741364346EB8F /* RDLUpgraderSupport.m in Sources */,
+				B5403D08F125593BE0DED433 /* RDLMigration2003.m in Sources */,
+				2D911A0813AB8633A25EB002 /* RDLMigration2005.m in Sources */,
+				611AD764BDEFE0B6717F4F33 /* RDLMigration2008.m in Sources */,
+				9412C602DD236B7DD82B9366 /* RDLMigration2010.m in Sources */,
+				D6627D0594A725B37226D7FF /* RDLUpgraderRepairs.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

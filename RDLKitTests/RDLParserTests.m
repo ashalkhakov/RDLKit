@@ -1,4 +1,5 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
+#import "RDLUpgrader.h"
 #import "RDLTestSupport.h"
 
 // An RDL 2005 report: page setup on <Report>, a Table with a header, a group
@@ -1666,6 +1667,60 @@ static NSString *RDLLegacyMatrixRDL(void) {
     XCTFail(@"%@", @"a dataset that names no data source should be an error");
 }
 
+
+#pragma mark - Upgrading
+
+static NSXMLDocument *RDLDocumentOf(NSString *xml) {
+  return [[NSXMLDocument alloc] initWithXMLString:xml options:0 error:NULL];
+}
+
+static NSString *RDLReportIn(NSString *year, NSString *body) {
+  return [NSString stringWithFormat:@"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/%@/01/"
+                                    @"reportdefinition\">%@</Report>",
+                                    year, body];
+}
+
+// A report is upgraded one schema at a time from the grammar it is really in:
+// what it declares, or older where it holds what only an older grammar has.
+- (void)testReportsAreMigratedFromTheGrammarTheyAreIn {
+  NSDictionary<NSString *, NSNumber *> *grammars = @{
+    RDLReportIn(@"2016", @"<ReportSections><ReportSection><Body/></ReportSection></ReportSections>") :
+        @(RDLSchemaVersion2016),
+    // This kit's older output: the 2010 namespace over a report with no sections.
+    RDLReportIn(@"2010", @"<Body/><Width>6in</Width>") : @(RDLSchemaVersion2008),
+    // A 2005 List under a later namespace.
+    RDLReportIn(@"2008", @"<Body><ReportItems><List Name=\"L\"/></ReportItems></Body>") :
+        @(RDLSchemaVersion2005),
+    // 2003's margins under 2005's namespace.
+    RDLReportIn(@"2005", @"<MarginTop>1in</MarginTop><Body/>") : @(RDLSchemaVersion2003),
+    @"<Report><Body/></Report>" : @(RDLSchemaVersion2005),
+  };
+  for (NSString *xml in grammars) {
+    RDLSchemaVersion grammar = [RDLUpgrader grammarOfDocument:RDLDocumentOf(xml)];
+    if (grammar != (RDLSchemaVersion)[grammars[xml] integerValue])
+      XCTFail(@"%@ should be read as %@, is read as %ld", xml, grammars[xml], (long)grammar);
+  }
+
+  // From 2003 to the end: the margins renamed, moved under the page, and the
+  // page put in a section with the body.
+  NSXMLDocument *old = RDLDocumentOf(RDLReportIn(@"2003", @"<MarginTop>1in</MarginTop><PageWidth>8.5in</PageWidth>"
+                                                          @"<Body><Height>2in</Height></Body><Width>6in</Width>"));
+  RDLSchemaVersion declared = [RDLUpgrader upgradeDocument:old];
+  NSArray *margins = [old nodesForXPath:@"/*[local-name()='Report']/*[local-name()='ReportSections']"
+                                        @"/*[local-name()='ReportSection']/*[local-name()='Page']"
+                                        @"/*[local-name()='TopMargin']"
+                                  error:NULL];
+  NSArray *bodies = [old nodesForXPath:@"//*[local-name()='ReportSection']/*[local-name()='Body']" error:NULL];
+  if (declared != RDLSchemaVersion2003 || [margins count] != 1 || [bodies count] != 1)
+    XCTFail(@"a 2003 report should come up to sections with its margin on the page:\n%@", [old XMLString]);
+  // And a document already in the current grammar is left as it was.
+  NSString *current = RDLReportIn(@"2016", @"<ReportSections><ReportSection><Body><Height>1in</Height></Body>"
+                                           @"<Width>6in</Width><Page/></ReportSection></ReportSections>");
+  NSXMLDocument *kept = RDLDocumentOf(current);
+  [RDLUpgrader upgradeDocument:kept];
+  if (![[kept XMLString] isEqualToString:[RDLDocumentOf(current) XMLString]])
+    XCTFail(@"%@", @"a 2016 report should be left as it was");
+}
 
 #pragma mark - Charts in the spec's names
 
