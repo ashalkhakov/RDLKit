@@ -148,7 +148,7 @@ UI.
 | Style | Padding, borders | Four padding sides, each a length or an f(x); a Borders… panel stating the default and each edge, on a text box and on a rectangle |
 | Style | Expressions | f(x) on 9 of the 27 style expressions |
 | Textbox | Value / expression | Yes; in-place double-click |
-| Textbox | Rich text | Modal editor; indents, lists and run properties kept but not editable |
+| Textbox | Rich text | Modal editor, with lists and indents; spacing and run properties kept but not editable |
 | Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | Yes |
 | Image | Source, Value, Sizing | Embedded/External only; Value has no f(x) |
 | Line | Colour, thickness, dash | Ink, thickness (with f(x)) and a dash list of None/Dotted/Dashed/Solid, all three on the border the line is drawn with (P1.1). No colour well, and no expression on the ink or the dash. |
@@ -246,7 +246,8 @@ bin that moved since the previous audit.
 | `CanGrow`, `CanShrink`, `HideDuplicates` | Done | The text box's options section; repeated values are hidden within a dataset or group picked by name. |
 | `ToggleImage`, `UserSort` | MODEL | |
 | Per-run style expressions, `MarkupType`, run `ActionInfo`/`ToolTip`/`Label` | UI (was MODEL) | Kept through the editor; not editable. |
-| Paragraph indents, spacing, lists | UI (was MODEL) | Shown and kept in the editor; no ruler, list or indent controls. |
+| Paragraph indents, lists | Done | The rich-text editor makes the selected paragraphs a bulleted or numbered list or none, and moves them in and out -- a list a level, other text a quarter inch. |
+| Paragraph spacing, right and hanging indents | UI | Shown and kept in the editor; no control. |
 | Inspector "mixed" state for a rich textbox | UI | An in-place plain edit also drops run styles (§5). |
 
 ### 4.6 Image, Line, Rectangle, Subreport
@@ -488,6 +489,7 @@ In rough order of how often a Report Builder user reaches for it:
     gradients, background image, `Calendar`, numerals); rich-text
     indent/list controls; report `Code` and `Variables` editors;
     subreport `NoRowsMessage`/`OmitBorderOnPageBreak`.
+    Done: all of it.
 
 ### P2 — large designer projects
 

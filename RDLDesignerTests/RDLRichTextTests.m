@@ -866,6 +866,86 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 }
 
 
+// The editor makes the selected paragraphs a list, moves them in and out, and
+// ends the list -- the markers shown again each time -- and a plain paragraph
+// moves in and out by a quarter inch. The panel does it through its controls.
+- (void)testParagraphsAreListedAndIndentedInTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Steps";
+  item.value = @"Mix\nFire\nGlaze";
+  NSAttributedString *text = [RDLRichTextCodec attributedStringForItem:item];
+  NSRange selection = NSMakeRange(5, 6);  // "ire\nGl": the second and third
+  NSAttributedString *listed = [RDLRichTextEditor text:text
+                                                forItem:item
+                              changingParagraphsInRange:selection
+                                                   with:^(RDLParagraph *layout) {
+                                                     layout.listStyle = RDLListStyleNumbered;
+                                                     layout.listLevel = 1;
+                                                   }
+                                              selection:&selection];
+  if (![[listed string] isEqualToString:@"Mix\n1.\tFire\n2.\tGlaze"])
+    XCTFail(@"the second and third should be numbered, read %@", [listed string]);
+  if (![[[listed string] substringWithRange:selection] isEqualToString:@"1.\tFire\n2.\tGlaze"])
+    XCTFail(@"the numbered paragraphs should stay selected, select %@", [[listed string] substringWithRange:selection]);
+  // In a level: the marker restarts under the level above.
+  NSAttributedString *nested = [RDLRichTextEditor text:listed
+                                                 forItem:item
+                               changingParagraphsInRange:NSMakeRange([[listed string] length] - 1, 0)
+                                                    with:^(RDLParagraph *layout) {
+                                                      layout.listLevel += 1;
+                                                    }
+                                               selection:NULL];
+  if (![[nested string] isEqualToString:@"Mix\n1.\tFire\n1.\tGlaze"])
+    XCTFail(@"the third should be numbered afresh a level in, reads %@", [nested string]);
+  // Ended, and the first moved in: plain text again, with an indent.
+  NSAttributedString *ended = [RDLRichTextEditor text:nested
+                                                forItem:item
+                              changingParagraphsInRange:NSMakeRange(0, [[nested string] length])
+                                                   with:^(RDLParagraph *layout) {
+                                                     layout.listStyle = RDLListStyleUnspecified;
+                                                     layout.listLevel = 0;
+                                                   }
+                                              selection:NULL];
+  if (![[ended string] isEqualToString:@"Mix\nFire\nGlaze"])
+    XCTFail(@"ending the list should take the markers away, reads %@", [ended string]);
+  [RDLRichTextCodec applyAttributedString:ended toItem:item];
+  if (item.paragraphs != nil && [item.paragraphs[1] listStyle] != RDLListStyleUnspecified)
+    XCTFail(@"%@", @"the paragraphs should not be a list any more");
+
+  // Through the panel's controls.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rich"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Box";
+  box.value = @"One\nTwo";
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRichTextEditor *ed = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  NSTextView *view = [ed valueForKey:@"textView"];
+  [view setSelectedRange:NSMakeRange(0, [[view string] length])];
+  NSPopUpButton *lists = [ed valueForKey:@"listPop"];
+  [lists selectItemWithTitle:@"Bulleted list"];
+  [ed listStyleChanged:lists];
+  [ed indent:nil];
+  if (![[view string] isEqualToString:@"\u25E6\tOne\n\u25E6\tTwo"])
+    XCTFail(@"the panel should bullet both a level in, reads %@", [view string]);
+  [view setSelectedRange:NSMakeRange(1, 0)];
+  if (![[lists titleOfSelectedItem] isEqualToString:@"Bulleted list"])
+    XCTFail(@"the popup should say the caret is in a bulleted list, says %@", [lists titleOfSelectedItem]);
+  // Chosen with the paragraphs selected, as it is used: a change of selection
+  // shows the list the caret is in.
+  [view setSelectedRange:NSMakeRange(0, [[view string] length])];
+  [lists selectItemWithTitle:@"Not a list"];
+  [ed listStyleChanged:lists];
+  [ed indent:nil];
+  [ed indent:nil];
+  [ed outdent:nil];
+  [RDLRichTextCodec applyAttributedString:[view textStorage] toItem:box];
+  if (![[box.paragraphs[0] leftIndent] isKindOfClass:[RDLLength class]] ||
+      fabs([box.paragraphs[0].leftIndent inches] - 0.25) > 0.001 || box.paragraphs[1].listStyle != RDLListStyleUnspecified)
+    XCTFail(@"%@", @"two steps in and one out should leave a quarter inch, and no list");
+  [[ed valueForKey:@"window"] close];
+}
+
 // Expressions in a run's style and a paragraph's cannot be shown as what they
 // evaluate to, so the editor shows the textbox's style -- and must still hand
 // them back rather than reading the style off what it showed.
