@@ -252,7 +252,7 @@ id RDLRunChunk(RDLChunk *chunk, RDLEvalScope *scope) {
       NSArray *vals = RDLTakeArguments(s, &sp, (NSUInteger)w[pc++]);
       // Whatever it answers is the call's value, nil included.
       id error = RDLFirstError(vals);
-      s[sp++] = error ?: handler(name, vals, nil, scope);
+      s[sp++] = error ?: handler(name, vals, scope);
       break;
     }
     case RDLOpcodeCallLibrary: {

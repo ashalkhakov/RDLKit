@@ -2224,9 +2224,9 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope);
 
 #pragma mark - The runtime library, function by function
 
-// One of the language's functions. `vals` are its arguments already worked out,
-// `args` the expressions they came from -- which only the few that choose not to
-// work all of them out need -- and `scope` what the report knows.
+// One of the language's functions. `vals` are its arguments, already worked out
+// -- a form that chooses which to work out is the compiler's business, not a
+// function's -- and `scope` what the report knows.
 //
 // One function each, rather than arms of one long chain: the evaluator's job is
 // to find the right one and call it, and nothing else.
@@ -2241,154 +2241,154 @@ static NSArray *RDLRest(NSArray *vals) {
   return [vals count] > 1 ? [vals subarrayWithRange:NSMakeRange(1, [vals count] - 1)] : @[];
 }
 
-static id RDLFnFormat(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFormat(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLVisualBasicFormat(RDLArg(vals, 0), RDLArg(vals, 1), scope.language);
 }
 
-static id RDLFnFormatDateTime(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFormatDateTime(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLFormatDateTime(RDLArg(vals, 0), RDLArg(vals, 1), scope.language);
 }
 
-static id RDLFnCStr(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCStr(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLStr(RDLArg(vals, 0));
 }
 
-static id RDLFnCType(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCType(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLArg(vals, 0);
 }
 
-static id RDLFnVal(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnVal(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLDouble(RDLNum(RDLArg(vals, 0)));
 }
 
-static id RDLFnCBool(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCBool(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLConvertToBoolean(RDLArg(vals, 0), RDLConversionStyleVisualBasic);
 }
 
-static id RDLFnCDate(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCDate(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLConvertToDate(RDLArg(vals, 0));
 }
 
-static id RDLFnLen(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLen(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLInt((int)RDLStr(RDLArg(vals, 0)).length);
 }
 
-static id RDLFnUCase(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnUCase(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [RDLStr(RDLArg(vals, 0)) uppercaseString];
 }
 
-static id RDLFnLCase(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLCase(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [RDLStr(RDLArg(vals, 0)) lowercaseString];
 }
 
-static id RDLFnTrim(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnTrim(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [RDLStr(RDLArg(vals, 0)) stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
 }
 
-static id RDLFnInStr(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnInStr(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLInStr(vals);
 }
 
-static id RDLFnReplace(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnReplace(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLReplace(vals);
 }
 
-static id RDLFnRound(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnRound(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLRound(RDLArg(vals, 0), RDLArg(vals, 1), RDLArg(vals, 2));
 }
 
-static id RDLFnAbs(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnAbs(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLAbsolute(RDLArg(vals, 0));
 }
 
-static id RDLFnSign(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnSign(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLSign(RDLArg(vals, 0));
 }
 
-static id RDLFnPow(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnPow(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLOfTwoDoubles(RDLArg(vals, 0), RDLArg(vals, 1), pow);
 }
 
-static id RDLFnCeiling(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCeiling(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLMathWhole(RDLArg(vals, 0), RDLWholeRoundingCeiling);
 }
 
-static id RDLFnFloor(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFloor(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLMathWhole(RDLArg(vals, 0), RDLWholeRoundingFloor);
 }
 
-static id RDLFnInt(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnInt(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLWholePart(RDLArg(vals, 0), NO);
 }
 
-static id RDLFnFix(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFix(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLWholePart(RDLArg(vals, 0), YES);
 }
 
-static id RDLFnIsNothing(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnIsNothing(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLYes(RDLIsNothing(RDLArg(vals, 0)));
 }
 
-static id RDLFnDateAdd(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDateAdd(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLDateAddition(vals);
 }
 
-static id RDLFnDateDiff(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDateDiff(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLDateDiff(vals, scope.language);
 }
 
-static id RDLFnDatePart(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDatePart(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLDatePart(vals, scope.language);
 }
 
-static id RDLFnInStrRev(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnInStrRev(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLInStrRev(vals);
 }
 
-static id RDLFnHex(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnHex(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [[NSString stringWithFormat:@"%lX", (long)RDLNum(RDLArg(vals, 0))] uppercaseString];
 }
 
-static id RDLFnOct(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnOct(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [NSString stringWithFormat:@"%lo", (unsigned long)RDLNum(RDLArg(vals, 0))];
 }
 
-static id RDLFnChr(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnChr(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return [NSString stringWithFormat:@"%C", (unichar)MAX(0, (NSInteger)RDLNum(RDLArg(vals, 0)))];
 }
 
-static id RDLFnIsArray(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnIsArray(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLYes([RDLArg(vals, 0) isKindOfClass:[NSArray class]]);
 }
 
-static id RDLFnCObj(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCObj(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLArg(vals, 0);
 }
 
-static id RDLFnFormatCurrency(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFormatCurrency(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLVisualBasicNumberText(RDLArg(vals, 0), RDLVisualBasicNumberStyleCurrency, RDLRest(vals), scope.language);
 }
 
-static id RDLFnFormatNumber(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFormatNumber(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLVisualBasicNumberText(RDLArg(vals, 0), RDLVisualBasicNumberStyleNumber, RDLRest(vals), scope.language);
 }
 
-static id RDLFnFormatPercent(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFormatPercent(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLVisualBasicNumberText(RDLArg(vals, 0), RDLVisualBasicNumberStylePercent, RDLRest(vals), scope.language);
 }
 
-static id RDLFnCChar(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnCChar(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *str = RDLStr(RDLArg(vals, 0));
   return [str length] ? [str substringToIndex:1] : @"";
 }
 
-static id RDLFnRGB(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnRGB(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   int r = (int)RDLNum(RDLArg(vals, 0)), g = (int)RDLNum(RDLArg(vals, 1)), b = (int)RDLNum(RDLArg(vals, 2));
   return [NSString stringWithFormat:@"#%02X%02X%02X", MAX(MIN(r, 255), 0), MAX(MIN(g, 255), 0),
                                     MAX(MIN(b, 255), 0)];
 }
 
-static id RDLFnLTrim(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLTrim(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSUInteger i = 0;
   while (i < s.length && [[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:[s characterAtIndex:i]])
@@ -2396,12 +2396,12 @@ static id RDLFnLTrim(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope 
   return [s substringFromIndex:i];
 }
 
-static id RDLFnSpace(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnSpace(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger k = MAX(0, (NSInteger)RDLNum(RDLArg(vals, 0)));
   return [@"" stringByPaddingToLength:(NSUInteger)k withString:@" " startingAtIndex:0];
 }
 
-static id RDLFnStrReverse(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStrReverse(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSMutableString *out = [NSMutableString stringWithCapacity:s.length];
   for (NSInteger i = (NSInteger)s.length - 1; i >= 0; i--)
@@ -2409,7 +2409,7 @@ static id RDLFnStrReverse(NSString *name, NSArray *vals, NSArray *args, RDLEvalS
   return out;
 }
 
-static id RDLFnSplit(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnSplit(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSString *delim = RDLArg(vals, 1) == nil ? @"," : RDLStr(RDLArg(vals, 1));
   if ([delim length] == 0)
@@ -2417,12 +2417,12 @@ static id RDLFnSplit(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope 
   return [s componentsSeparatedByString:delim];
 }
 
-static id RDLFnAsc(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnAsc(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   return RDLInt([s length] ? (int)[s characterAtIndex:0] : 0);
 }
 
-static id RDLFnIsNumeric(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnIsNumeric(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id a0 = RDLArg(vals, 0);
   if (RDLNumericLikeValue(a0))
     return RDLYes(YES);
@@ -2434,13 +2434,13 @@ static id RDLFnIsNumeric(NSString *name, NSArray *vals, NSArray *args, RDLEvalSc
   return RDLYes(ok);
 }
 
-static id RDLFnIsDate(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnIsDate(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id a0 = RDLArg(vals, 0);
   return RDLYes([a0 isKindOfClass:[NSDate class]] ||
                 ([a0 isKindOfClass:[NSString class]] && RDLDateFromText(a0) != nil));
 }
 
-static id RDLFnLeft(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLeft(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSInteger k = (NSInteger)RDLNum(RDLArg(vals, 1));
   if (k < 0)
@@ -2450,7 +2450,7 @@ static id RDLFnLeft(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *
   return [s substringToIndex:(NSUInteger)k];
 }
 
-static id RDLFnRight(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnRight(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSInteger k = (NSInteger)RDLNum(RDLArg(vals, 1));
   if (k < 0)
@@ -2460,7 +2460,7 @@ static id RDLFnRight(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope 
   return [s substringFromIndex:s.length - (NSUInteger)k];
 }
 
-static id RDLFnMid(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnMid(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSInteger start = (NSInteger)RDLNum(RDLArg(vals, 1));
   if (start < 1)
@@ -2474,7 +2474,7 @@ static id RDLFnMid(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *s
   return [s substringWithRange:NSMakeRange(i, len)];
 }
 
-static id RDLFnRTrim(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnRTrim(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *s = RDLStr(RDLArg(vals, 0));
   NSInteger i = (NSInteger)s.length - 1;
   while (i >= 0 && [[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:[s characterAtIndex:(NSUInteger)i]])
@@ -2482,7 +2482,7 @@ static id RDLFnRTrim(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope 
   return [s substringToIndex:(NSUInteger)i + 1];
 }
 
-static id RDLFnStrDup(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStrDup(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger count = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 0), 0, &count);
   if (error)
@@ -2495,7 +2495,7 @@ static id RDLFnStrDup(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope
   return [@"" stringByPaddingToLength:(NSUInteger)count withString:[character substringToIndex:1] startingAtIndex:0];
 }
 
-static id RDLFnDateSerial(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDateSerial(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSDate *now = scope.executionTime ?: [NSDate date];
   NSInteger year = 0, month = 0, day = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 0), 0, &year) ?: RDLIntegerArgument(RDLArg(vals, 1), 0, &month) ?: RDLIntegerArgument(RDLArg(vals, 2), 0, &day);
@@ -2520,7 +2520,7 @@ static id RDLFnDateSerial(NSString *name, NSArray *vals, NSArray *args, RDLEvalS
   return date ?: [RDLExprError errorWithMessage:@"Year, Month, and Day parameters describe an un-representable DateTime."];
 }
 
-static id RDLFnTimeSerial(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnTimeSerial(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger hour = 0, minute = 0, second = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 0), 0, &hour) ?: RDLIntegerArgument(RDLArg(vals, 1), 0, &minute) ?: RDLIntegerArgument(RDLArg(vals, 2), 0, &second);
   if (error)
@@ -2531,7 +2531,7 @@ static id RDLFnTimeSerial(NSString *name, NSArray *vals, NSArray *args, RDLEvalS
   return RDLTimeOnFirstDay(seconds);
 }
 
-static id RDLFnDateOrTimeValue(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDateOrTimeValue(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id date = RDLConvertToDate(RDLArg(vals, 0));
   if (RDLIsError(date))
     return date;
@@ -2547,7 +2547,7 @@ static id RDLFnDateOrTimeValue(NSString *name, NSArray *vals, NSArray *args, RDL
   return [cal dateFromComponents:c];
 }
 
-static id RDLFnStr(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStr(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id number = RDLNumericOperand(RDLArg(vals, 0));
   if (RDLIsError(number))
     return number;
@@ -2555,7 +2555,7 @@ static id RDLFnStr(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *s
   return [text hasPrefix:@"-"] ? text : [@" " stringByAppendingString:text];
 }
 
-static id RDLFnStrComp(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStrComp(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   RDLCompareMethod method = RDLCompareMethodBinary;
   id error = RDLCompareMethodOfValue(RDLArg(vals, 2), &method);
   if (error)
@@ -2565,7 +2565,7 @@ static id RDLFnStrComp(NSString *name, NSArray *vals, NSArray *args, RDLEvalScop
   return RDLInt(c == NSOrderedAscending ? -1 : c == NSOrderedDescending ? 1 : 0);
 }
 
-static id RDLFnStrConv(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStrConv(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger conversion = RDLStrConvNone;
   id error = RDLIntegerArgument(RDLArg(vals, 1), RDLStrConvNone, &conversion);
   if (error)
@@ -2580,7 +2580,7 @@ static id RDLFnStrConv(NSString *name, NSArray *vals, NSArray *args, RDLEvalScop
   return [RDLExprError errorWithMessage:@"The conversion StrConv was asked for is not supported."];
 }
 
-static id RDLFnLSetOrRSet(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLSetOrRSet(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger width = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 1), 0, &width);
   if (error)
@@ -2594,14 +2594,14 @@ static id RDLFnLSetOrRSet(NSString *name, NSArray *vals, NSArray *args, RDLEvalS
   return [name isEqualToString:@"lset"] ? [text stringByAppendingString:padding] : [padding stringByAppendingString:text];
 }
 
-static id RDLFnAscW(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnAscW(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *text = RDLStr(RDLArg(vals, 0));
   if ([text length] == 0)
     return RDLInvalidArgument(@"String");
   return RDLInt([text characterAtIndex:0]);
 }
 
-static id RDLFnChrW(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnChrW(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSInteger code = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 0), 0, &code);
   if (error)
@@ -2612,7 +2612,7 @@ static id RDLFnChrW(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *
   return [NSString stringWithCharacters:&character length:1];
 }
 
-static id RDLFnGetChar(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnGetChar(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSString *text = RDLStr(RDLArg(vals, 0));
   NSInteger index = 0;
   id error = RDLIntegerArgument(RDLArg(vals, 1), 0, &index);
@@ -2623,7 +2623,7 @@ static id RDLFnGetChar(NSString *name, NSArray *vals, NSArray *args, RDLEvalScop
   return [text substringWithRange:NSMakeRange((NSUInteger)index - 1, 1)];
 }
 
-static id RDLFnFilter(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnFilter(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id a0 = RDLArg(vals, 0);
   if (![a0 isKindOfClass:[NSArray class]])
     return RDLInvalidArgument(@"Source");
@@ -2648,7 +2648,7 @@ static id RDLFnFilter(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope
 // The maths of a Double: .NET's own answers, NaN and Infinity among them --
 // Sqrt(-1) is NaN and Log(0) -Infinity -- and #Error for an argument that is
 // not a number. Which one is decided by the name, once, here.
-static id RDLFnOfDouble(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnOfDouble(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   double (*ofDouble)(double) = NULL;
   if ([name isEqualToString:@"sqrt"])
     ofDouble = sqrt;
@@ -2671,7 +2671,7 @@ static id RDLFnOfDouble(NSString *name, NSArray *vals, NSArray *args, RDLEvalSco
   return RDLIsError(x) ? x : RDLDouble(ofDouble([(RDLNumber *)x doubleValue]));
 }
 
-static id RDLFnLog(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnLog(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   id x = RDLDoubleOperand(RDLArg(vals, 0));
   id base = RDLArg(vals, 1) == nil ? nil : RDLDoubleOperand(RDLArg(vals, 1));
   if (RDLIsError(x) || RDLIsError(base))
@@ -2682,7 +2682,7 @@ static id RDLFnLog(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *s
 
 // Year to Second, and Weekday: Integers, of a date as CDate reads it. Each is
 // DatePart asked for one interval, which the name says.
-static id RDLFnDateComponent(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDateComponent(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   NSDictionary<NSString *, NSNumber *> *parts = @{
     @"year" : @(RDLDateIntervalNameYear), @"month" : @(RDLDateIntervalNameMonth), @"day" : @(RDLDateIntervalNameDay),
     @"hour" : @(RDLDateIntervalNameHour), @"minute" : @(RDLDateIntervalNameMinute), @"second" : @(RDLDateIntervalNameSecond),
@@ -2697,13 +2697,13 @@ static id RDLFnDateComponent(NSString *name, NSArray *vals, NSArray *args, RDLEv
   return RDLDatePart(partArguments, scope.language);
 }
 
-static id RDLFnDayOrMonthName(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnDayOrMonthName(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   return RDLDayOrMonthName([name isEqualToString:@"monthname"], vals, scope.language);
 }
 
 // Math's and Financial's members, which SSRS makes available by their names
 // alone. Max and Min there are the aggregates, so they are not here.
-static id RDLFnStaticMemberByName(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLFnStaticMemberByName(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   static NSSet<NSString *> *financial = nil;
   static dispatch_once_t once;
   dispatch_once(&once, ^{
@@ -2826,7 +2826,7 @@ static NSDictionary<NSString *, NSValue *> *RDLFunctionTable(void) {
   return table;
 }
 
-static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope) {
+static id RDLCall(NSString *name, NSArray *vals, RDLEvalScope *scope) {
   // The table first: a name it knows is a function of its own.
   {
     NSValue *found = RDLFunctionTable()[[name lowercaseString]];
@@ -2836,7 +2836,7 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
       // hand back what they were given, and a report may give them nothing.
       // Every name in the table is one its handler answers to, so there is no
       // such thing here as a handler declining.
-      return handler([name lowercaseString], vals, args, scope);
+      return handler([name lowercaseString], vals, scope);
     }
   }
   NSString *n = [name lowercaseString];
@@ -2879,7 +2879,6 @@ static id RDLCall(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *sc
   if ([n isEqualToString:@"iserror"] || [n isEqualToString:@"isdbnull"])
     return RDLYes(NO);
   // A function there is not: SSRS would not have accepted the report.
-  (void)args;
   return [RDLExprError errorWithMessage:[NSString stringWithFormat:@"'%@' is not declared.", name]];
 }
 
@@ -3034,11 +3033,11 @@ static id RDLMemberOfValue(id target, NSString *member, NSArray *vals, RDLEvalSc
   if ([m isEqualToString:@"tolower"] || [m isEqualToString:@"tolowerinvariant"])
     return [s lowercaseString];
   if ([m isEqualToString:@"trim"])
-    return RDLCall(@"trim", @[ s ], @[], scope);
+    return RDLCall(@"trim", @[ s ], scope);
   if ([m isEqualToString:@"trimstart"])
-    return RDLCall(@"ltrim", @[ s ], @[], scope);
+    return RDLCall(@"ltrim", @[ s ], scope);
   if ([m isEqualToString:@"trimend"])
-    return RDLCall(@"rtrim", @[ s ], @[], scope);
+    return RDLCall(@"rtrim", @[ s ], scope);
   if ([m isEqualToString:@"substring"]) {
     NSUInteger start = (NSUInteger)MIN(MAX(0, (NSInteger)RDLNum(a0)), (NSInteger)s.length);
     NSUInteger length = a1 ? (NSUInteger)MAX(0, (NSInteger)RDLNum(a1)) : s.length - start;
@@ -3105,7 +3104,7 @@ static id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope) 
   if (conversion != RDLConversionTargetUnspecified)
     return RDLConvert(arg(0), conversion, conversionStyle);
   if (alike[n])
-    return RDLCall(alike[n], vals, @[], scope);
+    return RDLCall(alike[n], vals, scope);
   NSDictionary<NSString *, NSNumber *> *enumerations = @{
     @"dateformat.generaldate" : @(RDLDateFormatNameGeneralDate), @"dateformat.longdate" : @(RDLDateFormatNameLongDate),
     @"dateformat.shortdate" : @(RDLDateFormatNameShortDate), @"dateformat.longtime" : @(RDLDateFormatNameLongTime),
@@ -3425,7 +3424,7 @@ id RDLLoadReference(RDLOpcode opcode, RDLExprNode *node, RDLEvalScope *scope) {
 }
 
 id RDLCallLibrary(NSString *name, NSArray *vals, RDLEvalScope *scope) {
-  return RDLCall(name, vals, nil, scope);
+  return RDLCall(name, vals, scope);
 }
 
 static id RDLArgumentAt(NSArray *vals, NSUInteger i) {

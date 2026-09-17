@@ -107,7 +107,7 @@ static const NSUInteger kRDLCodeLoopLimit = 1000000;
 static const NSUInteger kRDLCodeCallDepthLimit = 64;
 
 // A runtime-library function, as the table has it.
-typedef id (*RDLFunctionHandler)(NSString *name, NSArray *vals, NSArray *args, RDLEvalScope *scope);
+typedef id (*RDLFunctionHandler)(NSString *name, NSArray *vals, RDLEvalScope *scope);
 
 // One compiled piece of code: the instructions, what they refer to, and how deep
 // the stack can get while they run.
