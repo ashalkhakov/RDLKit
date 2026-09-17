@@ -1562,9 +1562,9 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // Layout, hit-testing and the designer all depend on that order. Iterate
 // -bandKeys with -bandWithKey: when you need the key alongside the band.
 + (NSArray<NSString *> *)bandKeys;
-// Only the Body carries a Style in the RDL this writes, so a background set on
-// a page header or footer would be silently dropped. Asked by the inspector
-// rather than reimplemented there.
+// Whether a band of this key has a Style of its own -- the body, the page
+// header and the page footer all do, and each is written and painted. Asked
+// by the inspector rather than reimplemented there.
 + (BOOL)bandKeySupportsBackground:(NSString *)bandKey;
 - (NSArray<RDLBand *> *)allBands;
 - (RDLBand *)bandWithKey:(NSString *)key;

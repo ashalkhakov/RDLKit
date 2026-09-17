@@ -159,12 +159,12 @@
   if ([pdoc.report.page matchingStandardSize] != nil)
     XCTFail(@"%@", @"a custom size should match no preset");
 
-  // Only the Body carries a background in the RDL this writes.
-  if (![RDLReport bandKeySupportsBackground:@"body"])
-    XCTFail(@"%@", @"the body should support a background");
-  if ([RDLReport bandKeySupportsBackground:@"pageHeader"] ||
-      [RDLReport bandKeySupportsBackground:@"pageFooter"])
-    XCTFail(@"%@", @"header and footer bands should not claim background support");
+  // Every band has a Style of its own, written and painted.
+  for (NSString *key in [RDLReport bandKeys])
+    if (![RDLReport bandKeySupportsBackground:key])
+      XCTFail(@"the %@ should support a background", key);
+  if ([RDLReport bandKeySupportsBackground:@"sidebar"])
+    XCTFail(@"%@", @"a band the report does not have supports nothing");
 
   // An unbound control is reported as unhandled, so the caller can deal with
   // the composite fields itself.
@@ -1092,6 +1092,46 @@
       ![back.page.style.backgroundColor isEqualToString:@"#f0f0f0"] || !back.consumeContainerWhitespace ||
       ![[back.initialPageName source] isEqualToString:@"=Parameters!Region.Value"])
     XCTFail(@"%@", @"the page setup should survive a save");
+}
+
+// The page header and footer: which pages they are on, and a background --
+// set in the band's section and kept through a save.
+- (void)testThePageHeaderSaysWhereItPrints {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Heads"];
+  report.pageHeader.height = 0.5;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  [ctx.selection selectBandWithKey:@"body"];
+  if (![[inspector valueForKey:@"printBox"] isHidden])
+    XCTFail(@"%@", @"the body is on every page, and says nothing about it");
+  [ctx.selection selectBandWithKey:@"pageHeader"];
+  if ([[inspector valueForKey:@"printBox"] isHidden])
+    XCTFail(@"%@", @"the page header should say which pages it is on");
+  NSButton *first = [inspector valueForKey:@"printOnFirstPageCheck"];
+  NSButton *last = [inspector valueForKey:@"printOnLastPageCheck"];
+  [first setState:NSOnState];
+  [inspector changed:first];
+  [last setState:NSOnState];
+  [inspector changed:last];
+  if (!report.pageHeader.printOnFirstPage || !report.pageHeader.printOnLastPage)
+    XCTFail(@"%@", @"ticking the boxes should print the header on the first and last pages");
+  NSTextField *background = [inspector valueForKey:@"bandBGField"];
+  if (![background isEnabled])
+    XCTFail(@"%@", @"a page header can have a background");
+  [background setStringValue:@"#eeeeee"];
+  [inspector changed:background];
+  if (![report.pageHeader.style.backgroundColor isEqualToString:@"#eeeeee"])
+    XCTFail(@"the header's background is %@", report.pageHeader.style.backgroundColor);
+  [ctx.document.undoManager undo];
+  if (report.pageHeader.style.backgroundColor != nil)
+    XCTFail(@"%@", @"undo should take the background away");
+  [ctx.document.undoManager redo];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (!back.pageHeader.printOnFirstPage || !back.pageHeader.printOnLastPage ||
+      ![back.pageHeader.style.backgroundColor isEqualToString:@"#eeeeee"])
+    XCTFail(@"%@", @"the header's settings should survive a save");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to

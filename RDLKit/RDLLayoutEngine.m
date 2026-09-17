@@ -3861,6 +3861,23 @@ static BOOL RDLStylePaints(RDLStyle *style) {
 // [sliceTop, sliceBot). One with no height -- empty text boxes that shrank --
 // starting at the top of the slice is on it: taken to end above the slice, it
 // was culled from every page, and a report of such rows laid out onto nothing.
+// What paints a band's Style behind it, or nil when the style has nothing to
+// paint. One above the lowest ZIndex, so the page's Style, at the lowest, stays
+// under it.
+static RDLItem *RDLBandBackground(RDLBand *band, NSString *name, CGFloat width, CGFloat height) {
+  RDLStyle *style = band.style;
+  if (style == nil || height <= 0 ||
+      !([style.backgroundColor length] || (style.border && style.border.style != RDLBorderStyleNone)))
+    return nil;
+  RDLItem *background = [[RDLItem alloc] init];
+  background.name = name;
+  background.width = width;
+  background.height = height;
+  background.zIndex = NSIntegerMin + 1;
+  background.style = style;
+  return background;
+}
+
 static BOOL RDLRowOutsideSlice(CGFloat absY, CGFloat height, CGFloat sliceTop, CGFloat sliceBot) {
   if (absY >= sliceBot)
     return YES;
@@ -4232,27 +4249,20 @@ static void RDLMarkRegion(RDLLaidOutPage *page, NSUInteger from, RDLLaidOutRegio
     return [a[@"slice"] compare:b[@"slice"]];
   }];
 
-  // Body background painted behind every page's body area when Body has Style.
-  RDLItem *bodyBG = nil;
-  if (report.body.style &&
-      ([report.body.style.backgroundColor length] ||
-       (report.body.style.border && report.body.style.border.style != RDLBorderStyleNone))) {
-    bodyBG = [[RDLItem alloc] init];
-      bodyBG.name = @"__BodyBackground";
-    bodyBG.left = 0;
-    bodyBG.top = 0;
-    bodyBG.width = report.width > 0 ? report.width
-                                    : report.page.pageWidth - mx - report.page.rightMargin;
-    bodyBG.height = bodyAvail;
-    bodyBG.zIndex = NSIntegerMin;
-    bodyBG.style = report.body.style;
-  }
+  // A band's Style painted behind the band: the body's behind every column of
+  // it, and the page header's and footer's behind them, across the page between
+  // the margins. Above the page's own Style, which is under everything.
+  CGFloat acrossMargins = report.page.pageWidth - mx - report.page.rightMargin;
+  RDLItem *bodyBG = RDLBandBackground(report.body, @"__BodyBackground",
+                                      report.width > 0 ? report.width : acrossMargins, bodyAvail);
+  RDLItem *headerBG = RDLBandBackground(report.pageHeader, @"__PageHeaderBackground", acrossMargins, headerH);
+  RDLItem *footerBG = RDLBandBackground(report.pageFooter, @"__PageFooterBackground", acrossMargins, footerH);
 
   RDLItem *pageBG = nil;
   if (report.page.style) {
     pageBG = [[RDLItem alloc] init];
     pageBG.name = @"__PageBackground";
-    pageBG.width = report.page.pageWidth - mx - report.page.rightMargin;
+    pageBG.width = acrossMargins;
     pageBG.height = report.page.pageHeight - my - report.page.bottomMargin;
     pageBG.zIndex = NSIntegerMin;
     pageBG.style = report.page.style;
@@ -4389,6 +4399,8 @@ static void RDLMarkRegion(RDLLaidOutPage *page, NSUInteger from, RDLLaidOutRegio
     // thing a running head does and the reason SSRS allows ReportItems there.
     if (showHeader) {
       NSUInteger from = [page.items count];
+      if (headerBG)
+        [self placeItem:headerBG originX:mx originY:my scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
       for (RDLItem *it in report.pageHeader.items)
         [self placeItem:it originX:mx originY:my scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
       RDLMarkRegion(page, from, RDLLaidOutRegionPageHeader);
@@ -4396,6 +4408,8 @@ static void RDLMarkRegion(RDLLaidOutPage *page, NSUInteger from, RDLLaidOutRegio
     if (showFooter) {
       NSUInteger from = [page.items count];
       CGFloat fy = report.page.pageHeight - report.page.bottomMargin - footerH;
+      if (footerBG)
+        [self placeItem:footerBG originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
       for (RDLItem *it in report.pageFooter.items)
         [self placeItem:it originX:mx originY:fy scope:scope onPage:page clipTop:0 clipBottom:report.page.pageHeight];
       RDLMarkRegion(page, from, RDLLaidOutRegionPageFooter);

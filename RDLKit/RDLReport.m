@@ -2411,7 +2411,7 @@ static void RDLCollectChartGroupNames(NSArray<RDLChartMember *> *members, NSMuta
 }
 
 + (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
-  return [bandKey isEqualToString:@"body"];
+  return [[self bandKeys] containsObject:bandKey];
 }
 
 + (NSArray<NSString *> *)bandKeys {

@@ -120,8 +120,8 @@ UI.
 | Report | Page size | Popup: Letter, A4, Legal, Tabloid, A3, A5, Custom; orientation; width and height typed in the report's unit |
 | Report | Margins | Each edge on its own; the body's width follows the side margins and the columns |
 | Report | Header/body/footer heights | Yes |
-| Report | Header/footer `PrintOnFirstPage`/`PrintOnLastPage` | — |
-| Report | Band `Style` | Body background only; a stale guard (`RDLReport.m`, body-only) disables it for header/footer though the writer emits any band's style |
+| Report | Header/footer `PrintOnFirstPage`/`PrintOnLastPage` | Yes, in the band's section |
+| Report | Band `Style` | Background on every band; the engine paints the page header's and footer's as it does the body's |
 | Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | Yes; the page's Style as a background colour only |
 | Report | `Code`, `Variables` | — |
 | Report | Parameters | Navigator (add/remove) + inspector: name, "Asked for" and its prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line; values a `DataSetReference` supplies are shown, read-only |
@@ -185,7 +185,7 @@ bin that moved since the previous audit.
 |---|---|---|
 | Arbitrary `PageWidth`/`PageHeight`, landscape, more paper sizes | UI | `RDLEditor -setPageWidth:height:` exists; only the popup is limited. |
 | Per-edge margins | UI | Model has all four; the editor has `-setUniformMargin:` only. |
-| `PrintOnFirstPage`/`PrintOnLastPage` | UI | Default false, as the spec has it. |
+| `PrintOnFirstPage`/`PrintOnLastPage` | Done | Default false, as the spec has it. |
 | Header/footer `Style` | UI | Only a stale body-only guard blocks it. |
 | Page `Style`, `Columns`, `ColumnSpacing` | UI (was MODEL) | Engine FULL (columns PDF-only). |
 | `ConsumeContainerWhitespace`, `InitialPageName` | UI (was MODEL) | |
@@ -443,8 +443,9 @@ In rough order of how often a Report Builder user reaches for it:
    header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.
    Done: a paper section for the report -- the sizes and Custom, orientation,
    width and height, each margin, columns and their spacing, the page's
-   background colour, the first page's name and consuming whitespace. Left:
-   the page Style beyond its background, and the header and footer.
+   background colour, the first page's name and consuming whitespace; and
+   the header's and footer's pages and background, which the engine now
+   paints. Left: a style beyond a background, on the page and on a band.
 4. Tablix and group properties (on top of P0.1): group sort, page break,
    visibility, `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`;
    tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;

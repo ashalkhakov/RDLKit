@@ -69,6 +69,9 @@
 // Band section
 @property (nonatomic, strong) IBOutlet NSView *bandBox;
 @property (nonatomic, strong) IBOutlet NSTextField *bandHField, *bandBGField;
+// Whether the page header or footer appears on the first and the last page.
+@property (nonatomic, strong) IBOutlet NSView *printBox;
+@property (nonatomic, strong) IBOutlet NSButton *printOnFirstPageCheck, *printOnLastPageCheck;
 // Common item geometry section
 @property (nonatomic, strong) IBOutlet NSView *geoBox;
 @property (nonatomic, strong) IBOutlet NSTextField *nameField;
@@ -201,7 +204,7 @@
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
-  _sections = @[ _docBox, _paperBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
+  _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
                  _subreportBox, _chartBox, _tablixBox, _cellBox, _nameBox, _visibilityBox,
                  _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
@@ -335,6 +338,10 @@
              kind:RDLFieldKindValue values:nil placeholder:@"False"];
   [_bindings bind:_pageNameField keyPath:@"pageName" scope:RDLFieldScopeItem
              kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_printOnFirstPageCheck keyPath:@"printOnFirstPage" scope:RDLFieldScopeBand
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_printOnLastPageCheck keyPath:@"printOnLastPage" scope:RDLFieldScopeBand
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
   [_bindings bind:_initialPageNameField keyPath:@"initialPageName" scope:RDLFieldScopeReport
              kind:RDLFieldKindValue values:nil placeholder:nil];
   [_bindings bind:_consumeWhitespaceCheck keyPath:@"consumeContainerWhitespace" scope:RDLFieldScopeReport
@@ -675,14 +682,14 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [self stackBoxes:boxes];
   } else if (band != nil) {
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
-    // Only the Body carries a background in RDL, so the field is disabled
-    // elsewhere rather than silently doing nothing.
-    BOOL isBody = [RDLReport bandKeySupportsBackground:sel.bandKey];
-    [_bandBGField setEditable:isBody];
-    [_bandBGField setEnabled:isBody];
-    [_bandBGField setStringValue:isBody ? (band.style.backgroundColor ?: @"") : @""];
-    [_bandBGField setToolTip:isBody ? nil : @"Background is supported on the Body band only"];
-    [self stackBoxes:@[ _bandBox ]];
+    BOOL hasStyle = [RDLReport bandKeySupportsBackground:sel.bandKey];
+    [_bandBGField setEditable:hasStyle];
+    [_bandBGField setEnabled:hasStyle];
+    [_bandBGField setStringValue:hasStyle ? (band.style.backgroundColor ?: @"") : @""];
+    // The page header and footer choose the pages they appear on; the body is
+    // on all of them.
+    BOOL pageSection = ![sel.bandKey isEqualToString:@"body"];
+    [self stackBoxes:pageSection ? @[ _bandBox, _printBox ] : @[ _bandBox ]];
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
     [self fillPaper:report.page];
@@ -886,12 +893,16 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 
   if (sender == _bandBGField && sel.scope == RDLSelectionScopeBand) {
     RDLBand *band = [_context.report bandWithKey:sel.bandKey];
+    // Read before anything changes: making the style is an edit, the inspector
+    // reloads on it, and the field then shows the colour the band had -- none.
+    NSString *color = [[_bandBGField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
     [editor beginGroup:@"Band Background"];
     // Creating the style belongs to the same step, so undoing does not leave
     // an empty Style behind for the writer to emit.
     if (band.style == nil)
       [editor setValue:[[RDLStyle alloc] init] forKeyPath:@"style" ofBandWithKey:sel.bandKey];
-    [editor setValue:[_bandBGField stringValue]
+    [editor setValue:[color length] ? color : nil
           forKeyPath:@"style.backgroundColor"
        ofBandWithKey:sel.bandKey];
     [editor endGroup];

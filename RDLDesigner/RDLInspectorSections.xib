@@ -68,6 +68,9 @@
                 <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
+                <outlet property="printBox" destination="printBox" id="printBoxOutlet"/>
+                <outlet property="printOnFirstPageCheck" destination="printOnFirstPageCheck" id="printOnFirstPageCheckOutlet"/>
+                <outlet property="printOnLastPageCheck" destination="printOnLastPageCheck" id="printOnLastPageCheckOutlet"/>
                 <outlet property="paperBox" destination="paperBox" id="paperBoxOutlet"/>
                 <outlet property="orientationPop" destination="orientationPop" id="orientationPopOutlet"/>
                 <outlet property="pageBGField" destination="pageBGField" id="pageBGFieldOutlet"/>
@@ -667,6 +670,34 @@
                         <outlet property="delegate" destination="-2" id="bandBGFieldDelegate"/>
                     </connections>
                 </textField>
+            </subviews>
+        </customView>
+        <customView id="printBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="52"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <button toolTip="Whether this appears on the report's first page" id="printOnFirstPageCheck">
+                    <rect key="frame" x="10" y="4" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Print on the first page" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="printOnFirstPageCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="printOnFirstPageCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Whether this appears on the report's last page" id="printOnLastPageCheck">
+                    <rect key="frame" x="10" y="28" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Print on the last page" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="printOnLastPageCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="printOnLastPageCheckAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="nameBox">

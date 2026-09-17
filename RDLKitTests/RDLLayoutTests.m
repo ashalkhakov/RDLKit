@@ -5858,4 +5858,52 @@ static RDLChart *RDLSalesLineChart(RDLReport *r) {
                                               (unsigned long)pagesOf(NO), (unsigned long)pagesOf(YES)]);
 }
 
+
+// A page header's and footer's Style is painted behind them, across the page
+// between the margins, and only on the pages they appear on. Every band's
+// background is above the page's own, which is under everything.
+- (void)testPageSectionBackgroundsArePaintedAboveThePagesOwn {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Sections"];
+  r.page.pageWidth = 8.5;
+  r.page.pageHeight = 11;
+  r.page.leftMargin = r.page.rightMargin = 1;
+  r.page.topMargin = r.page.bottomMargin = 0.5;
+  r.page.style = [[RDLStyle alloc] init];
+  r.page.style.backgroundColor = @"#ffffee";
+  r.body.style = [[RDLStyle alloc] init];
+  r.body.style.backgroundColor = @"#eeffee";
+  r.pageHeader.height = 0.75;
+  r.pageHeader.printOnFirstPage = YES;
+  r.pageHeader.style = [[RDLStyle alloc] init];
+  r.pageHeader.style.backgroundColor = @"#eeeeff";
+  r.pageFooter.height = 0.5;
+  r.pageFooter.printOnFirstPage = NO;
+  r.pageFooter.style = [[RDLStyle alloc] init];
+  r.pageFooter.style.backgroundColor = @"#ffeeee";
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Only";
+  tb.value = @"x";
+  tb.width = 1;
+  tb.height = 0.25;
+  [r.body.items addObject:tb];
+  [r adoptItems];
+  NSArray<RDLLaidOutPage *> *pages = [RDLLayoutEngine pagesForReport:r paramValues:@{}];
+  NSMutableArray<NSString *> *order = [NSMutableArray array];
+  RDLLaidOutItem *header = nil;
+  for (RDLLaidOutItem *item in [pages firstObject].items) {
+    [order addObject:item.name ?: @""];
+    if ([item.name isEqualToString:@"__PageHeaderBackground"])
+      header = item;
+  }
+  NSArray *want = @[ @"__PageBackground", @"__BodyBackground", @"__PageHeaderBackground", @"Only" ];
+  if (![order isEqualToArray:want])
+    XCTFail(@"painted in the order %@", order);
+  if (fabs(header.x - 1) > 0.01 || fabs(header.y - 0.5) > 0.01 || fabs(header.w - 6.5) > 0.01 ||
+      fabs(header.h - 0.75) > 0.01 || ![header.style.backgroundColor isEqualToString:@"#eeeeff"])
+    XCTFail(@"the header's background is at %g,%g, %g by %g", header.x, header.y, header.w, header.h);
+  // The footer does not print on the first page, so neither does its background.
+  if ([order containsObject:@"__PageFooterBackground"])
+    XCTFail(@"%@", @"a footer that is not on the page should not paint there");
+}
+
 @end
