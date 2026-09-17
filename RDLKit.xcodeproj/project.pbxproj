@@ -277,6 +277,10 @@
 		7C446AB0549B19011A0988F9 /* RDLChartSeriesEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = C52688409B017FF5EFD268CA /* RDLChartSeriesEditor.xib */; };
 		72552CEFDF2F0A8EB08BFAAC /* RDLChartSeriesEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = FC874E1B232219E90B40C8BF /* RDLChartSeriesEditor.m */; };
 		0D3BDFCA4A2057B1AC784C80 /* RDLChartSeriesEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = C52688409B017FF5EFD268CA /* RDLChartSeriesEditor.xib */; };
+		0F640984BB6CD69A50B0729E /* RDLValueListEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 87141F351EF953D4C4F5E8ED /* RDLValueListEditor.m */; };
+		34A676699AA94149DC1E7BC7 /* RDLValueListEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 01A29918CBF0290BC12885BA /* RDLValueListEditor.xib */; };
+		8222D2543CCDB6E6DF124E65 /* RDLValueListEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 87141F351EF953D4C4F5E8ED /* RDLValueListEditor.m */; };
+		055E9A651C5BD3BF45F023A6 /* RDLValueListEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 01A29918CBF0290BC12885BA /* RDLValueListEditor.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -588,6 +592,9 @@
 		493163AEF74F4C98E3F87CAF /* RDLChartSeriesEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChartSeriesEditor.h; sourceTree = "<group>"; };
 		FC874E1B232219E90B40C8BF /* RDLChartSeriesEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChartSeriesEditor.m; sourceTree = "<group>"; };
 		C52688409B017FF5EFD268CA /* RDLChartSeriesEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLChartSeriesEditor.xib; sourceTree = "<group>"; };
+		73C0678C2E6669E9397A0CB2 /* RDLValueListEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLValueListEditor.h; sourceTree = "<group>"; };
+		87141F351EF953D4C4F5E8ED /* RDLValueListEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLValueListEditor.m; sourceTree = "<group>"; };
+		01A29918CBF0290BC12885BA /* RDLValueListEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLValueListEditor.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -791,6 +798,9 @@
 				493163AEF74F4C98E3F87CAF /* RDLChartSeriesEditor.h */,
 				FC874E1B232219E90B40C8BF /* RDLChartSeriesEditor.m */,
 				C52688409B017FF5EFD268CA /* RDLChartSeriesEditor.xib */,
+				73C0678C2E6669E9397A0CB2 /* RDLValueListEditor.h */,
+				87141F351EF953D4C4F5E8ED /* RDLValueListEditor.m */,
+				01A29918CBF0290BC12885BA /* RDLValueListEditor.xib */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1167,6 +1177,7 @@
 				B8CE160B4A969BFF141D4259 /* RDLSortEditor.xib in Resources */,
 				99C25BEADA04CDD05900E098 /* RDLChartAxisEditor.xib in Resources */,
 				0D3BDFCA4A2057B1AC784C80 /* RDLChartSeriesEditor.xib in Resources */,
+				055E9A651C5BD3BF45F023A6 /* RDLValueListEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1203,6 +1214,7 @@
 				BC143CE8101074A035A8C43C /* RDLSortEditor.xib in Resources */,
 				CCCB9775AB6E8A78015C2DBB /* RDLChartAxisEditor.xib in Resources */,
 				7C446AB0549B19011A0988F9 /* RDLChartSeriesEditor.xib in Resources */,
+				34A676699AA94149DC1E7BC7 /* RDLValueListEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1292,6 +1304,7 @@
 				190FB5F1BEE4CCA14031CC23 /* RDLSortEditor.m in Sources */,
 				86A53228FA1051CFC103B5B1 /* RDLChartAxisEditor.m in Sources */,
 				45455921C2AC8D719BC4E0D6 /* RDLChartSeriesEditor.m in Sources */,
+				0F640984BB6CD69A50B0729E /* RDLValueListEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1363,6 +1376,7 @@
 				B90735937B31CB99BA00920A /* RDLSortEditor.m in Sources */,
 				677D302CAC9A8567428F0B38 /* RDLChartAxisEditor.m in Sources */,
 				72552CEFDF2F0A8EB08BFAAC /* RDLChartSeriesEditor.m in Sources */,
+				8222D2543CCDB6E6DF124E65 /* RDLValueListEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

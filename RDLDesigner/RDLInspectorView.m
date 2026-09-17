@@ -12,6 +12,7 @@
 #import "RDLSortEditor.h"
 #import "RDLChartAxisEditor.h"
 #import "RDLChartSeriesEditor.h"
+#import "RDLValueListEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -138,7 +139,7 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *legendPositionPop, *legendLayoutPop;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *noDataMessageField;
 @property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton, *chartAxesButton;
-@property (nonatomic, strong) IBOutlet NSButton *chartSeriesButton;
+@property (nonatomic, strong) IBOutlet NSButton *chartSeriesButton, *customColorsButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
 @property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
@@ -270,6 +271,25 @@
     return;
   if ([RDLChartSeriesEditor runForChart:(RDLChart *)item context:_context])
     [self reload];
+}
+
+// A Custom palette's colours, in order; each a colour or an expression.
+- (void)editCustomColors:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  RDLChart *chart = (RDLChart *)item;
+  NSArray<RDLValue *> *edited =
+      [RDLValueListEditor runForValues:chart.customPaletteColors
+                                 title:[NSString stringWithFormat:@"Custom Colours — %@", chart.name ?: @"Chart"]
+                               heading:@"The series are drawn in these colours, in turn."
+                               context:RDLExpressionContextColor
+                                report:_context.report];
+  if (edited == nil || RDLValueListsEqual(edited, chart.customPaletteColors))
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"customPaletteColors" ofItem:chart];
+  [self reload];
 }
 
 - (void)editChartAxes:(id)sender {
@@ -779,8 +799,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
       [boxes addObject:_chartOptionsBox];
-      // A title's position is written with the title, and there is none.
-      [_chartTitlePositionPop setEnabled:[(RDLChart *)it chartTitle] != nil];
+      [self syncDependentControls];
       [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
@@ -1014,6 +1033,21 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   return RDLExpressionCompletions([textView string], charRange, scope);
 }
 
+// Controls whose state follows another's value.
+- (void)syncDependentControls {
+  RDLItem *it = [_context selectedItem];
+  if (![it isKindOfClass:[RDLChart class]])
+    return;
+  RDLChart *chart = (RDLChart *)it;
+  // A title's position is written with the title, and there may be none.
+  [_chartTitlePositionPop setEnabled:chart.chartTitle != nil];
+  // Only a Custom palette reads its colours; the button says how many there are.
+  NSUInteger colors = [chart.customPaletteColors count];
+  [_customColorsButton setEnabled:chart.palette == RDLChartPaletteCustom];
+  [_customColorsButton setTitle:colors ? [NSString stringWithFormat:@"Custom Colours (%lu)…", (unsigned long)colors]
+                                       : @"Custom Colours…"];
+}
+
 - (void)changed:(id)sender {
   if (_reloading)
     return;
@@ -1021,9 +1055,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
 
-  // Most fields are a plain read-and-write of one model value.
-  if ([_bindings applyControl:sender editor:editor item:it bandKey:sel.bandKey])
+  // Most fields are a plain read-and-write of one model value. A change like
+  // that does not reload the inspector, so what depends on it is updated here.
+  if ([_bindings applyControl:sender editor:editor item:it bandKey:sel.bandKey]) {
+    [self syncDependentControls];
     return;
+  }
 
   // The rest are composites: each writes more than one property and must undo
   // as a single step.

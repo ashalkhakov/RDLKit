@@ -6,6 +6,7 @@
 #import "RDLBordersEditor.h"
 #import "RDLChartAxisEditor.h"
 #import "RDLChartSeriesEditor.h"
+#import "RDLValueListEditor.h"
 
 
 
@@ -1457,6 +1458,66 @@
   if (![again apply] || [chart.series count] != 1 || ![[chart.series[0] name] isEqualToString:@"Trend"] ||
       [chart.series[0] type] != RDLChartTypeLine)
     XCTFail(@"%@", @"the line, renamed and moved first, should be all that is left");
+}
+
+// A Custom palette's colours: the button is on only for that palette and says
+// how many there are, and the list panel adds, types, reorders and removes
+// them, leaving out a row left empty.
+- (void)testCustomPaletteColoursAreListed {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  NSButton *colours = [inspector valueForKey:@"customColorsButton"];
+  if ([colours isEnabled])
+    XCTFail(@"%@", @"the colours are the Custom palette's alone");
+  NSPopUpButton *palette = [inspector valueForKey:@"chartPalettePop"];
+  [palette selectItemWithTitle:@"Custom"];
+  [inspector changed:palette];
+  if (![colours isEnabled])
+    XCTFail(@"%@", @"a Custom palette should offer its colours");
+
+  RDLValueListEditor *list = [RDLValueListEditor editorForValues:chart.customPaletteColors
+                                                           title:@"Colours"
+                                                         heading:nil
+                                                         context:RDLExpressionContextColor
+                                                          report:report];
+  [list addValue:nil];
+  [list setText:@"#1f4e79" atRow:0];
+  [list addValue:nil];
+  [list setText:@"=IIf(Parameters!Dark.Value, \"White\", \"Black\")" atRow:1];
+  [list addValue:nil];  // left empty
+  [list addValue:nil];
+  [list setText:@"Teal" atRow:3];
+  [list moveValueUp:nil];
+  [list selectRow:0];
+  [list moveValueDown:nil];
+  NSArray<NSString *> *sources = [list.values valueForKey:@"source"];
+  NSArray<NSString *> *expected = @[ @"=IIf(Parameters!Dark.Value, \"White\", \"Black\")", @"#1f4e79", @"Teal" ];
+  if (![sources isEqualToArray:expected])
+    XCTFail(@"the list should read %@, reads %@", expected, sources);
+  [list selectRow:2];
+  [list removeValue:nil];
+  if ([list.values count] != 2 || ![list.values[0] isExpression])
+    XCTFail(@"removing should leave two, the expression first; leaves %@", [list.values valueForKey:@"source"]);
+
+  [ctx.editor setValue:[list.values mutableCopy] forKeyPath:@"customPaletteColors" ofItem:chart];
+  [inspector reload];
+  if (![[colours title] containsString:@"(2)"])
+    XCTFail(@"the button should count two colours, says %@", [colours title]);
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLChart *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = (RDLChart *)it;
+  if (!RDLValueListsEqual(saved.customPaletteColors, chart.customPaletteColors) ||
+      saved.palette != RDLChartPaletteCustom)
+    XCTFail(@"%@", @"the colours should survive a save");
+  [ctx.document.undoManager undo];
+  if ([chart.customPaletteColors count])
+    XCTFail(@"%@", @"undo should take the colours away");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to
