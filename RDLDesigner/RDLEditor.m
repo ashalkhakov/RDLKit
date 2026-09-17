@@ -1,3 +1,4 @@
+#import "RDLPlainTextEdit.h"
 #import "RDLTablixStructure.h"
 #import "RDLEditor.h"
 #import "RDLChange.h"
@@ -747,9 +748,15 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
   // Unchanged text is not an edit, so the runs stay.
   if ([typed isEqualToString:current])
     return;
+  // Changed text changes the runs it falls in and no others; only when it
+  // cannot be carried into them does the text box become plain.
+  NSArray<RDLParagraph *> *paragraphs =
+      [item isKindOfClass:[RDLTextbox class]] ? [(RDLTextbox *)item paragraphs] : nil;
+  NSMutableArray<RDLParagraph *> *edited =
+      [paragraphs count] ? RDLParagraphsEditedAsText(paragraphs, current, typed) : nil;
   [self beginGroup:@"Edit Text"];
   [self setValue:typed forKeyPath:@"value" ofItem:item];
-  [self setValue:nil forKeyPath:@"paragraphs" ofItem:item];
+  [self setValue:edited forKeyPath:@"paragraphs" ofItem:item];
   [self endGroup];
 }
 

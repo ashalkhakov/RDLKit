@@ -261,6 +261,8 @@
 		46D19545DEBC6A8EC6A30E12 /* RDLFunctionTable.m in Sources */ = {isa = PBXBuildFile; fileRef = 9EAA8428AADBF056A4DECD45 /* RDLFunctionTable.m */; };
 		9229A03D6FB9F96FF7502978 /* RDLDotNetMembers.m in Sources */ = {isa = PBXBuildFile; fileRef = 95A8B34909A04C506A2DE623 /* RDLDotNetMembers.m */; };
 		A2D5FEE497DE8F9306BAD54D /* RDLForms.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A4E5F6E1A14E1FF0FCE8CD9 /* RDLForms.m */; };
+		EFC61084F4F6199B75B9345F /* RDLPlainTextEdit.m in Sources */ = {isa = PBXBuildFile; fileRef = CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */; };
+		5BA5D296146818514FC6785F /* RDLPlainTextEdit.m in Sources */ = {isa = PBXBuildFile; fileRef = CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -559,6 +561,8 @@
 		9EAA8428AADBF056A4DECD45 /* RDLFunctionTable.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLFunctionTable.m; sourceTree = "<group>"; };
 		95A8B34909A04C506A2DE623 /* RDLDotNetMembers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLDotNetMembers.m; sourceTree = "<group>"; };
 		6A4E5F6E1A14E1FF0FCE8CD9 /* RDLForms.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLForms.m; sourceTree = "<group>"; };
+		ACAA124C9A9B11686A93907E /* RDLPlainTextEdit.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPlainTextEdit.h; sourceTree = "<group>"; };
+		CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPlainTextEdit.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -751,6 +755,8 @@
 				BE41C653CA556AECA4C3DDC7 /* RDLNewReportPanel.m */,
 				8399CC90B6584EEB8751BAD3 /* RDLNewReportPanel.xib */,
 				DB2FCE4459F00F9B28626BD8 /* RDLDesigner.icns */,
+				ACAA124C9A9B11686A93907E /* RDLPlainTextEdit.h */,
+				CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1239,6 +1245,7 @@
 				6A42D0D007C753EA81406391 /* RDLRichTextFormatter.m in Sources */,
 				85E4D28A97D8150EB37E381B /* RDLNewReport.m in Sources */,
 				D2C4D4627A54694089CA5C42 /* RDLNewReportPanel.m in Sources */,
+				EFC61084F4F6199B75B9345F /* RDLPlainTextEdit.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1306,6 +1313,7 @@
 				0EF8A1B103C3BAC6DA99890B /* RDLRichTextFormatter.m in Sources */,
 				9A0DF837B69B19F10D27BD5E /* RDLNewReport.m in Sources */,
 				C00014D4136BD4D999A82A59 /* RDLNewReportPanel.m in Sources */,
+				5BA5D296146818514FC6785F /* RDLPlainTextEdit.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

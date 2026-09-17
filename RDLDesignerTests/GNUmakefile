@@ -33,6 +33,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLNewReportPanel.m \
   ../RDLDesigner/RDLPageGeometry.m \
   ../RDLDesigner/RDLRichTextCodec.m \
+  ../RDLDesigner/RDLPlainTextEdit.m \
   ../RDLDesigner/RDLRichTextFormatter.m \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \

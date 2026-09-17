@@ -144,13 +144,9 @@
   [self tearDownEditor];
   if (cancelled || it == nil)
     return;
-  if ([text isEqualToString:[(RDLTextbox *)it value] ?: @""])
-    return;
-  RDLEditor *editor = _ctx.editor;
-  [editor beginGroup:@"Edit Text"];
-  [editor setValue:text forKeyPath:@"value" ofItem:it];
-  [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it]; // plain edit drops the runs
-  [editor endGroup];
+  // The same edit as the inspector's value field: the runs the text changed in
+  // change, and the rest of a rich text box stays as it was.
+  [_ctx.editor setPlainValue:text ofItem:it];
 }
 
 // The textbox after `item` among the cells of the tablix it is in, row by row,

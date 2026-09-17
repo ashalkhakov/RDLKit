@@ -14,6 +14,7 @@ RDLDesigner_OBJC_FILES = \
   RDLItemFactory.m \
   RDLPageGeometry.m \
   RDLRichTextCodec.m \
+  RDLPlainTextEdit.m \
   RDLRichTextFormatter.m \
   RDLCanvasView.m \
   RDLCanvasRenderer.m \

@@ -344,15 +344,9 @@ matter more than missing features because they destroy work.
 
 ### Still present, worst first
 
-| Trigger | What is lost | Fix |
-|---|---|---|
-| In-place plain edit of a rich textbox | `Paragraphs` are replaced and run styles dropped. | "Mixed" state; keep runs when the text is unchanged. |
-
-Two smaller ones: selecting an empty cell from the outline passes body
-row/cell indices where the insertion point expects grid coordinates, so
-grouped tables and crosstabs pick the wrong cell or none; and
-Paste/Duplicate with a cell selected lands the item in the band, not the
-cell *(both by inspection)*.
+None known. The last one listed here -- a plain edit of a rich text box
+replacing its paragraphs -- is fixed below; the outline's cell addressing
+and paste into a cell were fixed with P0.5.
 
 ### Fixed since the previous audit
 
@@ -384,7 +378,10 @@ panes edit a copy and the editor keeps each field as it was); the pieces of a
 file this kit does not read, dropped when the dataset, source, field or
 parameter they sit under was renamed (a rename carries them); and a report
 renamed to its file's basename on every save, over a name typed in the
-inspector (only a report with no name takes the file's).
+inspector (only a report with no name takes the file's). Editing a rich
+text box as plain text, in the value field or on the canvas, which replaced
+its paragraphs and dropped every run's styling when a single word changed
+(the edit now goes into the runs it falls in; the rest stay as they were).
 
 ## 6. Designer priorities
 
