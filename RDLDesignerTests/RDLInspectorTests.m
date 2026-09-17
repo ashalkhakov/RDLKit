@@ -829,6 +829,121 @@
     XCTFail(@"%@", @"a cell that holds something is not an empty cell");
 }
 
+// What every report item has: whether it shows and what toggles it, a link,
+// keeping it on one page, and a region's page breaks and page name -- each in
+// the sections of the kinds MS-RDL gives it to, and each written through the
+// editor. The model has carried all of them; the inspector had none.
+- (void)testTheInspectorEditsWhatEveryItemHas {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Common"];
+  RDLTextbox *heading = [[RDLTextbox alloc] init];
+  heading.name = @"Heading";
+  RDLTextbox *detail = [[RDLTextbox alloc] init];
+  detail.name = @"Detail";
+  RDLRectangle *box = [[RDLRectangle alloc] init];
+  box.name = @"Panel";
+  RDLLine *rule = [[RDLLine alloc] init];
+  rule.name = @"Rule";
+  [report.body.items addObjectsFromArray:@[ heading, detail, box, rule ]];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  for (NSString *name in @[ @"visibilityBox", @"linkBox", @"keepBox", @"pageBox", @"hiddenField",
+                            @"hiddenExprButton", @"toggleItemPop", @"hyperlinkField", @"keepTogetherCheck",
+                            @"pageBreakPop", @"resetPageNumberCheck", @"pageBreakDisabledField",
+                            @"pageNameField", @"pageNameExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+  BOOL (^shown)(NSString *) = ^BOOL(NSString *section) {
+    return ![[inspector valueForKey:section] isHidden];
+  };
+  void (^type)(NSString *, NSString *) = ^(NSString *fieldName, NSString *text) {
+    NSTextField *field = [inspector valueForKey:fieldName];
+    [field setStringValue:text];
+    [inspector changed:field];
+  };
+
+  // A text box: shown or not, a link, keeping together -- no page breaks.
+  [ctx.selection selectItem:detail inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || !shown(@"linkBox") || !shown(@"keepBox") || shown(@"pageBox"))
+    XCTFail(@"%@", @"a text box shows visibility, a link and keep-together, and no page breaks");
+  type(@"hiddenField", @"=Parameters!Brief.Value");
+  if (![detail.hidden isExpression] || ![[detail.hidden source] isEqualToString:@"=Parameters!Brief.Value"])
+    XCTFail(@"hidden reads %@", [detail.hidden source]);
+  type(@"hiddenField", @"True");
+  if ([detail.hidden isExpression] || ![[detail.hidden literal] isEqualToString:@"True"])
+    XCTFail(@"hidden reads %@", [detail.hidden source]);
+  type(@"hyperlinkField", @"https://example.org");
+  if (![[detail.hyperlink literal] isEqualToString:@"https://example.org"])
+    XCTFail(@"the link reads %@", [detail.hyperlink source]);
+  NSButton *keep = [inspector valueForKey:@"keepTogetherCheck"];
+  [keep setState:NSOnState];
+  [inspector changed:keep];
+  if (!detail.keepTogether)
+    XCTFail(@"%@", @"ticking keep-together should set it");
+
+  // What toggles it: the other text boxes, not itself, and None.
+  NSPopUpButton *toggle = [inspector valueForKey:@"toggleItemPop"];
+  if (![[toggle itemTitles] isEqualToArray:@[ @"None", @"Heading" ]])
+    XCTFail(@"the toggle list is %@", [toggle itemTitles]);
+  [toggle selectItemWithTitle:@"Heading"];
+  [inspector changed:toggle];
+  if (![detail.toggleItem isEqualToString:@"Heading"])
+    XCTFail(@"toggled by %@", detail.toggleItem);
+  [ctx.document.undoManager undo];
+  if (detail.toggleItem != nil)
+    XCTFail(@"%@", @"undo should take the toggle away again");
+  // One the report does not have is kept and shown, not dropped.
+  detail.toggleItem = @"Gone";
+  [ctx.selection selectItem:heading inBandWithKey:@"body"];
+  [ctx.selection selectItem:detail inBandWithKey:@"body"];
+  if (![[toggle titleOfSelectedItem] isEqualToString:@"Gone"])
+    XCTFail(@"a toggle the report lacks shows as %@", [toggle titleOfSelectedItem]);
+  [toggle selectItemAtIndex:0];
+  [inspector changed:toggle];
+  if (detail.toggleItem != nil)
+    XCTFail(@"%@", @"None should clear the toggle");
+
+  // A rectangle: page breaks and a page name, and no link.
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || shown(@"linkBox") || !shown(@"keepBox") || !shown(@"pageBox"))
+    XCTFail(@"%@", @"a rectangle shows visibility, keep-together and page breaks, and no link");
+  NSPopUpButton *breaks = [inspector valueForKey:@"pageBreakPop"];
+  [breaks selectItemWithTitle:RDLStringFromPageBreakLocation(RDLPageBreakLocationEnd)];
+  [inspector changed:breaks];
+  if (box.pageBreak != RDLPageBreakLocationEnd)
+    XCTFail(@"the break is %ld", (long)box.pageBreak);
+  NSButton *restart = [inspector valueForKey:@"resetPageNumberCheck"];
+  [restart setState:NSOnState];
+  [inspector changed:restart];
+  if (!box.resetPageNumber)
+    XCTFail(@"%@", @"ticking restart should reset the page numbers");
+  type(@"pageBreakDisabledField", @"=Globals!PageNumber = 1");
+  type(@"pageNameField", @"=Fields!Region.Value");
+  if (![box.pageBreakDisabled isExpression] || ![box.pageName isExpression])
+    XCTFail(@"disabled reads %@, page name %@", [box.pageBreakDisabled source], [box.pageName source]);
+  // And each kept on a round trip through the file.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *panel = nil, *detailBack = nil;
+  for (RDLItem *item in back.body.items) {
+    if ([item.name isEqualToString:@"Panel"])
+      panel = item;
+    if ([item.name isEqualToString:@"Detail"])
+      detailBack = item;
+  }
+  if (panel.pageBreak != RDLPageBreakLocationEnd || !panel.resetPageNumber ||
+      ![[panel.pageName source] isEqualToString:@"=Fields!Region.Value"])
+    XCTFail(@"%@", @"the rectangle's page settings should survive a save");
+  if (!detailBack.keepTogether || ![[detailBack.hyperlink literal] isEqualToString:@"https://example.org"])
+    XCTFail(@"%@", @"the text box's keep-together and link should survive a save");
+
+  // A line: whether it shows, and nothing else of these.
+  [ctx.selection selectItem:rule inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || shown(@"linkBox") || shown(@"keepBox") || shown(@"pageBox"))
+    XCTFail(@"%@", @"a line shows only visibility");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

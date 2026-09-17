@@ -106,6 +106,16 @@
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
 @property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
+// What every report item has, in the sections that apply to its kind: whether
+// it shows and what toggles it; a link (a text box's or an image's); keeping it
+// on one page; and the page breaks and page name of a region or rectangle.
+@property (nonatomic, strong) IBOutlet NSView *visibilityBox, *linkBox, *keepBox, *pageBox;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *hiddenField, *hyperlinkField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *pageBreakDisabledField, *pageNameField;
+@property (nonatomic, strong) IBOutlet NSButton *hiddenExprButton, *hyperlinkExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *pageBreakDisabledExprButton, *pageNameExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *toggleItemPop, *pageBreakPop;
+@property (nonatomic, strong) IBOutlet NSButton *keepTogetherCheck, *resetPageNumberCheck;
 @end
 
 @implementation RDLInspectorView {
@@ -168,14 +178,16 @@
                          _languageExprButton, _docLanguageExprButton,
                          _rectBGExprButton, _sizeExprButton, _textBGExprButton,
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
-                         _padBottomExprButton, _lineWidthExprButton ])
+                         _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
+                         _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _tablixBox, _cellBox ];
+                 _subreportBox, _chartBox, _tablixBox, _cellBox, _visibilityBox, _linkBox,
+                 _keepBox, _pageBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
@@ -286,6 +298,27 @@
 // -changed: below, because each is a composite that must undo as one step.
 - (void)declareBindings {
   _bindings = [[RDLFieldBindings alloc] init];
+  // What every item has. Hidden and the break's Disabled are True, False or an
+  // expression; the rest of the pagination is a box to tick and a list.
+  [_bindings bind:_hiddenField keyPath:@"hidden" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"False"];
+  [_bindings bind:_hyperlinkField keyPath:@"hyperlink" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"https://"];
+  [_bindings bind:_keepTogetherCheck keyPath:@"keepTogether" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_resetPageNumberCheck keyPath:@"resetPageNumber" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_pageBreakPop
+          keyPath:@"pageBreak"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_pageBreakPop, RDLPageBreakLocationNone, RDLPageBreakLocationBetween,
+                               ^(NSInteger v) { return RDLStringFromPageBreakLocation((RDLPageBreakLocation)v); })
+      placeholder:nil];
+  [_bindings bind:_pageBreakDisabledField keyPath:@"pageBreakDisabled" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"False"];
+  [_bindings bind:_pageNameField keyPath:@"pageName" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:nil];
 
   // Item geometry.
   [_bindings bind:_leftField keyPath:@"left" scope:RDLFieldScopeItem
@@ -582,6 +615,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
+    [boxes addObjectsFromArray:[self commonBoxesForItem:it]];
+    [self rebuildTogglePopFor:it];
     // An item in a tablix cell: the column it is in, whose width is the cell's.
     NSUInteger cellRow = 0, cellColumn = 0;
     if (cell != nil && [cellTablix getRow:&cellRow column:&cellColumn ofCell:cell] &&
@@ -632,6 +667,58 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 
   [_bindings fillFromItem:it band:band report:report];
   _reloading = NO;
+}
+
+// What MS-RDL lets each kind say. Visibility is every item's; a link is a text
+// box's or an image's; KeepTogether is on a text box, a subreport, a rectangle
+// and a data region; page breaks and a page name only on a rectangle or a
+// data region.
+- (NSArray<NSView *> *)commonBoxesForItem:(RDLItem *)it {
+  NSMutableArray<NSView *> *boxes = [NSMutableArray arrayWithObject:_visibilityBox];
+  BOOL region = [it isKindOfClass:[RDLRectangle class]] || [it isKindOfClass:[RDLTablix class]] ||
+                [it isKindOfClass:[RDLChart class]];
+  if ([it isKindOfClass:[RDLTextbox class]] || [it isKindOfClass:[RDLImage class]])
+    [boxes addObject:_linkBox];
+  if (region || [it isKindOfClass:[RDLTextbox class]] || [it isKindOfClass:[RDLSubreport class]])
+    [boxes addObject:_keepBox];
+  if (region)
+    [boxes addObject:_pageBox];
+  return boxes;
+}
+
+// The text boxes that could toggle `it`: every one in the report but itself,
+// by name, after None. A ToggleItem naming something else -- a text box the
+// report no longer has -- is listed too, so showing it does not lose it.
+- (void)rebuildTogglePopFor:(RDLItem *)it {
+  [_toggleItemPop removeAllItems];
+  [_toggleItemPop addItemWithTitle:@"None"];
+  NSMutableArray<NSString *> *names = [NSMutableArray array];
+  for (RDLBand *band in [_context.report allBands])
+    for (RDLItem *top in band.items)
+      for (RDLItem *candidate in [top itemsIncludingNested])
+        if ([candidate isKindOfClass:[RDLTextbox class]] && candidate != it && [candidate.name length] &&
+            ![names containsObject:candidate.name])
+          [names addObject:candidate.name];
+  if ([it.toggleItem length] && ![names containsObject:it.toggleItem])
+    [names addObject:it.toggleItem];
+  for (NSString *name in names) {
+    // addItemWithTitle: would fold a name into one already there.
+    [[_toggleItemPop menu] addItemWithTitle:name action:NULL keyEquivalent:@""];
+  }
+  if ([it.toggleItem length])
+    [_toggleItemPop selectItemAtIndex:(NSInteger)[names indexOfObject:it.toggleItem] + 1];
+  else
+    [_toggleItemPop selectItemAtIndex:0];
+}
+
+- (BOOL)applyToggleControl:(id)sender item:(RDLItem *)it {
+  if (sender != _toggleItemPop)
+    return NO;
+  NSInteger index = [_toggleItemPop indexOfSelectedItem];
+  NSString *name = index > 0 ? [_toggleItemPop titleOfSelectedItem] : nil;
+  if (it != nil && !(name == it.toggleItem || [name isEqualToString:it.toggleItem]))
+    [_context.editor setValue:name forKeyPath:@"toggleItem" ofItem:it];
+  return YES;
 }
 
 // The width of a tablix's body column, or NO when there is no such column --
@@ -778,7 +865,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
-  if ([self applyCellControl:sender] || [self applyRowHeightControl:sender])
+  if ([self applyCellControl:sender] || [self applyRowHeightControl:sender] ||
+      [self applyToggleControl:sender item:it])
     return;
   if (sender == _marginField) {
     [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
@@ -808,6 +896,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _languageField.expressionContext = RDLExpressionContextText;
   _docLanguageField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
+  _hiddenField.expressionContext = RDLExpressionContextBoolean;
+  _hyperlinkField.expressionContext = RDLExpressionContextText;
+  _pageBreakDisabledField.expressionContext = RDLExpressionContextBoolean;
+  _pageNameField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -828,6 +920,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _padTopExprButton) return _padTopField;
   if (sender == _padBottomExprButton) return _padBottomField;
   if (sender == _lineWidthExprButton) return _lineWidthField;
+  if (sender == _hiddenExprButton) return _hiddenField;
+  if (sender == _hyperlinkExprButton) return _hyperlinkField;
+  if (sender == _pageBreakDisabledExprButton) return _pageBreakDisabledField;
+  if (sender == _pageNameExprButton) return _pageNameField;
   return nil;
 }
 

@@ -134,7 +134,7 @@ UI.
 | Items | Position, size | Fields + drag; snap fixed at 0.05in; hidden for in-cell items |
 | Items | ZIndex / front-back | — (written and honoured at render; the canvas ignores it) |
 | Items | Name | Shown, not editable |
-| Items | Visibility, Hyperlink, PageBreak, ResetPageNumber, PageName, KeepTogether | — |
+| Items | Visibility, Hyperlink, PageBreak, ResetPageNumber, PageName, KeepTogether | Yes: Hidden (literal or expression) and what toggles it on every item; a link on a text box and an image; KeepTogether where RDL has it; page breaks, their Disabled and PageName on a rectangle and a data region |
 | Style | Font family, size, colour, format, language | Yes (text or expression) |
 | Style | Font weight | Popup, the whole list from the enumeration |
 | Style | Font style (italic), text decoration | Italic ticks a box; decoration is a popup |
@@ -211,13 +211,13 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| `Visibility/Hidden` | UI | |
-| `Visibility/ToggleItem` | UI (engine MODEL) | Authorable for SSRS; the preview cannot expand it. |
-| `ActionInfo/Hyperlink` | UI | |
+| `Visibility/Hidden` | Done | Literal or expression, on every item. |
+| `Visibility/ToggleItem` | Done (engine MODEL) | A list of the report's other text boxes; one it no longer has is kept and shown. The preview cannot expand it. |
+| `ActionInfo/Hyperlink` | Done | On a text box and an image, where RDL has ActionInfo. |
 | `Drillthrough`, `BookmarkLink` | MODEL | |
-| `PageBreak/BreakLocation`, `Disabled`, `ResetPageNumber` | UI | |
-| `PageName` | UI | The writer now places it correctly. |
-| `KeepTogether` | UI | |
+| `PageBreak/BreakLocation`, `Disabled`, `ResetPageNumber` | Done | On a rectangle, a tablix and a chart. |
+| `PageName` | Done | On a rectangle, a tablix and a chart. |
+| `KeepTogether` | Done | On a text box, a subreport, a rectangle, a tablix and a chart. |
 | `ZIndex` | UI (was UI+MODEL) | Written and honoured at render; no front/back commands and the canvas ignores it. |
 | `Name` editing | UI | An item rename must also update `ToggleItem` and `ReportItems!` references. Renaming a dataset, source, field or parameter carries the pieces kept under it (§5). |
 | `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | Kept and written back. |
@@ -252,7 +252,7 @@ bin that moved since the previous audit.
 | Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
 | Line width, style | — | The canvas draws a line at its border's width, colour and dash, running the way its box says, and the inspector edits all three (P1.1); *as audited* every line was a one-pixel rule along the top of its box, a line with no width -- a vertical one -- drew nothing at all, and the ink field wrote a property nothing read. |
 | Line: the other diagonal | MODEL | |
-| Rectangle padding, `PageBreak`, `KeepTogether` | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
+| Rectangle padding | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
 | Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
 | Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | |
 
@@ -288,7 +288,7 @@ not yet keep that.
 | Details `SortExpressions` | UI (engine FULL) | |
 | Row heights other than the heading and value rows | UI | Kept; no control. |
 | Rows inserted or deleted on their own | UI (model has them) | The canvas menu offers columns; rows come with groups and totals. |
-| Tablix `NoRowsMessage`, `SortExpressions`, `KeepTogether`, `PageBreak`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | UI | |
+| Tablix `NoRowsMessage`, `SortExpressions`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | UI | |
 | `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
 | Nested tablix or chart in a cell | UI (was MODEL) | |
 | A "List" preset | UI | |
@@ -428,7 +428,10 @@ In rough order of how often a Report Builder user reaches for it:
    when the panel changes something and undone with the borders in one step.
 2. Common item properties: `Hidden`, `ToggleItem`, `Hyperlink`,
    `KeepTogether`, `PageBreak`/`ResetPageNumber`/`PageName`; item rename;
-   front/back commands and canvas z-order.
+   front/back commands and canvas z-order. Done: the first six, in inspector
+   sections shown for the kinds MS-RDL gives each to (not yet looked at in
+   dark mode, for the reason `2fa0db1` records). Left: rename, which has to
+   carry `ReportItems!` and `ToggleItem` references, and z-order.
 3. Page setup: free size, orientation, four margins, `Columns`/
    `ColumnSpacing`, page `Style`, `PrintOnFirstPage`/`PrintOnLastPage`,
    header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.

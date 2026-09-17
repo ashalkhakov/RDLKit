@@ -68,6 +68,22 @@
                 <outlet property="textBordersButton" destination="textBordersButton" id="textBordersButtonOutlet"/>
                 <outlet property="rectBordersButton" destination="rectBordersButton" id="rectBordersButtonOutlet"/>
                 <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
+                <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
+                <outlet property="linkBox" destination="linkBox" id="linkBoxOutlet"/>
+                <outlet property="keepBox" destination="keepBox" id="keepBoxOutlet"/>
+                <outlet property="pageBox" destination="pageBox" id="pageBoxOutlet"/>
+                <outlet property="hiddenField" destination="hiddenField" id="hiddenFieldOutlet"/>
+                <outlet property="hiddenExprButton" destination="hiddenExprButton" id="hiddenExprButtonOutlet"/>
+                <outlet property="toggleItemPop" destination="toggleItemPop" id="toggleItemPopOutlet"/>
+                <outlet property="hyperlinkField" destination="hyperlinkField" id="hyperlinkFieldOutlet"/>
+                <outlet property="hyperlinkExprButton" destination="hyperlinkExprButton" id="hyperlinkExprButtonOutlet"/>
+                <outlet property="keepTogetherCheck" destination="keepTogetherCheck" id="keepTogetherCheckOutlet"/>
+                <outlet property="pageBreakPop" destination="pageBreakPop" id="pageBreakPopOutlet"/>
+                <outlet property="resetPageNumberCheck" destination="resetPageNumberCheck" id="resetPageNumberCheckOutlet"/>
+                <outlet property="pageBreakDisabledField" destination="pageBreakDisabledField" id="pageBreakDisabledFieldOutlet"/>
+                <outlet property="pageBreakDisabledExprButton" destination="pageBreakDisabledExprButton" id="pageBreakDisabledExprButtonOutlet"/>
+                <outlet property="pageNameField" destination="pageNameField" id="pageNameFieldOutlet"/>
+                <outlet property="pageNameExprButton" destination="pageNameExprButton" id="pageNameExprButtonOutlet"/>
                 <outlet property="padLeftField" destination="padLeftField" id="padLeftFieldOutlet"/>
                 <outlet property="padLeftExprButton" destination="padLeftExprButton" id="padLeftExprButtonOutlet"/>
                 <outlet property="padRightField" destination="padRightField" id="padRightFieldOutlet"/>
@@ -542,6 +558,220 @@
                     </buttonCell>
                     <connections>
                         <action selector="editBorders:" target="-2" id="cellBordersButtonAction"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+        <customView id="visibilityBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblHidden">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Hidden (True, False, or an expression)" id="lblHiddenCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="Whether this is left out when the report renders" focusRingType="none" id="hiddenField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="20" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="hiddenFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="hiddenFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="hiddenFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="hiddenExprButton">
+                    <rect key="frame" x="226" y="20" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="hiddenExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="hiddenExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblToggleItem">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Shown and hidden by" id="lblToggleItemCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="The text box whose + and - show and hide this, in an interactive viewer" id="toggleItemPop">
+                    <rect key="frame" x="10" y="64" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="toggleItemPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="toggleItemPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="toggleItemPopAction"/>
+                    </connections>
+                </popUpButton>
+            </subviews>
+        </customView>
+        <customView id="linkBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="48"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblHyperlink">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Link" id="lblHyperlinkCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="Where clicking this goes: a URL, or an expression giving one" focusRingType="none" id="hyperlinkField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="20" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="hyperlinkFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="hyperlinkFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="hyperlinkFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="hyperlinkExprButton">
+                    <rect key="frame" x="226" y="20" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="hyperlinkExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="hyperlinkExprButtonAction"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+        <customView id="keepBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="28"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <button toolTip="Start this on a new page rather than split it, when it fits on one" id="keepTogetherCheck">
+                    <rect key="frame" x="10" y="4" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Keep together on one page" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="keepTogetherCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="keepTogetherCheckAction"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+        <customView id="pageBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="136"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblPageBreak">
+                    <rect key="frame" x="10" y="4" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Page break" id="lblPageBreakCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="Where a new page starts: before this, after it, or both" id="pageBreakPop">
+                    <rect key="frame" x="10" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="pageBreakPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="pageBreakPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pageBreakPopAction"/>
+                    </connections>
+                </popUpButton>
+                <button toolTip="Number the pages after the break from 1 again" id="resetPageNumberCheck">
+                    <rect key="frame" x="136" y="21" width="114" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Renumber" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="resetPageNumberCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="resetPageNumberCheckAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblPageBreakDisabled">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="No break when (an expression)" id="lblPageBreakDisabledCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="When this is True, the break does not happen" focusRingType="none" id="pageBreakDisabledField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="64" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="pageBreakDisabledFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pageBreakDisabledFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="pageBreakDisabledFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="pageBreakDisabledExprButton">
+                    <rect key="frame" x="226" y="64" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="pageBreakDisabledExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="pageBreakDisabledExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblPageName">
+                    <rect key="frame" x="10" y="92" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Page name" id="lblPageNameCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="What the pages this lands on are called: Globals!PageName, and a sheet name in Excel" focusRingType="none" id="pageNameField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="108" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="pageNameFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pageNameFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="pageNameFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="pageNameExprButton">
+                    <rect key="frame" x="226" y="108" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="pageNameExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="pageNameExprButtonAction"/>
                     </connections>
                 </button>
             </subviews>
