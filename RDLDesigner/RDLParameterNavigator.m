@@ -10,7 +10,7 @@
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSButton *addButton;
-@property (nonatomic, strong) IBOutlet NSButton *removeButton;
+@property (nonatomic, strong) IBOutlet NSButton *removeButton, *upButton, *downButton;
 @end
 
 @implementation RDLParameterNavigator {
@@ -36,6 +36,8 @@
   RDLFillHost(self, _content);
   RDLSetToolbarIcon(_addButton, RDLToolbarGlyphAdd);
   RDLSetToolbarIcon(_removeButton, RDLToolbarGlyphRemove);
+  RDLSetToolbarIcon(_upButton, RDLToolbarGlyphMoveUp);
+  RDLSetToolbarIcon(_downButton, RDLToolbarGlyphMoveDown);
   [_table setAllowsEmptySelection:YES];
   return self;
 }
@@ -52,6 +54,15 @@
   NSUInteger i = was ? [_context.report.parameters indexOfObject:was] : NSNotFound;
   if (i != NSNotFound)
     [self selectRow:i];
+  [self syncButtons];
+}
+
+- (void)syncButtons {
+  NSInteger row = [_table selectedRow];
+  NSInteger count = (NSInteger)[_context.report.parameters count];
+  [_removeButton setEnabled:row >= 0 && row < count];
+  [_upButton setEnabled:row > 0 && row < count];
+  [_downButton setEnabled:row >= 0 && row + 1 < count];
 }
 
 #pragma mark - Adding and removing
@@ -93,6 +104,28 @@
   [_delegate parameterNavigator:self didSelectParameter:[self selectedParameter]];
 }
 
+- (void)moveBy:(NSInteger)step {
+  RDLParameter *parameter = [self selectedParameter];
+  NSInteger to = (NSInteger)[_context.report.parameters indexOfObjectIdenticalTo:parameter] + step;
+  if (parameter == nil || to < 0 || ![_context.editor moveParameter:parameter toIndex:(NSUInteger)to])
+    return;
+  // The row chosen is where the parameter was, which another now fills: the
+  // parameter moved stays chosen.
+  [_table reloadData];
+  [self selectRow:(NSUInteger)to];
+  [self syncButtons];
+}
+
+- (void)moveParameterUp:(id)sender {
+  (void)sender;
+  [self moveBy:-1];
+}
+
+- (void)moveParameterDown:(id)sender {
+  (void)sender;
+  [self moveBy:1];
+}
+
 #pragma mark - Table
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
@@ -121,6 +154,7 @@
 
 - (void)tableViewSelectionDidChange:(NSNotification *)note {
   (void)note;
+  [self syncButtons];
   if (_reselecting)
     return;
   [_delegate parameterNavigator:self didSelectParameter:[self selectedParameter]];

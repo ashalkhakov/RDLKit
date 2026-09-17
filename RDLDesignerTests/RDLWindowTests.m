@@ -17,6 +17,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLValueListEditor.h"
 #import "RDLParameterNavigator.h"
 #import "RDLGeneratorWindow.h"
 #import "RDLDataSourceView.h"
@@ -1528,22 +1529,26 @@ static NSTabView *_centerTabViewOf(id wc) {
   [typePop selectItemWithTitle:@"String"];
   [multiCheck setState:NSOnState];
   [defaultField setStringValue:@"=User!Language"];
-  [validText setString:@"en-US\nde-DE"];
   [inspector changed:promptField];
+  // What it accepts comes from the list panel, a label beside each value.
+  [inspector setValidValues:@[ [RDLValue literal:@"en-US"], [RDLValue literal:@"de-DE"] ]
+                     labels:@[ [NSNull null], [RDLValue literal:@"German"] ]];
+  if ([validText isEditable] || [[validText string] rangeOfString:@"de-DE — German"].location == NSNotFound)
+    XCTFail(@"the pane should list what it accepts with the labels, not take typing: %@", [validText string]);
 
   if (![p.prompt isEqualToString:@"Which culture?"] || !p.multiValue)
     XCTFail(@"%@", @"prompt and multi-value should have been written through");
   if (![p.defaultValue isExpression] ||
       ![[p.defaultValue source] isEqualToString:@"=User!Language"])
     XCTFail(@"%@", [NSString stringWithFormat:@"default: %@", [p.defaultValue source]]);
-  if ([p.validValues count] != 2 ||
-      ![[p.validValues[1] source] isEqualToString:@"de-DE"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"accepts: %@", p.validValues]);
+  if ([p.validValues count] != 2 || ![[p.validValues[1] source] isEqualToString:@"de-DE"] ||
+      ![[[p labelForValidValue:@"de-DE"] source] isEqualToString:@"German"] || [p labelForValidValue:@"en-US"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"accepts: %@ labelled %@", p.validValues, p.validValueLabels]);
 
   // Undo puts a setting back, which is what makes these edits like every other.
   [ctx.document.undoManager undo];
-  if ([p.validValues count] != 0)
-    XCTFail(@"%@", @"undo should take back the values it accepts");
+  if ([p.validValues count] != 0 || [p.validValueLabels count] != 0)
+    XCTFail(@"%@", @"undo should take back the values it accepts, and their labels");
 
   // And removing it takes it out of the report, undoably.
   [nav removeParameter:nil];
@@ -1552,6 +1557,128 @@ static NSTabView *_centerTabViewOf(id wc) {
   [ctx.document.undoManager undo];
   if ([report.parameters count] != 1)
     XCTFail(@"%@", @"undo should put it back");
+}
+
+// A parameter's other settings: whether it is hidden, whether a String one
+// allows a blank, and -- with several values -- a list of defaults, summed up
+// in the field; what it accepts, each value with a label. All saved.
+- (void)testAParametersListsAndFlagsAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Asks"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLParameterInspectorView *inspector =
+      [[RDLParameterInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 280, 400) context:ctx];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Kilns";
+  p.prompt = @"Which kilns?";
+  p.dataType = RDLParameterDataTypeString;
+  [ctx.editor addParameter:p];
+  [inspector showParameter:p];
+  NSButton *hidden = [inspector valueForKey:@"hiddenCheck"];
+  NSButton *blank = [inspector valueForKey:@"allowBlankCheck"];
+  NSButton *several = [inspector valueForKey:@"multiCheck"];
+  NSTextField *defaultField = [inspector valueForKey:@"defaultField"];
+  NSButton *defaults = [inspector valueForKey:@"defaultsButton"];
+  if (![blank isEnabled] || [defaults isEnabled] || ![defaultField isEnabled])
+    XCTFail(@"%@", @"a String parameter of one value allows a blank and has one default");
+  [hidden setState:NSOnState];
+  [blank setState:NSOnState];
+  [several setState:NSOnState];
+  [inspector changed:several];
+  if (!p.hidden || !p.allowBlank || !p.multiValue || [defaultField isEnabled] || ![defaults isEnabled])
+    XCTFail(@"%@", @"the flags should be set, and the defaults become a list");
+
+  // The defaults, as the list panel hands them back, summed up in the field.
+  RDLValueListEditor *list = [RDLValueListEditor editorForValues:p.defaultValues
+                                                           title:nil
+                                                         heading:nil
+                                                         context:RDLExpressionContextText
+                                                          report:report];
+  [list addValue:nil];
+  [list setText:@"North" atRow:0];
+  [list addValue:nil];
+  [list setText:@"South" atRow:1];
+  [ctx.editor setValue:[list.values mutableCopy] forKeyPath:@"defaultValues" ofParameter:p];
+  [inspector showParameter:p];
+  if (![[defaultField stringValue] isEqualToString:@"North, South"])
+    XCTFail(@"the field should sum up the defaults, says %@", [defaultField stringValue]);
+  // Another setting changed does not write the summary back as a value.
+  [hidden setState:NSOffState];
+  [inspector changed:hidden];
+  if ([p.defaultValues count] != 2 || p.hidden)
+    XCTFail(@"the defaults should be left as the list had them, not %@", [p.defaultValues valueForKey:@"source"]);
+
+  // What it accepts: a value and a label a row, a row left empty dropped with
+  // its label.
+  RDLValueListEditor *accepts = [RDLValueListEditor editorForValues:@[]
+                                                             labels:@[]
+                                                              title:nil
+                                                            heading:nil
+                                                            context:RDLExpressionContextText
+                                                             report:report];
+  if ([[accepts valueForKey:@"table"] numberOfColumns] != 2)
+    XCTFail(@"%@", @"a labelled list should have a label column");
+  [accepts addValue:nil];
+  [accepts setText:@"N" atRow:0];
+  [accepts setLabel:@"North" atRow:0];
+  [accepts addValue:nil];
+  [accepts setLabel:@"Nowhere" atRow:1];
+  [accepts addValue:nil];
+  [accepts setText:@"S" atRow:2];
+  if ([accepts.values count] != 2 || [accepts.labels count] != 2 || accepts.labels[1] != [NSNull null] ||
+      ![[(RDLValue *)accepts.labels[0] source] isEqualToString:@"North"])
+    XCTFail(@"the values and labels should be in step, read %@ / %@", [accepts.values valueForKey:@"source"],
+            accepts.labels);
+  [inspector setValidValues:accepts.values labels:accepts.labels];
+  // A String parameter no longer: a blank is not a number.
+  NSPopUpButton *typePop = [inspector valueForKey:@"typePop"];
+  [typePop selectItemWithTitle:@"Integer"];
+  [inspector changed:typePop];
+  if ([blank isEnabled])
+    XCTFail(@"%@", @"only a String parameter allows a blank");
+  [typePop selectItemWithTitle:@"String"];
+  [inspector changed:typePop];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLParameter *saved = [back parameterNamed:@"Kilns"];
+  if (saved.hidden || !saved.allowBlank || !saved.multiValue ||
+      ![[saved.defaultValues valueForKey:@"source"] isEqualToArray:@[ @"North", @"South" ]] ||
+      ![[[saved labelForValidValue:@"N"] source] isEqualToString:@"North"] || [saved labelForValidValue:@"S"] ||
+      [saved.validValues count] != 2)
+    XCTFail(@"%@", @"the settings and lists should survive a save");
+}
+
+// Parameters are asked for in their order, which the navigator changes -- and
+// one removed and put back returns to its place.
+- (void)testParametersAreReordered {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Asks"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLParameterNavigator *nav =
+      [[RDLParameterNavigator alloc] initWithFrame:NSMakeRect(0, 0, 220, 200) context:ctx];
+  [nav addParameter:nil];
+  [nav addParameter:nil];
+  [nav addParameter:nil];
+  NSArray<NSString *> *(^names)(void) = ^{
+    return (NSArray<NSString *> *)[report.parameters valueForKey:@"name"];
+  };
+  NSButton *up = [nav valueForKey:@"upButton"];
+  NSButton *down = [nav valueForKey:@"downButton"];
+  if (![up isEnabled] || [down isEnabled])
+    XCTFail(@"%@", @"the last parameter can move up and not down");
+  [nav moveParameterUp:nil];
+  [nav moveParameterUp:nil];
+  NSArray *moved = @[ @"Parameter3", @"Parameter1", @"Parameter2" ];
+  if (![names() isEqualToArray:moved] || nav.selectedParameter != report.parameters[0] || [up isEnabled])
+    XCTFail(@"the third should be first and still chosen, reads %@", names());
+  [nav moveParameterUp:nil];
+  if (![names() isEqualToArray:moved])
+    XCTFail(@"%@", @"the first goes no higher");
+  [ctx.document.undoManager undo];
+  if (![names() isEqualToArray:(@[ @"Parameter1", @"Parameter3", @"Parameter2" ])])
+    XCTFail(@"one undo should take back one move, reads %@", names());
+  [ctx.editor removeParameter:report.parameters[1]];
+  [ctx.document.undoManager undo];
+  if (![names() isEqualToArray:(@[ @"Parameter1", @"Parameter3", @"Parameter2" ])])
+    XCTFail(@"a removed parameter should come back to its place, reads %@", names());
 }
 
 // The window shows a chosen parameter in the inspector, and an element chosen
@@ -3353,7 +3480,8 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   NSTextField *defaultField = [inspector valueForKey:@"defaultField"];
   NSTextView *validText = [inspector valueForKey:@"validText"];
   NSTextField *reference = [inspector valueForKey:@"referenceLabel"];
-  if ([defaultField isEnabled] || [validText isEditable])
+  if ([defaultField isEnabled] || [validText isEditable] || [[inspector valueForKey:@"validValuesButton"] isEnabled] ||
+      [[inspector valueForKey:@"defaultsButton"] isEnabled])
     XCTFail(@"%@", @"values that come from a dataset are not typed over");
   if ([[defaultField stringValue] rangeOfString:@"Regions"].location == NSNotFound ||
       [[validText string] rangeOfString:@"Name"].location == NSNotFound ||

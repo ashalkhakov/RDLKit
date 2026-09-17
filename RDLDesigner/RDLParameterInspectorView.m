@@ -5,6 +5,7 @@
 #import "RDLExpressionField.h"
 #import "RDLKit.h"
 #import "RDLPane.h"
+#import "RDLValueListEditor.h"
 
 @interface RDLParameterInspectorView () <NSTextFieldDelegate, NSTextViewDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
@@ -16,7 +17,10 @@
 // whose values come from a dataset rather than from the file.
 @property (nonatomic, strong) IBOutlet NSTextField *referenceLabel;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *typePop;
-@property (nonatomic, strong) IBOutlet NSButton *nullableCheck, *multiCheck;
+@property (nonatomic, strong) IBOutlet NSButton *nullableCheck, *multiCheck, *allowBlankCheck, *hiddenCheck;
+// The defaults of a parameter of several values, and the values any parameter
+// accepts with their labels, each a list edited in a panel.
+@property (nonatomic, strong) IBOutlet NSButton *defaultsButton, *validValuesButton;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *defaultField;
 @property (nonatomic, strong) IBOutlet NSScrollView *validScroll;
 @property (nonatomic, strong) IBOutlet NSTextView *validText;
@@ -64,7 +68,8 @@ static NSString *RDLReferenceSummary(RDLDataSetReference *reference) {
   _filling = YES;
   BOOL any = parameter != nil;
   for (NSView *v in @[ _nameField, _promptField, _promptCheck, _typePop, _nullableCheck, _multiCheck,
-                       _defaultField, _validScroll ])
+                       _allowBlankCheck, _hiddenCheck, _defaultField, _defaultsButton, _validScroll,
+                       _validValuesButton ])
     [v setHidden:!any];
   [_empty setHidden:any];
   [_referenceLabel setHidden:!any];
@@ -81,26 +86,41 @@ static NSString *RDLReferenceSummary(RDLDataSetReference *reference) {
       [_typePop selectItemWithTitle:type];
     [_nullableCheck setState:parameter.nullable ? NSOnState : NSOffState];
     [_multiCheck setState:parameter.multiValue ? NSOnState : NSOffState];
+    // A blank is text, so only a String parameter can allow one.
+    [_allowBlankCheck setState:parameter.allowBlank ? NSOnState : NSOffState];
+    [_allowBlankCheck setEnabled:parameter.dataType == RDLParameterDataTypeString ||
+                                 parameter.dataType == RDLParameterDataTypeUnspecified];
+    [_hiddenCheck setState:parameter.hidden ? NSOnState : NSOffState];
     // A parameter whose defaults or values come from a dataset is shown as it
     // is and not edited: what was typed here could not be written, because the
     // file holds the reference instead.
     RDLDataSetReference *defaults = parameter.defaultValuesReference;
     RDLDataSetReference *valid = parameter.validValuesReference;
-    [_defaultField setEnabled:defaults == nil];
-    [_validText setEditable:valid == nil];
+    // A parameter of several values starts with a list of them, which the
+    // field only sums up; the list is edited in a panel.
+    BOOL several = parameter.multiValue;
+    [_defaultField setEnabled:defaults == nil && !several];
+    [_defaultsButton setEnabled:defaults == nil && several];
+    [_validValuesButton setEnabled:valid == nil];
+    // What it accepts is a list of values and their labels, edited in a panel
+    // and shown here one a line.
+    [_validText setEditable:NO];
     NSMutableArray<NSString *> *lines = [NSMutableArray array];
     if (defaults != nil) {
       [_defaultField setStringValue:RDLReferenceSummary(defaults)];
+    } else if (several) {
+      [_defaultField setStringValue:[[parameter.defaultValues valueForKey:@"source"] componentsJoinedByString:@", "]];
     } else {
       [_defaultField setStringValue:[parameter.defaultValue source] ?: @""];
     }
     if (valid != nil) {
       [lines addObject:RDLReferenceSummary(valid)];
     } else {
-      // One value a line: a list written on one line could not hold a value
-      // with a comma in it, and these are values rather than a sentence.
-      for (RDLValue *v in parameter.validValues)
-        [lines addObject:[v source] ?: @""];
+      for (RDLValue *v in parameter.validValues) {
+        RDLValue *label = [parameter labelForValidValue:[v source]];
+        [lines addObject:label ? [NSString stringWithFormat:@"%@ — %@", [v source], [label source]]
+                               : ([v source] ?: @"")];
+      }
     }
     [_validText setString:[lines componentsJoinedByString:@"\n"]];
     NSMutableArray<NSString *> *read = [NSMutableArray array];
@@ -132,25 +152,67 @@ static NSString *RDLReferenceSummary(RDLDataSetReference *reference) {
     [editor setValue:@(type) forKeyPath:@"dataType" ofParameter:_parameter];
   [editor setValue:@([_nullableCheck state] == NSOnState) forKeyPath:@"nullable"
        ofParameter:_parameter];
+  // The field is read before the checkbox is written: a parameter that has
+  // just become one of several values shows its defaults summed up, and that
+  // summary is not a value.
+  BOOL wasSeveral = _parameter.multiValue;
+  NSString *written = [_defaultField stringValue];
   [editor setValue:@([_multiCheck state] == NSOnState) forKeyPath:@"multiValue"
        ofParameter:_parameter];
-  if (_parameter.defaultValuesReference == nil) {
-    NSString *written = [_defaultField stringValue];
-    [editor setValue:[RDLValue valueWithSource:written] forKeyPath:@"defaultValue"
-         ofParameter:_parameter];
-  }
+  if ([_allowBlankCheck isEnabled])
+    [editor setValue:@([_allowBlankCheck state] == NSOnState) forKeyPath:@"allowBlank" ofParameter:_parameter];
+  [editor setValue:@([_hiddenCheck state] == NSOnState) forKeyPath:@"hidden" ofParameter:_parameter];
+  if (_parameter.defaultValuesReference == nil && !wasSeveral)
+    [editor setValue:[RDLValue valueWithSource:written] forKeyPath:@"defaultValue" ofParameter:_parameter];
+  [self showParameter:_parameter];
+}
 
-  if (_parameter.validValuesReference != nil)
+- (void)editDefaultValues:(id)sender {
+  (void)sender;
+  RDLParameter *parameter = _parameter;
+  if (parameter == nil || parameter.defaultValuesReference != nil)
     return;
-  NSMutableArray *values = [NSMutableArray array];
-  for (NSString *line in [[_validText string] componentsSeparatedByString:@"\n"]) {
-    NSString *one =
-        [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    RDLValue *value = [RDLValue valueWithSource:one];
-    if (value)
-      [values addObject:value];
-  }
-  [editor setValidValues:values ofParameter:_parameter];
+  NSArray<RDLValue *> *edited =
+      [RDLValueListEditor runForValues:parameter.defaultValues
+                                 title:[NSString stringWithFormat:@"Default Values — %@", parameter.name ?: @""]
+                               heading:@"The values the parameter starts with."
+                               context:RDLExpressionContextText
+                                report:_context.report];
+  if (edited == nil || RDLValueListsEqual(edited, parameter.defaultValues))
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"defaultValues" ofParameter:parameter];
+  [self showParameter:parameter];
+}
+
+- (void)editValidValues:(id)sender {
+  (void)sender;
+  RDLParameter *parameter = _parameter;
+  if (parameter == nil || parameter.validValuesReference != nil)
+    return;
+  NSMutableArray *labels = [NSMutableArray array];
+  for (RDLValue *value in parameter.validValues)
+    [labels addObject:[parameter labelForValidValue:[value source]] ?: [NSNull null]];
+  NSArray<RDLValue *> *values = nil;
+  NSArray *editedLabels = nil;
+  if (![RDLValueListEditor runForValues:parameter.validValues
+                                 labels:labels
+                                  title:[NSString stringWithFormat:@"Available Values — %@", parameter.name ?: @""]
+                                heading:@"The values the parameter accepts, and what each is shown as."
+                                context:RDLExpressionContextText
+                                 report:_context.report
+                           editedValues:&values
+                           editedLabels:&editedLabels])
+    return;
+  [self setValidValues:values labels:editedLabels];
+}
+
+- (void)setValidValues:(NSArray<RDLValue *> *)values labels:(NSArray *)labels {
+  NSMutableDictionary<NSString *, RDLValue *> *byValue = [NSMutableDictionary dictionary];
+  for (NSUInteger i = 0; i < [values count] && i < [labels count]; i++)
+    if ([labels[i] isKindOfClass:[RDLValue class]] && [values[i] source])
+      byValue[[values[i] source]] = labels[i];
+  [_context.editor setValidValues:values labels:byValue ofParameter:_parameter];
+  [self showParameter:_parameter];
 }
 
 - (void)rename:(id)sender {

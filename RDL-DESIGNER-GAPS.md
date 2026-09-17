@@ -124,7 +124,7 @@ UI.
 | Report | Band `Style` | Background on every band; the engine paints the page header's and footer's as it does the body's |
 | Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | Yes; the page's Style as a background colour only |
 | Report | `Code`, `Variables` | — |
-| Report | Parameters | Navigator (add/remove) + inspector: name, "Asked for" and its prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line; values a `DataSetReference` supplies are shown, read-only |
+| Report | Parameters | Navigator (add, remove, reorder) + inspector: name, "Asked for" and its prompt, type, "Allows null", "Allows blank", "Hidden", several values, default (expression) or defaults (a list), available values with labels (a list); values a `DataSetReference` supplies are shown, read-only |
 | Report | Data sources | Navigator + pane: JSON/XML/CSV; file beside the report or embedded content; CSV header row, delimiter, widths; connect string composed |
 | Report | Embedded images | — (the Image inspector accepts a name; none can be added) |
 | Data | Datasets: add, remove, rename (regions follow) | Yes |
@@ -198,11 +198,11 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Parameter `Hidden`, `AllowBlank` | UI (was MODEL) | "Allows blank" sets `Nullable`; relabel it and add both. |
+| Parameter `Hidden`, `AllowBlank` | Done | "Allows null" sets `Nullable`; "Allows blank", on for a String parameter, and "Hidden" beside it. |
 | Parameter `UsedInQuery` | UI | Round-trip only; low value. |
-| Parameter ordering | UI | Order matters for cascading and for the prompt pane; no move command. |
-| Valid values with labels | UI (was MODEL) | `validValueLabels` is keyed by value source, so editing a value's text loses its label. |
-| Multi-value defaults | UI + defect | The inspector writes only `defaultValue`; see §5. |
+| Parameter ordering | Done | Up and down in the navigator, each a step; a removed parameter comes back to its place. |
+| Valid values with labels | Done | Available values are edited in a list panel with a label column and set with their labels as one step; the pane lists them, "value — label". |
+| Multi-value defaults | Done | A parameter of several values has its defaults as a list, edited in the list panel; the field sums them up and is never written back as a value. |
 | `DataSetReference` valid values and defaults | UI | Shown as what they read -- the dataset and its value and label fields -- and not typed over, since the file holds the reference. Editing the reference itself has no control. |
 | `MultiValue` value entry in the data pane | UI | One text field; with valid values, a single-select popup. |
 | `ReportParametersLayout` | MODEL | |
@@ -476,6 +476,7 @@ In rough order of how often a Report Builder user reaches for it:
    Left for later: nested groupings, and the styles beside those set here.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
+   Done: all but the data pane's entry of several values.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.
 8. Image: `Database`, `MIMEType`, embedded images panel with file import.
 9. Expressions: live `RDLChecker` in the editor, parser warnings on open,

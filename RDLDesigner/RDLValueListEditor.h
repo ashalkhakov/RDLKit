@@ -18,15 +18,37 @@
                               context:(RDLExpressionContext)context
                                report:(RDLReport *)report;
 
+// The same, with a label beside each value -- `labels` in step with `values`,
+// NSNull where a value has none. NO if the user cancelled; otherwise the
+// edited values and labels, in step, come back through the last two.
++ (BOOL)runForValues:(NSArray<RDLValue *> *)values
+              labels:(NSArray *)labels
+               title:(NSString *)title
+             heading:(NSString *)heading
+             context:(RDLExpressionContext)context
+              report:(RDLReport *)report
+        editedValues:(NSArray<RDLValue *> **)editedValues
+        editedLabels:(NSArray **)editedLabels;
+
 // Built but not shown, for checking what it does without a modal session.
+// `labels` nil for a list of values alone.
 + (instancetype)editorForValues:(NSArray<RDLValue *> *)values
                           title:(NSString *)title
                         heading:(NSString *)heading
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report;
++ (instancetype)editorForValues:(NSArray<RDLValue *> *)values
+                         labels:(NSArray *)labels
+                          title:(NSString *)title
+                        heading:(NSString *)heading
+                        context:(RDLExpressionContext)context
+                         report:(RDLReport *)report;
 
-// The values as the table holds them. A row left empty is left out.
+// The values as the table holds them. A row left empty is left out -- and its
+// label with it, so `labels` stays in step: NSNull where a value has none, and
+// nil for a list without labels.
 @property (nonatomic, readonly, copy) NSArray<RDLValue *> *values;
+@property (nonatomic, readonly, copy) NSArray *labels;
 
 // The buttons' actions, declared so they can be driven without a click. A
 // value is added after the selected row, and selected to be typed into.
@@ -36,6 +58,7 @@
 - (void)moveValueDown:(id)sender;
 // What the table does when a row is typed into.
 - (void)setText:(NSString *)text atRow:(NSUInteger)row;
+- (void)setLabel:(NSString *)label atRow:(NSUInteger)row;
 - (void)selectRow:(NSInteger)row;
 @end
 

@@ -19,8 +19,13 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
 @property (nonatomic, strong) IBOutlet NSTextField *headingLabel;
 @end
 
+// The label column's identifier; a list of values alone has none.
+static NSString *const kRDLLabelColumn = @"label";
+
 @implementation RDLValueListEditor {
   NSMutableArray<NSString *> *_rows;
+  // In step with the rows, or nil for a list without labels.
+  NSMutableArray<NSString *> *_labelRows;
   RDLExpressionContext _context;
   RDLReport *_report;
 }
@@ -30,10 +35,26 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
                         heading:(NSString *)heading
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report {
+  return [self editorForValues:values labels:nil title:title heading:heading context:context report:report];
+}
+
++ (instancetype)editorForValues:(NSArray<RDLValue *> *)values
+                         labels:(NSArray *)labels
+                          title:(NSString *)title
+                        heading:(NSString *)heading
+                        context:(RDLExpressionContext)context
+                         report:(RDLReport *)report {
   RDLValueListEditor *ed = [[self alloc] init];
   ed->_rows = [NSMutableArray array];
   for (RDLValue *value in values)
     [ed->_rows addObject:[value source] ?: @""];
+  if (labels != nil) {
+    ed->_labelRows = [NSMutableArray array];
+    for (NSUInteger i = 0; i < [values count]; i++) {
+      id label = i < [labels count] ? labels[i] : nil;
+      [ed->_labelRows addObject:[label isKindOfClass:[RDLValue class]] ? ([(RDLValue *)label source] ?: @"") : @""];
+    }
+  }
   ed->_context = context;
   ed->_report = report;
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLValueListEditor" bundle:[NSBundle bundleForClass:self]];
@@ -54,15 +75,42 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
                               heading:(NSString *)heading
                               context:(RDLExpressionContext)context
                                report:(RDLReport *)report {
-  RDLValueListEditor *ed = [self editorForValues:values title:title heading:heading context:context report:report];
-  if (ed == nil)
+  NSArray<RDLValue *> *edited = nil;
+  if (![self runForValues:values
+                   labels:nil
+                    title:title
+                  heading:heading
+                  context:context
+                   report:report
+             editedValues:&edited
+             editedLabels:NULL])
     return nil;
+  return edited;
+}
+
++ (BOOL)runForValues:(NSArray<RDLValue *> *)values
+              labels:(NSArray *)labels
+               title:(NSString *)title
+             heading:(NSString *)heading
+             context:(RDLExpressionContext)context
+              report:(RDLReport *)report
+        editedValues:(NSArray<RDLValue *> **)editedValues
+        editedLabels:(NSArray **)editedLabels {
+  RDLValueListEditor *ed =
+      [self editorForValues:values labels:labels title:title heading:heading context:context report:report];
+  if (ed == nil)
+    return NO;
   [ed.window center];
   NSInteger code = [NSApp runModalForWindow:ed.window];
   [ed.window makeFirstResponder:nil];  // commit whatever row was being typed in
-  NSArray *edited = [ed values];
   [ed.window orderOut:nil];
-  return code == NSModalResponseOK ? edited : nil;
+  if (code != NSModalResponseOK)
+    return NO;
+  if (editedValues)
+    *editedValues = [ed values];
+  if (editedLabels)
+    *editedLabels = [ed labels];
+  return YES;
 }
 
 - (void)prepareTable {
@@ -73,17 +121,42 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
   cell.buttonTarget = self;
   cell.buttonAction = @selector(editExpression:);
   [column setDataCell:cell];
+  if (_labelRows == nil)
+    return;
+  // A label is text to show, not a value to work out, so its column is plain.
+  NSTableColumn *labels = [[NSTableColumn alloc] initWithIdentifier:kRDLLabelColumn];
+  [[labels headerCell] setStringValue:@"Label"];
+  [labels setWidth:140];
+  [labels setEditable:YES];
+  [column setWidth:MAX([column width] - [labels width], 120)];
+  [_table addTableColumn:labels];
+}
+
+static NSString *RDLTrimmedRow(NSString *row) {
+  return [row stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 }
 
 - (NSArray<RDLValue *> *)values {
   NSMutableArray<RDLValue *> *values = [NSMutableArray array];
   for (NSString *row in _rows) {
-    RDLValue *value =
-        [RDLValue valueWithSource:[row stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
+    RDLValue *value = [RDLValue valueWithSource:RDLTrimmedRow(row)];
     if (value != nil)
       [values addObject:value];
   }
   return values;
+}
+
+- (NSArray *)labels {
+  if (_labelRows == nil)
+    return nil;
+  NSMutableArray *labels = [NSMutableArray array];
+  for (NSUInteger i = 0; i < [_rows count]; i++) {
+    if ([RDLValue valueWithSource:RDLTrimmedRow(_rows[i])] == nil)
+      continue;
+    RDLValue *label = [RDLValue valueWithSource:RDLTrimmedRow(_labelRows[i])];
+    [labels addObject:label ?: [NSNull null]];
+  }
+  return labels;
 }
 
 - (NSInteger)selectedIndex {
@@ -104,6 +177,12 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
     _rows[row] = text ?: @"";
 }
 
+- (void)setLabel:(NSString *)label atRow:(NSUInteger)row {
+  [_table abortEditing];
+  if (row < [_labelRows count])
+    _labelRows[row] = label ?: @"";
+}
+
 #pragma mark - Actions
 
 // A row being typed into keeps what was typed before the rows change.
@@ -117,6 +196,7 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
   NSInteger selected = [self selectedIndex];
   NSUInteger at = selected >= 0 ? (NSUInteger)selected + 1 : [_rows count];
   [_rows insertObject:@"" atIndex:at];
+  [_labelRows insertObject:@"" atIndex:at];
   [self selectRow:(NSInteger)at];
   // Straight into the new row: an empty row is there to be typed into.
   if ([_table window] != nil)
@@ -130,6 +210,7 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
   if (row < 0)
     return;
   [_rows removeObjectAtIndex:(NSUInteger)row];
+  [_labelRows removeObjectAtIndex:(NSUInteger)row];
   [self selectRow:MIN(row, (NSInteger)[_rows count] - 1)];
 }
 
@@ -140,6 +221,7 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
   if (row < 0 || to < 0 || to >= (NSInteger)[_rows count])
     return;
   [_rows exchangeObjectAtIndex:(NSUInteger)row withObjectAtIndex:(NSUInteger)to];
+  [_labelRows exchangeObjectAtIndex:(NSUInteger)row withObjectAtIndex:(NSUInteger)to];
   [self selectRow:to];
 }
 
@@ -184,8 +266,8 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
 
 - (id)tableView:(NSTableView *)tableView objectValueForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
   (void)tableView;
-  (void)column;
-  return row >= 0 && row < (NSInteger)[_rows count] ? _rows[(NSUInteger)row] : @"";
+  NSArray<NSString *> *rows = [[column identifier] isEqualToString:kRDLLabelColumn] ? _labelRows : _rows;
+  return row >= 0 && row < (NSInteger)[rows count] ? rows[(NSUInteger)row] : @"";
 }
 
 - (void)tableView:(NSTableView *)tableView
@@ -193,11 +275,11 @@ BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b) {
     forTableColumn:(NSTableColumn *)column
                row:(NSInteger)row {
   (void)tableView;
-  (void)column;
   // The row being committed: written straight in, since -setText:atRow:
   // would end the very edit that is committing.
-  if (row >= 0 && row < (NSInteger)[_rows count])
-    _rows[(NSUInteger)row] = [value description] ?: @"";
+  NSMutableArray<NSString *> *rows = [[column identifier] isEqualToString:kRDLLabelColumn] ? _labelRows : _rows;
+  if (row >= 0 && row < (NSInteger)[rows count])
+    rows[(NSUInteger)row] = [value description] ?: @"";
 }
 
 @end

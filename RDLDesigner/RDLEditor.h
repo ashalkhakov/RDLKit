@@ -137,12 +137,21 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // not chase the expressions that named it -- an expression is the author's
 // text, and the checker is what reports one that no longer resolves.
 - (void)addParameter:(RDLParameter *)parameter;
+- (void)insertParameter:(RDLParameter *)parameter atIndex:(NSUInteger)index;
+// A parameter moved to another place in the order they are asked in. NO when
+// it is there already or is not the report's.
+- (BOOL)moveParameter:(RDLParameter *)parameter toIndex:(NSUInteger)index;
 - (void)removeParameter:(RDLParameter *)parameter;
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofParameter:(RDLParameter *)parameter;
 // What the parameter accepts. Its own operation because validValues is a
 // mutable array the parameter owns, so it is replaced in place rather than
 // assigned -- and the old contents are what undo puts back.
 - (void)setValidValues:(NSArray *)values ofParameter:(RDLParameter *)parameter;
+// The values a parameter accepts and the label each is shown under -- keyed by
+// the value's source, as the model keeps them -- as one step.
+- (void)setValidValues:(NSArray<RDLValue *> *)values
+                labels:(NSDictionary<NSString *, RDLValue *> *)labels
+           ofParameter:(RDLParameter *)parameter;
 // Which source a dataset reads from.
 - (void)setDataSourceName:(NSString *)name ofDataSet:(RDLDataSet *)dataSet;
 // The rows a provider just read. Not undoable as data -- loading again is how

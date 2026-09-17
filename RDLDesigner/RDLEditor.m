@@ -297,13 +297,32 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
 }
 
 - (void)addParameter:(RDLParameter *)parameter {
-  if (parameter == nil)
+  [self insertParameter:parameter atIndex:[_document.report.parameters count]];
+}
+
+- (void)insertParameter:(RDLParameter *)parameter atIndex:(NSUInteger)index {
+  NSMutableArray<RDLParameter *> *parameters = _document.report.parameters;
+  if (parameter == nil || [parameters indexOfObjectIdenticalTo:parameter] != NSNotFound)
     return;
   [self beginGroup:@"Add Parameter"];
   [[self undoProxy] removeParameter:parameter];
-  [_document.report.parameters addObject:parameter];
+  [parameters insertObject:parameter atIndex:MIN(index, [parameters count])];
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (BOOL)moveParameter:(RDLParameter *)parameter toIndex:(NSUInteger)index {
+  NSMutableArray<RDLParameter *> *parameters = _document.report.parameters;
+  NSUInteger from = parameter ? [parameters indexOfObjectIdenticalTo:parameter] : NSNotFound;
+  if (from == NSNotFound || index >= [parameters count] || index == from)
+    return NO;
+  [self beginGroup:@"Move Parameter"];
+  [[self undoProxy] moveParameter:parameter toIndex:from];
+  [parameters removeObjectAtIndex:from];
+  [parameters insertObject:parameter atIndex:index];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+  return YES;
 }
 
 - (void)removeParameter:(RDLParameter *)parameter {
@@ -312,7 +331,9 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   if (index == NSNotFound)
     return;
   [self beginGroup:@"Remove Parameter"];
-  [[self undoProxy] addParameter:parameter];
+  // Back where it was: the order is the order they are asked in, and what a
+  // cascading parameter may read.
+  [[self undoProxy] insertParameter:parameter atIndex:index];
   [_document.report.parameters removeObjectAtIndex:index];
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
@@ -343,6 +364,27 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [[self undoProxy] setValidValues:old ofParameter:parameter];
   [parameter.validValues removeAllObjects];
   [parameter.validValues addObjectsFromArray:values ?: @[]];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setValidValues:(NSArray<RDLValue *> *)values
+                labels:(NSDictionary<NSString *, RDLValue *> *)labels
+           ofParameter:(RDLParameter *)parameter {
+  if (parameter == nil)
+    return;
+  NSDictionary<NSString *, RDLValue *> *oldLabels = [parameter.validValueLabels copy] ?: @{};
+  BOOL sameLabels = [oldLabels count] == [labels count];
+  for (NSString *key in labels)
+    sameLabels = sameLabels && [[oldLabels[key] source] isEqualToString:[labels[key] source]];
+  BOOL sameValues = [[parameter.validValues valueForKey:@"source"] isEqualToArray:[values valueForKey:@"source"] ?: @[]];
+  if (sameValues && sameLabels)
+    return;
+  [self beginGroup:@"Edit Parameter"];
+  [[self undoProxy] setValidValues:[parameter.validValues copy] labels:oldLabels ofParameter:parameter];
+  [parameter.validValues removeAllObjects];
+  [parameter.validValues addObjectsFromArray:values ?: @[]];
+  parameter.validValueLabels = [labels mutableCopy] ?: [NSMutableDictionary dictionary];
   [self endGroup];
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
 }
