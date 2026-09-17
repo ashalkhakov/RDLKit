@@ -5,6 +5,7 @@
 #import "RDLExpressionCell.h"
 #import "RDLExpressionEditor.h"
 #import "RDLFilterEditor.h"
+#import "RDLSortEditor.h"
 #import "RDLPane.h"
 
 @interface RDLGroupPropertiesEditor () <NSTableViewDataSource, NSTableViewDelegate>
@@ -13,6 +14,11 @@
 @property (nonatomic, strong) IBOutlet NSTextField *messageLabel;
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSButton *filtersButton;
+// Its sort, page breaks and visibility.
+@property (nonatomic, strong) IBOutlet NSButton *sortingButton, *resetPageNumberCheck, *keepTogetherCheck;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *pageBreakPop, *togglePop;
+@property (nonatomic, strong) IBOutlet NSTextField *pageBreakDisabledField, *pageNameField, *hiddenField;
+@property (nonatomic, strong) IBOutlet NSButton *pageBreakDisabledExprButton, *pageNameExprButton, *hiddenExprButton;
 @end
 
 @implementation RDLGroupPropertiesEditor {
@@ -20,6 +26,7 @@
   RDLTablixAxis _axis;
   RDLTablix *_tablix;
   RDLEditingContext *_context;
+  NSArray<RDLSortExpression *> *_sorts;
 }
 
 + (instancetype)editorForGroup:(RDLTablixMember *)group
@@ -38,6 +45,7 @@
   for (RDLValue *expression in group.groupExpressions)
     [ed->_expressions addObject:[expression source] ?: @""];
   ed->_filters = [group.filters copy];
+  ed->_sorts = [group.sortExpressions copy] ?: @[];
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLGroupPropertiesEditor"
                                         bundle:[NSBundle bundleForClass:self]];
   if (![nib instantiateWithOwner:ed topLevelObjects:NULL])
@@ -48,6 +56,7 @@
   [ed.messageLabel setStringValue:@""];
   [ed prepareTable];
   [ed syncFiltersButton];
+  [ed fillSettingsFrom:group];
   return ed;
 }
 
@@ -95,6 +104,107 @@
   NSUInteger count = [_filters count];
   [_filtersButton setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…", (unsigned long)count]
                                  : @"Filters…"];
+}
+
+#pragma mark - Sort, page breaks and visibility
+
+// The page break's choices, None first; the index is the location less one.
+static NSArray<NSNumber *> *RDLPageBreakChoices(void) {
+  return @[ @(RDLPageBreakLocationNone), @(RDLPageBreakLocationStart), @(RDLPageBreakLocationEnd),
+            @(RDLPageBreakLocationStartAndEnd), @(RDLPageBreakLocationBetween) ];
+}
+
+- (void)fillSettingsFrom:(RDLTablixMember *)group {
+  [_pageBreakPop removeAllItems];
+  for (NSNumber *location in RDLPageBreakChoices())
+    [_pageBreakPop addItemWithTitle:RDLStringFromPageBreakLocation((RDLPageBreakLocation)[location integerValue])];
+  NSUInteger at = [RDLPageBreakChoices() indexOfObject:@(group.pageBreak)];
+  [_pageBreakPop selectItemAtIndex:at == NSNotFound ? 0 : (NSInteger)at];
+  [_resetPageNumberCheck setState:group.resetPageNumber ? NSOnState : NSOffState];
+  [_keepTogetherCheck setState:group.keepTogether ? NSOnState : NSOffState];
+  [_pageBreakDisabledField setStringValue:[group.pageBreakDisabled source] ?: @""];
+  [_pageNameField setStringValue:[group.pageName source] ?: @""];
+  [_hiddenField setStringValue:[group.hidden source] ?: @""];
+  [_hiddenField setPlaceholderString:@"False"];
+  // The report's text boxes, None first; a toggle naming one the report no
+  // longer has is kept and shown.
+  [_togglePop removeAllItems];
+  [_togglePop addItemWithTitle:@"None"];
+  NSMutableArray<NSString *> *names = [NSMutableArray array];
+  for (RDLItem *it in [_context.report allItemsIncludingNested])
+    if ([it isKindOfClass:[RDLTextbox class]] && [it.name length] && ![names containsObject:it.name])
+      [names addObject:it.name];
+  if ([group.toggleItem length] && ![names containsObject:group.toggleItem])
+    [names addObject:group.toggleItem];
+  for (NSString *name in names)
+    [[_togglePop menu] addItemWithTitle:name action:NULL keyEquivalent:@""];
+  [_togglePop selectItemAtIndex:[group.toggleItem length] ? (NSInteger)[names indexOfObject:group.toggleItem] + 1 : 0];
+  [self syncSortingButton];
+}
+
+- (void)syncSortingButton {
+  NSUInteger count = [_sorts count];
+  [_sortingButton setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
+}
+
+static RDLValue *RDLValueInField(NSTextField *field) {
+  NSString *text = [[field stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  return [text length] ? [RDLValue valueWithSource:text] : nil;
+}
+
+// What the panel holds for the settings, as a member of their own.
+- (RDLTablixMember *)settings {
+  RDLTablixMember *settings = [[RDLTablixMember alloc] init];
+  settings.sortExpressions = [_sorts mutableCopy];
+  NSInteger at = [_pageBreakPop indexOfSelectedItem];
+  settings.pageBreak = at >= 0 && at < (NSInteger)[RDLPageBreakChoices() count]
+                           ? (RDLPageBreakLocation)[RDLPageBreakChoices()[(NSUInteger)at] integerValue]
+                           : RDLPageBreakLocationNone;
+  // None is what a group that says nothing about breaks has.
+  if (settings.pageBreak == RDLPageBreakLocationNone && _group.pageBreak == RDLPageBreakLocationUnspecified)
+    settings.pageBreak = RDLPageBreakLocationUnspecified;
+  settings.resetPageNumber = [_resetPageNumberCheck state] == NSOnState;
+  settings.keepTogether = [_keepTogetherCheck state] == NSOnState;
+  settings.pageBreakDisabled = RDLValueInField(_pageBreakDisabledField);
+  settings.pageName = RDLValueInField(_pageNameField);
+  settings.hidden = RDLValueInField(_hiddenField);
+  settings.toggleItem = [_togglePop indexOfSelectedItem] > 0 ? [_togglePop titleOfSelectedItem] : nil;
+  return settings;
+}
+
+- (void)editSorting:(id)sender {
+  (void)sender;
+  NSArray<RDLSortExpression *> *edited = [RDLSortEditor runForSortExpressions:_sorts
+                                                                         title:[self name]
+                                                                        fields:[[self dataSet] fieldNames]
+                                                                        report:_context.report];
+  if (edited == nil)
+    return;
+  _sorts = [edited copy];
+  [self syncSortingButton];
+}
+
+- (void)setSortExpressions:(NSArray<RDLSortExpression *> *)sorts {
+  _sorts = [sorts copy] ?: @[];
+  [self syncSortingButton];
+}
+
+- (NSArray<RDLSortExpression *> *)sortExpressions {
+  return _sorts;
+}
+
+// f(x) beside a setting: the expression editor for that field.
+- (void)editSettingExpression:(id)sender {
+  NSTextField *field = sender == _pageBreakDisabledExprButton ? _pageBreakDisabledField
+                       : sender == _pageNameExprButton        ? _pageNameField
+                       : sender == _hiddenExprButton          ? _hiddenField
+                                                              : nil;
+  if (field == nil)
+    return;
+  RDLExpressionContext context = field == _pageNameField ? RDLExpressionContextText : RDLExpressionContextBoolean;
+  NSString *edited = [RDLExpressionEditor runForSource:[field stringValue] context:context report:_context.report];
+  if (edited != nil)
+    [field setStringValue:edited];
 }
 
 // Whatever is being typed in a cell, into the list.
@@ -166,15 +276,21 @@
   NSMutableArray<NSString *> *was = [NSMutableArray array];
   for (RDLValue *expression in _group.groupExpressions)
     [was addObject:[expression source] ?: @""];
-  if ([name isEqualToString:_group.groupName] && [sources isEqualToArray:was] &&
-      [_filters isEqualToArray:_group.filters])
+  BOOL sameGrouping = [name isEqualToString:_group.groupName] && [sources isEqualToArray:was] &&
+                      [_filters isEqualToArray:_group.filters];
+  RDLTablixMember *settings = [self settings];
+  if (sameGrouping && RDLGroupHasSettings(_group, settings))
     return YES;
   if ([_context.editor setName:name
                    expressions:expressions
                        filters:_filters
+                      settings:settings
                        ofGroup:_group
                           axis:_axis
                       ofTablix:_tablix])
+    return YES;
+  // Nothing changed and nothing refused: the grouping was as it is.
+  if (sameGrouping)
     return YES;
   // Why, in the terms of what is on the panel.
   if ([name length] == 0)

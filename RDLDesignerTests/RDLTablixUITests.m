@@ -7,6 +7,7 @@
 #import "RDLFilterEditor.h"
 #import "RDLTablixStructure.h"
 #import "RDLGroupPropertiesEditor.h"
+#import "RDLSortEditor.h"
 
 
 
@@ -605,6 +606,139 @@
       restored = m;
   if (![restored.groupName isEqualToString:was] || [restored.filters count] != [group.filters count] - 1)
     XCTFail(@"%@", @"one undo should put the group back as it was");
+}
+
+// The sort panel: one row a key, the first deciding first; a field picked by
+// name, a direction per row, rows moved up and down, and a row with nothing to
+// sort on left out.
+- (void)testTheSortPanelEditsRowsInOrder {
+  RDLSortExpression *byJob = [[RDLSortExpression alloc] init];
+  byJob.expression = [RDLValue valueWithSource:@"=Fields!Job.Value"];
+  RDLSortExpression *byCost = [[RDLSortExpression alloc] init];
+  byCost.expression = [RDLValue valueWithSource:@"=Fields!Cost.Value * 2"];
+  byCost.direction = RDLSortDirectionDescending;
+  RDLSortEditor *panel = [RDLSortEditor editorForSortExpressions:@[ byJob, byCost ]
+                                                            title:@"Jobs"
+                                                           fields:@[ @"Job", @"Cost", @"Finish" ]
+                                                           report:[RDLReport emptyReportNamed:@"Sorted"]];
+  NSTableView *table = [panel valueForKey:@"table"];
+  if (panel == nil || table == nil) {
+    XCTFail(@"%@", @"RDLSortEditor.xib did not load");
+    return;
+  }
+  if (!RDLSortExpressionsEqual([panel sortExpressions], @[ byJob, byCost ]))
+    XCTFail(@"%@", @"the panel should arrive holding the sort it was given");
+  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)panel;
+  NSTableColumn *expression = [table tableColumnWithIdentifier:@"expression"];
+  NSTableColumn *direction = [table tableColumnWithIdentifier:@"direction"];
+  if (expression == nil || direction == nil) {
+    XCTFail(@"%@", @"the panel should have a Sort by and an Order column");
+    return;
+  }
+  // A plain field shows by name; an expression shows as itself.
+  if ([[source tableView:table objectValueForTableColumn:expression row:0] integerValue] != 0 ||
+      [[source tableView:table objectValueForTableColumn:direction row:1] integerValue] != 1)
+    XCTFail(@"%@", @"the rows should show Job first and the second one descending");
+
+  // Pick Finish for the first row, Z to A.
+  [source tableView:table setObjectValue:@2 forTableColumn:expression row:0];
+  [source tableView:table setObjectValue:@1 forTableColumn:direction row:0];
+  // A new row, moved to the top.
+  [panel addSort:nil];
+  [panel moveSortUp:nil];
+  [panel moveSortUp:nil];
+  [panel moveSortUp:nil];  // already at the top: stays
+  NSMutableArray<NSString *> *read = [NSMutableArray array];
+  for (RDLSortExpression *sort in [panel sortExpressions])
+    [read addObject:[NSString stringWithFormat:@"%@ %@", [sort.expression source],
+                                               sort.direction == RDLSortDirectionDescending ? @"desc" : @"asc"]];
+  NSArray *want = @[ @"=Fields!Job.Value asc", @"=Fields!Finish.Value desc", @"=Fields!Cost.Value * 2 desc" ];
+  if (![read isEqualToArray:want])
+    XCTFail(@"the sort reads %@", read);
+  [panel moveSortDown:nil];
+  [panel removeSort:nil];
+  if ([[panel sortExpressions] count] != 2)
+    XCTFail(@"%lu rows after removing one", (unsigned long)[[panel sortExpressions] count]);
+  [[panel valueForKey:@"window"] close];
+}
+
+// The group panel also sorts the group, breaks pages at it, names those pages,
+// hides it and says what toggles it -- applied with the rest as one step, and
+// not at all when the name is refused.
+- (void)testTheGroupPropertiesPanelSetsPagesSortAndVisibility {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLTablixMember *group = nil;
+  for (RDLTablixMember *m in tablix.rowHierarchy.members)
+    if ([m.groupExpressions count] && group == nil)
+      group = m;
+  RDLGroupPropertiesEditor *panel = [RDLGroupPropertiesEditor editorForGroup:group
+                                                                        axis:RDLTablixAxisRows
+                                                                    ofTablix:tablix
+                                                                     context:ctx];
+  for (NSString *name in @[ @"sortingButton", @"pageBreakPop", @"resetPageNumberCheck", @"pageBreakDisabledField",
+                            @"pageNameField", @"hiddenField", @"togglePop", @"keepTogetherCheck" ])
+    if ([panel valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+  NSString *toggler = nil;
+  for (RDLItem *it in [report allItemsIncludingNested])
+    if ([it isKindOfClass:[RDLTextbox class]] && toggler == nil)
+      toggler = it.name;
+
+  // A refused name takes the rest with it.
+  panel.name = tablix.dataSetName;
+  [[panel valueForKey:@"pageBreakPop"] selectItemWithTitle:@"End"];
+  if ([panel apply] || group.pageBreak == RDLPageBreakLocationEnd || [ctx.document.undoManager canUndo])
+    XCTFail(@"%@", @"nothing should be applied when the name is refused");
+  panel.name = group.groupName;
+
+  RDLSortExpression *sort = [[RDLSortExpression alloc] init];
+  sort.expression = [RDLValue valueWithSource:@"=Fields!Job.Value"];
+  sort.direction = RDLSortDirectionDescending;
+  panel.sortExpressions = @[ sort ];
+  if (![[[panel valueForKey:@"sortingButton"] title] isEqualToString:@"Sorting (1)…"])
+    XCTFail(@"the sorting button says %@", [[panel valueForKey:@"sortingButton"] title]);
+  [[panel valueForKey:@"resetPageNumberCheck"] setState:NSOnState];
+  [[panel valueForKey:@"keepTogetherCheck"] setState:NSOnState];
+  [[panel valueForKey:@"pageBreakDisabledField"] setStringValue:@"=Globals!PageNumber = 1"];
+  [[panel valueForKey:@"pageNameField"] setStringValue:@"=Fields!Finish.Value"];
+  [[panel valueForKey:@"hiddenField"] setStringValue:@"=Parameters!Brief.Value"];
+  [[panel valueForKey:@"togglePop"] selectItemWithTitle:toggler];
+  NSString *before = [RDLEditor XMLStringForItem:tablix];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply");
+  if (group.pageBreak != RDLPageBreakLocationEnd || !group.resetPageNumber || !group.keepTogether ||
+      ![[group.pageBreakDisabled source] isEqualToString:@"=Globals!PageNumber = 1"] ||
+      ![[group.pageName source] isEqualToString:@"=Fields!Finish.Value"] ||
+      ![[group.hidden source] isEqualToString:@"=Parameters!Brief.Value"] ||
+      ![group.toggleItem isEqualToString:toggler] || [group.sortExpressions count] != 1 ||
+      group.sortExpressions[0].direction != RDLSortDirectionDescending)
+    XCTFail(@"%@", @"the group should take its sort, page break and visibility");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the tablix back as it was");
+  if ([ctx.document.undoManager canUndo])
+    XCTFail(@"%@", @"and that should have been the only step");
+
+  // An untouched panel still records nothing.
+  RDLTablixMember *again = nil;
+  for (RDLTablixMember *m in tablix.rowHierarchy.members)
+    if ([m.groupExpressions count] && again == nil)
+      again = m;
+  RDLGroupPropertiesEditor *idle = [RDLGroupPropertiesEditor editorForGroup:again
+                                                                       axis:RDLTablixAxisRows
+                                                                   ofTablix:tablix
+                                                                    context:ctx];
+  if (![idle apply] || ![[RDLEditor XMLStringForItem:tablix] isEqualToString:before])
+    XCTFail(@"%@", @"accepting an untouched panel should change nothing");
+  [[panel valueForKey:@"window"] close];
+  [[idle valueForKey:@"window"] close];
 }
 
 // The dialog edits a copy with the edits the canvas makes, so OK keeps what

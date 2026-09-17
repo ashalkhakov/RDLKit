@@ -5,10 +5,10 @@
 
 @class RDLEditingContext;
 
-// A group's properties: what it is called, what it groups on, and what it
-// filters out -- the part of Report Builder's Group Properties the designer
-// edits so far. A group's sort, page breaks and visibility are kept as the
-// file has them.
+// A group's properties: what it is called, what it groups on, what it filters
+// out and sorts by, where it breaks pages, and whether it shows. What a member
+// row itself does -- repeat on each page, keep with its group, hide with no
+// rows -- is not here, as it is not in Report Builder's Group Properties.
 //
 // Modal, like the other panels here. The panel holds its own copy of all
 // three, so Cancel leaves the group exactly as it was, and OK applies them
@@ -33,10 +33,13 @@
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, readonly, strong) NSMutableArray<NSString *> *expressions;
 @property (nonatomic, copy) NSArray<RDLFilter *> *filters;
+// The group's sort as the sort panel last left it.
+@property (nonatomic, copy) NSArray<RDLSortExpression *> *sortExpressions;
 
 - (void)addExpression:(id)sender;
 - (void)removeExpression:(id)sender;
 - (void)editFilters:(id)sender;
+- (void)editSorting:(id)sender;
 
 // What OK does. NO, changing nothing, when the editor refuses what the panel
 // holds -- a name another dataset, data region or group already has, or a

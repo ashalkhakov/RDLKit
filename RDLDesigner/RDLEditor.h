@@ -18,6 +18,12 @@
 @class RDLDataSet;
 @class NSAttributedString;
 
+// The group settings the Group Properties panel edits beyond its name,
+// expressions and filters.
+FOUNDATION_EXPORT NSArray<NSString *> *RDLGroupSettingKeys(void);
+// Whether `member` already has every one of those settings as `settings` does.
+FOUNDATION_EXPORT BOOL RDLGroupHasSettings(RDLTablixMember *member, RDLTablixMember *settings);
+
 @interface RDLEditor : NSObject
 - (instancetype)initWithDocument:(RDLDocument *)document;
 @property (nonatomic, readonly, weak) RDLDocument *document;
@@ -185,6 +191,17 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 - (BOOL)setName:(NSString *)name
     expressions:(NSArray<RDLValue *> *)expressions
         filters:(NSArray<RDLFilter *> *)filters
+        ofGroup:(RDLTablixMember *)member
+           axis:(RDLTablixAxis)axis
+       ofTablix:(RDLTablix *)tablix;
+// The same, and the group's sorting, page breaks and visibility as well --
+// what `settings` holds for the keys RDLGroupSettingKeys names; nil leaves them.
+// One undoable step. NO, changing nothing, when the name is refused or when the
+// group has all of it already.
+- (BOOL)setName:(NSString *)name
+    expressions:(NSArray<RDLValue *> *)expressions
+        filters:(NSArray<RDLFilter *> *)filters
+       settings:(RDLTablixMember *)settings
         ofGroup:(RDLTablixMember *)member
            axis:(RDLTablixAxis)axis
        ofTablix:(RDLTablix *)tablix;

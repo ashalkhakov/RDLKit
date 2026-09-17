@@ -2,6 +2,7 @@
 #import "RDLEditor.h"
 #import "RDLItemFactory.h"
 #import "RDLPlainTextEdit.h"
+#import "RDLSortEditor.h"
 #import "RDLChange.h"
 #import "RDLKit.h"
 #import "RDLDocument.h"
@@ -873,18 +874,88 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
         ofGroup:(RDLTablixMember *)member
            axis:(RDLTablixAxis)axis
        ofTablix:(RDLTablix *)tablix {
+  return [self setName:name expressions:expressions filters:filters settings:nil ofGroup:member axis:axis
+              ofTablix:tablix];
+}
+
+- (BOOL)setName:(NSString *)name
+    expressions:(NSArray<RDLValue *> *)expressions
+        filters:(NSArray<RDLFilter *> *)filters
+       settings:(RDLTablixMember *)settings
+        ofGroup:(RDLTablixMember *)member
+           axis:(RDLTablixAxis)axis
+       ofTablix:(RDLTablix *)tablix {
   RDLReport *report = _document.report;
+  NSMutableArray<NSString *> *sources = [NSMutableArray array], *was = [NSMutableArray array];
+  for (RDLValue *expression in expressions)
+    [sources addObject:[expression source] ?: @""];
+  for (RDLValue *expression in member.groupExpressions)
+    [was addObject:[expression source] ?: @""];
+  BOOL sameGrouping = [name isEqualToString:member.groupName] && [sources isEqualToArray:was] &&
+                      [filters isEqualToArray:member.filters];
+  // Inside the one change, so one snapshot undoes both; and the grouping
+  // first, since that is what can be refused.
   return [self changeStructureOfTablix:tablix
                                 action:@"Group Properties"
                                 change:^BOOL {
-                                  return [RDLTablixStructure setName:name
-                                                         expressions:expressions
-                                                             filters:filters
-                                                             ofGroup:member
-                                                                axis:axis
-                                                            inTablix:tablix
-                                                              report:report];
+                                  BOOL grouped = NO;
+                                  if (!sameGrouping) {
+                                    grouped = [RDLTablixStructure setName:name
+                                                              expressions:expressions
+                                                                  filters:filters
+                                                                  ofGroup:member
+                                                                     axis:axis
+                                                                 inTablix:tablix
+                                                                   report:report];
+                                    if (!grouped)
+                                      return NO;
+                                  }
+                                  BOOL settled = settings != nil && RDLTakeGroupSettings(member, settings);
+                                  return grouped || settled;
                                 }];
+}
+
+NSArray<NSString *> *RDLGroupSettingKeys(void) {
+  return @[ @"sortExpressions", @"pageBreak", @"resetPageNumber", @"pageBreakDisabled", @"pageName", @"hidden",
+            @"toggleItem", @"keepTogether" ];
+}
+
+// Two settings the same, the way the file would say them: an expression by its
+// source, a sort row by row.
+static BOOL RDLSettingsEqual(id a, id b) {
+  if (a == b)
+    return YES;
+  if ([a isKindOfClass:[RDLValue class]] || [b isKindOfClass:[RDLValue class]])
+    return [([(RDLValue *)a source] ?: @"") isEqualToString:([(RDLValue *)b source] ?: @"")];
+  if ([a isKindOfClass:[NSArray class]] || [b isKindOfClass:[NSArray class]])
+    return RDLSortExpressionsEqual(a ?: @[], b ?: @[]);
+  if ([a isKindOfClass:[NSString class]] || [b isKindOfClass:[NSString class]])
+    return [([a length] ? a : @"") isEqualToString:([b length] ? b : @"")];
+  return [a isEqual:b];
+}
+
+BOOL RDLGroupHasSettings(RDLTablixMember *member, RDLTablixMember *settings) {
+  for (NSString *key in RDLGroupSettingKeys())
+    if (!RDLSettingsEqual([member valueForKey:key], [settings valueForKey:key]))
+      return NO;
+  return YES;
+}
+
+// The settings into the group, where they differ. YES when any did.
+static BOOL RDLTakeGroupSettings(RDLTablixMember *member, RDLTablixMember *settings) {
+  BOOL changed = NO;
+  for (NSString *key in RDLGroupSettingKeys()) {
+    id wanted = [settings valueForKey:key];
+    if (RDLSettingsEqual([member valueForKey:key], wanted))
+      continue;
+    if ([wanted isKindOfClass:[NSArray class]])
+      wanted = [wanted mutableCopy];
+    if ([wanted isKindOfClass:[NSString class]] && [wanted length] == 0)
+      wanted = nil;
+    [member setValue:wanted forKey:key];
+    changed = YES;
+  }
+  return changed;
 }
 
 - (BOOL)replaceTablix:(RDLTablix *)tablix withEdited:(RDLTablix *)edited {

@@ -265,6 +265,10 @@
 		5BA5D296146818514FC6785F /* RDLPlainTextEdit.m in Sources */ = {isa = PBXBuildFile; fileRef = CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */; };
 		2D0E19FD5452CA6C6BDAA397 /* RDLReferenceSites.h in Headers */ = {isa = PBXBuildFile; fileRef = C5F9F2D496D37F5207A8E078 /* RDLReferenceSites.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		242798F0C370CC15BF86141E /* RDLReferenceSites.m in Sources */ = {isa = PBXBuildFile; fileRef = 3EE0F558290B255167D1C54A /* RDLReferenceSites.m */; };
+		190FB5F1BEE4CCA14031CC23 /* RDLSortEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */; };
+		BC143CE8101074A035A8C43C /* RDLSortEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */; };
+		B90735937B31CB99BA00920A /* RDLSortEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */; };
+		B8CE160B4A969BFF141D4259 /* RDLSortEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -567,6 +571,9 @@
 		CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPlainTextEdit.m; sourceTree = "<group>"; };
 		C5F9F2D496D37F5207A8E078 /* RDLReferenceSites.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLReferenceSites.h; sourceTree = "<group>"; };
 		3EE0F558290B255167D1C54A /* RDLReferenceSites.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLReferenceSites.m; sourceTree = "<group>"; };
+		7E5E5F58C969B5A7DEF443E7 /* RDLSortEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSortEditor.h; sourceTree = "<group>"; };
+		B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLSortEditor.m; sourceTree = "<group>"; };
+		AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLSortEditor.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -761,6 +768,9 @@
 				DB2FCE4459F00F9B28626BD8 /* RDLDesigner.icns */,
 				ACAA124C9A9B11686A93907E /* RDLPlainTextEdit.h */,
 				CD681A2062837468911A8F98 /* RDLPlainTextEdit.m */,
+				7E5E5F58C969B5A7DEF443E7 /* RDLSortEditor.h */,
+				B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */,
+				AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1134,6 +1144,7 @@
 				0F974519B2EF46F9790D99D2 /* RDLRichTextEditor.xib in Resources */,
 				0177C034AE8CBD8251E87809 /* RDLNewReportPanel.xib in Resources */,
 				B2118CE5F9C4BC6478D55FEA /* RDLAddElementPanel.xib in Resources */,
+				B8CE160B4A969BFF141D4259 /* RDLSortEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1167,6 +1178,7 @@
 				E57B48BECBA27CF5473E355C /* RDLInspectorSections.xib in Resources */,
 				93DDFA3148BCE38AF05CC8AA /* RDLNewReportPanel.xib in Resources */,
 				72801F4D5A77D7B30B27500A /* RDLDesigner.icns in Resources */,
+				BC143CE8101074A035A8C43C /* RDLSortEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1253,6 +1265,7 @@
 				85E4D28A97D8150EB37E381B /* RDLNewReport.m in Sources */,
 				D2C4D4627A54694089CA5C42 /* RDLNewReportPanel.m in Sources */,
 				EFC61084F4F6199B75B9345F /* RDLPlainTextEdit.m in Sources */,
+				190FB5F1BEE4CCA14031CC23 /* RDLSortEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1321,6 +1334,7 @@
 				9A0DF837B69B19F10D27BD5E /* RDLNewReport.m in Sources */,
 				C00014D4136BD4D999A82A59 /* RDLNewReportPanel.m in Sources */,
 				5BA5D296146818514FC6785F /* RDLPlainTextEdit.m in Sources */,
+				B90735937B31CB99BA00920A /* RDLSortEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

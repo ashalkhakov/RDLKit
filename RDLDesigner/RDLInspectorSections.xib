@@ -69,6 +69,7 @@
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
                 <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
+                <outlet property="tablixSortingButton" destination="tablixSortingButton" id="tablixSortingButtonOutlet"/>
                 <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
                 <outlet property="noRowsMessageExprButton" destination="noRowsMessageExprButton" id="noRowsMessageExprButtonOutlet"/>
                 <outlet property="layoutDirectionPop" destination="layoutDirectionPop" id="layoutDirectionPopOutlet"/>
@@ -711,7 +712,7 @@
             </subviews>
         </customView>
         <customView id="tablixOptionsBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="216"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="244"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblNoRows">
@@ -840,6 +841,17 @@
                     </buttonCell>
                     <connections>
                         <action selector="changed:" target="-2" id="omitBorderCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="What the table's rows are sorted by" id="tablixSortingButton">
+                    <rect key="frame" x="10" y="216" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Sorting…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="tablixSortingButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editTablixSorting:" target="-2" id="tablixSortingButtonAction"/>
                     </connections>
                 </button>
             </subviews>

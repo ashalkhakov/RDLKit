@@ -9,6 +9,7 @@
 #import "RDLKit.h"
 #import "RDLToolbarIcons.h"
 #import "RDLFilterEditor.h"
+#import "RDLSortEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -127,6 +128,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *noRowsMessageExprButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
+@property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
 @property (nonatomic, strong) IBOutlet NSButton *repeatColumnHeadersCheck, *repeatRowHeadersCheck,
     *fixedColumnHeadersCheck, *fixedRowHeadersCheck, *omitBorderCheck;
 // What every report item has, in the sections that apply to its kind: whether
@@ -219,6 +221,31 @@
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
+}
+
+// A button that opens a sort says how many keys it holds, since a sort is
+// otherwise invisible from here.
+- (void)syncSortingButton:(NSButton *)button count:(NSUInteger)count {
+  [button setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
+}
+
+// The rows of a tablix, sorted before any group sees them.
+- (void)editTablixSorting:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTablix class]])
+    return;
+  RDLTablix *tablix = (RDLTablix *)item;
+  RDLDataSet *ds = [_context.report dataSetNamed:tablix.dataSetName];
+  NSArray<RDLSortExpression *> *edited =
+      [RDLSortEditor runForSortExpressions:tablix.sortExpressions
+                                     title:tablix.name
+                                    fields:[(ds ?: [_context.report.dataSets firstObject]) fieldNames]
+                                    report:_context.report];
+  if (edited == nil || RDLSortExpressionsEqual(edited, tablix.sortExpressions))
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"sortExpressions" ofItem:tablix];
+  [self reload];
 }
 
 // A chart is a data region too, and RDL filters it in the same terms. The
@@ -675,6 +702,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
       [boxes addObject:_tablixOptionsBox];
+      [self syncSortingButton:_tablixSortingButton count:[[(RDLTablix *)it sortExpressions] count]];
       [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
