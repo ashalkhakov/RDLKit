@@ -1388,13 +1388,22 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   [_cellBox setFrame:box];
 }
 
+// The dataset an item's expressions read: its own, for a data region, or that
+// of the table it sits in. nil leaves it to the report's only dataset.
+- (NSString *)dataSetNameReadBy:(RDLItem *)item {
+  if ([item isKindOfClass:[RDLDataRegion class]])
+    return [(RDLDataRegion *)item dataSetName];
+  return [_context.report tablixHoldingItem:item].dataSetName;
+}
+
 - (void)editExpression:(id)sender {
   RDLExpressionField *field = [self expressionFieldForButton:sender];
   if (field == nil)
     return;
   NSString *edited = [RDLExpressionEditor runForSource:[field stringValue]
                                                context:field.expressionContext
-                                                report:_context.report];
+                                                report:_context.report
+                                           dataSetName:[self dataSetNameReadBy:[_context selectedItem]]];
   if (edited == nil)
     return;  // cancelled: the field keeps what it had
   [field setStringValue:edited];

@@ -1330,6 +1330,22 @@ static void RDLCheckItem(RDLItem *item, RDLScope *outer, RDLCheckRun *run) {
   return run.out;
 }
 
++ (NSArray<RDLDiagnostic *> *)checkExpression:(NSString *)source
+                                     inReport:(RDLReport *)report
+                                  dataSetName:(NSString *)dataSetName {
+  RDLCheckRun *run = [[RDLCheckRun alloc] init];
+  run.out = [NSMutableArray array];
+  if (report == nil)
+    return run.out;
+  RDLScope *root = [[RDLScope alloc] init];
+  root.report = report;
+  root.path = @"";
+  root.insideBody = YES;
+  RDLDataSet *dataSet = [dataSetName length] ? [report dataSetNamed:dataSetName] : nil;
+  RDLCheckSource(source, dataSet ? RDLScopeOfDataSet(dataSet, root) : root, run);
+  return run.out;
+}
+
 @end
 
 #pragma mark - Data contract

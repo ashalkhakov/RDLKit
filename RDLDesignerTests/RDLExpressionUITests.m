@@ -91,6 +91,41 @@
                                               [third source]]);
 }
 
+// The editor checks the expression as it is written, against the dataset it
+// reads: a field that dataset lacks is said in the status line, and a sound
+// expression is said to be one.
+- (void)testTheEditorChecksAsItIsWritten {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Checked"];
+  for (NSString *name in @[ @"Orders", @"Kilns" ]) {
+    RDLDataSet *ds = [[RDLDataSet alloc] init];
+    ds.name = name;
+    ds.dataSourceName = @"Inline";
+    [ds setFieldNames:[name isEqualToString:@"Orders"] ? @[ @"Amount" ] : @[ @"Temperature" ]];
+    [r.dataSets addObject:ds];
+  }
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [r.dataSources addObject:source];
+  RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@"=Sum(Fields!Temperature.Value)"
+                                                         context:RDLExpressionContextText
+                                                          report:r
+                                                     dataSetName:@"Orders"];
+  if ([ed.diagnostics count] == 0 || [ed.status rangeOfString:@"Temperature"].location == NSNotFound)
+    XCTFail(@"a field Orders lacks should be said, status reads %@", ed.status);
+  NSTextStorage *storage = ed.sourceStorage;
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Sum(Fields!Amount.Value)"];
+  [(id<NSTextViewDelegate>)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+                                                                          object:nil]];
+  if ([ed.diagnostics count] || ![ed.status hasPrefix:@"An expression"])
+    XCTFail(@"a field Orders has should pass, status reads %@ (%@)", ed.status,
+            [ed.diagnostics valueForKey:@"message"]);
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Frobnicate(1) + Nope(2)"];
+  [(id<NSTextViewDelegate>)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+                                                                          object:nil]];
+  if ([ed.diagnostics count] < 2 || [ed.status rangeOfString:@"more"].location == NSNotFound)
+    XCTFail(@"two problems should be counted, status reads %@", ed.status);
+}
+
 - (void)testCompletion {
   RDLReport *r = [RDLReport emptyReportNamed:@"Completion"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];

@@ -528,6 +528,28 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     XCTFail(@"%@", [NSString stringWithFormat:@"evaluate → %@", [e evaluateTextInScope:scope]]);
 }
 
+// One expression checked where it would be written -- against a dataset
+// named, or the report's only one -- as an editor asks while it is typed.
+- (void)testOneExpressionIsChecked {
+  RDLReport *r = RDLCheckableReport();
+  NSArray<RDLDiagnostic *> *(^check)(NSString *, NSString *) = ^(NSString *source, NSString *dataSet) {
+    return [RDLChecker checkExpression:source inReport:r dataSetName:dataSet];
+  };
+  if ([check(@"=Fields!Amount.Value * Parameters!Year.Value", @"Sales") count])
+    XCTFail(@"a sound expression should pass, reports %@", check(@"=Fields!Amount.Value", @"Sales"));
+  if (!RDLSawDiagnostic(check(@"=Fields!Nope.Value", @"Sales"), @"unknown-field", @"Nope"))
+    XCTFail(@"%@", @"a field the named dataset lacks should be reported");
+  // The report's only dataset is the one read when none is named.
+  if ([check(@"=Sum(Fields!Units.Value)", nil) count])
+    XCTFail(@"%@", @"the only dataset should be read when none is named");
+  if (!RDLSawDiagnostic(check(@"=Frobnicate(1)", nil), @"unknown-function", @"Frobnicate"))
+    XCTFail(@"an unknown function should be reported, reports %@", check(@"=Frobnicate(1)", nil));
+  if (!RDLSawDiagnostic(check(@"=1 2", nil), @"syntax", nil))
+    XCTFail(@"a broken expression should be reported, reports %@", check(@"=1 2", nil));
+  if ([check(@"Just words", @"Sales") count] || [check(@"", nil) count])
+    XCTFail(@"%@", @"a literal has nothing to find");
+}
+
 - (void)testChecker {
 
   // A field the dataset does not have.

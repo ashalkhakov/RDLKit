@@ -18,6 +18,7 @@
 @implementation RDLExpressionEditor {
   RDLReport *_report;
   RDLExpressionContext _context;
+  NSString *_dataSetName;
   NSArray<RDLFunctionCategory *> *_categories;
   NSArray<RDLFunctionInfo *> *_items;
 }
@@ -135,10 +136,33 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
     return;
   }
   RDLExpr *expr = [RDLExpr expressionWithSource:text];
-  if (expr != nil && expr.parsedCompletely)
-    [_statusLabel setStringValue:[NSString stringWithFormat:@"An expression. Expects %@.", expects]];
-  else
+  if (expr == nil || !expr.parsedCompletely) {
     [_statusLabel setStringValue:@"The expression ends before the text does; the rest is ignored."];
+    return;
+  }
+  // What the checker finds, the first thing first, and how many more.
+  RDLDiagnostic *first = [_diagnostics firstObject];
+  if (first == nil) {
+    [_statusLabel setStringValue:[NSString stringWithFormat:@"An expression. Expects %@.", expects]];
+    return;
+  }
+  NSString *message = [first.message length] ? first.message : @"something is wrong";
+  NSString *sentence = [[[message substringToIndex:1] uppercaseString]
+      stringByAppendingString:[message substringFromIndex:1]];
+  NSUInteger more = [_diagnostics count] - 1;
+  [_statusLabel setStringValue:more ? [NSString stringWithFormat:@"%@ (and %lu more).", sentence, (unsigned long)more]
+                                    : [NSString stringWithFormat:@"%@.", sentence]];
+  [_statusLabel setToolTip:[[_diagnostics valueForKey:@"message"] componentsJoinedByString:@"\n"]];
+}
+
+- (void)check {
+  _diagnostics = [RDLChecker checkExpression:[self source] inReport:_report dataSetName:_dataSetName] ?: @[];
+  [_statusLabel setToolTip:nil];
+  [self showStatus];
+}
+
+- (NSString *)status {
+  return [_statusLabel stringValue];
 }
 
 - (void)showSummary {
@@ -172,7 +196,7 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
   }
   [storage replaceCharactersInRange:at withString:text];
   [_sourceView setSelectedRange:NSMakeRange(at.location + [text length], 0)];
-  [self showStatus];
+  [self check];
 }
 
 - (void)ok:(id)sender {
@@ -213,7 +237,7 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
 
 - (void)textDidChange:(NSNotification *)note {
   (void)note;
-  [self showStatus];
+  [self check];
 }
 
 #pragma mark - Running
@@ -221,9 +245,17 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
 + (instancetype)editorForSource:(NSString *)source
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report {
+  return [self editorForSource:source context:context report:report dataSetName:nil];
+}
+
++ (instancetype)editorForSource:(NSString *)source
+                        context:(RDLExpressionContext)context
+                         report:(RDLReport *)report
+                    dataSetName:(NSString *)dataSetName {
   RDLExpressionEditor *ed = [[RDLExpressionEditor alloc] init];
   ed->_report = report;
   ed->_context = context;
+  ed->_dataSetName = [dataSetName copy];
   [ed buildCategories];
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLExpressionEditor"
                                         bundle:[NSBundle bundleForClass:self]];
@@ -237,14 +269,21 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
                                    [[NSAttributedString alloc] initWithString:source ?: @""]];
   [ed.sourceView setDelegate:ed];
   [ed selectCategoryNamed:[[ed categoryNames] firstObject]];
-  [ed showStatus];
+  [ed check];
   return ed;
 }
 
 + (NSString *)runForSource:(NSString *)source
                    context:(RDLExpressionContext)context
                     report:(RDLReport *)report {
-  RDLExpressionEditor *ed = [self editorForSource:source context:context report:report];
+  return [self runForSource:source context:context report:report dataSetName:nil];
+}
+
++ (NSString *)runForSource:(NSString *)source
+                   context:(RDLExpressionContext)context
+                    report:(RDLReport *)report
+               dataSetName:(NSString *)dataSetName {
+  RDLExpressionEditor *ed = [self editorForSource:source context:context report:report dataSetName:dataSetName];
   if (ed == nil)
     return nil;
   [ed.window center];

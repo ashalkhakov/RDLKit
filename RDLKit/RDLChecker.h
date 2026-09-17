@@ -39,6 +39,13 @@ typedef NS_ENUM(NSInteger, RDLDiagnosticSeverity) {
 // Every problem found, in report order. An empty array means nothing was
 // found, which is not the same as the report being correct.
 + (NSArray<RDLDiagnostic *> *)checkReport:(RDLReport *)report;
+// One expression, as it would be checked in the body of `report` reading the
+// dataset named -- or, naming none, the report's only dataset if it has one.
+// What an editor asks while the expression is being written. A literal has
+// nothing to find.
++ (NSArray<RDLDiagnostic *> *)checkExpression:(NSString *)source
+                                     inReport:(RDLReport *)report
+                                  dataSetName:(NSString *)dataSetName;
 @end
 
 // The shape of the data a report needs, so a caller can check what it is about

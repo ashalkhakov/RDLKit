@@ -328,7 +328,7 @@ not yet keep that.
 
 | Feature | Bin | Notes |
 |---|---|---|
-| Semantic checking in the expression editor | UI | `RDLChecker` (19 rules) runs only in the new-report wizard; the status line reports parse status. |
+| Semantic checking in the expression editor | Done | The editor checks the expression as it is written, against the dataset the item reads, and says the first problem and how many more. |
 | An errors pane for the whole report; checking before save or export | UI | Export checks parameter problems only. |
 | Completion from `RDLExpressionCatalog` | UI | The completion list is separate and lacks most P1 functions. |
 | Completion of `ReportItems!`, `Variables!`, `Code.` | UI (was MODEL) | The engine resolves all three. |
