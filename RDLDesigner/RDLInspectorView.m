@@ -54,7 +54,18 @@
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *pagePop;
-@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *bodyHField, *footerHField, *marginField;
+@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *bodyHField, *footerHField;
+// The paper: its size and which way up, its margins and columns, and what the
+// pages say before anything names them.
+@property (nonatomic, strong) IBOutlet NSView *paperBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *orientationPop;
+@property (nonatomic, strong) IBOutlet NSTextField *pageBGField, *paperWidthField, *paperHeightField;
+@property (nonatomic, strong) IBOutlet NSTextField *leftMarginField, *rightMarginField, *topMarginField,
+    *bottomMarginField, *columnsField, *columnSpacingField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *initialPageNameField;
+@property (nonatomic, strong) IBOutlet NSButton *initialPageNameExprButton, *consumeWhitespaceCheck;
+@property (nonatomic, strong) IBOutlet NSTextField *paperWidthLabel, *paperHeightLabel, *leftMarginLabel,
+    *rightMarginLabel, *topMarginLabel, *bottomMarginLabel, *columnSpacingLabel;
 // Band section
 @property (nonatomic, strong) IBOutlet NSView *bandBox;
 @property (nonatomic, strong) IBOutlet NSTextField *bandHField, *bandBGField;
@@ -72,7 +83,7 @@
 // matter of what the author reads and types, not of what the file means.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *unitPop;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHLabel, *bodyHLabel, *footerHLabel,
-    *marginLabel, *bandHeightLabel, *cellWidthLabel, *tablixHeaderLabel, *tablixRowLabel;
+    *bandHeightLabel, *cellWidthLabel, *tablixHeaderLabel, *tablixRowLabel;
 @property (nonatomic, strong) IBOutlet NSButton *docLanguageExprButton, *languageExprButton;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
@@ -170,6 +181,10 @@
   // way to know; the dataset popups are filled per report in -reload.
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
+  // Last, for a page that is none of them; choosing it changes nothing.
+  [_pagePop addItemWithTitle:@"Custom"];
+  [_orientationPop addItemWithTitle:@"Portrait"];
+  [_orientationPop addItemWithTitle:@"Landscape"];
   [_unitPop addItemWithTitle:@"Inches"];
   [_unitPop addItemWithTitle:@"Centimeters"];
   // f(x) is a picture, not two letters and two brackets: at 24 points wide the
@@ -179,13 +194,14 @@
                          _rectBGExprButton, _sizeExprButton, _textBGExprButton,
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
                          _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
-                         _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton ])
+                         _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
+                         _initialPageNameExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
-  _sections = @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
+  _sections = @[ _docBox, _paperBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
                  _subreportBox, _chartBox, _tablixBox, _cellBox, _nameBox, _visibilityBox,
                  _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
@@ -319,6 +335,10 @@
              kind:RDLFieldKindValue values:nil placeholder:@"False"];
   [_bindings bind:_pageNameField keyPath:@"pageName" scope:RDLFieldScopeItem
              kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_initialPageNameField keyPath:@"initialPageName" scope:RDLFieldScopeReport
+             kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_consumeWhitespaceCheck keyPath:@"consumeContainerWhitespace" scope:RDLFieldScopeReport
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
 
   // Item geometry.
   [_bindings bind:_leftField keyPath:@"left" scope:RDLFieldScopeItem
@@ -548,7 +568,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     @"headerHLabel" : @"Header",
     @"bodyHLabel" : @"Body",
     @"footerHLabel" : @"Footer",
-    @"marginLabel" : @"Margin",
+    @"paperWidthLabel" : @"Width",
+    @"paperHeightLabel" : @"Height",
+    @"leftMarginLabel" : @"Left",
+    @"rightMarginLabel" : @"Right",
+    @"topMarginLabel" : @"Top",
+    @"bottomMarginLabel" : @"Bottom",
+    @"columnSpacingLabel" : @"Spacing",
     @"bandHeightLabel" : @"Height",
     @"cellWidthLabel" : @"Column width",
     @"tablixHeaderLabel" : @"Header",
@@ -659,12 +685,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [self stackBoxes:@[ _bandBox ]];
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
-    NSDictionary *size = [report.page matchingStandardSize];
-    NSUInteger sizeIndex = size ? [[RDLPage standardSizes] indexOfObject:size] : NSNotFound;
-    if (sizeIndex != NSNotFound)
-      [_pagePop selectItemAtIndex:(NSInteger)sizeIndex];
-    [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", report.page.leftMargin]];
-    [self stackBoxes:@[ _docBox ]];
+    [self fillPaper:report.page];
+    [self stackBoxes:@[ _docBox, _paperBox ]];
   }
 
   [_bindings fillFromItem:it band:band report:report];
@@ -881,21 +903,71 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if ([self applyCellControl:sender] || [self applyRowHeightControl:sender] ||
       [self applyToggleControl:sender item:it])
     return;
-  if (sender == _marginField) {
-    [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
-    return;
-  }
+  [self applyPaperControl:sender];
+}
 
+#pragma mark - The paper
+
+- (void)fillPaper:(RDLPage *)page {
+  NSDictionary *size = [page matchingStandardSize];
+  NSUInteger sizeIndex = size ? [[RDLPage standardSizes] indexOfObject:size] : NSNotFound;
+  [_pagePop selectItemAtIndex:sizeIndex != NSNotFound ? (NSInteger)sizeIndex : [_pagePop numberOfItems] - 1];
+  [_orientationPop selectItemAtIndex:[page isLandscape] ? 1 : 0];
+  [_paperWidthField setStringValue:[self stringFromInches:page.pageWidth]];
+  [_paperHeightField setStringValue:[self stringFromInches:page.pageHeight]];
+  [_leftMarginField setStringValue:[self stringFromInches:page.leftMargin]];
+  [_rightMarginField setStringValue:[self stringFromInches:page.rightMargin]];
+  [_topMarginField setStringValue:[self stringFromInches:page.topMargin]];
+  [_bottomMarginField setStringValue:[self stringFromInches:page.bottomMargin]];
+  [_columnsField setStringValue:[NSString stringWithFormat:@"%ld", (long)MAX(page.columns, (NSInteger)1)]];
+  [_columnSpacingField setStringValue:[self stringFromInches:page.columnSpacing]];
+  [_pageBGField setStringValue:page.style.backgroundColor ?: @""];
+}
+
+- (CGFloat)inchesInField:(NSTextField *)field {
+  return RDLInchesFromUnits([[field stringValue] doubleValue], _context.report.unit);
+}
+
+// The paper's controls, each through the editor, which keeps the body's width
+// in step with the page. A size keeps the page the way up it is.
+- (BOOL)applyPaperControl:(id)sender {
+  RDLEditor *editor = _context.editor;
+  RDLPage *page = _context.report.page;
   if (sender == _pagePop) {
     NSArray *sizes = [RDLPage standardSizes];
     NSInteger i = [_pagePop indexOfSelectedItem];
     if (i >= 0 && i < (NSInteger)[sizes count]) {
-      NSDictionary *size = sizes[(NSUInteger)i];
-      [editor setPageWidth:[size[@"width"] doubleValue]
-                    height:[size[@"height"] doubleValue]];
+      CGFloat shorter = [sizes[(NSUInteger)i][@"width"] doubleValue];
+      CGFloat longer = [sizes[(NSUInteger)i][@"height"] doubleValue];
+      BOOL landscape = [page isLandscape];
+      [editor setPageWidth:landscape ? longer : shorter height:landscape ? shorter : longer];
     }
-    return;
+  } else if (sender == _orientationPop) {
+    BOOL landscape = [_orientationPop indexOfSelectedItem] == 1;
+    if (landscape != [page isLandscape])
+      [editor setPageWidth:page.pageHeight height:page.pageWidth];
+  } else if (sender == _paperWidthField || sender == _paperHeightField) {
+    [editor setPageWidth:[self inchesInField:_paperWidthField] height:[self inchesInField:_paperHeightField]];
+  } else if (sender == _leftMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeLeft];
+  } else if (sender == _rightMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeRight];
+  } else if (sender == _topMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeTop];
+  } else if (sender == _bottomMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeBottom];
+  } else if (sender == _columnsField || sender == _columnSpacingField) {
+    [editor setColumns:[[_columnsField stringValue] integerValue]
+               spacing:[self inchesInField:_columnSpacingField]];
+  } else if (sender == _pageBGField) {
+    [editor setPageBackgroundColor:[[_pageBGField stringValue]
+                                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
+  } else {
+    return NO;
   }
+  // A value the editor refused, or put right, shows as it is.
+  [self fillPaper:page];
+  return YES;
 }
 
 // What each expression-capable field has to produce. Set once: it is a
@@ -913,6 +985,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _hyperlinkField.expressionContext = RDLExpressionContextText;
   _pageBreakDisabledField.expressionContext = RDLExpressionContextBoolean;
   _pageNameField.expressionContext = RDLExpressionContextText;
+  _initialPageNameField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -937,6 +1010,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _hyperlinkExprButton) return _hyperlinkField;
   if (sender == _pageBreakDisabledExprButton) return _pageBreakDisabledField;
   if (sender == _pageNameExprButton) return _pageNameField;
+  if (sender == _initialPageNameExprButton) return _initialPageNameField;
   return nil;
 }
 

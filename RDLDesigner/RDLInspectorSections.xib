@@ -57,8 +57,6 @@
                 <outlet property="lineWidthField" destination="lineWidthField" id="lineWidthFieldOutlet"/>
                 <outlet property="lineWidthExprButton" destination="lineWidthExprButton" id="lineWidthExprButtonOutlet"/>
                 <outlet property="lineDashPop" destination="lineDashPop" id="lineDashPopOutlet"/>
-                <outlet property="marginField" destination="marginField" id="marginFieldOutlet"/>
-                <outlet property="marginLabel" destination="lbl8" id="marginLabelOutlet"/>
                 <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
                 <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
                 <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
@@ -70,6 +68,27 @@
                 <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
+                <outlet property="paperBox" destination="paperBox" id="paperBoxOutlet"/>
+                <outlet property="orientationPop" destination="orientationPop" id="orientationPopOutlet"/>
+                <outlet property="pageBGField" destination="pageBGField" id="pageBGFieldOutlet"/>
+                <outlet property="paperWidthField" destination="paperWidthField" id="paperWidthFieldOutlet"/>
+                <outlet property="paperHeightField" destination="paperHeightField" id="paperHeightFieldOutlet"/>
+                <outlet property="leftMarginField" destination="leftMarginField" id="leftMarginFieldOutlet"/>
+                <outlet property="rightMarginField" destination="rightMarginField" id="rightMarginFieldOutlet"/>
+                <outlet property="topMarginField" destination="topMarginField" id="topMarginFieldOutlet"/>
+                <outlet property="bottomMarginField" destination="bottomMarginField" id="bottomMarginFieldOutlet"/>
+                <outlet property="columnsField" destination="columnsField" id="columnsFieldOutlet"/>
+                <outlet property="columnSpacingField" destination="columnSpacingField" id="columnSpacingFieldOutlet"/>
+                <outlet property="initialPageNameField" destination="initialPageNameField" id="initialPageNameFieldOutlet"/>
+                <outlet property="initialPageNameExprButton" destination="initialPageNameExprButton" id="initialPageNameExprButtonOutlet"/>
+                <outlet property="consumeWhitespaceCheck" destination="consumeWhitespaceCheck" id="consumeWhitespaceCheckOutlet"/>
+                <outlet property="paperWidthLabel" destination="paperWidthLabel" id="paperWidthLabelOutlet"/>
+                <outlet property="paperHeightLabel" destination="paperHeightLabel" id="paperHeightLabelOutlet"/>
+                <outlet property="leftMarginLabel" destination="leftMarginLabel" id="leftMarginLabelOutlet"/>
+                <outlet property="rightMarginLabel" destination="rightMarginLabel" id="rightMarginLabelOutlet"/>
+                <outlet property="topMarginLabel" destination="topMarginLabel" id="topMarginLabelOutlet"/>
+                <outlet property="bottomMarginLabel" destination="bottomMarginLabel" id="bottomMarginLabelOutlet"/>
+                <outlet property="columnSpacingLabel" destination="columnSpacingLabel" id="columnSpacingLabelOutlet"/>
                 <outlet property="linkBox" destination="linkBox" id="linkBoxOutlet"/>
                 <outlet property="keepBox" destination="keepBox" id="keepBoxOutlet"/>
                 <outlet property="pageBox" destination="pageBox" id="pageBoxOutlet"/>
@@ -140,7 +159,7 @@
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
         <customView id="docBox">
-            <rect key="frame" x="0.0" y="0.0" width="260" height="378"/>
+            <rect key="frame" x="0.0" y="0.0" width="260" height="334"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
@@ -206,28 +225,8 @@
                         <outlet property="delegate" destination="-2" id="descFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl4">
-                    <rect key="frame" x="10" y="158" width="240" height="14"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" title="Page" id="lbl4Cell">
-                        <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                    </textFieldCell>
-                </textField>
-                <popUpButton id="pagePop">
-                    <rect key="frame" x="10" y="174" width="240" height="22"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="pagePopCell">
-                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
-                        <font key="font" metaFont="message"/>
-                        <menu key="menu" id="pagePopMenu"/>
-                    </popUpButtonCell>
-                    <connections>
-                        <action selector="changed:" target="-2" id="pagePopAction"/>
-                    </connections>
-                </popUpButton>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl5">
-                    <rect key="frame" x="10" y="202" width="114" height="14"/>
+                    <rect key="frame" x="10" y="158" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Header in" id="lbl5Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -235,7 +234,7 @@
                     </textFieldCell>
                 </textField>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl6">
-                    <rect key="frame" x="136" y="202" width="114" height="14"/>
+                    <rect key="frame" x="136" y="158" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Body in" id="lbl6Cell">
                         <font key="font" metaFont="user" size="10"/>
@@ -243,7 +242,7 @@
                     </textFieldCell>
                 </textField>
                 <textField focusRingType="none" id="headerHField">
-                    <rect key="frame" x="10" y="218" width="114" height="22"/>
+                    <rect key="frame" x="10" y="174" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="headerHFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -256,7 +255,7 @@
                     </connections>
                 </textField>
                 <textField focusRingType="none" id="bodyHField">
-                    <rect key="frame" x="136" y="218" width="114" height="22"/>
+                    <rect key="frame" x="136" y="174" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bodyHFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -269,23 +268,15 @@
                     </connections>
                 </textField>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl7">
-                    <rect key="frame" x="10" y="246" width="114" height="14"/>
+                    <rect key="frame" x="10" y="202" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Footer in" id="lbl7Cell">
                         <font key="font" metaFont="user" size="10"/>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl8">
-                    <rect key="frame" x="136" y="246" width="114" height="14"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" title="Margin in" id="lbl8Cell">
-                        <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                    </textFieldCell>
-                </textField>
                 <textField focusRingType="none" id="footerHField">
-                    <rect key="frame" x="10" y="262" width="114" height="22"/>
+                    <rect key="frame" x="10" y="218" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="footerHFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -297,21 +288,8 @@
                         <outlet property="delegate" destination="-2" id="footerHFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField focusRingType="none" id="marginField">
-                    <rect key="frame" x="136" y="262" width="114" height="22"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="marginFieldCell">
-                        <font key="font" metaFont="user" size="11"/>
-                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                    </textFieldCell>
-                    <connections>
-                        <action selector="changed:" target="-2" id="marginFieldAction"/>
-                        <outlet property="delegate" destination="-2" id="marginFieldDelegate"/>
-                    </connections>
-                </textField>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblDocLanguage">
-                    <rect key="frame" x="10" y="290" width="240" height="14"/>
+                    <rect key="frame" x="10" y="246" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Language" id="lblDocLanguageCell">
                         <font key="font" metaFont="user" size="10"/>
@@ -319,7 +297,7 @@
                     </textFieldCell>
                 </textField>
                 <textField toolTip="The culture this report is written in — en-US, de-DE, or an expression such as =User!Language" focusRingType="none" id="docLanguageField" customClass="RDLExpressionField">
-                    <rect key="frame" x="10" y="306" width="212" height="22"/>
+                    <rect key="frame" x="10" y="262" width="212" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="docLanguageFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -332,7 +310,7 @@
                     </connections>
                 </textField>
                 <button toolTip="Edit this as an expression" id="docLanguageExprButton">
-                    <rect key="frame" x="226" y="306" width="24" height="22"/>
+                    <rect key="frame" x="226" y="262" width="24" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="docLanguageExprButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
@@ -343,7 +321,7 @@
                     </connections>
                 </button>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblUnits">
-                    <rect key="frame" x="10" y="334" width="240" height="14"/>
+                    <rect key="frame" x="10" y="290" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" title="Units" id="lblUnitsCell">
                         <font key="font" metaFont="user" size="10"/>
@@ -351,7 +329,7 @@
                     </textFieldCell>
                 </textField>
                 <popUpButton toolTip="The unit this report is authored in — what the boxes and rulers show" id="unitPop">
-                    <rect key="frame" x="10" y="350" width="240" height="22"/>
+                    <rect key="frame" x="10" y="306" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="unitPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
@@ -364,6 +342,284 @@
                 </popUpButton>
             </subviews>
             <point key="canvasLocation" x="140" y="-86"/>
+        </customView>
+        <customView id="paperBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="340"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblPaper">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Paper" id="lblPaperCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="pagePop">
+                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="pagePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="pagePopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pagePopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblOrientation">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Orientation" id="lblOrientationCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="Which way up the paper is" id="orientationPop">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="orientationPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="orientationPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="orientationPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblPageBG">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Background" id="lblPageBGCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The colour behind everything on the page, inside the margins" focusRingType="none" id="pageBGField">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="pageBGFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="pageBGFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="pageBGFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="paperWidthLabel">
+                    <rect key="frame" x="10" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Width" id="paperWidthLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How wide the paper is" focusRingType="none" id="paperWidthField">
+                    <rect key="frame" x="10" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="paperWidthFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="paperWidthFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="paperWidthFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="paperHeightLabel">
+                    <rect key="frame" x="136" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Height" id="paperHeightLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How tall the paper is" focusRingType="none" id="paperHeightField">
+                    <rect key="frame" x="136" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="paperHeightFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="paperHeightFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="paperHeightFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="leftMarginLabel">
+                    <rect key="frame" x="10" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Left" id="leftMarginLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The left margin" focusRingType="none" id="leftMarginField">
+                    <rect key="frame" x="10" y="152" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="leftMarginFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="leftMarginFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="leftMarginFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="rightMarginLabel">
+                    <rect key="frame" x="136" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Right" id="rightMarginLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The right margin" focusRingType="none" id="rightMarginField">
+                    <rect key="frame" x="136" y="152" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rightMarginFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="rightMarginFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="rightMarginFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="topMarginLabel">
+                    <rect key="frame" x="10" y="180" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Top" id="topMarginLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The top margin" focusRingType="none" id="topMarginField">
+                    <rect key="frame" x="10" y="196" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="topMarginFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="topMarginFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="topMarginFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="bottomMarginLabel">
+                    <rect key="frame" x="136" y="180" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Bottom" id="bottomMarginLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The bottom margin" focusRingType="none" id="bottomMarginField">
+                    <rect key="frame" x="136" y="196" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bottomMarginFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="bottomMarginFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="bottomMarginFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblColumns">
+                    <rect key="frame" x="10" y="224" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Columns" id="lblColumnsCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How many columns the body runs in across a page" focusRingType="none" id="columnsField">
+                    <rect key="frame" x="10" y="240" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="columnsFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="columnsFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="columnsFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="columnSpacingLabel">
+                    <rect key="frame" x="136" y="224" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Spacing" id="columnSpacingLabelCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The space between the columns" focusRingType="none" id="columnSpacingField">
+                    <rect key="frame" x="136" y="240" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="columnSpacingFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="columnSpacingFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="columnSpacingFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblInitialPageName">
+                    <rect key="frame" x="10" y="268" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="First page name" id="lblInitialPageNameCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="What the first page is called until a region or group names its pages" focusRingType="none" id="initialPageNameField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="284" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="initialPageNameFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="initialPageNameFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="initialPageNameFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="initialPageNameExprButton">
+                    <rect key="frame" x="226" y="284" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="initialPageNameExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="initialPageNameExprButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Keep the space around items the same when what is in them grows, rather than the space at the bottom" id="consumeWhitespaceCheck">
+                    <rect key="frame" x="10" y="312" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Consume container whitespace" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="consumeWhitespaceCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="consumeWhitespaceCheckAction"/>
+                    </connections>
+                </button>
+            </subviews>
         </customView>
         <customView id="bandBox">
             <rect key="frame" x="0.0" y="28" width="260" height="92"/>

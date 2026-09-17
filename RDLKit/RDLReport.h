@@ -1465,8 +1465,11 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // Here rather than in the UI because they are facts about paper, and because
 // the writer and the layout engine care about the same numbers.
 + (NSArray<NSDictionary *> *)standardSizes;
-// The entry matching this page's dimensions, or nil for a custom size.
+// The entry matching this page's dimensions, either way up, or nil for a
+// custom size. Standard sizes are given portrait.
 - (NSDictionary *)matchingStandardSize;
+// Wider than it is tall.
+- (BOOL)isLandscape;
 @end
 
 // A piece of the file this kit does not read -- an element or an attribute --

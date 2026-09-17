@@ -2194,16 +2194,26 @@ const CGFloat RDLDefaultColumnSpacing = 0.5;
     sizes = @[
       @{ @"name" : @"Letter 8.5 × 11", @"width" : @8.5, @"height" : @11.0 },
       @{ @"name" : @"A4 210 × 297 mm", @"width" : @8.27, @"height" : @11.69 },
+      @{ @"name" : @"Legal 8.5 × 14", @"width" : @8.5, @"height" : @14.0 },
+      @{ @"name" : @"Tabloid 11 × 17", @"width" : @11.0, @"height" : @17.0 },
+      @{ @"name" : @"A3 297 × 420 mm", @"width" : @11.69, @"height" : @16.54 },
+      @{ @"name" : @"A5 148 × 210 mm", @"width" : @5.83, @"height" : @8.27 },
     ];
   }
   return sizes;
 }
 
+- (BOOL)isLandscape {
+  return self.pageWidth > self.pageHeight;
+}
+
 - (NSDictionary *)matchingStandardSize {
+  // The shorter side against the paper's width, so a sheet turned on its side
+  // is still that paper. Loose, because A4 in inches is not exact.
+  CGFloat shorter = MIN(self.pageWidth, self.pageHeight), longer = MAX(self.pageWidth, self.pageHeight);
   for (NSDictionary *size in [RDLPage standardSizes]) {
-    // Loose, because A4 in inches is not exact.
-    if (fabs(self.pageWidth - [size[@"width"] doubleValue]) < 0.05 &&
-        fabs(self.pageHeight - [size[@"height"] doubleValue]) < 0.05)
+    if (fabs(shorter - [size[@"width"] doubleValue]) < 0.05 &&
+        fabs(longer - [size[@"height"] doubleValue]) < 0.05)
       return size;
   }
   return nil;

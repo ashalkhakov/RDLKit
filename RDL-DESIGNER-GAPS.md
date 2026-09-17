@@ -117,12 +117,12 @@ UI.
 | Report | Name, Author, Description | Yes (name is overwritten from the file name on save, §5) |
 | Report | Language | Yes (literal or expression) |
 | Report | Unit (`rd:ReportUnitType`) | Popup: Inches, Centimeters; inspector fields and rulers follow it |
-| Report | Page size | Popup: Letter, A4 (portrait only) |
-| Report | Margins | One uniform value applied to all four edges |
+| Report | Page size | Popup: Letter, A4, Legal, Tabloid, A3, A5, Custom; orientation; width and height typed in the report's unit |
+| Report | Margins | Each edge on its own; the body's width follows the side margins and the columns |
 | Report | Header/body/footer heights | Yes |
 | Report | Header/footer `PrintOnFirstPage`/`PrintOnLastPage` | — |
 | Report | Band `Style` | Body background only; a stale guard (`RDLReport.m`, body-only) disables it for header/footer though the writer emits any band's style |
-| Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | — |
+| Report | `ConsumeContainerWhitespace`, `InitialPageName`, page `Columns`/`ColumnSpacing`/`Style` | Yes; the page's Style as a background colour only |
 | Report | `Code`, `Variables` | — |
 | Report | Parameters | Navigator (add/remove) + inspector: name, "Asked for" and its prompt, type, "Allows blank" (sets `Nullable`), several values, default (expression), valid values one per line; values a `DataSetReference` supplies are shown, read-only |
 | Report | Data sources | Navigator + pane: JSON/XML/CSV; file beside the report or embedded content; CSV header row, delimiter, widths; connect string composed |
@@ -441,6 +441,10 @@ In rough order of how often a Report Builder user reaches for it:
 3. Page setup: free size, orientation, four margins, `Columns`/
    `ColumnSpacing`, page `Style`, `PrintOnFirstPage`/`PrintOnLastPage`,
    header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.
+   Done: a paper section for the report -- the sizes and Custom, orientation,
+   width and height, each margin, columns and their spacing, the page's
+   background colour, the first page's name and consuming whitespace. Left:
+   the page Style beyond its background, and the header and footer.
 4. Tablix and group properties (on top of P0.1): group sort, page break,
    visibility, `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`;
    tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;

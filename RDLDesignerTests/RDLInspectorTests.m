@@ -1008,6 +1008,92 @@
     XCTFail(@"%@", @"an item in a cell should show its name and not its geometry");
 }
 
+// The paper, in the report's own section: its size either way up, each
+// margin, the columns, the page's background, the first page's name and
+// whether containers consume whitespace. The body's width follows the space
+// the side margins and the columns leave.
+- (void)testThePaperSectionSetsUpThePage {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Paper"];
+  report.page.pageWidth = 8.5;
+  report.page.pageHeight = 11;
+  report.page.leftMargin = report.page.rightMargin = 1;
+  report.page.topMargin = report.page.bottomMargin = 1;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  [ctx.selection selectReport];
+  if ([[inspector valueForKey:@"paperBox"] isHidden] || [[inspector valueForKey:@"docBox"] isHidden])
+    XCTFail(@"%@", @"the report should show its own section and the paper's");
+  void (^type)(NSString *, NSString *) = ^(NSString *fieldName, NSString *text) {
+    NSTextField *field = [inspector valueForKey:fieldName];
+    [field setStringValue:text];
+    [inspector changed:field];
+  };
+  RDLPage *page = report.page;
+  NSPopUpButton *paper = [inspector valueForKey:@"pagePop"];
+  NSPopUpButton *orientation = [inspector valueForKey:@"orientationPop"];
+
+  // Landscape turns the paper, and a size chosen then stays landscape.
+  [orientation selectItemWithTitle:@"Landscape"];
+  [inspector changed:orientation];
+  if (page.pageWidth != 11 || page.pageHeight != 8.5)
+    XCTFail(@"landscape Letter is %gx%g", page.pageWidth, page.pageHeight);
+  [paper selectItemWithTitle:@"Legal 8.5 × 14"];
+  [inspector changed:paper];
+  if (page.pageWidth != 14 || page.pageHeight != 8.5 || ![[paper titleOfSelectedItem] hasPrefix:@"Legal"])
+    XCTFail(@"landscape Legal is %gx%g, shown as %@", page.pageWidth, page.pageHeight, [paper titleOfSelectedItem]);
+  if (fabs(report.width - 12) > 1e-6)
+    XCTFail(@"the body is %g wide, not the 12 the margins leave", report.width);
+
+  // A size typed in is Custom.
+  type(@"paperWidthField", @"9");
+  if (page.pageWidth != 9 || ![[paper titleOfSelectedItem] isEqualToString:@"Custom"])
+    XCTFail(@"a typed width gives %g, shown as %@", page.pageWidth, [paper titleOfSelectedItem]);
+  [orientation selectItemWithTitle:@"Portrait"];
+  [inspector changed:orientation];
+
+  // Each margin on its own; the side ones carry the body's width.
+  type(@"leftMarginField", @"0.5");
+  type(@"topMarginField", @"0.25");
+  if (page.leftMargin != 0.5 || page.rightMargin != 1 || page.topMargin != 0.25 || page.bottomMargin != 1)
+    XCTFail(@"the margins are %g %g %g %g", page.leftMargin, page.rightMargin, page.topMargin, page.bottomMargin);
+  if (fabs(report.width - (8.5 - 1.5)) > 1e-6)
+    XCTFail(@"the body is %g wide after the left margin", report.width);
+
+  // Two columns a quarter inch apart share what the margins leave.
+  type(@"columnsField", @"2");
+  type(@"columnSpacingField", @"0.25");
+  if (page.columns != 2 || page.columnSpacing != 0.25 || fabs(report.width - 3.375) > 1e-6)
+    XCTFail(@"%ld columns %g apart leave a body %g wide", (long)page.columns, page.columnSpacing, report.width);
+  [ctx.document.undoManager undo];
+  if (page.columnSpacing != 0.5 || fabs(report.width - 3.25) > 1e-6)
+    XCTFail(@"undo should put the default spacing back, and the width with it: %g, %g", page.columnSpacing,
+            report.width);
+  type(@"columnsField", @"0");
+  if (page.columns != 1)
+    XCTFail(@"%@", @"a page has at least one column");
+
+  // The page's background, the first page's name, and whitespace.
+  type(@"pageBGField", @"#f0f0f0");
+  if (![page.style.backgroundColor isEqualToString:@"#f0f0f0"])
+    XCTFail(@"the page background is %@", page.style.backgroundColor);
+  type(@"initialPageNameField", @"=Parameters!Region.Value");
+  if (![report.initialPageName isExpression])
+    XCTFail(@"the first page's name is %@", [report.initialPageName source]);
+  NSButton *consume = [inspector valueForKey:@"consumeWhitespaceCheck"];
+  [consume setState:NSOnState];
+  [inspector changed:consume];
+  if (!report.consumeContainerWhitespace)
+    XCTFail(@"%@", @"ticking the box should consume container whitespace");
+
+  // All of it kept through a save.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (back.page.leftMargin != 0.5 || back.page.topMargin != 0.25 || back.page.pageWidth != 8.5 ||
+      ![back.page.style.backgroundColor isEqualToString:@"#f0f0f0"] || !back.consumeContainerWhitespace ||
+      ![[back.initialPageName source] isEqualToString:@"=Parameters!Region.Value"])
+    XCTFail(@"%@", @"the page setup should survive a save");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

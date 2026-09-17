@@ -554,15 +554,26 @@ static NSUInteger RDLStackingTarget(NSUInteger at, NSUInteger count, RDLStacking
 
 #pragma mark - Page setup
 
+// The body's width for the page as it now is: what the side margins leave,
+// less the gaps between columns, shared among them.
+- (void)fitBodyWidth {
+  RDLReport *report = _document.report;
+  RDLPage *page = report.page;
+  NSInteger columns = MAX(page.columns, (NSInteger)1);
+  CGFloat across = page.pageWidth - page.leftMargin - page.rightMargin;
+  CGFloat width = (across - (CGFloat)(columns - 1) * page.columnSpacing) / (CGFloat)columns;
+  if (width > 0 && fabs(width - report.width) > 1e-9)
+    [self setReportValue:@(width) forKeyPath:@"width"];
+}
+
 - (void)setPageWidth:(CGFloat)width height:(CGFloat)height {
   RDLReport *report = _document.report;
-  if (report == nil)
+  if (report == nil || width <= 0 || height <= 0)
     return;
   [self beginGroup:@"Page Size"];
   [self setReportValue:@(width) forKeyPath:@"page.pageWidth"];
   [self setReportValue:@(height) forKeyPath:@"page.pageHeight"];
-  [self setReportValue:@(width - report.page.leftMargin - report.page.rightMargin)
-            forKeyPath:@"width"];
+  [self fitBodyWidth];
   [self endGroup];
 }
 
@@ -573,7 +584,52 @@ static NSUInteger RDLStackingTarget(NSUInteger at, NSUInteger count, RDLStacking
   [self beginGroup:@"Margins"];
   for (NSString *edge in @[ @"leftMargin", @"rightMargin", @"topMargin", @"bottomMargin" ])
     [self setReportValue:@(margin) forKeyPath:[@"page." stringByAppendingString:edge]];
-  [self setReportValue:@(report.page.pageWidth - 2 * margin) forKeyPath:@"width"];
+  [self fitBodyWidth];
+  [self endGroup];
+}
+
+- (void)setMargin:(CGFloat)margin forEdge:(RDLBoxEdge)edge {
+  RDLReport *report = _document.report;
+  NSString *key = edge == RDLBoxEdgeLeft     ? @"page.leftMargin"
+                  : edge == RDLBoxEdgeRight  ? @"page.rightMargin"
+                  : edge == RDLBoxEdgeTop    ? @"page.topMargin"
+                  : edge == RDLBoxEdgeBottom ? @"page.bottomMargin"
+                                             : nil;
+  if (report == nil || key == nil || margin < 0 ||
+      fabs([[report valueForKeyPath:key] doubleValue] - margin) < 1e-9)
+    return;
+  [self beginGroup:@"Margin"];
+  [self setReportValue:@(margin) forKeyPath:key];
+  [self fitBodyWidth];
+  [self endGroup];
+}
+
+- (void)setColumns:(NSInteger)columns spacing:(CGFloat)spacing {
+  RDLReport *report = _document.report;
+  NSInteger count = MAX(columns, (NSInteger)1);
+  if (report == nil || spacing < 0 ||
+      (report.page.columns == count && fabs(report.page.columnSpacing - spacing) < 1e-9))
+    return;
+  [self beginGroup:@"Columns"];
+  [self setReportValue:@(count) forKeyPath:@"page.columns"];
+  [self setReportValue:@(spacing) forKeyPath:@"page.columnSpacing"];
+  [self fitBodyWidth];
+  [self endGroup];
+}
+
+- (void)setPageBackgroundColor:(NSString *)color {
+  RDLReport *report = _document.report;
+  NSString *wanted = [color length] ? color : nil;
+  RDLStyle *style = report.page.style;
+  if (report == nil || wanted == style.backgroundColor || [wanted isEqualToString:style.backgroundColor])
+    return;
+  [self beginGroup:@"Page Background"];
+  if (style == nil && wanted) {
+    style = [[RDLStyle alloc] init];
+    // A bare style: it states nothing but what is set on it.
+    [self setReportValue:style forKeyPath:@"page.style"];
+  }
+  [self setReportValue:wanted forKeyPath:@"page.style.backgroundColor"];
   [self endGroup];
 }
 

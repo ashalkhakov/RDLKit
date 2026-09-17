@@ -75,6 +75,16 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // remember the dependency.
 - (void)setPageWidth:(CGFloat)width height:(CGFloat)height;
 - (void)setUniformMargin:(CGFloat)margin;
+// One margin. The body is as wide as what the side margins leave, shared out
+// among the page's columns, so a side margin, the paper and the columns each
+// carry the body's width with them.
+- (void)setMargin:(CGFloat)margin forEdge:(RDLBoxEdge)edge;
+// Columns across a page -- at least one -- and the space between them.
+- (void)setColumns:(NSInteger)columns spacing:(CGFloat)spacing;
+// The page's background colour, or none for nil or empty. The page's Style is
+// made in the same step when it has none; one left saying nothing is not
+// written.
+- (void)setPageBackgroundColor:(NSString *)color;
 
 // --- Structure ------------------------------------------------------------
 - (void)insertItem:(RDLItem *)item
