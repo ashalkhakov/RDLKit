@@ -31,6 +31,13 @@
 @property (nonatomic, assign) BOOL withLines;
 @end
 
+// A cell's body row and column, in one menu item tag.
+static const NSInteger kRDLCellTagRowFactor = 1 << 16;
+
+static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
+  return (NSInteger)row * kRDLCellTagRowFactor + (NSInteger)column;
+}
+
 @implementation RDLGroupCommand
 @end
 
@@ -434,6 +441,28 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
     [m addItem:[NSMenuItem separatorItem]];
   }
   NSInteger bodyRow = gridRow >= 0 ? [RDLTablixGeometry bodyRowOf:tab forGridRow:(NSUInteger)gridRow] : -1;
+  // The cell clicked, as the merge it is part of: the cell the merge starts at.
+  NSUInteger mergeRow = 0, mergeColumn = 0;
+  if (bodyRow >= 0 && col >= 0 &&
+      [tab cellCoveringRow:(NSUInteger)bodyRow column:(NSUInteger)col originRow:&mergeRow originColumn:&mergeColumn]) {
+    NSInteger cellTag = RDLCellTag(mergeRow, mergeColumn);
+    BOOL any = NO;
+    if ([RDLTablixStructure mergeCellAtRow:mergeRow column:mergeColumn along:RDLTablixAxisColumns inTablix:tab apply:NO]) {
+      [m addItem:[self tablixMenuItem:@"Merge with Cell to the Right" action:@selector(ctxMergeRight:) tag:cellTag]];
+      any = YES;
+    }
+    if ([RDLTablixStructure mergeCellAtRow:mergeRow column:mergeColumn along:RDLTablixAxisRows inTablix:tab apply:NO]) {
+      [m addItem:[self tablixMenuItem:@"Merge with Cell Below" action:@selector(ctxMergeDown:) tag:cellTag]];
+      any = YES;
+    }
+    RDLTablixCell *merged = tab.tablixBody.rows[mergeRow].cells[mergeColumn];
+    if (merged.rowSpan > 1 || merged.colSpan > 1) {
+      [m addItem:[self tablixMenuItem:@"Split Cell" action:@selector(ctxSplitCell:) tag:cellTag]];
+      any = YES;
+    }
+    if (any)
+      [m addItem:[NSMenuItem separatorItem]];
+  }
   if (bodyRow >= 0) {
     [m addItem:[self tablixMenuItem:@"Insert Row Above" action:@selector(ctxInsertRowAbove:) tag:bodyRow]];
     [m addItem:[self tablixMenuItem:@"Insert Row Below" action:@selector(ctxInsertRowBelow:) tag:bodyRow]];
@@ -604,6 +633,26 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
 - (void)ctxDeleteColumn:(NSMenuItem *)mi {
   [_context.editor removeTablixColumnAtIndex:(NSUInteger)[mi tag]
                                     ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxMergeRight:(NSMenuItem *)mi {
+  [_context.editor mergeTablixCellAtRow:(NSUInteger)([mi tag] / kRDLCellTagRowFactor)
+                                 column:(NSUInteger)([mi tag] % kRDLCellTagRowFactor)
+                                  along:RDLTablixAxisColumns
+                               ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxMergeDown:(NSMenuItem *)mi {
+  [_context.editor mergeTablixCellAtRow:(NSUInteger)([mi tag] / kRDLCellTagRowFactor)
+                                 column:(NSUInteger)([mi tag] % kRDLCellTagRowFactor)
+                                  along:RDLTablixAxisRows
+                               ofTablix:[self tablixOfMenuItem:mi]];
+}
+
+- (void)ctxSplitCell:(NSMenuItem *)mi {
+  [_context.editor splitTablixCellAtRow:(NSUInteger)([mi tag] / kRDLCellTagRowFactor)
+                                 column:(NSUInteger)([mi tag] % kRDLCellTagRowFactor)
+                               ofTablix:[self tablixOfMenuItem:mi]];
 }
 
 - (void)ctxInsertRowAbove:(NSMenuItem *)mi {

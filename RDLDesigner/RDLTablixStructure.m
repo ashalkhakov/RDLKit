@@ -432,6 +432,82 @@ static NSString *RDLTotalFor(RDLItem *item, RDLDataSet *dataSet) {
   return YES;
 }
 
+#pragma mark - Merged cells
+
+// Whether lines `first` to `last` along `axis` are plain lines under one parent:
+// no group of their own, the same siblings. With no hierarchy, any lines are.
+static BOOL RDLLinesArePlainSiblings(RDLTablix *tablix, RDLTablixAxis axis, NSUInteger first, NSUInteger last) {
+  RDLTablixHierarchy *hierarchy = [RDLTablixStructure hierarchyOfTablix:tablix axis:axis];
+  if ([hierarchy.members count] == 0)
+    return YES;
+  NSArray<RDLTablixMember *> *leaves = [hierarchy leafMembers];
+  if (last >= [leaves count])
+    return NO;
+  NSMutableArray *siblings = RDLSiblingsOf(leaves[first], hierarchy);
+  for (NSUInteger line = first; line <= last; line++)
+    if ([leaves[line].groupName length] || RDLSiblingsOf(leaves[line], hierarchy) != siblings)
+      return NO;
+  return YES;
+}
+
++ (BOOL)mergeCellAtRow:(NSUInteger)row
+                column:(NSUInteger)column
+                 along:(RDLTablixAxis)axis
+              inTablix:(RDLTablix *)tablix
+                 apply:(BOOL)apply {
+  if (!RDLIsConsistent(tablix) || row >= [tablix.tablixBody.rows count] ||
+      column >= [tablix.tablixBody.columns count])
+    return NO;
+  BOOL rows = axis == RDLTablixAxisRows;
+  NSUInteger line = rows ? row : column, place = rows ? column : row;
+  NSUInteger originLine = 0, originPlace = 0;
+  RDLTablixCell *origin = RDLCoveringCell(tablix, axis, line, place, &originLine, &originPlace);
+  // Only the cell a merge starts at is merged from.
+  if (origin == nil || originLine != line || originPlace != place)
+    return NO;
+  NSUInteger next = line + RDLLineSpan(origin, axis);
+  if (next >= RDLLineCount(tablix, axis))
+    return NO;
+  NSUInteger nextLine = 0, nextPlace = 0;
+  RDLTablixCell *neighbour = RDLCoveringCell(tablix, axis, next, place, &nextLine, &nextPlace);
+  RDLTablixAxis across = RDLAcross(axis);
+  if (neighbour == nil || nextLine != next || nextPlace != place ||
+      RDLLineSpan(neighbour, across) != RDLLineSpan(origin, across))
+    return NO;
+  NSUInteger last = next + RDLLineSpan(neighbour, axis) - 1;
+  if (!RDLLinesArePlainSiblings(tablix, axis, line, last))
+    return NO;
+  if (!apply)
+    return YES;
+  if (origin.item == nil)
+    origin.item = neighbour.item;
+  RDLSetLineSpan(origin, axis, RDLLineSpan(origin, axis) + RDLLineSpan(neighbour, axis));
+  neighbour.item = nil;
+  neighbour.rowSpan = 0;
+  neighbour.colSpan = 0;
+  return YES;
+}
+
++ (BOOL)splitCellAtRow:(NSUInteger)row
+                column:(NSUInteger)column
+              inTablix:(RDLTablix *)tablix
+                report:(RDLReport *)report {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  if (!RDLIsConsistent(tablix) || row >= [rows count] || column >= [rows[row].cells count])
+    return NO;
+  RDLTablixCell *origin = rows[row].cells[column];
+  NSUInteger down = RDLSpan(origin.rowSpan), across = RDLSpan(origin.colSpan);
+  if (down == 1 && across == 1)
+    return NO;
+  origin.rowSpan = 0;
+  origin.colSpan = 0;
+  for (NSUInteger r = row; r < row + down; r++)
+    for (NSUInteger c = column; c < column + across; c++)
+      if (r != row || c != column)
+        rows[r].cells[c].item = RDLNewTextbox(@"Textbox", @"", tablix, report);
+  return YES;
+}
+
 // Whether a merged cell reaches across the line between columns `left` and
 // `left + 1`.
 static BOOL RDLSpanCrosses(RDLTablix *tablix, NSUInteger left) {

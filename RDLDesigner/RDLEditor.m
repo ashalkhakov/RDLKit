@@ -809,6 +809,33 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
                                 }];
 }
 
+- (BOOL)mergeTablixCellAtRow:(NSUInteger)row
+                      column:(NSUInteger)column
+                       along:(RDLTablixAxis)axis
+                    ofTablix:(RDLTablix *)tablix {
+  return [self changeStructureOfTablix:tablix
+                                action:@"Merge Cells"
+                                change:^BOOL {
+                                  return [RDLTablixStructure mergeCellAtRow:row
+                                                                     column:column
+                                                                      along:axis
+                                                                   inTablix:tablix
+                                                                      apply:YES];
+                                }];
+}
+
+- (BOOL)splitTablixCellAtRow:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix {
+  RDLReport *report = _document.report;
+  return [self changeStructureOfTablix:tablix
+                                action:@"Split Cell"
+                                change:^BOOL {
+                                  return [RDLTablixStructure splitCellAtRow:row
+                                                                     column:column
+                                                                   inTablix:tablix
+                                                                     report:report];
+                                }];
+}
+
 - (void)moveTablixColumnAtIndex:(NSUInteger)from
                         toIndex:(NSUInteger)to
                        ofTablix:(RDLTablix *)tablix {

@@ -796,6 +796,71 @@
     XCTFail(@"%@", @"undoing should put the tablix back as it was");
 }
 
+// Cells merged and split from the canvas: to the right and down, keeping the
+// first cell's contents -- or taking the neighbour's when the first had none --
+// and back again with a text box in each cell uncovered. A merge never
+// reaches into a group's own row.
+- (void)testCellsAreMergedAndSplit {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  NSString *before = [RDLEditor XMLStringForItem:tablix];
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  RDLItem *first = rows[0].cells[0].item;
+
+  // The heading row, across.
+  if (![ctx.editor mergeTablixCellAtRow:0 column:0 along:RDLTablixAxisColumns ofTablix:tablix])
+    XCTFail(@"%@", @"two heading cells should merge");
+  if (rows[0].cells[0].colSpan != 2 || rows[0].cells[0].item != first || rows[0].cells[1].item != nil ||
+      [[tablix structuralProblems] count])
+    XCTFail(@"the merge reads span %ld, problems %@", (long)rows[0].cells[0].colSpan, [tablix structuralProblems]);
+  // Merging from under a merge is not a merge.
+  if ([RDLTablixStructure mergeCellAtRow:0 column:1 along:RDLTablixAxisColumns inTablix:tablix apply:NO])
+    XCTFail(@"%@", @"a covered cell should not merge");
+  if (![ctx.editor splitTablixCellAtRow:0 column:0 ofTablix:tablix] ||
+      ![rows[0].cells[1].item isKindOfClass:[RDLTextbox class]] || rows[0].cells[0].colSpan > 1)
+    XCTFail(@"%@", @"a split should give the uncovered cell a text box of its own");
+
+  // Down: a group's own row is not merged into; two plain rows are, and an
+  // empty first cell takes the one below's text box.
+  NSArray<RDLTablixMember *> *leaves = [tablix.rowHierarchy leafMembers];
+  NSInteger plainPair = -1, intoGroup = -1;
+  for (NSUInteger i = 0; i + 1 < [leaves count]; i++) {
+    BOOL plain = [leaves[i].groupName length] == 0 && [leaves[i + 1].groupName length] == 0 &&
+                 [tablix.rowHierarchy pathToMember:leaves[i]].count == [tablix.rowHierarchy pathToMember:leaves[i + 1]].count;
+    if (plain && plainPair < 0)
+      plainPair = (NSInteger)i;
+    if ([leaves[i + 1].groupName length] && intoGroup < 0)
+      intoGroup = (NSInteger)i;
+  }
+  if (intoGroup >= 0 &&
+      [RDLTablixStructure mergeCellAtRow:(NSUInteger)intoGroup column:0 along:RDLTablixAxisRows inTablix:tablix apply:NO])
+    XCTFail(@"%@", @"a merge should not reach into a group's own row");
+  if (plainPair < 0) {
+    [ctx.editor insertTablixRowAtIndex:1 ofTablix:tablix];
+    [ctx.editor insertTablixRowAtIndex:1 ofTablix:tablix];
+    plainPair = 1;
+  }
+  NSUInteger upper = (NSUInteger)plainPair;
+  RDLItem *lower = tablix.tablixBody.rows[upper + 1].cells[0].item;
+  tablix.tablixBody.rows[upper].cells[0].item = nil;
+  if (![ctx.editor mergeTablixCellAtRow:upper column:0 along:RDLTablixAxisRows ofTablix:tablix])
+    XCTFail(@"%@", @"two plain rows' cells should merge down");
+  RDLTablixCell *merged = tablix.tablixBody.rows[upper].cells[0];
+  if (merged.rowSpan != 2 || merged.item != lower || [[tablix structuralProblems] count])
+    XCTFail(@"the downward merge reads span %ld, problems %@", (long)merged.rowSpan, [tablix structuralProblems]);
+  // One undo takes the merge back: the span gone, the text box below again.
+  [ctx.document.undoManager undo];
+  RDLTablixCell *upperCell = tablix.tablixBody.rows[upper].cells[0];
+  RDLTablixCell *lowerCell = tablix.tablixBody.rows[upper + 1].cells[0];
+  if (upperCell.rowSpan > 1 || upperCell.item != nil || ![lowerCell.item.name isEqualToString:lower.name])
+    XCTFail(@"%@", @"undo should put the two cells back as they were");
+  (void)before;
+}
+
 // The dialog edits a copy with the edits the canvas makes, so OK keeps what
 // the dialog has no column for -- a merged heading, a cell's own background --
 // and is one undo; Cancel leaves everything as it was, a group's filters

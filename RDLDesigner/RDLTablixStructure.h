@@ -67,6 +67,24 @@ typedef NS_ENUM(NSInteger, RDLGroupPlacement) {
                   report:(RDLReport *)report;
 + (BOOL)removeRowAtIndex:(NSUInteger)index inTablix:(RDLTablix *)tablix;
 
+// The cell starting at body `row` and `column` merged with the cell after it
+// along `axis` -- to its right for the column axis, below it for the row
+// axis -- where that cell is not under another merge, covers the same lines
+// across, and both lie in plain lines under the same parent, so a merge never
+// reaches into a group's repeated row. The merged cell keeps its contents, or
+// its neighbour's when it had none. `apply` NO only asks.
++ (BOOL)mergeCellAtRow:(NSUInteger)row
+                column:(NSUInteger)column
+                 along:(RDLTablixAxis)axis
+              inTablix:(RDLTablix *)tablix
+                 apply:(BOOL)apply;
+// A merged cell back into cells of its own, each it uncovers holding an empty
+// text box. NO for a cell that is not merged.
++ (BOOL)splitCellAtRow:(NSUInteger)row
+                column:(NSUInteger)column
+              inTablix:(RDLTablix *)tablix
+                report:(RDLReport *)report;
+
 // The total row at the end of a grouped tablix: a static row member after the
 // groups, with a body row of its own.
 + (BOOL)tablixHasTotalRow:(RDLTablix *)tablix;

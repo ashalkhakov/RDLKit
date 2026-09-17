@@ -168,6 +168,12 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // A row on its own, as tall as the row it goes beside; and one taken away.
 - (BOOL)insertTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 - (BOOL)removeTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+// Merged cells, as RDLTablixStructure has them, each one step.
+- (BOOL)mergeTablixCellAtRow:(NSUInteger)row
+                      column:(NSUInteger)column
+                       along:(RDLTablixAxis)axis
+                    ofTablix:(RDLTablix *)tablix;
+- (BOOL)splitTablixCellAtRow:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix;
 - (void)removeTablixColumnAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 // Reorder: the column at `from` ends up at `to`, taking its heading, its value
 // and its width with it. What dragging a column's handle on the canvas does.

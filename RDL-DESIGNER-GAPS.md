@@ -287,7 +287,7 @@ not yet keep that.
 | Spec feature | Bin | Notes |
 |---|---|---|
 | Per-cell `Style` (borders, background, padding) | UI | All of it works through the in-cell textbox, which is where MS-RDL keeps it: `TablixCell` has no `Style` of its own, so the text section -- background, padding and the Borders… panel -- is what styles a cell (P1.1). An empty cell holds no item and so has nothing to style until something is put in it. Kept by every edit. |
-| Merged cells (`ColSpan`/`RowSpan`) | UI | Kept, and carried across column and row edits; nothing merges or splits. |
+| Merged cells (`ColSpan`/`RowSpan`) | Done | Merge with the cell to the right or below, and Split Cell, on the canvas; kept and carried across column and row edits. A merge stays within plain rows or columns under one parent. |
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `KeepTogether` | Done | In Group Properties, applied with the name, expressions and filters as one step; sorting through a panel shared with the tablix. |
 | Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData`; group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. What a member row does is Report Builder's Advanced Mode row pane, which the designer does not have. |
 | Details `SortExpressions` | Done (engine FULL) | Through the details group's Group Properties, when the details group is named, as Report Builder names it. |
