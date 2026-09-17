@@ -4,6 +4,7 @@
 // that its hand-written sections do not overlap.
 #import "RDLDesignerTestSupport.h"
 #import "RDLBordersEditor.h"
+#import "RDLChartAxisEditor.h"
 
 
 
@@ -1259,6 +1260,98 @@
       saved.legendLayout != RDLChartLegendLayoutTallTable || !saved.legendHidden ||
       ![[saved.noDataMessage source] isEqualToString:@"No firings this quarter"])
     XCTFail(@"%@", @"the options should survive a save");
+}
+
+// The axis panel: every axis the chart has, each one's title, range,
+// interval, format, margins, grid lines, tick marks and side, applied as one
+// step -- and a range that is no number refused, with the panel saying so.
+- (void)testTheAxisPanelSetsEachAxis {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  RDLChartAxis *secondary = [[RDLChartAxis alloc] init];
+  secondary.name = @"Secondary";
+  [chart.secondaryValueAxes addObject:secondary];
+  NSString *before = [RDLEditor XMLStringForItem:chart];
+
+  RDLChartAxisEditor *panel = [RDLChartAxisEditor editorForChart:chart context:ctx];
+  NSPopUpButton *axisPop = [panel valueForKey:@"axisPop"];
+  if ([axisPop numberOfItems] != 3 || ![[axisPop itemTitleAtIndex:2] containsString:@"Secondary"]) {
+    XCTFail(@"the panel should offer three axes, offers %@", [axisPop itemTitles]);
+    return;
+  }
+  [axisPop selectItemAtIndex:1];
+  [panel selectAxis:axisPop];
+  NSDictionary<NSString *, NSString *> *typed = @{
+    @"titleField" : @"Pieces",
+    @"minimumField" : @"0",
+    @"maximumField" : @"=Max(Fields!Pieces.Value) * 1.1",
+    @"intervalField" : @"a few",
+    @"formatField" : @"N0",
+  };
+  for (NSString *name in typed)
+    [(NSTextField *)[panel valueForKey:name] setStringValue:typed[name]];
+  [(NSPopUpButton *)[panel valueForKey:@"marginPop"] selectItemWithTitle:@"None"];
+  [(NSPopUpButton *)[panel valueForKey:@"majorTicksPop"] selectItemWithTitle:@"Across"];
+  [(NSButton *)[panel valueForKey:@"minorGridCheck"] setState:NSOnState];
+  [(NSButton *)[panel valueForKey:@"oppositeCheck"] setState:NSOnState];
+  [(NSButton *)[panel valueForKey:@"showAxisCheck"] setState:NSOffState];
+  if ([panel apply] || ![[[panel valueForKey:@"messageLabel"] stringValue] containsString:@"interval"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"an interval that is no number should be refused, and the chart left alone");
+  // Nor can the panel leave that axis for another until it is put right.
+  [axisPop selectItemAtIndex:2];
+  [panel selectAxis:axisPop];
+  if (panel.shownAxis != panel.axes[1])
+    XCTFail(@"%@", @"the panel should stay on the axis whose interval is wrong");
+  [(NSTextField *)[panel valueForKey:@"intervalField"] setStringValue:@"5"];
+  [axisPop selectItemAtIndex:2];
+  [panel selectAxis:axisPop];
+  if (panel.shownAxis != panel.axes[2] || [[[panel valueForKey:@"titleField"] stringValue] length])
+    XCTFail(@"%@", @"the panel should show the secondary axis, untitled");
+  [(NSTextField *)[panel valueForKey:@"titleField"] setStringValue:@"Share"];
+  [(NSTextField *)[panel valueForKey:@"formatField"] setStringValue:@"=Parameters!Format.Value"];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+
+  RDLChartAxis *value = chart.valueAxis;
+  if (![[value.title source] isEqualToString:@"Pieces"] || ![[value.minimum source] isEqualToString:@"0"] ||
+      ![value.maximum isExpression] || ![[value.majorInterval source] isEqualToString:@"5"] ||
+      ![value.style.format isEqualToString:@"N0"] || value.margin != RDLChartAxisMarginFalse ||
+      value.majorTickMarks != RDLChartTickMarksCross || !value.showMinorGridLines ||
+      value.location != RDLChartAxisLocationOpposite || !value.hidden)
+    XCTFail(@"%@", @"the value axis should be set as typed");
+  RDLChartAxis *second = [chart.secondaryValueAxes firstObject];
+  if (![[second.title source] isEqualToString:@"Share"] || second.style.format != nil ||
+      ![[second.style.expressions.format source] isEqualToString:@"=Parameters!Format.Value"] ||
+      ![second.name isEqualToString:@"Secondary"])
+    XCTFail(@"%@", @"the secondary axis should be titled and formatted by an expression, keeping its name");
+  if (chart.categoryAxis.title != nil)
+    XCTFail(@"%@", @"the category axis was not touched");
+  NSString *after = [RDLEditor XMLStringForItem:chart];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = it;
+  if (![[RDLEditor XMLStringForItem:saved] isEqualToString:after])
+    XCTFail(@"%@", @"the axes should survive a save");
+
+  // One step back, and forward again.
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the axes back");
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"redo should set them again");
+  // A panel changed in nothing records nothing: the next undo is still the one above.
+  RDLChartAxisEditor *untouched = [RDLChartAxisEditor editorForChart:chart context:ctx];
+  if (![untouched apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"an untouched panel should record nothing to undo");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to

@@ -775,6 +775,57 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
   into.filters = from.filters;
 }
 
+#pragma mark - Charts
+
+// What the chart panels edit, from one chart into another -- into the same
+// object, so what points at the chart still does.
+static void RDLTransplantChart(RDLChart *into, RDLChart *from) {
+  into.series = from.series;
+  into.categoryMembers = from.categoryMembers;
+  into.seriesMembers = from.seriesMembers;
+  into.categoryAxis = from.categoryAxis;
+  into.valueAxis = from.valueAxis;
+  into.secondaryValueAxes = from.secondaryValueAxes;
+  into.customPaletteColors = from.customPaletteColors;
+}
+
+- (BOOL)changeChart:(RDLChart *)chart action:(NSString *)action change:(void (^)(void))change {
+  if (![chart isKindOfClass:[RDLChart class]])
+    return NO;
+  NSString *before = [RDLEditor XMLStringForItem:chart];
+  change();
+  if ([[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    return NO;
+  [self beginGroup:action];
+  [[self undoProxy] restoreChart:chart fromXML:before];
+  [self endGroup];
+  [self noteChange:[RDLChange structureChange:chart bandKey:nil]];
+  return YES;
+}
+
+- (void)restoreChart:(RDLChart *)chart fromXML:(NSString *)xml {
+  RDLChart *saved = (RDLChart *)[RDLEditor itemFromXMLString:xml];
+  if (![saved isKindOfClass:[RDLChart class]])
+    return;
+  [self beginGroup:nil];
+  [[self undoProxy] restoreChart:chart fromXML:[RDLEditor XMLStringForItem:chart]];
+  RDLTransplantChart(chart, saved);
+  [self endGroup];
+  [self noteChange:[RDLChange structureChange:chart bandKey:nil]];
+}
+
+- (BOOL)setAxesOfChart:(RDLChart *)chart from:(RDLChart *)edited {
+  if (![edited isKindOfClass:[RDLChart class]])
+    return NO;
+  return [self changeChart:chart
+                    action:@"Axis Properties"
+                    change:^{
+                      chart.categoryAxis = edited.categoryAxis;
+                      chart.valueAxis = edited.valueAxis;
+                      chart.secondaryValueAxes = edited.secondaryValueAxes;
+                    }];
+}
+
 // Undo of a structural edit: the tablix as it was, put back into the same one.
 - (void)restoreStructureOfTablix:(RDLTablix *)tablix fromXML:(NSString *)xml {
   RDLTablix *saved = (RDLTablix *)[RDLEditor itemFromXMLString:xml];

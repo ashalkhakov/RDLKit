@@ -7,6 +7,7 @@
 #import "RDLFilterEditor.h"
 #import "RDLSortEditor.h"
 #import "RDLPane.h"
+#import "RDLToolbarIcons.h"
 
 @interface RDLGroupPropertiesEditor () <NSTableViewDataSource, NSTableViewDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
@@ -57,6 +58,8 @@
   [ed prepareTable];
   [ed syncFiltersButton];
   [ed fillSettingsFrom:group];
+  for (NSButton *button in @[ ed.pageBreakDisabledExprButton, ed.pageNameExprButton, ed.hiddenExprButton ])
+    RDLSetToolbarIcon(button, RDLToolbarGlyphExpression);
   return ed;
 }
 

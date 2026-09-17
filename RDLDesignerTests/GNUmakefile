@@ -44,6 +44,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLFilterEditor.m \
   ../RDLDesigner/RDLSortEditor.m \
+  ../RDLDesigner/RDLChartAxisEditor.m \
   ../RDLDesigner/RDLGroupPropertiesEditor.m \
   ../RDLDesigner/RDLToolbarIcons.m \
   ../RDLDesigner/RDLPane.m \
@@ -80,6 +81,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLInspectorSections.xib \
   ../RDLDesigner/RDLFilterEditor.xib \
   ../RDLDesigner/RDLSortEditor.xib \
+  ../RDLDesigner/RDLChartAxisEditor.xib \
   ../RDLDesigner/RDLGroupPropertiesEditor.xib \
   ../RDLDesigner/RDLDatasetNavigator.xib \
   ../RDLDesigner/RDLInsertPalette.xib \

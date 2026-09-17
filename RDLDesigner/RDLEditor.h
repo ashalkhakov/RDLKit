@@ -159,6 +159,9 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // CellContents holds 0 or 1 report items, so this is the whole of a cell's
 // contents -- a cell that has to hold more holds a Rectangle, and the items go
 // in that.
+// A chart's axes, from a copy of the chart the axis panel edited, as one
+// undoable step. NO, recording nothing, when they are as they were.
+- (BOOL)setAxesOfChart:(RDLChart *)chart from:(RDLChart *)edited;
 // The corner cell at a corner row and column, made as an undoable structural
 // edit when the file wrote none. nil past the corner.
 - (RDLTablixCell *)makeCornerCellAtRow:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix;

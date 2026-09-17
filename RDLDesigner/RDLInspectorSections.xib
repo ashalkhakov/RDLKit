@@ -80,6 +80,7 @@
                 <outlet property="legendLayoutPop" destination="legendLayoutPop" id="legendLayoutPopOutlet"/>
                 <outlet property="noDataMessageField" destination="noDataMessageField" id="noDataMessageFieldOutlet"/>
                 <outlet property="noDataMessageExprButton" destination="noDataMessageExprButton" id="noDataMessageExprButtonOutlet"/>
+                <outlet property="chartAxesButton" destination="chartAxesButton" id="chartAxesButtonOutlet"/>
                 <outlet property="tablixSortingButton" destination="tablixSortingButton" id="tablixSortingButtonOutlet"/>
                 <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
                 <outlet property="noRowsMessageExprButton" destination="noRowsMessageExprButton" id="noRowsMessageExprButtonOutlet"/>
@@ -723,7 +724,7 @@
             </subviews>
         </customView>
         <customView id="chartOptionsBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="206"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="236"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lblChartSubtype">
@@ -867,6 +868,17 @@
                     </buttonCell>
                     <connections>
                         <action selector="editExpression:" target="-2" id="noDataMessageExprButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="The chart's axes: their titles, ranges, intervals, grid lines and tick marks" id="chartAxesButton">
+                    <rect key="frame" x="10" y="208" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Axes…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="chartAxesButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editChartAxes:" target="-2" id="chartAxesButtonAction"/>
                     </connections>
                 </button>
             </subviews>

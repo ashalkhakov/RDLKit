@@ -160,7 +160,8 @@ UI.
 | Tablix | Cell selection; any simple item or subreport in a cell | Yes |
 | Tablix | Per-cell border/background/padding, merged cells, static members, group sort/page break/visibility, per-row heights, corner, `NoRowsMessage`, sort, repeat/fixed headers | — |
 | Chart | Type, subtype, dataset, title and its position, palette, legend, no-data message, category field, value field, Filters… | Every type |
-| Chart | Series, axes, labels, markers, custom palette colours | — |
+| Chart | Axes (Axis Properties) | Every axis |
+| Chart | Series, labels, markers, custom palette colours | — |
 | Expressions | Editor with categories, function picker, parse status; completion | Yes; completion is a hard-coded list of ~90 names, not the engine catalogue |
 | Expressions | Semantic checking | — (`RDLChecker` runs only in the new-report wizard) |
 | Canvas | Selection | Single item (or one cell) |
@@ -309,7 +310,8 @@ not yet keep that.
 | The High/Low and Start/End values a Range or Stock chart plots | UI | Every type the kit models is in the popup, from the enumeration, and a chart keeps the type its file gave it. What it plots has no control. |
 | Multiple series, series grouping, per-series type | UI | The inspector edits the first series, and the outermost category and series group; groups nested inside those are kept as the file has them. |
 | Legend hidden/position/layout, title position, palette, no-data message | Done | In the chart's section; the title's position is off while there is no title, which is what it is written with. |
-| Axis titles/min/max/interval/label interval/margin/grid lines/tick marks, custom palette colours, markers, data labels, secondary axis, series and point style, X/Size values | UI (was partly MODEL) | Engine draws them. |
+| Axis title and its position, shown or hidden, min/max/interval/label interval, number format, margin, major and minor grid lines and tick marks, scalar, side | Done | Axis Properties, from the chart's section: the category axis, the value axis and each further value axis, applied as one step. |
+| Axis title style, grid line style, tick mark length and their own intervals; custom palette colours, markers, data labels, which value axis a series uses, series and point style, X/Size values | UI (was partly MODEL) | Engine draws them. |
 | 3D, strip lines, scale breaks, border skin, empty points, BoxPlot/ErrorBar/TreeMap | MODEL | Kept and written back. |
 
 ### 4.9 Other report items
@@ -464,7 +466,7 @@ In rough order of how often a Report Builder user reaches for it:
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
    Done: subtype, palette, legend, the title's position and the no-data
-   message, in the chart's section.
+   message, in the chart's section; the axes, in Axis Properties.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.

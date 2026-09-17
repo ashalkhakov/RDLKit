@@ -10,6 +10,7 @@
 #import "RDLToolbarIcons.h"
 #import "RDLFilterEditor.h"
 #import "RDLSortEditor.h"
+#import "RDLChartAxisEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -135,7 +136,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *showLegendCheck;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *legendPositionPop, *legendLayoutPop;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *noDataMessageField;
-@property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton, *chartAxesButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
 @property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
@@ -256,6 +257,17 @@
     return;
   [_context.editor setValue:[edited mutableCopy] forKeyPath:@"sortExpressions" ofItem:tablix];
   [self reload];
+}
+
+// A chart's axes, in a panel of their own: there are a dozen settings to each,
+// and a chart may have several.
+- (void)editChartAxes:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  if ([RDLChartAxisEditor runForChart:(RDLChart *)item context:_context])
+    [self reload];
 }
 
 // A chart is a data region too, and RDL filters it in the same terms. The

@@ -269,6 +269,10 @@
 		BC143CE8101074A035A8C43C /* RDLSortEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */; };
 		B90735937B31CB99BA00920A /* RDLSortEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */; };
 		B8CE160B4A969BFF141D4259 /* RDLSortEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */; };
+		86A53228FA1051CFC103B5B1 /* RDLChartAxisEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 114630EAD5AD1115915A8A45 /* RDLChartAxisEditor.m */; };
+		CCCB9775AB6E8A78015C2DBB /* RDLChartAxisEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2F760DDC80E5D6F4FBD9AFAB /* RDLChartAxisEditor.xib */; };
+		677D302CAC9A8567428F0B38 /* RDLChartAxisEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = 114630EAD5AD1115915A8A45 /* RDLChartAxisEditor.m */; };
+		99C25BEADA04CDD05900E098 /* RDLChartAxisEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2F760DDC80E5D6F4FBD9AFAB /* RDLChartAxisEditor.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -574,6 +578,9 @@
 		7E5E5F58C969B5A7DEF443E7 /* RDLSortEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSortEditor.h; sourceTree = "<group>"; };
 		B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLSortEditor.m; sourceTree = "<group>"; };
 		AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLSortEditor.xib; sourceTree = "<group>"; };
+		BA46416E33D62224FE5D3600 /* RDLChartAxisEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLChartAxisEditor.h; sourceTree = "<group>"; };
+		114630EAD5AD1115915A8A45 /* RDLChartAxisEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLChartAxisEditor.m; sourceTree = "<group>"; };
+		2F760DDC80E5D6F4FBD9AFAB /* RDLChartAxisEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLChartAxisEditor.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -771,6 +778,9 @@
 				7E5E5F58C969B5A7DEF443E7 /* RDLSortEditor.h */,
 				B7101AF559A1B2E71FB9E949 /* RDLSortEditor.m */,
 				AC8C55E8D0F561AA622034D4 /* RDLSortEditor.xib */,
+				BA46416E33D62224FE5D3600 /* RDLChartAxisEditor.h */,
+				114630EAD5AD1115915A8A45 /* RDLChartAxisEditor.m */,
+				2F760DDC80E5D6F4FBD9AFAB /* RDLChartAxisEditor.xib */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1145,6 +1155,7 @@
 				0177C034AE8CBD8251E87809 /* RDLNewReportPanel.xib in Resources */,
 				B2118CE5F9C4BC6478D55FEA /* RDLAddElementPanel.xib in Resources */,
 				B8CE160B4A969BFF141D4259 /* RDLSortEditor.xib in Resources */,
+				99C25BEADA04CDD05900E098 /* RDLChartAxisEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1179,6 +1190,7 @@
 				93DDFA3148BCE38AF05CC8AA /* RDLNewReportPanel.xib in Resources */,
 				72801F4D5A77D7B30B27500A /* RDLDesigner.icns in Resources */,
 				BC143CE8101074A035A8C43C /* RDLSortEditor.xib in Resources */,
+				CCCB9775AB6E8A78015C2DBB /* RDLChartAxisEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1266,6 +1278,7 @@
 				D2C4D4627A54694089CA5C42 /* RDLNewReportPanel.m in Sources */,
 				EFC61084F4F6199B75B9345F /* RDLPlainTextEdit.m in Sources */,
 				190FB5F1BEE4CCA14031CC23 /* RDLSortEditor.m in Sources */,
+				86A53228FA1051CFC103B5B1 /* RDLChartAxisEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1335,6 +1348,7 @@
 				C00014D4136BD4D999A82A59 /* RDLNewReportPanel.m in Sources */,
 				5BA5D296146818514FC6785F /* RDLPlainTextEdit.m in Sources */,
 				B90735937B31CB99BA00920A /* RDLSortEditor.m in Sources */,
+				677D302CAC9A8567428F0B38 /* RDLChartAxisEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
