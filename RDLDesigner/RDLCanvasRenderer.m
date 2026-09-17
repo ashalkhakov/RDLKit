@@ -302,6 +302,12 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
     for (RDLItem *it in RDLItemsInPaintOrder(bf.band.items))
       [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
   }
+  // What the drag is lining itself up with, over the items it runs across.
+  for (NSValue *guide in overlay.guides) {
+    [[NSColor colorWithCalibratedRed:0.85 green:0.30 blue:0.45 alpha:0.9] set];
+    NSRect line = [guide rectValue];
+    NSRectFill(NSMakeRect(NSMinX(line), NSMinY(line), MAX(NSWidth(line), 1), MAX(NSHeight(line), 1)));
+  }
   // The box being drawn to take hold of several items, over everything it is
   // being drawn across.
   if (!NSIsEmptyRect(overlay.marqueeRect)) {

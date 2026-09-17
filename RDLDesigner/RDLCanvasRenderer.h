@@ -32,6 +32,9 @@
 // The box being drawn across the canvas to take hold of several items at once,
 // in model space; empty when none is being drawn.
 @property (nonatomic, assign) NSRect marqueeRect;
+// The lines a drag is currently lining itself up with, each a rect one unit
+// thick; empty when nothing is being dragged into line.
+@property (nonatomic, copy) NSArray<NSValue *> *guides;
 @end
 
 @interface RDLCanvasRenderer : NSObject

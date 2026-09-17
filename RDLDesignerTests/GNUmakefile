@@ -52,6 +52,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLCodeEditor.m \
   ../RDLDesigner/RDLStylePanel.m \
   ../RDLDesigner/RDLProblemsView.m \
+  ../RDLDesigner/RDLSnapGuides.m \
   ../RDLDesigner/RDLChartAxisEditor.m \
   ../RDLDesigner/RDLChartSeriesEditor.m \
   ../RDLDesigner/RDLGroupPropertiesEditor.m \

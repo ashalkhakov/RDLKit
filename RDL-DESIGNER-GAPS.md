@@ -504,8 +504,9 @@ report-wide errors pane.
 
 Done: the errors pane, as the left pane's Problems tab; multi-select
 with Shift-click and a marquee, moved, nudged and deleted together,
-with align, make-same-size and distribute in the Edit menu. Eight
-handles, smart guides and snap size are still to come.
+with align, make-same-size and distribute in the Edit menu; eight
+handles; smart guides, which line a drag up with the edges, middles and
+sizes near it.
 
 ### P3 — matches the engine's P3
 

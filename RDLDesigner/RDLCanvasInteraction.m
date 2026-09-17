@@ -2,6 +2,7 @@
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
+#import "RDLSnapGuides.h"
 
 @implementation RDLCanvasInteraction {
   RDLEditingContext *_ctx;
@@ -41,7 +42,19 @@
   NSRect _marqueeRect;
   NSString *_marqueeBand;
   BOOL _marqueeAdds;
+  // The lines this drag is lining itself up with, and the boxes it is lining
+  // itself up against -- read once when the drag begins, since they do not
+  // move while it is going on.
+  NSArray<NSValue *> *_guides;
+  NSArray<NSValue *> *_neighbours;
+  // Where the item was on the canvas when the drag began. The neighbours are
+  // in the canvas's own coordinates, and an item's Left and Top are its band's,
+  // so lining the two up is done in the canvas's.
+  NSRect _dragRect;
 }
+
+// How near a line has to be before a drag takes it, in model points.
+static const CGFloat kRDLSnapTolerance = 5.0;
 
 // The smallest box a drag makes, in inches, so a grip pulled past the far edge
 // does not turn the item inside out. The editor clamps the result again, to
@@ -192,6 +205,10 @@ static BOOL RDLEventToggles(NSEvent *event) {
     _origH = hit.height;
     // Everything a move drag carries, and where each of them started.
     _dragItems = [_ctx.selection.items copy] ?: @[];
+    // What this drag lines itself up against: the band's other items, and the
+    // band itself.
+    _neighbours = [[_host interactionGeometry] rectsInBandWithKey:bandKey besides:_dragItems];
+    _dragRect = itemRect;
     NSMutableArray<NSValue *> *origins = [NSMutableArray array];
     for (RDLItem *item in _dragItems)
       [origins addObject:[NSValue valueWithPoint:NSMakePoint(item.left, item.top)]];
@@ -247,17 +264,34 @@ static BOOL RDLEventToggles(NSEvent *event) {
     _marqueeRect = RDLRectBetween(_dragStart, p);
     [_host interactionNeedsRedraw];
   } else if ([_dragKind isEqualToString:@"move"]) {
-    // Every item selected, each from where it was when the drag began.
+    // Where the item being dragged would land, lined up with what is near it;
+    // whatever it takes, the rest of the selection follows by the same step.
+    NSRect wanted = NSOffsetRect(_dragRect, dx * RDLPointsPerInch, dy * RDLPointsPerInch);
+    RDLSnapResult *snap = RDLSnapMovedRect(wanted, _neighbours, kRDLSnapTolerance);
+    _guides = snap.guides;
+    CGFloat sdx = dx + (NSMinX(snap.rect) - NSMinX(wanted)) / RDLPointsPerInch;
+    CGFloat sdy = dy + (NSMinY(snap.rect) - NSMinY(wanted)) / RDLPointsPerInch;
     for (NSUInteger i = 0; i < [_dragItems count] && i < [_dragOrigins count]; i++) {
       NSPoint was = [_dragOrigins[i] pointValue];
-      [_ctx.editor moveItem:_dragItems[i] toLeft:was.x + dx top:was.y + dy];
+      [_ctx.editor moveItem:_dragItems[i] toLeft:was.x + sdx top:was.y + sdy];
     }
+    [_host interactionNeedsRedraw];
   }
   else if ([RDLHandleKinds() containsObject:_dragKind]) {
     // The box the grip makes, in inches: a corner moves two edges, a side one,
     // and the ones on the top and the left move the item as they resize it.
     NSRect was = NSMakeRect(_origLeft, _origTop, _origW, _origH);
     NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy), kRDLLeastItemSize);
+    // Lined up with the edges near it, or made the same size as a neighbour.
+    // In the canvas's coordinates, where the neighbours are, and back again.
+    NSRect inCanvas = NSMakeRect(NSMinX(_dragRect) + (NSMinX(now) - _origLeft) * RDLPointsPerInch,
+                                 NSMinY(_dragRect) + (NSMinY(now) - _origTop) * RDLPointsPerInch,
+                                 NSWidth(now) * RDLPointsPerInch, NSHeight(now) * RDLPointsPerInch);
+    RDLSnapResult *snap = RDLSnapSizedRect(inCanvas, _dragKind, _neighbours, kRDLSnapTolerance);
+    _guides = snap.guides;
+    now = NSMakeRect(_origLeft + (NSMinX(snap.rect) - NSMinX(_dragRect)) / RDLPointsPerInch,
+                     _origTop + (NSMinY(snap.rect) - NSMinY(_dragRect)) / RDLPointsPerInch,
+                     NSWidth(snap.rect) / RDLPointsPerInch, NSHeight(snap.rect) / RDLPointsPerInch);
     RDLItem *item = [_ctx selectedItem];
     if (NSMinX(now) != NSMinX(was) || NSMinY(now) != NSMinY(was))
       [_ctx.editor moveItem:item toLeft:NSMinX(now) top:NSMinY(now)];
@@ -336,6 +370,10 @@ static BOOL RDLEventToggles(NSEvent *event) {
   }
   _dragKind = nil;
   _dragActive = NO;
+  if ([_guides count]) {
+    _guides = @[];
+    [_host interactionNeedsRedraw];
+  }
   if (_pendingEditItem && [event clickCount] >= 2) {
     // Begin the edit now the event sequence is over: starting a field editor
     // inside mouseDown: is unreliable on Cocoa. Re-resolve the rect, since the

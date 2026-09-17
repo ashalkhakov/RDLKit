@@ -1,5 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLDesignerTestSupport.h"
+#import "RDLSnapGuides.h"
+#import "RDLCanvasInteraction.h"
 #import "RDLCanvasRenderer.h"
 #import "RDLCanvasView.h"
 
@@ -764,6 +766,105 @@ paperOrigin:NSMakePoint(0, 0)];
   [ctx.document.undoManager undo];
   if (fabs(item.left - 1) > 0.001 || fabs(item.width - 2) > 0.001)
     XCTFail(@"%@", @"one undo should put the box back");
+}
+
+
+// Smart guides: a box dragged near another's edge or middle lines up with it,
+// and a box sized near another's size takes that size.
+- (void)testDragsLineUpWithWhatIsNearThem {
+  NSArray<NSValue *> *others = @[
+    [NSValue valueWithRect:NSMakeRect(100, 100, 80, 40)],   // left 100, middle 140, right 180
+    [NSValue valueWithRect:NSMakeRect(300, 400, 120, 60)],  // a second box, further off
+  ];
+  // Near the first box's left edge: it takes it, and says so with a line.
+  RDLSnapResult *left = RDLSnapMovedRect(NSMakeRect(103, 250, 50, 20), others, 5);
+  if (!left.snapped || fabs(NSMinX(left.rect) - 100) > 0.001 || [left.guides count] != 1)
+    XCTFail(@"the box should line up with the left edge, sits at %g with %lu lines",
+            NSMinX(left.rect), (unsigned long)[left.guides count]);
+  NSRect line = [[left.guides firstObject] rectValue];
+  if (fabs(NSMinX(line) - 100) > 0.001 || NSHeight(line) < 100)
+    XCTFail(@"the line should run down the edge they share: %@", NSStringFromRect(line));
+  // Its size is not changed by lining it up.
+  if (fabs(NSWidth(left.rect) - 50) > 0.001 || fabs(NSHeight(left.rect) - 20) > 0.001)
+    XCTFail(@"%@", @"lining up should not resize the box");
+  // Middles line up too, and the nearer line wins.
+  RDLSnapResult *middle = RDLSnapMovedRect(NSMakeRect(113, 250, 50, 20), others, 5);
+  if (fabs(NSMidX(middle.rect) - 140) > 0.001)
+    XCTFail(@"the middles should meet, sits at %g", NSMidX(middle.rect));
+  // Too far off, and nothing moves.
+  RDLSnapResult *far = RDLSnapMovedRect(NSMakeRect(200, 250, 50, 20), others, 5);
+  if (far.snapped || fabs(NSMinX(far.rect) - 200) > 0.001 || [far.guides count])
+    XCTFail(@"%@", @"a box away from everything should be left where it is");
+  // Both axes at once.
+  RDLSnapResult *both = RDLSnapMovedRect(NSMakeRect(102, 98, 50, 20), others, 5);
+  if (fabs(NSMinX(both.rect) - 100) > 0.001 || fabs(NSMinY(both.rect) - 100) > 0.001 ||
+      [both.guides count] != 2)
+    XCTFail(@"%@", @"a corner should line up both ways, with a line each");
+
+  // Sizing: the dragged edge meets the edge beside it.
+  RDLSnapResult *edge = RDLSnapSizedRect(NSMakeRect(20, 100, 78, 40), RDLHandleEast, others, 5);
+  if (fabs(NSMaxX(edge.rect) - 100) > 0.001 || fabs(NSMinX(edge.rect) - 20) > 0.001)
+    XCTFail(@"the right edge should meet the box beside it: %@", NSStringFromRect(edge.rect));
+  // Or, with no edge near, the size matches a neighbour's: 82 wide is near 80.
+  RDLSnapResult *size = RDLSnapSizedRect(NSMakeRect(500, 600, 82, 40), RDLHandleEast, others, 5);
+  if (!size.snapped || fabs(NSWidth(size.rect) - 80) > 0.001 || fabs(NSMinX(size.rect) - 500) > 0.001)
+    XCTFail(@"the box should take the neighbour's width: %@", NSStringFromRect(size.rect));
+  // A west drag that matches a size moves the left edge, not the right.
+  RDLSnapResult *west = RDLSnapSizedRect(NSMakeRect(500, 600, 82, 40), RDLHandleWest, others, 5);
+  if (fabs(NSWidth(west.rect) - 80) > 0.001 || fabs(NSMaxX(west.rect) - 582) > 0.001)
+    XCTFail(@"a west drag should keep the right edge: %@", NSStringFromRect(west.rect));
+}
+
+// On the canvas: dragging one box past another's left edge lines the two up,
+// and the guide is shown while the mouse is down and gone when it is up.
+- (void)testDraggingOnTheCanvasLinesUpWithNeighbours {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Guides"];
+  RDLTextbox *fixed = [[RDLTextbox alloc] init];
+  fixed.name = @"Fixed";
+  fixed.left = 2;
+  fixed.top = 1;
+  fixed.width = 1;
+  fixed.height = 0.5;
+  RDLTextbox *moving = [[RDLTextbox alloc] init];
+  moving.name = @"Moving";
+  moving.left = 0.5;
+  moving.top = 3;
+  moving.width = 1;
+  moving.height = 0.5;
+  [report.body.items addObjectsFromArray:@[ fixed, moving ]];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 1200, 1200) context:ctx];
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1200, 1200)
+                                                 styleMask:NSTitledWindowMask
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:YES];
+  [[window contentView] addSubview:canvas];
+  NSEvent *(^at)(NSPoint, NSEventType) = ^NSEvent *(NSPoint p, NSEventType type) {
+    return [NSEvent mouseEventWithType:type
+                              location:[canvas convertPoint:NSMakePoint(p.x * ctx.zoom, p.y * ctx.zoom) toView:nil]
+                         modifierFlags:0
+                             timestamp:0
+                          windowNumber:[window windowNumber]
+                               context:nil
+                           eventNumber:0
+                            clickCount:1
+                              pressure:1];
+  };
+  NSRect rect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:moving rect:&rect];
+  NSPoint grab = NSMakePoint(NSMidX(rect), NSMidY(rect));
+  // A hair short of lining the two up: 1.47in across, not 1.5.
+  CGFloat nearly = 1.47 * RDLPointsPerInch;
+  [canvas mouseDown:at(grab, NSEventTypeLeftMouseDown)];
+  [canvas mouseDragged:at(NSMakePoint(grab.x + nearly, grab.y), NSEventTypeLeftMouseDragged)];
+  RDLCanvasInteraction *interaction = [canvas valueForKey:@"interaction"];
+  if ([interaction.guides count] == 0)
+    XCTFail(@"%@", @"a drag into line should show the line it met");
+  if (fabs(moving.left - 2.0) > 0.001)
+    XCTFail(@"the box should have taken the other's left edge, sits at %g", moving.left);
+  [canvas mouseUp:at(NSMakePoint(grab.x + nearly, grab.y), NSEventTypeLeftMouseUp)];
+  if ([interaction.guides count])
+    XCTFail(@"%@", @"the lines should go when the mouse comes up");
 }
 
 @end

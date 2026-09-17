@@ -296,6 +296,7 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
   _overlay.dragColumnTarget = _interaction.dragColumnTarget;
   _overlay.editingItem = _inPlaceEditor.editingItem;
   _overlay.marqueeRect = _interaction.marqueeRect;
+  _overlay.guides = _interaction.guides;
   [_renderer drawGeometry:[self geometry] overlay:_overlay bounds:self.bounds];
 }
 

@@ -313,6 +313,8 @@
 		B6B7CD157690D1986C0E45A1 /* RDLProblemsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */; };
 		B5B8648EE3C969F76D5931E7 /* RDLProblemsView.m in Sources */ = {isa = PBXBuildFile; fileRef = F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */; };
 		3909301127020DFAF9384DB2 /* RDLProblemsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */; };
+		FAF060289BBF517A5AF5CDD7 /* RDLSnapGuides.m in Sources */ = {isa = PBXBuildFile; fileRef = D10AEECB8A8EBBE4052E6CA6 /* RDLSnapGuides.m */; };
+		727DE1D856A7E50C0397C1AC /* RDLSnapGuides.m in Sources */ = {isa = PBXBuildFile; fileRef = D10AEECB8A8EBBE4052E6CA6 /* RDLSnapGuides.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -654,6 +656,8 @@
 		2E114B48550391EB427D2967 /* RDLProblemsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLProblemsView.h; sourceTree = "<group>"; };
 		F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLProblemsView.m; sourceTree = "<group>"; };
 		13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLProblemsView.xib; sourceTree = "<group>"; };
+		0EA69DA6B4FA9432E9F1555A /* RDLSnapGuides.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSnapGuides.h; sourceTree = "<group>"; };
+		D10AEECB8A8EBBE4052E6CA6 /* RDLSnapGuides.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLSnapGuides.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -880,6 +884,8 @@
 				2E114B48550391EB427D2967 /* RDLProblemsView.h */,
 				F6C7D406C6D1E96623D9934B /* RDLProblemsView.m */,
 				13C698A2755FE4A09FC1EBC8 /* RDLProblemsView.xib */,
+				0EA69DA6B4FA9432E9F1555A /* RDLSnapGuides.h */,
+				D10AEECB8A8EBBE4052E6CA6 /* RDLSnapGuides.m */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1418,6 +1424,7 @@
 				5C5DA4998CE2C8EE0335C889 /* RDLCodeEditor.m in Sources */,
 				8B562660F1ED9721D7672B15 /* RDLStylePanel.m in Sources */,
 				A94D5ADEA56B3F6E6C89B9F4 /* RDLProblemsView.m in Sources */,
+				FAF060289BBF517A5AF5CDD7 /* RDLSnapGuides.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1497,6 +1504,7 @@
 				CD435E0DBE4DAC360B27EC72 /* RDLCodeEditor.m in Sources */,
 				FB5180CD8C03DBD53D549D68 /* RDLStylePanel.m in Sources */,
 				B5B8648EE3C969F76D5931E7 /* RDLProblemsView.m in Sources */,
+				727DE1D856A7E50C0397C1AC /* RDLSnapGuides.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

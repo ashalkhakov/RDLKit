@@ -146,6 +146,11 @@ FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
 // the rectangle.
 - (NSArray<RDLItem *> *)itemsIntersectingRect:(NSRect)rect inBandWithKey:(NSString *)bandKey;
 
+// The boxes of a band's items, less those given, as NSValues: what a drag
+// lines itself up against, and the band's own frame, which is a line to meet
+// as much as any item's edge is.
+- (NSArray<NSValue *> *)rectsInBandWithKey:(NSString *)bandKey besides:(NSArray<RDLItem *> *)items;
+
 // Every tablix in the report, paired with its rect — including ones nested in
 // a Rectangle, which the old per-band scan missed.
 - (NSArray<RDLItem *> *)tablixItemsWithRects:(NSArray<NSValue *> **)outRects;

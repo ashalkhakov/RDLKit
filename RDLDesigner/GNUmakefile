@@ -48,6 +48,7 @@ RDLDesigner_OBJC_FILES = \
   RDLCodeEditor.m \
   RDLStylePanel.m \
   RDLProblemsView.m \
+  RDLSnapGuides.m \
   RDLChartAxisEditor.m \
   RDLChartSeriesEditor.m \
   RDLGroupPropertiesEditor.m \

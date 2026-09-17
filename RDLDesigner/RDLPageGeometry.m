@@ -395,6 +395,20 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p, BOOL hasHandles) {
   return found;
 }
 
+- (NSArray<NSValue *> *)rectsInBandWithKey:(NSString *)bandKey besides:(NSArray<RDLItem *> *)items {
+  NSMutableArray<NSValue *> *rects = [NSMutableArray array];
+  for (RDLBandFrame *bf in _bandFrames) {
+    if (![bf.bandKey isEqualToString:bandKey])
+      continue;
+    [rects addObject:[NSValue valueWithRect:bf.frame]];
+    NSPoint origin = NSMakePoint(NSMinX(bf.frame), NSMinY(bf.frame));
+    for (RDLItem *item in bf.band.items)
+      if ([items indexOfObjectIdenticalTo:item] == NSNotFound)
+        [rects addObject:[NSValue valueWithRect:[self rectForItem:item origin:origin]]];
+  }
+  return rects;
+}
+
 - (NSString *)bandKeyAtPoint:(NSPoint)point {
   for (RDLBandFrame *bf in _bandFrames) {
     if (NSPointInRect(point, bf.frame))

@@ -40,6 +40,8 @@
 // The box being drawn across the canvas to take hold of several items, in
 // model space; empty when none is being drawn.
 @property (nonatomic, readonly, assign) NSRect marqueeRect;
+// The lines the drag in progress is lining itself up with; empty otherwise.
+@property (nonatomic, readonly, copy) NSArray<NSValue *> *guides;
 
 - (void)mouseDown:(NSEvent *)event;
 - (void)mouseDragged:(NSEvent *)event;
