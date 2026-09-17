@@ -4,9 +4,10 @@ LIBRARY_NAME = RDLKit
 RDLKit_NEEDS_GUI = yes
 RDLKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
 RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
-# The Visual Basic implementation -- the expression language, the report's
-# code, and the runtime library both call -- is a directory of its own.
-RDLKit_INCLUDE_DIRS += -IVisualBasic
+# MiniVB, the subset of Visual Basic that RDL expressions and a report's Code
+# need -- not a Visual Basic -- with the runtime library both call, is a
+# directory of its own.
+RDLKit_INCLUDE_DIRS += -IMiniVB
 RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \
@@ -43,8 +44,8 @@ RDLKit_OBJC_FILES = \
   RDLZipArchive.m \
   RDLDocxReader.m \
   RDLImporter.m \
-  VisualBasic/RDLExpression.m \
-  VisualBasic/RDLExpressionCatalog.m \
+  MiniVB/RDLExpression.m \
+  MiniVB/RDLExpressionCatalog.m \
   RDLLayoutEngine.m \
   RDLView.m \
   RDLHTMLBackend.m \
@@ -57,28 +58,28 @@ RDLKit_OBJC_FILES = \
   RDLCSVDataProvider.m \
   RDLSubreportLoader.m \
   RDLTextAttributes.m \
-  VisualBasic/RDLValueBoxing.m \
-  VisualBasic/RDLConversions.m \
-  VisualBasic/RDLReferences.m \
-  VisualBasic/RDLAggregates.m \
-  VisualBasic/RDLDateFormats.m \
-  VisualBasic/RDLVisualBasicText.m \
-  VisualBasic/RDLVisualBasicDates.m \
-  VisualBasic/RDLFunctionTable.m \
-  VisualBasic/RDLDotNetMembers.m \
-  VisualBasic/RDLForms.m \
+  MiniVB/RDLValueBoxing.m \
+  MiniVB/RDLConversions.m \
+  MiniVB/RDLReferences.m \
+  MiniVB/RDLAggregates.m \
+  MiniVB/RDLDateFormats.m \
+  MiniVB/RDLVisualBasicText.m \
+  MiniVB/RDLVisualBasicDates.m \
+  MiniVB/RDLFunctionTable.m \
+  MiniVB/RDLDotNetMembers.m \
+  MiniVB/RDLForms.m \
   RDLReferenceSites.m \
-  VisualBasic/RDLCompiler.m \
-  VisualBasic/RDLVirtualMachine.m \
+  MiniVB/RDLCompiler.m \
+  MiniVB/RDLVirtualMachine.m \
   RDLBorderPainter.m \
   RDLLinePainter.m \
   RDLMarkup.m \
-  VisualBasic/RDLCode.m \
-  VisualBasic/RDLCodeAST.m \
-  VisualBasic/RDLCodeParser.m \
-  VisualBasic/RDLExpressionParser.m \
+  MiniVB/RDLCode.m \
+  MiniVB/RDLCodeAST.m \
+  MiniVB/RDLCodeParser.m \
+  MiniVB/RDLExpressionParser.m \
   RDLParameterValues.m \
-  VisualBasic/RDLNumber.m \
+  MiniVB/RDLNumber.m \
   RDLDataEvaluation.m
 
 # The app, instrumented. "corrupted double-linked list" is reported by whatever
@@ -112,16 +113,16 @@ endif
 include $(GNUSTEP_MAKEFILES)/library.make
 
 # The language's public headers, installed beside the rest rather than in a
-# VisualBasic directory: RDLKit.h imports them by name, as the Xcode
+# MiniVB directory: RDLKit.h imports them by name, as the Xcode
 # framework, which flattens its headers, has them.
-VISUAL_BASIC_PUBLIC_HEADERS = RDLExpression.h RDLExpressionCatalog.h RDLNumber.h RDLValueBoxing.h
+MINIVB_PUBLIC_HEADERS = RDLExpression.h RDLExpressionCatalog.h RDLNumber.h RDLValueBoxing.h
 
 after-install::
-	$(ECHO_NOTHING)for file in $(VISUAL_BASIC_PUBLIC_HEADERS); do \
-	  $(INSTALL_DATA) VisualBasic/$$file $(GNUSTEP_HEADERS)/RDLKit/$$file; \
+	$(ECHO_NOTHING)for file in $(MINIVB_PUBLIC_HEADERS); do \
+	  $(INSTALL_DATA) MiniVB/$$file $(GNUSTEP_HEADERS)/RDLKit/$$file; \
 	done$(END_ECHO)
 
 after-uninstall::
-	$(ECHO_NOTHING)for file in $(VISUAL_BASIC_PUBLIC_HEADERS); do \
+	$(ECHO_NOTHING)for file in $(MINIVB_PUBLIC_HEADERS); do \
 	  rm -f $(GNUSTEP_HEADERS)/RDLKit/$$file; \
 	done$(END_ECHO)

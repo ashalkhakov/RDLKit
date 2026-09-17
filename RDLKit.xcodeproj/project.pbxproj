@@ -874,7 +874,7 @@
 			path = RDLDesigner;
 			sourceTree = "<group>";
 		};
-		C0DE00000000000000001D00 /* VisualBasic */ = {
+		C0DE00000000000000001D00 /* MiniVB */ = {
 			isa = PBXGroup;
 			children = (
 				1B73D39AEAC5AB3BBF0BBAEF /* RDLExpression.h */,
@@ -906,13 +906,13 @@
 				95A8B34909A04C506A2DE623 /* RDLDotNetMembers.m */,
 				6A4E5F6E1A14E1FF0FCE8CD9 /* RDLForms.m */,
 			);
-			path = VisualBasic;
+			path = MiniVB;
 			sourceTree = "<group>";
 		};
 		45316B45CB436116EC434408 /* RDLKit */ = {
 			isa = PBXGroup;
 			children = (
-				C0DE00000000000000001D00 /* VisualBasic */,
+				C0DE00000000000000001D00 /* MiniVB */,
 				03EB33FD7A64B360E76AF94E /* RDLKit.h */,
 				0870B1CA8FCBFEE09BFC85EF /* RDLCompatibility.h */,
 				5B462C812D943AA1A0D5BFDC /* RDLReport.h */,
@@ -1590,7 +1590,7 @@
 				PRODUCT_NAME = RDLDesigner;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 			};
 			name = Release;
@@ -1616,7 +1616,7 @@
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 			};
 			name = Release;
@@ -1644,7 +1644,7 @@
 				PRODUCT_NAME = RDLDesignerTests;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 					"$(SRCROOT)/RDLDesignerTests",
 				);
 			};
@@ -1679,7 +1679,7 @@
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -1709,7 +1709,7 @@
 				PRODUCT_NAME = RDLDesignerTests;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 					"$(SRCROOT)/RDLDesignerTests",
 				);
 			};
@@ -1768,7 +1768,7 @@
 				PRODUCT_NAME = RDLDesigner;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 			};
 			name = Debug;
@@ -1822,7 +1822,7 @@
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 			};
 			name = Debug;
@@ -1895,7 +1895,7 @@
 				SKIP_INSTALL = YES;
 				USER_HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/RDLKit",
-					"$(SRCROOT)/RDLKit/VisualBasic",
+					"$(SRCROOT)/RDLKit/MiniVB",
 				);
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";

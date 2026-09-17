@@ -104,12 +104,12 @@ A `Subreport` renders another report inside this one. The element carries a `Rep
 | Class | Role |
 | --- | --- |
 | `RDLParser` / `RDLWriter` | RDL 2010 XML ↔ `RDLReport` |
-| `RDLExpression` (in `VisualBasic/`) | VB-style expressions: tokenize → AST → bytecode → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
+| `RDLExpression` (in `MiniVB/`) | VB-style expressions: tokenize → AST → bytecode → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
 | `RDLLayoutEngine` | Banded pages + tablix expansion → laid-out elements |
 | `RDLView` | Flipped `NSView`; stacked pages; PDF from pages |
 | `RDLPDFBackend` | PDF backend (`renderPages:`) |
 | `RDLHTMLBackend` | HTML backend (`renderPages:` / `HTMLStringForPages:`) |
-| `RDLCode` (in `VisualBasic/`) | The report's `Code`: VB functions parsed and compiled for the same VM as expressions. `VisualBasic/` holds the whole language -- lexer, parsers, compiler, VM, runtime library, `RDLNumber` -- and GNUstep builds it with `-IVisualBasic` |
+| `RDLCode` (in `MiniVB/`) | The report's `Code`: VB functions parsed and compiled for the same VM as expressions. `MiniVB/` is the subset of Visual Basic that RDL needs, not a Visual Basic: lexer, parsers, compiler, VM, runtime library and `RDLNumber`. GNUstep builds it with `-IMiniVB` |
 | `RDLUpgrader` | 2003 → 2005 → 2008 → 2010 → 2016, one migration at a time (`RDLMigration<year>.m`), in place on read, the way SSRS upgrades an older report — so the model only knows one shape |
 | `RDLChecker` / `RDLDataContract` | Static checking with no data bound, and the data shape a report needs, described in Objective-C terms |
 | `RDLChartRenderer` | A chart as plain shapes, shared by both backends and the designer canvas |
