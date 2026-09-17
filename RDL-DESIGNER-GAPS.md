@@ -289,7 +289,8 @@ not yet keep that.
 | Per-cell `Style` (borders, background, padding) | UI | All of it works through the in-cell textbox, which is where MS-RDL keeps it: `TablixCell` has no `Style` of its own, so the text section -- background, padding and the Borders… panel -- is what styles a cell (P1.1). An empty cell holds no item and so has nothing to style until something is put in it. Kept by every edit. |
 | Merged cells (`ColSpan`/`RowSpan`) | Done | Merge with the cell to the right or below, and Split Cell, on the canvas; kept and carried across column and row edits. A merge stays within plain rows or columns under one parent. |
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `KeepTogether` | Done | In Group Properties, applied with the name, expressions and filters as one step; sorting through a panel shared with the tablix. |
-| Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData`; group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. What a member row does is Report Builder's Advanced Mode row pane, which the designer does not have. |
+| Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData` | Done | For a row that is no group's, in the canvas's This Row menu; a column's are not offered yet. |
+| Group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. |
 | Details `SortExpressions` | Done (engine FULL) | Through the details group's Group Properties, when the details group is named, as Report Builder names it. |
 | Row heights other than the heading and value rows | Done | The cell section's Row height, for the row the selected cell is in. |
 | Rows inserted or deleted on their own | Done | Insert Row Above/Below and Delete Row on the canvas, beside the row clicked and inside its group; a group's own row goes with the group. |

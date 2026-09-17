@@ -168,6 +168,9 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // A row on its own, as tall as the row it goes beside; and one taken away.
 - (BOOL)insertTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
 - (BOOL)removeTablixRowAtIndex:(NSUInteger)index ofTablix:(RDLTablix *)tablix;
+// One setting of a member of the tablix's hierarchies -- repeatOnNewPage,
+// keepWithGroup and the like -- as one step. NO when it is that already.
+- (BOOL)setValue:(id)value forKey:(NSString *)key ofMember:(RDLTablixMember *)member ofTablix:(RDLTablix *)tablix;
 // Merged cells, as RDLTablixStructure has them, each one step.
 - (BOOL)mergeTablixCellAtRow:(NSUInteger)row
                       column:(NSUInteger)column

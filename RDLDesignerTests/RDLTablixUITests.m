@@ -861,6 +861,46 @@
   (void)before;
 }
 
+// What a plain row does -- repeat on each page, stay with its group, hide
+// when the group is empty -- set on its member as one step each.
+- (void)testARowsOwnSettingsAreSet {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLTablixMember *heading = [[tablix.rowHierarchy leafMembers] firstObject];
+  if ([heading.groupName length]) {
+    XCTFail(@"%@", @"the sample's first row should be its heading, no group's");
+    return;
+  }
+  BOOL repeats = !heading.repeatOnNewPage;
+  if (![ctx.editor setValue:@(repeats) forKey:@"repeatOnNewPage" ofMember:heading ofTablix:tablix] ||
+      heading.repeatOnNewPage != repeats)
+    XCTFail(@"%@", @"the heading's repeating should change");
+  if ([ctx.editor setValue:@(repeats) forKey:@"repeatOnNewPage" ofMember:heading ofTablix:tablix])
+    XCTFail(@"%@", @"setting what is already so is not an edit");
+  [ctx.editor setValue:@(RDLKeepWithGroupAfter) forKey:@"keepWithGroup" ofMember:heading ofTablix:tablix];
+  [ctx.editor setValue:@YES forKey:@"hideIfNoRows" ofMember:heading ofTablix:tablix];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTablix *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      saved = (RDLTablix *)it;
+  RDLTablixMember *savedHeading = [[saved.rowHierarchy leafMembers] firstObject];
+  if (savedHeading.repeatOnNewPage != repeats || savedHeading.keepWithGroup != RDLKeepWithGroupAfter ||
+      !savedHeading.hideIfNoRows)
+    XCTFail(@"%@", @"the row's settings should survive a save");
+  // Undo puts the tablix back from before, as new members.
+  [ctx.document.undoManager undo];
+  if ([[tablix.rowHierarchy leafMembers] firstObject].hideIfNoRows)
+    XCTFail(@"%@", @"undo should take the last setting back");
+  RDLTablixMember *stranger = [[RDLTablixMember alloc] init];
+  if ([ctx.editor setValue:@YES forKey:@"repeatOnNewPage" ofMember:stranger ofTablix:tablix])
+    XCTFail(@"%@", @"a member of no hierarchy of this tablix is not set");
+}
+
 // The dialog edits a copy with the edits the canvas makes, so OK keeps what
 // the dialog has no column for -- a merged heading, a cell's own background --
 // and is one undo; Cancel leaves everything as it was, a group's filters

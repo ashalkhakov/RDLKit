@@ -29,6 +29,9 @@
 // A total's side, and whether a deleted group's rows or columns go with it.
 @property (nonatomic, assign) BOOL after;
 @property (nonatomic, assign) BOOL withLines;
+// A setting of the member's own, and what it is to become.
+@property (nonatomic, copy) NSString *settingKey;
+@property (nonatomic, strong) id settingValue;
 @end
 
 // A cell's body row and column, in one menu item tag.
@@ -472,6 +475,8 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
                                 : nil;
     if ([tab.tablixBody.rows count] > 1 && [leaf.groupName length] == 0)
       [m addItem:[self tablixMenuItem:@"Delete Row" action:@selector(ctxDeleteRow:) tag:bodyRow]];
+    if (leaf != nil && [leaf.groupName length] == 0)
+      [m addItem:[self rowSettingsItemForMember:leaf tablix:tab]];
     [m addItem:[NSMenuItem separatorItem]];
   }
   if (gridRow >= 0 && gridColumn >= 0) {
@@ -498,6 +503,48 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
   for (NSMenuItem *mi in [m itemArray])
     [mi setRepresentedObject:tab];
   return m;
+}
+
+// What a row that is no group's does, as Report Builder's Advanced Mode sets
+// it: repeat on each page, stay with its group, hide when the group is empty,
+// stay in view when scrolled. Each item shows what the row does now.
+- (NSMenuItem *)rowSettingsItemForMember:(RDLTablixMember *)member tablix:(RDLTablix *)tab {
+  NSMenu *sub = [[NSMenu alloc] initWithTitle:@"This Row"];
+  NSMenuItem *(^setting)(NSString *, NSString *, id, BOOL) = ^NSMenuItem *(NSString *title, NSString *key, id value,
+                                                                           BOOL on) {
+    RDLGroupCommand *command = [self commandForMember:member axis:RDLTablixAxisRows tablix:tab];
+    command.settingKey = key;
+    command.settingValue = value;
+    NSMenuItem *mi = [self groupCommandItem:title action:@selector(ctxSetRowSetting:) command:command];
+    [mi setState:on ? NSOnState : NSOffState];
+    return mi;
+  };
+  [sub addItem:setting(@"Repeat on Each Page", @"repeatOnNewPage", @(!member.repeatOnNewPage),
+                       member.repeatOnNewPage)];
+  [sub addItem:setting(@"Hide When the Group Has No Rows", @"hideIfNoRows", @(!member.hideIfNoRows),
+                       member.hideIfNoRows)];
+  [sub addItem:setting(@"Keep in View When Scrolled", @"fixedData", @(!member.fixedData), member.fixedData)];
+  [sub addItem:[NSMenuItem separatorItem]];
+  RDLKeepWithGroup keep = member.keepWithGroup;
+  [sub addItem:setting(@"Not Kept with a Group", @"keepWithGroup", @(RDLKeepWithGroupNone),
+                       keep == RDLKeepWithGroupNone || keep == RDLKeepWithGroupUnspecified)];
+  [sub addItem:setting(@"Kept with the Group Before", @"keepWithGroup", @(RDLKeepWithGroupBefore),
+                       keep == RDLKeepWithGroupBefore)];
+  [sub addItem:setting(@"Kept with the Group After", @"keepWithGroup", @(RDLKeepWithGroupAfter),
+                       keep == RDLKeepWithGroupAfter)];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"This Row" action:NULL keyEquivalent:@""];
+  [item setSubmenu:sub];
+  return item;
+}
+
+- (void)ctxSetRowSetting:(NSMenuItem *)mi {
+  RDLGroupCommand *command = [self groupCommandOfMenuItem:mi];
+  if (command.settingKey == nil)
+    return;
+  [_context.editor setValue:command.settingValue
+                     forKey:command.settingKey
+                   ofMember:command.member
+                   ofTablix:command.tablix];
 }
 
 - (NSMenuItem *)groupCommandItem:(NSString *)title action:(SEL)action command:(RDLGroupCommand *)command {

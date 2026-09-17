@@ -809,6 +809,20 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
                                 }];
 }
 
+- (BOOL)setValue:(id)value forKey:(NSString *)key ofMember:(RDLTablixMember *)member ofTablix:(RDLTablix *)tablix {
+  if (member == nil || [key length] == 0 ||
+      ([tablix.rowHierarchy pathToMember:member] == nil && [tablix.columnHierarchy pathToMember:member] == nil))
+    return NO;
+  return [self changeStructureOfTablix:tablix
+                                action:@"Row Settings"
+                                change:^BOOL {
+                                  if (RDLValuesEqual([member valueForKey:key], value))
+                                    return NO;
+                                  [member setValue:value forKey:key];
+                                  return YES;
+                                }];
+}
+
 - (BOOL)mergeTablixCellAtRow:(NSUInteger)row
                       column:(NSUInteger)column
                        along:(RDLTablixAxis)axis
