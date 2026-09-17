@@ -42,6 +42,7 @@ RDLDesigner_OBJC_FILES = \
   RDLSortEditor.m \
   RDLValueListEditor.m \
   RDLEmbeddedImages.m \
+  RDLEmbeddedImagesEditor.m \
   RDLChartAxisEditor.m \
   RDLChartSeriesEditor.m \
   RDLGroupPropertiesEditor.m \
@@ -99,6 +100,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLFilterEditor.xib \
   RDLSortEditor.xib \
   RDLValueListEditor.xib \
+  RDLEmbeddedImagesEditor.xib \
   RDLChartAxisEditor.xib \
   RDLChartSeriesEditor.xib \
   RDLGroupPropertiesEditor.xib \

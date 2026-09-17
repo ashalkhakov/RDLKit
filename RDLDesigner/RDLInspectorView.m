@@ -14,6 +14,7 @@
 #import "RDLChartSeriesEditor.h"
 #import "RDLValueListEditor.h"
 #import "RDLEmbeddedImages.h"
+#import "RDLEmbeddedImagesEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -115,6 +116,8 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
 // The report's own pictures to show, and what kind a field's bytes are.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
+// The report's own pictures, in a panel of their own.
+@property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton;
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
@@ -880,6 +883,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
     [self fillPaper:report.page];
+    NSUInteger pictures = [report.embeddedImages count];
+    [_embeddedImagesButton setTitle:pictures ? [NSString stringWithFormat:@"Embedded Images (%lu)…",
+                                                                          (unsigned long)pictures]
+                                             : @"Embedded Images…"];
     [self stackBoxes:@[ _docBox, _paperBox ]];
   }
 
@@ -961,6 +968,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [_context.editor setValue:[_imageEmbeddedPop titleOfSelectedItem] forKeyPath:@"value" ofItem:it];
   [self reload];
   return YES;
+}
+
+- (void)editEmbeddedImages:(id)sender {
+  (void)sender;
+  if ([RDLEmbeddedImagesEditor runWithContext:_context])
+    [self reload];
 }
 
 - (void)importImage:(id)sender {

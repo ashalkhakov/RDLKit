@@ -49,6 +49,7 @@
                 <outlet property="imageEmbeddedPop" destination="imageEmbeddedPop" id="imageEmbeddedPopOutlet"/>
                 <outlet property="imageImportButton" destination="imageImportButton" id="imageImportButtonOutlet"/>
                 <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
+                <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
                 <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
@@ -195,7 +196,7 @@
             <point key="canvasLocation" x="140" y="154"/>
         </textField>
         <customView id="docBox">
-            <rect key="frame" x="0.0" y="0.0" width="260" height="334"/>
+            <rect key="frame" x="0.0" y="0.0" width="260" height="362"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl1">
@@ -376,6 +377,17 @@
                         <action selector="changed:" target="-2" id="unitPopAction"/>
                     </connections>
                 </popUpButton>
+                <button toolTip="The pictures kept in the report: import, rename and remove them" id="embeddedImagesButton">
+                    <rect key="frame" x="10" y="334" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Embedded Images…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="embeddedImagesButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editEmbeddedImages:" target="-2" id="embeddedImagesButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
             <point key="canvasLocation" x="140" y="-86"/>
         </customView>

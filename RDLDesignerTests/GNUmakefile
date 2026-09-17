@@ -46,6 +46,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLSortEditor.m \
   ../RDLDesigner/RDLValueListEditor.m \
   ../RDLDesigner/RDLEmbeddedImages.m \
+  ../RDLDesigner/RDLEmbeddedImagesEditor.m \
   ../RDLDesigner/RDLChartAxisEditor.m \
   ../RDLDesigner/RDLChartSeriesEditor.m \
   ../RDLDesigner/RDLGroupPropertiesEditor.m \
@@ -85,6 +86,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLFilterEditor.xib \
   ../RDLDesigner/RDLSortEditor.xib \
   ../RDLDesigner/RDLValueListEditor.xib \
+  ../RDLDesigner/RDLEmbeddedImagesEditor.xib \
   ../RDLDesigner/RDLChartAxisEditor.xib \
   ../RDLDesigner/RDLChartSeriesEditor.xib \
   ../RDLDesigner/RDLGroupPropertiesEditor.xib \

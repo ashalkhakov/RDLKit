@@ -7,6 +7,7 @@
 #import "RDLChartAxisEditor.h"
 #import "RDLChartSeriesEditor.h"
 #import "RDLValueListEditor.h"
+#import "RDLEmbeddedImagesEditor.h"
 
 
 
@@ -1658,6 +1659,63 @@ static NSData *RDLTinyPNG(void) {
       ![saved.value isEqualToString:@"=Fields!Photo.Value"] || ![[back embeddedImageNamed:@"Kiln"].imageData
                                                                      isEqualToData:RDLTinyPNG()])
     XCTFail(@"%@", @"the image and the embedded picture should survive a save");
+  [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
+}
+
+// The report's pictures, in a panel: imported, renamed -- which the images
+// showing one follow -- and removed, as one step; a name a report cannot use,
+// or one two pictures share, refused.
+- (void)testTheEmbeddedImagesPanelKeepsTheReportsPictures {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Pictured"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
+  NSURL *logo = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"logo.png"]];
+  NSURL *seal = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"seal.gif"]];
+  [RDLTinyPNG() writeToURL:logo atomically:YES];
+  [RDLTinyPNG() writeToURL:seal atomically:YES];
+  [ctx addItemOfKind:RDLItemKindImage];
+  RDLImage *image = (RDLImage *)[ctx selectedItem];
+  [inspector importImageFromURL:logo error:NULL];
+  NSString *before = [RDLWriter XMLStringFromReport:report];
+
+  RDLEmbeddedImagesEditor *panel = [RDLEmbeddedImagesEditor editorWithContext:ctx];
+  if (![panel importFromURL:seal error:NULL] || [panel.images count] != 2 ||
+      ![[panel.images[1] mimeType] isEqualToString:@"image/gif"])
+    XCTFail(@"%@", @"the panel should import a second picture");
+  [panel setName:@"seal" atRow:1];
+  [panel setName:@"LOGO" atRow:1];
+  if ([panel apply] || ![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"two pictures of one name, whatever its case, should be refused");
+  [panel setName:@"1st" atRow:1];
+  if ([panel apply])
+    XCTFail(@"%@", @"a name a report cannot use should be refused");
+  [panel setName:@"Seal" atRow:1];
+  [panel setName:@"Letterhead" atRow:0];
+  if (![panel apply] || [report.embeddedImages count] != 2 || ![image.value isEqualToString:@"Letterhead"] ||
+      ![[report embeddedImageNamed:@"Seal"].mimeType isEqualToString:@"image/gif"])
+    XCTFail(@"the pictures should be kept as the panel had them, the image following, shows %@", image.value);
+  [ctx.selection selectReport];
+  if (![[[inspector valueForKey:@"embeddedImagesButton"] title] containsString:@"(2)"])
+    XCTFail(@"%@", @"the report's button should count two pictures");
+  [ctx.document.undoManager undo];
+  if (![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the pictures and the image back");
+  [ctx.document.undoManager redo];
+
+  RDLEmbeddedImagesEditor *again = [RDLEmbeddedImagesEditor editorWithContext:ctx];
+  NSString *kept = [RDLWriter XMLStringFromReport:report];
+  [again apply];
+  [ctx.document.undoManager undo];
+  if ([[RDLWriter XMLStringFromReport:report] isEqualToString:kept])
+    XCTFail(@"%@", @"an untouched panel should record nothing, so undo takes the panel's edit back");
+  [ctx.document.undoManager redo];
+  [again selectRow:1];
+  [again removeImage:nil];
+  if (![again apply] || [report.embeddedImages count] != 1 || [report embeddedImageNamed:@"Seal"] != nil)
+    XCTFail(@"%@", @"removing should leave the letterhead alone");
   [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
 }
 

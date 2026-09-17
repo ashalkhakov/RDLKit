@@ -211,7 +211,7 @@ bin that moved since the previous audit.
 | `QueryParameters` | UI (was MODEL) | Engine FULL. |
 | `CommandType`, `Timeout` | UI (was MODEL) | Round-trip only in the engine. |
 | Collation, case/accent/kana/width sensitivity | UI (was MODEL) | Engine FULL, with a visible effect on grouping and sorting. |
-| Embedded images: add from file, list, delete, rename | UI | Nothing in the designer refers to `embeddedImages`. |
+| Embedded images: add from file, list, delete, rename | Done | See §4.6. |
 
 ### 4.3 Report items — common
 
@@ -255,7 +255,7 @@ bin that moved since the previous audit.
 |---|---|---|
 | Image: pick an embedded image; import a file as embedded | Done | The image's section chooses one of the report's pictures by name, or imports a PNG, JPEG, GIF or BMP file, named after it, as one step. |
 | Image `Source=Database`, `MIMEType`; f(x) on Value | Done | Every source is offered; a field's picture is given its type. |
-| The report's embedded images: list, rename, delete | UI | A rename through the editor carries to the images that show it; no panel yet. |
+| The report's embedded images: list, rename, delete | Done | Embedded Images…, in the report's section: imported, renamed -- the images showing one follow -- and removed, as one step. |
 | Line width, style | — | The canvas draws a line at its border's width, colour and dash, running the way its box says, and the inspector edits all three (P1.1); *as audited* every line was a one-pixel rule along the top of its box, a line with no width -- a vertical one -- drew nothing at all, and the ink field wrote a property nothing read. |
 | Line: the other diagonal | MODEL | |
 | Rectangle padding | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
@@ -478,7 +478,7 @@ In rough order of how often a Report Builder user reaches for it:
    defaults and data-pane entry.
    Done: all of it.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`. Done.
-8. Image: `Database`, `MIMEType`, embedded images panel with file import.
+8. Image: `Database`, `MIMEType`, embedded images panel with file import. Done.
 9. Expressions: live `RDLChecker` in the editor, parser warnings on open,
    completion from the catalogue including `ReportItems!`/`Variables!`/
    `Code.`.
