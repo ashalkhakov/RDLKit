@@ -123,7 +123,7 @@
 
   // Insert into the body, which is where the panel would put it.
   [ctx.selection selectBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Tablix"];
+  [ctx addItemOfKind:RDLItemKindTablix];
   RDLTablix *tablix = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
@@ -148,7 +148,7 @@
   // same insert path, onto a report that now has a dataset nothing has ever
   // put a row in.
   [ctx.selection selectBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]])

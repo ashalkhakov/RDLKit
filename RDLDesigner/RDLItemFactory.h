@@ -2,8 +2,8 @@
 // looks like when it arrives.
 //
 // Three separable kinds of knowledge that used to sit together in the old
-// RDLController: insertion *policy* (a Rectangle may hold simple items but
-// not a data region), insertion *location* (derived from the selection), and
+// RDLController: insertion *policy* (what kinds may go where), insertion
+// *location* (derived from the selection), and
 // new-item *defaults* (a fresh Chart binds the first dataset's first two
 // fields). Naming lives here too, so there is one definition of "a name unused
 // anywhere in this report" — including inside nested Rectangles, which the
@@ -14,6 +14,24 @@
 @class RDLItem;
 @class RDLReport;
 @class RDLSelection;
+
+// What can be inserted. Mostly an RDL element each; List is a Tablix made the
+// way Report Builder makes a list -- one cell, holding a rectangle, repeated
+// for each row.
+typedef NS_ENUM(NSInteger, RDLItemKind) {
+  RDLItemKindUnspecified = 0,
+  RDLItemKindTextbox,
+  RDLItemKindLine,
+  RDLItemKindRectangle,
+  RDLItemKindImage,
+  RDLItemKindTablix,
+  RDLItemKindList,
+  RDLItemKindChart,
+  RDLItemKindSubreport,
+};
+
+// What the kind is called where a person picks it.
+FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
 
 // The resolved answer to "where would a new element land right now?"
 @interface RDLInsertionPoint : NSObject
@@ -39,12 +57,13 @@
 + (RDLInsertionPoint *)insertionPointInReport:(RDLReport *)report
                                     selection:(RDLSelection *)selection;
 
-// What may be inserted where: every kind, in a band, a rectangle or a cell.
-+ (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point;
-+ (BOOL)kind:(NSString *)kind isAllowedAt:(RDLInsertionPoint *)point;
+// What may be inserted where, as RDLItemKinds: every kind, in a band, a
+// rectangle or a cell.
++ (NSArray<NSNumber *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point;
++ (BOOL)kind:(RDLItemKind)kind isAllowedAt:(RDLInsertionPoint *)point;
 
 // A named, positioned, styled item of `kind`, ready to insert at `point`.
-+ (RDLItem *)itemOfKind:(NSString *)kind
++ (RDLItem *)itemOfKind:(RDLItemKind)kind
                  atPoint:(RDLInsertionPoint *)point
                 inReport:(RDLReport *)report;
 

@@ -552,8 +552,8 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"report selection should insert into the body at top level");
   if (p.items != r.body.items)
     XCTFail(@"%@", @"insertion point should target the body items array");
-  // Textbox, Line, Rectangle, Image, Tablix, Chart and Subreport.
-  if ([[RDLItemFactory elementKindsAllowedAt:p] count] != 7)
+  // Textbox, Line, Rectangle, Image, Tablix, List, Chart and Subreport.
+  if ([[RDLItemFactory elementKindsAllowedAt:p] count] != 8)
     XCTFail(@"%@", @"band level should allow every element kind");
   if (![[p localizedDescription] isEqualToString:@"into Body"])
     XCTFail(@"%@", [NSString stringWithFormat:@"description %@", [p localizedDescription]]);
@@ -576,11 +576,11 @@ static RDLReport *RDLGroupedJobs(void) {
   if (p.container != box || p.items != box.items)
     XCTFail(@"%@", @"selecting a Rectangle should insert into it");
   NSArray *allowed = [RDLItemFactory elementKindsAllowedAt:p];
-  if (![allowed containsObject:@"Tablix"] || ![allowed containsObject:@"Chart"])
+  if (![allowed containsObject:@(RDLItemKindTablix)] || ![allowed containsObject:@(RDLItemKindChart)])
     XCTFail(@"%@", @"a Rectangle should accept data regions");
-  if (![RDLItemFactory kind:@"Textbox" isAllowedAt:p])
+  if (![RDLItemFactory kind:RDLItemKindTextbox isAllowedAt:p])
     XCTFail(@"%@", @"a Rectangle should accept a Textbox");
-  if (![RDLItemFactory kind:@"Tablix" isAllowedAt:p])
+  if (![RDLItemFactory kind:RDLItemKindTablix isAllowedAt:p])
     XCTFail(@"%@", @"kind:isAllowedAt: should agree with the allowed list");
   if (![[p localizedDescription] isEqualToString:@"inside Box"])
     XCTFail(@"%@", [NSString stringWithFormat:@"container description %@",
@@ -604,7 +604,7 @@ static RDLReport *RDLGroupedJobs(void) {
   // Defaults: a new Tablix binds the first dataset and builds a real body.
   [sel selectReport];
   p = [RDLItemFactory insertionPointInReport:r selection:sel];
-  RDLTablix *tab = (RDLTablix *)[RDLItemFactory itemOfKind:@"Tablix" atPoint:p inReport:r];
+  RDLTablix *tab = (RDLTablix *)[RDLItemFactory itemOfKind:RDLItemKindTablix atPoint:p inReport:r];
   if (![tab.dataSetName isEqualToString:@"Rows"])
     XCTFail(@"%@", @"a new Tablix should bind the first dataset");
   if ([tab.columnSpecs count] != 2)
@@ -614,18 +614,18 @@ static RDLReport *RDLGroupedJobs(void) {
   if (![tab.columnSpecs.firstObject[@"value"] isEqualToString:@"=Fields!Sku.Value"])
     XCTFail(@"%@", [NSString stringWithFormat:@"new tablix column value %@",
                                                tab.columnSpecs.firstObject[@"value"]]);
-  RDLChart *chart = (RDLChart *)[RDLItemFactory itemOfKind:@"Chart" atPoint:p inReport:r];
+  RDLChart *chart = (RDLChart *)[RDLItemFactory itemOfKind:RDLItemKindChart atPoint:p inReport:r];
   if (![chart.categoryField isEqualToString:@"Sku"] ||
       ![chart.valueField isEqualToString:@"Amount"])
     XCTFail(@"%@", @"a new Chart should bind the first two fields");
-  RDLItem *line = [RDLItemFactory itemOfKind:@"Line" atPoint:p inReport:r];
+  RDLItem *line = [RDLItemFactory itemOfKind:RDLItemKindLine atPoint:p inReport:r];
   if (line.height > 0.05)
     XCTFail(@"%@", @"a new Line should be hairline height");
 
   // Position follows the insertion point.
   [sel selectItem:title inBandWithKey:@"body"];
   p = [RDLItemFactory insertionPointInReport:r selection:sel];
-  RDLItem *below = [RDLItemFactory itemOfKind:@"Textbox" atPoint:p inReport:r];
+  RDLItem *below = [RDLItemFactory itemOfKind:RDLItemKindTextbox atPoint:p inReport:r];
   if (fabs(below.left - title.left) > 0.0001)
     XCTFail(@"%@", @"a sibling should share the selection's left edge");
   if (below.top <= title.top)
@@ -731,9 +731,9 @@ static RDLReport *RDLGroupedJobs(void) {
 
   // 3. Insertion honours policy and selects what it made.
   [ctx.selection selectReport];
-  if (!([[ctx allowedElementKinds] count] == 7))
+  if (!([[ctx allowedElementKinds] count] == 8))
     XCTFail(@"%@", @"context: band level allows every kind");
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   RDLItem *added = [ctx selectedItem];
   if (!(added != nil))
     XCTFail(@"%@", @"context: adding selects the new item");
@@ -747,27 +747,27 @@ static RDLReport *RDLGroupedJobs(void) {
     XCTFail(@"%@", @"context: undo removes the added item");
 
   // 4. A Rectangle takes every kind, a data region included.
-  [ctx addItemOfKind:@"Rectangle"];
+  [ctx addItemOfKind:RDLItemKindRectangle];
   RDLRectangle *rect = (RDLRectangle *)[ctx selectedItem];
   if (!([rect isKindOfClass:[RDLRectangle class]]))
     XCTFail(@"%@", @"context: added a Rectangle");
-  if (!([[ctx allowedElementKinds] count] == 7))
+  if (!([[ctx allowedElementKinds] count] == 8))
     XCTFail(@"%@", @"context: a Rectangle allows every kind");
   NSUInteger before = [ctx.report.body.items count];
-  [ctx addItemOfKind:@"Tablix"];
+  [ctx addItemOfKind:RDLItemKindTablix];
   if (!([ctx.report.body.items count] == before) || !([rect.items count] == 1) ||
       ![[rect.items firstObject] isKindOfClass:[RDLTablix class]])
     XCTFail(@"%@", @"context: a Tablix goes inside the Rectangle");
   [ctx.selection selectItem:rect inBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   if (!([rect.items count] == 2))
     XCTFail(@"%@", @"context: a Textbox goes inside the Rectangle");
 
   // 5. New elements land next to the selection, not at the end of the band.
   [ctx.selection selectReport];
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   RDLItem *first = [ctx selectedItem];
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   RDLItem *second = [ctx selectedItem];
   NSUInteger i1 = [ctx.report.body.items indexOfObjectIdenticalTo:first];
   NSUInteger i2 = [ctx.report.body.items indexOfObjectIdenticalTo:second];
@@ -816,7 +816,7 @@ static RDLReport *RDLGroupedJobs(void) {
   // A data region pasted with a Rectangle selected goes inside it, as any
   // other item does.
   [ctx.selection selectReport];
-  [ctx addItemOfKind:@"Tablix"];
+  [ctx addItemOfKind:RDLItemKindTablix];
   RDLTablix *tablix = (RDLTablix *)[ctx selectedItem];
   if (!(tablix != nil && [tablix isKindOfClass:[RDLTablix class]]))
     XCTFail(@"%@", @"context: added a Tablix");
@@ -2104,7 +2104,7 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   [bare.dataSets removeAllObjects];
   RDLEditingContext *bareCtx = [[RDLEditingContext alloc] initWithReport:bare];
   [bareCtx.selection selectReport];
-  [bareCtx addItemOfKind:@"Tablix"];
+  [bareCtx addItemOfKind:RDLItemKindTablix];
   RDLTablix *lonely = (RDLTablix *)[bareCtx selectedItem];
   if (![lonely.dataSetName length] || [bare dataSetNamed:lonely.dataSetName] == nil)
     XCTFail(@"a table in a report with no dataset should get one of its own, not %@", lonely.dataSetName);
@@ -2124,7 +2124,7 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
                                 row:(NSInteger)[RDLTablixGeometry gridRowOf:outer forBodyRow:0]
                              column:(NSInteger)[RDLTablixGeometry gridColumnOf:outer forBodyColumn:0]
                       inBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Tablix"];
+  [ctx addItemOfKind:RDLItemKindTablix];
   if (![cell.item isKindOfClass:[RDLTablix class]] || [[outer structuralProblems] count])
     XCTFail(@"a table should fill the cell and leave its tablix consistent: %@", [outer structuralProblems]);
   RDLRectangle *panel = [[RDLRectangle alloc] init];
@@ -2133,7 +2133,7 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   panel.height = 3;
   [report.body.items addObject:panel];
   [ctx.selection selectItem:panel inBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Chart"];
+  [ctx addItemOfKind:RDLItemKindChart];
   if (![[panel.items firstObject] isKindOfClass:[RDLChart class]])
     XCTFail(@"%@", @"a chart should go inside the rectangle");
 
@@ -2156,6 +2156,49 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   [view cacheDisplayInRect:[view bounds] toBitmapImageRep:rep];
   if (rep == nil)
     XCTFail(@"%@", @"the canvas should draw a report with nested regions");
+}
+
+
+// A List, as Report Builder makes one: a tablix of one cell holding a
+// rectangle, the row a details group, bound to a dataset -- consistent, kept
+// by a save, and laid out once per row.
+- (void)testAListIsATablixOfOneRepeatedRectangle {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectReport];
+  if (![[ctx allowedElementKinds] containsObject:@(RDLItemKindList)])
+    XCTFail(@"%@", @"a List should be offered");
+  [ctx addItemOfKind:RDLItemKindList];
+  RDLTablix *list = (RDLTablix *)[ctx selectedItem];
+  if (![list isKindOfClass:[RDLTablix class]] || ![list.name hasPrefix:@"List"]) {
+    XCTFail(@"a List should be a tablix named for it, not %@", list);
+    return;
+  }
+  RDLTablixMember *details = [list.rowHierarchy.members firstObject];
+  if ([list.tablixBody.rows count] != 1 || [list.tablixBody.columns count] != 1 ||
+      ![list.tablixBody.rows[0].cells[0].item isKindOfClass:[RDLRectangle class]] ||
+      [details.groupName length] == 0 || [details.groupExpressions count] != 0 ||
+      [[list structuralProblems] count] || [report dataSetNamed:list.dataSetName] == nil)
+    XCTFail(@"the list's shape is wrong: %@", [list structuralProblems]);
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTablix *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it.name isEqualToString:list.name])
+      saved = (RDLTablix *)it;
+  if (![saved.tablixBody.rows[0].cells[0].item isKindOfClass:[RDLRectangle class]])
+    XCTFail(@"%@", @"the list should survive a save");
+  [back adoptItems];
+  NSArray<RDLLaidOutPage *> *pages = [RDLLayoutEngine pagesForReport:back paramValues:@{}];
+  NSUInteger drawn = 0;
+  RDLDataSet *ds = [back dataSetNamed:saved.dataSetName];
+  NSString *rectangle = saved.tablixBody.rows[0].cells[0].item.name;
+  for (RDLLaidOutPage *page in pages)
+    for (RDLLaidOutItem *item in page.items)
+      if ([item.name isEqualToString:rectangle])
+        drawn += 1;
+  if ([ds.rows count] && drawn != [ds.rows count])
+    XCTFail(@"the list's rectangle is laid out %lu times for %lu rows", (unsigned long)drawn,
+            (unsigned long)[ds.rows count]);
 }
 
 @end

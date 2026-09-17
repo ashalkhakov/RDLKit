@@ -69,8 +69,9 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 // These coordinate the three core objects: ask RDLItemFactory where a new item
 // goes, mutate through RDLEditor so it undoes, then move the selection. Views
 // call these rather than assembling the sequence themselves.
-- (void)addItemOfKind:(NSString *)kind;
-- (NSArray<NSString *> *)allowedElementKinds;
+- (void)addItemOfKind:(RDLItemKind)kind;
+// The RDLItemKinds that may be inserted where the selection is.
+- (NSArray<NSNumber *> *)allowedElementKinds;
 - (NSString *)insertionDescription;
 - (void)deleteSelectedItem;
 

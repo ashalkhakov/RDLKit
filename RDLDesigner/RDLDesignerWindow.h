@@ -33,7 +33,7 @@
 // Cancel, and the height that holds them. Published because the panel runs a
 // modal session, and this is the part of it a check can drive.
 - (BOOL)loadAddElementPanel;
-- (void)layOutAddElementPanelForKinds:(NSArray<NSString *> *)kinds;
+- (void)layOutAddElementPanelForKinds:(NSArray<NSNumber *> *)kinds;
 - (void)removeElement:(id)sender;
 // Open the report the selected Subreport names, in a window of its own beside
 // this one. A subreport is a separate file, so it is edited as a separate

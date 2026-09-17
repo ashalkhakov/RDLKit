@@ -150,7 +150,7 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   return [RDLItemFactory insertionPointInReport:self.report selection:_selection];
 }
 
-- (NSArray<NSString *> *)allowedElementKinds {
+- (NSArray<NSNumber *> *)allowedElementKinds {
   return [RDLItemFactory elementKindsAllowedAt:[self insertionPoint]];
 }
 
@@ -180,14 +180,14 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   region.dataSetName = name;
 }
 
-- (void)addItemOfKind:(NSString *)kind {
+- (void)addItemOfKind:(RDLItemKind)kind {
   RDLInsertionPoint *point = [self insertionPoint];
   if (![RDLItemFactory kind:kind isAllowedAt:point])
     return;
   RDLItem *item = [RDLItemFactory itemOfKind:kind atPoint:point inReport:self.report];
   if (item == nil)
     return;
-  [_editor beginGroup:[NSString stringWithFormat:@"Add %@", kind]];
+  [_editor beginGroup:[NSString stringWithFormat:@"Add %@", RDLTitleOfItemKind(kind)]];
   [self giveDataSetTo:item];
   if (point.cell != nil) {
     [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
@@ -226,7 +226,7 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   RDLInsertionPoint *point = [self selectedEmptyCell];
   if (point == nil)
     return nil;
-  RDLItem *item = [RDLItemFactory itemOfKind:@"Textbox" atPoint:point inReport:self.report];
+  RDLItem *item = [RDLItemFactory itemOfKind:RDLItemKindTextbox atPoint:point inReport:self.report];
   if (![item isKindOfClass:[RDLTextbox class]])
     return nil;
   // Blank: the stand-in words a text box inserted from the menu gets would be
@@ -353,15 +353,9 @@ static NSString * const kRDLItemPboardType = @"com.rdlkit.item-xml";
 - (void)insertCopiedItem:(RDLItem *)item {
   if (item == nil)
     return;
+  // Whatever it is, it goes where the selection says: every kind is allowed
+  // everywhere.
   RDLInsertionPoint *point = [self insertionPoint];
-  // A data region cannot live inside a Rectangle, so a pasted one goes to the
-  // band instead of being silently dropped.
-  if (![RDLItemFactory kind:item.rdlElementName isAllowedAt:point]) {
-    [_selection selectBandWithKey:point.bandKey];
-    point = [self insertionPoint];
-    if (![RDLItemFactory kind:item.rdlElementName isAllowedAt:point])
-      return;
-  }
   [RDLItemFactory renameTreeUniquely:item inReport:self.report];
   // Into the cell, when that is what is selected: a cell holds one item, and
   // where it sits is the cell's business, so there is nothing to offset.

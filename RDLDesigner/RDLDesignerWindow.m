@@ -486,7 +486,7 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
   // than anything that names this line. The next -addElement: loads the nib
   // again and the outlet's old panel goes then, well clear of all that.
   if (code >= 1 && code <= (NSInteger)[kinds count])
-    [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
+    [_context addItemOfKind:(RDLItemKind)[kinds[(NSUInteger)(code - 1)] integerValue]];
 }
 
 // The panel itself, from its XIB. Its own method because a check needs the
@@ -509,7 +509,7 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 //
 // Published so the arithmetic can be checked without a modal session -- which
 // is the only way to check it at all, since the panel runs one.
-- (void)layOutAddElementPanelForKinds:(NSArray<NSString *> *)kinds {
+- (void)layOutAddElementPanelForKinds:(NSArray<NSNumber *> *)kinds {
   const CGFloat margin = 12, captionHeight = 20, buttonHeight = 26, gap = 4, width = 260;
   NSUInteger count = [kinds count];
   CGFloat buttons = count ? count * buttonHeight + (count - 1) * gap : 0;
@@ -529,9 +529,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 
   CGFloat y = height - margin - captionHeight - gap - buttonHeight;
   NSInteger tag = 1;
-  for (NSString *kind in kinds) {
+  for (NSNumber *kind in kinds) {
     NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(14, y, width - 28, buttonHeight)];
-    [b setTitle:kind];
+    [b setTitle:RDLTitleOfItemKind((RDLItemKind)[kind integerValue])];
     [b setBezelStyle:NSShadowlessSquareBezelStyle];
     [b setTag:tag];
     [b setTarget:self];

@@ -2364,7 +2364,7 @@ paperOrigin:NSMakePoint(0, 0)];
     return;
   }
   [ctx.selection selectBandWithKey:@"body"];
-  NSArray<NSString *> *kinds = [ctx allowedElementKinds];
+  NSArray<NSNumber *> *kinds = [ctx allowedElementKinds];
   [wc layOutAddElementPanelForKinds:kinds];
 
   NSWindow *panel = [wc valueForKey:@"palettePanel"];
@@ -2467,7 +2467,7 @@ paperOrigin:NSMakePoint(0, 0)];
   }
 
   [ctx.selection selectItem:was inBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Subreport"];
+  [ctx addItemOfKind:RDLItemKindSubreport];
   if (![cell.item isKindOfClass:[RDLRectangle class]]) {
     XCTFail(@"%@", [NSString stringWithFormat:@"the cell should now hold a Rectangle: %@",
                                               cell.item]);
@@ -2505,7 +2505,7 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"and the empty cell is what stays selected");
 
   // Which is where the next element goes, with nothing to wrap.
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   if (![cell.item isKindOfClass:[RDLTextbox class]])
     XCTFail(@"%@", [NSString stringWithFormat:@"an empty cell takes what it is given: %@",
                                               cell.item]);
@@ -2556,7 +2556,7 @@ paperOrigin:NSMakePoint(0, 0)];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:
                                                           [RDLReport emptyReportNamed:@"Master"]];
   [ctx.selection selectReport];
-  [ctx addItemOfKind:@"Subreport"];
+  [ctx addItemOfKind:RDLItemKindSubreport];
   RDLItem *added = [ctx selectedItem];
   if (![added isKindOfClass:[RDLSubreport class]]) {
     XCTFail(@"%@", @"a Subreport should be one of the elements that can be added");

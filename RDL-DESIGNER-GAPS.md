@@ -298,7 +298,7 @@ not yet keep that.
 | Tablix `SortExpressions` | Done | Sorting… in the tablix's section. |
 | `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
 | Nested tablix or chart in a cell | Done | Inserted, pasted and drawn in a cell or a rectangle like any other item. A new region with no dataset to bind gets an empty one of its own. |
-| A "List" preset | UI | |
+| A "List" preset | Done | Insert → List: one cell holding a rectangle, repeated by a details group. |
 | `DomainScope`, `ReGroupExpressions`, `DataElement*` | MODEL | |
 
 ### 4.8 Chart
@@ -454,6 +454,10 @@ In rough order of how often a Report Builder user reaches for it:
    tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;
    merged cells; per-row heights; corner; details sort; data regions in
    cells and rectangles; a List preset.
+   Done: all of it but the corner's content and a column's own settings --
+   the tablix's section, sorting, Group Properties' page breaks and
+   visibility, rows on their own, merged cells, any row's height, a row's
+   own settings, data regions in cells and rectangles, and the List.
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value

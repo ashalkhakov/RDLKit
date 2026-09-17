@@ -129,16 +129,41 @@ static RDLItem *RDLFindInItems(NSArray *items, RDLItem *target, RDLItem *parent,
 
 #pragma mark - Policy
 
-+ (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point {
+NSString *RDLTitleOfItemKind(RDLItemKind kind) {
+  switch (kind) {
+  case RDLItemKindTextbox:
+    return @"Textbox";
+  case RDLItemKindLine:
+    return @"Line";
+  case RDLItemKindRectangle:
+    return @"Rectangle";
+  case RDLItemKindImage:
+    return @"Image";
+  case RDLItemKindTablix:
+    return @"Tablix";
+  case RDLItemKindList:
+    return @"List";
+  case RDLItemKindChart:
+    return @"Chart";
+  case RDLItemKindSubreport:
+    return @"Subreport";
+  case RDLItemKindUnspecified:
+    break;
+  }
+  return nil;
+}
+
++ (NSArray<NSNumber *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point {
   // Everything goes everywhere: MS-RDL allows a data region in a Rectangle
   // and in a tablix cell as much as a subreport, and the engine lays a region
   // out wherever it is -- a table per group, a chart per row.
   (void)point;
-  return @[ @"Textbox", @"Line", @"Rectangle", @"Image", @"Tablix", @"Chart", @"Subreport" ];
+  return @[ @(RDLItemKindTextbox), @(RDLItemKindLine), @(RDLItemKindRectangle), @(RDLItemKindImage),
+            @(RDLItemKindTablix), @(RDLItemKindList), @(RDLItemKindChart), @(RDLItemKindSubreport) ];
 }
 
-+ (BOOL)kind:(NSString *)kind isAllowedAt:(RDLInsertionPoint *)point {
-  return [[self elementKindsAllowedAt:point] containsObject:kind ?: @""];
++ (BOOL)kind:(RDLItemKind)kind isAllowedAt:(RDLInsertionPoint *)point {
+  return [[self elementKindsAllowedAt:point] containsObject:@(kind)];
 }
 
 #pragma mark - Naming
@@ -206,16 +231,16 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
 
 #pragma mark - Defaults
 
-+ (RDLItem *)itemOfKind:(NSString *)kind
++ (RDLItem *)itemOfKind:(RDLItemKind)kind
                  atPoint:(RDLInsertionPoint *)point
                 inReport:(RDLReport *)report {
-  if ([kind length] == 0)
-    return nil;
-  RDLItem *it = [self newItemNamed:kind];
+  RDLItem *it = [self newItemOfKind:kind];
   if (it == nil)
     return nil;
-  it.name = [self uniqueNameWithPrefix:kind inReport:report];
+  it.name = [self uniqueNameWithPrefix:RDLTitleOfItemKind(kind) inReport:report];
   [self applyDefaultsTo:it report:report];
+  if (kind == RDLItemKindList)
+    [self makeList:(RDLTablix *)it report:report];
 
   // Position: follow the selection, tuck into a container, else inset on the page.
   if (point.sibling) {
@@ -231,24 +256,59 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
   return it;
 }
 
-// The designer names element kinds the way RDL does, so the name picks the
-// class directly.
-+ (RDLItem *)newItemNamed:(NSString *)elementName {
-  static NSDictionary *classes = nil;
-  static dispatch_once_t once;
-  dispatch_once(&once, ^{
-    classes = @{
-      @"Textbox" : [RDLTextbox class],
-      @"Line" : [RDLLine class],
-      @"Rectangle" : [RDLRectangle class],
-      @"Image" : [RDLImage class],
-      @"Chart" : [RDLChart class],
-      @"Tablix" : [RDLTablix class],
-      @"Subreport" : [RDLSubreport class],
-    };
-  });
-  Class cls = classes[elementName ?: @""];
-  return cls ? [[cls alloc] init] : nil;
+// The class each kind is made of; a List is a Tablix.
++ (RDLItem *)newItemOfKind:(RDLItemKind)kind {
+  switch (kind) {
+  case RDLItemKindTextbox:
+    return [[RDLTextbox alloc] init];
+  case RDLItemKindLine:
+    return [[RDLLine alloc] init];
+  case RDLItemKindRectangle:
+    return [[RDLRectangle alloc] init];
+  case RDLItemKindImage:
+    return [[RDLImage alloc] init];
+  case RDLItemKindTablix:
+  case RDLItemKindList:
+    return [[RDLTablix alloc] init];
+  case RDLItemKindChart:
+    return [[RDLChart alloc] init];
+  case RDLItemKindSubreport:
+    return [[RDLSubreport alloc] init];
+  case RDLItemKindUnspecified:
+    break;
+  }
+  return nil;
+}
+
+// A list, as Report Builder makes one: a single column and a single row, the
+// row a details group repeated for each row of the dataset, its cell holding a
+// rectangle to lay out in freely.
++ (void)makeList:(RDLTablix *)list report:(RDLReport *)report {
+  static const CGFloat kListWidth = 3.0, kListHeight = 1.0;
+  RDLTablixBody *body = [[RDLTablixBody alloc] init];
+  RDLTablixColumn *column = [[RDLTablixColumn alloc] init];
+  column.width = kListWidth;
+  body.columns = [@[ column ] mutableCopy];
+  RDLTablixRow *row = [[RDLTablixRow alloc] init];
+  row.height = kListHeight;
+  RDLTablixCell *cell = [[RDLTablixCell alloc] init];
+  RDLRectangle *content = [[RDLRectangle alloc] init];
+  content.name = [self uniqueNameWithPrefix:@"Rectangle" inReport:report besides:list];
+  content.width = kListWidth;
+  content.height = kListHeight;
+  cell.item = content;
+  row.cells = [@[ cell ] mutableCopy];
+  body.rows = [@[ row ] mutableCopy];
+  list.tablixBody = body;
+  RDLTablixMember *details = [[RDLTablixMember alloc] init];
+  details.groupName = [NSString stringWithFormat:@"%@_Details", list.name ?: @"List"];
+  list.rowHierarchy = [[RDLTablixHierarchy alloc] init];
+  list.rowHierarchy.members = [@[ details ] mutableCopy];
+  list.columnHierarchy = [[RDLTablixHierarchy alloc] init];
+  list.columnHierarchy.members = [@[ [[RDLTablixMember alloc] init] ] mutableCopy];
+  list.cornerRows = [NSMutableArray array];
+  list.width = kListWidth;
+  list.height = kListHeight;
 }
 
 + (void)applyDefaultsTo:(RDLItem *)it report:(RDLReport *)report {
