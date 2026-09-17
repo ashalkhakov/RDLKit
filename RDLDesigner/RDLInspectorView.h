@@ -15,4 +15,8 @@
 // A control finished editing: read it back into the model. Declared because
 // the sections are driven through it, in the app and in checks alike.
 - (void)changed:(id)sender;
+// A picture file embedded in the report and shown by the selected image, as
+// one step -- what Import… does once a file is chosen. NO, saying why, when the
+// file cannot be embedded.
+- (BOOL)importImageFromURL:(NSURL *)url error:(NSError **)error;
 @end

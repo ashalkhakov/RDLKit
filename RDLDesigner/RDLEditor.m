@@ -389,6 +389,59 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
 }
 
+#pragma mark - Embedded images
+
+// What a name became, compared as an embedded image's name is: without regard
+// to case. nil when it was not renamed, or is an expression.
+static NSString *RDLRenamed(NSDictionary<NSString *, NSString *> *renames, NSString *name) {
+  if ([name length] == 0 || [RDLExpr isExpressionSource:name])
+    return nil;
+  for (NSString *old in renames)
+    if ([old caseInsensitiveCompare:name] == NSOrderedSame)
+      return renames[old];
+  return nil;
+}
+
+- (void)addEmbeddedImage:(RDLEmbeddedImage *)image {
+  NSMutableArray<RDLEmbeddedImage *> *images = _document.report.embeddedImages;
+  if (image == nil || [images indexOfObjectIdenticalTo:image] != NSNotFound)
+    return;
+  [self beginGroup:@"Import Image"];
+  [[self undoProxy] setEmbeddedImages:[images copy] renaming:@{}];
+  [images addObject:image];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)setEmbeddedImages:(NSArray<RDLEmbeddedImage *> *)images
+                 renaming:(NSDictionary<NSString *, NSString *> *)renames {
+  RDLReport *report = _document.report;
+  NSArray<RDLEmbeddedImage *> *was = [report.embeddedImages copy] ?: @[];
+  BOOL same = [was isEqualToArray:images ?: @[]] && [renames count] == 0;
+  if (same)
+    return;
+  [self beginGroup:@"Embedded Images"];
+  // Undo renames back, from the new names to the old.
+  NSMutableDictionary<NSString *, NSString *> *back = [NSMutableDictionary dictionary];
+  for (NSString *old in renames)
+    back[renames[old]] = old;
+  [[self undoProxy] setEmbeddedImages:was renaming:back];
+  if (report.embeddedImages == nil)
+    report.embeddedImages = [NSMutableArray array];
+  [report.embeddedImages setArray:images ?: @[]];
+  // An image showing an embedded image by name shows it under its new one.
+  for (RDLItem *item in [report allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLImage class]])
+      continue;
+    RDLImage *image = (RDLImage *)item;
+    NSString *renamed = image.source == RDLImageSourceEmbedded ? RDLRenamed(renames, image.value) : nil;
+    if (renamed != nil)
+      [self setValue:renamed forKeyPath:@"value" ofItem:image];
+  }
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
 - (void)setQuery:(NSString *)query ofDataSet:(RDLDataSet *)dataSet {
   if (dataSet == nil || [dataSet.commandText isEqualToString:query])
     return;

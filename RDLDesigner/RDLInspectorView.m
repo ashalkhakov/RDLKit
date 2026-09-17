@@ -13,6 +13,7 @@
 #import "RDLChartAxisEditor.h"
 #import "RDLChartSeriesEditor.h"
 #import "RDLValueListEditor.h"
+#import "RDLEmbeddedImages.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -109,8 +110,11 @@
 @property (nonatomic, strong) IBOutlet RDLExpressionField *rectBGField;
 // Image section
 @property (nonatomic, strong) IBOutlet NSView *imageBox;
-@property (nonatomic, strong) IBOutlet NSTextField *imageValueField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *imageValueField;
+@property (nonatomic, strong) IBOutlet NSButton *imageValueExprButton, *imageImportButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
+// The report's own pictures to show, and what kind a field's bytes are.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
@@ -228,7 +232,8 @@
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
                          _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
                          _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
-                         _initialPageNameExprButton, _noRowsMessageExprButton, _noDataMessageExprButton ])
+                         _initialPageNameExprButton, _noRowsMessageExprButton, _noDataMessageExprButton,
+                         _imageValueExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -571,15 +576,24 @@
   // Image.
   [_bindings bind:_imageValueField keyPath:@"value" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
-  [_bindings bind:_imageSourcePop keyPath:@"source" scope:RDLFieldScopeItem
+  [_bindings bind:_imageSourcePop
+          keyPath:@"source"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLImageSourceEmbedded), @(RDLImageSourceExternal) ]
+           values:RDLFillPopUp(_imageSourcePop, RDLImageSourceExternal, RDLImageSourceDatabase,
+                               ^(NSInteger v) { return RDLStringFromImageSource((RDLImageSource)v); })
       placeholder:nil];
-  [_bindings bind:_imageSizingPop keyPath:@"sizing" scope:RDLFieldScopeItem
+  [_bindings bind:_imageSizingPop
+          keyPath:@"sizing"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLImageSizingFit), @(RDLImageSizingFitProportional),
-                     @(RDLImageSizingClip), @(RDLImageSizingAutoSize) ]
+           values:RDLFillPopUp(_imageSizingPop, RDLImageSizingAutoSize, RDLImageSizingClip,
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromImageSizing((RDLImageSizing)v)); })
       placeholder:nil];
+  [_imageMimePop removeAllItems];
+  [_imageMimePop addItemsWithTitles:RDLImageMIMETypes()];
+  [_bindings bind:_imageMimePop keyPath:@"mimeType" scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpTitle];
 
   // Subreport. The name is a file beside this report, written the way MS-RDL
   // writes it: without the .rdl.
@@ -804,13 +818,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [boxes addObject:_rectBox];
     } else if ([it isKindOfClass:[RDLImage class]]) {
       [boxes addObject:_imageBox];
+      [self rebuildEmbeddedImagePopFor:(RDLImage *)it];
     } else if ([it isKindOfClass:[RDLSubreport class]]) {
       [boxes addObject:_subreportBox];
       [self fillSubreportStatus:(RDLSubreport *)it];
     } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
       [boxes addObject:_chartOptionsBox];
-      [self syncDependentControls];
       [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
@@ -820,6 +834,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
     [boxes addObjectsFromArray:[self commonBoxesForItem:it]];
+    [self syncDependentControls];
     [self rebuildTogglePopFor:it];
     // An item in a tablix cell: the column it is in, whose width is the cell's.
     NSUInteger cellRow = 0, cellColumn = 0;
@@ -921,6 +936,60 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   NSString *was = [(RDLTextbox *)it hideDuplicates];
   if (!(scope == was || [scope isEqualToString:was]))
     [_context.editor setValue:scope forKeyPath:@"hideDuplicates" ofItem:it];
+  return YES;
+}
+
+#pragma mark - Images
+
+- (void)rebuildEmbeddedImagePopFor:(RDLImage *)image {
+  [_imageEmbeddedPop removeAllItems];
+  NSArray<RDLEmbeddedImage *> *images = _context.report.embeddedImages;
+  [_imageEmbeddedPop addItemWithTitle:[images count] ? @"Choose a picture" : @"None in this report"];
+  for (RDLEmbeddedImage *embedded in images)
+    [[_imageEmbeddedPop menu] addItemWithTitle:embedded.name ?: @"" action:NULL keyEquivalent:@""];
+  RDLEmbeddedImage *shown =
+      image.source == RDLImageSourceEmbedded ? [_context.report embeddedImageNamed:image.value] : nil;
+  NSUInteger at = shown ? [images indexOfObjectIdenticalTo:shown] : NSNotFound;
+  [_imageEmbeddedPop selectItemAtIndex:at == NSNotFound ? 0 : (NSInteger)at + 1];
+}
+
+- (BOOL)applyEmbeddedImageControl:(id)sender item:(RDLItem *)it {
+  if (sender != _imageEmbeddedPop || ![it isKindOfClass:[RDLImage class]])
+    return NO;
+  NSInteger chosen = [_imageEmbeddedPop indexOfSelectedItem];
+  if (chosen > 0 && ![[_imageEmbeddedPop titleOfSelectedItem] isEqualToString:[(RDLImage *)it value]])
+    [_context.editor setValue:[_imageEmbeddedPop titleOfSelectedItem] forKeyPath:@"value" ofItem:it];
+  [self reload];
+  return YES;
+}
+
+- (void)importImage:(id)sender {
+  (void)sender;
+  NSOpenPanel *panel = [NSOpenPanel openPanel];
+  [panel setAllowsMultipleSelection:NO];
+  [panel setCanChooseDirectories:NO];
+  [panel setAllowedFileTypes:@[ @"png", @"jpg", @"jpeg", @"gif", @"bmp" ]];
+  if ([panel runModal] != NSModalResponseOK || [[panel URLs] count] == 0)
+    return;
+  NSError *error = nil;
+  if (![self importImageFromURL:[[panel URLs] firstObject] error:&error] && error != nil)
+    [[NSAlert alertWithError:error] runModal];
+}
+
+- (BOOL)importImageFromURL:(NSURL *)url error:(NSError **)error {
+  RDLItem *it = [_context selectedItem];
+  if (![it isKindOfClass:[RDLImage class]])
+    return NO;
+  RDLEmbeddedImage *embedded = RDLEmbeddedImageFromFile(url, _context.report.embeddedImages, error);
+  if (embedded == nil)
+    return NO;
+  RDLEditor *editor = _context.editor;
+  [editor beginGroup:@"Import Image"];
+  [editor addEmbeddedImage:embedded];
+  [editor setValue:@(RDLImageSourceEmbedded) forKeyPath:@"source" ofItem:it];
+  [editor setValue:embedded.name forKeyPath:@"value" ofItem:it];
+  [editor endGroup];
+  [self reload];
   return YES;
 }
 
@@ -1079,6 +1148,15 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 // Controls whose state follows another's value.
 - (void)syncDependentControls {
   RDLItem *it = [_context selectedItem];
+  if ([it isKindOfClass:[RDLImage class]]) {
+    // The report's pictures are what an Embedded image shows, and a type is
+    // what a Database image's bytes need.
+    RDLImageSource source = [(RDLImage *)it source];
+    [_imageEmbeddedPop setEnabled:source == RDLImageSourceEmbedded];
+    [_imageImportButton setEnabled:source == RDLImageSourceEmbedded];
+    [_imageMimePop setEnabled:source == RDLImageSourceDatabase];
+    return;
+  }
   if (![it isKindOfClass:[RDLChart class]])
     return;
   RDLChart *chart = (RDLChart *)it;
@@ -1148,7 +1226,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
   if ([self applyCellControl:sender] || [self applyRowHeightControl:sender] ||
-      [self applyToggleControl:sender item:it] || [self applyHideDuplicatesControl:sender item:it])
+      [self applyToggleControl:sender item:it] || [self applyHideDuplicatesControl:sender item:it] ||
+      [self applyEmbeddedImageControl:sender item:it])
     return;
   [self applyPaperControl:sender];
 }
@@ -1235,6 +1314,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _initialPageNameField.expressionContext = RDLExpressionContextText;
   _noRowsMessageField.expressionContext = RDLExpressionContextText;
   _noDataMessageField.expressionContext = RDLExpressionContextText;
+  _imageValueField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -1262,6 +1342,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _initialPageNameExprButton) return _initialPageNameField;
   if (sender == _noRowsMessageExprButton) return _noRowsMessageField;
   if (sender == _noDataMessageExprButton) return _noDataMessageField;
+  if (sender == _imageValueExprButton) return _imageValueField;
   return nil;
 }
 

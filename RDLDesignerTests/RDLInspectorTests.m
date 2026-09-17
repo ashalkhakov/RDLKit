@@ -1578,6 +1578,89 @@
     XCTFail(@"%@", @"the popup should come back to showing every value");
 }
 
+// A picture of two red pixels, as PNG.
+static NSData *RDLTinyPNG(void) {
+  static NSString *const base64 = @"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9"
+                                  @"i18U1AAAAABJRU5ErkJggg==";
+  return [[NSData alloc] initWithBase64EncodedString:base64 options:NSDataBase64DecodingIgnoreUnknownCharacters];
+}
+
+// An image shows one of the report's own pictures, chosen by name or imported
+// from a file -- named after it, and not after one already there -- or a field's
+// bytes of a type it is told; and a picture renamed is still shown.
+- (void)testAnImageShowsAnEmbeddedOrADatabasePicture {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Pictured"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindImage];
+  RDLImage *image = (RDLImage *)[ctx selectedItem];
+  NSPopUpButton *source = [inspector valueForKey:@"imageSourcePop"];
+  NSPopUpButton *embedded = [inspector valueForKey:@"imageEmbeddedPop"];
+  NSPopUpButton *mime = [inspector valueForKey:@"imageMimePop"];
+  if (![image isKindOfClass:[RDLImage class]] || ![[source itemTitles] containsObject:@"Database"]) {
+    XCTFail(@"an image should be selected with every source offered, offers %@", [source itemTitles]);
+    return;
+  }
+  NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
+  NSURL *photo = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"Kiln Photo.png"]];
+  NSURL *notes = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"notes.txt"]];
+  [RDLTinyPNG() writeToURL:photo atomically:YES];
+  [[@"not a picture" dataUsingEncoding:NSUTF8StringEncoding] writeToURL:notes atomically:YES];
+
+  NSError *error = nil;
+  if (![inspector importImageFromURL:photo error:&error] || [report.embeddedImages count] != 1)
+    XCTFail(@"the picture should be embedded: %@", error);
+  RDLEmbeddedImage *first = [report.embeddedImages firstObject];
+  if (![first.name isEqualToString:@"Kiln_Photo"] || ![first.mimeType isEqualToString:@"image/png"] ||
+      ![first.imageData isEqualToData:RDLTinyPNG()] || image.source != RDLImageSourceEmbedded ||
+      ![image.value isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"the image should show the embedded picture, shows %@ from %ld", image.value, (long)image.source);
+  if (![embedded isEnabled] || ![[embedded titleOfSelectedItem] isEqualToString:@"Kiln_Photo"] || [mime isEnabled])
+    XCTFail(@"%@", @"the embedded picture should be chosen, and no type asked for");
+  [inspector importImageFromURL:photo error:NULL];
+  if (![[report.embeddedImages[1] name] isEqualToString:@"Kiln_Photo2"] || ![image.value isEqualToString:@"Kiln_Photo2"])
+    XCTFail(@"a second import should be named apart, is %@", [report.embeddedImages[1] name]);
+  [ctx.document.undoManager undo];
+  if ([report.embeddedImages count] != 1 || ![image.value isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"%@", @"one undo should take back the second import, picture and all");
+  if ([inspector importImageFromURL:notes error:&error] || error == nil || [report.embeddedImages count] != 1)
+    XCTFail(@"%@", @"a file that is no picture should be refused, saying why");
+
+  // Renamed, the picture is still the one shown.
+  RDLEmbeddedImage *renamed = [[RDLEmbeddedImage alloc] init];
+  renamed.name = @"Kiln";
+  renamed.mimeType = first.mimeType;
+  renamed.imageData = first.imageData;
+  [ctx.editor setEmbeddedImages:@[ renamed ] renaming:@{@"Kiln_Photo" : @"Kiln"}];
+  if (![image.value isEqualToString:@"Kiln"])
+    XCTFail(@"the image should follow its picture's new name, shows %@", image.value);
+  [ctx.document.undoManager undo];
+  if (![image.value isEqualToString:@"Kiln_Photo"] || ![[report.embeddedImages firstObject].name isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"%@", @"undo should put the old name back, on both");
+  [ctx.document.undoManager redo];
+  [inspector reload];
+
+  // From a field: the bytes' type is asked for.
+  [source selectItemWithTitle:@"Database"];
+  [inspector changed:source];
+  if (![mime isEnabled] || [embedded isEnabled])
+    XCTFail(@"%@", @"a field's picture should be given a type, and no embedded one chosen");
+  [mime selectItemWithTitle:@"image/jpeg"];
+  [inspector changed:mime];
+  NSTextField *value = [inspector valueForKey:@"imageValueField"];
+  [value setStringValue:@"=Fields!Photo.Value"];
+  [inspector changed:value];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLImage *saved = (RDLImage *)[back itemNamed:image.name inBand:NULL];
+  if (saved.source != RDLImageSourceDatabase || ![saved.mimeType isEqualToString:@"image/jpeg"] ||
+      ![saved.value isEqualToString:@"=Fields!Photo.Value"] || ![[back embeddedImageNamed:@"Kiln"].imageData
+                                                                     isEqualToData:RDLTinyPNG()])
+    XCTFail(@"%@", @"the image and the embedded picture should survive a save");
+  [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

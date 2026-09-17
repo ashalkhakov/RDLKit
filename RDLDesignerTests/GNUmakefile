@@ -45,6 +45,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLFilterEditor.m \
   ../RDLDesigner/RDLSortEditor.m \
   ../RDLDesigner/RDLValueListEditor.m \
+  ../RDLDesigner/RDLEmbeddedImages.m \
   ../RDLDesigner/RDLChartAxisEditor.m \
   ../RDLDesigner/RDLChartSeriesEditor.m \
   ../RDLDesigner/RDLGroupPropertiesEditor.m \

@@ -136,6 +136,12 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // A report's parameters: what it asks for before it runs. Renaming one does
 // not chase the expressions that named it -- an expression is the author's
 // text, and the checker is what reports one that no longer resolves.
+// An embedded image added to the report, as one step.
+- (void)addEmbeddedImage:(RDLEmbeddedImage *)image;
+// The report's embedded images as a list says, as one step: `renames` maps an
+// old name to the new one, and every image showing the old shows the new.
+- (void)setEmbeddedImages:(NSArray<RDLEmbeddedImage *> *)images
+                 renaming:(NSDictionary<NSString *, NSString *> *)renames;
 - (void)addParameter:(RDLParameter *)parameter;
 - (void)insertParameter:(RDLParameter *)parameter atIndex:(NSUInteger)index;
 // A parameter moved to another place in the order they are asked in. NO when

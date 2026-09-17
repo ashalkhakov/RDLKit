@@ -45,6 +45,10 @@
                 <outlet property="headerHLabel" destination="lbl5" id="headerHLabelOutlet"/>
                 <outlet property="heightField" destination="heightField" id="heightFieldOutlet"/>
                 <outlet property="imageBox" destination="imageBox" id="imageBoxOutlet"/>
+                <outlet property="imageValueExprButton" destination="imageValueExprButton" id="imageValueExprButtonOutlet"/>
+                <outlet property="imageEmbeddedPop" destination="imageEmbeddedPop" id="imageEmbeddedPopOutlet"/>
+                <outlet property="imageImportButton" destination="imageImportButton" id="imageImportButtonOutlet"/>
+                <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
                 <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
@@ -2179,19 +2183,59 @@
             </subviews>
         </customView>
         <customView id="imageBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="182"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
-                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl25">
-                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl26">
+                    <rect key="frame" x="10" y="4" width="114" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" title="Image (name or =expr)" id="lbl25Cell">
+                    <textFieldCell key="cell" title="Source" id="lbl26Cell">
                         <font key="font" metaFont="user" size="10"/>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField focusRingType="none" id="imageValueField">
-                    <rect key="frame" x="10" y="20" width="240" height="22"/>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl27">
+                    <rect key="frame" x="136" y="4" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Sizing" id="lbl27Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="Where the picture comes from: the report, a file or address, or a field" id="imageSourcePop">
+                    <rect key="frame" x="10" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSourcePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="imageSourcePopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="imageSourcePopAction"/>
+                    </connections>
+                </popUpButton>
+                <popUpButton toolTip="How the picture fills its box" id="imageSizingPop">
+                    <rect key="frame" x="136" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSizingPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="imageSizingPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="imageSizingPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl25">
+                    <rect key="frame" x="10" y="48" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Image" id="lbl25Cell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="The embedded image's name, a file or address, or the field holding the picture" focusRingType="none" id="imageValueField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="64" width="212" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="imageValueFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -2203,56 +2247,66 @@
                         <outlet property="delegate" destination="-2" id="imageValueFieldDelegate"/>
                     </connections>
                 </textField>
-                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl26">
-                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                <button toolTip="Edit this as an expression" id="imageValueExprButton">
+                    <rect key="frame" x="226" y="64" width="24" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" title="Source" id="lbl26Cell">
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="imageValueExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="imageValueExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblEmbeddedImage">
+                    <rect key="frame" x="10" y="92" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Embedded image" id="lblEmbeddedImageCell">
                         <font key="font" metaFont="user" size="10"/>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField focusRingType="none" verticalHuggingPriority="750" id="lbl27">
-                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                <popUpButton toolTip="One of the report's own pictures" id="imageEmbeddedPop">
+                    <rect key="frame" x="10" y="108" width="150" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" title="Sizing" id="lbl27Cell">
-                        <font key="font" metaFont="user" size="10"/>
-                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
-                    </textFieldCell>
-                </textField>
-                <popUpButton id="imageSourcePop">
-                    <rect key="frame" x="10" y="64" width="114" height="22"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSourcePopCell">
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageEmbeddedPopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="message"/>
-                        <menu key="menu" id="imageSourcePopMenu">
-                            <items>
-                                <menuItem title="Embedded" id="mi6"/>
-                                <menuItem title="External" id="mi7"/>
-                            </items>
-                        </menu>
+                        <menu key="menu" id="imageEmbeddedPopMenu"/>
                     </popUpButtonCell>
                     <connections>
-                        <action selector="changed:" target="-2" id="imageSourcePopAction"/>
+                        <action selector="changed:" target="-2" id="imageEmbeddedPopAction"/>
                     </connections>
                 </popUpButton>
-                <popUpButton id="imageSizingPop">
-                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                <button toolTip="Embed a picture file in the report, and show it here" id="imageImportButton">
+                    <rect key="frame" x="166" y="108" width="84" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageSizingPopCell">
+                    <buttonCell key="cell" type="push" title="Import…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="imageImportButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="importImage:" target="-2" id="imageImportButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblImageMime">
+                    <rect key="frame" x="10" y="136" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Picture type, for one read from a field" id="lblImageMimeCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="What kind of picture a field's bytes are" id="imageMimePop">
+                    <rect key="frame" x="10" y="152" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="imageMimePopCell">
                         <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="message"/>
-                        <menu key="menu" id="imageSizingPopMenu">
-                            <items>
-                                <menuItem title="Fit" id="mi8"/>
-                                <menuItem title="FitProportional" id="mi9"/>
-                                <menuItem title="Clip" id="mi10"/>
-                                <menuItem title="AutoSize" id="mi11"/>
-                            </items>
-                        </menu>
+                        <menu key="menu" id="imageMimePopMenu"/>
                     </popUpButtonCell>
                     <connections>
-                        <action selector="changed:" target="-2" id="imageSizingPopAction"/>
+                        <action selector="changed:" target="-2" id="imageMimePopAction"/>
                     </connections>
                 </popUpButton>
             </subviews>

@@ -253,12 +253,13 @@ bin that moved since the previous audit.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Image: pick an embedded image; import a file as embedded | UI | |
-| Image `Source=Database`, `MIMEType`; f(x) on Value | UI (was MODEL) | Engine FULL. |
+| Image: pick an embedded image; import a file as embedded | Done | The image's section chooses one of the report's pictures by name, or imports a PNG, JPEG, GIF or BMP file, named after it, as one step. |
+| Image `Source=Database`, `MIMEType`; f(x) on Value | Done | Every source is offered; a field's picture is given its type. |
+| The report's embedded images: list, rename, delete | UI | A rename through the editor carries to the images that show it; no panel yet. |
 | Line width, style | — | The canvas draws a line at its border's width, colour and dash, running the way its box says, and the inspector edits all three (P1.1); *as audited* every line was a one-pixel rule along the top of its box, a line with no width -- a vertical one -- drew nothing at all, and the ink field wrote a property nothing read. |
 | Line: the other diagonal | MODEL | |
 | Rectangle padding | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
-| Data regions inside a Rectangle or a cell | UI (engine now FULL) | `RDLItemFactory` and `RDLEditingCoreTests` still enforce the old limit. |
+| Data regions inside a Rectangle or a cell | Done | See §4.7. |
 | Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | |
 
 ### 4.7 Tablix
