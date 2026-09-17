@@ -1186,6 +1186,81 @@
     XCTFail(@"%@", @"the options should survive a save");
 }
 
+// A chart's own settings, in a section of their own: how its series combine,
+// its palette, where its title and legend go, whether it has a legend, and
+// what it says with no data -- each named in words, and each saved.
+- (void)testTheChartOptionsAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1200)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  if (![chart isKindOfClass:[RDLChart class]] || [[inspector valueForKey:@"chartOptionsBox"] isHidden]) {
+    XCTFail(@"%@", @"a new chart should be selected and show its options");
+    return;
+  }
+  // Where a title goes means nothing without one.
+  NSPopUpButton *titlePosition = [inspector valueForKey:@"chartTitlePositionPop"];
+  if (chart.chartTitle == nil && [titlePosition isEnabled])
+    XCTFail(@"%@", @"an untitled chart's title position should be off");
+  NSTextField *title = [inspector valueForKey:@"titleField"];
+  [title setStringValue:@"Firings"];
+  [inspector changed:title];
+  // What it plots: RDL keeps a chart's subtype on its series.
+  NSTextField *value = [inspector valueForKey:@"valField"];
+  [value setStringValue:@"Pieces"];
+  [inspector changed:value];
+  if (![titlePosition isEnabled])
+    XCTFail(@"%@", @"a titled chart's title position should be on");
+  NSDictionary<NSString *, NSString *> *choices = @{
+    @"chartSubtypePop" : @"Percent stacked",
+    @"chartPalettePop" : @"Earth tones",
+    @"chartTitlePositionPop" : @"Bottom left",
+    @"legendPositionPop" : @"Right center",
+    @"legendLayoutPop" : @"Tall table",
+  };
+  for (NSString *name in choices) {
+    NSPopUpButton *pop = [inspector valueForKey:name];
+    if ([pop itemWithTitle:choices[name]] == nil) {
+      XCTFail(@"%@ should offer %@, offers %@", name, choices[name], [pop itemTitles]);
+      continue;
+    }
+    [pop selectItemWithTitle:choices[name]];
+    [inspector changed:pop];
+  }
+  NSButton *legend = [inspector valueForKey:@"showLegendCheck"];
+  if ([legend state] != NSOnState)
+    XCTFail(@"%@", @"a new chart's legend should show as shown");
+  [legend setState:NSOffState];
+  [inspector changed:legend];
+  NSTextField *message = [inspector valueForKey:@"noDataMessageField"];
+  [message setStringValue:@"No firings this quarter"];
+  [inspector changed:message];
+  if (chart.subtype != RDLChartSubtypePercentStacked || chart.palette != RDLChartPaletteEarthTones ||
+      chart.titlePosition != RDLChartTitlePositionBottomLeft ||
+      chart.legendPosition != RDLChartLegendPositionRightCenter ||
+      chart.legendLayout != RDLChartLegendLayoutTallTable || !chart.legendHidden ||
+      ![[chart.noDataMessage source] isEqualToString:@"No firings this quarter"])
+    XCTFail(@"%@", @"each option should be written to the chart");
+  [ctx.document.undoManager undo];
+  if (chart.noDataMessage != nil)
+    XCTFail(@"%@", @"undo should take the message away");
+  [ctx.document.undoManager redo];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLChart *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = (RDLChart *)it;
+  if (saved.subtype != RDLChartSubtypePercentStacked || saved.palette != RDLChartPaletteEarthTones ||
+      saved.titlePosition != RDLChartTitlePositionBottomLeft ||
+      saved.legendPosition != RDLChartLegendPositionRightCenter ||
+      saved.legendLayout != RDLChartLegendLayoutTallTable || !saved.legendHidden ||
+      ![[saved.noDataMessage source] isEqualToString:@"No firings this quarter"])
+    XCTFail(@"%@", @"the options should survive a save");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

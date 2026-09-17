@@ -1009,7 +1009,10 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 // (close); nil where the file has none.
 @property (nonatomic, strong) RDLValue *high, *low, *start, *end;
 // A series may override the chart's own type and subtype, which is how RDL
-// expresses a combination chart (bars with a line over them).
+// expresses a combination chart (bars with a line over them). Unspecified
+// follows the chart's, which is what a series read with the chart's own type
+// and subtype is left as -- so changing the chart's changes it too.
+// -[RDLChart typeOfSeries:] says which it comes to.
 @property (nonatomic, assign) RDLChartType type;
 @property (nonatomic, assign) RDLChartSubtype subtype;
 // ChartDataPoint/ChartDataLabel, and ChartSeries/ChartDataLabel for every point
@@ -1065,6 +1068,11 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 // -- which is also where a series naming none goes -- and 1 onwards for the
 // secondary ones; NSNotFound when the chart has no axis of that name.
 - (NSUInteger)indexOfValueAxisNamed:(NSString *)name;
+
+// What a series of this chart is drawn as: its own type and subtype, or the
+// chart's where it follows the chart -- which is when it names no type.
+- (RDLChartType)typeOfSeries:(RDLChartSeries *)series;
+- (RDLChartSubtype)subtypeOfSeries:(RDLChartSeries *)series;
 
 // The grouped members of the category and series hierarchies, outermost first:
 // the first member if it has a Group, then its own first submember if that has

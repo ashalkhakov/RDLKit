@@ -1255,6 +1255,16 @@ static NSArray<RDLChartMember *> *RDLChartGroupChain(NSArray<RDLChartMember *> *
   return i == NSNotFound ? NSNotFound : i + 1;
 }
 
+// A series with a type of its own has its own subtype too, none being Plain;
+// only one that follows the chart takes the chart's.
+- (RDLChartType)typeOfSeries:(RDLChartSeries *)series {
+  return series.type != RDLChartTypeUnspecified ? series.type : self.chartType;
+}
+
+- (RDLChartSubtype)subtypeOfSeries:(RDLChartSeries *)series {
+  return series.type != RDLChartTypeUnspecified ? series.subtype : self.subtype;
+}
+
 #pragma mark - Designer conveniences
 
 // The field a single grouping is over, so the inspector can offer a field

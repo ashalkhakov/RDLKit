@@ -819,6 +819,13 @@ static RDLValue *RDLChartIntervalValue(NSXMLElement *el) {
   RDLChartSeries *first = [chart.series firstObject];
   chart.chartType = first.type;
   chart.subtype = first.subtype;
+  // A series that says what the chart says follows it, so a change to the
+  // chart's type reaches it; one of its own -- a line over columns -- keeps it.
+  for (RDLChartSeries *series in chart.series)
+    if (series.type == chart.chartType && series.subtype == chart.subtype) {
+      series.type = RDLChartTypeUnspecified;
+      series.subtype = RDLChartSubtypeUnspecified;
+    }
   [chart.filters addObjectsFromArray:[self parseFilters:RDLChild(el, @"Filters")]];
   [chart.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"SortExpressions")]];
 }
@@ -2545,10 +2552,8 @@ static void RDLAddChartAxes(NSXMLElement *parent, NSString *collectionName, NSAr
     RDLAddIf(se, @"ValueAxisName", series.valueAxisName);
     // The type lives on the series from 2008 onwards; fall back to the
     // chart's own so a designer-made chart still says what it is.
-    RDLChartType type = series.type != RDLChartTypeUnspecified ? series.type : chart.chartType;
-    RDLChartSubtype sub = series.subtype != RDLChartSubtypeUnspecified ? series.subtype : chart.subtype;
     NSString *typeName = nil, *subtypeName = nil;
-    RDLChartKindToRDL(type, sub, &typeName, &subtypeName);
+    RDLChartKindToRDL([chart typeOfSeries:series], [chart subtypeOfSeries:series], &typeName, &subtypeName);
     RDLAdd(se, @"Type", typeName);
     RDLAddIf(se, @"Subtype", subtypeName);
     [collection addChild:se];

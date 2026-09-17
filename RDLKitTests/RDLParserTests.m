@@ -2098,10 +2098,10 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     RDLChart *chart = RDLFirstChart(r);
     RDLChartSeries *series = [chart.series firstObject];
     RDLChartAxis *secondary = [chart.secondaryValueAxes firstObject];
-    if (series.type != RDLChartTypeLine || series.subtype != RDLChartSubtypeStepped ||
+    if ([chart typeOfSeries:series] != RDLChartTypeLine || [chart subtypeOfSeries:series] != RDLChartSubtypeStepped ||
         ![series.valueAxisName isEqualToString:@"Secondary"])
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the series %ld %ld %@", when, (long)series.type,
-                                                (long)series.subtype, series.valueAxisName]);
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the series %ld %ld %@", when, (long)[chart typeOfSeries:series],
+                                                (long)[chart subtypeOfSeries:series], series.valueAxisName]);
     if (![chart.valueAxis.name isEqualToString:@"Primary"] || [chart.secondaryValueAxes count] != 1 ||
         ![secondary.name isEqualToString:@"Secondary"] || secondary.location != RDLChartAxisLocationOpposite ||
         ![[secondary.maximum source] isEqualToString:@"500"] || [chart indexOfValueAxisNamed:@"Secondary"] != 1)
@@ -2122,10 +2122,13 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
   RDLReport *r = [RDLParser reportFromXMLString:RDLChartDocument(@"2016", @"<Type>Column</Type><Subtype>Stepped</Subtype>",
                                                                   @"", @"", @"")
                                           error:NULL];
-  RDLChartSeries *column = [RDLFirstChart(r).series firstObject];
-  if (column.type != RDLChartTypeColumn || column.subtype != RDLChartSubtypeUnspecified)
-    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped column is a column: %ld %ld", (long)column.type,
-                                              (long)column.subtype]);
+  RDLChart *columns = RDLFirstChart(r);
+  RDLChartSeries *column = [columns.series firstObject];
+  if ([columns typeOfSeries:column] != RDLChartTypeColumn ||
+      [columns subtypeOfSeries:column] != RDLChartSubtypeUnspecified)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a stepped column is a column: %ld %ld",
+                                              (long)[columns typeOfSeries:column],
+                                              (long)[columns subtypeOfSeries:column]]);
   for (NSString *w in r.warnings)
     XCTFail(@"%@", [NSString stringWithFormat:@"a stepped column: %@", w]);
 }
@@ -2218,15 +2221,18 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     for (NSUInteger pass = 0; pass < 2; pass++) {
       NSString *when = [NSString stringWithFormat:@"%@ %@", kind, pass == 0 ? @"read" : @"read back"];
       RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
-      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
-      if (series.type != (RDLChartType)[kinds[kind] integerValue] ||
-          ([kind containsString:@"Smooth"] && series.subtype != RDLChartSubtypeSmooth) ||
+      RDLChart *chart = RDLFirstChart(r);
+      RDLChartSeries *series = [chart.series firstObject];
+      if ([chart typeOfSeries:series] != (RDLChartType)[kinds[kind] integerValue] ||
+          ([kind containsString:@"Smooth"] && [chart subtypeOfSeries:series] != RDLChartSubtypeSmooth) ||
           ![[series.high source] isEqualToString:@"=Max(Fields!Price.Value)"] ||
           ![[series.low source] isEqualToString:@"=Min(Fields!Price.Value)"] ||
           ![[series.start source] isEqualToString:@"=First(Fields!Price.Value)"] ||
           ![[series.end source] isEqualToString:@"=Last(Fields!Price.Value)"])
-        XCTFail(@"%@", [NSString stringWithFormat:@"%@: %ld %ld, %@ %@ %@ %@", when, (long)series.type,
-                                                  (long)series.subtype, [series.high source], [series.low source],
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@: %ld %ld, %@ %@ %@ %@", when,
+                                                  (long)[chart typeOfSeries:series],
+                                                  (long)[chart subtypeOfSeries:series], [series.high source],
+                                                  [series.low source],
                                                   [series.start source], [series.end source]]);
       for (NSString *w in r.warnings)
         XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
@@ -2241,6 +2247,37 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
 }
 
 
+// A chart's type and subtype are its series' unless a series has its own: a
+// combination chart retyped keeps its line, and the series that said what the
+// chart said are written as the chart now says.
+- (void)testAChartsTypeReachesTheSeriesThatFollowIt {
+  NSString *xml = RDLChartDocument(@"2016", @"<Type>Column</Type><Subtype>Stacked</Subtype>", @"", @"", @"");
+  NSString *line = @"<ChartSeries Name=\"Trend\"><ChartDataPoints><ChartDataPoint><ChartDataPointValues><Y>=2</Y>"
+                   @"</ChartDataPointValues></ChartDataPoint></ChartDataPoints><Type>Line</Type></ChartSeries>"
+                   @"</ChartSeriesCollection>";
+  xml = [xml stringByReplacingOccurrencesOfString:@"</ChartSeriesCollection>" withString:line];
+  RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLChart *chart = RDLFirstChart(r);
+  if ([chart.series count] != 2 || chart.chartType != RDLChartTypeColumn || chart.subtype != RDLChartSubtypeStacked) {
+    XCTFail(@"the chart should read as stacked columns with two series, reads %ld %ld with %lu",
+            (long)chart.chartType, (long)chart.subtype, (unsigned long)[chart.series count]);
+    return;
+  }
+  if ([chart typeOfSeries:chart.series[1]] != RDLChartTypeLine ||
+      [chart subtypeOfSeries:chart.series[1]] != RDLChartSubtypeUnspecified)
+    XCTFail(@"%@", @"the line should be a plain line, not take the chart's stacking");
+  chart.chartType = RDLChartTypeBar;
+  chart.subtype = RDLChartSubtypePercentStacked;
+  RDLChart *back = RDLFirstChart([RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL]);
+  if (back.chartType != RDLChartTypeBar || back.subtype != RDLChartSubtypePercentStacked ||
+      [back typeOfSeries:back.series[0]] != RDLChartTypeBar ||
+      [back typeOfSeries:back.series[1]] != RDLChartTypeLine)
+    XCTFail(@"the retyped chart should read back as percent-stacked bars and a line, reads %ld %ld, %ld %ld",
+            (long)back.chartType, (long)back.subtype, (long)[back typeOfSeries:back.series[0]],
+            (long)[back typeOfSeries:back.series[1]]);
+}
+
+
 // A funnel and a pyramid are read as such and written back. They were reported
 // and drawn as columns.
 - (void)testFunnelAndPyramidChartsAreReadAndWritten {
@@ -2252,9 +2289,10 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     NSString *xml = RDLChartDocument(@"2016", kind, @"", @"", @"");
     for (NSUInteger pass = 0; pass < 2; pass++) {
       RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
-      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
-      if (series.type != (RDLChartType)[kinds[kind] integerValue])
-        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)series.type]);
+      RDLChart *chart = RDLFirstChart(r);
+      RDLChartType type = [chart typeOfSeries:[chart.series firstObject]];
+      if (type != (RDLChartType)[kinds[kind] integerValue])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)type]);
       for (NSString *w in r.warnings)
         XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %@", kind, (unsigned long)pass, w]);
       xml = [RDLWriter XMLStringFromReport:r];
@@ -2274,9 +2312,10 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     NSString *xml = RDLChartDocument(@"2016", kind, @"", @"", @"");
     for (NSUInteger pass = 0; pass < 2; pass++) {
       RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
-      RDLChartSeries *series = [RDLFirstChart(r).series firstObject];
-      if (series.type != (RDLChartType)[kinds[kind] integerValue])
-        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)series.type]);
+      RDLChart *chart = RDLFirstChart(r);
+      RDLChartType type = [chart typeOfSeries:[chart.series firstObject]];
+      if (type != (RDLChartType)[kinds[kind] integerValue])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %ld", kind, (unsigned long)pass, (long)type]);
       for (NSString *w in r.warnings)
         XCTFail(@"%@", [NSString stringWithFormat:@"%@ pass %lu: %@", kind, (unsigned long)pass, w]);
       xml = [RDLWriter XMLStringFromReport:r];

@@ -5137,23 +5137,23 @@ static RDLChart *RDLSalesLineChart(RDLReport *r) {
     return RDLReplacing(xml, @"<DataValues><DataValue><Value>=Sum(Fields!Amount.Value)</Value></DataValue></DataValues>",
                         valuesOf(e));
   };
-  RDLChartSeries *candle = [RDLSalesChart([RDLParser reportFromXMLString:stock(@"Candlestick", @[ @"Max", @"Min", @"First", @"Last" ])
-                                                                   error:NULL])
-                                .series firstObject];
-  if (candle.type != RDLChartTypeCandlestick || ![[candle.high source] isEqualToString:@"=Max(Fields!Amount.Value)"] ||
+  RDLChart *candles = RDLSalesChart([RDLParser reportFromXMLString:stock(@"Candlestick", @[ @"Max", @"Min", @"First", @"Last" ])
+                                                             error:NULL]);
+  RDLChartSeries *candle = [candles.series firstObject];
+  if ([candles typeOfSeries:candle] != RDLChartTypeCandlestick || ![[candle.high source] isEqualToString:@"=Max(Fields!Amount.Value)"] ||
       ![[candle.low source] isEqualToString:@"=Min(Fields!Amount.Value)"] ||
       ![[candle.start source] isEqualToString:@"=First(Fields!Amount.Value)"] ||
       ![[candle.end source] isEqualToString:@"=Last(Fields!Amount.Value)"])
     XCTFail(@"%@", [NSString stringWithFormat:@"a candlestick of high, low, open and close: %ld %@ %@ %@ %@",
-                                              (long)candle.type, [candle.high source], [candle.low source],
+                                              (long)[candles typeOfSeries:candle], [candle.high source], [candle.low source],
                                               [candle.start source], [candle.end source]]);
-  RDLChartSeries *hlc = [RDLSalesChart([RDLParser reportFromXMLString:stock(@"HighLowClose", @[ @"Max", @"Min", @"Last" ])
-                                                                error:NULL])
-                             .series firstObject];
-  if (hlc.type != RDLChartTypeStock || ![[hlc.high source] isEqualToString:@"=Max(Fields!Amount.Value)"] ||
+  RDLChart *stocks = RDLSalesChart([RDLParser reportFromXMLString:stock(@"HighLowClose", @[ @"Max", @"Min", @"Last" ])
+                                                            error:NULL]);
+  RDLChartSeries *hlc = [stocks.series firstObject];
+  if ([stocks typeOfSeries:hlc] != RDLChartTypeStock || ![[hlc.high source] isEqualToString:@"=Max(Fields!Amount.Value)"] ||
       ![[hlc.low source] isEqualToString:@"=Min(Fields!Amount.Value)"] || hlc.start != nil ||
       ![[hlc.end source] isEqualToString:@"=Last(Fields!Amount.Value)"])
-    XCTFail(@"%@", [NSString stringWithFormat:@"a stock chart of high, low and close: %ld %@ %@ %@ %@", (long)hlc.type,
+    XCTFail(@"%@", [NSString stringWithFormat:@"a stock chart of high, low and close: %ld %@ %@ %@ %@", (long)[stocks typeOfSeries:hlc],
                                               [hlc.high source], [hlc.low source], [hlc.start source], [hlc.end source]]);
 }
 

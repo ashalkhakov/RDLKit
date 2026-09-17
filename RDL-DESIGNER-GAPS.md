@@ -159,8 +159,8 @@ UI.
 | Tablix | Group name, expressions and filters; region filters | Group Properties…; tablix dialog |
 | Tablix | Cell selection; any simple item or subreport in a cell | Yes |
 | Tablix | Per-cell border/background/padding, merged cells, static members, group sort/page break/visibility, per-row heights, corner, `NoRowsMessage`, sort, repeat/fixed headers | — |
-| Chart | Type, dataset, title, category field, value field, Filters… | 7 of 17 types |
-| Chart | Subtype, series, legend, axes, palette, labels, markers, no-data message | — |
+| Chart | Type, subtype, dataset, title and its position, palette, legend, no-data message, category field, value field, Filters… | Every type |
+| Chart | Series, axes, labels, markers, custom palette colours | — |
 | Expressions | Editor with categories, function picker, parse status; completion | Yes; completion is a hard-coded list of ~90 names, not the engine catalogue |
 | Expressions | Semantic checking | — (`RDLChecker` runs only in the new-report wizard) |
 | Canvas | Selection | Single item (or one cell) |
@@ -305,9 +305,11 @@ not yet keep that.
 
 | Spec feature | Bin | Notes |
 |---|---|---|
-| Subtypes (Stacked, PercentStacked, Smooth, Exploded, Stepped); the High/Low and Start/End values a Range or Stock chart plots | UI | Every type the kit models is in the popup, from the enumeration, and a chart keeps the type its file gave it. What it plots, and its subtype, have no control. |
+| Subtypes (Stacked, PercentStacked, Smooth, Exploded, Stepped) | Done | In the chart's section. A series that says what the chart says follows it, so a chart read from a file is retyped by the popup; a series of its own type keeps it. |
+| The High/Low and Start/End values a Range or Stock chart plots | UI | Every type the kit models is in the popup, from the enumeration, and a chart keeps the type its file gave it. What it plots has no control. |
 | Multiple series, series grouping, per-series type | UI | The inspector edits the first series, and the outermost category and series group; groups nested inside those are kept as the file has them. |
-| Legend hidden/position/layout, title position, axis titles/min/max/interval/label interval/margin/grid lines/tick marks, palettes and custom colours, markers, data labels, secondary axis, series and point style, no-data message, X/Size values | UI (was partly MODEL) | Engine draws them. |
+| Legend hidden/position/layout, title position, palette, no-data message | Done | In the chart's section; the title's position is off while there is no title, which is what it is written with. |
+| Axis titles/min/max/interval/label interval/margin/grid lines/tick marks, custom palette colours, markers, data labels, secondary axis, series and point style, X/Size values | UI (was partly MODEL) | Engine draws them. |
 | 3D, strip lines, scale breaks, border skin, empty points, BoxPlot/ErrorBar/TreeMap | MODEL | Kept and written back. |
 
 ### 4.9 Other report items
@@ -461,6 +463,8 @@ In rough order of how often a Report Builder user reaches for it:
    the report Variables editor below, whose table they can share.
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
+   Done: subtype, palette, legend, the title's position and the no-data
+   message, in the chart's section.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.

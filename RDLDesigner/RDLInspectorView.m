@@ -128,6 +128,14 @@
 @property (nonatomic, strong) IBOutlet NSView *tablixOptionsBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *noRowsMessageField;
 @property (nonatomic, strong) IBOutlet NSButton *noRowsMessageExprButton;
+// A chart's own settings: how its series combine, its colours, where its title
+// and legend go, and what it says with no data.
+@property (nonatomic, strong) IBOutlet NSView *chartOptionsBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *chartSubtypePop, *chartPalettePop, *chartTitlePositionPop;
+@property (nonatomic, strong) IBOutlet NSButton *showLegendCheck;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *legendPositionPop, *legendLayoutPop;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *noDataMessageField;
+@property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
 @property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
@@ -211,14 +219,14 @@
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
                          _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
                          _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
-                         _initialPageNameExprButton, _noRowsMessageExprButton ])
+                         _initialPageNameExprButton, _noRowsMessageExprButton, _noDataMessageExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _tablixBox, _tablixOptionsBox, _cellBox, _nameBox, _visibilityBox,
+                 _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox, _cellBox, _nameBox, _visibilityBox,
                  _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
@@ -544,6 +552,52 @@
              kind:RDLFieldKindPopUpIndex
            values:chartTypes
       placeholder:nil];
+  [_bindings bind:_chartSubtypePop
+          keyPath:@"subtype"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartSubtypePop, RDLChartSubtypePlain, RDLChartSubtypeStepped,
+                               ^(NSInteger v) { return RDLWordsOf(RDLStringFromChartSubtype((RDLChartSubtype)v)); })
+      placeholder:nil];
+  [_bindings bind:_chartPalettePop
+          keyPath:@"palette"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartPalettePop, RDLChartPaletteDefault, RDLChartPaletteSeaGreen,
+                               ^(NSInteger v) { return RDLWordsOf(RDLStringFromChartPalette((RDLChartPalette)v)); })
+      placeholder:nil];
+  [_bindings bind:_chartTitlePositionPop
+          keyPath:@"titlePosition"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartTitlePositionPop, RDLChartTitlePositionTopCenter, RDLChartTitlePositionBottomLeft,
+                               ^(NSInteger v) {
+                                 return RDLWordsOf(RDLStringFromChartTitlePosition((RDLChartTitlePosition)v));
+                               })
+      placeholder:nil];
+  // Shown is the box ticked, and hidden what the model stores.
+  [_bindings bind:_showLegendCheck keyPath:@"legendHidden" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @YES, @NO ] placeholder:nil];
+  [_bindings bind:_legendPositionPop
+          keyPath:@"legendPosition"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_legendPositionPop, RDLChartLegendPositionTopLeft, RDLChartLegendPositionBottomRight,
+                               ^(NSInteger v) {
+                                 return RDLWordsOf(RDLStringFromChartLegendPosition((RDLChartLegendPosition)v));
+                               })
+      placeholder:nil];
+  [_bindings bind:_legendLayoutPop
+          keyPath:@"legendLayout"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_legendLayoutPop, RDLChartLegendLayoutAutoTable, RDLChartLegendLayoutTallTable,
+                               ^(NSInteger v) {
+                                 return RDLWordsOf(RDLStringFromChartLegendLayout((RDLChartLegendLayout)v));
+                               })
+      placeholder:nil];
+  [_bindings bind:_noDataMessageField keyPath:@"noDataMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:nil];
   [_bindings bind:_catField keyPath:@"categoryField" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
   [_bindings bind:_valField keyPath:@"valueField" scope:RDLFieldScopeItem
@@ -582,6 +636,21 @@
 
 // A popup holding a whole vocabulary: every case from `first` to `last`, named
 // as the model names it, and the matching values for the binding to write.
+// A name as the model spells it, as words: "PercentStacked" is "Percent stacked".
+static NSString *RDLWordsOf(NSString *name) {
+  NSMutableString *words = [NSMutableString string];
+  NSCharacterSet *upper = [NSCharacterSet uppercaseLetterCharacterSet];
+  for (NSUInteger i = 0; i < [name length]; i++) {
+    NSString *letter = [name substringWithRange:NSMakeRange(i, 1)];
+    if (i > 0 && [upper characterIsMember:[name characterAtIndex:i]]) {
+      [words appendString:@" "];
+      letter = [letter lowercaseString];
+    }
+    [words appendString:letter];
+  }
+  return words;
+}
+
 static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NSInteger last,
                                          NSString *(^name)(NSInteger)) {
   [pop removeAllItems];
@@ -701,7 +770,10 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self fillSubreportStatus:(RDLSubreport *)it];
     } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
-        [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
+      [boxes addObject:_chartOptionsBox];
+      // A title's position is written with the title, and there is none.
+      [_chartTitlePositionPop setEnabled:[(RDLChart *)it chartTitle] != nil];
+      [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
       [boxes addObject:_tablixOptionsBox];
@@ -1074,6 +1146,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _pageNameField.expressionContext = RDLExpressionContextText;
   _initialPageNameField.expressionContext = RDLExpressionContextText;
   _noRowsMessageField.expressionContext = RDLExpressionContextText;
+  _noDataMessageField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -1100,6 +1173,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _pageNameExprButton) return _pageNameField;
   if (sender == _initialPageNameExprButton) return _initialPageNameField;
   if (sender == _noRowsMessageExprButton) return _noRowsMessageField;
+  if (sender == _noDataMessageExprButton) return _noDataMessageField;
   return nil;
 }
 

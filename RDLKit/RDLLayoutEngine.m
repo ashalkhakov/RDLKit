@@ -3172,7 +3172,7 @@ static void RDLLayOutChart(RDLChart *chart, RDLLaidOutChart *lc, RDLEvalScope *s
       NSString *seriesColor = RDLChartColorHex(RDLResolveStyle(def.style, scope).color);
       out.color = seriesColor ?: palette[[drawn count] % [palette count]];
       out.type = def.type != RDLChartTypeUnspecified ? def.type : lc.chartType;
-      out.subtype = def.subtype != RDLChartSubtypeUnspecified ? def.subtype : lc.subtype;
+      out.subtype = def.type != RDLChartTypeUnspecified ? def.subtype : lc.subtype;
       // Against the axis its ValueAxisName names, or the first.
       NSUInteger axisIndex = [chart indexOfValueAxisNamed:def.valueAxisName];
       out.valueAxisIndex = axisIndex == NSNotFound ? 0 : axisIndex;
