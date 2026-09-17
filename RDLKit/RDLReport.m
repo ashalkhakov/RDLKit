@@ -2644,3 +2644,42 @@ NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind) {
   return RDLStringFromUnsupportedItemKind(_kind) ?: @"CustomReportItem";
 }
 @end
+
+NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *items) {
+  return [items sortedArrayWithOptions:NSSortStable
+                       usingComparator:^NSComparisonResult(RDLItem *a, RDLItem *b) {
+                         if (a.zIndex < b.zIndex)
+                           return NSOrderedAscending;
+                         if (a.zIndex > b.zIndex)
+                           return NSOrderedDescending;
+                         return NSOrderedSame;
+                       }];
+}
+
+static NSMutableArray<RDLItem *> *RDLListHolding(NSMutableArray<RDLItem *> *list, RDLItem *item) {
+  for (RDLItem *it in list) {
+    if (it == item)
+      return list;
+    if ([it isKindOfClass:[RDLRectangle class]]) {
+      NSMutableArray *inside = RDLListHolding([(RDLRectangle *)it items], item);
+      if (inside)
+        return inside;
+    }
+  }
+  return nil;
+}
+
+@implementation RDLReport (RDLItemLists)
+
+- (NSMutableArray<RDLItem *> *)itemListContainingItem:(RDLItem *)item {
+  if (item == nil)
+    return nil;
+  for (RDLBand *band in [self allBands]) {
+    NSMutableArray *list = RDLListHolding(band.items, item);
+    if (list)
+      return list;
+  }
+  return nil;
+}
+
+@end

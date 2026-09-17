@@ -128,6 +128,29 @@
                                     <action selector="duplicate:" target="-1" id="duplicateAction"/>
                                 </connections>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="arrangeSep"/>
+                            <menuItem title="Bring to Front" keyEquivalent="F" id="bringToFrontItem">
+                                <connections>
+                                    <action selector="bringToFront:" target="-1" id="bringToFrontItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Bring Forward" keyEquivalent="f" id="bringForwardItem">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="bringForward:" target="-1" id="bringForwardItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send Backward" keyEquivalent="b" id="sendBackwardItem">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="sendBackward:" target="-1" id="sendBackwardItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send to Back" keyEquivalent="B" id="sendToBackItem">
+                                <connections>
+                                    <action selector="sendToBack:" target="-1" id="sendToBackItemAction"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="editSep2"/>
                             <menuItem title="Add Element…" keyEquivalent="A" id="addElementItem">
                                 <connections>

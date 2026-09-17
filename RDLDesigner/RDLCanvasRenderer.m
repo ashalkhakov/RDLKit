@@ -299,7 +299,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
                                               withAttributes:labelAttr];
     [[NSGraphicsContext currentContext] restoreGraphicsState];
 
-    for (RDLItem *it in bf.band.items)
+    for (RDLItem *it in RDLItemsInPaintOrder(bf.band.items))
       [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
   }
   [[NSGraphicsContext currentContext] restoreGraphicsState];
@@ -429,7 +429,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
     [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
     [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:1.0];
-    for (RDLItem *child in it.childItems)
+    for (RDLItem *child in RDLItemsInPaintOrder(it.childItems))
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it isKindOfClass:[RDLTablix class]]) {
     // A tablix nobody is working in is just its cells: no band, no brackets,

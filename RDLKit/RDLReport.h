@@ -1444,6 +1444,11 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 // ColumnSpacing when a report says nothing, as MS-RDL gives it.
 FOUNDATION_EXPORT const CGFloat RDLDefaultColumnSpacing;
 
+// Items in the order they are painted: by ZIndex, lowest first, and in the
+// order they are listed where two share one. The last is on top.
+@class RDLItem;
+FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *items);
+
 @interface RDLPage : NSObject
 @property (nonatomic, assign) CGFloat pageWidth, pageHeight;
 @property (nonatomic, assign) CGFloat leftMargin, rightMargin, topMargin, bottomMargin;
@@ -1580,6 +1585,13 @@ FOUNDATION_EXPORT const CGFloat RDLDefaultColumnSpacing;
 // whether it can be moved (it cannot: the cell places it) and what deleting it
 // means (the cell is emptied, not the tablix).
 - (RDLTablixCell *)cellContainingItem:(RDLItem *)item tablix:(RDLTablix **)outTablix;
+@end
+
+@interface RDLReport (RDLItemLists)
+// The list `item` is one of -- a band's items, or a rectangle's -- which are
+// the items it is stacked with. nil for an item that is in no such list, as
+// what fills a tablix cell is not.
+- (NSMutableArray<RDLItem *> *)itemListContainingItem:(RDLItem *)item;
 @end
 
 // Layout IR. Tablix is gone; backends consume these elements only.

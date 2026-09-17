@@ -98,10 +98,14 @@ The important findings:
    back, the root shape validates, style defaults are the spec's and are
    not materialised, placeholders are no longer stamped, and unsupported
    items open as placeholders.
-5. **The canvas does not draw what renders**: `ZIndex` is ignored, and
-   the preview honours it. Borders and lines are no longer among them:
-   the canvas, the preview and PDF draw both through one
-   `RDLBorderPainter` and one `RDLLinePainter` (P1.1).
+5. **The canvas draws what renders** in the respects this audit found:
+   borders and lines go through one `RDLBorderPainter` and one
+   `RDLLinePainter` shared with the preview and PDF (P1.1), and items are
+   painted and hit in `ZIndex` order (P1.2). One difference is left: the
+   canvas stacks an item among its own container's items, as SSRS does,
+   while the engine sorts a whole page's laid-out items by `ZIndex`, so a
+   raised item inside a rectangle can come out above the rectangle's
+   neighbours in the preview.
 
 ## 3. What the designer constructs today
 
@@ -218,7 +222,7 @@ bin that moved since the previous audit.
 | `PageBreak/BreakLocation`, `Disabled`, `ResetPageNumber` | Done | On a rectangle, a tablix and a chart. |
 | `PageName` | Done | On a rectangle, a tablix and a chart. |
 | `KeepTogether` | Done | On a text box, a subreport, a rectangle, a tablix and a chart. |
-| `ZIndex` | UI (was UI+MODEL) | Written and honoured at render; no front/back commands and the canvas ignores it. |
+| `ZIndex` | Done | Bring to Front / Forward, Send Backward / to Back in the Edit menu, changing as few ZIndexes as they can; the canvas paints and hit-tests in that order (see §2, finding 5, for where the engine differs). |
 | `Name` editing | Done | In the inspector, for every item including one in a cell. `ReportItems!` references in any expression and every `ToggleItem` follow the rename, and one undo puts them back; a name RDL does not accept, or another item's, is refused. Not followed: a data region named as an aggregate's scope, which is a string (`Sum(x, "Table1")`). Renaming a dataset, source, field or parameter carries the pieces kept under it (§5). |
 | `ToolTip`, `Bookmark`, `DocumentMapLabel`, `RepeatWith`, `CustomProperties`, `DataElement*` | MODEL | Kept and written back. |
 
@@ -432,7 +436,8 @@ In rough order of how often a Report Builder user reaches for it:
    sections shown for the kinds MS-RDL gives each to (not yet looked at in
    dark mode, for the reason `2fa0db1` records). Rename is done too, carrying
    `ReportItems!` and `ToggleItem` references (`RDLReferenceSites` finds
-   them). Left: z-order.
+   them), and so is z-order: the Arrange commands, and the canvas painting
+   and hit-testing by `ZIndex`.
 3. Page setup: free size, orientation, four margins, `Columns`/
    `ColumnSpacing`, page `Style`, `PrintOnFirstPage`/`PrintOnLastPage`,
    header/footer style, `ConsumeContainerWhitespace`, `InitialPageName`.

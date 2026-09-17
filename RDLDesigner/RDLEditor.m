@@ -448,6 +448,75 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
 }
 
+#pragma mark - Stacking
+
+// Where `item` would land among `siblings` if its ZIndex were `z`.
+static NSUInteger RDLPaintPositionWith(NSArray<RDLItem *> *siblings, RDLItem *item, NSInteger z) {
+  NSUInteger below = 0, listed = [siblings indexOfObjectIdenticalTo:item];
+  for (NSUInteger i = 0; i < [siblings count]; i++) {
+    RDLItem *other = siblings[i];
+    if (other != item && (other.zIndex < z || (other.zIndex == z && i < listed)))
+      below += 1;
+  }
+  return below;
+}
+
+static NSUInteger RDLStackingTarget(NSUInteger at, NSUInteger count, RDLStackingMove move) {
+  switch (move) {
+  case RDLStackingMoveToFront:
+    return count - 1;
+  case RDLStackingMoveForward:
+    return MIN(at + 1, count - 1);
+  case RDLStackingMoveBackward:
+    return at ? at - 1 : 0;
+  case RDLStackingMoveToBack:
+  case RDLStackingMoveUnspecified:
+    return 0;
+  }
+  return at;
+}
+
+- (BOOL)canMoveItem:(RDLItem *)item inStacking:(RDLStackingMove)move {
+  NSArray<RDLItem *> *siblings = [_document.report itemListContainingItem:item];
+  if ([siblings count] < 2 || move == RDLStackingMoveUnspecified)
+    return NO;
+  NSUInteger at = [RDLItemsInPaintOrder(siblings) indexOfObjectIdenticalTo:item];
+  return at != NSNotFound && RDLStackingTarget(at, [siblings count], move) != at;
+}
+
+- (BOOL)moveItem:(RDLItem *)item inStacking:(RDLStackingMove)move {
+  if (![self canMoveItem:item inStacking:move])
+    return NO;
+  NSArray<RDLItem *> *siblings = [[_document.report itemListContainingItem:item] copy];
+  NSArray<RDLItem *> *order = RDLItemsInPaintOrder(siblings);
+  NSUInteger at = [order indexOfObjectIdenticalTo:item];
+  NSUInteger to = RDLStackingTarget(at, [order count], move);
+  // One ZIndex, where one will do: just above the item it passes, or just
+  // below it.
+  RDLItem *passed = order[to];
+  NSInteger z = to > at ? passed.zIndex + 1 : passed.zIndex - 1;
+  if (move == RDLStackingMoveToFront)
+    z = MAX(item.zIndex, [[order lastObject] zIndex] + 1);
+  NSString *action = move == RDLStackingMoveToFront  ? @"Bring to Front"
+                     : move == RDLStackingMoveForward ? @"Bring Forward"
+                     : move == RDLStackingMoveBackward ? @"Send Backward"
+                                                       : @"Send to Back";
+  [self beginGroup:action];
+  if (z >= 0 && RDLPaintPositionWith(siblings, item, z) == to) {
+    [self setValue:@(z) forKeyPath:@"zIndex" ofItem:item];
+  } else {
+    // No room: the siblings numbered afresh in the order they are to have.
+    NSMutableArray<RDLItem *> *wanted = [order mutableCopy];
+    [wanted removeObjectAtIndex:at];
+    [wanted insertObject:item atIndex:to];
+    for (NSUInteger i = 0; i < [wanted count]; i++)
+      if (wanted[i].zIndex != (NSInteger)i)
+        [self setValue:@(i) forKeyPath:@"zIndex" ofItem:wanted[i]];
+  }
+  [self endGroup];
+  return YES;
+}
+
 #pragma mark - Geometry
 
 - (void)moveItem:(RDLItem *)item toLeft:(CGFloat)left top:(CGFloat)top {

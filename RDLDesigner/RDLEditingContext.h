@@ -92,4 +92,7 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 - (void)pasteItem;
 - (BOOL)canPaste;
 - (void)duplicateSelectedItem;
+// The selected item moved up or down among the items it is stacked with.
+- (BOOL)moveSelectedItemInStacking:(RDLStackingMove)move;
+- (BOOL)canMoveSelectedItemInStacking:(RDLStackingMove)move;
 @end

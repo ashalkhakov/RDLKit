@@ -218,8 +218,8 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
                    point:(NSPoint)point
                     kind:(NSString **)outKind
                     rect:(NSRect *)outRect {
-  // Later siblings draw on top, so search them first.
-  for (RDLItem *it in [items reverseObjectEnumerator]) {
+  // What is painted last is on top, so it is searched first.
+  for (RDLItem *it in [RDLItemsInPaintOrder(items) reverseObjectEnumerator]) {
     NSRect r = [self rectForItem:it origin:origin];
     if ([it.childItems count]) {
       RDLItem *child = [self itemInItems:it.childItems

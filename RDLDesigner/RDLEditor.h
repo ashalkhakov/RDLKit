@@ -44,6 +44,22 @@
 // as one step that undoes. NO, changing nothing, for a name RDL does not accept
 // or that another item already has.
 - (BOOL)renameItem:(RDLItem *)item to:(NSString *)name;
+
+// Where an item goes among the items it is stacked with.
+typedef NS_ENUM(NSInteger, RDLStackingMove) {
+  RDLStackingMoveUnspecified = 0,
+  RDLStackingMoveToFront,
+  RDLStackingMoveForward,   // above the one above it
+  RDLStackingMoveBackward,  // below the one below it
+  RDLStackingMoveToBack,
+};
+// Moves an item up or down among its band's or rectangle's items by its
+// ZIndex, as one step that undoes. As few ZIndexes change as can: to the front
+// is one; the siblings are numbered afresh only where there is no room, since a
+// ZIndex is never below 0. NO, changing nothing, when it is already there or
+// is stacked with nothing -- as what fills a tablix cell is not.
+- (BOOL)moveItem:(RDLItem *)item inStacking:(RDLStackingMove)move;
+- (BOOL)canMoveItem:(RDLItem *)item inStacking:(RDLStackingMove)move;
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofBandWithKey:(NSString *)bandKey;
 - (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath;
 

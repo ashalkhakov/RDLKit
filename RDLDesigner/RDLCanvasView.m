@@ -314,6 +314,40 @@
   [_context deleteSelectedItem];
 }
 
+// Arrange: which way each command moves the selection among what it is
+// stacked with.
+static RDLStackingMove RDLStackingMoveForAction(SEL action) {
+  if (action == @selector(bringToFront:))
+    return RDLStackingMoveToFront;
+  if (action == @selector(bringForward:))
+    return RDLStackingMoveForward;
+  if (action == @selector(sendBackward:))
+    return RDLStackingMoveBackward;
+  if (action == @selector(sendToBack:))
+    return RDLStackingMoveToBack;
+  return RDLStackingMoveUnspecified;
+}
+
+- (void)bringToFront:(id)sender {
+  RDL_UNUSED(sender);
+  [_context moveSelectedItemInStacking:RDLStackingMoveToFront];
+}
+
+- (void)bringForward:(id)sender {
+  RDL_UNUSED(sender);
+  [_context moveSelectedItemInStacking:RDLStackingMoveForward];
+}
+
+- (void)sendBackward:(id)sender {
+  RDL_UNUSED(sender);
+  [_context moveSelectedItemInStacking:RDLStackingMoveBackward];
+}
+
+- (void)sendToBack:(id)sender {
+  RDL_UNUSED(sender);
+  [_context moveSelectedItemInStacking:RDLStackingMoveToBack];
+}
+
 // Select All on the canvas widens the selection to the current band instead
 // of beeping (item → its band, otherwise → body).
 - (void)selectAll:(id)sender {
@@ -329,6 +363,9 @@
     return [_context selectedItem] != nil;
   if (a == @selector(paste:))
     return [_context canPaste];
+  RDLStackingMove move = RDLStackingMoveForAction(a);
+  if (move != RDLStackingMoveUnspecified)
+    return [_context canMoveSelectedItemInStacking:move];
   return YES;
 }
 

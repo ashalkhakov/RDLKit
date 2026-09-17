@@ -181,6 +181,14 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   [_selection selectItem:item inBandWithKey:point.bandKey];
 }
 
+- (BOOL)moveSelectedItemInStacking:(RDLStackingMove)move {
+  return [_editor moveItem:[self selectedItem] inStacking:move];
+}
+
+- (BOOL)canMoveSelectedItemInStacking:(RDLStackingMove)move {
+  return [_editor canMoveItem:[self selectedItem] inStacking:move];
+}
+
 // The cell the selection points at, when that cell is empty. An item selected
 // in a cell also resolves to a cell, but that one is full.
 - (RDLInsertionPoint *)selectedEmptyCell {

@@ -2014,4 +2014,84 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
     XCTFail(@"undo should put the field back, not leave it as %@ (%ld)", back.name, (long)back.dataType);
 }
 
+
+// Items stack by ZIndex, as the preview paints them: the canvas paints and
+// hit-tests in that order, and the four Arrange moves change as few ZIndexes as
+// they can -- one, where there is room -- numbering the siblings afresh only
+// where there is not, since a ZIndex is never below 0.
+- (void)testItemsStackByZIndex {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Stacked"];
+  RDLTextbox *a = [[RDLTextbox alloc] init], *b = [[RDLTextbox alloc] init], *c = [[RDLTextbox alloc] init];
+  NSArray *boxes = @[ a, b, c ];
+  NSArray *names = @[ @"A", @"B", @"C" ];
+  for (NSUInteger i = 0; i < 3; i++) {
+    RDLTextbox *box = boxes[i];
+    box.name = names[i];
+    box.left = 1;
+    box.top = 1;
+    box.width = 2;
+    box.height = 0.5;
+  }
+  [r.body.items addObjectsFromArray:boxes];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:r];
+  RDLEditor *editor = ctx.editor;
+  NSString *(^order)(void) = ^NSString * {
+    NSMutableString *out = [NSMutableString string];
+    for (RDLItem *it in RDLItemsInPaintOrder(r.body.items))
+      [out appendFormat:@"%@%ld ", it.name, (long)it.zIndex];
+    return out;
+  };
+  // Hit by what is on top, whatever order the list has.
+  RDLItem *(^hit)(void) = ^RDLItem * {
+    RDLPageGeometry *g = [RDLPageGeometry geometryForReport:r paperOrigin:NSZeroPoint];
+    NSRect rect = NSZeroRect;
+    [g findRectOfItem:a rect:&rect];
+    return [g itemAtPoint:NSMakePoint(NSMidX(rect), NSMidY(rect)) kind:NULL bandKey:NULL rect:NULL];
+  };
+  if (![order() isEqualToString:@"A0 B0 C0 "] || hit() != c)
+    XCTFail(@"%@", @"with no ZIndex, the list order stacks them");
+
+  // To the front: one ZIndex.
+  if (![editor moveItem:a inStacking:RDLStackingMoveToFront] || ![order() isEqualToString:@"B0 C0 A1 "])
+    XCTFail(@"to the front gives %@", order());
+  if (hit() != a)
+    XCTFail(@"%@", @"the item on top should be the one hit, though it is listed first");
+  if ([editor canMoveItem:a inStacking:RDLStackingMoveToFront] || [editor moveItem:a inStacking:RDLStackingMoveForward])
+    XCTFail(@"%@", @"an item already on top should not move further up");
+
+  // To the back, with no room under 0: the three numbered afresh.
+  [editor moveItem:a inStacking:RDLStackingMoveToBack];
+  if (![order() isEqualToString:@"A0 B1 C2 "])
+    XCTFail(@"to the back gives %@", order());
+  // One step up, and one step down, each a single ZIndex.
+  [editor moveItem:b inStacking:RDLStackingMoveForward];
+  if (![order() isEqualToString:@"A0 C2 B3 "])
+    XCTFail(@"forward gives %@", order());
+  [editor moveItem:b inStacking:RDLStackingMoveBackward];
+  if (![order() isEqualToString:@"A0 B1 C2 "])
+    XCTFail(@"backward gives %@", order());
+  [ctx.document.undoManager undo];
+  if (![order() isEqualToString:@"A0 C2 B3 "])
+    XCTFail(@"undo gives %@", order());
+
+  // Inside a rectangle, the rectangle's items are what an item is stacked
+  // with; what fills a tablix cell is stacked with nothing.
+  RDLRectangle *panel = [[RDLRectangle alloc] init];
+  RDLLine *under = [[RDLLine alloc] init], *over = [[RDLLine alloc] init];
+  panel.items = [@[ under, over ] mutableCopy];
+  [r.body.items addObject:panel];
+  if (![editor moveItem:under inStacking:RDLStackingMoveToFront] || under.zIndex != 1 || over.zIndex != 0)
+    XCTFail(@"%@", @"a rectangle's item should stack among the rectangle's items");
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.tablixBody = [[RDLTablixBody alloc] init];
+  RDLTablixRow *row = [[RDLTablixRow alloc] init];
+  RDLTablixCell *cell = [[RDLTablixCell alloc] init];
+  cell.item = [[RDLTextbox alloc] init];
+  row.cells = [@[ cell ] mutableCopy];
+  tablix.tablixBody.rows = [@[ row ] mutableCopy];
+  [r.body.items addObject:tablix];
+  if ([editor canMoveItem:cell.item inStacking:RDLStackingMoveToBack])
+    XCTFail(@"%@", @"what fills a cell has nothing to be stacked with");
+}
+
 @end
