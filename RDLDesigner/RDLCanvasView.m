@@ -441,6 +441,10 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
       [m addItem:[self tablixMenuItem:@"Delete Column"
                                action:@selector(ctxDeleteColumn:)
                                   tag:col]];
+    NSArray<RDLTablixMember *> *columnLeaves = [tab.columnHierarchy leafMembers];
+    RDLTablixMember *columnLeaf = col < (NSInteger)[columnLeaves count] ? columnLeaves[(NSUInteger)col] : nil;
+    if (columnLeaf != nil && [columnLeaf.groupName length] == 0)
+      [m addItem:[self memberSettingsItemForMember:columnLeaf axis:RDLTablixAxisColumns tablix:tab]];
     [m addItem:[NSMenuItem separatorItem]];
   }
   NSInteger bodyRow = gridRow >= 0 ? [RDLTablixGeometry bodyRowOf:tab forGridRow:(NSUInteger)gridRow] : -1;
@@ -476,7 +480,7 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
     if ([tab.tablixBody.rows count] > 1 && [leaf.groupName length] == 0)
       [m addItem:[self tablixMenuItem:@"Delete Row" action:@selector(ctxDeleteRow:) tag:bodyRow]];
     if (leaf != nil && [leaf.groupName length] == 0)
-      [m addItem:[self rowSettingsItemForMember:leaf tablix:tab]];
+      [m addItem:[self memberSettingsItemForMember:leaf axis:RDLTablixAxisRows tablix:tab]];
     [m addItem:[NSMenuItem separatorItem]];
   }
   if (gridRow >= 0 && gridColumn >= 0) {
@@ -505,17 +509,20 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
   return m;
 }
 
-// What a row that is no group's does, as Report Builder's Advanced Mode sets
-// it: repeat on each page, stay with its group, hide when the group is empty,
-// stay in view when scrolled. Each item shows what the row does now.
-- (NSMenuItem *)rowSettingsItemForMember:(RDLTablixMember *)member tablix:(RDLTablix *)tab {
-  NSMenu *sub = [[NSMenu alloc] initWithTitle:@"This Row"];
+// What a row or column that is no group's does, as Report Builder's Advanced
+// Mode sets it: repeat on each page, stay with its group, hide when the group
+// is empty, stay in view when scrolled. Each item shows what it does now.
+- (NSMenuItem *)memberSettingsItemForMember:(RDLTablixMember *)member
+                                       axis:(RDLTablixAxis)axis
+                                     tablix:(RDLTablix *)tab {
+  NSString *heading = axis == RDLTablixAxisColumns ? @"This Column" : @"This Row";
+  NSMenu *sub = [[NSMenu alloc] initWithTitle:heading];
   NSMenuItem *(^setting)(NSString *, NSString *, id, BOOL) = ^NSMenuItem *(NSString *title, NSString *key, id value,
                                                                            BOOL on) {
-    RDLGroupCommand *command = [self commandForMember:member axis:RDLTablixAxisRows tablix:tab];
+    RDLGroupCommand *command = [self commandForMember:member axis:axis tablix:tab];
     command.settingKey = key;
     command.settingValue = value;
-    NSMenuItem *mi = [self groupCommandItem:title action:@selector(ctxSetRowSetting:) command:command];
+    NSMenuItem *mi = [self groupCommandItem:title action:@selector(ctxSetMemberSetting:) command:command];
     [mi setState:on ? NSOnState : NSOffState];
     return mi;
   };
@@ -532,12 +539,12 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
                        keep == RDLKeepWithGroupBefore)];
   [sub addItem:setting(@"Kept with the Group After", @"keepWithGroup", @(RDLKeepWithGroupAfter),
                        keep == RDLKeepWithGroupAfter)];
-  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"This Row" action:NULL keyEquivalent:@""];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:heading action:NULL keyEquivalent:@""];
   [item setSubmenu:sub];
   return item;
 }
 
-- (void)ctxSetRowSetting:(NSMenuItem *)mi {
+- (void)ctxSetMemberSetting:(NSMenuItem *)mi {
   RDLGroupCommand *command = [self groupCommandOfMenuItem:mi];
   if (command.settingKey == nil)
     return;

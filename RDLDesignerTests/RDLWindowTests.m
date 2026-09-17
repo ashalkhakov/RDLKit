@@ -47,6 +47,11 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
                             pressure:1];
 }
 
+// The canvas's menu for a place in a tablix, as a right-click builds it.
+@interface RDLCanvasView (RDLTablixMenu)
+- (NSMenu *)tablixMenuForGridRow:(NSInteger)gridRow gridColumn:(NSInteger)gridColumn item:(RDLTablix *)tab;
+@end
+
 @interface RDLWindowTests : RDLDesignerTestCase
 @end
 static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
@@ -3052,6 +3057,37 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   if (editor.editingItem == nil || [report cellContainingItem:editor.editingItem tablix:NULL] == nil)
     XCTFail(@"%@", @"Return on a table should edit the textbox in its first cell");
   [editor commit];
+}
+
+// The canvas's menu for a cell of a table offers what its column and its row
+// do, each a submenu naming its own member, and choosing an item sets it.
+- (void)testTheTablixMenuSetsAColumnsAndARowsOwnSettings {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  NSUInteger gridColumn = [RDLTablixGeometry headerColumnCountOf:tablix];
+  NSUInteger gridRow = [RDLTablixGeometry headerRowCountOf:tablix];
+  NSMenu *menu = [canvas tablixMenuForGridRow:(NSInteger)gridRow gridColumn:(NSInteger)gridColumn item:tablix];
+  for (NSString *heading in @[ @"This Column", @"This Row" ]) {
+    NSMenu *sub = [[menu itemWithTitle:heading] submenu];
+    NSMenuItem *repeat = [sub itemWithTitle:@"Repeat on Each Page"];
+    if (repeat == nil) {
+      XCTFail(@"the menu should offer %@ with a Repeat on Each Page item", heading);
+      continue;
+    }
+    BOOL columns = [heading isEqualToString:@"This Column"];
+    RDLTablixHierarchy *hierarchy = columns ? tablix.columnHierarchy : tablix.rowHierarchy;
+    NSUInteger line = columns ? [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:gridColumn]
+                              : (NSUInteger)[RDLTablixGeometry bodyRowOf:tablix forGridRow:gridRow];
+    BOOL was = [hierarchy leafMembers][line].repeatOnNewPage;
+    if (([repeat state] == NSOnState) != was)
+      XCTFail(@"%@'s item should show what the member does now", heading);
+    [NSApp sendAction:[repeat action] to:[repeat target] from:repeat];
+    if ([hierarchy leafMembers][line].repeatOnNewPage == was)
+      XCTFail(@"choosing the item should change %@'s repeating", heading);
+  }
 }
 
 // The corner's text box is typed into like a body cell's, and Tab goes on

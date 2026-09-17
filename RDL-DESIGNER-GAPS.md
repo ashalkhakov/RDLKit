@@ -289,7 +289,7 @@ not yet keep that.
 | Per-cell `Style` (borders, background, padding) | UI | All of it works through the in-cell textbox, which is where MS-RDL keeps it: `TablixCell` has no `Style` of its own, so the text section -- background, padding and the Borders… panel -- is what styles a cell (P1.1). An empty cell holds no item and so has nothing to style until something is put in it. Kept by every edit. |
 | Merged cells (`ColSpan`/`RowSpan`) | Done | Merge with the cell to the right or below, and Split Cell, on the canvas; kept and carried across column and row edits. A merge stays within plain rows or columns under one parent. |
 | Group `SortExpressions`, `PageBreak`, `Visibility`/`ToggleItem`, `KeepTogether` | Done | In Group Properties, applied with the name, expressions and filters as one step; sorting through a panel shared with the tablix. |
-| Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData` | Done | For a row that is no group's, in the canvas's This Row menu; a column's are not offered yet. |
+| Member `RepeatOnNewPage`, `KeepWithGroup`, `HideIfNoRows`, `FixedData` | Done | For a row or column that is no group's, in the canvas's This Row and This Column menus. |
 | Group `Variables` | UI | Kept, and exchanged with the group when the dialog re-nests it. |
 | Details `SortExpressions` | Done (engine FULL) | Through the details group's Group Properties, when the details group is named, as Report Builder names it. |
 | Row heights other than the heading and value rows | Done | The cell section's Row height, for the row the selected cell is in. |
@@ -454,10 +454,11 @@ In rough order of how often a Report Builder user reaches for it:
    tablix `NoRowsMessage`, sort, repeat/fixed headers, `LayoutDirection`;
    merged cells; per-row heights; corner; details sort; data regions in
    cells and rectangles; a List preset.
-   Done: all of it but a column's own settings -- the corner,
-   the tablix's section, sorting, Group Properties' page breaks and
-   visibility, rows on their own, merged cells, any row's height, a row's
-   own settings, data regions in cells and rectangles, and the List.
+   Done: all of it -- the corner, the tablix's section, sorting, Group
+   Properties' page breaks and visibility, rows on their own, merged cells,
+   any row's height, a row's and a column's own settings, data regions in
+   cells and rectangles, and the List. A group's Variables are left for
+   the report Variables editor below, whose table they can share.
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
