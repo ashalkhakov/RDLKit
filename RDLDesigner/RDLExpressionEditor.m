@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLExpressionEditor.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionHelper.h"
 #import "RDLExpressionTextStorage.h"
 #import "RDLPane.h"
 
@@ -38,6 +39,27 @@
                                                 containing:[self parameterEntries]]];
   [categories addObject:[RDLFunctionCategory categoryNamed:@"Globals"
                                                 containing:[self globalEntries]]];
+  // What else the report gives an expression to read, where it has any.
+  RDLExpressionScope *scope = [RDLExpressionScope scopeWithReport:_report dataSetName:_dataSetName];
+  NSArray<RDLFunctionInfo *> *items = [self entriesFor:scope.reportItemNames
+                                                format:@"ReportItems!%@.Value"
+                                               summary:@"What the %@ text box shows."];
+  NSArray<RDLFunctionInfo *> *variables = [self entriesFor:scope.variableNames
+                                                    format:@"Variables!%@.Value"
+                                                   summary:@"The %@ variable."];
+  NSMutableArray<RDLFunctionInfo *> *code = [NSMutableArray array];
+  for (NSString *name in scope.codeFunctionNames) {
+    RDLFunctionInfo *f = RDLEntry([NSString stringWithFormat:@"Code.%@", name],
+                                  [NSString stringWithFormat:@"The report's own %@ function.", name]);
+    f.insertion = [NSString stringWithFormat:@"Code.%@(", name];
+    [code addObject:f];
+  }
+  if ([items count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Report Items" containing:items]];
+  if ([variables count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Variables" containing:variables]];
+  if ([code count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Code" containing:code]];
   [categories addObjectsFromArray:[RDLExpressionCatalog categories]];
   _categories = [categories copy];
 }
@@ -51,6 +73,15 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
   f.signature = name;
   f.summary = summary;
   return f;
+}
+
+- (NSArray<RDLFunctionInfo *> *)entriesFor:(NSArray<NSString *> *)names
+                                    format:(NSString *)format
+                                   summary:(NSString *)summary {
+  NSMutableArray<RDLFunctionInfo *> *out = [NSMutableArray array];
+  for (NSString *name in names)
+    [out addObject:RDLEntry([NSString stringWithFormat:format, name], [NSString stringWithFormat:summary, name])];
+  return out;
 }
 
 - (NSArray<RDLFunctionInfo *> *)fieldEntries {

@@ -330,8 +330,8 @@ not yet keep that.
 |---|---|---|
 | Semantic checking in the expression editor | Done | The editor checks the expression as it is written, against the dataset the item reads, and says the first problem and how many more. |
 | An errors pane for the whole report; checking before save or export | UI | Export checks parameter problems only. |
-| Completion from `RDLExpressionCatalog` | UI | The completion list is separate and lacks most P1 functions. |
-| Completion of `ReportItems!`, `Variables!`, `Code.` | UI (was MODEL) | The engine resolves all three. |
+| Completion from `RDLExpressionCatalog` | Done | Every function the catalogue lists completes, with the language's own words. |
+| Completion of `ReportItems!`, `Variables!`, `Code.` | Done | Text boxes, report and group variables, and the code's functions (not its subs), in completion and in the editor's picker. |
 | Showing the parser's `warnings` on open | Done | Said once in a sheet when the window opens: the first eight as sentences and a count of the rest. |
 
 ### 4.11 Canvas and editing (CANVAS bin)
@@ -482,6 +482,7 @@ In rough order of how often a Report Builder user reaches for it:
 9. Expressions: live `RDLChecker` in the editor, parser warnings on open,
    completion from the catalogue including `ReportItems!`/`Variables!`/
    `Code.`.
+   Done: all three.
 10. Data: query parameters, collation and sensitivities.
 11. Further style (`LineHeight`, `WritingMode`, `Direction`, shadows,
     gradients, background image, `Calendar`, numerals); rich-text

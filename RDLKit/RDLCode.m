@@ -180,6 +180,14 @@ id RDLCodeStartingValue(RDLCodeType type) {
   _functions = compiled;
 }
 
+- (NSArray<NSString *> *)functionNames {
+  NSMutableArray<NSString *> *names = [NSMutableArray array];
+  for (RDLCompiledFunction *compiled in [_functions allValues])
+    if (!compiled.function.isSub && [compiled.function.name length])
+      [names addObject:compiled.function.name];
+  return [names sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+}
+
 - (BOOL)hasFunctionNamed:(NSString *)name {
   return _functions[[name lowercaseString]] != nil;
 }

@@ -26,6 +26,9 @@
 // What could not be read, one each: "line 3: ...".
 @property (nonatomic, readonly, copy) NSArray<NSString *> *problems;
 - (BOOL)hasFunctionNamed:(NSString *)name;
+// The functions an expression can call as Code.Name, as the module spells
+// them, in order of name. A Sub gives nothing back, so it is not among them.
+@property (nonatomic, readonly, copy) NSArray<NSString *> *functionNames;
 // How many arguments a function of this module takes; NO when it has none of
 // that name.
 - (BOOL)function:(NSString *)name takesAtLeast:(NSUInteger *)minimum atMost:(NSUInteger *)maximum;

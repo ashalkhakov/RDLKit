@@ -8,13 +8,18 @@
 #import <AppKit/AppKit.h>
 #import "RDLKit.h"
 
-// The field and parameter vocabulary a completion runs against.
+// The vocabulary a completion runs against: the dataset's fields, and the
+// report's parameters, text boxes, variables and code.
 @interface RDLExpressionScope : NSObject
 + (instancetype)scopeWithReport:(RDLReport *)report dataSetName:(NSString *)dataSetName;
 + (instancetype)scopeWithFieldNames:(NSArray<NSString *> *)fieldNames
                      parameterNames:(NSArray<NSString *> *)parameterNames;
 @property (nonatomic, readonly, copy) NSArray<NSString *> *fieldNames;
 @property (nonatomic, readonly, copy) NSArray<NSString *> *parameterNames;
+// ReportItems!Name.Value, Variables!Name.Value and Code.Name(...).
+@property (nonatomic, copy) NSArray<NSString *> *reportItemNames;
+@property (nonatomic, copy) NSArray<NSString *> *variableNames;
+@property (nonatomic, copy) NSArray<NSString *> *codeFunctionNames;
 @end
 
 // Completions for the partial word in `charRange` of `text`.
@@ -32,7 +37,8 @@ BOOL RDLShouldAutoComplete(NSString *text, NSRange selectedRange);
 // after the `!`. Returns {NSNotFound, 0} when not applicable.
 NSRange RDLExpressionCompletionRange(NSString *text, NSUInteger caret);
 
-// The built-in function vocabulary.
+// The built-in function vocabulary: every function the catalogue lists, and
+// the language's own words.
 NSArray<NSString *> *RDLExpressionFunctionNames(void);
 
 // YES when the current event is ordinary typing. Auto-completion must not

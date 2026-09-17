@@ -2272,6 +2272,10 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   return _codeModule;
 }
 
+- (NSArray<NSString *> *)codeFunctionNames {
+  return [self codeModule].functionNames ?: @[];
+}
+
 + (instancetype)emptyReportNamed:(NSString *)name {
   RDLReport *r = [[RDLReport alloc] init];
   r.name = name ?: @"Untitled";

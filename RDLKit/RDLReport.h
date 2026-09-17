@@ -1534,6 +1534,9 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // Field), and every path through one of that name called `was` now says `name`.
 - (void)renameKeptPiecesOfElement:(NSString *)element from:(NSString *)was to:(NSString *)name;
 @property (nonatomic, readonly) RDLCodeModule *codeModule;
+// The functions the report's code gives expressions to call as Code.Name, in
+// order of name; empty when it has no code.
+- (NSArray<NSString *> *)codeFunctionNames;
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, strong) RDLPage *page;
 @property (nonatomic, strong) RDLBand *pageHeader;
