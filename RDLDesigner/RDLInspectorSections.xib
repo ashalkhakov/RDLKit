@@ -68,6 +68,16 @@
                 <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
                 <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
+                <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
+                <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
+                <outlet property="noRowsMessageExprButton" destination="noRowsMessageExprButton" id="noRowsMessageExprButtonOutlet"/>
+                <outlet property="layoutDirectionPop" destination="layoutDirectionPop" id="layoutDirectionPopOutlet"/>
+                <outlet property="groupsBeforeRowHeadersField" destination="groupsBeforeRowHeadersField" id="groupsBeforeRowHeadersFieldOutlet"/>
+                <outlet property="repeatColumnHeadersCheck" destination="repeatColumnHeadersCheck" id="repeatColumnHeadersCheckOutlet"/>
+                <outlet property="repeatRowHeadersCheck" destination="repeatRowHeadersCheck" id="repeatRowHeadersCheckOutlet"/>
+                <outlet property="fixedColumnHeadersCheck" destination="fixedColumnHeadersCheck" id="fixedColumnHeadersCheckOutlet"/>
+                <outlet property="fixedRowHeadersCheck" destination="fixedRowHeadersCheck" id="fixedRowHeadersCheckOutlet"/>
+                <outlet property="omitBorderCheck" destination="omitBorderCheck" id="omitBorderCheckOutlet"/>
                 <outlet property="printBox" destination="printBox" id="printBoxOutlet"/>
                 <outlet property="printOnFirstPageCheck" destination="printOnFirstPageCheck" id="printOnFirstPageCheckOutlet"/>
                 <outlet property="printOnLastPageCheck" destination="printOnLastPageCheck" id="printOnLastPageCheckOutlet"/>
@@ -696,6 +706,140 @@
                     </buttonCell>
                     <connections>
                         <action selector="changed:" target="-2" id="printOnLastPageCheckAction"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+        <customView id="tablixOptionsBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="216"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblNoRows">
+                    <rect key="frame" x="10" y="4" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="When there are no rows, show" id="lblNoRowsCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="What the table shows instead of itself when its dataset has no rows" focusRingType="none" id="noRowsMessageField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="20" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="noRowsMessageFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="noRowsMessageFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="noRowsMessageFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="noRowsMessageExprButton">
+                    <rect key="frame" x="226" y="20" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="noRowsMessageExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="noRowsMessageExprButtonAction"/>
+                    </connections>
+                </button>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblDirection">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Columns run" id="lblDirectionCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton toolTip="Left to right, or right to left" id="layoutDirectionPop">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="layoutDirectionPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="layoutDirectionPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="layoutDirectionPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblGroupsBefore">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="Groups before rows" id="lblGroupsBeforeCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="How many column groups are drawn above the corner, before the row headers" focusRingType="none" id="groupsBeforeRowHeadersField">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="groupsBeforeRowHeadersFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="groupsBeforeRowHeadersFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="groupsBeforeRowHeadersFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Draw the column headers again at the top of every page the table runs onto" id="repeatColumnHeadersCheck">
+                    <rect key="frame" x="10" y="92" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Repeat column headers on each page" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="repeatColumnHeadersCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="repeatColumnHeadersCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Draw the row headers again at the left of every page the table runs across" id="repeatRowHeadersCheck">
+                    <rect key="frame" x="10" y="116" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Repeat row headers on each page" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="repeatRowHeadersCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="repeatRowHeadersCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Keep the column headers visible while the table is scrolled, in an interactive viewer" id="fixedColumnHeadersCheck">
+                    <rect key="frame" x="10" y="140" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Keep column headers in view" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="fixedColumnHeadersCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="fixedColumnHeadersCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Keep the row headers visible while the table is scrolled, in an interactive viewer" id="fixedRowHeadersCheck">
+                    <rect key="frame" x="10" y="164" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Keep row headers in view" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="fixedRowHeadersCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="fixedRowHeadersCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Leave the table's border out along a page break" id="omitBorderCheck">
+                    <rect key="frame" x="10" y="188" width="240" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="No border where a page breaks" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="omitBorderCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="omitBorderCheckAction"/>
                     </connections>
                 </button>
             </subviews>

@@ -26,6 +26,9 @@ typedef NS_ENUM(NSInteger, RDLFieldKind) {
   RDLFieldKindText = 0,
   // NSTextField holding an inch measurement, shown to three decimals.
   RDLFieldKindNumber,
+  // NSTextField holding a whole number, never below zero: a count, not a
+  // measurement.
+  RDLFieldKindInteger,
   // NSTextField holding an RDL measurement written with its unit ("10pt",
   // "0.5in"), bound to an RDLLength rather than a string.
   RDLFieldKindLength,

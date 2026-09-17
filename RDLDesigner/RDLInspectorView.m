@@ -120,6 +120,15 @@
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
 @property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
+// A tablix's own settings: what it shows with no rows, which way its columns
+// run, and how its headers behave across pages and when scrolled.
+@property (nonatomic, strong) IBOutlet NSView *tablixOptionsBox;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *noRowsMessageField;
+@property (nonatomic, strong) IBOutlet NSButton *noRowsMessageExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
+@property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
+@property (nonatomic, strong) IBOutlet NSButton *repeatColumnHeadersCheck, *repeatRowHeadersCheck,
+    *fixedColumnHeadersCheck, *fixedRowHeadersCheck, *omitBorderCheck;
 // What every report item has, in the sections that apply to its kind: whether
 // it shows and what toggles it; a link (a text box's or an image's); keeping it
 // on one page; and the page breaks and page name of a region or rectangle.
@@ -198,14 +207,14 @@
                          _padLeftExprButton, _padRightExprButton, _padTopExprButton,
                          _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
                          _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
-                         _initialPageNameExprButton ])
+                         _initialPageNameExprButton, _noRowsMessageExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _tablixBox, _cellBox, _nameBox, _visibilityBox,
+                 _subreportBox, _chartBox, _tablixBox, _tablixOptionsBox, _cellBox, _nameBox, _visibilityBox,
                  _linkBox, _keepBox, _pageBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
@@ -338,6 +347,24 @@
              kind:RDLFieldKindValue values:nil placeholder:@"False"];
   [_bindings bind:_pageNameField keyPath:@"pageName" scope:RDLFieldScopeItem
              kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_noRowsMessageField keyPath:@"noRowsMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText values:nil placeholder:nil];
+  [_bindings bind:_layoutDirectionPop
+          keyPath:@"layoutDirection"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_layoutDirectionPop, RDLLayoutDirectionLTR, RDLLayoutDirectionRTL,
+                               ^(NSInteger v) { return v == RDLLayoutDirectionRTL ? @"Right to left" : @"Left to right"; })
+      placeholder:nil];
+  [_bindings bind:_groupsBeforeRowHeadersField keyPath:@"groupsBeforeRowHeaders" scope:RDLFieldScopeItem
+             kind:RDLFieldKindInteger values:nil placeholder:nil];
+  for (NSArray *pair in @[ @[ @"repeatColumnHeadersCheck", @"repeatColumnHeaders" ],
+                           @[ @"repeatRowHeadersCheck", @"repeatRowHeaders" ],
+                           @[ @"fixedColumnHeadersCheck", @"fixedColumnHeaders" ],
+                           @[ @"fixedRowHeadersCheck", @"fixedRowHeaders" ],
+                           @[ @"omitBorderCheck", @"omitBorderOnPageBreak" ] ])
+    [_bindings bind:[self valueForKey:pair[0]] keyPath:pair[1] scope:RDLFieldScopeItem
+               kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
   [_bindings bind:_printOnFirstPageCheck keyPath:@"printOnFirstPage" scope:RDLFieldScopeBand
              kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
   [_bindings bind:_printOnLastPageCheck keyPath:@"printOnLastPage" scope:RDLFieldScopeBand
@@ -647,6 +674,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
         [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
+      [boxes addObject:_tablixOptionsBox];
       [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
@@ -997,6 +1025,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _pageBreakDisabledField.expressionContext = RDLExpressionContextBoolean;
   _pageNameField.expressionContext = RDLExpressionContextText;
   _initialPageNameField.expressionContext = RDLExpressionContextText;
+  _noRowsMessageField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -1022,6 +1051,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _pageBreakDisabledExprButton) return _pageBreakDisabledField;
   if (sender == _pageNameExprButton) return _pageNameField;
   if (sender == _initialPageNameExprButton) return _initialPageNameField;
+  if (sender == _noRowsMessageExprButton) return _noRowsMessageField;
   return nil;
 }
 

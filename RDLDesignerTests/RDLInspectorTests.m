@@ -1134,6 +1134,58 @@
     XCTFail(@"%@", @"the header's settings should survive a save");
 }
 
+// A tablix's own settings, in a section of their own: its no-rows message,
+// which way its columns run, how many column groups come before the row
+// headers, and how its headers behave across pages and when scrolled.
+- (void)testTheTablixOptionsAreEdited {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1200)
+                                                                context:ctx];
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  if ([[inspector valueForKey:@"tablixOptionsBox"] isHidden])
+    XCTFail(@"%@", @"a tablix should show its options");
+  NSTextField *message = [inspector valueForKey:@"noRowsMessageField"];
+  [message setStringValue:@"=\"Nothing for \" & Parameters!Region.Value"];
+  [inspector changed:message];
+  NSPopUpButton *direction = [inspector valueForKey:@"layoutDirectionPop"];
+  [direction selectItemWithTitle:@"Right to left"];
+  [inspector changed:direction];
+  NSTextField *before = [inspector valueForKey:@"groupsBeforeRowHeadersField"];
+  [before setStringValue:@"2"];
+  [inspector changed:before];
+  for (NSString *name in @[ @"repeatColumnHeadersCheck", @"repeatRowHeadersCheck", @"fixedColumnHeadersCheck",
+                            @"fixedRowHeadersCheck", @"omitBorderCheck" ]) {
+    NSButton *check = [inspector valueForKey:name];
+    [check setState:NSOnState];
+    [inspector changed:check];
+  }
+  if (![tablix.noRowsMessage hasPrefix:@"=\"Nothing for"] || tablix.layoutDirection != RDLLayoutDirectionRTL ||
+      tablix.groupsBeforeRowHeaders != 2 || !tablix.repeatColumnHeaders || !tablix.repeatRowHeaders ||
+      !tablix.fixedColumnHeaders || !tablix.fixedRowHeaders || !tablix.omitBorderOnPageBreak)
+    XCTFail(@"%@", @"each option should be written to the tablix");
+  [before setStringValue:@"-3"];
+  [inspector changed:before];
+  if (tablix.groupsBeforeRowHeaders != 0)
+    XCTFail(@"a count below zero is zero, not %ld", (long)tablix.groupsBeforeRowHeaders);
+  [ctx.document.undoManager undo];
+  if (tablix.groupsBeforeRowHeaders != 2)
+    XCTFail(@"%@", @"undo should put the count back");
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTablix *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      saved = (RDLTablix *)it;
+  if (saved.layoutDirection != RDLLayoutDirectionRTL || saved.groupsBeforeRowHeaders != 2 ||
+      !saved.repeatColumnHeaders || !saved.omitBorderOnPageBreak || ![saved.noRowsMessage hasPrefix:@"=\"Nothing for"])
+    XCTFail(@"%@", @"the options should survive a save");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

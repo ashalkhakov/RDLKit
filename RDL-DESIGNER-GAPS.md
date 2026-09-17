@@ -292,7 +292,8 @@ not yet keep that.
 | Details `SortExpressions` | UI (engine FULL) | |
 | Row heights other than the heading and value rows | UI | Kept; no control. |
 | Rows inserted or deleted on their own | UI (model has them) | The canvas menu offers columns; rows come with groups and totals. |
-| Tablix `NoRowsMessage`, `SortExpressions`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | UI | |
+| Tablix `NoRowsMessage`, repeat/fixed headers, `LayoutDirection`, `GroupsBeforeRowHeaders`, `OmitBorderOnPageBreak` | Done | A section of the tablix's own. |
+| Tablix `SortExpressions` | UI | |
 | `TablixCorner` content | UI (engine FULL) | Kept and drawn; not edited. |
 | Nested tablix or chart in a cell | UI (was MODEL) | |
 | A "List" preset | UI | |

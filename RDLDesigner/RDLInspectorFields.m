@@ -148,6 +148,9 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
             setStringValue:[NSString stringWithFormat:@"%.3f",
                                      RDLUnitsFromInches([value doubleValue], report.unit)]];
         break;
+      case RDLFieldKindInteger:
+        [(NSTextField *)b.control setStringValue:[NSString stringWithFormat:@"%ld", (long)[value integerValue]]];
+        break;
       case RDLFieldKindLength: {
         RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
         [(NSTextField *)b.control
@@ -253,6 +256,9 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
         // the inches everything downstream measures in.
         value = @(RDLInchesFromUnits([[(NSTextField *)b.control stringValue] doubleValue],
                                      editor.document.report.unit));
+        break;
+      case RDLFieldKindInteger:
+        value = @(MAX([[(NSTextField *)b.control stringValue] integerValue], (NSInteger)0));
         break;
       case RDLFieldKindLength:
         // Clearing the field removes the measurement rather than storing zero.
