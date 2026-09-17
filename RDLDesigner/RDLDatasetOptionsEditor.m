@@ -176,7 +176,8 @@ static NSInteger RDLChosen(NSPopUpButton *pop, NSArray<NSNumber *> *choices, NSI
   for (RDLParameter *reportParameter in _context.report.parameters)
     if ([reportParameter.name length] && ![taken containsObject:[reportParameter.name lowercaseString]]) {
       added.name = reportParameter.name;
-      added.value = [RDLValue valueWithSource:[NSString stringWithFormat:@"=Parameters!%@.Value", reportParameter.name]];
+      NSString *reads = [NSString stringWithFormat:@"=Parameters!%@.Value", reportParameter.name];
+      added.value = [RDLValue valueWithSource:reads];
       break;
     }
   if (added.name == nil) {

@@ -153,7 +153,8 @@ static NSArray<NSNumber *> *RDLPageBreakChoices(void) {
 
 - (void)syncSortingButton {
   NSUInteger count = [_sorts count];
-  [_sortingButton setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
+  [_sortingButton
+      setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
 }
 
 static RDLValue *RDLValueInField(NSTextField *field) {

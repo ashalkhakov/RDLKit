@@ -453,7 +453,9 @@
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_layoutDirectionPop, RDLLayoutDirectionLTR, RDLLayoutDirectionRTL,
-                               ^(NSInteger v) { return v == RDLLayoutDirectionRTL ? @"Right to left" : @"Left to right"; })
+                               ^(NSInteger v) {
+                                 return v == RDLLayoutDirectionRTL ? @"Right to left" : @"Left to right";
+                               })
       placeholder:nil];
   [_bindings bind:_groupsBeforeRowHeadersField keyPath:@"groupsBeforeRowHeaders" scope:RDLFieldScopeItem
              kind:RDLFieldKindInteger values:nil placeholder:nil];
@@ -900,8 +902,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
                                                                           (unsigned long)pictures]
                                              : @"Embedded Images…"];
     NSUInteger variables = [report.variables count];
-    [_reportVariablesButton setTitle:variables ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)variables]
-                                               : @"Variables…"];
+    [_reportVariablesButton
+        setTitle:variables ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)variables] : @"Variables…"];
     [self stackBoxes:@[ _docBox, _paperBox ]];
   }
 

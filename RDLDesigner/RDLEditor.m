@@ -378,7 +378,8 @@ static void RDLRenameDataSetInItems(NSArray *items, NSString *from, NSString *to
   BOOL sameLabels = [oldLabels count] == [labels count];
   for (NSString *key in labels)
     sameLabels = sameLabels && [[oldLabels[key] source] isEqualToString:[labels[key] source]];
-  BOOL sameValues = [[parameter.validValues valueForKey:@"source"] isEqualToArray:[values valueForKey:@"source"] ?: @[]];
+  NSArray *wasSources = [parameter.validValues valueForKey:@"source"];
+  BOOL sameValues = [wasSources isEqualToArray:[values valueForKey:@"source"] ?: @[]];
   if (sameValues && sameLabels)
     return;
   [self beginGroup:@"Edit Parameter"];
