@@ -5,6 +5,7 @@
 #import "RDLDesignerTestSupport.h"
 #import "RDLBordersEditor.h"
 #import "RDLChartAxisEditor.h"
+#import "RDLChartSeriesEditor.h"
 
 
 
@@ -1352,6 +1353,110 @@
   [ctx.document.undoManager undo];
   if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
     XCTFail(@"%@", @"an untouched panel should record nothing to undo");
+}
+
+// The series panel: series added, retyped, put on another axis, coloured,
+// marked and labelled, moved and removed, applied as one step -- and a marker
+// size that is no size, or two series of one name, refused.
+- (void)testTheSeriesPanelSetsEachSeries {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  RDLField *pieces = [[RDLField alloc] init];
+  pieces.name = @"Pieces";
+  pieces.dataField = @"Pieces";
+  [report dataSetNamed:chart.dataSetName].fields = @[ pieces ];
+  chart.valueField = @"Pieces";
+  RDLChartAxis *share = [[RDLChartAxis alloc] init];
+  share.name = @"Share";
+  [chart.secondaryValueAxes addObject:share];
+  NSString *before = [RDLEditor XMLStringForItem:chart];
+
+  RDLChartSeriesEditor *panel = [RDLChartSeriesEditor editorForChart:chart context:ctx];
+  NSPopUpButton *typePop = [panel valueForKey:@"typePop"];
+  NSPopUpButton *subtypePop = [panel valueForKey:@"subtypePop"];
+  if (panel.shownSeries != panel.chart.series[0] || [typePop indexOfSelectedItem] != 0 || [subtypePop isEnabled])
+    XCTFail(@"%@", @"the first series should show, following the chart's type");
+
+  [panel addSeries:nil];
+  RDLChartSeries *added = panel.shownSeries;
+  if ([panel.chart.series count] != 2 || added != panel.chart.series[1] ||
+      ![[added.value source] isEqualToString:@"=Sum(Fields!Pieces.Value)"] ||
+      [added.name isEqualToString:[panel.chart.series[0] name]])
+    XCTFail(@"a new series should be selected, summing the first field under a name of its own, reads %@ %@",
+            added.name, [added.value source]);
+  [typePop selectItemWithTitle:@"Line"];
+  [panel typeChanged:typePop];
+  if (![subtypePop isEnabled] || [[panel valueForKey:@"xField"] isEnabled] ||
+      [[panel valueForKey:@"highField"] isEnabled])
+    XCTFail(@"%@", @"a line of its own should have a variant, and no X or high value");
+  [subtypePop selectItemWithTitle:@"Smooth"];
+  [(NSPopUpButton *)[panel valueForKey:@"axisPop"] selectItemWithTitle:@"Share"];
+  [(NSTextField *)[panel valueForKey:@"colorField"] setStringValue:@"#c0392b"];
+  [(NSPopUpButton *)[panel valueForKey:@"markerPop"] selectItemWithTitle:@"Diamond"];
+  [(NSTextField *)[panel valueForKey:@"markerSizeField"] setStringValue:@"big"];
+  [(NSButton *)[panel valueForKey:@"labelsCheck"] setState:NSOnState];
+  [(NSPopUpButton *)[panel valueForKey:@"labelPositionPop"] selectItemWithTitle:@"Top"];
+  [(NSTextField *)[panel valueForKey:@"labelTextField"] setStringValue:@"=FormatPercent(Fields!Pieces.Value)"];
+  if ([panel apply] || ![[[panel valueForKey:@"messageLabel"] stringValue] containsString:@"marker size"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"a marker size that is no size should be refused, and the chart left alone");
+  if ([panel showSeriesAtIndex:0] || panel.shownSeries != added)
+    XCTFail(@"%@", @"the panel should stay on the series whose marker size is wrong");
+  [(NSTextField *)[panel valueForKey:@"markerSizeField"] setStringValue:@"6pt"];
+  // A bubble plots an X and a size; the line keeps what it was set to.
+  if (![panel showSeriesAtIndex:0])
+    XCTFail(@"%@", @"the first series should show again");
+  [typePop selectItemWithTitle:@"Bubble"];
+  [panel typeChanged:typePop];
+  if (![[panel valueForKey:@"xField"] isEnabled] || ![[panel valueForKey:@"sizeField"] isEnabled])
+    XCTFail(@"%@", @"a bubble should take an X value and a size");
+  [typePop selectItemAtIndex:0];
+  [panel typeChanged:typePop];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+
+  RDLChartSeries *line = chart.series[1];
+  if ([chart.series count] != 2 || [chart.series[0] type] != RDLChartTypeUnspecified ||
+      line.type != RDLChartTypeLine || line.subtype != RDLChartSubtypeSmooth ||
+      ![line.valueAxisName isEqualToString:@"Share"] || ![line.pointStyle.color isEqualToString:@"#c0392b"] ||
+      line.marker.type != RDLChartMarkerTypeDiamond || ![[line.marker.size source] isEqualToString:@"6pt"] ||
+      !line.dataLabel.visible || line.dataLabel.position != RDLChartDataLabelPositionTop ||
+      ![line.dataLabel.label isExpression])
+    XCTFail(@"%@", @"the series should be set as the panel had them");
+  NSString *after = [RDLEditor XMLStringForItem:chart];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = it;
+  if (![[RDLEditor XMLStringForItem:saved] isEqualToString:after])
+    XCTFail(@"%@", @"the series should survive a save");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the series back");
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"redo should set them again");
+
+  // Two series of one name are refused; moved and removed, they are kept.
+  RDLChartSeriesEditor *again = [RDLChartSeriesEditor editorForChart:chart context:ctx];
+  id<NSTableViewDataSource> rows = (id<NSTableViewDataSource>)again;
+  NSTableView *table = [again valueForKey:@"table"];
+  NSTableColumn *nameColumn = [table tableColumnWithIdentifier:@"name"];
+  [rows tableView:table setObjectValue:[chart.series[0] name] forTableColumn:nameColumn row:1];
+  if ([again apply] || ![[[again valueForKey:@"messageLabel"] stringValue] containsString:@"Two series"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"two series of one name should be refused");
+  [rows tableView:table setObjectValue:@"Trend" forTableColumn:nameColumn row:1];
+  [again showSeriesAtIndex:1];
+  [again moveSeriesUp:nil];
+  [again showSeriesAtIndex:1];
+  [again removeSeries:nil];
+  if (![again apply] || [chart.series count] != 1 || ![[chart.series[0] name] isEqualToString:@"Trend"] ||
+      [chart.series[0] type] != RDLChartTypeLine)
+    XCTFail(@"%@", @"the line, renamed and moved first, should be all that is left");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to

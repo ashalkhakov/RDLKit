@@ -814,6 +814,16 @@ static void RDLTransplantChart(RDLChart *into, RDLChart *from) {
   [self noteChange:[RDLChange structureChange:chart bandKey:nil]];
 }
 
+- (BOOL)setSeriesOfChart:(RDLChart *)chart from:(RDLChart *)edited {
+  if (![edited isKindOfClass:[RDLChart class]])
+    return NO;
+  return [self changeChart:chart
+                    action:@"Series Properties"
+                    change:^{
+                      chart.series = edited.series;
+                    }];
+}
+
 - (BOOL)setAxesOfChart:(RDLChart *)chart from:(RDLChart *)edited {
   if (![edited isKindOfClass:[RDLChart class]])
     return NO;

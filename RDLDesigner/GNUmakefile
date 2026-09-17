@@ -41,6 +41,7 @@ RDLDesigner_OBJC_FILES = \
   RDLFilterEditor.m \
   RDLSortEditor.m \
   RDLChartAxisEditor.m \
+  RDLChartSeriesEditor.m \
   RDLGroupPropertiesEditor.m \
   RDLBordersEditor.m \
   RDLSubreportParametersEditor.m \
@@ -96,6 +97,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLFilterEditor.xib \
   RDLSortEditor.xib \
   RDLChartAxisEditor.xib \
+  RDLChartSeriesEditor.xib \
   RDLGroupPropertiesEditor.xib \
   RDLBordersEditor.xib \
   RDLSubreportParametersEditor.xib \

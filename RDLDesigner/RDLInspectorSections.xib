@@ -81,6 +81,7 @@
                 <outlet property="noDataMessageField" destination="noDataMessageField" id="noDataMessageFieldOutlet"/>
                 <outlet property="noDataMessageExprButton" destination="noDataMessageExprButton" id="noDataMessageExprButtonOutlet"/>
                 <outlet property="chartAxesButton" destination="chartAxesButton" id="chartAxesButtonOutlet"/>
+                <outlet property="chartSeriesButton" destination="chartSeriesButton" id="chartSeriesButtonOutlet"/>
                 <outlet property="tablixSortingButton" destination="tablixSortingButton" id="tablixSortingButtonOutlet"/>
                 <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
                 <outlet property="noRowsMessageExprButton" destination="noRowsMessageExprButton" id="noRowsMessageExprButtonOutlet"/>
@@ -870,8 +871,19 @@
                         <action selector="editExpression:" target="-2" id="noDataMessageExprButtonAction"/>
                     </connections>
                 </button>
+                <button toolTip="What the chart plots: each series, drawn as what, against which axis, with which markers and labels" id="chartSeriesButton">
+                    <rect key="frame" x="10" y="208" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="Series…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="chartSeriesButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editChartSeries:" target="-2" id="chartSeriesButtonAction"/>
+                    </connections>
+                </button>
                 <button toolTip="The chart's axes: their titles, ranges, intervals, grid lines and tick marks" id="chartAxesButton">
-                    <rect key="frame" x="10" y="208" width="240" height="22"/>
+                    <rect key="frame" x="136" y="208" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="Axes…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="chartAxesButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>

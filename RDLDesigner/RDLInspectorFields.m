@@ -4,6 +4,20 @@
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 
+NSString *RDLWordsOfName(NSString *name) {
+  NSMutableString *words = [NSMutableString string];
+  NSCharacterSet *upper = [NSCharacterSet uppercaseLetterCharacterSet];
+  for (NSUInteger i = 0; i < [name length]; i++) {
+    NSString *letter = [name substringWithRange:NSMakeRange(i, 1)];
+    if (i > 0 && [upper characterIsMember:[name characterAtIndex:i]]) {
+      [words appendString:@" "];
+      letter = [letter lowercaseString];
+    }
+    [words appendString:letter];
+  }
+  return words;
+}
+
 @implementation RDLFieldBinding
 @end
 

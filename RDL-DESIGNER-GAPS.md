@@ -160,8 +160,8 @@ UI.
 | Tablix | Cell selection; any simple item or subreport in a cell | Yes |
 | Tablix | Per-cell border/background/padding, merged cells, static members, group sort/page break/visibility, per-row heights, corner, `NoRowsMessage`, sort, repeat/fixed headers | — |
 | Chart | Type, subtype, dataset, title and its position, palette, legend, no-data message, category field, value field, Filters… | Every type |
-| Chart | Axes (Axis Properties) | Every axis |
-| Chart | Series, labels, markers, custom palette colours | — |
+| Chart | Axes (Axis Properties); series, their types, axes, colours, markers and labels (Series Properties) | Every axis and series |
+| Chart | Custom palette colours, groupings beyond the outermost | — |
 | Expressions | Editor with categories, function picker, parse status; completion | Yes; completion is a hard-coded list of ~90 names, not the engine catalogue |
 | Expressions | Semantic checking | — (`RDLChecker` runs only in the new-report wizard) |
 | Canvas | Selection | Single item (or one cell) |
@@ -307,11 +307,13 @@ not yet keep that.
 | Spec feature | Bin | Notes |
 |---|---|---|
 | Subtypes (Stacked, PercentStacked, Smooth, Exploded, Stepped) | Done | In the chart's section. A series that says what the chart says follows it, so a chart read from a file is retyped by the popup; a series of its own type keeps it. |
-| The High/Low and Start/End values a Range or Stock chart plots | UI | Every type the kit models is in the popup, from the enumeration, and a chart keeps the type its file gave it. What it plots has no control. |
-| Multiple series, series grouping, per-series type | UI | The inspector edits the first series, and the outermost category and series group; groups nested inside those are kept as the file has them. |
+| The High/Low and Start/End values a Range or Stock chart plots | Done | Series Properties, with the X and size a scatter or bubble plots; each is offered for the types that plot it. |
+| Multiple series, per-series type | Done | Series Properties: added, removed, reordered and named; each drawn as the chart's type or one of its own, with a variant. |
+| Series grouping beyond the outermost | UI | The inspector edits the outermost category and series group; groups nested inside those are kept as the file has them. |
 | Legend hidden/position/layout, title position, palette, no-data message | Done | In the chart's section; the title's position is off while there is no title, which is what it is written with. |
 | Axis title and its position, shown or hidden, min/max/interval/label interval, number format, margin, major and minor grid lines and tick marks, scalar, side | Done | Axis Properties, from the chart's section: the category axis, the value axis and each further value axis, applied as one step. |
-| Axis title style, grid line style, tick mark length and their own intervals; custom palette colours, markers, data labels, which value axis a series uses, series and point style, X/Size values | UI (was partly MODEL) | Engine draws them. |
+| Markers, data labels, which value axis a series uses, a point's colour | Done | Series Properties, on the data point, which is what Report Builder writes and what wins when drawn. |
+| Axis title style, grid line style, tick mark length and their own intervals; custom palette colours; a series' own style, marker and label beside its points'; a label's rotation and style | UI (was partly MODEL) | Engine draws them. |
 | 3D, strip lines, scale breaks, border skin, empty points, BoxPlot/ErrorBar/TreeMap | MODEL | Kept and written back. |
 
 ### 4.9 Other report items
@@ -466,7 +468,9 @@ In rough order of how often a Report Builder user reaches for it:
 5. Chart: subtype, legend, titles, axes, palette, data labels, markers,
    series list with per-series type and value axis, range/stock values.
    Done: subtype, palette, legend, the title's position and the no-data
-   message, in the chart's section; the axes, in Axis Properties.
+   message, in the chart's section; the axes, in Axis Properties; the
+   series, with per-series type, value axis, range and stock values,
+   markers and labels, in Series Properties. Left: custom palette colours.
 6. Parameters: `Hidden`, `AllowBlank`, labels, ordering, multi-value
    defaults and data-pane entry.
 7. Textbox: `CanGrow`, `CanShrink`, `HideDuplicates`.

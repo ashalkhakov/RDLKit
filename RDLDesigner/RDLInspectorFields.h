@@ -14,6 +14,10 @@
 @class RDLItem;
 @class RDLReport;
 
+// A name as the model spells it, as words for a popup: "PercentStacked" is
+// "Percent stacked".
+FOUNDATION_EXPORT NSString *RDLWordsOfName(NSString *name);
+
 typedef NS_ENUM(NSInteger, RDLFieldScope) {
   RDLFieldScopeItem = 0,
   RDLFieldScopeBand,

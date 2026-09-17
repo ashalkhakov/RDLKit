@@ -162,6 +162,8 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 // A chart's axes, from a copy of the chart the axis panel edited, as one
 // undoable step. NO, recording nothing, when they are as they were.
 - (BOOL)setAxesOfChart:(RDLChart *)chart from:(RDLChart *)edited;
+// Its series, likewise, from a copy the series panel edited.
+- (BOOL)setSeriesOfChart:(RDLChart *)chart from:(RDLChart *)edited;
 // The corner cell at a corner row and column, made as an undoable structural
 // edit when the file wrote none. nil past the corner.
 - (RDLTablixCell *)makeCornerCellAtRow:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix;

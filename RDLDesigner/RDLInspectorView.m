@@ -11,6 +11,7 @@
 #import "RDLFilterEditor.h"
 #import "RDLSortEditor.h"
 #import "RDLChartAxisEditor.h"
+#import "RDLChartSeriesEditor.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -137,6 +138,7 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *legendPositionPop, *legendLayoutPop;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *noDataMessageField;
 @property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton, *chartAxesButton;
+@property (nonatomic, strong) IBOutlet NSButton *chartSeriesButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
 @property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
@@ -259,8 +261,17 @@
   [self reload];
 }
 
-// A chart's axes, in a panel of their own: there are a dozen settings to each,
-// and a chart may have several.
+// A chart's series, and its axes, in panels of their own: a chart may have
+// several of each, and there are a dozen settings to each.
+- (void)editChartSeries:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  if ([RDLChartSeriesEditor runForChart:(RDLChart *)item context:_context])
+    [self reload];
+}
+
 - (void)editChartAxes:(id)sender {
   (void)sender;
   RDLItem *item = [_context selectedItem];
@@ -569,14 +580,14 @@
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_chartSubtypePop, RDLChartSubtypePlain, RDLChartSubtypeStepped,
-                               ^(NSInteger v) { return RDLWordsOf(RDLStringFromChartSubtype((RDLChartSubtype)v)); })
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromChartSubtype((RDLChartSubtype)v)); })
       placeholder:nil];
   [_bindings bind:_chartPalettePop
           keyPath:@"palette"
             scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_chartPalettePop, RDLChartPaletteDefault, RDLChartPaletteSeaGreen,
-                               ^(NSInteger v) { return RDLWordsOf(RDLStringFromChartPalette((RDLChartPalette)v)); })
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromChartPalette((RDLChartPalette)v)); })
       placeholder:nil];
   [_bindings bind:_chartTitlePositionPop
           keyPath:@"titlePosition"
@@ -584,7 +595,7 @@
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_chartTitlePositionPop, RDLChartTitlePositionTopCenter, RDLChartTitlePositionBottomLeft,
                                ^(NSInteger v) {
-                                 return RDLWordsOf(RDLStringFromChartTitlePosition((RDLChartTitlePosition)v));
+                                 return RDLWordsOfName(RDLStringFromChartTitlePosition((RDLChartTitlePosition)v));
                                })
       placeholder:nil];
   // Shown is the box ticked, and hidden what the model stores.
@@ -596,7 +607,7 @@
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_legendPositionPop, RDLChartLegendPositionTopLeft, RDLChartLegendPositionBottomRight,
                                ^(NSInteger v) {
-                                 return RDLWordsOf(RDLStringFromChartLegendPosition((RDLChartLegendPosition)v));
+                                 return RDLWordsOfName(RDLStringFromChartLegendPosition((RDLChartLegendPosition)v));
                                })
       placeholder:nil];
   [_bindings bind:_legendLayoutPop
@@ -605,7 +616,7 @@
              kind:RDLFieldKindPopUpIndex
            values:RDLFillPopUp(_legendLayoutPop, RDLChartLegendLayoutAutoTable, RDLChartLegendLayoutTallTable,
                                ^(NSInteger v) {
-                                 return RDLWordsOf(RDLStringFromChartLegendLayout((RDLChartLegendLayout)v));
+                                 return RDLWordsOfName(RDLStringFromChartLegendLayout((RDLChartLegendLayout)v));
                                })
       placeholder:nil];
   [_bindings bind:_noDataMessageField keyPath:@"noDataMessage" scope:RDLFieldScopeItem
@@ -648,21 +659,6 @@
 
 // A popup holding a whole vocabulary: every case from `first` to `last`, named
 // as the model names it, and the matching values for the binding to write.
-// A name as the model spells it, as words: "PercentStacked" is "Percent stacked".
-static NSString *RDLWordsOf(NSString *name) {
-  NSMutableString *words = [NSMutableString string];
-  NSCharacterSet *upper = [NSCharacterSet uppercaseLetterCharacterSet];
-  for (NSUInteger i = 0; i < [name length]; i++) {
-    NSString *letter = [name substringWithRange:NSMakeRange(i, 1)];
-    if (i > 0 && [upper characterIsMember:[name characterAtIndex:i]]) {
-      [words appendString:@" "];
-      letter = [letter lowercaseString];
-    }
-    [words appendString:letter];
-  }
-  return words;
-}
-
 static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NSInteger last,
                                          NSString *(^name)(NSInteger)) {
   [pop removeAllItems];
