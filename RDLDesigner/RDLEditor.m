@@ -1449,6 +1449,40 @@ static BOOL RDLTakeGroupSettings(RDLTablixMember *member, RDLTablixMember *setti
   [self endGroup];
 }
 
+#pragma mark - The whole report
+
+- (BOOL)replaceReportWithSource:(NSString *)source error:(NSError **)error {
+  RDLReport *parsed = [RDLParser reportFromXMLString:source ?: @"" error:error];
+  if (parsed == nil)
+    return NO;
+  // Written back out to compare, because the text is one of many ways to write
+  // the same report -- reformatting it, or typing an attribute in another
+  // order, is not an edit and should not land on the undo stack.
+  NSString *before = [_document XMLString];
+  if ([[RDLWriter XMLStringFromReport:parsed] isEqualToString:before ?: @""])
+    return YES;
+  [self takeReport:parsed undoingTo:before action:@"Edit Source"];
+  return YES;
+}
+
+// Undo of a replaced report is another replacement, from the text the report
+// was written as before it. A report is a graph rather than a value, so there
+// is nothing smaller to record here: the whole of it changed.
+- (void)restoreReportFromSource:(NSString *)source {
+  RDLReport *parsed = [RDLParser reportFromXMLString:source ?: @"" error:NULL];
+  if (parsed == nil)
+    return;
+  [self takeReport:parsed undoingTo:[_document XMLString] action:nil];
+}
+
+- (void)takeReport:(RDLReport *)report undoingTo:(NSString *)before action:(NSString *)action {
+  [self beginGroup:action];
+  [[self undoProxy] restoreReportFromSource:before];
+  [self endGroup];
+  [_document takeReport:report];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
 #pragma mark - Item transfer
 
 + (NSString *)XMLStringForItem:(RDLItem *)item {

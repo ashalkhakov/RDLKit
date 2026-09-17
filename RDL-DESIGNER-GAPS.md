@@ -507,9 +507,15 @@ with Shift-click and a marquee, moved, nudged and deleted together,
 with align, make-same-size and distribute in the Edit menu; eight
 handles; smart guides, which line a drag up with the edges, middles and
 sizes near it; drag reordering in the outline, which also moves an item
-into a rectangle or another band. The canvas has drawn what the
-backends draw since P1.1 -- lines, borders and padding through the same
-painters.
+into a rectangle or another band; an editable Source pane, where what is
+typed is read back as the report in one step that undoes, and text that
+will not parse changes nothing and says why. The canvas has drawn what
+the backends draw since P1.1 -- lines, borders and padding through the
+same painters.
+
+The Problems tab reached nothing until now: it had a button in the left
+tab bar but no pane of its own in the window, so choosing it selected a
+tab that was not there. It has one.
 
 ### P3 — matches the engine's P3
 

@@ -57,6 +57,12 @@
 
 - (void)loadReport:(RDLReport *)report;
 - (void)loadReport:(RDLReport *)report originURL:(NSURL *)originURL;
+// The report swapped for another as an *edit* rather than a load: undo and the
+// file stand, and the document is dirtied by whoever notes the change. What
+// re-parsing the edited source does, since a report typed out afresh is a new
+// object graph rather than a change to the one that is open. Everything else
+// edits the report in place through RDLEditor.
+- (void)takeReport:(RDLReport *)report;
 - (BOOL)openURL:(NSURL *)url error:(NSError **)error;
 - (BOOL)saveToURL:(NSURL *)url error:(NSError **)error;
 // Save back to `fileURL`; NO with a nil-safe error when there is no file yet.

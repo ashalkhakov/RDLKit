@@ -143,6 +143,16 @@ NSString *const RDLReportDocumentType = @"rdl";
   [self postChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
 }
 
+- (void)takeReport:(RDLReport *)report {
+  if (report == nil || report == _report)
+    return;
+  _report = report;
+  // The parameters a preview is run with belong to the report, so a report
+  // typed out afresh brings its own; the file, undo and dirty are untouched
+  // because this is an edit of the open document, not another document.
+  [self syncParamValuesFromReport];
+}
+
 // Reading into a document that already exists, rather than making one. The
 // document controller's own path goes through -readFromData:; this is for the
 // places that have a document in hand -- the generator window, and the tests.

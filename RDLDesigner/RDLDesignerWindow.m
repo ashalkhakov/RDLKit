@@ -1,6 +1,7 @@
 #import "RDLDesignerWindow.h"
 #import "RDLChange.h"
 #import "RDLSelection.h"
+#import "RDLSourceView.h"
 #import "RDLCanvasView.h"
 #import "RDLEditingContext.h"
 #import "RDLInspectorView.h"
@@ -80,8 +81,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 - (void)showDatasetFields:(BOOL)show;
 @property (nonatomic, strong) RDLInsertPalette *palette;
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
-@property (nonatomic, strong) IBOutlet NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
+// The report as RDL, and the way back: what is typed there becomes the report.
+@property (nonatomic, strong) RDLSourceView *sourceView;
 @property (nonatomic, strong) IBOutlet NSView *problemsHost;
 // What is wrong with the report, listed beside the ways into it.
 @property (nonatomic, strong) RDLProblemsView *problemsView;
@@ -107,7 +109,6 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 static const NSUInteger kRDLOpeningNotesShown = 8;
 
 @implementation RDLDesignerWindow {
-  BOOL _sourceNeedsRewrite;
   BOOL _presentedOpeningNotes;
   RDLExpressionFieldEditor *_fieldEditor;
 }
@@ -323,9 +324,9 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 
   NSString *showing = [[_centerTabView selectedTabViewItem] identifier];
   if (dataset)
-    [_centerTabView selectTabViewItemAtIndex:2];
+    [self showCentreTab:2];
   else if (source)
-    [_centerTabView selectTabViewItemAtIndex:3];
+    [self showCentreTab:3];
   else if ([showing isEqualToString:@"dataset"] || [showing isEqualToString:@"dataSource"])
     [self centerModeChanged:nil];  // back to whatever Preview/Source says
 }
@@ -784,18 +785,9 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
   RDLFillHost(_paletteHost, _palette);
 
-  // The source pane's text view and its scrollers are in the XIB. What is set
-  // here is not layout: the pane shows what the report would be written as,
-  // read-only for now -- editing it means parsing the result and deciding what
-  // to do when it does not parse, which is its own piece of work -- and source
-  // is read in a fixed pitch, in lines that are as long as they are rather than
-  // wrapped.
-  [_sourceText setEditable:NO];
-  [_sourceText setRichText:NO];
-  [_sourceText setFont:[NSFont userFixedPitchFontOfSize:11] ?: [NSFont systemFontOfSize:11]];
-  [[_sourceText textContainer] setWidthTracksTextView:NO];
-  [[_sourceText textContainer] setContainerSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
-  [_sourceText setHorizontallyResizable:YES];
+  _sourceView = [[RDLSourceView alloc] initWithFrame:[_sourceHost bounds] context:_context];
+  RDLFillHost(_sourceHost, _sourceView);
+  _sourceView.live = [self sourceIsVisible];
   [self reloadPanes];
 }
 
@@ -808,27 +800,18 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_parameterNavigator reload];
   [_parameterInspector showParameter:_parameterInspector.parameter];
   [_palette reload];
-  // The source is written when it is being looked at, not on every edit.
-  // Serialising the whole report to answer a change nobody can see is waste on
-  // any platform; on GNUstep it is worse than waste, because building and
-  // discarding an NSXMLDocument repeatedly damages the heap there -- see
+  // The source pane follows the report on its own, and writes it out only
+  // when it is the pane being looked at. Serialising the whole report to
+  // answer a change nobody can see is waste on any platform; on GNUstep it is
+  // worse than waste, because building and discarding an NSXMLDocument
+  // repeatedly damages the heap there -- see
   // Patches/gnustep-patch-repros/empty-loop.m, which kills a process in six
-  // rounds with no RDLKit UI in it at all. Doing it only when the pane is in
-  // front takes the fault off the path of every edit.
-  _sourceNeedsRewrite = YES;
-  [self rewriteSourceIfVisible];
+  // rounds with no RDLKit UI in it at all.
 }
 
 // Index 1 of the centre tabs is the source; 0 is the canvas and 2 the dataset.
 - (BOOL)sourceIsVisible {
   return [_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 1;
-}
-
-- (void)rewriteSourceIfVisible {
-  if (!_sourceNeedsRewrite || ![self sourceIsVisible])
-    return;
-  _sourceNeedsRewrite = NO;
-  [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
 }
 
 // The centre's Dataset tab shows one of the two, never both.
@@ -918,13 +901,18 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // again" when a dataset was showing.
 - (void)centerModeChanged:(id)sender {
   RDL_UNUSED(sender);
-  [_centerTabView selectTabViewItemAtIndex:[_centerMode selectedSegment] == 1 ? 1 : 0];
-  // Switching to the source is when it gets written.
-  [self rewriteSourceIfVisible];
+  [self showCentreTab:[_centerMode selectedSegment] == 1 ? 1 : 0];
+}
+
+// The one way the centre is switched, so the source pane always learns whether
+// it is the pane being looked at -- which is when it writes the report out.
+- (void)showCentreTab:(NSInteger)index {
+  [_centerTabView selectTabViewItemAtIndex:index];
+  _sourceView.live = [self sourceIsVisible];
 }
 
 - (void)showDatasetPane {
-  [_centerTabView selectTabViewItemAtIndex:2];
+  [self showCentreTab:2];
 }
 
 - (void)rightTabChanged:(id)sender {

@@ -18,6 +18,7 @@
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLProblemsView.h"
+#import "RDLSourceView.h"
 #import "RDLOutlineDataSource.h"
 #import "RDLValueListEditor.h"
 #import "RDLDatasetOptionsEditor.h"
@@ -365,11 +366,12 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   if ([xib rangeOfString:@"id=\"attributeTabView\""].location == NSNotFound)
     XCTFail(@"%@", @"the Attributes tab has nothing to swap between");
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
-  // Left: outline, datasets, insert. Centre: preview, source, dataset, data
-  // source -- the two things that are edited rather than drawn. Right: report,
-  // attributes -- and inside attributes, element, dataset field and parameter.
-  if (items != 12)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 12 panes across the four tab views, got %lu",
+  // Left: outline, datasets, insert, problems. Centre: preview, source,
+  // dataset, data source -- the two things that are edited rather than drawn.
+  // Right: report, attributes -- and inside attributes, element, dataset field
+  // and parameter.
+  if (items != 13)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 13 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
   // Both navigators have somewhere to live, and the data source pane has a
   // host of its own: a pane with no host is one nothing can reach.
@@ -432,21 +434,34 @@ static NSTabView *_centerTabViewOf(id wc) {
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is still empty", host]);
   }
 
-  // The source pane is not filled that way any more: its text view and
-  // scrollers come from the XIB, so what this checks is that the outlet
-  // arrived and that it is inside the pane rather than adrift.
-  NSTextView *source = [wc valueForKey:@"sourceText"];
+  // The source pane, and the problems pane beside the outline: both are views
+  // of their own hosted in the window, so a host with nothing in it is the
+  // state a missing tab used to leave them in.
+  RDLSourceView *source = [wc valueForKey:@"sourceView"];
   NSView *sourceHost = [wc valueForKey:@"sourceHost"];
   if (source == nil || ![source isDescendantOf:sourceHost])
-    XCTFail(@"%@", @"the source pane's text view is not in the source pane");
-  // Written when it is looked at, not on every edit -- so ask for it the way a
-  // user does, by switching the centre to the source.
+    XCTFail(@"%@", @"the source pane is not in the window");
+  if (![[wc valueForKey:@"problemsView"] isDescendantOf:[wc valueForKey:@"problemsHost"]])
+    XCTFail(@"%@", @"the problems pane is not in the window");
+  leftBar.selectedIndex = 3;
+  [wc leftTabChanged:leftBar];
+  if ([leftTabs indexOfTabViewItem:[leftTabs selectedTabViewItem]] != 3)
+    XCTFail(@"%@", @"the Problems pane is not reachable from its tab");
+  leftBar.selectedIndex = 0;
+  [wc leftTabChanged:leftBar];
+
+  // The source is written when it is looked at, not on every edit -- so ask
+  // for it the way a user does, by switching the centre to the source.
   NSTabView *centre = [wc valueForKey:@"centerTabView"];
-  [centre selectTabViewItemAtIndex:1];
-  [wc performSelector:@selector(rewriteSourceIfVisible)];
-  if ([[source string] length] == 0)
-    XCTFail(@"%@", @"the source pane is empty after being shown");
-  if ([[source string] rangeOfString:@"<Report"].location == NSNotFound)
+  [[wc valueForKey:@"centerMode"] setSelectedSegment:0];  // the canvas
+  [wc centerModeChanged:nil];
+  if (source.live)
+    XCTFail(@"%@", @"the source pane is writing the report out while nobody is looking at it");
+  [[wc valueForKey:@"centerMode"] setSelectedSegment:1];
+  [wc centerModeChanged:nil];
+  if ([centre indexOfTabViewItem:[centre selectedTabViewItem]] != 1)
+    XCTFail(@"%@", @"choosing Source did not show the source");
+  if ([source.sourceText rangeOfString:@"<Report"].location == NSNotFound)
     XCTFail(@"%@", @"the source pane is not showing the report as RDL");
 
   // Selecting an element shows the element inspector; selecting a dataset
@@ -1596,6 +1611,78 @@ static NSTabView *_centerTabViewOf(id wc) {
   }
   if ([pane.problems count] < 2 || sawWarningBeforeError)
     XCTFail(@"errors should come before warnings: %@", [pane.problems valueForKey:@"message"]);
+}
+
+// The source pane both ways: the report written out, and text read back as the
+// report -- one step that undoes, and nothing at all when it will not parse.
+- (void)testTheSourcePaneReadsBackWhatIsTypedIntoIt {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Typed"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Title";
+  box.value = @"Before";
+  box.width = 2;
+  box.height = 0.3;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLSourceView *pane = [[RDLSourceView alloc] initWithFrame:NSMakeRect(0, 0, 600, 400) context:ctx];
+
+  // Nothing is written until the pane is the one being looked at.
+  if ([pane.sourceText length])
+    XCTFail(@"%@", @"the source pane wrote the report out before it was shown");
+  pane.live = YES;
+  if ([pane.sourceText rangeOfString:@"Before"].location == NSNotFound)
+    XCTFail(@"the pane should show the report as RDL, shows %@", pane.sourceText);
+
+  // Typed into, it stops following the report and says so.
+  NSString *edited = [pane.sourceText stringByReplacingOccurrencesOfString:@"Before" withString:@"After"];
+  pane.sourceText = edited;
+  if (!pane.isEdited || [pane.status length] == 0)
+    XCTFail(@"typing should leave the pane edited, says %@", pane.status);
+
+  // Applied, the text becomes the report -- and what was selected in the old
+  // one does not survive into the new one, so the selection lets go of it.
+  if (![pane apply:nil])
+    XCTFail(@"%@ should have applied: %@", @"the edited source", pane.status);
+  RDLTextbox *now = (RDLTextbox *)[ctx.report.body.items firstObject];
+  if (![[now.value description] isEqualToString:@"After"])
+    XCTFail(@"the report should hold what was typed, holds %@", now.value);
+  if (ctx.selectedItem == box)
+    XCTFail(@"%@", @"the selection is still holding an item from the report that was replaced");
+  if (pane.isEdited)
+    XCTFail(@"%@", @"the pane should be following the report again once applied");
+
+  // One step, and it undoes.
+  [[ctx.document undoManager] undo];
+  RDLTextbox *back = (RDLTextbox *)[ctx.report.body.items firstObject];
+  if (![[back.value description] isEqualToString:@"Before"])
+    XCTFail(@"undo should put the report back, holds %@", back.value);
+  if ([pane.sourceText rangeOfString:@"Before"].location == NSNotFound)
+    XCTFail(@"the pane should follow the report back, shows %@", pane.sourceText);
+  [[ctx.document undoManager] redo];
+  if (![[[(RDLTextbox *)[ctx.report.body.items firstObject] value] description] isEqualToString:@"After"])
+    XCTFail(@"%@", @"redo should apply the edit again");
+
+  // Text that is not a report changes nothing and says why.
+  NSString *good = pane.sourceText;
+  pane.sourceText = @"<Report><Body>";
+  if ([pane apply:nil])
+    XCTFail(@"%@", @"half a document should not have applied");
+  if ([pane.status length] == 0)
+    XCTFail(@"%@", @"the pane should say why the text would not parse");
+  if (![[[(RDLTextbox *)[ctx.report.body.items firstObject] value] description] isEqualToString:@"After"])
+    XCTFail(@"%@", @"the report should be untouched by text that does not parse");
+
+  // Reverting throws the edits away.
+  [pane revert:nil];
+  if (pane.isEdited || ![pane.sourceText isEqualToString:good])
+    XCTFail(@"%@", @"reverting should hand the pane back to the report");
+
+  // Applying what is already open is not an edit: it records no undo step.
+  [[ctx.document undoManager] removeAllActions];
+  pane.sourceText = good;
+  if (![pane apply:nil] || [[ctx.document undoManager] canUndo])
+    XCTFail(@"%@", @"applying the report as it stands should record nothing");
 }
 
 // The outline reorders by dragging: a row dropped among another band's items

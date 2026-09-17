@@ -302,6 +302,15 @@ typedef NS_ENUM(NSInteger, RDLDistributeAxis) {
 // runs on that threw away formatting as soon as the rich-text panel closed.
 - (void)setPlainValue:(NSString *)value ofItem:(RDLItem *)item;
 
+// --- The whole report -----------------------------------------------------
+// The report replaced by whatever parsing `source` gives -- what applying an
+// edited Source pane does. NO with `error` and nothing changed when the text is
+// not a report, so a half-typed document costs nothing; YES recording nothing
+// when it parses to what is already open. Otherwise one step that undoes, back
+// to the report as it was rather than to the text as it was: the model is what
+// is edited here, and the source is a way of writing it down.
+- (BOOL)replaceReportWithSource:(NSString *)source error:(NSError **)error;
+
 // --- Item transfer (clipboard, duplicate) ---------------------------------
 // An item round-trips as RDL XML by hosting it in an otherwise empty report, so
 // the writer's tablix handling applies unchanged and a pasted item is a genuine

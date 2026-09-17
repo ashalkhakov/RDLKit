@@ -22,8 +22,27 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
     // generator and "edit this subreport" all need. Weak on that side: the
     // window controller holding this context is what decides its lifetime.
     _document.context = self;
+    // A change to the report as a whole may have taken away what is selected:
+    // re-parsing an edited source builds a new object graph, so the items the
+    // selection holds are no longer in the report even though they look like
+    // the ones that are. The selection checks itself rather than each such
+    // edit remembering to tell it.
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(documentDidChange:)
+                                                 name:RDLDocumentDidChangeNotification
+                                               object:_document];
   }
   return self;
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)documentDidChange:(NSNotification *)note {
+  RDLChange *change = [note userInfo][RDLChangeKey];
+  if (change.scope == RDLChangeScopeReport)
+    [_selection validateAgainstReport:_document.report];
 }
 
 - (instancetype)initWithReport:(RDLReport *)report {
