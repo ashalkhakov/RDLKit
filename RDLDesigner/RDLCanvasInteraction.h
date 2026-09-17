@@ -37,6 +37,9 @@
 // drop would land in. -1 when no column is being dragged.
 @property (nonatomic, readonly, strong) RDLTablix *dragTablix;
 @property (nonatomic, readonly, assign) NSInteger dragColumnTarget;
+// The box being drawn across the canvas to take hold of several items, in
+// model space; empty when none is being drawn.
+@property (nonatomic, readonly, assign) NSRect marqueeRect;
 
 - (void)mouseDown:(NSEvent *)event;
 - (void)mouseDragged:(NSEvent *)event;

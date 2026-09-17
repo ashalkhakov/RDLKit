@@ -299,7 +299,20 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
 }
 
 - (void)deleteSelectedItem {
-  RDLItem *item = [self selectedItem];
+  // Everything selected goes, as one step: a box drawn round five things and
+  // Delete is one act, and one undo puts them all back.
+  NSArray<RDLItem *> *items = _selection.items;
+  if ([items count] > 1) {
+    [_editor beginGroup:@"Delete"];
+    for (RDLItem *each in items)
+      [self deleteItem:each];
+    [_editor endGroup];
+    return;
+  }
+  [self deleteItem:[self selectedItem]];
+}
+
+- (void)deleteItem:(RDLItem *)item {
   if (item == nil)
     return;
   // An item that is a cell's contents is not in any band's item list: deleting

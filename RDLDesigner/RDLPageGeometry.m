@@ -25,6 +25,11 @@ NSRect RDLTablixHandleRect(NSRect itemRect) {
 
 NSString * const RDLHandleCell = @"cell";
 NSString * const RDLHandleSouthEast = @"se";
+NSString * const RDLDragMarquee = @"marquee";
+
+NSRect RDLRectBetween(NSPoint a, NSPoint b) {
+  return NSMakeRect(MIN(a.x, b.x), MIN(a.y, b.y), fabs(a.x - b.x), fabs(a.y - b.y));
+}
 NSString * const RDLHandleEast = @"e";
 NSString * const RDLHandleSouth = @"s";
 
@@ -321,6 +326,19 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p) {
   if (outBandKey)
     *outBandKey = nil;
   return nil;
+}
+
+- (NSArray<RDLItem *> *)itemsIntersectingRect:(NSRect)rect inBandWithKey:(NSString *)bandKey {
+  NSMutableArray<RDLItem *> *found = [NSMutableArray array];
+  for (RDLBandFrame *bf in _bandFrames) {
+    if (![bf.bandKey isEqualToString:bandKey])
+      continue;
+    NSPoint origin = NSMakePoint(NSMinX(bf.frame), NSMinY(bf.frame));
+    for (RDLItem *item in bf.band.items)
+      if (NSIntersectsRect(rect, [self rectForItem:item origin:origin]))
+        [found addObject:item];
+  }
+  return found;
 }
 
 - (NSString *)bandKeyAtPoint:(NSPoint)point {

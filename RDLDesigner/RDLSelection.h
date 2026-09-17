@@ -41,8 +41,14 @@ extern NSString * const RDLSelectionDidChangeNotification;
 
 @interface RDLSelection : NSObject
 @property (nonatomic, readonly, assign) RDLSelectionScope scope;
-// The selected item, or nil unless scope is RDLSelectionScopeItem.
+// The selected item, or nil unless scope is RDLSelectionScopeItem. With
+// several selected this is the first of them: the one the others are aligned
+// and sized to, and the one the inspector shows.
 @property (nonatomic, readonly, strong) RDLItem *item;
+// Everything selected, in the order it was selected; empty unless the scope is
+// RDLSelectionScopeItem, and one long for an ordinary click. Several items are
+// selected on the canvas and moved, aligned, sized and deleted together.
+@property (nonatomic, readonly, copy) NSArray<RDLItem *> *items;
 // The dataset being edited, or the one the selected field belongs to; nil
 // unless the scope is RDLSelectionScopeDataSet or RDLSelectionScopeDatasetField.
 @property (nonatomic, readonly, strong) RDLDataSet *dataSet;
@@ -60,6 +66,14 @@ extern NSString * const RDLSelectionDidChangeNotification;
 - (void)selectReport;
 - (void)selectBandWithKey:(NSString *)bandKey;
 - (void)selectItem:(RDLItem *)item inBandWithKey:(NSString *)bandKey;
+// Several at once, in the order given; the first is the anchor. An empty list
+// selects the band.
+- (void)selectItems:(NSArray<RDLItem *> *)items inBandWithKey:(NSString *)bandKey;
+// Adds an item to the selection, or takes it out when it is already there --
+// what a shift-click does. Selecting nothing leaves the band selected.
+- (void)toggleItem:(RDLItem *)item inBandWithKey:(NSString *)bandKey;
+// Whether `item` is one of those selected.
+- (BOOL)isSelectedItem:(RDLItem *)item;
 // A dataset's field, or a report parameter. Passing nil selects the report,
 // which is what "nothing in particular" means everywhere else here.
 - (void)selectDataSet:(RDLDataSet *)dataSet;

@@ -302,6 +302,14 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
     for (RDLItem *it in RDLItemsInPaintOrder(bf.band.items))
       [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
   }
+  // The box being drawn to take hold of several items, over everything it is
+  // being drawn across.
+  if (!NSIsEmptyRect(overlay.marqueeRect)) {
+    [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:0.15] set];
+    NSRectFillUsingOperation(overlay.marqueeRect, NSCompositeSourceOver);
+    [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:0.9] set];
+    NSFrameRect(overlay.marqueeRect);
+  }
   [[NSGraphicsContext currentContext] restoreGraphicsState];
 }
 
@@ -420,7 +428,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
 }
 
 - (void)drawItem:(RDLItem *)it inRect:(NSRect)r {
-  BOOL sel = it == [_ctx selectedItem];
+  BOOL sel = [_ctx.selection isSelectedItem:it];
   if ([it isKindOfClass:[RDLLine class]]) {
     // The item's own width and height, not the rect: the rect is clamped to a
     // point tall so a flat line can still be seen, which is the very thing the
@@ -488,6 +496,10 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
   if (sel) {
     [[NSColor colorWithCalibratedRed:0.1 green:0.1 blue:0.09 alpha:1] set];
     NSFrameRect(NSInsetRect(r, -1, -1));
+    // The grips belong to the item a drag would resize, which is the one the
+    // inspector is showing: with several selected, the first of them.
+    if (it != [_ctx selectedItem])
+      return;
     NSRect handles[3] = {
         NSMakeRect(NSMaxX(r) - 3, NSMaxY(r) - 3, 6, 6),
         NSMakeRect(NSMaxX(r) - 3, NSMidY(r) - 3, 6, 6),

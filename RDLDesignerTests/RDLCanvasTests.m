@@ -510,4 +510,96 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"a column group should get a bracket of its own");
 }
 
+
+// Several items at once: Shift-clicking adds and removes, a box drawn across
+// the paper takes hold of what it touches, dragging one of them moves them
+// all, and Delete removes the lot in one step.
+- (void)testSeveralItemsAreSelectedTogether {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Several"];
+  NSMutableArray<RDLTextbox *> *boxes = [NSMutableArray array];
+  for (NSUInteger i = 0; i < 3; i++) {
+    RDLTextbox *box = [[RDLTextbox alloc] init];
+    box.name = [NSString stringWithFormat:@"Box%lu", (unsigned long)i + 1];
+    box.value = box.name;
+    box.left = 0.5;
+    box.top = 0.5 + i * 0.75;
+    box.width = 1.5;
+    box.height = 0.4;
+    [report.body.items addObject:box];
+    [boxes addObject:box];
+  }
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900) context:ctx];
+  NSPoint (^middleOf)(RDLItem *) = ^NSPoint(RDLItem *item) {
+    NSRect r = NSZeroRect;
+    [[canvas geometry] findRectOfItem:item rect:&r];
+    return NSMakePoint(NSMidX(r) * ctx.zoom, NSMidY(r) * ctx.zoom);
+  };
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 900, 900)
+                                                 styleMask:NSTitledWindowMask
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:YES];
+  [[window contentView] addSubview:canvas];
+  NSEvent *(^click)(NSPoint, NSEventType, NSUInteger) = ^NSEvent *(NSPoint p, NSEventType type, NSUInteger flags) {
+    return [NSEvent mouseEventWithType:type
+                              location:[canvas convertPoint:p toView:nil]
+                         modifierFlags:flags
+                             timestamp:0
+                          windowNumber:[window windowNumber]
+                               context:nil
+                           eventNumber:0
+                            clickCount:1
+                              pressure:1];
+  };
+
+  [canvas mouseDown:click(middleOf(boxes[0]), NSEventTypeLeftMouseDown, 0)];
+  [canvas mouseUp:click(middleOf(boxes[0]), NSEventTypeLeftMouseUp, 0)];
+  if ([ctx.selection.items count] != 1 || [ctx selectedItem] != boxes[0])
+    XCTFail(@"%@", @"a plain click should select just what it landed on");
+  [canvas mouseDown:click(middleOf(boxes[1]), NSEventTypeLeftMouseDown, NSShiftKeyMask)];
+  [canvas mouseUp:click(middleOf(boxes[1]), NSEventTypeLeftMouseUp, NSShiftKeyMask)];
+  if ([ctx.selection.items count] != 2 || [ctx selectedItem] != boxes[0] ||
+      ![ctx.selection isSelectedItem:boxes[1]])
+    XCTFail(@"shift-clicking should add the second, keeping the first as the one shown: %@",
+            [ctx.selection.items valueForKey:@"name"]);
+  // And again takes it back out.
+  [canvas mouseDown:click(middleOf(boxes[1]), NSEventTypeLeftMouseDown, NSShiftKeyMask)];
+  [canvas mouseUp:click(middleOf(boxes[1]), NSEventTypeLeftMouseUp, NSShiftKeyMask)];
+  if ([ctx.selection.items count] != 1 || [ctx.selection isSelectedItem:boxes[1]])
+    XCTFail(@"%@", @"shift-clicking it again should take it out");
+
+  // A box drawn from bare paper across all three.
+  NSRect first = NSZeroRect, last = NSZeroRect;
+  [[canvas geometry] findRectOfItem:boxes[0] rect:&first];
+  [[canvas geometry] findRectOfItem:boxes[2] rect:&last];
+  NSPoint from = NSMakePoint((NSMinX(first) - 6) * ctx.zoom, (NSMinY(first) - 6) * ctx.zoom);
+  NSPoint to = NSMakePoint((NSMaxX(last) + 6) * ctx.zoom, (NSMaxY(last) + 6) * ctx.zoom);
+  [canvas mouseDown:click(from, NSEventTypeLeftMouseDown, 0)];
+  [canvas mouseDragged:click(to, NSEventTypeLeftMouseDragged, 0)];
+  [canvas mouseUp:click(to, NSEventTypeLeftMouseUp, 0)];
+  if ([ctx.selection.items count] != 3)
+    XCTFail(@"the box should take hold of all three, took %@", [ctx.selection.items valueForKey:@"name"]);
+
+  // Dragging one of them moves them all, as one step.
+  CGFloat wasTop = boxes[2].top;
+  NSPoint grab = middleOf(boxes[1]);
+  [canvas mouseDown:click(grab, NSEventTypeLeftMouseDown, 0)];
+  [canvas mouseDragged:click(NSMakePoint(grab.x + 72, grab.y), NSEventTypeLeftMouseDragged, 0)];
+  [canvas mouseUp:click(NSMakePoint(grab.x + 72, grab.y), NSEventTypeLeftMouseUp, 0)];
+  if (fabs(boxes[0].left - 1.5) > 0.001 || fabs(boxes[2].left - 1.5) > 0.001 ||
+      fabs(boxes[2].top - wasTop) > 0.001)
+    XCTFail(@"all three should have moved an inch across: %g %g", boxes[0].left, boxes[2].left);
+  [ctx.document.undoManager undo];
+  if (fabs(boxes[0].left - 0.5) > 0.001 || fabs(boxes[2].left - 0.5) > 0.001)
+    XCTFail(@"%@", @"one undo should put them all back");
+
+  // Delete takes them all, and one undo brings them back.
+  [ctx deleteSelectedItem];
+  if ([report.body.items count] != 0)
+    XCTFail(@"deleting should remove all three, %lu left", (unsigned long)[report.body.items count]);
+  [ctx.document.undoManager undo];
+  if ([report.body.items count] != 3)
+    XCTFail(@"%@", @"one undo should bring all three back");
+}
+
 @end

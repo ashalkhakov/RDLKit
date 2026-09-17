@@ -29,6 +29,9 @@
 // since a cell is edited as its own textbox; drawing it underneath shows
 // through the field on GNUstep and doubles it on Cocoa.
 @property (nonatomic, strong) RDLItem *editingItem;
+// The box being drawn across the canvas to take hold of several items at once,
+// in model space; empty when none is being drawn.
+@property (nonatomic, assign) NSRect marqueeRect;
 @end
 
 @interface RDLCanvasRenderer : NSObject

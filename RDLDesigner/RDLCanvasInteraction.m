@@ -32,6 +32,21 @@
   // A double-click's edit starts on mouse-up (see -mouseUp:).
   RDLItem *_pendingEditItem;
   NSPoint _pendingEditPoint;
+  // Moving several items at once: what was selected when the drag began and
+  // where each of them was, so every position is worked out from the original.
+  NSArray<RDLItem *> *_dragItems;
+  NSArray<NSValue *> *_dragOrigins;
+  // A box drawn across the canvas, and the band it was started in: what it
+  // touches there is what it takes hold of.
+  NSRect _marqueeRect;
+  NSString *_marqueeBand;
+  BOOL _marqueeAdds;
+}
+
+// What a click means when it lands on something: with Shift or Command held,
+// the item joins the selection or leaves it; without, it becomes the selection.
+static BOOL RDLEventToggles(NSEvent *event) {
+  return ([event modifierFlags] & (NSShiftKeyMask | NSCommandKeyMask)) != 0;
 }
 
 - (instancetype)initWithContext:(RDLEditingContext *)context hostView:(NSView *)hostView {
@@ -92,7 +107,20 @@
       _dragKind = nil;
       return;
     }
-    [_ctx.selection selectItem:hit inBandWithKey:bandKey];
+    if (RDLEventToggles(event)) {
+      // Joining or leaving the selection is the whole of this click: nothing
+      // is dragged and nothing is edited.
+      [_ctx.selection toggleItem:hit inBandWithKey:bandKey];
+      _dragKind = nil;
+      _pendingEditItem = nil;
+      return;
+    }
+    // Pressing on something already selected among others keeps them all, so
+    // the drag moves the group; pressing anything else selects just it.
+    BOOL movingGroup = [_ctx.selection isSelectedItem:hit] && [_ctx.selection.items count] > 1 &&
+                       [kind isEqualToString:RDLHandleMove];
+    if (!movingGroup)
+      [_ctx.selection selectItem:hit inBandWithKey:bandKey];
     if ([event clickCount] >= 2) {
       // The edit starts from mouseUp: -- the reliable Cocoa pattern -- so
       // remember what was hit for the second click's release to act on.
@@ -157,15 +185,29 @@
     _origTop = hit.top;
     _origW = hit.width;
     _origH = hit.height;
+    // Everything a move drag carries, and where each of them started.
+    _dragItems = [_ctx.selection.items copy] ?: @[];
+    NSMutableArray<NSValue *> *origins = [NSMutableArray array];
+    for (RDLItem *item in _dragItems)
+      [origins addObject:[NSValue valueWithPoint:NSMakePoint(item.left, item.top)]];
+    _dragOrigins = origins;
     return;
   }
 
   NSString *band = [[_host interactionGeometry] bandKeyAtPoint:p];
-  if (band)
-    [_ctx.selection selectBandWithKey:band];
-  else
-    [_ctx.selection selectReport];
-  _dragKind = nil;
+  // A press on bare paper selects the band, and drawing from there takes hold
+  // of what the box touches -- adding to the selection when Shift is held.
+  _marqueeAdds = RDLEventToggles(event);
+  if (!_marqueeAdds) {
+    if (band)
+      [_ctx.selection selectBandWithKey:band];
+    else
+      [_ctx.selection selectReport];
+  }
+  _dragKind = band ? RDLDragMarquee : nil;
+  _marqueeBand = band;
+  _marqueeRect = NSZeroRect;
+  _dragStart = p;
   _pendingEditItem = nil;
 }
 
@@ -184,18 +226,28 @@
       return;
     _dragActive = YES;
     _pendingEditItem = nil;
-    // Moving a column changes nothing until the drop, so it opens no group;
-    // everything else mutates as the mouse moves and the whole drag is one
-    // undo step. A group opened here and not closed leaves the undo manager
-    // nested, and the next Cmd+Z throws "too many nested undo groups".
-    _dragGroupOpen = ![_dragKind isEqualToString:@"tabmove"];
+    // Moving a column changes nothing until the drop, and a box drawn across
+    // the paper changes nothing at all, so neither opens a group; everything
+    // else mutates as the mouse moves and the whole drag is one undo step. A
+    // group opened here and not closed leaves the undo manager nested, and the
+    // next Cmd+Z throws "too many nested undo groups".
+    _dragGroupOpen = ![_dragKind isEqualToString:@"tabmove"] &&
+                     ![_dragKind isEqualToString:RDLDragMarquee];
     if (_dragGroupOpen)
       [_ctx.editor beginGroup:@"Move"];
   }
   CGFloat dx = (p.x - _dragStart.x) / RDLPointsPerInch;
   CGFloat dy = (p.y - _dragStart.y) / RDLPointsPerInch;
-  if ([_dragKind isEqualToString:@"move"])
-    [_ctx.editor moveItem:[_ctx selectedItem] toLeft:_origLeft + dx top:_origTop + dy];
+  if ([_dragKind isEqualToString:RDLDragMarquee]) {
+    _marqueeRect = RDLRectBetween(_dragStart, p);
+    [_host interactionNeedsRedraw];
+  } else if ([_dragKind isEqualToString:@"move"]) {
+    // Every item selected, each from where it was when the drag began.
+    for (NSUInteger i = 0; i < [_dragItems count] && i < [_dragOrigins count]; i++) {
+      NSPoint was = [_dragOrigins[i] pointValue];
+      [_ctx.editor moveItem:_dragItems[i] toLeft:was.x + dx top:was.y + dy];
+    }
+  }
   else if ([_dragKind isEqualToString:@"se"])
     [_ctx.editor resizeItem:[_ctx selectedItem] toWidth:_origW + dx height:_origH + dy];
   else if ([_dragKind isEqualToString:@"e"])
@@ -222,6 +274,26 @@
 }
 
 - (void)mouseUp:(NSEvent *)event {
+  if ([_dragKind isEqualToString:RDLDragMarquee]) {
+    // What the box touched, in the band it was drawn in.
+    NSArray<RDLItem *> *caught = _dragActive ? [[_host interactionGeometry]
+                                                   itemsIntersectingRect:_marqueeRect
+                                                           inBandWithKey:_marqueeBand]
+                                             : @[];
+    if ([caught count]) {
+      NSMutableArray<RDLItem *> *items =
+          _marqueeAdds ? [_ctx.selection.items mutableCopy] : [NSMutableArray array];
+      for (RDLItem *item in caught)
+        if ([items indexOfObjectIdenticalTo:item] == NSNotFound)
+          [items addObject:item];
+      [_ctx.selection selectItems:items inBandWithKey:_marqueeBand];
+    }
+    _dragKind = nil;
+    _dragActive = NO;
+    _marqueeRect = NSZeroRect;
+    [_host interactionNeedsRedraw];
+    return;
+  }
   if (_notAllowed) {
     [NSCursor pop];
     _notAllowed = NO;
@@ -296,6 +368,7 @@
 // Arrow keys move the selected item one grid step; Shift+arrow resizes.
 // A burst of presses coalesces into a single undo step.
 - (BOOL)nudgeWithKey:(unichar)key shift:(BOOL)shift {
+  NSArray<RDLItem *> *items = _ctx.selection.items;
   RDLItem *it = [_ctx selectedItem];
   if (it == nil)
     return NO;
@@ -312,10 +385,13 @@
                                            selector:@selector(endNudge)
                                              object:nil];
   [self performSelector:@selector(endNudge) withObject:nil afterDelay:0.5];
-  if (shift)
-    [_ctx.editor resizeItem:it toWidth:it.width + dx height:it.height + dy];
-  else
-    [_ctx.editor moveItem:it toLeft:it.left + dx top:it.top + dy];
+  // Every item selected moves or grows together.
+  for (RDLItem *item in items) {
+    if (shift)
+      [_ctx.editor resizeItem:item toWidth:item.width + dx height:item.height + dy];
+    else
+      [_ctx.editor moveItem:item toLeft:item.left + dx top:item.top + dy];
+  }
   return YES;
 }
 

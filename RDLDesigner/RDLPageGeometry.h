@@ -28,6 +28,11 @@ extern const CGFloat RDLPointsPerInch;
 
 // Drag handle kinds, as returned by -itemAtPoint:.
 extern NSString * const RDLHandleMove;
+// Not a handle: the box drawn across bare paper to take hold of what it
+// touches. A drag kind like the others, so the state machine has one list.
+extern NSString * const RDLDragMarquee;
+// The rect two corners make, whichever way round they were given.
+FOUNDATION_EXPORT NSRect RDLRectBetween(NSPoint a, NSPoint b);
 // An item that lives in a tablix cell: selectable, but not draggable and not
 // resizable. MS-RDL ignores Top/Left/Height/Width inside CellContents -- the
 // cell decides where it is and how big it is -- so the canvas must not offer
@@ -114,6 +119,12 @@ FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
 
 // The band whose frame contains `point`, or nil.
 - (NSString *)bandKeyAtPoint:(NSPoint)point;
+
+// The items of one band that `rect` touches, in the order the band lists them.
+// What a marquee drawn across the canvas takes hold of: the items a band draws,
+// not what is inside a Rectangle -- dragging a box around a rectangle means
+// the rectangle.
+- (NSArray<RDLItem *> *)itemsIntersectingRect:(NSRect)rect inBandWithKey:(NSString *)bandKey;
 
 // Every tablix in the report, paired with its rect — including ones nested in
 // a Rectangle, which the old per-band scan missed.
