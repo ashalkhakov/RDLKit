@@ -1,4 +1,5 @@
 #import "RDLExpressionInternal.h"
+#import "RDLRuntimeLibrary.h"
 #import "RDLValueBoxing.h"
 #import "RDLCode.h"
 #import "RDLExpressionCatalog.h"
@@ -705,3 +706,44 @@ id RDLOperate(RDLExprOperator op, id a, id b) {
   }
 }
 
+@implementation RDLExpression
+
++ (NSString *)formatValue:(id)value format:(NSString *)format {
+  return [self formatValue:value format:format language:nil];
+}
+
++ (NSString *)formatValue:(id)value
+                   format:(NSString *)format
+                 language:(NSString *)language {
+  return RDLStr(RDLFormatted(value, format, language));
+}
+
++ (NSString *)formatValue:(id)value formatting:(RDLTextFormatting *)formatting {
+  NSString *text = RDLStr(RDLFormattedInCalendar(value, formatting.format, formatting.language, formatting.calendar));
+  NSString *numerals = [formatting.numeralLanguage length] ? formatting.numeralLanguage : formatting.language;
+  NSString *digits = RDLDigitsOfNumeralVariant(formatting.numeralVariant, numerals);
+  return digits ? RDLWithDigits(text, digits) : text;
+}
+
++ (id)evaluate:(NSString *)expr scope:(RDLEvalScope *)scope {
+  if (expr == nil)
+    return @"";
+  if (![expr hasPrefix:@"="])
+    return expr;
+  RDLExprNode *ast = RDLParse(expr);
+  if (ast == nil)
+    return expr;
+  // Nothing comes back as nil.
+  return RDLExec(ast, scope);
+}
+
++ (NSString *)evaluateText:(NSString *)expr scope:(RDLEvalScope *)scope {
+  return RDLStr([self evaluate:expr scope:scope]);
+}
+
++ (NSString *)translationOf:(NSString *)expr {
+  RDLExprNode *ast = RDLParse(expr);
+  return ast ? RDLPrint(ast) : @"";
+}
+
+@end

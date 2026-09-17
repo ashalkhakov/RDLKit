@@ -51,7 +51,15 @@ RDLKit_OBJC_FILES = \
   RDLSubreportLoader.m \
   RDLTextAttributes.m \
   RDLValueBoxing.m \
-  RDLExpressionLibrary.m \
+  RDLConversions.m \
+  RDLReferences.m \
+  RDLAggregates.m \
+  RDLDateFormats.m \
+  RDLVisualBasicText.m \
+  RDLVisualBasicDates.m \
+  RDLFunctionTable.m \
+  RDLDotNetMembers.m \
+  RDLForms.m \
   RDLCompiler.m \
   RDLVirtualMachine.m \
   RDLBorderPainter.m \
