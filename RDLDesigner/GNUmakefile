@@ -46,6 +46,7 @@ RDLDesigner_OBJC_FILES = \
   RDLDatasetOptionsEditor.m \
   RDLVariablesEditor.m \
   RDLCodeEditor.m \
+  RDLStylePanel.m \
   RDLChartAxisEditor.m \
   RDLChartSeriesEditor.m \
   RDLGroupPropertiesEditor.m \
@@ -107,6 +108,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLDatasetOptionsEditor.xib \
   RDLVariablesEditor.xib \
   RDLCodeEditor.xib \
+  RDLStylePanel.xib \
   RDLChartAxisEditor.xib \
   RDLChartSeriesEditor.xib \
   RDLGroupPropertiesEditor.xib \

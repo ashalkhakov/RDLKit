@@ -17,6 +17,7 @@
 #import "RDLEmbeddedImagesEditor.h"
 #import "RDLCodeEditor.h"
 #import "RDLVariablesEditor.h"
+#import "RDLStylePanel.h"
 #import "RDLSubreportParametersEditor.h"
 #import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
@@ -118,6 +119,8 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
 // The report's own pictures to show, and what kind a field's bytes are.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
+// The rest of an item's style, in a panel of its own.
+@property (nonatomic, strong) IBOutlet NSView *moreStyleBox;
 // The report's own pictures, code and variables, each in a panel of its own.
 @property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton, *reportCodeButton, *reportVariablesButton;
 // What a subreport shows with no rows, and how it breaks and reads.
@@ -250,7 +253,7 @@
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
                  _textOptionsBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
-                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox ];
+                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
@@ -851,6 +854,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
     [boxes addObjectsFromArray:[self commonBoxesForItem:it]];
+    [boxes addObject:_moreStyleBox];
     [self syncDependentControls];
     [self rebuildTogglePopFor:it];
     // An item in a tablix cell: the column it is in, whose width is the cell's.
@@ -985,6 +989,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     [_context.editor setValue:[_imageEmbeddedPop titleOfSelectedItem] forKeyPath:@"value" ofItem:it];
   [self reload];
   return YES;
+}
+
+- (void)editMoreStyle:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (item != nil && [RDLStylePanel runForItem:item context:_context])
+    [self reload];
 }
 
 - (void)editReportCode:(id)sender {

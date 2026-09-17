@@ -50,6 +50,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLDatasetOptionsEditor.m \
   ../RDLDesigner/RDLVariablesEditor.m \
   ../RDLDesigner/RDLCodeEditor.m \
+  ../RDLDesigner/RDLStylePanel.m \
   ../RDLDesigner/RDLChartAxisEditor.m \
   ../RDLDesigner/RDLChartSeriesEditor.m \
   ../RDLDesigner/RDLGroupPropertiesEditor.m \
@@ -93,6 +94,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLDatasetOptionsEditor.xib \
   ../RDLDesigner/RDLVariablesEditor.xib \
   ../RDLDesigner/RDLCodeEditor.xib \
+  ../RDLDesigner/RDLStylePanel.xib \
   ../RDLDesigner/RDLChartAxisEditor.xib \
   ../RDLDesigner/RDLChartSeriesEditor.xib \
   ../RDLDesigner/RDLGroupPropertiesEditor.xib \

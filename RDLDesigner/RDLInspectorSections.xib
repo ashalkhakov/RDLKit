@@ -51,6 +51,7 @@
                 <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
                 <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
                 <outlet property="reportCodeButton" destination="reportCodeButton" id="reportCodeButtonOutlet"/>
+                <outlet property="moreStyleBox" destination="moreStyleBox" id="moreStyleBoxOutlet"/>
                 <outlet property="reportVariablesButton" destination="reportVariablesButton" id="reportVariablesButtonOutlet"/>
                 <outlet property="subreportNoRowsField" destination="subreportNoRowsField" id="subreportNoRowsFieldOutlet"/>
                 <outlet property="subreportNoRowsExprButton" destination="subreportNoRowsExprButton" id="subreportNoRowsExprButtonOutlet"/>
@@ -819,6 +820,23 @@
                         <action selector="changed:" target="-2" id="hideDuplicatesPopAction"/>
                     </connections>
                 </popUpButton>
+            </subviews>
+        </customView>
+        <customView id="moreStyleBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="32"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <button toolTip="Line height, direction, shadow, calendar, digits, gradient and background picture" id="moreStyleButton">
+                    <rect key="frame" x="10" y="4" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="More Style…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="moreStyleButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editMoreStyle:" target="-2" id="moreStyleButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="chartOptionsBox">

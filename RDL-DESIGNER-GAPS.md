@@ -236,7 +236,7 @@ bin that moved since the previous audit.
 | `Border` + per-edge borders | UI | The canvas draws each edge in its own style, width and colour through `RDLBorderPainter`, the one the preview and PDF use, so a rectangle is bordered and a thick or dashed edge looks like itself (P1.1). Each edge is stated in the Borders… panel, which is also how a cell is bordered, since `TablixCell` has no `Style` of its own (P1.1). |
 | `FontWeight` beyond Normal/Bold | UI (engine PART) | The popup offers every weight; Font… still collapses SemiBold and the like to Normal or Bold *(by inspection)*. |
 | Style expressions on every property | UI | 9 of 27 wired. |
-| `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | UI (was MODEL) | Engine FULL or PART. |
+| `Direction`, `WritingMode`, `LineHeight`, `TextEffect`, `ShadowColor/Offset`, `BackgroundGradient*`, `BackgroundImage`, `Calendar`, `NumeralLanguage/Variant`, `UnicodeBiDi` | Done | More Style…, for every item: each may be left unset; lengths and text may be expressions. |
 | `BackgroundHatchType` | MODEL | |
 
 ### 4.5 Textbox and rich text

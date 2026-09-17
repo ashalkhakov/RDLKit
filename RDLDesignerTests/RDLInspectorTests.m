@@ -10,6 +10,7 @@
 #import "RDLEmbeddedImagesEditor.h"
 #import "RDLVariablesEditor.h"
 #import "RDLCodeEditor.h"
+#import "RDLStylePanel.h"
 
 
 
@@ -1797,6 +1798,97 @@ static NSData *RDLTinyPNG(void) {
   RDLVariablesEditor *group = [RDLVariablesEditor editorForVariables:@[] title:nil writable:NO report:report];
   if ([[group valueForKey:@"table"] numberOfColumns] != 2)
     XCTFail(@"%@", @"a group's variables should not offer a Writable column");
+}
+
+// The rest of an item's style, in a panel: text spacing, direction and
+// shadow, calendar and digits, gradient and background picture -- each left
+// unset or set, a length or an expression, applied as one step and saved.
+- (void)testTheStylePanelSetsTheRestOfAStyle {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Styled"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindTextbox];
+  RDLTextbox *box = (RDLTextbox *)[ctx selectedItem];
+  if ([[inspector valueForKey:@"moreStyleBox"] isHidden])
+    XCTFail(@"%@", @"an item should offer the rest of its style");
+  NSString *before = [RDLEditor XMLStringForItem:box];
+  RDLStylePanel *panel = [RDLStylePanel panelForItem:box context:ctx];
+  NSDictionary<NSString *, NSString *> *texts = @{
+    @"lineHeightField" : @"=IIf(Parameters!Dense.Value, \"10pt\", \"14pt\")",
+    @"shadowColorField" : @"#333333",
+    @"shadowOffsetField" : @"wide",
+    @"numeralLanguageField" : @"ar-SA",
+    @"gradientEndField" : @"LightBlue",
+    @"imageValueField" : @"Letterhead",
+  };
+  for (NSString *name in texts)
+    [(NSTextField *)[panel valueForKey:name] setStringValue:texts[name]];
+  NSDictionary<NSString *, NSString *> *choices = @{
+    @"directionPop" : @"Right to left",
+    @"writingModePop" : @"Vertical",
+    @"textEffectPop" : @"Shadow",
+    @"calendarPop" : @"Hijri",
+    @"numeralVariantPop" : @"3",
+    @"gradientPop" : @"Top bottom",
+    @"imageSourcePop" : @"Embedded",
+    @"imageRepeatPop" : @"No repeat",
+  };
+  for (NSString *name in choices) {
+    NSPopUpButton *pop = [panel valueForKey:name];
+    if ([pop itemWithTitle:choices[name]] == nil)
+      XCTFail(@"%@ should offer %@, offers %@", name, choices[name], [pop itemTitles]);
+    [pop selectItemWithTitle:choices[name]];
+  }
+  if ([panel apply] || ![[RDLEditor XMLStringForItem:box] isEqualToString:before])
+    XCTFail(@"%@", @"a shadow offset that is no length should be refused, and nothing set");
+  [(NSTextField *)[panel valueForKey:@"shadowOffsetField"] setStringValue:@"2pt"];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+  RDLStyle *style = box.style;
+  if (style.lineHeight != nil || ![style.expressions.lineHeight source] || style.direction != RDLLayoutDirectionRTL ||
+      style.writingMode != RDLWritingModeVertical || style.textEffect != RDLTextEffectShadow ||
+      ![style.shadowColor isEqualToString:@"#333333"] || ![[style.shadowOffset stringValue] isEqualToString:@"2pt"] ||
+      style.calendar != RDLCalendarHijri || ![style.numeralLanguage isEqualToString:@"ar-SA"] ||
+      style.numeralVariant != 3 || style.backgroundGradientType != RDLGradientTypeTopBottom ||
+      ![style.backgroundGradientEndColor isEqualToString:@"LightBlue"] ||
+      style.backgroundImage.source != RDLImageSourceEmbedded ||
+      ![style.backgroundImage.value isEqualToString:@"Letterhead"] ||
+      style.backgroundImage.repeat != RDLBackgroundRepeatNoRepeat || style.unicodeBiDi != RDLUnicodeBiDiUnspecified)
+    XCTFail(@"%@", @"the style should be set as the panel had it, what was not chosen left unset");
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  // Compared by value: a text box read back keeps its box's style apart from
+  // its runs', which one made in the designer writes as one.
+  RDLStyle *saved = [back itemNamed:box.name inBand:NULL].style;
+  for (NSString *key in @[ @"direction", @"writingMode", @"textEffect", @"shadowColor", @"calendar",
+                           @"numeralLanguage", @"numeralVariant", @"backgroundGradientType",
+                           @"backgroundGradientEndColor" ])
+    if (![[saved valueForKey:key] isEqual:[style valueForKey:key]])
+      XCTFail(@"%@ should survive a save, reads %@", key, [saved valueForKey:key]);
+  if (![[saved.shadowOffset stringValue] isEqualToString:@"2pt"] ||
+      ![[saved.expressions.lineHeight source] isEqualToString:[style.expressions.lineHeight source]] ||
+      saved.backgroundImage.repeat != RDLBackgroundRepeatNoRepeat ||
+      ![saved.backgroundImage.value isEqualToString:@"Letterhead"])
+    XCTFail(@"%@", @"the lengths, the expression and the picture should survive a save");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:box] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the style back");
+  [ctx.document.undoManager redo];
+  // Cleared again: "Not set", and the picture's name taken away.
+  RDLStylePanel *again = [RDLStylePanel panelForItem:box context:ctx];
+  [(NSPopUpButton *)[again valueForKey:@"directionPop"] selectItemAtIndex:0];
+  [(NSTextField *)[again valueForKey:@"imageValueField"] setStringValue:@""];
+  [(NSTextField *)[again valueForKey:@"lineHeightField"] setStringValue:@"12pt"];
+  [again apply];
+  if (box.style.direction != RDLLayoutDirectionUnspecified || box.style.backgroundImage != nil ||
+      box.style.expressions.lineHeight != nil || ![[box.style.lineHeight stringValue] isEqualToString:@"12pt"])
+    XCTFail(@"%@", @"a property set back to unset, a picture taken away and an expression made a length should read so");
+  // An untouched panel records nothing.
+  NSString *kept = [RDLEditor XMLStringForItem:box];
+  [[RDLStylePanel panelForItem:box context:ctx] apply];
+  [ctx.document.undoManager undo];
+  if ([[RDLEditor XMLStringForItem:box] isEqualToString:kept])
+    XCTFail(@"%@", @"an untouched panel should record nothing, so undo takes back the edit before");
 }
 
 // A line's thickness, dash and ink, in the real inspector. All three belong to
