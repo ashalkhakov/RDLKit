@@ -50,6 +50,10 @@
                 <outlet property="imageImportButton" destination="imageImportButton" id="imageImportButtonOutlet"/>
                 <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
                 <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
+                <outlet property="subreportNoRowsField" destination="subreportNoRowsField" id="subreportNoRowsFieldOutlet"/>
+                <outlet property="subreportNoRowsExprButton" destination="subreportNoRowsExprButton" id="subreportNoRowsExprButtonOutlet"/>
+                <outlet property="subreportOmitBorderCheck" destination="subreportOmitBorderCheck" id="subreportOmitBorderCheckOutlet"/>
+                <outlet property="subreportMergeCheck" destination="subreportMergeCheck" id="subreportMergeCheckOutlet"/>
                 <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
@@ -2138,7 +2142,7 @@
             </subviews>
         </customView>
         <customView id="subreportBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="92"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="166"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="subreportStatusLabel">
@@ -2192,6 +2196,60 @@
                         <outlet property="delegate" destination="-2" id="subreportNameFieldDelegate"/>
                     </connections>
                 </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="lblSubreportNoRows">
+                    <rect key="frame" x="10" y="92" width="240" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" title="When the subreport has no rows, show" id="lblSubreportNoRowsCell">
+                        <font key="font" metaFont="user" size="10"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField toolTip="What shows in place of the subreport when its data has no rows" focusRingType="none" id="subreportNoRowsField" customClass="RDLExpressionField">
+                    <rect key="frame" x="10" y="108" width="212" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="subreportNoRowsFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="subreportNoRowsFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="subreportNoRowsFieldDelegate"/>
+                    </connections>
+                </textField>
+                <button toolTip="Edit this as an expression" id="subreportNoRowsExprButton">
+                    <rect key="frame" x="226" y="108" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="subreportNoRowsExprButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="smallSystem"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editExpression:" target="-2" id="subreportNoRowsExprButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Where the subreport breaks across pages, leave its border off along the break" id="subreportOmitBorderCheck">
+                    <rect key="frame" x="10" y="136" width="120" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Omit border" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="subreportOmitBorderCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="subreportOmitBorderCheckAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Read the subreport's data in the same transaction as this report's" id="subreportMergeCheck">
+                    <rect key="frame" x="136" y="136" width="114" height="20"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="One transaction" bezelStyle="regularSquare" imagePosition="left" alignment="left" inset="2" id="subreportMergeCheckCell">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="subreportMergeCheckAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="imageBox">

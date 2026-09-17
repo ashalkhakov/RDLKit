@@ -118,6 +118,10 @@
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
 // The report's own pictures, in a panel of their own.
 @property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton;
+// What a subreport shows with no rows, and how it breaks and reads.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *subreportNoRowsField;
+@property (nonatomic, strong) IBOutlet NSButton *subreportNoRowsExprButton, *subreportOmitBorderCheck;
+@property (nonatomic, strong) IBOutlet NSButton *subreportMergeCheck;
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
@@ -236,7 +240,7 @@
                          _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
                          _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
                          _initialPageNameExprButton, _noRowsMessageExprButton, _noDataMessageExprButton,
-                         _imageValueExprButton ])
+                         _imageValueExprButton, _subreportNoRowsExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
@@ -602,6 +606,12 @@
   // writes it: without the .rdl.
   [_bindings bind:_subreportNameField keyPath:@"reportName" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
+  [_bindings bind:_subreportNoRowsField keyPath:@"noRowsMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText values:nil placeholder:nil];
+  [_bindings bind:_subreportOmitBorderCheck keyPath:@"omitBorderOnPageBreak" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_subreportMergeCheck keyPath:@"mergeTransactions" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
 
   // Chart.
   [_bindings bind:_chartDatasetPop keyPath:@"dataSetName" scope:RDLFieldScopeItem
@@ -1328,6 +1338,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   _noRowsMessageField.expressionContext = RDLExpressionContextText;
   _noDataMessageField.expressionContext = RDLExpressionContextText;
   _imageValueField.expressionContext = RDLExpressionContextText;
+  _subreportNoRowsField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -1356,6 +1367,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if (sender == _noRowsMessageExprButton) return _noRowsMessageField;
   if (sender == _noDataMessageExprButton) return _noDataMessageField;
   if (sender == _imageValueExprButton) return _imageValueField;
+  if (sender == _subreportNoRowsExprButton) return _subreportNoRowsField;
   return nil;
 }
 

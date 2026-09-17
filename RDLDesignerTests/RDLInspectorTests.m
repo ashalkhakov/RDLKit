@@ -1719,6 +1719,35 @@ static NSData *RDLTinyPNG(void) {
   [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
 }
 
+// A subreport says what it shows with no rows, whether its border is left off
+// where it breaks, and whether it reads in this report's transaction.
+- (void)testASubreportsSettingsAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Parent"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindSubreport];
+  RDLSubreport *sub = (RDLSubreport *)[ctx selectedItem];
+  NSTextField *message = [inspector valueForKey:@"subreportNoRowsField"];
+  [message setStringValue:@"=\"No firings for \" & Parameters!Kiln.Value"];
+  [inspector changed:message];
+  for (NSString *name in @[ @"subreportOmitBorderCheck", @"subreportMergeCheck" ]) {
+    NSButton *check = [inspector valueForKey:name];
+    [check setState:NSOnState];
+    [inspector changed:check];
+  }
+  if (![sub.noRowsMessage hasPrefix:@"=\"No firings"] || !sub.omitBorderOnPageBreak || !sub.mergeTransactions)
+    XCTFail(@"%@", @"the settings should be written to the subreport");
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLSubreport *saved = (RDLSubreport *)[back itemNamed:sub.name inBand:NULL];
+  if (![saved.noRowsMessage isEqualToString:sub.noRowsMessage] || !saved.omitBorderOnPageBreak ||
+      !saved.mergeTransactions)
+    XCTFail(@"%@", @"the settings should survive a save");
+  [ctx.document.undoManager undo];
+  if (sub.mergeTransactions)
+    XCTFail(@"%@", @"undo should take the last setting back");
+}
+
 // A line's thickness, dash and ink, in the real inspector. All three belong to
 // its border, which is where every backend reads them from; the ink field used
 // to write style.color, so on a line whose file gave a border colour, typing a

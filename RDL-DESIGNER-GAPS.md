@@ -152,7 +152,7 @@ UI.
 | Textbox | `CanGrow`, `CanShrink`, `HideDuplicates` | Yes |
 | Image | Source, Value, Sizing | Embedded/External only; Value has no f(x) |
 | Line | Colour, thickness, dash | Ink, thickness (with f(x)) and a dash list of None/Dotted/Dashed/Solid, all three on the border the line is drawn with (P1.1). No colour well, and no expression on the ink or the dash. |
-| Subreport | `ReportName`, status, Parameters…, Edit Subreport… | Yes; `NoRowsMessage`/`MergeTransactions`/`OmitBorderOnPageBreak` — |
+| Subreport | `ReportName`, status, Parameters…, Edit Subreport…, `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | Yes |
 | Tablix | Dataset; heading-row and value-row heights | Yes, in place |
 | Tablix | Columns: heading, value, width, Shows, Report, align, total | Tablix dialog, column width field, context menu, handle band, border drag — each edits the body in place, one undo (§4.7) |
 | Tablix | Row and column groups: parent, child, adjacent, delete, re-nest; a total beside a group; grand total | Row Group / Column Group menus on any cell; tablix dialog |
@@ -260,7 +260,7 @@ bin that moved since the previous audit.
 | Line: the other diagonal | MODEL | |
 | Rectangle padding | UI | Its borders have a panel of their own, and the canvas draws them (P1.1). |
 | Data regions inside a Rectangle or a cell | Done | See §4.7. |
-| Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | UI | |
+| Subreport `NoRowsMessage`, `MergeTransactions`, `OmitBorderOnPageBreak` | Done | The subreport's section. |
 
 ### 4.7 Tablix
 
