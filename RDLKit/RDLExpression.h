@@ -4,6 +4,7 @@
 @class RDLDataSet;
 @class RDLParameterValues;
 @class RDLDataBinder;
+@class RDLCodeFrame;
 
 // One value out of one row of a dataset.
 //
@@ -115,11 +116,10 @@ typedef NS_ENUM(NSInteger, RDLRenderFormat) {
 // answers -- and what a report following its reader sets Language to. The
 // machine's own when nothing says otherwise.
 @property (nonatomic, copy) NSString *userLanguage;
-// Inside the report's code: the running function's local variables, by
-// lower-cased name, Nothing kept as NSNull; nil anywhere else. A name in an
-// expression there is one of these, or one of the module's own variables,
-// before it is anything else.
-@property (nonatomic, strong) NSMutableDictionary<NSString *, id> *codeLocals;
+// Inside the report's code: the running call of one of its functions -- its
+// locals, which the code's names were compiled to -- so that an aggregate
+// evaluating its argument over other rows still sees them. nil anywhere else.
+@property (nonatomic, strong) RDLCodeFrame *codeFrame;
 
 // The same scope, in another situation: evaluating a Lookup in a second
 // dataset, an aggregate over a group's rows, Previous on the row before. The

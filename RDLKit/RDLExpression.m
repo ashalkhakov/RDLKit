@@ -50,7 +50,7 @@
   copy->_renderFormat = _renderFormat;
   copy->_language = _language;
   copy->_userLanguage = _userLanguage;
-  copy->_codeLocals = _codeLocals;
+  copy->_codeFrame = _codeFrame;
   if (change)
     change(copy);
   return copy;

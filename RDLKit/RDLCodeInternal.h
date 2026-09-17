@@ -94,14 +94,6 @@ typedef NS_ENUM(NSInteger, RDLCodeFlow) {
 @property (nonatomic, copy) NSArray<RDLCodeStatement *> *body;
 @end
 
-// One call's locals, their declared types, and what it returns.
-@interface RDLCodeFrame : NSObject
-@property (nonatomic, strong) NSMutableDictionary<NSString *, id> *locals;
-@property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *types;
-@property (nonatomic, strong) id returnValue;
-@property (nonatomic, assign) BOOL returned;
-@end
-
 #pragma mark - Reading the text
 
 NSString *RDLCodeTrimmed(NSString *text);
@@ -117,6 +109,10 @@ NSString *RDLCodeWithoutComment(NSString *line);
 // handling the interpreter does with them.
 FOUNDATION_EXPORT RDLCodeType RDLCodeTypeNamed(NSString *name);
 FOUNDATION_EXPORT RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStatement *> *body);
+// A value as a variable declared with that type holds it, and what one holds
+// before anything is put in it.
+FOUNDATION_EXPORT id RDLCodeConverted(id value, RDLCodeType type);
+FOUNDATION_EXPORT id RDLCodeStartingValue(RDLCodeType type);
 
 // The parser. The interpreter makes one to read a module's source.
 @interface RDLCodeReader : NSObject

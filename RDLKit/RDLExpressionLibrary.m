@@ -3441,20 +3441,6 @@ id RDLExecTree(RDLExprNode *ast, RDLEvalScope *scope) {
   if (ast.kind == RDLExprNodeKindVariable)
     return RDLOutOfCollection(scope.variableValues[ast.name ?: @""]);
   if (ast.kind == RDLExprNodeKindIdentifier) {
-    // Inside the report's code a name is a local variable, one of the module's
-    // own, or one of its functions called without brackets.
-    if (scope.codeLocals) {
-      NSString *key = [ast.name lowercaseString] ?: @"";
-      id local = scope.codeLocals[key];
-      if (local)
-        return local == [NSNull null] ? nil : local;
-      RDLCodeModule *module = scope.report.codeModule;
-      id shared = nil;
-      if ([module readVariableNamed:key value:&shared scope:scope])
-        return shared;
-      if ([module hasFunctionNamed:key])
-        return [module callFunctionNamed:key arguments:@[] scope:scope];
-    }
     return ast.name ?: @"";
   }
   if (ast.kind == RDLExprNodeKindOperator) {
@@ -3476,14 +3462,6 @@ id RDLExecTree(RDLExprNode *ast, RDLEvalScope *scope) {
   }
   if (ast.kind == RDLExprNodeKindCall) {
     NSString *n = [ast.name lowercaseString];
-    // Inside the report's code its own functions come first: one may share a
-    // name with a function of the expression language.
-    if (scope.codeLocals && [scope.report.codeModule hasFunctionNamed:n]) {
-      NSMutableArray *arguments = [NSMutableArray array];
-      for (RDLExprNode *arg in ast.args)
-        [arguments addObject:RDLExecChild(arg, scope) ?: [NSNull null]];
-      return [scope.report.codeModule callFunctionNamed:n arguments:arguments scope:scope];
-    }
     // Union(a, b): the two sets together, in order, without repeats. A set
     // here is what LookupSet returns, an array.
     // InScope("Name"): is that scope one of the ones we are inside?
@@ -3596,24 +3574,6 @@ id RDLExecTree(RDLExprNode *ast, RDLEvalScope *scope) {
       [vals addObject:v ?: [NSNull null]];
     }
     if (ast.kind == RDLExprNodeKindMember) {
-      // Inside the report's code, word.Substring(0, 1) whose first part is a
-      // variable reads members of the variable's value; the parser cannot tell
-      // a variable from a class, so it is told apart here.
-      NSArray<NSString *> *parts = [(ast.name ?: @"") componentsSeparatedByString:@"."];
-      if (scope.codeLocals && [parts count] > 1) {
-        NSString *key = [parts[0] lowercaseString];
-        id value = scope.codeLocals[key];
-        BOOL found = value != nil;
-        if (found)
-          value = value == [NSNull null] ? nil : value;
-        else
-          found = [scope.report.codeModule readVariableNamed:key value:&value scope:scope];
-        if (found) {
-          for (NSUInteger i = 1; i < [parts count]; i++)
-            value = RDLMemberOfValue(value, parts[i], i + 1 == [parts count] ? vals : @[], scope);
-          return value;
-        }
-      }
       return RDLStaticMember(ast.name ?: @"", vals, scope);
     }
     id target = [vals count] && vals[0] != [NSNull null] ? vals[0] : nil;
@@ -3674,35 +3634,6 @@ id RDLLoadReference(RDLOpcode opcode, RDLExprNode *node, RDLEvalScope *scope) {
   default:
     return nil;
   }
-}
-
-// A bare name. Inside the report's code it is a local variable, one of the
-// module's own, or one of its functions called without brackets; anywhere else,
-// and failing those, it is the name itself.
-id RDLLoadName(NSString *name, RDLEvalScope *scope) {
-  if (scope.codeLocals) {
-    NSString *key = [name lowercaseString] ?: @"";
-    id local = scope.codeLocals[key];
-    if (local)
-      return local == [NSNull null] ? nil : local;
-    RDLCodeModule *module = scope.report.codeModule;
-    id shared = nil;
-    if ([module readVariableNamed:key value:&shared scope:scope])
-      return shared;
-    if ([module hasFunctionNamed:key])
-      return [module callFunctionNamed:key arguments:@[] scope:scope];
-  }
-  return name;
-}
-
-// Inside the report's code its own functions come first: one may share a name
-// with a function of the expression language.
-BOOL RDLIsCodeFunction(NSString *lowercaseName, RDLEvalScope *scope) {
-  return scope.codeLocals != nil && [scope.report.codeModule hasFunctionNamed:lowercaseName];
-}
-
-id RDLCallCodeFunction(NSString *lowercaseName, NSArray *vals, RDLEvalScope *scope) {
-  return [scope.report.codeModule callFunctionNamed:lowercaseName arguments:vals scope:scope];
 }
 
 id RDLCallLibrary(NSString *name, NSArray *vals, RDLEvalScope *scope) {
@@ -3836,24 +3767,13 @@ id RDLCallLazyForm(RDLForm form, NSString *lowercaseName, NSArray<RDLExprNode *>
   }
 }
 
-id RDLCallMember(NSString *dottedName, NSArray *vals, RDLEvalScope *scope) {
-  // Inside the report's code, word.Substring(0, 1) whose first part is a
-  // variable reads members of the variable's value; the parser cannot tell a
-  // variable from a class, so it is told apart here.
-  NSArray<NSString *> *parts = [dottedName componentsSeparatedByString:@"."];
-  if (scope.codeLocals && [parts count] > 1) {
-    NSString *key = [parts[0] lowercaseString];
-    id value = scope.codeLocals[key];
-    BOOL found = value != nil;
-    if (found)
-      value = value == [NSNull null] ? nil : value;
-    else
-      found = [scope.report.codeModule readVariableNamed:key value:&value scope:scope];
-    if (found) {
-      for (NSUInteger i = 1; i < [parts count]; i++)
-        value = RDLMemberOfValue(value, parts[i], i + 1 == [parts count] ? vals : @[], scope);
-      return value;
-    }
+id RDLCallMember(NSString *dottedName, NSArray *vals, id head, BOOL headFound, RDLEvalScope *scope) {
+  if (headFound) {
+    NSArray<NSString *> *parts = [dottedName componentsSeparatedByString:@"."];
+    id value = head;
+    for (NSUInteger i = 1; i < [parts count]; i++)
+      value = RDLMemberOfValue(value, parts[i], i + 1 == [parts count] ? vals : @[], scope);
+    return value;
   }
   return RDLStaticMember(dottedName, vals, scope);
 }

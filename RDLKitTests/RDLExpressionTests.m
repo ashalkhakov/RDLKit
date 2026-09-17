@@ -1079,7 +1079,8 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   scope.userID = @"someone";
   scope.language = @"en-GB";
   scope.userLanguage = @"en-US";
-  scope.codeLocals = [@{@"l" : @1} mutableCopy];
+  // A frame of the report's code is internal; any one will do.
+  scope.codeFrame = [[NSClassFromString(@"RDLCodeFrame") alloc] init];
   scope.renderFormat = RDLRenderFormatHTML;
 
   RDLEvalScope *derived = [scope scopeBy:^(RDLEvalScope *s) { s.rowNumber = 99; }];
@@ -1195,6 +1196,281 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   [self expectNumber:@"=Code.TimesGraded()" scope:scope equals:6];
   [r.codeModule reset];
   [self expectNumber:@"=Code.TimesGraded()" scope:scope equals:0];
+}
+
+// The report's code compiled onto the expression machine: where each Exit goes,
+// what a loop does to its counter, and what a name means -- a local once it has
+// been set, else the module's variable, else a function, else the name itself.
+// The values are the ones the statement-walking interpreter gave, which the
+// machine replaced without changing any of them.
+- (void)testTheReportsCodeKeepsItsControlFlowAndNames {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Flow"];
+  r.code = @"Dim counter As Integer\n"
+           @"Dim label = \"L\" & 1\n"
+           @"Function Down(n)\n"
+           @"  Dim s As String = \"\"\n"
+           @"  For i = n To 1 Step -2\n"
+           @"    s &= i\n"
+           @"  Next\n"
+           @"  Return s & \"|\" & i\n"
+           @"End Function\n"
+           @"Function Quarters()\n"
+           @"  Dim s = \"\"\n"
+           @"  For x As Double = 0 To 1 Step 0.25\n"
+           @"    s = s & x & \",\"\n"
+           @"  Next\n"
+           @"  Return s\n"
+           @"End Function\n"
+           @"Function WholeSteps()\n"
+           @"  Dim s = \"\"\n"
+           @"  For i As Integer = 1 To 2 Step 0.5\n"
+           @"    s &= i & \",\"\n"
+           @"  Next\n"
+           @"  Return s\n"
+           @"End Function\n"
+           @"Function MovedCounter()\n"
+           @"  Dim n = 0\n"
+           @"  For i = 1 To 10\n"
+           @"    i = i + 2\n"
+           @"    n = n + 1\n"
+           @"  Next\n"
+           @"  Return n & \"/\" & i\n"
+           @"End Function\n"
+           @"Function ExitMid(n)\n"
+           @"  Dim r = 0\n"
+           @"  For i = 1 To 10\n"
+           @"    If i > n Then Exit For\n"
+           @"    r = r + i\n"
+           @"  Next\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitForFromDo()\n"
+           @"  Dim r = 0\n"
+           @"  For i = 1 To 3\n"
+           @"    Do While True\n"
+           @"      r = r + 1\n"
+           @"      Exit For\n"
+           @"    Loop\n"
+           @"  Next\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitDoFromFor()\n"
+           @"  Dim r = 0\n"
+           @"  Do While r < 100\n"
+           @"    For i = 1 To 3\n"
+           @"      r = r + 10\n"
+           @"      Exit Do\n"
+           @"    Next\n"
+           @"  Loop\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitForOutsideLoop()\n"
+           @"  ExitForOutsideLoop = 5\n"
+           @"  Exit For\n"
+           @"  ExitForOutsideLoop = 6\n"
+           @"End Function\n"
+           @"Function Reversed(t As String)\n"
+           @"  Dim out = \"\"\n"
+           @"  For Each c In t\n"
+           @"    out = c & out\n"
+           @"  Next\n"
+           @"  Return out\n"
+           @"End Function\n"
+           @"Function EachOne()\n"
+           @"  Dim n = 0\n"
+           @"  For Each v In 42\n"
+           @"    n = v + 1\n"
+           @"  Next\n"
+           @"  Return n\n"
+           @"End Function\n"
+           @"Function EachNothing()\n"
+           @"  Dim n = 3\n"
+           @"  For Each v In Nothing\n"
+           @"    n = 99\n"
+           @"  Next\n"
+           @"  Return n\n"
+           @"End Function\n"
+           @"Function UntilLoop(n)\n"
+           @"  Dim i = 0\n"
+           @"  Do Until i >= n\n"
+           @"    i += 1\n"
+           @"  Loop\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function WhileAtEnd(n)\n"
+           @"  Dim i = 10\n"
+           @"  Do\n"
+           @"    i += 1\n"
+           @"  Loop While i < n\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function UntilAtEnd(n)\n"
+           @"  Dim i = 0\n"
+           @"  Do\n"
+           @"    i += 2\n"
+           @"  Loop Until i >= n\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function NoCaseMatches(a)\n"
+           @"  NoCaseMatches = \"none\"\n"
+           @"  Select Case a\n"
+           @"    Case 1\n"
+           @"      NoCaseMatches = \"one\"\n"
+           @"  End Select\n"
+           @"End Function\n"
+           @"Function Nested(a, b)\n"
+           @"  Select Case a\n"
+           @"    Case 1\n"
+           @"      Select Case b\n"
+           @"        Case 1\n"
+           @"          Return \"11\"\n"
+           @"        Case Else\n"
+           @"          Return \"1x\"\n"
+           @"      End Select\n"
+           @"    Case Else\n"
+           @"      Return \"xx\"\n"
+           @"  End Select\n"
+           @"End Function\n"
+           @"Function Bump()\n"
+           @"  counter = counter + 1\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Shadow()\n"
+           @"  Dim counter = 100\n"
+           @"  counter = counter + 1\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function LoopOverModuleName()\n"
+           @"  For counter = 1 To 3\n"
+           @"  Next\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Relabel()\n"
+           @"  label = label & \"x\"\n"
+           @"  Return label & label.Length\n"
+           @"End Function\n"
+           @"Function Implicit()\n"
+           @"  fresh = 7\n"
+           @"  Return fresh + 1\n"
+           @"End Function\n"
+           @"Function ReadBeforeSet()\n"
+           @"  Dim r = before\n"
+           @"  before = 3\n"
+           @"  Return r & \"/\" & before\n"
+           @"End Function\n"
+           @"Function NoBrackets()\n"
+           @"  Return Bump + 0\n"
+           @"End Function\n"
+           @"Function Tripled(a, Optional b = a * 3)\n"
+           @"  Return b\n"
+           @"End Function\n"
+           @"Function BadDim()\n"
+           @"  Dim x As Integer = \"abc\"\n"
+           @"  Return 1\n"
+           @"End Function\n"
+           @"Function BadCondition()\n"
+           @"  If \"maybe\" Then\n"
+           @"    Return 1\n"
+           @"  End If\n"
+           @"  Return 2\n"
+           @"End Function\n"
+           @"Function Twice(x As Integer) As Integer\n"
+           @"  Return x * 2\n"
+           @"End Function\n"
+           @"Function BadCall()\n"
+           @"  Twice(\"nope\")\n"
+           @"  Return 1\n"
+           @"End Function\n"
+           @"Function Rounded() As Integer\n"
+           @"  Rounded = 2.6\n"
+           @"End Function\n"
+           @"Function KeptOnExit()\n"
+           @"  KeptOnExit = 9\n"
+           @"  Exit Function\n"
+           @"  KeptOnExit = 10\n"
+           @"End Function\n"
+           @"Function BareReturn()\n"
+           @"  BareReturn = 4\n"
+           @"  Return\n"
+           @"End Function\n"
+           @"Sub Add(n)\n"
+           @"  counter = counter + n\n"
+           @"  Exit Sub\n"
+           @"  counter = counter + 500\n"
+           @"End Sub\n"
+           @"Function AfterSub()\n"
+           @"  Add(1000)\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Member()\n"
+           @"  Dim w As String = \"Hello\"\n"
+           @"  Return w.Substring(1, 3) & w.Length\n"
+           @"End Function\n"
+           @"Function Forever()\n"
+           @"  Return Forever()\n"
+           @"End Function\n";
+  if ([r.codeModule.problems count])
+    XCTFail(@"the code should read cleanly: %@", r.codeModule.problems);
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+
+  // A loop's counter: worked out from the variable each time round, and what
+  // is left in it is the last value the loop gave it.
+  [self expectText:@"=Code.Down(7)" scope:scope equals:@"7531|1"];
+  [self expectText:@"=Code.Quarters()" scope:scope equals:@"0,0.25,0.5,0.75,1,"];
+  [self expectText:@"=Code.WholeSteps()" scope:scope equals:@"1,2,"];
+  [self expectText:@"=Code.MovedCounter()" scope:scope equals:@"4/12"];
+  // Exit For and Exit Do leave the innermost loop of their own kind, through
+  // any of the other kind; with none, the function.
+  [self expectNumber:@"=Code.ExitMid(3)" scope:scope equals:6];
+  [self expectNumber:@"=Code.ExitForFromDo()" scope:scope equals:1];
+  [self expectNumber:@"=Code.ExitDoFromFor()" scope:scope equals:10];
+  [self expectNumber:@"=Code.ExitForOutsideLoop()" scope:scope equals:5];
+  // For Each over a text's characters, one value, and nothing at all.
+  [self expectText:@"=Code.Reversed(\"abc\")" scope:scope equals:@"cba"];
+  [self expectNumber:@"=Code.EachOne()" scope:scope equals:43];
+  [self expectNumber:@"=Code.EachNothing()" scope:scope equals:3];
+  // Conditions at the top and at the bottom: the bottom one runs the body once
+  // whatever it says.
+  [self expectNumber:@"=Code.UntilLoop(4)" scope:scope equals:4];
+  [self expectNumber:@"=Code.WhileAtEnd(5)" scope:scope equals:11];
+  [self expectNumber:@"=Code.WhileAtEnd(15)" scope:scope equals:15];
+  [self expectNumber:@"=Code.UntilAtEnd(5)" scope:scope equals:6];
+  [self expectText:@"=Code.NoCaseMatches(2) & Code.NoCaseMatches(1)" scope:scope equals:@"noneone"];
+  [self expectText:@"=Code.Nested(1, 1) & Code.Nested(1, 2) & Code.Nested(2, 1)" scope:scope equals:@"111xxx"];
+
+  // Names. A local hides the module's variable; a For over an unset name
+  // declares a local rather than counting with the module's.
+  [self expectNumber:@"=Code.Bump()" scope:scope equals:1];
+  [self expectNumber:@"=Code.Shadow()" scope:scope equals:101];
+  [self expectNumber:@"=Code.LoopOverModuleName()" scope:scope equals:3];
+  [self expectNumber:@"=Code.Bump()" scope:scope equals:2];
+  // Assigning to a module's variable changes it, and a member of it is read.
+  [self expectText:@"=Code.Relabel()" scope:scope equals:@"L1x3"];
+  [self expectText:@"=Code.Relabel()" scope:scope equals:@"L1xx4"];
+  // A name assigned without Dim is a local; read before it is set, it is only
+  // its own name.
+  [self expectNumber:@"=Code.Implicit()" scope:scope equals:8];
+  [self expectText:@"=Code.ReadBeforeSet()" scope:scope equals:@"before/3"];
+  // A function named without brackets is called.
+  [self expectNumber:@"=Code.NoBrackets()" scope:scope equals:3];
+  [self expectNumber:@"=Code.Tripled(2)" scope:scope equals:6];
+
+  // Where VB would throw, the function ends with the error.
+  for (NSString *failing in @[ @"=Code.BadDim()", @"=Code.BadCondition()", @"=Code.BadCall()" ])
+    if (![[RDLExpression evaluate:failing scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@ should be #Error", failing);
+
+  // What a function gives back: its own name converted to its type, unless a
+  // Return said otherwise.
+  [self expectNumber:@"=Code.Rounded()" scope:scope equals:3];
+  [self expectNumber:@"=Code.KeptOnExit()" scope:scope equals:9];
+  [self expectNumber:@"=Code.BareReturn()" scope:scope equals:4];
+  [self expectNumber:@"=Code.AfterSub()" scope:scope equals:1003];
+  [self expectText:@"=Code.Member()" scope:scope equals:@"ell5"];
+  // Calls nest only so deep, and then give up rather than overflow.
+  if ([RDLExpression evaluate:@"=Code.Forever()" scope:scope] != nil)
+    XCTFail(@"%@", @"a call nested too deep should come to Nothing");
 }
 
 // What the code is written in beyond the subset is reported with its line, and

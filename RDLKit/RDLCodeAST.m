@@ -29,7 +29,3 @@ RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStatement *> *
 @implementation RDLCodeFunction
 @end
 
-
-@implementation RDLCodeFrame
-@end
-
