@@ -519,7 +519,11 @@ a viewer -- it reads the report's data and loads its subreports before
 rendering, says what it could not read, walks through the pages with
 first/previous/next/last and a "Page n of m", and prints as a paginated
 document through NSDocument, which is what File > Print and Cmd-P now
-reach. The canvas has drawn what
+reach; a properties grid in the right pane, listing every property of
+what is selected -- the element's own and its style's, read from the
+class rather than from a list, so a property added to the model appears
+without anything being edited -- each editable where the model can take
+text back, through the editor so it undoes. The canvas has drawn what
 the backends draw since P1.1 -- lines, borders and padding through the
 same painters.
 

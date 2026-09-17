@@ -24,6 +24,7 @@
                 <outlet property="leftTabView" destination="leftTabView" id="leftTabViewOutlet"/>
                 <outlet property="outline" destination="outline" id="outlineOutlet"/>
                 <outlet property="problemsHost" destination="problemsHost" id="problemsHostOutlet"/>
+                <outlet property="propertiesHost" destination="propertiesHost" id="propertiesHostOutlet"/>
                 <outlet property="paletteHost" destination="paletteHost" id="paletteHostOutlet"/>
                 <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
                 <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
@@ -488,7 +489,19 @@
                                                                         </subviews>
                                                                     </view>
                                                                 </tabViewItem>
-                                                            </tabViewItems>
+                                                                                                        <tabViewItem label="Properties" identifier="properties" id="rightPropertiesItem">
+                                                <view key="view" id="rightPropertiesItemView">
+                                                    <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
+                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                    <subviews>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="propertiesHost">
+                                                            <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                        </customView>
+                                                    </subviews>
+                                                </view>
+                                            </tabViewItem>
+</tabViewItems>
                                                         </tabView>
                                                     </subviews>
                                                 </view>
