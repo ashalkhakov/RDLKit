@@ -898,6 +898,96 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"a drop outside the bands should be refused");
 }
 
+// A field dropped on a table goes in the cell it was dropped on -- which is
+// what a table is for -- and names the column above it when that heading is
+// still blank.
+- (void)testAFieldDroppedOnATableFillsTheCell {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Filling"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  ds.dataSourceName = @"Inline";
+  [ds setFieldNames:@[ @"Amount", @"Region" ]];
+  [report.dataSets addObject:ds];
+
+  // Two columns with nothing in them: a table drawn out before it was filled in.
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.name = @"Table1";
+  tablix.dataSetName = @"Sales";
+  tablix.left = 0.5;
+  tablix.top = 0.5;
+  tablix.width = 3.2;
+  tablix.height = 0.6;
+  tablix.headerHeight = 0.3;
+  tablix.rowHeight = 0.28;
+  tablix.columnSpecs = @[
+    @{ @"width" : @1.6, @"header" : @"", @"value" : @"" },
+    @{ @"width" : @1.6, @"header" : @"", @"value" : @"" }
+  ];
+  [tablix rebuildTablix];
+  [report.body.items addObject:tablix];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas =
+      [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  NSRect itemRect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:tablix rect:&itemRect]) {
+    XCTFail(@"%@", @"the table is not on the page");
+    return;
+  }
+  NSUInteger inBand = [report.body.items count];
+  NSRect detail = [RDLTablixGeometry cellRectOf:tablix itemRect:itemRect row:1 column:0];
+  if (![canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
+                   atPoint:NSMakePoint(NSMidX(detail), NSMidY(detail))]) {
+    XCTFail(@"%@", @"the canvas refused a field dropped on a cell");
+    return;
+  }
+  if ([report.body.items count] != inBand)
+    XCTFail(@"%@", @"a field dropped on a table should not also land in the band");
+  RDLTextbox *filled = (RDLTextbox *)[RDLTablixGeometry itemOf:tablix inRow:1 column:0];
+  if (![[filled.value description] isEqualToString:@"=Fields!Amount.Value"])
+    XCTFail(@"the cell should hold the binding, holds %@", filled.value);
+  RDLTextbox *heading = (RDLTextbox *)[RDLTablixGeometry itemOf:tablix inRow:0 column:0];
+  if (![[heading.value description] isEqualToString:@"Amount"])
+    XCTFail(@"the blank heading should be named after the field, reads %@", heading.value);
+  if ([ctx selectedItem] != filled)
+    XCTFail(@"%@", @"what the field landed in should be selected");
+
+  // Binding the cell and naming its column are one thing that was done, so
+  // they are one thing to undo.
+  [[ctx.document undoManager] undo];
+  if ([[filled.value description] length] || [[heading.value description] length])
+    XCTFail(@"undo should empty both the cell and its heading, reads %@ / %@", filled.value,
+            heading.value);
+  [[ctx.document undoManager] redo];
+
+  // A cell with nothing in it at all gets a text box of its own, bound.
+  RDLTablixCell *empty = [RDLTablixGeometry cellOf:tablix inRow:1 column:1];
+  [ctx.editor setItem:nil inCell:empty ofTablix:tablix];
+  NSRect second = [RDLTablixGeometry cellRectOf:tablix itemRect:itemRect row:1 column:1];
+  if (![canvas dropBinding:@{ @"expression" : @"=Fields!Region.Value", @"label" : @"Region" }
+                   atPoint:NSMakePoint(NSMidX(second), NSMidY(second))]) {
+    XCTFail(@"%@", @"the canvas refused a field dropped on an empty cell");
+    return;
+  }
+  RDLTextbox *made = (RDLTextbox *)[RDLTablixGeometry itemOf:tablix inRow:1 column:1];
+  if (![made isKindOfClass:[RDLTextbox class]] ||
+      ![[made.value description] isEqualToString:@"=Fields!Region.Value"])
+    XCTFail(@"an empty cell should be given a bound text box, holds %@", made);
+  if ([made.name rangeOfString:@"Region"].location == NSNotFound)
+    XCTFail(@"it should be named after the field, is named %@", made.name);
+
+  // A heading someone has written is theirs: a second field dropped in the
+  // same column does not rename it.
+  if (![canvas dropBinding:@{ @"expression" : @"=Fields!Region.Value", @"label" : @"Region" }
+                   atPoint:NSMakePoint(NSMidX(detail), NSMidY(detail))])
+    XCTFail(@"%@", @"the canvas refused a field dropped on a cell that holds one");
+  if (![[heading.value description] isEqualToString:@"Amount"])
+    XCTFail(@"the heading should have been left alone, reads %@", heading.value);
+}
+
 // The dataset arrangement, as the Core Data builder has it: the attributes in
 // the centre, where what is being edited goes, and the selected attribute's
 // settings in the inspector, where the settings of whatever is selected always

@@ -153,11 +153,14 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
 }
 
 // The drop itself, apart from the drag that delivered it: where the pointer is
-// decides the band and the position inside it.
+// decides the band and the position inside it -- or the cell of a tablix, when
+// that is what the pointer is over.
 - (BOOL)dropBinding:(NSDictionary *)binding atPoint:(NSPoint)p {
   NSString *expression = binding[RDLPaletteExpressionKey];
   if ([expression length] == 0)
     return NO;
+  if ([self dropBinding:binding intoCellAtPoint:p])
+    return YES;
 
   // Which band, and where inside it. A drop outside every band has nowhere to
   // go, so it is refused rather than guessed at.
@@ -187,6 +190,78 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
   [_context.editor addItem:box into:target.band.items bandKey:target.bandKey];
   [_context.selection selectItem:box inBandWithKey:target.bandKey];
   return YES;
+}
+
+// A field dropped on a tablix belongs in the cell it was dropped on, not on
+// top of the region: that is what a tablix is for, and dropping a field into a
+// table is how Report Builder fills one in. NO when the pointer is not over a
+// cell that can take it, so the drop falls back to landing in the band.
+- (BOOL)dropBinding:(NSDictionary *)binding intoCellAtPoint:(NSPoint)p {
+  RDLPageGeometry *geometry = [self geometry];
+  NSArray<NSValue *> *rects = nil;
+  NSArray<RDLItem *> *tablixes = [geometry tablixItemsWithRects:&rects];
+  for (NSUInteger i = 0; i < [tablixes count]; i++) {
+    RDLTablix *tablix = (RDLTablix *)tablixes[i];
+    NSUInteger row = 0, column = 0;
+    if (![RDLTablixGeometry tablix:tablix
+                          itemRect:[rects[i] rectValue]
+                             point:p
+                               row:&row
+                            column:&column])
+      continue;
+    return [self bind:binding toCellAtRow:row column:column ofTablix:tablix];
+  }
+  return NO;
+}
+
+- (BOOL)bind:(NSDictionary *)binding
+    toCellAtRow:(NSUInteger)row
+         column:(NSUInteger)column
+       ofTablix:(RDLTablix *)tablix {
+  RDLTablixCell *cell = [RDLTablixGeometry cellOf:tablix inRow:row column:column];
+  if (cell == nil)
+    return NO;  // a row-header column or the corner: the row hierarchy's, not the body's
+  NSString *expression = binding[RDLPaletteExpressionKey];
+  NSString *label = binding[RDLPaletteLabelKey] ?: @"Field";
+  RDLItem *held = cell.item;
+  if (held != nil && ![held isKindOfClass:[RDLTextbox class]])
+    return NO;  // something that is not text: let the drop land in the band instead
+
+  [_context.editor beginGroup:@"Bind Cell"];
+  if (held == nil) {
+    RDLTextbox *box = [[RDLTextbox alloc] init];
+    box.name = [RDLItemFactory uniqueNameWithPrefix:label inReport:_context.report];
+    [RDLItemFactory applyDefaultsTo:box report:_context.report];
+    box.value = expression;
+    [_context.editor setItem:box inCell:cell ofTablix:tablix];
+    held = box;
+  } else {
+    [_context.editor setPlainValue:expression ofItem:held];
+  }
+  [self nameColumnAbove:row column:column ofTablix:tablix as:label];
+  [_context.editor endGroup];
+  [_context.selection selectItem:held inBandWithKey:_context.selection.bandKey];
+  return YES;
+}
+
+// The heading a bound cell should have: the cell above it, when that one is an
+// empty text box waiting to be given a name. A table scaffolded here already
+// names its columns, and a heading someone has written is theirs -- neither is
+// overwritten. Inside the same undo step as the binding, since naming the
+// column is part of dropping the field rather than an edit of its own.
+- (void)nameColumnAbove:(NSUInteger)row column:(NSUInteger)column ofTablix:(RDLTablix *)tablix as:(NSString *)label {
+  if (row == 0)
+    return;
+  RDLItem *above = [RDLTablixGeometry itemOf:tablix inRow:row - 1 column:column];
+  if (![above isKindOfClass:[RDLTextbox class]])
+    return;
+  NSString *heading = [[(RDLTextbox *)above value] description];
+  if ([[heading stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] length])
+    return;
+  // The field's own name, not the expression: a heading is a caption. The
+  // palette marks a calculated field, and that mark is not part of the name.
+  NSString *name = [[label componentsSeparatedByString:@"  "] firstObject];
+  [_context.editor setPlainValue:name ofItem:above];
 }
 
 - (BOOL)isFlipped {
