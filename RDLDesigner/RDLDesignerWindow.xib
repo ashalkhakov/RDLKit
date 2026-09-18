@@ -25,6 +25,7 @@
                 <outlet property="outline" destination="outline" id="outlineOutlet"/>
                 <outlet property="problemsHost" destination="problemsHost" id="problemsHostOutlet"/>
                 <outlet property="propertiesHost" destination="propertiesHost" id="propertiesHostOutlet"/>
+                <outlet property="groupsHost" destination="groupsHost" id="groupsHostOutlet"/>
                 <outlet property="paletteHost" destination="paletteHost" id="paletteHostOutlet"/>
                 <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
                 <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
@@ -284,8 +285,12 @@
                                                     <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
+                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="groupsHost">
+                                                            <rect key="frame" x="0.0" y="0.0" width="778" height="140"/>
+                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
+                                                        </customView>
                                                         <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="canvasScroll">
-                                                            <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
+                                                            <rect key="frame" x="0.0" y="140" width="778" height="568"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                             <clipView key="contentView" copiesOnScroll="NO" id="canvasScrollClip">
                                                                 <rect key="frame" x="1" y="1" width="761" height="691"/>

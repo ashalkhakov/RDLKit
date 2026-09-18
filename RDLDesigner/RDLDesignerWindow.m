@@ -2,6 +2,7 @@
 #import "RDLChange.h"
 #import "RDLSelection.h"
 #import "RDLPreviewWindow.h"
+#import "RDLGroupsView.h"
 #import "RDLPropertiesView.h"
 #import "RDLSourceView.h"
 #import "RDLCanvasView.h"
@@ -86,7 +87,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
 // The report as RDL, and the way back: what is typed there becomes the report.
 @property (nonatomic, strong) RDLSourceView *sourceView;
-@property (nonatomic, strong) IBOutlet NSView *problemsHost, *propertiesHost;
+@property (nonatomic, strong) IBOutlet NSView *problemsHost, *propertiesHost, *groupsHost;
+// How the region being worked in groups, under the canvas.
+@property (nonatomic, strong) RDLGroupsView *groupsView;
 // Every property of what is selected, beside the inspector's chosen few.
 @property (nonatomic, strong) RDLPropertiesView *propertiesView;
 // What is wrong with the report, listed beside the ways into it.
@@ -726,6 +729,11 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
                                                      context:_context];
   _reportInspector.showsReportOnly = YES;
   RDLFillHost(_reportInspectorHost, _reportInspector);
+
+  // How the tablix being worked in groups, under the canvas where the region
+  // it is about is.
+  _groupsView = [[RDLGroupsView alloc] initWithFrame:[_groupsHost bounds] context:_context];
+  RDLFillHost(_groupsHost, _groupsView);
 
   // Every property of what is selected, for the ones the inspector has no
   // field for.

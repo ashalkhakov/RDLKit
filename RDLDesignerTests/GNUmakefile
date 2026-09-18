@@ -52,6 +52,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLCodeEditor.m \
   ../RDLDesigner/RDLStylePanel.m \
   ../RDLDesigner/RDLPreviewWindow.m \
+  ../RDLDesigner/RDLGroupsView.m \
   ../RDLDesigner/RDLProblemsView.m \
   ../RDLDesigner/RDLPropertiesView.m \
   ../RDLDesigner/RDLSourceView.m \
@@ -101,6 +102,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLCodeEditor.xib \
   ../RDLDesigner/RDLStylePanel.xib \
   ../RDLDesigner/RDLPreviewWindow.xib \
+  ../RDLDesigner/RDLGroupsView.xib \
   ../RDLDesigner/RDLProblemsView.xib \
   ../RDLDesigner/RDLPropertiesView.xib \
   ../RDLDesigner/RDLSourceView.xib \

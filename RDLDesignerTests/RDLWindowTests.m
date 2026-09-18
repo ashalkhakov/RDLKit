@@ -19,6 +19,7 @@
 #import "RDLParameterInspectorView.h"
 #import "RDLPreviewWindow.h"
 #import "RDLProblemsView.h"
+#import "RDLGroupsView.h"
 #import "RDLPropertiesView.h"
 #import "RDLSourceView.h"
 #import "RDLOutlineDataSource.h"
@@ -114,10 +115,15 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
     XCTFail(@"%@", [NSString stringWithFormat:@"the canvas gained %g of the 600 points",
                                               NSWidth([panes[1] frame]) - centreWas]);
 
-  // And what is in a pane fills it, all the way down.
+  // And what is in a pane fills it, all the way down. The centre is shared:
+  // the canvas takes what is left above the groups pane docked under it, and
+  // the two of them together fill it.
   NSScrollView *canvasScroll = [wc valueForKey:@"canvasScroll"];
-  if (NSHeight([canvasScroll frame]) < NSHeight([panes[1] frame]) - 40)
-    XCTFail(@"%@", @"the canvas scroll view should fill the centre pane");
+  NSView *groupsHost = [wc valueForKey:@"groupsHost"];
+  if (NSHeight([canvasScroll frame]) + NSHeight([groupsHost frame]) < NSHeight([panes[1] frame]) - 40)
+    XCTFail(@"%@", @"the canvas and the groups pane should fill the centre pane between them");
+  if (NSMinY([groupsHost frame]) != 0 || NSHeight([groupsHost frame]) < 60)
+    XCTFail(@"%@", @"the groups pane should sit along the bottom of the centre");
   if (fabs(NSWidth([canvasScroll frame]) - NSWidth([panes[1] frame])) > 0.01)
     XCTFail(@"%@", @"and be as wide as it");
   NSOutlineView *outline = [wc valueForKey:@"outline"];
@@ -899,6 +905,102 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([canvas dropBinding:@{ @"expression" : @"=Fields!Amount.Value", @"label" : @"Amount" }
                   atPoint:NSMakePoint(2, 2)])
     XCTFail(@"%@", @"a drop outside the bands should be refused");
+}
+
+// The Row Groups / Column Groups pane: the grouping of the region being worked
+// in, with a group added inside or beside the one picked out, deleted, and its
+// properties opened in the panel that has always edited one.
+- (void)testTheGroupsPaneShowsAndEditsTheHierarchy {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Grouped"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  ds.dataSourceName = @"Inline";
+  [ds setFieldNames:@[ @"Region", @"City", @"Amount" ]];
+  [report.dataSets addObject:ds];
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.name = @"Table1";
+  tablix.dataSetName = @"Sales";
+  tablix.left = 0.5;
+  tablix.top = 0.5;
+  tablix.width = 3.2;
+  tablix.height = 0.6;
+  tablix.headerHeight = 0.3;
+  tablix.rowHeight = 0.28;
+  tablix.columnSpecs = @[
+    @{ @"width" : @1.6, @"header" : @"Region", @"value" : @"=Fields!Region.Value" },
+    @{ @"width" : @1.6, @"header" : @"Amount", @"value" : @"=Fields!Amount.Value" }
+  ];
+  [tablix rebuildTablix];
+  [report.body.items addObject:tablix];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+
+  // Nothing selected: the pane says what to select rather than showing an
+  // empty tree as though the report had no groups.
+  if ([pane.heading rangeOfString:@"Select"].location == NSNotFound)
+    XCTFail(@"the pane should ask for a region, says %@", pane.heading);
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  if ([pane.heading rangeOfString:@"Table1"].location == NSNotFound)
+    XCTFail(@"the pane should name the region it is showing, says %@", pane.heading);
+
+  // A table starts with its details group, which is the one Report Builder
+  // shows as (Details): the pane lists it rather than pretending a table with
+  // no groups of its own has no grouping at all.
+  if ([[pane groupsOnAxis:RDLTablixAxisRows] count] != 1 ||
+      [pane.heading rangeOfString:@"1 row group"].location == NSNotFound)
+    XCTFail(@"the details group should be listed, the pane says %@", pane.heading);
+
+  // A first row group, added from the Row Groups heading.
+  [pane selectAxis:RDLTablixAxisRows];
+  RDLTablixMember *region = [pane addGroupWithExpression:@"=Fields!Region.Value"
+                                               placement:RDLGroupPlacementChild];
+  if (region == nil || [tablix.rowHierarchy.members count] == 0) {
+    XCTFail(@"%@", @"the pane should have added a row group");
+    return;
+  }
+  if (pane.selectedGroup != region || pane.selectedAxis != RDLTablixAxisRows)
+    XCTFail(@"%@", @"the group just added should be the one picked out");
+  if ([pane.heading rangeOfString:@"2 row groups"].location == NSNotFound)
+    XCTFail(@"the pane should count the groups, says %@", pane.heading);
+
+  // One inside it, which is what nesting is.
+  RDLTablixMember *city = [pane addGroupWithExpression:@"=Fields!City.Value"
+                                             placement:RDLGroupPlacementChild];
+  if (city == nil || [pane.heading rangeOfString:@"3 row groups"].location == NSNotFound)
+    XCTFail(@"a group inside the first should make three with the details, says %@", pane.heading);
+
+  // A column group goes on the other axis, from that heading.
+  [pane selectAxis:RDLTablixAxisColumns];
+  RDLTablixMember *year = [pane addGroupWithExpression:@"=Fields!Amount.Value"
+                                             placement:RDLGroupPlacementChild];
+  if (year == nil || [pane.heading rangeOfString:@"1 column group"].location == NSNotFound)
+    XCTFail(@"the pane should have added a column group, says %@", pane.heading);
+
+  // Deleting takes the group and the rows it owns, as one step that undoes.
+  if (![pane selectGroup:city axis:RDLTablixAxisRows])
+    XCTFail(@"%@", @"the group that was just added should be one the pane can pick out");
+  [pane deleteGroup:nil];
+  if ([pane.heading rangeOfString:@"2 row groups"].location == NSNotFound)
+    XCTFail(@"deleting the inner group should leave two, says %@", pane.heading);
+  [[ctx.document undoManager] undo];
+  if ([pane.heading rangeOfString:@"3 row groups"].location == NSNotFound)
+    XCTFail(@"undo should put the group back, says %@", pane.heading);
+
+  // The properties panel is the one that has always edited a group: built for
+  // the pane's own selection rather than for a menu item's.
+  // Through the pane's own list, since a structural edit builds new members
+  // and the one added earlier is not in the tablix any more.
+  RDLTablixMember *outermost = [[pane groupsOnAxis:RDLTablixAxisRows] lastObject];
+  [pane selectGroup:outermost axis:RDLTablixAxisRows];
+  RDLGroupPropertiesEditor *editor = [RDLGroupPropertiesEditor editorForGroup:pane.selectedGroup
+                                                                         axis:pane.selectedAxis
+                                                                     ofTablix:tablix
+                                                                      context:ctx];
+  if (editor == nil)
+    XCTFail(@"%@", @"the group the pane has picked out should open in the properties panel");
 }
 
 // The properties grid: every property of what is selected, read from the class

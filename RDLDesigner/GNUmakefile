@@ -48,6 +48,7 @@ RDLDesigner_OBJC_FILES = \
   RDLCodeEditor.m \
   RDLStylePanel.m \
   RDLPreviewWindow.m \
+  RDLGroupsView.m \
   RDLProblemsView.m \
   RDLPropertiesView.m \
   RDLSourceView.m \
@@ -114,6 +115,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLVariablesEditor.xib \
   RDLCodeEditor.xib \
   RDLStylePanel.xib \
+  RDLGroupsView.xib \
   RDLProblemsView.xib \
   RDLPropertiesView.xib \
   RDLSourceView.xib \

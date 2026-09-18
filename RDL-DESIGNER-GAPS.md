@@ -523,7 +523,13 @@ reach; a properties grid in the right pane, listing every property of
 what is selected -- the element's own and its style's, read from the
 class rather than from a list, so a property added to the model appears
 without anything being edited -- each editable where the model can take
-text back, through the editor so it undoes. The canvas has drawn what
+text back, through the editor so it undoes; a Row Groups / Column Groups
+pane docked under the canvas, showing how the region being worked in
+groups -- the details group among them, as Report Builder lists it --
+with a group added inside or beside the one picked out, deleted with the
+rows or columns it owns, and opened in the Group Properties panel, which
+stays: the pane is the hierarchy always in view, not a second
+implementation of what that panel edits. The canvas has drawn what
 the backends draw since P1.1 -- lines, borders and padding through the
 same painters.
 
