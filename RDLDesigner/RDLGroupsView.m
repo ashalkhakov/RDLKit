@@ -20,7 +20,7 @@
 @implementation RDLGroupsAxisNode
 @end
 
-@interface RDLGroupsView () <NSOutlineViewDataSource, NSOutlineViewDelegate>
+@interface RDLGroupsView () <NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSOutlineView *outline;
 @property (nonatomic, strong) IBOutlet NSTextField *headingLabel;
@@ -39,6 +39,12 @@
   RDLFillHost(self, _content);
   [_outline setTarget:self];
   [_outline setDoubleAction:@selector(editGroup:)];
+  // The pane's commands are where Report Builder puts them: on the group
+  // itself. The menu is built when it is asked for, because what it offers
+  // depends on the row it was asked on.
+  NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Group"];
+  [menu setDelegate:self];
+  [_outline setMenu:menu];
   _axes = @[];
   self.context = context;
   return self;
@@ -107,10 +113,46 @@ static NSUInteger RDLCountGroups(NSArray<RDLTablixMember *> *groups) {
   return count;
 }
 
+// Where a group sits in the tree: which one of the outermost groups, then
+// which inside that, and so on. A structural edit builds new members, so this
+// is how the pane finds again the group the person was working in -- the one
+// in the same place is the same group to them, whatever object it is now.
+- (NSArray<NSNumber *> *)pathOfGroup:(RDLTablixMember *)group axis:(RDLTablixAxis)axis {
+  NSMutableArray<NSNumber *> *path = [NSMutableArray array];
+  NSArray<RDLTablixMember *> *level = [[self nodeForAxis:axis] groups] ?: @[];
+  while ([level count]) {
+    NSUInteger at = NSNotFound;
+    for (NSUInteger i = 0; i < [level count] && at == NSNotFound; i++)
+      if (level[i] == group || RDLGroupsHold(RDLGroupsIn(level[i].members), group))
+        at = i;
+    if (at == NSNotFound)
+      return nil;
+    [path addObject:@(at)];
+    if (level[at] == group)
+      return path;
+    level = RDLGroupsIn(level[at].members);
+  }
+  return nil;
+}
+
+- (RDLTablixMember *)groupAtPath:(NSArray<NSNumber *> *)path axis:(RDLTablixAxis)axis {
+  NSArray<RDLTablixMember *> *level = [[self nodeForAxis:axis] groups] ?: @[];
+  RDLTablixMember *group = nil;
+  for (NSNumber *index in path) {
+    NSUInteger at = [index unsignedIntegerValue];
+    if (at >= [level count])
+      return nil;
+    group = level[at];
+    level = RDLGroupsIn(group.members);
+  }
+  return group;
+}
+
 - (void)reload {
   RDLTablix *tablix = [self tablix];
   RDLTablixMember *wasGroup = _selectedGroup;
   RDLTablixAxis wasAxis = _selectedAxis;
+  NSArray<NSNumber *> *wasPath = wasGroup ? [self pathOfGroup:wasGroup axis:wasAxis] : nil;
   if (tablix == nil) {
     _axes = @[];
     _heading = @"Select a table, matrix or list to see how it groups.";
@@ -138,7 +180,12 @@ static NSUInteger RDLCountGroups(NSArray<RDLTablixMember *> *groups) {
   // A structural edit builds new members, so what was picked out is gone; the
   // axis is still meaningful, and keeping it is what leaves the pane where the
   // person was working.
-  if (wasGroup != nil && ![self selectGroup:wasGroup axis:wasAxis])
+  // A structural edit builds new members, so what was picked out is gone as an
+  // object; the group in the same place is the one to pick out again.
+  RDLTablixMember *again = wasGroup;
+  if (again != nil && [self pathOfGroup:again axis:wasAxis] == nil)
+    again = [self groupAtPath:wasPath axis:wasAxis];
+  if (wasGroup != nil && (again == nil || ![self selectGroup:again axis:wasAxis]))
     [self selectAxis:wasAxis];
   [self readSelection];
 }
@@ -280,6 +327,113 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
   if (tablix == nil || _selectedGroup == nil)
     return;
   [RDLGroupPropertiesEditor runForGroup:_selectedGroup axis:_selectedAxis ofTablix:tablix context:_context];
+}
+
+#pragma mark - The commands, where Report Builder puts them
+
+// Right-clicking a row picks it out first: a command is about the group under
+// the pointer, not about whatever was picked out before.
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+  [menu removeAllItems];
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil)
+    return;
+  NSInteger row = [_outline clickedRow];
+  if (row >= 0) {
+    id item = [_outline itemAtRow:row];
+    if ([item isKindOfClass:[RDLTablixMember class]])
+      [self selectGroup:item axis:[self axisOfGroup:item]];
+    else if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+      [self selectAxis:[(RDLGroupsAxisNode *)item axis]];
+  }
+  BOOL onGroup = _selectedGroup != nil;
+  BOOL rows = _selectedAxis != RDLTablixAxisColumns;
+
+  // Adding: round what is there when nothing is picked out, and otherwise
+  // where the submenu says, each on a field of the dataset or on an expression.
+  NSMenu *add = [[NSMenu alloc] initWithTitle:@"Add Group"];
+  NSArray<NSArray *> *places = onGroup ? @[
+    @[ @(RDLGroupPlacementParent), @"Parent Group" ],
+    @[ @(RDLGroupPlacementChild), @"Child Group" ],
+    @[ @(RDLGroupPlacementBefore), rows ? @"Adjacent Above" : @"Adjacent Left" ],
+    @[ @(RDLGroupPlacementAfter), rows ? @"Adjacent Below" : @"Adjacent Right" ],
+  ] : @[ @[ @(RDLGroupPlacementParent), @"Group" ] ];
+  for (NSArray *place in places)
+    [add addItem:[self addItemTitled:place[1] placement:(RDLGroupPlacement)[place[0] integerValue] ofTablix:tablix]];
+  NSMenuItem *addItem = [[NSMenuItem alloc] initWithTitle:@"Add Group" action:NULL keyEquivalent:@""];
+  [addItem setSubmenu:add];
+  [menu addItem:addItem];
+
+  if (!onGroup)
+    return;
+  // A total beside the group, which is what a subtotal row is.
+  NSMenu *totals = [[NSMenu alloc] initWithTitle:@"Add Total"];
+  for (NSNumber *after in @[ @NO, @YES ]) {
+    NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:[after boolValue] ? @"After" : @"Before"
+                                                action:@selector(addTotalFromMenu:)
+                                         keyEquivalent:@""];
+    [mi setTarget:self];
+    [mi setRepresentedObject:after];
+    [totals addItem:mi];
+  }
+  NSMenuItem *totalItem = [[NSMenuItem alloc] initWithTitle:@"Add Total" action:NULL keyEquivalent:@""];
+  [totalItem setSubmenu:totals];
+  [menu addItem:totalItem];
+
+  [menu addItem:[NSMenuItem separatorItem]];
+  NSMenuItem *remove = [[NSMenuItem alloc] initWithTitle:@"Delete Group"
+                                                  action:@selector(deleteGroup:)
+                                           keyEquivalent:@""];
+  [remove setTarget:self];
+  [menu addItem:remove];
+  [menu addItem:[NSMenuItem separatorItem]];
+  NSMenuItem *properties = [[NSMenuItem alloc] initWithTitle:@"Group Properties…"
+                                                      action:@selector(editGroup:)
+                                               keyEquivalent:@""];
+  [properties setTarget:self];
+  [menu addItem:properties];
+}
+
+// One placement, with the dataset's fields under it and "Expression…" last --
+// the same offer the tablix's own menu makes on the canvas.
+- (NSMenuItem *)addItemTitled:(NSString *)title
+                    placement:(RDLGroupPlacement)placement
+                     ofTablix:(RDLTablix *)tablix {
+  NSMenu *on = [[NSMenu alloc] initWithTitle:title];
+  for (NSString *field in [[_context.report dataSetNamed:tablix.dataSetName] fieldNames] ?: @[]) {
+    NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:field
+                                                action:@selector(addGroupFromMenu:)
+                                         keyEquivalent:@""];
+    [mi setTarget:self];
+    [mi setRepresentedObject:@[ @(placement), [NSString stringWithFormat:@"=Fields!%@.Value", field] ]];
+    [on addItem:mi];
+  }
+  NSMenuItem *asked = [[NSMenuItem alloc] initWithTitle:@"Expression…"
+                                                 action:@selector(addGroupFromMenu:)
+                                          keyEquivalent:@""];
+  [asked setTarget:self];
+  [asked setRepresentedObject:@[ @(placement) ]];
+  [on addItem:asked];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:NULL keyEquivalent:@""];
+  [item setSubmenu:on];
+  return item;
+}
+
+- (void)addGroupFromMenu:(NSMenuItem *)sender {
+  NSArray *what = [sender representedObject];
+  [self addGroupWithExpression:[what count] > 1 ? what[1] : nil
+                     placement:(RDLGroupPlacement)[what[0] integerValue]];
+}
+
+- (void)addTotalFromMenu:(NSMenuItem *)sender {
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
+  [_context.editor addTotalBesideGroup:_selectedGroup
+                                 after:[[sender representedObject] boolValue]
+                                  axis:_selectedAxis
+                              ofTablix:tablix];
+  [self reload];
 }
 
 #pragma mark - The tree

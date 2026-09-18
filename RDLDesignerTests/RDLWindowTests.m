@@ -989,6 +989,40 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([pane.heading rangeOfString:@"3 row groups"].location == NSNotFound)
     XCTFail(@"undo should put the group back, says %@", pane.heading);
 
+  // The commands are where Report Builder puts them as well: on the group
+  // itself, in a menu built for the row it is asked on.
+  [pane selectGroup:[[pane groupsOnAxis:RDLTablixAxisRows] lastObject] axis:RDLTablixAxisRows];
+  NSMenu *menu = [[pane valueForKey:@"outline"] menu];
+  [(id<NSMenuDelegate>)pane menuNeedsUpdate:menu];
+  NSMutableArray<NSString *> *titles = [NSMutableArray array];
+  for (NSMenuItem *mi in [menu itemArray])
+    [titles addObject:[mi title]];
+  for (NSString *wanted in @[ @"Add Group", @"Add Total", @"Delete Group", @"Group Properties…" ])
+    if (![titles containsObject:wanted])
+      XCTFail(@"the menu should offer %@; it offers %@", wanted, titles);
+  NSMenu *places = [[menu itemWithTitle:@"Add Group"] submenu];
+  for (NSString *wanted in @[ @"Parent Group", @"Child Group", @"Adjacent Above", @"Adjacent Below" ])
+    if ([places indexOfItemWithTitle:wanted] < 0)
+      XCTFail(@"%@ should be one of the ways to add a group", wanted);
+  // A field of the dataset groups on it straight away, without a panel.
+  NSMenuItem *onCity = [[[places itemWithTitle:@"Child Group"] submenu] itemWithTitle:@"City"];
+  if (onCity == nil) {
+    XCTFail(@"%@", @"the dataset's fields should be offered to group on");
+    return;
+  }
+  [pane addGroupFromMenu:onCity];
+  if ([pane.heading rangeOfString:@"4 row groups"].location == NSNotFound)
+    XCTFail(@"grouping on a field from the menu should add a group, the pane says %@", pane.heading);
+  [[ctx.document undoManager] undo];
+
+  // A total beside a group is a row of its own.
+  NSUInteger rowsBefore = [tablix.tablixBody.rows count];
+  [(id<NSMenuDelegate>)pane menuNeedsUpdate:menu];
+  NSMenuItem *after = [[[menu itemWithTitle:@"Add Total"] submenu] itemWithTitle:@"After"];
+  [pane addTotalFromMenu:after];
+  if ([tablix.tablixBody.rows count] <= rowsBefore)
+    XCTFail(@"%@", @"a total should add a row");
+
   // The properties panel is the one that has always edited a group: built for
   // the pane's own selection rather than for a menu item's.
   // Through the pane's own list, since a structural edit builds new members

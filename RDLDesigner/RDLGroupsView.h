@@ -51,4 +51,9 @@
 - (void)addAdjacentGroup:(id)sender;  // beside it
 - (void)deleteGroup:(id)sender;
 - (void)editGroup:(id)sender;
+// What the pane's own menu does, each carrying what it is about in the menu
+// item: a placement and, when a field was chosen rather than "Expression…",
+// what to group on; and which side a total goes.
+- (void)addGroupFromMenu:(NSMenuItem *)sender;
+- (void)addTotalFromMenu:(NSMenuItem *)sender;
 @end
