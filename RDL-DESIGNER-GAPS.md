@@ -502,6 +502,11 @@ reordering in the outline; editable source with re-parse; print and page
 navigation in the preview, with data binding and subreport loading; a
 report-wide errors pane.
 
+Every one of these is now done; the paragraph below says how each was
+answered, and where the answer differs from the wording above -- the
+grouping pane stands beside the Group Properties panel rather than
+replacing it, at the user's decision.
+
 Done: the errors pane, as the left pane's Problems tab; multi-select
 with Shift-click and a marquee, moved, nudged and deleted together,
 with align, make-same-size and distribute in the Edit menu; eight
