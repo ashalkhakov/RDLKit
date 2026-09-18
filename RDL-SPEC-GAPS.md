@@ -95,7 +95,13 @@ a page that looks different from SSRS. The findings in that class:
    `Parameters!P.Label` returns the label, `ReportItems!` works and `^`
    follows VB precedence. Still open: all numbers are doubles, division by
    zero is 0 instead of `#Error`, and the single quote is always a comment
-   (§10).
+   (§10) -- as it is in VB.NET, so a report written for a tool that took
+   `' of '` as text now has that reported: the parser says an expression
+   that asks for a value or a bracket it has not got is not whole, and
+   the checker names the quote that ended it. Twenty-two corpus reports
+   are flagged this way, all of them page footers reading
+   `=Globals!PageNumber + ' of ' + Globals!TotalPages`, and all of them
+   already rendered without the words between the quotes.
 4. **Pagination is approximate.** Fixed in P0.3 and P0.8: phantom
    header/footer bands, the `PrintOnFirstPage`/`PrintOnLastPage` and
    `CanGrow` defaults, `RepeatOnNewPage` running into the footer,

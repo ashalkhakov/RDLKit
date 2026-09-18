@@ -293,6 +293,19 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 // That matters because these come out of a user's .rdl file and go back into
 // it: re-printing would quietly rewrite their spacing, parentheses and casing
 // every time the report was saved.
+// How much of what was written the parser made sense of.
+typedef NS_ENUM(NSInteger, RDLExprCompleteness) {
+  // The whole of it, with nothing left over.
+  RDLExprCompletenessWhole = 0,
+  // The parser stopped at something it did not understand and kept what it
+  // had, so the tree is a prefix of what was written: `=IIf(a % 2 = 0, "x")`
+  // becomes an IIf of one argument.
+  RDLExprCompletenessLeftovers,
+  // Something the expression asks for is not there: a value after an operator
+  // (`=1 +`), or a closing bracket (`=Sum(Fields!A.Value`).
+  RDLExprCompletenessMissing,
+};
+
 @interface RDLExpr : NSObject
 // nil when `source` is not an expression, i.e. does not begin with "=".
 + (instancetype)expressionWithSource:(NSString *)source;
@@ -304,10 +317,15 @@ FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
 // The parsed tree, or nil when the source did not parse. Read-only: the tokens
 // remain the record of what was written.
 @property (nonatomic, readonly, strong) RDLExprNode *root;
-// NO when the parser stopped before the end of the expression -- it keeps what
-// it understood, so the tree is a prefix of what was written and evaluating it
-// silently does less than the author asked. RDLChecker reports these.
+// NO when what was written is not a whole expression -- see `completeness` for
+// which way it is not. The tree is still there and is still what the kit
+// evaluates, so an expression that is not whole silently does less than the
+// author asked. RDLChecker reports these.
 @property (nonatomic, readonly) BOOL parsedCompletely;
+// Why it is not whole, which decides what there is to say about it: the parser
+// stopped and text was left over, or the expression asked for something it does
+// not have -- a value after an operator, a bracket to close one it opened.
+@property (nonatomic, readonly) RDLExprCompleteness completeness;
 // The source split into runs to colour, covering it end to end including the
 // whitespace, so an editor can attribute the whole string in one pass. Works on
 // any text, expression or not: a source without a leading "=" is one run of

@@ -551,6 +551,12 @@ NSArray *RDLLexCode(NSString *src) {
 @interface RDLExpressionParser : NSObject
 @property (nonatomic, strong) NSArray *toks;
 @property (nonatomic, assign) NSUInteger i;
+// Something the expression asks for and does not have: an operand after an
+// operator, a closing bracket, a token that cannot begin an expression at all.
+// The tree still comes back -- it is what the kit has always evaluated, and
+// changing it would change what existing reports render -- but a caller can
+// now be told that what was written is not a whole expression.
+@property (nonatomic, assign) BOOL missing;
 - (RDLExprNode *)parse;
 @end
 
@@ -735,7 +741,8 @@ NSArray *RDLLexCode(NSString *src) {
     while ([self matchP:@","])
       [a.args addObject:[self parseOr]];
   }
-  [self matchP:@")"];
+  if (![self matchP:@")"])
+    _missing = YES;  // the arguments run out before the call is closed
   return a;
 }
 - (RDLExprNode *)parseIdent {
@@ -890,8 +897,12 @@ NSArray *RDLLexCode(NSString *src) {
 
 - (RDLExprNode *)parsePrimary {
   RDLTok *t = [self peek];
-  if (t == nil)
+  // The expression ended where a value should be: "=1 +" asks for something to
+  // add and there is nothing after the operator.
+  if (t == nil) {
+    _missing = YES;
     return RDLLit([NSNull null]);
+  }
   if (t.kind == RDLExprTokenKindNumber) {
     [self eat];
     return RDLLit(t.value);
@@ -903,12 +914,17 @@ NSArray *RDLLexCode(NSString *src) {
   if (t.kind == RDLExprTokenKindPunctuation && [t.s isEqualToString:@"("]) {
     [self eat];
     RDLExprNode *v = [self parseOr];
-    [self matchP:@")"];
+    if (![self matchP:@")"])
+      _missing = YES;  // an opening bracket with nothing to close it
     return v;
   }
   if (t.kind == RDLExprTokenKindIdentifier)
     return [self parseIdent];
+  // A token that cannot begin a value at all -- a stray comma, a closing
+  // bracket, an operator with nothing before it. Skipped, as it always was,
+  // and now reported.
   [self eat];
+  _missing = YES;
   return RDLLit([NSNull null]);
 }
 @end
@@ -933,8 +949,10 @@ static RDLExprNode *RDLParseReportingRest(NSString *src, BOOL *outComplete) {
   p.toks = RDLLex([src substringFromIndex:1]);
   p.i = 0;
   RDLExprNode *root = [p parse];
+  // Whole means both: nothing left over at the end, and nothing missing in the
+  // middle.
   if (outComplete)
-    *outComplete = p.i >= [p.toks count];
+    *outComplete = p.i >= [p.toks count] && !p.missing;
   return root;
 }
 
@@ -1034,12 +1052,20 @@ NSString *RDLPrint(RDLExprNode *a) {
 
 #pragma mark - RDLExpr
 
+// Left over first: when the parser stopped early there is text to point at,
+// which says more than "something is missing" would.
+static RDLExprCompleteness RDLCompletenessOf(RDLExpressionParser *p) {
+  if (p.i < [p.toks count])
+    return RDLExprCompletenessLeftovers;
+  return p.missing ? RDLExprCompletenessMissing : RDLExprCompletenessWhole;
+}
+
 @implementation RDLExpr {
   NSString *_prefix;    // everything up to and including the leading "="
   NSArray *_toks;       // each carries its lexeme and the trivia before it
   NSString *_trailing;  // whitespace after the last token
   RDLExprNode *_ast;
-  BOOL _complete;
+  RDLExprCompleteness _completeness;
 }
 
 + (BOOL)isExpressionSource:(NSString *)source {
@@ -1059,7 +1085,7 @@ NSString *RDLPrint(RDLExprNode *a) {
   p.toks = e->_toks;
   p.i = 0;
   e->_ast = [p parse];
-  e->_complete = p.i >= [p.toks count];
+  e->_completeness = RDLCompletenessOf(p);
   return e;
 }
 
@@ -1107,7 +1133,11 @@ NSString *RDLPrint(RDLExprNode *a) {
 }
 
 - (BOOL)parsedCompletely {
-  return _complete;
+  return _completeness == RDLExprCompletenessWhole;
+}
+
+- (RDLExprCompleteness)completeness {
+  return _completeness;
 }
 
 + (NSArray<RDLExprToken *> *)tokensForSource:(NSString *)source {
@@ -1166,7 +1196,7 @@ NSString *RDLPrint(RDLExprNode *a) {
   p.toks = e->_toks;
   p.i = 0;
   e->_ast = [p parse];
-  e->_complete = p.i >= [p.toks count];
+  e->_completeness = RDLCompletenessOf(p);
   return e;
 }
 

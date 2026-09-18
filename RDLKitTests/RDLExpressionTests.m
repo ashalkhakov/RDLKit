@@ -1042,6 +1042,59 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be understood to its end", source]);
 }
 
+// Half an expression is not an expression. The parser keeps what it
+// understood, because that is what the kit has always evaluated, but it now
+// says that something is missing rather than reporting the whole of "=1 +" as
+// understood -- so the checker, the expression editor and the filter panel all
+// refuse it.
+- (void)testAnUnfinishedExpressionIsNotComplete {
+  NSArray<NSString *> *unfinished = @[
+    @"=1 +",                       // nothing to add
+    @"=Fields!Amount.Value *",     // nothing to multiply by
+    @"=Sum(Fields!Amount.Value",   // the call is never closed
+    @"=(1 + 2",                    // neither is the bracket
+    @"=IIf(1 = 1, \"a\",",         // an argument short, and unclosed
+    @"=Not",                       // nothing to negate
+  ];
+  for (NSString *source in unfinished) {
+    RDLExpr *expr = [RDLExpr expressionWithSource:source];
+    if ([expr parsedCompletely] || expr.completeness != RDLExprCompletenessMissing)
+      XCTFail(@"%@ asks for something it has not got, completeness %ld", source,
+              (long)expr.completeness);
+  }
+
+  // Text left over is the other way an expression is not whole, and it is
+  // reported as its own kind, because there is something to point at.
+  RDLExpr *leftovers = [RDLExpr expressionWithSource:@"=1 2"];
+  if ([leftovers parsedCompletely] || leftovers.completeness != RDLExprCompletenessLeftovers)
+    XCTFail(@"text after the expression should read as leftovers, not %ld",
+            (long)leftovers.completeness);
+
+  // What is whole stays whole.
+  for (NSString *source in @[ @"=1 + 2", @"=Sum(Fields!Amount.Value)", @"=IIf(1 = 1, \"a\", \"b\")",
+                              @"=(1 + 2) * 3", @"=Not True", @"=-2 ^ 2" ]) {
+    RDLExpr *expr = [RDLExpr expressionWithSource:source];
+    if (![expr parsedCompletely])
+      XCTFail(@"%@ is a whole expression, read as %ld", source, (long)expr.completeness);
+  }
+
+  // And the checker says so, in the words that fit which way it is unfinished.
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=1 +", YES), @"syntax", @"not finished"))
+    XCTFail(@"%@", @"an expression that ends after an operator should be reported");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=1 2", YES), @"syntax", @"partly understood"))
+    XCTFail(@"%@", @"an expression with text left over should be reported as before");
+
+  // The reason worth naming: a single quote begins a comment in Visual Basic,
+  // so an expression that meant it as text ends at the quote -- which is what
+  // SSRS does with it, and what several reports written for other tools do.
+  RDLExpr *quoted = [RDLExpr expressionWithSource:@"=Globals!PageNumber + ' of ' + Globals!TotalPages"];
+  if ([quoted parsedCompletely])
+    XCTFail(@"%@", @"a single quote comments out the rest, so that expression is not finished");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Globals!PageNumber + ' of ' + Globals!TotalPages", YES),
+                        @"syntax", @"single quote"))
+    XCTFail(@"%@", @"the checker should say which quote ended the expression");
+}
+
 // A member no value has, or a shared one Math, Convert, String or Financial
 // does not have, is an error, and a known one given the wrong number of
 // arguments is too. Members were never checked at all.

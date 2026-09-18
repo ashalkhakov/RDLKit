@@ -874,6 +874,19 @@ static RDLType *RDLCheckNode(RDLExprNode *node, RDLScope *scope, NSString *sourc
   return RDLUnknownType();
 }
 
+// Why an expression ends early, when the reason is one worth naming: in
+// Visual Basic a single quote begins a comment, so `=Globals!PageNumber + ' of
+// ' + Globals!TotalPages` -- which other reporting tools accept as text --
+// stops at the first quote and everything after it is a comment. That is what
+// SSRS does with it too, and it is not what the author meant, so the checker
+// says which quote did it rather than only that something is missing.
+static BOOL RDLEndsInAComment(NSString *source) {
+  for (RDLExprToken *token in [RDLExpr tokensForSource:source])
+    if (token.kind == RDLExprTokenKindTrivia && [token.text rangeOfString:@"'"].location != NSNotFound)
+      return YES;
+  return NO;
+}
+
 static void RDLCheckValue(RDLValue *value, RDLScope *scope, RDLCheckRun *run) {
   if (value == nil || ![value isExpression])
     return;
@@ -884,11 +897,16 @@ static void RDLCheckValue(RDLValue *value, RDLScope *scope, RDLCheckRun *run) {
     return;
   }
   if (![expr parsedCompletely]) {
-    // Everything past the cut is missing from the tree, so checking it further
-    // would complain about the wrong things -- an IIf that looks as though it
-    // were given one argument, say.
+    // Whatever is wrong, the tree is not the whole expression, so checking it
+    // further would complain about the wrong things -- an IIf that looks as
+    // though it were given one argument, say.
     RDLReportDiagnostic(run, RDLDiagnosticSeverityError, @"syntax", scope, [expr source],
-               @"this expression is only partly understood; the rest is ignored");
+               expr.completeness != RDLExprCompletenessMissing
+                   ? @"this expression is only partly understood; the rest is ignored"
+                   : RDLEndsInAComment([expr source])
+                         ? @"this expression is not finished: a single quote begins a comment, so the rest of "
+                            "it is ignored -- text goes in double quotes"
+                         : @"this expression is not finished: it asks for a value or a bracket that is not there");
     return;
   }
   RDLCheckNode(expr.root, scope, [expr source], run);
