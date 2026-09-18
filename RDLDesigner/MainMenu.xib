@@ -240,6 +240,12 @@
                                     <action selector="delete:" target="-2" id="deleteAction"/>
                                 </connections>
                             </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="View" id="viewMenuItem">
+                    <menu key="submenu" title="View" id="viewMenu">
+                        <items>
                             <menuItem title="Toggle Grid" keyEquivalent="g" id="toggleGridItem">
                                 <connections>
                                     <action selector="toggleGrid:" target="-2" id="toggleGridAction"/>
@@ -253,6 +259,12 @@
                             <menuItem title="Zoom Out" keyEquivalent="-" id="zoomOutItem">
                                 <connections>
                                     <action selector="zoomOut:" target="-2" id="zoomOutAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="viewSep1"/>
+                            <menuItem title="Row and Column Groups" keyEquivalent="G" id="groupsPaneItem">
+                                <connections>
+                                    <action selector="toggleGroupsPane:" target="-2" id="groupsPaneAction"/>
                                 </connections>
                             </menuItem>
                         </items>

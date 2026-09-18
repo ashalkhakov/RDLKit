@@ -33,6 +33,11 @@
 // How narrow a side pane may be dragged. Named because two delegate methods
 // have to agree on it.
 static const CGFloat kRDLSidePaneMinimum = 160.0;
+// The centre, top and bottom: what the canvas keeps for the page, how tall the
+// groups pane opens, and the least it can be dragged to before it shuts.
+static const CGFloat kRDLCanvasMinimumHeight = 200.0;
+static const CGFloat kRDLGroupsPaneHeight = 140.0;
+static const CGFloat kRDLGroupsPaneMinimum = 60.0;
 // What the two side panes open at. The right one has to clear the inspector's
 // sections, which are 260 points wide with a scroller beside them.
 static const CGFloat kRDLLeftPaneWidth = 220.0;
@@ -54,6 +59,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
+// The centre's own split: the canvas, and the groups pane under it, which
+// collapses.
+@property (nonatomic, strong) IBOutlet NSSplitView *centerSplit;
 @property (nonatomic, strong) IBOutlet RDLCanvasView *canvas;
 @property (nonatomic, strong) IBOutlet NSScrollView *canvasScroll;
 @property (nonatomic, strong) IBOutlet NSOutlineView *outline;
@@ -115,6 +123,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 static const NSUInteger kRDLOpeningNotesShown = 8;
 
 @implementation RDLDesignerWindow {
+  // How tall the groups pane was when it was last shut, so it comes back that
+  // size.
+  CGFloat _groupsPaneHeight;
   BOOL _presentedOpeningNotes;
   RDLExpressionFieldEditor *_fieldEditor;
 }
@@ -200,6 +211,10 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 // all do with their side panes.
 - (BOOL)splitView:(NSSplitView *)splitView shouldAdjustSizeOfSubview:(NSView *)subview {
   NSArray<NSView *> *panes = [splitView subviews];
+  // In the centre, a taller window is for more page: the groups pane keeps the
+  // height it was dragged to and the canvas takes the rest.
+  if (splitView == _centerSplit)
+    return subview != [panes lastObject];
   // Once there is not enough width for all three, holding the sides at their
   // size means the centre absorbs the whole shortfall and collapses to
   // nothing. Below that everyone gives way together, so a window that is too
@@ -215,8 +230,61 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 - (CGFloat)splitView:(NSSplitView *)splitView
     constrainMinCoordinate:(CGFloat)proposed
                ofSubviewAt:(NSInteger)index {
-  RDL_UNUSED(splitView);
+  // The canvas keeps a page's worth of room; dragging the divider further than
+  // that collapses the groups pane rather than squeezing the page away.
+  if (splitView == _centerSplit)
+    return MAX(proposed, kRDLCanvasMinimumHeight);
   return index == 0 ? MAX(proposed, kRDLSidePaneMinimum) : proposed;
+}
+
+// The groups pane is the one thing here that collapses: it is about the region
+// being worked in, and a report with no tablix in it has no use for the space.
+// Dragging it shut, double-clicking the divider and the View menu item are
+// three ways to the same state.
+- (BOOL)splitView:(NSSplitView *)splitView canCollapseSubview:(NSView *)subview {
+  return splitView == _centerSplit && subview == [[splitView subviews] lastObject];
+}
+
+- (BOOL)splitView:(NSSplitView *)splitView
+    shouldCollapseSubview:(NSView *)subview
+    forDoubleClickOnDividerAtIndex:(NSInteger)index {
+  RDL_UNUSED(index);
+  return [self splitView:splitView canCollapseSubview:subview];
+}
+
+// Whether the groups pane is showing, and the two ways it changes.
+- (BOOL)groupsPaneIsShowing {
+  return _centerSplit != nil && ![_centerSplit isSubviewCollapsed:_groupsHost];
+}
+
+- (void)showGroupsPane:(BOOL)show {
+  if (_centerSplit == nil || show == [self groupsPaneIsShowing])
+    return;
+  CGFloat full = NSHeight([_centerSplit bounds]);
+  if (!show) {
+    // Remembered, so it comes back the size it was rather than the size the
+    // XIB opened at.
+    _groupsPaneHeight = NSHeight([_groupsHost frame]);
+    [_centerSplit setPosition:full ofDividerAtIndex:0];
+  } else {
+    CGFloat height = _groupsPaneHeight > kRDLGroupsPaneMinimum ? _groupsPaneHeight : kRDLGroupsPaneHeight;
+    [_centerSplit setPosition:MAX(kRDLCanvasMinimumHeight, full - height - [_centerSplit dividerThickness])
+             ofDividerAtIndex:0];
+  }
+}
+
+- (void)toggleGroupsPane:(id)sender {
+  RDL_UNUSED(sender);
+  [self showGroupsPane:![self groupsPaneIsShowing]];
+}
+
+// The menu item says which way it goes, the way a Mac menu does.
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if ([item action] == @selector(toggleGroupsPane:)) {
+    [item setState:[self groupsPaneIsShowing] ? NSOnState : NSOffState];
+    return YES;
+  }
+  return YES;
 }
 
 - (CGFloat)splitView:(NSSplitView *)splitView

@@ -203,7 +203,7 @@ shows up in the master's next preview.
 | --- | --- | --- |
 | `MainMenu.xib` | The whole menu bar. Items this app implements target File's Owner; the editing ones (Undo, Cut, Open…, Export PDF…) target First Responder, so the front window answers first | The Samples submenu, one item per sample in the catalogue |
 | `RDLWelcomeWindow.xib` | Everything | — |
-| `RDLDesignerWindow.xib` | The splits, both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
+| `RDLDesignerWindow.xib` | The splits — the three panes, and the centre's own canvas-over-groups split — both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
 | `RDLGeneratorWindow.xib` | The window, the toolbar row, the split and both panes | The sample list, and one export button per backend the kit offers |
 | `RDLInspectorSections.xib` | All ten sections as top-level views: every label, field, popup and frame | Which sections are shown and where they stack (`-stackBoxes:`), and the dataset/page popup contents |
 | `RDLSubreportParametersEditor.xib` | The panel, its three columns and the buttons | The parameter names the subreport declares, and the expression cell in the Value column |

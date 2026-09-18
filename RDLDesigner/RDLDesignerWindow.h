@@ -54,4 +54,10 @@
 // pane, and one placed half off the screen loses whatever hangs over the edge.
 // Published so where a second window lands can be checked without a screen.
 - (void)placeBesideMe:(NSWindow *)other;
+// The groups pane under the canvas shows or hides. Report Builder keeps its
+// grouping pane in view; a report with no tablix in it has no use for the
+// space, so the pane collapses -- by dragging its divider shut, by
+// double-clicking the divider, or from the View menu.
+- (void)toggleGroupsPane:(id)sender;
+- (BOOL)groupsPaneIsShowing;
 @end

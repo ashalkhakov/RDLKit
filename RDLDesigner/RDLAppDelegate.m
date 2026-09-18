@@ -214,6 +214,29 @@
     }
 }
 
+// The groups pane belongs to a window, so this goes to the window the way Add
+// Element does rather than through the editing session.
+- (void)toggleGroupsPane:(id)sender {
+  for (NSWindowController *wc in [[self currentDocument] windowControllers])
+    if ([wc isKindOfClass:[RDLDesignerWindow class]]) {
+      [(RDLDesignerWindow *)wc toggleGroupsPane:sender];
+      return;
+    }
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if ([item action] == @selector(toggleGroupsPane:)) {
+    for (NSWindowController *wc in [[self currentDocument] windowControllers])
+      if ([wc isKindOfClass:[RDLDesignerWindow class]]) {
+        [item setState:[(RDLDesignerWindow *)wc groupsPaneIsShowing] ? NSOnState : NSOffState];
+        return YES;
+      }
+    [item setState:NSOffState];
+    return NO;
+  }
+  return YES;
+}
+
 - (void)toggleGrid:(id)sender {
   (void)sender;
   [[self currentContext] toggleGrid];

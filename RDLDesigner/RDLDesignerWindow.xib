@@ -26,6 +26,7 @@
                 <outlet property="problemsHost" destination="problemsHost" id="problemsHostOutlet"/>
                 <outlet property="propertiesHost" destination="propertiesHost" id="propertiesHostOutlet"/>
                 <outlet property="groupsHost" destination="groupsHost" id="groupsHostOutlet"/>
+                <outlet property="centerSplit" destination="centerSplit" id="centerSplitOutlet"/>
                 <outlet property="paletteHost" destination="paletteHost" id="paletteHostOutlet"/>
                 <outlet property="parameterInspectorHost" destination="parameterInspectorHost" id="parameterInspectorHostOutlet"/>
                 <outlet property="parameterNavigatorHost" destination="parameterNavigatorHost" id="parameterNavigatorHostOutlet"/>
@@ -285,32 +286,47 @@
                                                     <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
-                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="groupsHost">
-                                                            <rect key="frame" x="0.0" y="0.0" width="778" height="140"/>
-                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
-                                                        </customView>
-                                                        <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="canvasScroll">
-                                                            <rect key="frame" x="0.0" y="140" width="778" height="568"/>
+                                                        <splitView fixedFrame="YES" arrangesAllSubviews="NO" dividerStyle="thin" vertical="NO" translatesAutoresizingMaskIntoConstraints="NO" id="centerSplit">
+                                                            <rect key="frame" x="0.0" y="0.0" width="778" height="708"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                            <clipView key="contentView" copiesOnScroll="NO" id="canvasScrollClip">
-                                                                <rect key="frame" x="1" y="1" width="761" height="691"/>
+                                                            <subviews>
+                                                            <scrollView horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" id="canvasScroll">
+                                                                <rect key="frame" x="0.0" y="140" width="778" height="568"/>
                                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                                <subviews>
-                                                                    <customView id="canvas" customClass="RDLCanvasView">
-                                                                        <rect key="frame" x="0.0" y="-15" width="800" height="1100"/>
-                                                                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                                    </customView>
-                                                                </subviews>
-                                                            </clipView>
-                                                            <scroller key="horizontalScroller" verticalHuggingPriority="750" horizontal="YES" id="canvasScrollHScroller">
-                                                                <rect key="frame" x="1" y="692" width="761" height="15"/>
-                                                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                            </scroller>
-                                                            <scroller key="verticalScroller" verticalHuggingPriority="750" doubleValue="0.95843520782396086" horizontal="NO" id="canvasScrollVScroller">
-                                                                <rect key="frame" x="762" y="1" width="15" height="691"/>
-                                                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                                            </scroller>
-                                                        </scrollView>
+                                                                <clipView key="contentView" copiesOnScroll="NO" id="canvasScrollClip">
+                                                                    <rect key="frame" x="1" y="1" width="761" height="691"/>
+                                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                                                                    <subviews>
+                                                                        <customView id="canvas" customClass="RDLCanvasView">
+                                                                            <rect key="frame" x="0.0" y="-15" width="800" height="1100"/>
+                                                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                                        </customView>
+                                                                    </subviews>
+                                                                </clipView>
+                                                                <scroller key="horizontalScroller" verticalHuggingPriority="750" horizontal="YES" id="canvasScrollHScroller">
+                                                                    <rect key="frame" x="1" y="692" width="761" height="15"/>
+                                                                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                                </scroller>
+                                                                <scroller key="verticalScroller" verticalHuggingPriority="750" doubleValue="0.95843520782396086" horizontal="NO" id="canvasScrollVScroller">
+                                                                    <rect key="frame" x="762" y="1" width="15" height="691"/>
+                                                                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                                                </scroller>
+                                                            </scrollView>
+                                                            <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="groupsHost">
+                                                                <rect key="frame" x="0.0" y="0.0" width="778" height="140"/>
+                                                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
+                                                            </customView>
+                                                            </subviews>
+                                                                                                                    <!-- The canvas gives and the groups pane holds, so a taller
+                                                                 window is more page rather than more group list. -->
+                                                            <holdingPriorities>
+                                                                <real value="250"/>
+                                                                <real value="260"/>
+                                                            </holdingPriorities>
+                                                            <connections>
+                                                                <outlet property="delegate" destination="-2" id="centerSplitDelegate"/>
+                                                            </connections>
+</splitView>
                                                     </subviews>
                                                 </view>
                                             </tabViewItem>

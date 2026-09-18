@@ -122,8 +122,11 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   NSView *groupsHost = [wc valueForKey:@"groupsHost"];
   if (NSHeight([canvasScroll frame]) + NSHeight([groupsHost frame]) < NSHeight([panes[1] frame]) - 40)
     XCTFail(@"%@", @"the canvas and the groups pane should fill the centre pane between them");
-  if (NSMinY([groupsHost frame]) != 0 || NSHeight([groupsHost frame]) < 60)
-    XCTFail(@"%@", @"the groups pane should sit along the bottom of the centre");
+  // A split view lays out top to bottom in its own flipped coordinates, so
+  // "under the canvas" is the last subview rather than the lowest y.
+  NSSplitView *centreSplit = [wc valueForKey:@"centerSplit"];
+  if (groupsHost != [[centreSplit subviews] lastObject] || NSHeight([groupsHost frame]) < 60)
+    XCTFail(@"%@", @"the groups pane should sit under the canvas in the centre");
   if (fabs(NSWidth([canvasScroll frame]) - NSWidth([panes[1] frame])) > 0.01)
     XCTFail(@"%@", @"and be as wide as it");
   NSOutlineView *outline = [wc valueForKey:@"outline"];
@@ -3196,6 +3199,58 @@ paperOrigin:NSMakePoint(0, 0)];
   }
   if (fabs(ctx.zoom - RDLMinimumZoom) > 0.001)
     XCTFail(@"%@", @"zoom out should reach the minimum again");
+}
+
+// The groups pane under the canvas collapses, because a report with no table
+// in it has no use for the space, and comes back the height it was.
+- (void)testTheGroupsPaneCollapsesAndComesBack {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSSplitView *split = [wc valueForKey:@"centerSplit"];
+  NSView *host = [wc valueForKey:@"groupsHost"];
+  if (![split isKindOfClass:[NSSplitView class]] || ![host isDescendantOf:split]) {
+    XCTFail(@"%@", @"the canvas and the groups pane should share a split view");
+    return;
+  }
+  if (![wc groupsPaneIsShowing])
+    XCTFail(@"%@", @"the groups pane should be showing to begin with");
+  // Only the groups pane collapses: the canvas is what the window is for.
+  if (![(id<NSSplitViewDelegate>)wc splitView:split canCollapseSubview:host] ||
+      [(id<NSSplitViewDelegate>)wc splitView:split
+                          canCollapseSubview:[wc valueForKey:@"canvasScroll"]])
+    XCTFail(@"%@", @"the groups pane should collapse and the canvas should not");
+
+  CGFloat was = NSHeight([host frame]);
+  [wc toggleGroupsPane:nil];
+  // A collapsed subview keeps its frame and stops being laid out, so what says
+  // it is shut is the split view, not the height.
+  if ([wc groupsPaneIsShowing] || ![split isSubviewCollapsed:host])
+    XCTFail(@"%@", @"the pane should be shut");
+  // The canvas takes the room it leaves.
+  if (NSHeight([[wc valueForKey:@"canvasScroll"] frame]) < NSHeight([split bounds]) - 20)
+    XCTFail(@"%@", @"the canvas should take the room the pane gave up");
+
+  [wc toggleGroupsPane:nil];
+  if (![wc groupsPaneIsShowing] || fabs(NSHeight([host frame]) - was) > 1)
+    XCTFail(@"the pane should come back the height it was (%g), it is %g", was,
+            NSHeight([host frame]));
+
+  // The menu item says which way it goes.
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"Row and Column Groups"
+                                                action:@selector(toggleGroupsPane:)
+                                         keyEquivalent:@""];
+  [wc validateMenuItem:item];
+  if ([item state] != NSOnState)
+    XCTFail(@"%@", @"the menu item should be ticked while the pane is showing");
+  [wc toggleGroupsPane:nil];
+  [wc validateMenuItem:item];
+  if ([item state] != NSOffState)
+    XCTFail(@"%@", @"and unticked once it is shut");
 }
 
 // The groups pane adds and removes groups along both axes, which is what makes
