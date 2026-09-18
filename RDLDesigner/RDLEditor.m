@@ -1290,6 +1290,51 @@ static void RDLTransplantChart(RDLChart *into, RDLChart *from) {
                                 }];
 }
 
+// The groups along an axis, outermost first and each followed by those inside
+// it -- the order the groups pane lists them in, which is the order a move is
+// spoken of in.
+static void RDLCollectGroupsInOrder(NSArray<RDLTablixMember *> *members,
+                                    NSMutableArray<RDLTablixMember *> *into) {
+  for (RDLTablixMember *member in members) {
+    if ([member.groupName length])
+      [into addObject:member];
+    RDLCollectGroupsInOrder(member.members, into);
+  }
+}
+
+- (BOOL)moveGroup:(RDLTablixMember *)group
+          toIndex:(NSUInteger)index
+             axis:(RDLTablixAxis)axis
+         ofTablix:(RDLTablix *)tablix {
+  RDLTablixHierarchy *hierarchy = [RDLTablixStructure hierarchyOfTablix:tablix axis:axis];
+  NSMutableArray<RDLTablixMember *> *groups = [NSMutableArray array];
+  RDLCollectGroupsInOrder(hierarchy.members, groups);
+  NSUInteger from = [groups indexOfObjectIdenticalTo:group];
+  if (from == NSNotFound || [groups count] == 0)
+    return NO;
+  // The index is where it would go before it is taken out of the list.
+  NSUInteger to = MIN(index > from ? index - 1 : index, [groups count] - 1);
+  if (to == from)
+    return NO;
+  // Only groups nested one inside the next can trade places, and a details
+  // group groups on nothing so it has nothing to trade.
+  for (NSUInteger i = MIN(from, to); i < MAX(from, to); i++)
+    if ([[hierarchy pathToMember:groups[i + 1]] indexOfObjectIdenticalTo:groups[i]] == NSNotFound ||
+        [groups[i].groupExpressions count] == 0 || [groups[i + 1].groupExpressions count] == 0)
+      return NO;
+  return [self changeStructureOfTablix:tablix
+                                action:@"Re-nest Group"
+                                change:^BOOL {
+                                  NSInteger step = to > from ? 1 : -1;
+                                  for (NSInteger i = (NSInteger)from; i != (NSInteger)to; i += step)
+                                    [RDLTablixStructure exchangeGroup:groups[(NSUInteger)i]
+                                                            withGroup:groups[(NSUInteger)(i + step)]
+                                                                 axis:axis
+                                                             inTablix:tablix];
+                                  return YES;
+                                }];
+}
+
 - (RDLTablixMember *)addTotalBesideGroup:(RDLTablixMember *)member
                                    after:(BOOL)after
                                     axis:(RDLTablixAxis)axis

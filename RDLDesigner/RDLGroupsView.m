@@ -9,6 +9,11 @@
 #import "RDLPane.h"
 #import "RDLSelection.h"
 
+// What a group dragged in the pane carries. Nothing but the drag being this
+// pane's: which group it is comes from the row the drag started on, and that
+// is held here while it lasts.
+static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
+
 // The two roots of the tree. Objects rather than strings, so an outline item
 // is either one of these or a member, with nothing to confuse them.
 @interface RDLGroupsAxisNode : NSObject
@@ -20,7 +25,7 @@
 @implementation RDLGroupsAxisNode
 @end
 
-@interface RDLGroupsView () <NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate>
+@interface RDLGroupsView () <NSOutlineViewDelegate, NSMenuDelegate>
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSOutlineView *outline;
 @property (nonatomic, strong) IBOutlet NSTextField *headingLabel;
@@ -28,6 +33,9 @@
 
 @implementation RDLGroupsView {
   NSArray<RDLGroupsAxisNode *> *_axes;
+  // The group being dragged, and the axis it groups along.
+  RDLTablixMember *_dragged;
+  RDLTablixAxis _draggedAxis;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -42,6 +50,7 @@
   // The pane's commands are where Report Builder puts them: on the group
   // itself. The menu is built when it is asked for, because what it offers
   // depends on the row it was asked on.
+  [_outline registerForDraggedTypes:@[ RDLGroupsDragType ]];
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Group"];
   [menu setDelegate:self];
   [_outline setMenu:menu];
@@ -311,13 +320,24 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
   RDLTablix *tablix = [self tablix];
   if (tablix == nil || _selectedGroup == nil)
     return;
-  // With the rows or columns it owns, which is what deleting a group in Report
-  // Builder's pane offers first. A group that is the only member inside
-  // another cannot take its lines with it -- that would leave the group around
-  // it owning nothing -- so the group alone goes there and what it held takes
-  // its place.
+  // The grouping goes and what it held stays: deleting an outer group with its
+  // rows would take the detail rows inside it as well, which is not what
+  // "delete this group" should mean. Taking the rows too is the other command,
+  // as Report Builder offers both.
+  [_context.editor deleteGroup:_selectedGroup withLines:NO axis:_selectedAxis ofTablix:tablix];
+  [self reload];
+}
+
+// The group and the rows or columns it owns. A group that is the only member
+// inside another cannot take its lines with it -- that would leave the group
+// around it owning nothing -- and nothing happens rather than something else.
+- (void)deleteGroupAndLines:(id)sender {
+  RDL_UNUSED(sender);
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
   if (![_context.editor deleteGroup:_selectedGroup withLines:YES axis:_selectedAxis ofTablix:tablix])
-    [_context.editor deleteGroup:_selectedGroup withLines:NO axis:_selectedAxis ofTablix:tablix];
+    NSBeep();
   [self reload];
 }
 
@@ -386,6 +406,12 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
                                            keyEquivalent:@""];
   [remove setTarget:self];
   [menu addItem:remove];
+  NSMenuItem *removeLines =
+      [[NSMenuItem alloc] initWithTitle:rows ? @"Delete Group and Rows" : @"Delete Group and Columns"
+                                 action:@selector(deleteGroupAndLines:)
+                          keyEquivalent:@""];
+  [removeLines setTarget:self];
+  [menu addItem:removeLines];
   [menu addItem:[NSMenuItem separatorItem]];
   NSMenuItem *properties = [[NSMenuItem alloc] initWithTitle:@"Group Properties…"
                                                       action:@selector(editGroup:)
@@ -434,6 +460,98 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
                                   axis:_selectedAxis
                               ofTablix:tablix];
   [self reload];
+}
+
+#pragma mark - Re-nesting by dragging
+
+- (NSArray<RDLTablixMember *> *)allGroupsOnAxis:(RDLTablixAxis)axis {
+  NSMutableArray<RDLTablixMember *> *flat = [NSMutableArray array];
+  NSArray<RDLTablixMember *> *level = [self groupsOnAxis:axis];
+  while ([level count]) {
+    [flat addObjectsFromArray:level];
+    NSMutableArray<RDLTablixMember *> *next = [NSMutableArray array];
+    for (RDLTablixMember *group in level)
+      [next addObjectsFromArray:RDLGroupsIn(group.members)];
+    level = next;
+  }
+  return flat;
+}
+
+// Where a drop between rows lands in that list: under an axis heading it is
+// the depth itself, and under a group it is one past that group.
+- (NSInteger)flatIndexOfDropOn:(id)item childIndex:(NSInteger)index axis:(RDLTablixAxis *)outAxis {
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]]) {
+    if (outAxis)
+      *outAxis = [(RDLGroupsAxisNode *)item axis];
+    return index;
+  }
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return -1;
+  RDLTablixAxis axis = [self axisOfGroup:item];
+  if (outAxis)
+    *outAxis = axis;
+  NSUInteger at = [[self allGroupsOnAxis:axis] indexOfObjectIdenticalTo:item];
+  return at == NSNotFound ? -1 : (NSInteger)at + 1 + index;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline writeItems:(NSArray *)items toPasteboard:(NSPasteboard *)pasteboard {
+  RDL_UNUSED(outline);
+  id item = [items firstObject];
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return NO;
+  _dragged = item;
+  _draggedAxis = [self axisOfGroup:item];
+  [pasteboard declareTypes:@[ RDLGroupsDragType ] owner:self];
+  [pasteboard setString:@"group" forType:RDLGroupsDragType];
+  return YES;
+}
+
+- (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outline pasteboardWriterForItem:(id)item {
+  RDL_UNUSED(outline);
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return nil;
+  _dragged = item;
+  _draggedAxis = [self axisOfGroup:item];
+  NSPasteboardItem *written = [[NSPasteboardItem alloc] init];
+  [written setString:@"group" forType:RDLGroupsDragType];
+  return written;
+}
+
+- (NSDragOperation)outlineView:(NSOutlineView *)outline
+                  validateDrop:(id<NSDraggingInfo>)info
+                  proposedItem:(id)item
+            proposedChildIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  // Between rows, not onto one: dropping a group onto another would read as
+  // putting it inside, and where a group nests is what the order already says.
+  if (index == NSOutlineViewDropOnItemIndex || _dragged == nil)
+    return NSDragOperationNone;
+  RDLTablixAxis axis = RDLTablixAxisUnspecified;
+  NSInteger to = [self flatIndexOfDropOn:item childIndex:index axis:&axis];
+  // Only among the groups it already nests with: a row group is not a column
+  // group, and moving it across would mean regrouping the region, not
+  // re-nesting.
+  return to >= 0 && axis == _draggedAxis ? NSDragOperationMove : NSDragOperationNone;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline
+         acceptDrop:(id<NSDraggingInfo>)info
+               item:(id)item
+         childIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  RDLTablix *tablix = [self tablix];
+  RDLTablixAxis axis = RDLTablixAxisUnspecified;
+  NSInteger to = [self flatIndexOfDropOn:item childIndex:index axis:&axis];
+  RDLTablixMember *group = _dragged;
+  _dragged = nil;
+  if (tablix == nil || group == nil || to < 0 || axis != _draggedAxis)
+    return NO;
+  if (![_context.editor moveGroup:group toIndex:(NSUInteger)to axis:axis ofTablix:tablix])
+    return NO;
+  [self reload];
+  return YES;
 }
 
 #pragma mark - The tree

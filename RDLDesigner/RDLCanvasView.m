@@ -11,7 +11,6 @@
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
 #import "RDLExpressionHelper.h"
-#import "RDLTablixEditor.h"
 #import "RDLRichTextEditor.h"
 #import "RDLGroupPropertiesEditor.h"
 #import "RDLExpressionEditor.h"
@@ -695,7 +694,6 @@ static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
   [m addItem:[self tablixMenuItem:[RDLTablixStructure tablixHasTotalRow:tab] ? @"Hide Grand Total" : @"Show Grand Total"
                            action:@selector(ctxToggleGrandTotal:)
                               tag:0]];
-  [m addItem:[self tablixMenuItem:@"Edit Group…" action:@selector(ctxEditGroup:) tag:0]];
   // The tablix goes with the command: what is selected may be an item in one
   // of its cells.
   for (NSMenuItem *mi in [m itemArray])
@@ -917,12 +915,6 @@ static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
 
 - (void)ctxToggleGrandTotal:(NSMenuItem *)mi {
   [_context.editor toggleGrandTotalOfTablix:[self tablixOfMenuItem:mi]];
-}
-
-- (void)ctxEditGroup:(NSMenuItem *)mi {
-  RDLTablix *tablix = [self tablixOfMenuItem:mi];
-  if (tablix)
-    [RDLTablixEditor runForTablix:tablix context:_context];
 }
 
 - (void)ctxEditRichText:(NSMenuItem *)mi {

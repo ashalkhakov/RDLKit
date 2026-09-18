@@ -19,7 +19,6 @@
 #import "RDLVariablesEditor.h"
 #import "RDLStylePanel.h"
 #import "RDLSubreportParametersEditor.h"
-#import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
 #import "RDLExpressionField.h"
@@ -130,7 +129,7 @@
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
-@property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton;
+@property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton, *tablixFiltersButton;
 @property (nonatomic, strong) IBOutlet NSTextField *titleField, *catField, *valField;
 // Subreport section. Which report it shows, and the two things a person does
 // with it: pass values to it, and open it -- because its contents belong to
@@ -263,6 +262,10 @@
 // otherwise invisible from here.
 - (void)syncSortingButton:(NSButton *)button count:(NSUInteger)count {
   [button setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
+}
+
+- (void)syncFiltersButton:(NSButton *)button count:(NSUInteger)count {
+  [button setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…", (unsigned long)count] : @"Filters…"];
 }
 
 // The rows of a tablix, sorted before any group sees them.
@@ -405,18 +408,24 @@
   [self reload];
 }
 
-// Opens the Report-Builder-style tablix editor for the selected tablix.
-- (void)editTablix:(id)sender {
+// The rows a table keeps, in the panel every data region filters through.
+// Report Builder has this in Tablix Properties; here the region's properties
+// are the inspector, which is where the chart's filters are too.
+- (void)editTablixFilters:(id)sender {
   (void)sender;
-  RDLItem *it = [_context selectedItem];
-  if (it == nil || ![it isKindOfClass:[RDLTablix class]])
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTablix class]])
     return;
-  if ([RDLTablixEditor runForTablix:(RDLTablix *)it context:_context]) {
-    // -documentDidChange: suppresses reload for a property edit of the item on
-    // show, which is right while the user is typing in a field but wrong when
-    // a modal has just rewritten several of them.
-    [self reload];
-  }
+  RDLTablix *tablix = (RDLTablix *)item;
+  RDLDataSet *ds = [_context.report dataSetNamed:tablix.dataSetName];
+  NSArray<RDLFilter *> *edited =
+      [RDLFilterEditor runForFilters:tablix.filters
+                               title:tablix.name
+                              fields:[(ds ?: [_context.report.dataSets firstObject]) fieldNames]
+                              report:_context.report];
+  if (edited == nil)
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"filters" ofItem:tablix];
 }
 
 #pragma mark - Field bindings
@@ -850,6 +859,9 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [boxes addObject:_tablixBox];
       [boxes addObject:_tablixOptionsBox];
       [self syncSortingButton:_tablixSortingButton count:[[(RDLTablix *)it sortExpressions] count]];
+      // The count, because a filter is otherwise invisible from here and a
+      // table that shows nothing is a mystery worth one word.
+      [self syncFiltersButton:_tablixFiltersButton count:[[(RDLTablix *)it filters] count]];
       [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }

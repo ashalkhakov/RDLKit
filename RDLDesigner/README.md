@@ -37,7 +37,7 @@ the same wizard.
 | `RDLOutlineDataSource` | The report outline: node tree, data source, delegate, and selection mirroring both ways. A tablix opens into its grid — a node per row, a node per cell under it, named by what the cell holds or "empty" — so an item inside a cell is somewhere the outline can reach |
 | `RDLInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `RDLInspectorFields` | One binding declaration per field — control, key path, scope, kind — driving both the fill and the write-back |
-| `RDLTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total, and whether a column shows text or a subreport), the row and column group lists — **+**/**−**, editable in place, and re-nested by dragging one group above another, which is what makes a crosstab — subtotals, and the grand-total row. Applies as one undo step |
+| `RDLGroupsView` | The Row Groups / Column Groups pane under the canvas, as Report Builder has it: how the region being worked in groups, with a group added inside, beside or around the one picked out, re-nested by dragging it past another, given a total, deleted, or opened in Group Properties. A tablix's structure is edited on the canvas itself, not in a dialog |
 | `RDLRichTextEditor` | Modal rich-text editor (right-click → Edit Rich Text…): a formatting bar over an NSTextView. Wiring only |
 | `RDLRichTextFormatter` | What the formatting bar does — read the state of a selection (on / off / mixed) and change font, size, colour, bold, italic, underline, strikethrough and paragraph alignment. No window, so checks drive it directly |
 | `RDLRichTextCodec` | Attributed string ⇄ RDL `Paragraphs`/`TextRuns` with sparse per-run styles. Plain text — multi-line included — stays a plain `value` |
@@ -207,7 +207,9 @@ shows up in the master's next preview.
 | `RDLGeneratorWindow.xib` | The window, the toolbar row, the split and both panes | The sample list, and one export button per backend the kit offers |
 | `RDLInspectorSections.xib` | All ten sections as top-level views: every label, field, popup and frame | Which sections are shown and where they stack (`-stackBoxes:`), and the dataset/page popup contents |
 | `RDLSubreportParametersEditor.xib` | The panel, its three columns and the buttons | The parameter names the subreport declares, and the expression cell in the Value column |
-| `RDLTablixEditor.xib` | The panel, the five columns with their widths and their Align/Total combo lists, the buttons | The dataset and field lists, and the tablix's own values |
+| `RDLGroupsView.xib` | The pane: the group tree with its two columns, and the four buttons | The groups of the region being worked in, and the menu on a row |
+| `RDLSourceView.xib` | The pane: the text view, the status line, Apply and Revert | The report written out as RDL |
+| `RDLPropertiesView.xib` | The pane: the two-column grid and its heading | Every property of what is selected, read from its class |
 | `RDLRichTextEditor.xib` | The window, the formatting bar and its controls, the text view and the buttons | The installed font families, and the text being edited |
 | `RDLAddElementPanel.xib` | The panel, its caption and Cancel | One button per allowed element kind, and the height to hold them |
 | `RDLPreviewWindow.xib` | Everything | — |

@@ -16,7 +16,7 @@
 //
 // Every edit goes through RDLEditor's group operations, the same ones the
 // tablix's own menu uses, so the two ways of doing it are one implementation.
-@interface RDLGroupsView : NSView
+@interface RDLGroupsView : NSView <NSOutlineViewDataSource>
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context;
 @property (nonatomic, strong) RDLEditingContext *context;
 
@@ -35,6 +35,10 @@
 // details group among them, as Report Builder shows it. What is inside one of
 // them is that group's own.
 - (NSArray<RDLTablixMember *> *)groupsOnAxis:(RDLTablixAxis)axis;
+// Every group along an axis as one list, outermost first and each followed by
+// those inside it -- the order the tree reads down, and the order re-nesting
+// counts in.
+- (NSArray<RDLTablixMember *> *)allGroupsOnAxis:(RDLTablixAxis)axis;
 // Picks one out, as clicking it does. NO when the group is not in this tablix.
 - (BOOL)selectGroup:(RDLTablixMember *)group axis:(RDLTablixAxis)axis;
 // Picks out the heading row of an axis, which is where a top-level group is
@@ -49,7 +53,10 @@
                                   placement:(RDLGroupPlacement)placement;
 - (void)addGroup:(id)sender;       // inside the group picked out, or top level
 - (void)addAdjacentGroup:(id)sender;  // beside it
+// The grouping goes and what it held stays where it is; the other takes the
+// rows or columns the group owns with it.
 - (void)deleteGroup:(id)sender;
+- (void)deleteGroupAndLines:(id)sender;
 - (void)editGroup:(id)sender;
 // What the pane's own menu does, each carrying what it is about in the menu
 // item: a placement and, when a field was chosen rather than "Expression…",

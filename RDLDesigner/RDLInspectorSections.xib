@@ -2609,15 +2609,15 @@
                         <outlet property="delegate" destination="-2" id="tablixRowHFieldDelegate"/>
                     </connections>
                 </textField>
-                <button id="editTablixButton">
+                <button toolTip="The rows this table keeps" id="tablixFiltersButton">
                     <rect key="frame" x="10" y="92" width="240" height="24"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <buttonCell key="cell" type="square" title="Edit Tablix…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="editTablixButtonCell">
+                    <buttonCell key="cell" type="square" title="Filters…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="tablixFiltersButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="system"/>
                     </buttonCell>
                     <connections>
-                        <action selector="editTablix:" target="-2" id="editTablixAction"/>
+                        <action selector="editTablixFilters:" target="-2" id="tablixFiltersAction"/>
                     </connections>
                 </button>
             </subviews>

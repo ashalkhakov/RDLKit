@@ -265,6 +265,16 @@ typedef NS_ENUM(NSInteger, RDLDistributeAxis) {
           withLines:(BOOL)withLines
                axis:(RDLTablixAxis)axis
            ofTablix:(RDLTablix *)tablix;
+// A group re-nested: moved to `index` among the groups along `axis`, counted
+// outermost first, trading places with each group it passes -- so what was the
+// outer grouping becomes the inner one, and the members, rows and columns stay
+// where they are. One undoable step. NO, changing nothing, when it is already
+// there or when a group on the way cannot trade places (a details group, or
+// one that is not nested with the others).
+- (BOOL)moveGroup:(RDLTablixMember *)group
+          toIndex:(NSUInteger)index
+             axis:(RDLTablixAxis)axis
+         ofTablix:(RDLTablix *)tablix;
 - (RDLTablixMember *)addTotalBesideGroup:(RDLTablixMember *)member
                                    after:(BOOL)after
                                     axis:(RDLTablixAxis)axis

@@ -28,7 +28,6 @@ RDLDesigner_OBJC_FILES = \
   RDLInspectorView.m \
   RDLInspectorFields.m \
   RDLExpressionHelper.m \
-  RDLTablixEditor.m \
   RDLNewReport.m \
   RDLNewReportPanel.m \
   RDLRichTextEditor.m \
@@ -134,7 +133,6 @@ RDLDesigner_RESOURCE_FILES += \
   RDLFieldInspectorView.xib \
   RDLAddElementPanel.xib \
   RDLPreviewWindow.xib \
-  RDLTablixEditor.xib \
   RDLRichTextEditor.xib \
   RDLNewReportPanel.xib
 

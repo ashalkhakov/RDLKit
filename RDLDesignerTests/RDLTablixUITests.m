@@ -3,6 +3,7 @@
 // The tablix as the designer presents it: its editor's group lists, selecting a
 // cell, the brackets that show the group structure, and the crosstab sample.
 #import "RDLDesignerTestSupport.h"
+#import "RDLGroupsView.h"
 #import "RDLExpressionCell.h"
 #import "RDLFilterEditor.h"
 #import "RDLTablixStructure.h"
@@ -15,44 +16,6 @@
 @interface RDLTablixUITests : RDLDesignerTestCase
 @end
 @implementation RDLTablixUITests
-
-// The dialog lists the groups the tablix has, nested as they are, and shows a
-// column by its cells: a crosstab's total is the aggregate its cells are, and
-// changing it changes them -- in the dialog's copy, not yet in the report.
-- (void)testTheTablixDialogShowsTheGroupsAndColumnsItHas {
-  RDLReport *report = [RDLSamples regionalSales];
-  RDLTablix *tablix = nil;
-  for (RDLItem *it in report.body.items)
-    if ([it isKindOfClass:[RDLTablix class]])
-      tablix = (RDLTablix *)it;
-  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLTablixEditor *ed = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  if (ed == nil) {
-    XCTFail(@"%@", @"RDLTablixEditor.xib did not load");
-    return;
-  }
-  NSArray *rows = [[ed rowGroups] valueForKey:@"groupName"], *columns = [[ed columnGroups] valueForKey:@"groupName"];
-  if (![rows isEqualToArray:@[ @"SalesMatrix_Region", @"SalesMatrix_City" ]] ||
-      ![columns isEqualToArray:@[ @"SalesMatrix_Year", @"SalesMatrix_Quarter" ]])
-    XCTFail(@"the lists should hold the tablix's groups, outermost first, not %@ and %@", rows, columns);
-  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)ed;
-  NSTableView *rowTable = [ed valueForKey:@"rowGroupTable"];
-  NSString *inner = [source tableView:rowTable objectValueForTableColumn:[[rowTable tableColumns] firstObject] row:1];
-  if (![inner isEqualToString:@"  City"])
-    XCTFail(@"a group inside another should be listed by its field, indented, not as '%@'", inner);
-
-  NSTableView *table = [ed valueForKey:@"table"];
-  NSTableColumn *aggregate = [table tableColumnWithIdentifier:@"aggregate"];
-  if (![[source tableView:table objectValueForTableColumn:aggregate row:0] isEqualToString:@"Sum"])
-    XCTFail(@"%@", @"a crosstab column's total should be the aggregate its cells are");
-  [source tableView:table setObjectValue:@"Avg" forTableColumn:aggregate row:0];
-  NSString *measure = [(RDLTextbox *)ed.edited.tablixBody.rows[0].cells[0].item value];
-  NSString *total = [(RDLTextbox *)ed.edited.tablixBody.rows[1].cells[0].item value];
-  if (![measure isEqualToString:@"=Avg(Fields!Amount.Value)"] || ![total isEqualToString:@"=Avg(Fields!Amount.Value)"])
-    XCTFail(@"averaging the column should average its cells and its total, not %@ and %@", measure, total);
-  if (![[(RDLTextbox *)tablix.tablixBody.rows[0].cells[0].item value] isEqualToString:@"=Sum(Fields!Amount.Value)"])
-    XCTFail(@"%@", @"the report's own tablix should not change before OK");
-}
 
 - (void)testTablixCellSelection {
   RDLReport *report = [RDLSamples atelierInvoice];
@@ -142,27 +105,20 @@
     return;
   }
 
-  // The point is that the editor can be built at all against a scaffold: a
+  // The point is that the tablix UI can be built at all against a scaffold: a
   // dataset of RDLField objects and a tablix bound to an empty one. That used
   // to reach for another table's fields and send -isEqualToString: to an
-  // RDLField. Built, not run: see RDLFindButtonTitled above.
+  // RDLField.
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:layout context:ctx];
-  if (editor == nil) {
-    XCTFail(@"%@", @"the tablix editor was not built for a scaffolded report");
-    return;
-  }
-  NSWindow *panel = [editor valueForKey:@"window"];
-  if (panel == nil) {
-    XCTFail(@"%@", @"RDLTablixEditor.xib did not load");
-    return;
-  }
-  if (RDLFindButtonTitled([panel contentView], @"Cancel") == nil)
-    XCTFail(@"%@", @"no Cancel button -- the editor did not build its panel");
-
+  [ctx.selection selectItem:layout inBandWithKey:@"body"];
+  RDLGroupsView *groups = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+  if (groups == nil || [groups.heading rangeOfString:layout.name].location == NSNotFound)
+    XCTFail(@"the groups pane should show the scaffolded table, it says %@", groups.heading);
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 700) context:ctx];
+  [inspector reload];
   // And it is filled in from the tablix it was given, not from whatever
   // dataset happened to be first.
-  NSPopUpButton *datasets = [editor valueForKey:@"datasetPop"];
+  NSPopUpButton *datasets = [inspector valueForKey:@"tablixDatasetPop"];
   if (![[datasets titleOfSelectedItem] isEqualToString:layout.dataSetName])
     XCTFail(@"%@", [NSString stringWithFormat:@"the dataset popup shows %@, not %@",
                                               [datasets titleOfSelectedItem],
@@ -908,11 +864,11 @@
     XCTFail(@"%@", @"a member of no hierarchy of this tablix is not set");
 }
 
-// The dialog edits a copy with the edits the canvas makes, so OK keeps what
-// the dialog has no column for -- a merged heading, a cell's own background --
-// and is one undo; Cancel leaves everything as it was, a group's filters
-// included; and accepting it untouched records nothing.
-- (void)testTheTablixDialogKeepsWhatItDoesNotShow {
+// What a structural edit keeps: grouping a table from the pane rebuilds its
+// members, and the merged heading cell and a cell's own background -- neither
+// of which the pane shows -- have to come through it, with one undo taking the
+// whole thing back.
+- (void)testGroupingKeepsWhatThePaneDoesNotShow {
   RDLReport *report = [RDLSamples workshopByFinish];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLTablix *tablix = nil;
@@ -929,34 +885,19 @@
   styled.style.backgroundColor = @"#ffeeaa";
   NSString *before = [RDLEditor XMLStringForItem:tablix];
 
-  RDLTablixEditor *cancelled = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  [cancelled addRowGroup:nil];
-  RDLFilter *filter = [[RDLFilter alloc] init];
-  filter.expression = [RDLValue valueWithSource:@"=Fields!Job.Value"];
-  [filter.values addObject:[RDLValue literal:@"Desk"]];
-  [[cancelled rowGroups].firstObject.filters addObject:filter];
-  if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:before] || [ctx.document.undoManager canUndo])
-    XCTFail(@"%@", @"what a dialog does before OK should not reach the report");
-
-  RDLTablixEditor *idle = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  if ([idle apply] || [ctx.document.undoManager canUndo])
-    XCTFail(@"%@", @"accepting an untouched dialog should change and record nothing");
-
-  RDLTablixEditor *ed = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  NSUInteger finish = [[[ed rowGroups] valueForKey:@"groupName"] indexOfObject:@"JobsByFinish_Finish"];
-  if (finish == NSNotFound) {
-    XCTFail(@"%@", @"the dialog should list the finish group");
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+  RDLTablixMember *finish = nil;
+  for (RDLTablixMember *group in [pane groupsOnAxis:RDLTablixAxisRows])
+    if ([group.groupName isEqualToString:@"JobsByFinish_Finish"])
+      finish = group;
+  if (finish == nil) {
+    XCTFail(@"%@", @"the pane should list the finish group");
     return;
   }
-  [[ed valueForKey:@"rowGroupTable"] selectRowIndexes:[NSIndexSet indexSetWithIndex:finish] byExtendingSelection:NO];
-  [ed addRowGroup:nil];
-  NSTableView *table = [ed valueForKey:@"table"];
-  [(id<NSTableViewDataSource>)ed tableView:table
-                            setObjectValue:@"2.5"
-                            forTableColumn:[table tableColumnWithIdentifier:@"width"]
-                                       row:3];
-  if (![ed apply]) {
-    XCTFail(@"%@", @"a dialog that grouped and resized should change the tablix");
+  [pane selectGroup:finish axis:RDLTablixAxisRows];
+  if ([pane addGroupWithExpression:@"=Fields!Job.Value" placement:RDLGroupPlacementChild] == nil) {
+    XCTFail(@"%@", @"a group inside the finish group should have been added");
     return;
   }
   RDLTablixMember *group = nil;
@@ -964,67 +905,14 @@
     if ([m.groupName isEqualToString:@"JobsByFinish_Finish"])
       group = m;
   if ([[tablix structuralProblems] count] || [group.members count] != 2 ||
-      [group.members.firstObject.groupExpressions count] == 0 || tablix.tablixBody.columns[3].width != 2.5)
-    XCTFail(@"the tablix should take the group inside the finish and the width: %@", [tablix structuralProblems]);
+      [group.members.firstObject.groupExpressions count] == 0)
+    XCTFail(@"the tablix should take the group inside the finish: %@", [tablix structuralProblems]);
   if (tablix.tablixBody.rows[0].cells[0].colSpan != 2 ||
       ![tablix.tablixBody.rows[1].cells[3].item.style.backgroundColor isEqualToString:@"#ffeeaa"])
     XCTFail(@"%@", @"the merged heading and the cell's background should be as they were");
   [ctx.document.undoManager undo];
   if (![[RDLEditor XMLStringForItem:tablix] isEqualToString:before])
-    XCTFail(@"%@", @"one undo should take the whole dialog back");
-}
-
-// The dialog's columns are the body's: added after the selected one with a
-// field to change, moved and removed by its buttons, and a column's heading,
-// kind and alignment are its cells'.
-- (void)testTheTablixDialogColumnsAreTheBodysColumns {
-  RDLReport *report = [RDLSamples harborManifest];
-  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLTablix *tablix = nil;
-  for (RDLItem *it in report.body.items)
-    if ([it isKindOfClass:[RDLTablix class]] && tablix == nil)
-      tablix = (RDLTablix *)it;
-  RDLTablixEditor *ed = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  NSTableView *table = [ed valueForKey:@"table"];
-  id<NSTableViewDataSource> source = (id<NSTableViewDataSource>)ed;
-  NSUInteger columns = [ed.edited.tablixBody.columns count];
-  NSString *field = [[[report dataSetNamed:tablix.dataSetName] fieldNames] firstObject];
-  if (ed == nil || columns < 2 || field == nil) {
-    XCTFail(@"%@", @"the manifest's first table should have columns and a dataset with fields");
-    return;
-  }
-  NSTableColumn *heading = [table tableColumnWithIdentifier:@"header"];
-  RDLTextbox *first = (RDLTextbox *)ed.edited.tablixBody.rows[0].cells[0].item;
-  if (![[source tableView:table objectValueForTableColumn:heading row:0] isEqualToString:first.value])
-    XCTFail(@"%@", @"a column's heading should be its heading cell's text");
-
-  [table selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
-  [ed addColumn:nil];
-  RDLTablixBody *body = ed.edited.tablixBody;
-  if ([body.columns count] != columns + 1 || [table selectedRow] != 1 ||
-      ![[(RDLTextbox *)body.rows[0].cells[1].item value] isEqualToString:field] ||
-      ![[(RDLTextbox *)body.rows[1].cells[1].item value] isEqualToString:[NSString stringWithFormat:@"=Fields!%@.Value", field]])
-    XCTFail(@"%@", @"a column should be added after the selected one, heading and showing the first field");
-  RDLItem *added = body.rows[1].cells[1].item;
-  [ed moveRight:nil];
-  if (body.rows[1].cells[2].item != added || [table selectedRow] != 2)
-    XCTFail(@"%@", @"moving right should take the column one place right, still selected");
-
-  [source tableView:table setObjectValue:@"Right" forTableColumn:[table tableColumnWithIdentifier:@"align"] row:2];
-  if ([(RDLTextbox *)body.rows[0].cells[2].item style].textAlign != RDLTextAlignRight ||
-      [(RDLTextbox *)body.rows[1].cells[2].item style].textAlign != RDLTextAlignRight)
-    XCTFail(@"%@", @"a column's alignment should be its heading's and its value's");
-  [source tableView:table setObjectValue:@"Subreport" forTableColumn:[table tableColumnWithIdentifier:@"kind"] row:2];
-  if (![body.rows[1].cells[2].item isKindOfClass:[RDLSubreport class]] ||
-      ![[source tableView:table objectValueForTableColumn:[table tableColumnWithIdentifier:@"kind"] row:2]
-          isEqualToString:@"Subreport"])
-    XCTFail(@"%@", @"a subreport column should show a subreport in its value cell");
-
-  [ed removeColumn:nil];
-  if ([body.columns count] != columns || [[ed.edited structuralProblems] count])
-    XCTFail(@"removing the selected column should leave the table as wide as it was: %@", [ed.edited structuralProblems]);
-  if ([tablix.tablixBody.columns count] != columns)
-    XCTFail(@"%@", @"the report's tablix should not change before OK");
+    XCTFail(@"%@", @"one undo should take the whole grouping back");
 }
 
 // The tablix section's two heights are the heading row's and the value row's,

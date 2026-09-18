@@ -78,7 +78,6 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
   ../RDLDesigner/RDLFieldInspectorView.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
-  ../RDLDesigner/RDLTablixEditor.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
 # Xcode resolves through its header map and gnustep-make has no equivalent for.
@@ -115,7 +114,6 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLFieldInspectorView.xib \
   ../RDLDesigner/RDLExpressionEditor.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
-  ../RDLDesigner/RDLTablixEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib
 
 # Heap corruption does not name itself: "malloc_consolidate(): unaligned

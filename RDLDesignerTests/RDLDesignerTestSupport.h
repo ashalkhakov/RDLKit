@@ -21,7 +21,6 @@
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLExpressionHelper.h"
-#import "RDLTablixEditor.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"

@@ -32,7 +32,7 @@ Every mutation of the report passes through `RDLEditor`
 `-[RDLInspectorView declareBindings]` or in one of the secondary
 inspectors (`RDLParameterInspectorView`, `RDLFieldInspectorView`,
 `RDLDataSourceView`), the palette of insertable items is `RDLItemFactory`,
-and the modal editors are `RDLTablixEditor`, `RDLRichTextEditor`,
+and the modal editors are `RDLGroupPropertiesEditor`, `RDLRichTextEditor`,
 `RDLFilterEditor` and `RDLSubreportParametersEditor`. Those files, plus
 the menu (`MainMenu.xib`), the inspector sections
 (`RDLInspectorSections.xib`), the navigators (`RDLDatasetNavigator`,

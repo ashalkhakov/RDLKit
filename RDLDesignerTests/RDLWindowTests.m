@@ -2770,36 +2770,58 @@ paperOrigin:NSMakePoint(0, 0)];
 // of the list is the order of the groups, outermost first -- which is what
 // Report Builder's Grouping pane does. Each group keeps what it groups on and
 // the header that shows it; the members, rows and columns stay put.
-- (void)testGroupsCanBeReNestedByDraggingInTheList {
+- (void)testGroupsAreReNestedByDraggingInThePane {
   RDLReport *report = [RDLSamples regionalSales];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLTablix *matrix = RDLFirstTablixOf(report);
-  RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:matrix context:ctx];
-  NSArray *was = [[editor rowGroups] valueForKey:@"groupName"];
-  if (editor == nil || [was count] < 2) {
+  [ctx.selection selectItem:matrix inBandWithKey:@"body"];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+  NSOutlineView *outline = [pane valueForKey:@"outline"];
+
+  // Row 0 is the Row Groups heading; the groups follow it, outermost first.
+  id axisNode = [outline itemAtRow:0];
+  RDLTablixMember *outer = [outline itemAtRow:1];
+  RDLTablixMember *inner = [outline itemAtRow:2];
+  if (![outer isKindOfClass:[RDLTablixMember class]] || ![inner isKindOfClass:[RDLTablixMember class]]) {
     XCTFail(@"%@", @"the crosstab nests two row groups, which is what re-nesting needs");
     return;
   }
-  if (![editor moveRowGroup:[editor rowGroups][1] toIndex:0] ||
-      ![[[editor rowGroups] valueForKey:@"groupName"] isEqualToArray:@[ was[1], was[0] ]])
-    XCTFail(@"re-nesting did not take: %@", [[editor rowGroups] valueForKey:@"groupName"]);
-  RDLTablixMember *outer = [editor rowGroups][0];
-  if (![[(RDLTextbox *)outer.header.item value] isEqualToString:[outer.groupExpressions.firstObject source]])
+  NSString *outerName = outer.groupName, *innerName = inner.groupName;
+
+  // Dragged above the one it is inside, the two trade places in the nesting.
+  NSPasteboard *pb = [NSPasteboard pasteboardWithUniqueName];
+  if (![pane outlineView:outline writeItems:@[ inner ] toPasteboard:pb])
+    XCTFail(@"%@", @"a group should be draggable");
+  if ([pane outlineView:outline validateDrop:nil proposedItem:axisNode proposedChildIndex:0] ==
+      NSDragOperationNone)
+    XCTFail(@"%@", @"dropping a row group above the outermost one should be allowed");
+  if (![pane outlineView:outline acceptDrop:nil item:axisNode childIndex:0])
+    XCTFail(@"%@", @"the drop should have re-nested the groups");
+  if (![[(RDLTablixMember *)[outline itemAtRow:1] groupName] isEqualToString:innerName])
+    XCTFail(@"the inner group should now be outermost, the pane lists %@",
+            [(RDLTablixMember *)[outline itemAtRow:1] groupName]);
+  // A group keeps what it groups on and the header that shows it.
+  RDLTablixMember *nowOuter = [outline itemAtRow:1];
+  if (![[(RDLTextbox *)nowOuter.header.item value]
+          isEqualToString:[[nowOuter.groupExpressions firstObject] source]])
     XCTFail(@"%@", @"a group's header should go with it");
 
-  // And back the other way: dropping below has to account for the place the
-  // group vacates, or it lands one short of where it was let go.
-  if (![editor moveRowGroup:[editor rowGroups][0] toIndex:2] ||
-      ![[[editor rowGroups] valueForKey:@"groupName"] isEqualToArray:was])
-    XCTFail(@"dragging downwards landed wrong: %@", [[editor rowGroups] valueForKey:@"groupName"]);
+  // One step, and it undoes.
+  [[ctx.document undoManager] undo];
+  if (![[(RDLTablixMember *)[outline itemAtRow:1] groupName] isEqualToString:outerName])
+    XCTFail(@"%@", @"undo should put the nesting back");
 
-  // Column groups are the same list in the other direction.
-  NSArray *columns = [[editor columnGroups] valueForKey:@"groupName"];
-  if ([columns count] >= 2 && (![editor moveColumnGroup:[editor columnGroups][1] toIndex:0] ||
-                               ![[[editor columnGroups] valueForKey:@"groupName"] isEqualToArray:@[ columns[1], columns[0] ]]))
-    XCTFail(@"%@", @"column groups re-nest the same way");
-  if (![[RDLFirstTablixOf(report).rowHierarchy.members.firstObject groupName] isEqualToString:was[0]])
-    XCTFail(@"%@", @"the report's tablix should not change before OK");
+  // A row group is not a column group: dragging one across would mean
+  // regrouping the region, not re-nesting it, so the pane refuses.
+  id columns = nil;  // the Column Groups heading, whatever row it is on
+  for (NSInteger row = 0; row < [outline numberOfRows]; row++)
+    if (![[outline itemAtRow:row] isKindOfClass:[RDLTablixMember class]] && row > 0)
+      columns = [outline itemAtRow:row];
+  [pane outlineView:outline writeItems:@[ [outline itemAtRow:1] ] toPasteboard:pb];
+  if (columns != nil &&
+      [pane outlineView:outline validateDrop:nil proposedItem:columns proposedChildIndex:0] !=
+          NSDragOperationNone)
+    XCTFail(@"%@", @"a row group should not be dropped among the column groups");
 }
 
 // A crosstab's columns are its groups: the row-header columns belong to the row
@@ -3176,49 +3198,43 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"zoom out should reach the minimum again");
 }
 
-// The Edit Tablix dialog's group lists add, regroup and remove: + groups on a
-// field no group uses yet, typing a field's name into a list regroups on it,
-// and − stops grouping while keeping the rows.
-- (void)testTheTablixDialogEditsTheGroups {
+// The groups pane adds and removes groups along both axes, which is what makes
+// a table a grouped table and a crosstab a crosstab.
+- (void)testTheGroupsPaneEditsBothAxes {
   RDLReport *report = [RDLSamples harborManifest];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLTablix *tablix = RDLFirstTablixOf(report);
-  RDLTablixEditor *editor = [RDLTablixEditor editorForTablix:tablix context:ctx];
-  if (editor == nil) {
-    XCTFail(@"%@", @"the tablix editor did not load");
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+
+  NSUInteger before = [[pane allGroupsOnAxis:RDLTablixAxisRows] count];
+  [pane selectAxis:RDLTablixAxisRows];
+  RDLTablixMember *added = [pane addGroupWithExpression:@"=Fields!Port.Value"
+                                              placement:RDLGroupPlacementChild];
+  if (added == nil || [[pane allGroupsOnAxis:RDLTablixAxisRows] count] != before + 1) {
+    XCTFail(@"%@", @"grouping the rows should add a group, and pick it out");
     return;
   }
-  NSUInteger before = [[editor rowGroups] count];
-  [editor addRowGroup:nil];
-  NSTableView *rowTable = [editor valueForKey:@"rowGroupTable"];
-  NSInteger added = [rowTable selectedRow];
-  if ([[editor rowGroups] count] != before + 1 || added < 0) {
-    XCTFail(@"%@", @"the + beside the row groups should add one, and select it");
-    return;
-  }
-  // Through the data source protocol, which is how the table itself writes a
-  // typed-in value back.
-  [(id<NSTableViewDataSource>)editor tableView:rowTable
-                                setObjectValue:@"Port"
-                                forTableColumn:[[rowTable tableColumns] firstObject]
-                                           row:added];
-  RDLTablixMember *group = [editor rowGroups][(NSUInteger)added];
-  if (![[group.groupExpressions.firstObject source] isEqualToString:@"=Fields!Port.Value"])
-    XCTFail(@"typing a field into the list should group on it, not on %@", [group.groupExpressions.firstObject source]);
-  [rowTable selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)added] byExtendingSelection:NO];
-  [editor removeRowGroup:nil];
-  if ([[editor rowGroups] count] != before || [[editor.edited structuralProblems] count])
-    XCTFail(@"%@", @"the − should stop grouping and keep the rows");
+  if (pane.selectedGroup != added)
+    XCTFail(@"%@", @"the group just added should be the one picked out");
+  if (![[added.groupExpressions.firstObject source] isEqualToString:@"=Fields!Port.Value"])
+    XCTFail(@"it should group on the field asked for, not on %@",
+            [added.groupExpressions.firstObject source]);
+
+  [pane deleteGroup:nil];
+  if ([[pane allGroupsOnAxis:RDLTablixAxisRows] count] != before || [[tablix structuralProblems] count])
+    XCTFail(@"deleting should take it away and leave the table sound: %@",
+            [tablix structuralProblems]);
 
   // Column groups, the same way -- that is what makes a crosstab.
-  NSUInteger columns = [[editor columnGroups] count];
-  [editor addColumnGroup:nil];
-  NSTableView *colTable = [editor valueForKey:@"colGroupTable"];
-  if ([[editor columnGroups] count] != columns + 1 || [colTable selectedRow] < 0)
-    XCTFail(@"%@", @"the + beside the column groups should add one");
-  [editor removeColumnGroup:nil];
-  if ([[editor columnGroups] count] != columns)
-    XCTFail(@"%@", @"and the − should take it away again");
+  NSUInteger columns = [[pane allGroupsOnAxis:RDLTablixAxisColumns] count];
+  [pane selectAxis:RDLTablixAxisColumns];
+  if ([pane addGroupWithExpression:@"=Fields!Port.Value" placement:RDLGroupPlacementChild] == nil ||
+      [[pane allGroupsOnAxis:RDLTablixAxisColumns] count] != columns + 1)
+    XCTFail(@"%@", @"grouping the columns should add a column group");
+  [pane deleteGroup:nil];
+  if ([[pane allGroupsOnAxis:RDLTablixAxisColumns] count] != columns)
+    XCTFail(@"%@", @"and deleting should take it away again");
 }
 
 // Selecting something is asking to see its settings. The right pane is two
