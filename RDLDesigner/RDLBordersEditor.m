@@ -2,6 +2,7 @@
 #import "RDLBordersEditor.h"
 #import "RDLEditingContext.h"
 #import "RDLEditor.h"
+#import "RDLInspectorFields.h"
 #import "RDLPane.h"
 
 // The five borders the panel edits, in the order its rows are in: the default
@@ -52,6 +53,10 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
 @property (nonatomic, strong) IBOutlet NSTextField *leftWidthField, *rightWidthField;
 @property (nonatomic, strong) IBOutlet NSTextField *defaultColorField, *topColorField, *bottomColorField;
 @property (nonatomic, strong) IBOutlet NSTextField *leftColorField, *rightColorField;
+// A colour is chosen the way it is chosen everywhere else here: a well beside
+// the field, which still holds the colour as RDL writes it.
+@property (nonatomic, strong) IBOutlet NSColorWell *defaultColorWell, *topColorWell, *bottomColorWell;
+@property (nonatomic, strong) IBOutlet NSColorWell *leftColorWell, *rightColorWell;
 @end
 
 @implementation RDLBordersEditor {
@@ -111,6 +116,35 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
   return _defaultColorField;
 }
 
+- (NSColorWell *)colorWellForEdge:(RDLBoxEdge)edge {
+  switch (edge) {
+  case RDLBoxEdgeTop:
+    return _topColorWell;
+  case RDLBoxEdgeBottom:
+    return _bottomColorWell;
+  case RDLBoxEdgeLeft:
+    return _leftColorWell;
+  case RDLBoxEdgeRight:
+    return _rightColorWell;
+  case RDLBoxEdgeUnspecified:
+    break;
+  }
+  return _defaultColorWell;
+}
+
+// A colour chosen in a well goes into the field beside it, which is what the
+// panel reads when it applies: the field is still where the colour is stated,
+// so a colour typed in and a colour picked are the same thing.
+- (void)colorWellPicked:(id)sender {
+  for (NSUInteger i = 0; i < kRDLBorderRowCount; i++) {
+    RDLBoxEdge edge = kRDLBorderRows[i];
+    if ([self colorWellForEdge:edge] != sender)
+      continue;
+    [[self colorFieldForEdge:edge] setStringValue:RDLColorChosenInWell(sender)];
+    return;
+  }
+}
+
 // What the item states on an edge today, straight from the model rather than
 // from -borderForEdge:, which answers what is drawn once the default is taken
 // into account.
@@ -137,6 +171,7 @@ static BOOL RDLBordersEqual(RDLBorder *a, RDLBorder *b) {
                              : stated.style - RDLBorderStyleDefault + 1];
   [[self widthFieldForEdge:edge] setStringValue:[stated.width stringValue] ?: @""];
   [[self colorFieldForEdge:edge] setStringValue:stated.color ?: @""];
+  RDLShowColorInWell([self colorWellForEdge:edge], stated.color);
 }
 
 + (instancetype)editorForItem:(RDLItem *)item context:(RDLEditingContext *)context {

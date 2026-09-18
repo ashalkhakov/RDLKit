@@ -14,12 +14,14 @@
                 <outlet property="bidiPop" destination="bidiPop" id="bidiPopOutlet"/>
                 <outlet property="textEffectPop" destination="textEffectPop" id="textEffectPopOutlet"/>
                 <outlet property="shadowColorField" destination="shadowColorField" id="shadowColorFieldOutlet"/>
+                <outlet property="shadowColorWell" destination="shadowColorWell" id="shadowColorWellOutlet"/>
                 <outlet property="shadowOffsetField" destination="shadowOffsetField" id="shadowOffsetFieldOutlet"/>
                 <outlet property="calendarPop" destination="calendarPop" id="calendarPopOutlet"/>
                 <outlet property="numeralLanguageField" destination="numeralLanguageField" id="numeralLanguageFieldOutlet"/>
                 <outlet property="numeralVariantPop" destination="numeralVariantPop" id="numeralVariantPopOutlet"/>
                 <outlet property="gradientPop" destination="gradientPop" id="gradientPopOutlet"/>
                 <outlet property="gradientEndField" destination="gradientEndField" id="gradientEndFieldOutlet"/>
+                <outlet property="gradientEndWell" destination="gradientEndWell" id="gradientEndWellOutlet"/>
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
                 <outlet property="imageRepeatPop" destination="imageRepeatPop" id="imageRepeatPopOutlet"/>
@@ -147,8 +149,16 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="shadowColorWell">
+                        <rect key="frame" x="380" y="346" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="shadowColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="The shadow's colour, or an expression" focusRingType="none" id="shadowColorField">
-                        <rect key="frame" x="380" y="346" width="126" height="22"/>
+                        <rect key="frame" x="408" y="346" width="98" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="shadowColorFieldCell">
                             <font key="font" metaFont="system"/>
@@ -273,8 +283,16 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="gradientEndWell">
+                        <rect key="frame" x="380" y="166" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="gradientEndWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="The colour the gradient shades to, or an expression" focusRingType="none" id="gradientEndField">
-                        <rect key="frame" x="380" y="166" width="126" height="22"/>
+                        <rect key="frame" x="408" y="166" width="98" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="gradientEndFieldCell">
                             <font key="font" metaFont="system"/>

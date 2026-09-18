@@ -45,4 +45,8 @@
 // it applies nothing, records nothing to undo, and still answers YES.
 - (BOOL)apply;
 
+// A colour chosen in one of the wells, into the field beside it. Declared
+// because it is what the panel does, and so a check can drive it without the
+// colour panel.
+- (void)colorWellPicked:(id)sender;
 @end

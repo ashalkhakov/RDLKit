@@ -17,6 +17,7 @@
                 <outlet property="subtypePop" destination="subtypePop" id="subtypePopOutlet"/>
                 <outlet property="axisPop" destination="axisPop" id="axisPopOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
+                <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="xField" destination="xField" id="xFieldOutlet"/>
                 <outlet property="sizeField" destination="sizeField" id="sizeFieldOutlet"/>
                 <outlet property="highField" destination="highField" id="highFieldOutlet"/>
@@ -215,8 +216,16 @@
                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="colorWell">
+                        <rect key="frame" x="354" y="276" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="colorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="The series' colour, over the palette's: a colour or an expression" focusRingType="none" id="colorField">
-                        <rect key="frame" x="354" y="276" width="150" height="22"/>
+                        <rect key="frame" x="382" y="276" width="122" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Palette" drawsBackground="YES" id="colorFieldCell">
                             <font key="font" metaFont="system"/>

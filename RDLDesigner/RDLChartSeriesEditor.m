@@ -14,6 +14,9 @@
 @property (nonatomic, strong) IBOutlet NSTableView *table;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *typePop, *subtypePop, *axisPop, *markerPop, *labelPositionPop;
 @property (nonatomic, strong) IBOutlet NSTextField *colorField, *xField, *sizeField, *highField, *lowField;
+// A colour is chosen in a well here as it is everywhere else; the field beside
+// it still holds the colour, or the expression the model lets it be.
+@property (nonatomic, strong) IBOutlet NSColorWell *colorWell;
 @property (nonatomic, strong) IBOutlet NSTextField *startField, *endField, *markerSizeField, *labelTextField;
 @property (nonatomic, strong) IBOutlet NSTextField *messageLabel;
 @property (nonatomic, strong) IBOutlet NSButton *labelsCheck, *labelTextExprButton;
@@ -222,6 +225,7 @@ static NSString *RDLStyleText(RDLStyle *style, NSString *key) {
   NSInteger axis = [series.valueAxisName length] ? [_axisPop indexOfItemWithTitle:series.valueAxisName] : 0;
   [_axisPop selectItemAtIndex:MAX(axis, 0)];
   [_colorField setStringValue:RDLStyleText(series.pointStyle, @"color")];
+  RDLShowColorInWell(_colorWell, [_colorField stringValue]);
   [_xField setStringValue:[series.x source] ?: @""];
   [_sizeField setStringValue:[series.size source] ?: @""];
   [_highField setStringValue:[series.high source] ?: @""];
@@ -242,6 +246,12 @@ static NSString *RDLStyleText(RDLStyle *style, NSString *key) {
                                            : 0];
   [_labelTextField setStringValue:[label.label source] ?: @""];
   [self enableForType];
+}
+
+// A colour chosen goes into the field beside it, which is what the panel reads
+// when it applies: a colour picked and a colour typed in are the same thing.
+- (void)colorWellPicked:(id)sender {
+  [_colorField setStringValue:RDLColorChosenInWell(sender)];
 }
 
 // The controls into the shown series. NO, keeping nothing, when the marker

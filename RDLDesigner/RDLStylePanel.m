@@ -117,6 +117,9 @@ static BOOL RDLSameValue(id a, id b) {
 // The rows' controls, reached by name from RDLStyleRows().
 @property (nonatomic, strong) IBOutlet NSTextField *lineHeightField, *shadowColorField, *shadowOffsetField;
 @property (nonatomic, strong) IBOutlet NSTextField *numeralLanguageField, *gradientEndField;
+// The colour rows get a well beside the field, as every other colour in this
+// designer does; the field still holds the colour, or the expression it is.
+@property (nonatomic, strong) IBOutlet NSColorWell *shadowColorWell, *gradientEndWell;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *directionPop, *writingModePop, *bidiPop, *textEffectPop;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *calendarPop, *numeralVariantPop, *gradientPop;
 @end
@@ -202,6 +205,8 @@ static NSInteger RDLChosen(NSPopUpButton *pop, NSInteger first) {
     else
       [(NSTextField *)control setStringValue:[self textOfRow:row inStyle:style]];
   }
+  for (NSArray<id> *pair in [self colorPairs])
+    RDLShowColorInWell(pair[0], [(NSTextField *)pair[1] stringValue]);
   RDLBackgroundImage *image = style.backgroundImage;
   RDLSelectChoice(_imageSourcePop, RDLImageSourceExternal, RDLImageSourceDatabase, image.source);
   RDLSelectChoice(_imageRepeatPop, RDLBackgroundRepeatRepeat, RDLBackgroundRepeatClip, image.repeat);
@@ -209,6 +214,20 @@ static NSInteger RDLChosen(NSPopUpButton *pop, NSInteger first) {
   [_imageValueField setStringValue:image.value ?: @""];
   NSUInteger mime = image.mimeType ? [RDLImageMIMETypes() indexOfObject:image.mimeType] : NSNotFound;
   [_imageMimePop selectItemAtIndex:mime == NSNotFound ? 0 : (NSInteger)mime + 1];
+}
+
+// The wells and the fields they belong to. Two rows hold a colour; the rest
+// hold lengths, names and numbers, which no well can choose.
+- (NSArray<NSArray<id> *> *)colorPairs {
+  return @[ @[ _shadowColorWell, _shadowColorField ], @[ _gradientEndWell, _gradientEndField ] ];
+}
+
+// A colour chosen goes into the field beside it, which is what the panel
+// applies from: a colour picked and a colour typed in are the same thing.
+- (void)colorWellPicked:(id)sender {
+  for (NSArray<id> *pair in [self colorPairs])
+    if (pair[0] == sender)
+      [(NSTextField *)pair[1] setStringValue:RDLColorChosenInWell(sender)];
 }
 
 #pragma mark - Applying

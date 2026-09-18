@@ -18,6 +18,21 @@
 // "Percent stacked".
 FOUNDATION_EXPORT NSString *RDLWordsOfName(NSString *name);
 
+// A colour well beside the field that holds the colour as RDL writes it. The
+// inspector pairs the two for every colour it edits, and the panels do the
+// same, so a colour is chosen the same way wherever one is edited -- a well
+// that opens the standard colour panel, with the text beside it for the
+// colours a report gives rather than chooses, and for the expressions the
+// model lets a colour be.
+//
+// Shows `color` in `well`: a hex colour or a colour name as it is, and white
+// for nothing at all, for Transparent and for an expression -- none of which
+// is a colour a well can show, and all of which the field beside it says.
+FOUNDATION_EXPORT void RDLShowColorInWell(NSColorWell *well, NSString *color);
+// What a well that has just been used puts in the field beside it: the colour
+// as RDL writes it.
+FOUNDATION_EXPORT NSString *RDLColorChosenInWell(NSColorWell *well);
+
 typedef NS_ENUM(NSInteger, RDLFieldScope) {
   RDLFieldScopeItem = 0,
   RDLFieldScopeBand,

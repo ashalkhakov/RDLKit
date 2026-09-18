@@ -18,6 +18,18 @@ NSString *RDLWordsOfName(NSString *name) {
   return words;
 }
 
+void RDLShowColorInWell(NSColorWell *well, NSString *color) {
+  // A colour that is not one -- nothing stated, Transparent, or an expression
+  // worked out per row -- is not something a well can show, so it shows white
+  // and the field beside it says what is actually there.
+  BOOL showable = [color length] && ![color hasPrefix:@"="] && !RDLColorIsTransparent(color);
+  [well setColor:showable ? RDLColorFromHex(color) : [NSColor whiteColor]];
+}
+
+NSString *RDLColorChosenInWell(NSColorWell *well) {
+  return RDLHexFromColor([well color]);
+}
+
 @implementation RDLFieldBinding
 @end
 
@@ -213,12 +225,8 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
         break;
       }
       case RDLFieldKindColor: {
-        NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
-        // A transparent background is not a colour the well can show, so it
-        // shows the paper it would let through.
-        [(NSColorWell *)b.control setColor:RDLColorIsTransparent(hex)
-                                               ? [NSColor whiteColor]
-                                               : RDLColorFromHex(hex)];
+        RDLShowColorInWell((NSColorWell *)b.control,
+                           [value isKindOfClass:[NSString class]] ? value : nil);
         break;
       }
       case RDLFieldKindCheck: {
@@ -349,7 +357,7 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
         break;
       }
       case RDLFieldKindColor:
-        value = RDLHexFromColor([(NSColorWell *)b.control color]);
+        value = RDLColorChosenInWell((NSColorWell *)b.control);
         break;
       case RDLFieldKindCheck: {
         NSUInteger i = [(NSButton *)b.control state] == NSOnState ? 1 : 0;

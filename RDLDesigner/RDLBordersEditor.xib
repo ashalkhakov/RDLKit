@@ -13,18 +13,23 @@
                 <outlet property="defaultStylePop" destination="defaultStylePop" id="defaultStylePopOutlet"/>
                 <outlet property="defaultWidthField" destination="defaultWidthField" id="defaultWidthFieldOutlet"/>
                 <outlet property="defaultColorField" destination="defaultColorField" id="defaultColorFieldOutlet"/>
+                <outlet property="defaultColorWell" destination="defaultColorWell" id="defaultColorWellOutlet"/>
                 <outlet property="topStylePop" destination="topStylePop" id="topStylePopOutlet"/>
                 <outlet property="topWidthField" destination="topWidthField" id="topWidthFieldOutlet"/>
                 <outlet property="topColorField" destination="topColorField" id="topColorFieldOutlet"/>
+                <outlet property="topColorWell" destination="topColorWell" id="topColorWellOutlet"/>
                 <outlet property="bottomStylePop" destination="bottomStylePop" id="bottomStylePopOutlet"/>
                 <outlet property="bottomWidthField" destination="bottomWidthField" id="bottomWidthFieldOutlet"/>
                 <outlet property="bottomColorField" destination="bottomColorField" id="bottomColorFieldOutlet"/>
+                <outlet property="bottomColorWell" destination="bottomColorWell" id="bottomColorWellOutlet"/>
                 <outlet property="leftStylePop" destination="leftStylePop" id="leftStylePopOutlet"/>
                 <outlet property="leftWidthField" destination="leftWidthField" id="leftWidthFieldOutlet"/>
                 <outlet property="leftColorField" destination="leftColorField" id="leftColorFieldOutlet"/>
+                <outlet property="leftColorWell" destination="leftColorWell" id="leftColorWellOutlet"/>
                 <outlet property="rightStylePop" destination="rightStylePop" id="rightStylePopOutlet"/>
                 <outlet property="rightWidthField" destination="rightWidthField" id="rightWidthFieldOutlet"/>
                 <outlet property="rightColorField" destination="rightColorField" id="rightColorFieldOutlet"/>
+                <outlet property="rightColorWell" destination="rightColorWell" id="rightColorWellOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -91,8 +96,16 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="defaultColorWell">
+                        <rect key="frame" x="334" y="244" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="defaultColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="Blank takes the default's colour" focusRingType="none" id="defaultColorField">
-                        <rect key="frame" x="334" y="244" width="110" height="22"/>
+                        <rect key="frame" x="362" y="244" width="82" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="defaultColorFieldCell">
                             <font key="font" metaFont="system"/>
@@ -127,8 +140,16 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="topColorWell">
+                        <rect key="frame" x="334" y="212" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="topColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="Blank takes the default's colour" focusRingType="none" id="topColorField">
-                        <rect key="frame" x="334" y="212" width="110" height="22"/>
+                        <rect key="frame" x="362" y="212" width="82" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="topColorFieldCell">
                             <font key="font" metaFont="system"/>
@@ -163,8 +184,16 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="bottomColorWell">
+                        <rect key="frame" x="334" y="180" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="bottomColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="Blank takes the default's colour" focusRingType="none" id="bottomColorField">
-                        <rect key="frame" x="334" y="180" width="110" height="22"/>
+                        <rect key="frame" x="362" y="180" width="82" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="bottomColorFieldCell">
                             <font key="font" metaFont="system"/>
@@ -199,8 +228,16 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="leftColorWell">
+                        <rect key="frame" x="334" y="148" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="leftColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="Blank takes the default's colour" focusRingType="none" id="leftColorField">
-                        <rect key="frame" x="334" y="148" width="110" height="22"/>
+                        <rect key="frame" x="362" y="148" width="82" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="leftColorFieldCell">
                             <font key="font" metaFont="system"/>
@@ -235,8 +272,16 @@
                             <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
+                    <colorWell toolTip="Choose a colour" id="rightColorWell">
+                        <rect key="frame" x="334" y="116" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                        <connections>
+                            <action selector="colorWellPicked:" target="-2" id="rightColorWellAction"/>
+                        </connections>
+                    </colorWell>
                     <textField toolTip="Blank takes the default's colour" focusRingType="none" id="rightColorField">
-                        <rect key="frame" x="334" y="116" width="110" height="22"/>
+                        <rect key="frame" x="362" y="116" width="82" height="22"/>
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="rightColorFieldCell">
                             <font key="font" metaFont="system"/>

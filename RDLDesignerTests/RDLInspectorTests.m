@@ -634,6 +634,26 @@
   if ([panel borderForEdge:RDLBoxEdgeRight].style != RDLBorderStyleUnspecified)
     XCTFail(@"%@", @"an edge nobody set should state nothing");
 
+  // A colour is chosen the way it is chosen everywhere else in this designer:
+  // a well beside the field, showing what the field holds, and writing what is
+  // picked back into it -- the field is still where the colour is stated.
+  NSColorWell *defaultWell = [panel valueForKey:@"defaultColorWell"];
+  NSTextField *defaultColor = [panel valueForKey:@"defaultColorField"];
+  if (defaultWell == nil) {
+    XCTFail(@"%@", @"the borders panel should offer a colour well, as the inspector does");
+    return;
+  }
+  if (![RDLHexFromColor([defaultWell color]) isEqualToString:@"#336699"])
+    XCTFail(@"the well should show the colour stated, shows %@",
+            RDLHexFromColor([defaultWell color]));
+  [defaultWell setColor:RDLColorFromHex(@"#c0392b")];
+  [panel colorWellPicked:defaultWell];
+  if (![[defaultColor stringValue] isEqualToString:@"#c0392b"])
+    XCTFail(@"choosing a colour should fill the field beside it, it reads %@",
+            [defaultColor stringValue]);
+  // Put back, so what follows tests the panel as it was found.
+  [defaultColor setStringValue:@"#336699"];
+
   // Applying an untouched panel changes nothing and records nothing.
   if (![panel apply])
     XCTFail(@"%@", @"an untouched panel should apply");
