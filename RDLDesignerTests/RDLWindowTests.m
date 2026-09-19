@@ -3225,6 +3225,12 @@ paperOrigin:NSMakePoint(0, 0)];
                           canCollapseSubview:[wc valueForKey:@"canvasScroll"]])
     XCTFail(@"%@", @"the groups pane should collapse and the canvas should not");
 
+  // A known window, because how much room the canvas and the pane have to
+  // share is what the arithmetic below is about -- and the window this opens
+  // at is not the same on every machine that runs this.
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
+  [[wc window] layoutIfNeeded];
+
   CGFloat was = NSHeight([host frame]);
   [wc toggleGroupsPane:nil];
   // A collapsed subview keeps its frame and stops being laid out, so what says
@@ -3239,6 +3245,39 @@ paperOrigin:NSMakePoint(0, 0)];
   if (![wc groupsPaneIsShowing] || fabs(NSHeight([host frame]) - was) > 1)
     XCTFail(@"the pane should come back the height it was (%g), it is %g", was,
             NSHeight([host frame]));
+
+  // How wide the window is has nothing to do with how tall the pane comes
+  // back. It did once: the centre split was answering the side panes' rule,
+  // which is measured across the window, so a narrow window opened the pane
+  // as tall as the canvas was wide.
+  [[wc window] setFrame:NSMakeRect(60, 60, 620, 900) display:NO];
+  [[wc window] layoutIfNeeded];
+  [wc toggleGroupsPane:nil];
+  [wc toggleGroupsPane:nil];
+  if (fabs(NSHeight([host frame]) - was) > 1)
+    XCTFail(@"in a narrow window it should still be %g, it is %g", was, NSHeight([host frame]));
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
+  [[wc window] layoutIfNeeded];
+
+  // A window too short for both gives the canvas its floor and the pane what
+  // is left -- and shutting it there does not forget the height it had when
+  // there was room, so a taller window gets that height back.
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 400) display:NO];
+  [[wc window] layoutIfNeeded];
+  [wc toggleGroupsPane:nil];  // shut
+  [wc toggleGroupsPane:nil];  // and open again, squeezed
+  CGFloat squeezed = NSHeight([host frame]);
+  CGFloat canvas = NSHeight([[wc valueForKey:@"canvasScroll"] frame]);
+  if (squeezed >= was)
+    XCTFail(@"a short window cannot give the pane its %g, it gave %g", was, squeezed);
+  if (canvas < 199)
+    XCTFail(@"the canvas should keep its floor, it has %g", canvas);
+  [wc toggleGroupsPane:nil];
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
+  [[wc window] layoutIfNeeded];
+  [wc toggleGroupsPane:nil];
+  if (fabs(NSHeight([host frame]) - was) > 1)
+    XCTFail(@"with room again it should be %g, it is %g", was, NSHeight([host frame]));
 
   // The menu item says which way it goes.
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"Row and Column Groups"

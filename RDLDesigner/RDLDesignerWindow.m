@@ -257,20 +257,61 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   return _centerSplit != nil && ![_centerSplit isSubviewCollapsed:_groupsHost];
 }
 
+// How tall the groups pane may be here: what is asked for, less whatever the
+// canvas needs to keep. A window too short for both gives the canvas its floor
+// and the pane what is left.
+- (CGFloat)groupsPaneHeightFitting:(CGFloat)wanted {
+  [_centerSplit layoutSubtreeIfNeeded];
+  CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
+  return MAX(0, MIN(wanted, room));
+}
+
+// Where the divider goes for a pane of that height. Which way the split counts
+// from is AppKit's business and has not been the same on every machine this
+// runs on, so the height is measured afterwards and the divider corrected by
+// what it came out wrong by, rather than the arithmetic being trusted once.
+- (void)setGroupsPaneHeight:(CGFloat)wanted {
+  CGFloat target = [self groupsPaneHeightFitting:wanted];
+  CGFloat position = NSHeight([_centerSplit bounds]) - target - [_centerSplit dividerThickness];
+  CGFloat lastGood = position;
+  for (NSUInteger pass = 0; pass < 3; pass++) {
+    [_centerSplit setPosition:position ofDividerAtIndex:0];
+    // Laid out before it is measured: the divider moves the subviews at the
+    // next layout, and what this reads before that is where they used to be.
+    [_centerSplit layoutSubtreeIfNeeded];
+    CGFloat got = [_centerSplit isSubviewCollapsed:_groupsHost] ? 0 : NSHeight([_groupsHost frame]);
+    CGFloat wrongBy = got - target;
+    if (fabs(wrongBy) < 0.5)
+      return;
+    // A pass that shut the pane went too far: the one before it stands.
+    if (got <= 0) {
+      [_centerSplit setPosition:lastGood ofDividerAtIndex:0];
+      return;
+    }
+    lastGood = position;
+    position += wrongBy;
+  }
+}
+
 - (void)showGroupsPane:(BOOL)show {
   if (_centerSplit == nil || show == [self groupsPaneIsShowing])
     return;
-  CGFloat full = NSHeight([_centerSplit bounds]);
   if (!show) {
     // Remembered, so it comes back the size it was rather than the size the
-    // XIB opened at.
-    _groupsPaneHeight = NSHeight([_groupsHost frame]);
-    [_centerSplit setPosition:full ofDividerAtIndex:0];
-  } else {
-    CGFloat height = _groupsPaneHeight > kRDLGroupsPaneMinimum ? _groupsPaneHeight : kRDLGroupsPaneHeight;
-    [_centerSplit setPosition:MAX(kRDLCanvasMinimumHeight, full - height - [_centerSplit dividerThickness])
-             ofDividerAtIndex:0];
+    // XIB opened at -- and not a height it was only squeezed to by a window
+    // too short to hold it.
+    // A height the window squeezed it to is the window's, not a choice, so it
+    // is not remembered: a pane shut in a short window and opened in a tall one
+    // comes back the size it was last given room for.
+    CGFloat height = NSHeight([_groupsHost frame]);
+    CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
+    if (height > kRDLGroupsPaneMinimum && height < room - 0.5)
+      _groupsPaneHeight = height;
+    [_centerSplit setPosition:NSHeight([_centerSplit bounds]) ofDividerAtIndex:0];
+    return;
   }
+  [self setGroupsPaneHeight:_groupsPaneHeight > kRDLGroupsPaneMinimum ? _groupsPaneHeight
+                                                                     : kRDLGroupsPaneHeight];
 }
 
 - (void)toggleGroupsPane:(id)sender {
@@ -290,6 +331,14 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 - (CGFloat)splitView:(NSSplitView *)splitView
     constrainMaxCoordinate:(CGFloat)proposed
                ofSubviewAt:(NSInteger)index {
+  // The centre split stacks the canvas over the groups pane, so what is left
+  // to the divider is measured down the window, not across it. This used to
+  // answer for it with the side panes' rule -- a width -- which capped the
+  // divider at the canvas's own width and left the pane as tall as the window
+  // was narrow.
+  if (splitView == _centerSplit)
+    return MIN(proposed, NSHeight([splitView bounds]) - kRDLGroupsPaneMinimum -
+                             [splitView dividerThickness]);
   NSArray<NSView *> *panes = [splitView subviews];
   if (index != (NSInteger)[panes count] - 2)
     return proposed;
