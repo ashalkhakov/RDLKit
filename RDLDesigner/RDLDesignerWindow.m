@@ -224,6 +224,54 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   return subview != [panes firstObject] && subview != [panes lastObject];
 }
 
+#if !defined(__APPLE__)
+// GNUstep's -adjustSubviews always sizes the last subview to whatever space is
+// left and never asks -shouldAdjustSizeOfSubview: about it, so a trailing side
+// pane (the inspector) cannot hold its width there. Distribute by hand to the
+// same rule the method above states: keep the subviews that should not adjust
+// at their current span, and share what is left among those that should, in
+// proportion to the spans they had.
+- (void)splitView:(NSSplitView *)splitView resizeSubviewsWithOldSize:(NSSize)oldSize {
+  RDL_UNUSED(oldSize);
+  NSArray<NSView *> *subs = [splitView subviews];
+  NSUInteger n = [subs count];
+  if (n == 0)
+    return;
+  BOOL vertical = [splitView isVertical];
+  NSRect bounds = [splitView bounds];
+  CGFloat divider = [splitView dividerThickness];
+  CGFloat total = (vertical ? NSWidth(bounds) : NSHeight(bounds)) - divider * (CGFloat)(n - 1);
+  CGFloat spans[n];
+  BOOL adjust[n];
+  CGFloat oldAdjustable = 0, fixed = 0;
+  NSUInteger adjustableCount = 0;
+  for (NSUInteger i = 0; i < n; i++) {
+    NSRect f = [subs[i] frame];
+    spans[i] = vertical ? NSWidth(f) : NSHeight(f);
+    adjust[i] = ![splitView isSubviewCollapsed:subs[i]] &&
+                [self splitView:splitView shouldAdjustSizeOfSubview:subs[i]];
+    if (adjust[i]) {
+      oldAdjustable += spans[i];
+      adjustableCount++;
+    } else {
+      fixed += spans[i];
+    }
+  }
+  CGFloat forAdjustable = MAX(0, total - fixed);
+  CGFloat running = 0;
+  for (NSUInteger i = 0; i < n; i++) {
+    CGFloat span = spans[i];
+    if (adjust[i])
+      span = oldAdjustable > 0.5 ? forAdjustable * (spans[i] / oldAdjustable)
+                                 : forAdjustable / (CGFloat)adjustableCount;
+    NSRect r = vertical ? NSMakeRect(running, 0, span, NSHeight(bounds))
+                        : NSMakeRect(0, running, NSWidth(bounds), span);
+    [subs[i] setFrame:[splitView centerScanRect:r]];
+    running += span + divider;
+  }
+}
+#endif
+
 // A pane dragged down to nothing is a pane nobody can get back without knowing
 // the divider is still there, so each side has a floor. They are the widths
 // the XIB opens at, less what a pane can lose and still read.
