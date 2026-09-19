@@ -456,7 +456,10 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   printView.pages = self.pages;
   [printView sizeToPages];
 
-  NSPrintInfo *info = given ? [given copy] : [[NSPrintInfo alloc] initWithDictionary:@{}];
+  // Built from its settings rather than copied: -copy on NSPrintInfo is not
+  // something both platforms promise, and the settings are the whole of it.
+  NSPrintInfo *info = [[NSPrintInfo alloc]
+      initWithDictionary:given ? [given dictionary] : @{}];
   RDLLaidOutPage *first = [self.pages firstObject];
   if (first)
     [info setPaperSize:NSMakeSize(first.width * kRDLDPI, first.height * kRDLDPI)];

@@ -261,7 +261,6 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 // canvas needs to keep. A window too short for both gives the canvas its floor
 // and the pane what is left.
 - (CGFloat)groupsPaneHeightFitting:(CGFloat)wanted {
-  [_centerSplit layoutSubtreeIfNeeded];
   CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
   return MAX(0, MIN(wanted, room));
 }
@@ -276,9 +275,6 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   CGFloat lastGood = position;
   for (NSUInteger pass = 0; pass < 3; pass++) {
     [_centerSplit setPosition:position ofDividerAtIndex:0];
-    // Laid out before it is measured: the divider moves the subviews at the
-    // next layout, and what this reads before that is where they used to be.
-    [_centerSplit layoutSubtreeIfNeeded];
     CGFloat got = [_centerSplit isSubviewCollapsed:_groupsHost] ? 0 : NSHeight([_groupsHost frame]);
     CGFloat wrongBy = got - target;
     if (fabs(wrongBy) < 0.5)

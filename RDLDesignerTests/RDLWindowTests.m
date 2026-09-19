@@ -3228,8 +3228,7 @@ paperOrigin:NSMakePoint(0, 0)];
   // A known window, because how much room the canvas and the pane have to
   // share is what the arithmetic below is about -- and the window this opens
   // at is not the same on every machine that runs this.
-  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
-  [[wc window] layoutIfNeeded];
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:YES];
 
   CGFloat was = NSHeight([host frame]);
   [wc toggleGroupsPane:nil];
@@ -3250,20 +3249,17 @@ paperOrigin:NSMakePoint(0, 0)];
   // back. It did once: the centre split was answering the side panes' rule,
   // which is measured across the window, so a narrow window opened the pane
   // as tall as the canvas was wide.
-  [[wc window] setFrame:NSMakeRect(60, 60, 620, 900) display:NO];
-  [[wc window] layoutIfNeeded];
+  [[wc window] setFrame:NSMakeRect(60, 60, 620, 900) display:YES];
   [wc toggleGroupsPane:nil];
   [wc toggleGroupsPane:nil];
   if (fabs(NSHeight([host frame]) - was) > 1)
     XCTFail(@"in a narrow window it should still be %g, it is %g", was, NSHeight([host frame]));
-  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
-  [[wc window] layoutIfNeeded];
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:YES];
 
   // A window too short for both gives the canvas its floor and the pane what
   // is left -- and shutting it there does not forget the height it had when
   // there was room, so a taller window gets that height back.
-  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 400) display:NO];
-  [[wc window] layoutIfNeeded];
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 400) display:YES];
   [wc toggleGroupsPane:nil];  // shut
   [wc toggleGroupsPane:nil];  // and open again, squeezed
   CGFloat squeezed = NSHeight([host frame]);
@@ -3273,8 +3269,7 @@ paperOrigin:NSMakePoint(0, 0)];
   if (canvas < 199)
     XCTFail(@"the canvas should keep its floor, it has %g", canvas);
   [wc toggleGroupsPane:nil];
-  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:NO];
-  [[wc window] layoutIfNeeded];
+  [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:YES];
   [wc toggleGroupsPane:nil];
   if (fabs(NSHeight([host frame]) - was) > 1)
     XCTFail(@"with room again it should be %g, it is %g", was, NSHeight([host frame]));

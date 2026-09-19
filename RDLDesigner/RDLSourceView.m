@@ -43,7 +43,8 @@ static NSString *const kRDLSourceApplied = @"Applied.";
   [[_text textContainer] setWidthTracksTextView:NO];
   [[_text textContainer] setContainerSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
   [_text setHorizontallyResizable:YES];
-  [_text setAutomaticQuoteSubstitutionEnabled:NO];
+  if ([_text respondsToSelector:@selector(setAutomaticQuoteSubstitutionEnabled:)])
+    [_text setAutomaticQuoteSubstitutionEnabled:NO];
   self.context = context;
   return self;
 }

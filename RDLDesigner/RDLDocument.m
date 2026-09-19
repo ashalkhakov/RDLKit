@@ -364,7 +364,9 @@ static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
 // panel all reach it. The report is laid out into a view of its own for the
 // occasion -- the preview's view belongs to the preview window, which may not
 // be open -- with its subreports found first, as any render needs.
-- (NSPrintOperation *)printOperationWithSettings:(NSDictionary<NSPrintInfoAttributeKey, id> *)settings
+// The keys are NSPrintInfo's own; spelt as strings because GNUstep has no
+// NSPrintInfoAttributeKey and on macOS that name is a typedef of NSString.
+- (NSPrintOperation *)printOperationWithSettings:(NSDictionary<NSString *, id> *)settings
                                            error:(NSError **)error {
   RDL_UNUSED(error);
   [self loadSubreports];
@@ -373,7 +375,8 @@ static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
   view.paramValues = [self suppliedParameters];
   view.documentBinder = [self dataBinder];
   [view reloadLayout];
-  NSPrintInfo *info = [[self printInfo] copy] ?: [NSPrintInfo sharedPrintInfo];
+  NSPrintInfo *from = [self printInfo] ?: [NSPrintInfo sharedPrintInfo];
+  NSPrintInfo *info = [[NSPrintInfo alloc] initWithDictionary:[from dictionary] ?: @{}];
   if ([settings count])
     [[info dictionary] addEntriesFromDictionary:settings];
   return [view printOperationWithPrintInfo:info];
