@@ -80,6 +80,11 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   NSSplitView *split = [wc valueForKey:@"split"];
   NSView *content = [window contentView];
 
+  // On-screen before the panes are measured: GNUstep's NSTabView installs and
+  // sizes the selected tab item's view (which holds the centre split and the
+  // outline) only once the tab view is displayed in an ordered-in window, so
+  // off-screen its contents keep their XIB size and never follow the window.
+  [window orderFront:nil];
   [window setFrame:NSMakeRect(0, 0, 1200, 800) display:YES];
   NSArray<NSView *> *panes = [split subviews];
   if ([panes count] != 3) {
@@ -3210,7 +3215,10 @@ paperOrigin:NSMakePoint(0, 0)];
 
   // A known window, because how much room the canvas and the pane have to
   // share is what the arithmetic below is about -- and the window this opens
-  // at is not the same on every machine that runs this.
+  // at is not the same on every machine that runs this. On-screen first, so
+  // GNUstep's NSTabView sizes the centre split to the window rather than
+  // leaving it at its XIB size (see testTheWindowsPanesFollowTheWindow).
+  [[wc window] orderFront:nil];
   [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:YES];
 
   CGFloat was = NSHeight([host frame]);
@@ -3239,16 +3247,27 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"in a narrow window it should still be %g, it is %g", was, NSHeight([host frame]));
   [[wc window] setFrame:NSMakeRect(60, 60, 1100, 900) display:YES];
 
-  // A window too short for both gives the canvas its floor and the pane what
-  // is left -- and shutting it there does not forget the height it had when
-  // there was room, so a taller window gets that height back.
+  // A window too short for both gives the canvas its floor and the pane what is
+  // left. How short that is depends on the window's chrome, which differs by
+  // platform -- GNUstep's thinner title bar leaves the minimum window tall
+  // enough to still hold the pane -- so shrink to the minimum and judge against
+  // the room actually left rather than assuming a fixed height is too tall.
   [[wc window] setFrame:NSMakeRect(60, 60, 1100, 400) display:YES];
   [wc toggleGroupsPane:nil];  // shut
-  [wc toggleGroupsPane:nil];  // and open again, squeezed
+  [wc toggleGroupsPane:nil];  // and open again, into whatever room there is
   CGFloat squeezed = NSHeight([host frame]);
   CGFloat canvas = NSHeight([[wc valueForKey:@"canvasScroll"] frame]);
-  if (squeezed >= was)
-    XCTFail(@"a short window cannot give the pane its %g, it gave %g", was, squeezed);
+  // 200 is the canvas's floor (kRDLCanvasMinimumHeight); the pane gets what is
+  // left of the centre split above it.
+  CGFloat room = NSHeight([split bounds]) - 200 - [split dividerThickness];
+  if (room < was - 1) {
+    // Too short for the whole pane: squeezed to the room, not given its full height.
+    if (squeezed >= was || squeezed > room + 1)
+      XCTFail(@"a short window should squeeze the pane to its room (%g), it gave %g", room, squeezed);
+  } else if (fabs(squeezed - was) > 1) {
+    // Still room for it: the pane keeps its height.
+    XCTFail(@"with room for it the pane should keep %g, it gave %g", was, squeezed);
+  }
   if (canvas < 199)
     XCTFail(@"the canvas should keep its floor, it has %g", canvas);
   [wc toggleGroupsPane:nil];
