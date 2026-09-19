@@ -14,6 +14,7 @@
 #import "RDLRichTextEditor.h"
 #import "RDLGroupPropertiesEditor.h"
 #import "RDLExpressionEditor.h"
+#import <objc/runtime.h>  // sel_isEqual
 
 // What a group command in the tablix menu acts on, carried by its menu item:
 // the member is the tablix's own when the menu is built, and the command is

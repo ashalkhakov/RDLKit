@@ -94,8 +94,13 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   CGFloat leftWas = NSWidth([panes[0] frame]);
   CGFloat centreWas = NSWidth([panes[1] frame]);
   CGFloat rightWas = NSWidth([panes[2] frame]);
+  CGFloat splitWas = NSWidth([split frame]);
 
   [window setFrame:NSMakeRect(0, 0, 1800, 1100) display:YES];
+  // How much the split actually grew: a window asked for more than the screen
+  // (a headless CI display is small) is clamped, so the test measures against
+  // the width the split really gained rather than the 600 points it asked for.
+  CGFloat splitGrew = NSWidth([split frame]) - splitWas;
 
   // The content view fills the window it is in -- no offset, no band of unused
   // window under it.
@@ -116,9 +121,9 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
     XCTFail(@"%@", @"the outline pane should keep its width");
   if (fabs(NSWidth([panes[2] frame]) - rightWas) > 0.01)
     XCTFail(@"%@", @"the inspector pane should keep its width");
-  if (NSWidth([panes[1] frame]) < centreWas + 590)
-    XCTFail(@"%@", [NSString stringWithFormat:@"the canvas gained %g of the 600 points",
-                                              NSWidth([panes[1] frame]) - centreWas]);
+  if (NSWidth([panes[1] frame]) < centreWas + splitGrew - 1)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the canvas gained %g of the split's %g",
+                                              NSWidth([panes[1] frame]) - centreWas, splitGrew]);
 
   // And what is in a pane fills it, all the way down. The centre is shared:
   // the canvas takes what is left above the groups pane docked under it, and
