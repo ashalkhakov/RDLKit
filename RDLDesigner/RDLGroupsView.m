@@ -36,6 +36,11 @@ static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
   // The group being dragged, and the axis it groups along.
   RDLTablixMember *_dragged;
   RDLTablixAxis _draggedAxis;
+  // Guards the context-menu rebuild against re-entry: on GNUstep adding an item
+  // to a menu with a delegate calls -[NSMenu update], which calls the delegate
+  // again, so an unguarded rebuild recurses until the stack is gone. Cocoa does
+  // not re-enter, so this is simply never set there.
+  BOOL _rebuildingMenu;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
@@ -354,6 +359,14 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
 // Right-clicking a row picks it out first: a command is about the group under
 // the pointer, not about whatever was picked out before.
 - (void)menuNeedsUpdate:(NSMenu *)menu {
+  if (_rebuildingMenu)
+    return;
+  _rebuildingMenu = YES;
+  [self rebuildMenu:menu];
+  _rebuildingMenu = NO;
+}
+
+- (void)rebuildMenu:(NSMenu *)menu {
   [menu removeAllItems];
   RDLTablix *tablix = [self tablix];
   if (tablix == nil)

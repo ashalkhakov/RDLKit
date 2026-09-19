@@ -25,3 +25,16 @@ FOUNDATION_EXPORT BOOL RDLLoadPaneNib(NSView *pane, NSString *name);
 // attribute is only as good as the reader's support for it and the cost of
 // being wrong is not something a stack trace will explain.
 FOUNDATION_EXPORT void RDLOwnWindow(NSWindow *window);
+
+#if !defined(__APPLE__)
+// GNUstep's NSTextView has no smart-substitution switches. Declaring them lets
+// the panes that turn them off (a code or source editor wants straight quotes
+// and dashes) do so behind a respondsToSelector check that type-checks here and
+// returns NO at runtime, so the substitutions are simply never touched.
+@interface NSTextView (RDLSmartSubstitution)
+- (void)setAutomaticQuoteSubstitutionEnabled:(BOOL)flag;
+- (void)setAutomaticDashSubstitutionEnabled:(BOOL)flag;
+- (void)setAutomaticTextReplacementEnabled:(BOOL)flag;
+- (void)setAutomaticSpellingCorrectionEnabled:(BOOL)flag;
+@end
+#endif

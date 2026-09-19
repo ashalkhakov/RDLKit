@@ -114,13 +114,16 @@
     XCTFail(@"a field Orders lacks should be said, status reads %@", ed.status);
   NSTextStorage *storage = ed.sourceStorage;
   [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Sum(Fields!Amount.Value)"];
-  [(id<NSTextViewDelegate>)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+  // Plain id, not id<NSTextViewDelegate>: GNUstep declares -textDidChange: in
+  // the informal NSObject(NSTextDelegate) category rather than in the formal
+  // NSTextViewDelegate protocol, so the protocol-typed send won't compile there.
+  [(id)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
                                                                           object:nil]];
   if ([ed.diagnostics count] || ![ed.status hasPrefix:@"An expression"])
     XCTFail(@"a field Orders has should pass, status reads %@ (%@)", ed.status,
             [ed.diagnostics valueForKey:@"message"]);
   [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Frobnicate(1) + Nope(2)"];
-  [(id<NSTextViewDelegate>)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+  [(id)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
                                                                           object:nil]];
   if ([ed.diagnostics count] < 2 || [ed.status rangeOfString:@"more"].location == NSNotFound)
     XCTFail(@"two problems should be counted, status reads %@", ed.status);

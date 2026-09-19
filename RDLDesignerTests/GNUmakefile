@@ -7,9 +7,10 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = RDLDesignerTests
 
-# The app's plain objects are compiled in directly: the test target holds the
-# editing logic, not the window shell, which is why RDLAppDelegate and the
-# window controllers are absent.
+# The app's objects are compiled in directly, so the checks can drive the same
+# classes the app runs. Only main.m is left out -- its main() would collide
+# with the test runner's -- so the window controllers and app delegate the
+# window checks exercise are all present.
 RDLDesignerTests_OBJC_FILES = \
   RDLEditingCoreTests.m \
   RDLCanvasTests.m \
@@ -78,6 +79,15 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
   ../RDLDesigner/RDLFieldInspectorView.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
+  ../RDLDesigner/RDLGeneratorWindow.m \
+  ../RDLDesigner/RDLParameterNavigator.m \
+  ../RDLDesigner/RDLDataSourceNavigator.m \
+  ../RDLDesigner/RDLDataSourceView.m \
+  ../RDLDesigner/RDLParameterInspectorView.m \
+  ../RDLDesigner/RDLBordersEditor.m \
+  ../RDLDesigner/RDLSubreportParametersEditor.m \
+  ../RDLDesigner/RDLAppDelegate.m \
+  ../RDLDesigner/RDLWelcomeWindow.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
 # Xcode resolves through its header map and gnustep-make has no equivalent for.
@@ -108,13 +118,22 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLChartAxisEditor.xib \
   ../RDLDesigner/RDLChartSeriesEditor.xib \
   ../RDLDesigner/RDLGroupPropertiesEditor.xib \
+  ../RDLDesigner/RDLBordersEditor.xib \
   ../RDLDesigner/RDLDatasetNavigator.xib \
   ../RDLDesigner/RDLInsertPalette.xib \
   ../RDLDesigner/RDLDatasetFieldsView.xib \
   ../RDLDesigner/RDLFieldInspectorView.xib \
   ../RDLDesigner/RDLExpressionEditor.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
-  ../RDLDesigner/RDLNewReportPanel.xib
+  ../RDLDesigner/RDLNewReportPanel.xib \
+  ../RDLDesigner/RDLDataSourceNavigator.xib \
+  ../RDLDesigner/RDLParameterNavigator.xib \
+  ../RDLDesigner/RDLParameterInspectorView.xib \
+  ../RDLDesigner/RDLDataSourceView.xib \
+  ../RDLDesigner/RDLSubreportParametersEditor.xib \
+  ../RDLDesigner/RDLGeneratorWindow.xib \
+  ../RDLDesigner/RDLWelcomeWindow.xib \
+  ../RDLDesigner/Samples
 
 # Heap corruption does not name itself: "malloc_consolidate(): unaligned
 # fastbin chunk" is reported by whichever allocation happens to notice, long
