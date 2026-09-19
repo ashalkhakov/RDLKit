@@ -30,8 +30,7 @@ FOUNDATION_EXPORT void RDLOwnWindow(NSWindow *window);
 // GNUstep's NSTextView has no smart-substitution switches, so declare them for
 // it; the panes that turn them off want straight quotes and dashes.
 @interface NSTextView (RDLSmartSubstitution)
-// Each is sent behind a respondsToSelector check at its call site (RDLCodeEditor,
-// RDLSourceView), so on GNUstep it type-checks here and simply no-ops at runtime.
+// Sent behind a respondsToSelector check at each call site; declared for GNUstep.
 - (void)setAutomaticQuoteSubstitutionEnabled:(BOOL)flag;
 - (void)setAutomaticDashSubstitutionEnabled:(BOOL)flag;
 - (void)setAutomaticTextReplacementEnabled:(BOOL)flag;
