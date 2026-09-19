@@ -69,10 +69,22 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 // These coordinate the three core objects: ask RDLItemFactory where a new item
 // goes, mutate through RDLEditor so it undoes, then move the selection. Views
 // call these rather than assembling the sequence themselves.
-- (void)addItemOfKind:(NSString *)kind;
-- (NSArray<NSString *> *)allowedElementKinds;
+- (void)addItemOfKind:(RDLItemKind)kind;
+// The RDLItemKinds that may be inserted where the selection is.
+- (NSArray<NSNumber *> *)allowedElementKinds;
 - (NSString *)insertionDescription;
 - (void)deleteSelectedItem;
+
+// A cell has no style of its own: MS-RDL styles a cell through the item in its
+// CellContents, and Report Builder keeps a blank text box in every cell for
+// that. An empty cell here holds nothing, so styling one starts from that same
+// blank text box -- made, not yet put in the cell, so a panel can edit it and
+// only put it there when something was actually changed. nil unless an empty
+// cell is selected.
+- (RDLTextbox *)blankTextboxForSelectedCell;
+// Puts `item` into the selected empty cell, through the editor, and selects it.
+// NO, doing nothing, unless an empty cell is selected.
+- (BOOL)addItemToSelectedEmptyCell:(RDLItem *)item;
 
 // Item clipboard. The item travels as RDL XML on the general pasteboard, so it
 // survives between processes and pastes back as a genuine deep copy.
@@ -81,4 +93,7 @@ FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
 - (void)pasteItem;
 - (BOOL)canPaste;
 - (void)duplicateSelectedItem;
+// The selected item moved up or down among the items it is stacked with.
+- (BOOL)moveSelectedItemInStacking:(RDLStackingMove)move;
+- (BOOL)canMoveSelectedItemInStacking:(RDLStackingMove)move;
 @end

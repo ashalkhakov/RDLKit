@@ -1,5 +1,8 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLTestSupport.h"
+#import "RDLCode.h"
+#import "RDLDataProvider.h"
+#import <objc/runtime.h>
 
 // Was a diagnostic of this rule reported, mentioning `needle`?
 static BOOL RDLSawDiagnostic(NSArray<RDLDiagnostic *> *ds, NSString *rule, NSString *needle) {
@@ -12,6 +15,19 @@ static BOOL RDLSawDiagnostic(NSArray<RDLDiagnostic *> *ds, NSString *rule, NSStr
   return NO;
 }
 
+// Nothing, however an evaluation hands it back.
+static BOOL RDLIsNothingValue(id v) {
+  return v == nil || v == [NSNull null];
+}
+
+// True or False, as NSNumber holds a Boolean. The library's own test: the
+// CFBoolean singletons are not a symbol GNUstep's Foundation exports (the
+// bundle failed to load with "undefined symbol: kCFBooleanTrue"), and
+// RDLNumberIsBoolean already answers this portably.
+static BOOL RDLNumberIsBooleanValue(id v) {
+  return RDLNumberIsBoolean(v);
+}
+
 static RDLReport *RDLCheckableReport(void) {
   RDLReport *r = [RDLReport emptyReportNamed:@"Checkable"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];
@@ -22,7 +38,10 @@ static RDLReport *RDLCheckableReport(void) {
   RDLField *region = [[RDLField alloc] init];
   region.name = @"Region";
   region.dataType = RDLFieldDataTypeString;
-  ds.fields = @[ amount, region ];
+  RDLField *units = [[RDLField alloc] init];
+  units.name = @"Units";
+  units.dataType = RDLFieldDataTypeLong;
+  ds.fields = @[ amount, region, units ];
   [r.dataSets addObject:ds];
   // A dataset reads from a source, and the checker now says so, so the fixture
   // has one -- otherwise every expression checked here would come back with a
@@ -30,6 +49,8 @@ static RDLReport *RDLCheckableReport(void) {
   RDLAttachInlineSource(r, ds, @"Demo");
   RDLParameter *p = [[RDLParameter alloc] init];
   p.name = @"Year";
+  // Asked for, as a parameter a report is given a value for is.
+  p.prompt = @"Year";
   p.dataType = RDLParameterDataTypeInteger;
   [r.parameters addObject:p];
   return r;
@@ -103,6 +124,182 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
 // GNUstep's implementation does not call it, which the font assertion proved
 // by surviving one. -setUp every implementation has, and -sharedApplication
 // is idempotent.
+// VB.NET's arithmetic, which is what SSRS hosts. Each of these produced a
+// different number here, and a report full of them is wrong in a way nobody
+// can see by reading it.
+// A nested aggregate takes the inner aggregate once per instance of the
+// inner scope and aggregates those. Taking it once per row over the outer
+// scope's rows made Sum(Max(B)) over 1, 2, 3 come out as 9.
+// A field's value is the column its DataField names. Rows were read by the
+// field's Name instead, so a field called Amount over a column called AMT --
+// the ordinary case in a report written against someone else's data -- read
+// nothing at all, and nothing said so.
+- (void)testAFieldReadsTheColumnItsDataFieldNames {
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLDataSet *ds = [r dataSetNamed:@"Sales"];
+  if ([ds.rows count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the fixture should bind 3 rows, got %lu",
+                                              (unsigned long)[ds.rows count]]);
+    return;
+  }
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = ds;
+  [self expectNumber:@"=Sum(Fields!Amount.Value)" scope:scope equals:205];
+  // Field names match without regard to case, and still find the column.
+  [self expectNumber:@"=Sum(Fields!amount.Value)" scope:scope equals:205];
+  scope.row = ds.rows[2];
+  [self expectText:@"=Fields!Region.Value" scope:scope equals:@"South"];
+  // A column no field declares is still reachable by its own name.
+  [self expectText:@"=Fields!Rep.Value" scope:scope equals:@"Cy"];
+  // And binding read each field's type off its own column.
+  if ([ds fieldNamed:@"Amount"].dataType != RDLFieldDataTypeInteger)
+    XCTFail(@"%@", @"Amount's type should be inferred from the AMT column");
+}
+
+// Something that reads another dataset reads that dataset's columns through
+// that dataset's fields. The column names here are deliberately not case
+// variants of the field names -- RGN, GOAL_AMT -- because row keys match
+// without regard to case, and a mapping through the wrong dataset could
+// otherwise find the column by accident.
+- (void)testAnotherDatasetIsReadThroughItsOwnFields {
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLDataSet *sales = [r dataSetNamed:@"Sales"];
+  RDLDataSet *targets = [[RDLDataSet alloc] init];
+  targets.name = @"Targets";
+  RDLField *where = [[RDLField alloc] init];
+  where.name = @"Region";
+  where.dataField = @"RGN";
+  RDLField *goal = [[RDLField alloc] init];
+  goal.name = @"Target";
+  goal.dataField = @"GOAL_AMT";
+  targets.fields = @[ where, goal ];
+  targets.rows = @[ @{@"RGN" : @"North", @"GOAL_AMT" : @200},
+                    @{@"RGN" : @"South", @"GOAL_AMT" : @90} ];
+  [r.dataSets addObject:targets];
+
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = sales;
+  scope.row = sales.rows[2];  // South
+  // An aggregate over the other dataset.
+  [self expectNumber:@"=Sum(Fields!Target.Value, \"Targets\")" scope:scope equals:290];
+  // A Lookup: the source key is this row's Region (TERRITORY), the match and the
+  // result are the other dataset's Region (RGN) and Target (GOAL_AMT).
+  [self expectNumber:
+            @"=Lookup(Fields!Region.Value, Fields!Region.Value, Fields!Target.Value, \"Targets\")"
+               scope:scope
+              equals:90];
+  // And the scope is put back: this row's own fields still read this dataset.
+  [self expectText:@"=Fields!Region.Value" scope:scope equals:@"South"];
+}
+
+- (void)testNestedAggregatesTakeTheInnerOncePerInstance {
+  RDLReport *r = RDLGroupedJobs();
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = [r dataSetNamed:@"Jobs"];
+  // The largest job of each finish -- Oil 1840, Lacquer 265, Wax 610 -- added up.
+  [self expectNumber:@"=Sum(Max(Fields!Amount.Value, \"JobsByFinish_Finish\"))"
+               scope:scope
+              equals:2715];
+  // The average finish total: (2355 + 313 + 800) / 3.
+  [self expectNumber:@"=Avg(Sum(Fields!Amount.Value, \"JobsByFinish_Finish\"))"
+               scope:scope
+              equals:1156];
+  // No inner scope: every row is its own instance, so Max of one row is that
+  // row, and the outer Sum is the plain total.
+  [self expectNumber:@"=Sum(Max(Fields!Amount.Value))" scope:scope equals:3468];
+}
+
+- (void)testVBArithmeticAgrees {
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  // ^ binds tighter than unary minus and associates to the left.
+  [self expectNumber:@"=-2^2" scope:s equals:-4];
+  [self expectNumber:@"=2^3^2" scope:s equals:64];
+  [self expectNumber:@"=2^-2" scope:s equals:0.25];
+  [self expectNumber:@"=-2^2+1" scope:s equals:-3];
+  // Round is banker's: halves go to the even neighbour.
+  [self expectNumber:@"=Round(2.5)" scope:s equals:2];
+  [self expectNumber:@"=Round(3.5)" scope:s equals:4];
+  [self expectNumber:@"=Round(-2.5)" scope:s equals:-2];
+  // With digits, on a half that a double represents exactly -- 2.675 is not
+  // one of those, and .NET's own answer for it depends on the representation.
+  [self expectNumber:@"=Round(0.125, 2)" scope:s equals:0.12];
+  [self expectNumber:@"=Round(0.375, 2)" scope:s equals:0.38];
+  // CInt rounds, Int goes down, Fix goes toward zero.
+  [self expectNumber:@"=CInt(2.7)" scope:s equals:3];
+  [self expectNumber:@"=CInt(2.5)" scope:s equals:2];
+  [self expectNumber:@"=Int(-2.7)" scope:s equals:-3];
+  [self expectNumber:@"=Fix(-2.7)" scope:s equals:-2];
+}
+
+// Two dates compare as dates. They used to be compared as their formatted
+// text, so a September date sorted after a November one and every
+// IIf(start < end, ...) in a report was a coin toss.
+- (void)testDatesCompareAsDates {
+  RDLEvalScope *s = [[RDLEvalScope alloc] init];
+  [self expectText:@"=CDate(\"2020-09-13\") < CDate(\"2023-11-14\")" scope:s equals:@"True"];
+  [self expectText:@"=CDate(\"2023-11-14\") < CDate(\"2020-09-13\")" scope:s equals:@"False"];
+  [self expectText:@"=CDate(\"2020-09-13\") = CDate(\"2020-09-13\")" scope:s equals:@"True"];
+  [self expectText:@"=CDate(\"2020-01-02\") >= CDate(\"2020-01-01\")" scope:s equals:@"True"];
+
+  // And Min/Max over a date field give back dates, not milliseconds.
+  RDLReport *r = [RDLReport emptyReportNamed:@"Dates"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"D";
+  [ds setFieldNames:@[ @"When" ]];
+  ds.rows = @[ @{ @"When" : [NSDate dateWithTimeIntervalSince1970:1000000] },
+               @{ @"When" : [NSDate dateWithTimeIntervalSince1970:2000000] } ];
+  [r.dataSets addObject:ds];
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.dataSet = ds;
+  id low = [RDLExpression evaluate:@"=Min(Fields!When.Value)" scope:scope];
+  if (![low isKindOfClass:[NSDate class]])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Min over dates should be a date, not %@",
+                                              [low class]]);
+  else if (fabs([(NSDate *)low timeIntervalSince1970] - 1000000) > 1)
+    XCTFail(@"%@", @"and it should be the earliest one");
+}
+
+// Parameters!P.Label is the name the chosen value goes under, not the prompt.
+- (void)testParameterLabelComesFromTheChosenValue {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Params"];
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Region";
+  p.prompt = @"Which region?";
+  p.dataType = RDLParameterDataTypeString;
+  [p.validValues addObject:[RDLValue literal:@"N"]];
+  [p.validValues addObject:[RDLValue literal:@"S"]];
+  p.validValueLabels[@"N"] = [RDLValue literal:@"North"];
+  p.validValueLabels[@"S"] = [RDLValue literal:@"South"];
+  [r.parameters addObject:p];
+
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.paramValues = @{ @"Region" : @"S" };
+  id label = [RDLExpression evaluate:@"=Parameters!Region.Label" scope:scope];
+  if (![[label description] isEqualToString:@"South"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"Label should be South, not %@", label]);
+
+  // A value with no label of its own reports itself.
+  scope.paramValues = @{ @"Region" : @"E" };
+  label = [RDLExpression evaluate:@"=Parameters!Region.Label" scope:scope];
+  if (![[label description] isEqualToString:@"E"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"an unlabelled value reports itself, not %@",
+                                              label]);
+
+  // And the label survives a round trip through the file.
+  NSString *xml = [RDLWriter XMLStringFromReport:r];
+  if ([xml rangeOfString:@"<Label>North</Label>"].location == NSNotFound)
+    XCTFail(@"%@", @"the writer should emit ParameterValue/Label");
+  RDLReport *back = [RDLParser reportFromXMLString:xml error:NULL];
+  RDLParameter *readBack = [back.parameters firstObject];
+  if (![[[readBack labelForValidValue:@"N"] source] isEqualToString:@"North"])
+    XCTFail(@"%@", @"and the reader should read it back");
+}
+
 - (void)testExpression {
   RDLReport *r = RDLMiniInvoice();
   RDLEvalScope *s = [[RDLEvalScope alloc] init];
@@ -198,7 +395,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   [self expectText:@"=LCase(\"AB\")" scope:s equals:@"ab"];
   [self expectText:@"=Trim(\"  x  \")" scope:s equals:@"x"];
   [self expectNumber:@"=Len(\"abc\")" scope:s equals:3];
-  [self expectNumber:@"=InStr(\"Hello\", \"LL\")" scope:s equals:3];
+  [self expectNumber:@"=InStr(\"Hello\", \"ll\")" scope:s equals:3];
   [self expectText:@"=Replace(\"aa\", \"a\", \"b\")" scope:s equals:@"bb"];
   [self expectText:@"=CStr(12)" scope:s equals:@"12"];
 
@@ -240,7 +437,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   if ([fmt rangeOfString:@"1"].location == NSNotFound)
     XCTFail(@"%@", [NSString stringWithFormat:@"nested Format(Sum*0.08) → %@", fmt]);
 
-  [self expectText:@"=User!UserID" scope:s equals:@"RDLDesigner"];
+  [self expectText:@"=User!UserID" scope:s equals:NSUserName()];
   [self expectNumber:@"=Globals!OverallPageNumber" scope:s equals:2];
   [self expectNumber:@"=Year(DateAdd(\"yyyy\", 1, CDate(\"2020-01-15\")))" scope:s equals:2021];
   [self expectNumber:@"=Month(CDate(\"2020-06-15\"))" scope:s equals:6];
@@ -261,7 +458,7 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   [self expectText:@"=Hex(255)" scope:s equals:@"FF"];
   [self expectText:@"=Chr(65)" scope:s equals:@"A"];
   [self expectNumber:@"=Asc(\"A\")" scope:s equals:65];
-  [self expectText:@"=String(3, \"*\")" scope:s equals:@"***"];
+  [self expectText:@"=StrDup(3, \"*\")" scope:s equals:@"***"];
   [self expectNumber:@"=InStrRev(\"abcabc\", \"bc\")" scope:s equals:5];
   [self expectNumber:@"=Log(Exp(1))" scope:s equals:1];
   [self expectNumber:@"=Month(DateSerial(2020, 6, 15))" scope:s equals:6];
@@ -331,6 +528,56 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     XCTFail(@"%@", [NSString stringWithFormat:@"evaluate → %@", [e evaluateTextInScope:scope]]);
 }
 
+// A complaint about something drawn names it, so what shows the report can
+// show what the complaint is about.
+- (void)testDiagnosticsNameTheItemTheyAreAbout {
+  RDLReport *r = RDLCheckableReport();
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Total";
+  box.value = @"=Fields!Nope.Value";
+  box.width = 2;
+  box.height = 0.3;
+  [r.body.items addObject:box];
+  RDLDiagnostic *found = nil;
+  for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+    if ([d.rule isEqualToString:@"unknown-field"])
+      found = d;
+  if (![found.itemName isEqualToString:@"Total"])
+    XCTFail(@"the complaint should name the text box, names %@ at %@", found.itemName, found.path);
+  // What is not about anything drawn names nothing.
+  RDLParameter *p = [[RDLParameter alloc] init];
+  p.name = @"Year2";
+  p.prompt = @"Year";
+  p.dataType = RDLParameterDataTypeInteger;
+  p.defaultValue = [RDLValue valueWithSource:@"=Fields!Nope.Value"];
+  [r.parameters addObject:p];
+  for (RDLDiagnostic *d in [RDLChecker checkReport:r])
+    if ([d.path rangeOfString:@"Parameter"].location != NSNotFound && [d.itemName length])
+      XCTFail(@"a parameter's complaint should name no item, names %@", d.itemName);
+}
+
+// One expression checked where it would be written -- against a dataset
+// named, or the report's only one -- as an editor asks while it is typed.
+- (void)testOneExpressionIsChecked {
+  RDLReport *r = RDLCheckableReport();
+  NSArray<RDLDiagnostic *> *(^check)(NSString *, NSString *) = ^(NSString *source, NSString *dataSet) {
+    return [RDLChecker checkExpression:source inReport:r dataSetName:dataSet];
+  };
+  if ([check(@"=Fields!Amount.Value * Parameters!Year.Value", @"Sales") count])
+    XCTFail(@"a sound expression should pass, reports %@", check(@"=Fields!Amount.Value", @"Sales"));
+  if (!RDLSawDiagnostic(check(@"=Fields!Nope.Value", @"Sales"), @"unknown-field", @"Nope"))
+    XCTFail(@"%@", @"a field the named dataset lacks should be reported");
+  // The report's only dataset is the one read when none is named.
+  if ([check(@"=Sum(Fields!Units.Value)", nil) count])
+    XCTFail(@"%@", @"the only dataset should be read when none is named");
+  if (!RDLSawDiagnostic(check(@"=Frobnicate(1)", nil), @"unknown-function", @"Frobnicate"))
+    XCTFail(@"an unknown function should be reported, reports %@", check(@"=Frobnicate(1)", nil));
+  if (!RDLSawDiagnostic(check(@"=1 2", nil), @"syntax", nil))
+    XCTFail(@"a broken expression should be reported, reports %@", check(@"=1 2", nil));
+  if ([check(@"Just words", @"Sales") count] || [check(@"", nil) count])
+    XCTFail(@"%@", @"a literal has nothing to find");
+}
+
 - (void)testChecker {
 
   // A field the dataset does not have.
@@ -398,10 +645,10 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
 
   // Truncation: the parser keeps what it understood, and that has to be said
   // rather than producing a confident complaint about the fragment.
-  // `%` is a real operator now, so truncation needs a character that is not:
-  // a three-part dotted name is the shape the parser genuinely stops on.
+  // `%` is a real operator now, and a three-part dotted name is a custom
+  // assembly's member, so truncation needs a character the lexer does not know.
   NSArray *partial =
-      RDLCheckExpression(@"=IIf(Helpers.Money.Format(Fields!Amount.Value), \"a\", \"b\")", YES);
+      RDLCheckExpression(@"=IIf(Fields!Amount.Value § 2, \"a\", \"b\")", YES);
   if (!RDLSawDiagnostic(partial, @"syntax", @"partly understood"))
     XCTFail(@"%@", @"an expression the parser could not finish should say so");
   if (RDLSawDiagnostic(partial, @"arity", nil))
@@ -530,7 +777,9 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
       sc.row = row;
       [got addObject:[e evaluateInScope:sc] ?: @0];
     }
-    if (![got isEqualToArray:@[ @1, @2, @3, @4 ]])
+    NSArray *want = @[ [RDLNumber numberWithInteger:1], [RDLNumber numberWithInteger:2], [RDLNumber numberWithInteger:3],
+                       [RDLNumber numberWithInteger:4] ];
+    if (![got isEqualToArray:want])
       XCTFail(@"%@", [NSString stringWithFormat:@"mixed key casing → %@", got]);
 
     // And switching between a dictionary and a KVC object mid-run.
@@ -593,11 +842,12 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
     XCTFail(@"%@", @"the contract should name the report's dataset");
   } else {
     NSArray *fields = sets[0][@"fields"];
-    if ([fields count] != 2)
+    if ([fields count] != 3)
       XCTFail(@"%@", @"the contract should list every field");
     else if (![fields[0][@"objcClass"] isEqualToString:@"NSNumber"] ||
              ![fields[0][@"objcType"] isEqualToString:@"double"] ||
-             ![fields[1][@"objcClass"] isEqualToString:@"NSString"])
+             ![fields[1][@"objcClass"] isEqualToString:@"NSString"] ||
+             ![fields[2][@"objcType"] isEqualToString:@"long long"])
       XCTFail(@"%@", [NSString stringWithFormat:@"contract field types → %@ / %@",
                                                  fields[0][@"objcClass"], fields[1][@"objcClass"]]);
     // The RDL declaration is kept alongside, for reference.
@@ -670,6 +920,2542 @@ static NSArray<RDLDiagnostic *> *RDLCheckExpressionInBodyOfTwoDatasetReport(NSSt
   RDLEvalScope *bare = [[RDLEvalScope alloc] init];
   if (![[RDLExpression evaluateText:@"=User!Language" scope:bare] isEqualToString:RDLHostLanguage()])
     XCTFail(@"%@", @"with nothing set, the reader's culture is the machine's");
+}
+
+
+// A run's style can be an expression, and the checker reads it like any other:
+// a field that is not in the dataset is caught there too.
+- (void)testRunStyleExpressionsAreChecked {
+  RDLReport *r = RDLCheckableReport();
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  para.style = [[RDLStyle alloc] init];
+  para.style.expressions.textAlign = [RDLExpr expressionWithSource:@"=Fields!Alignless.Value"];
+  RDLTextRun *textRun = [[RDLTextRun alloc] init];
+  textRun.value = @"Total";
+  textRun.style = [[RDLStyle alloc] init];
+  textRun.style.expressions.color =
+      [RDLExpr expressionWithSource:@"=IIf(Fields!Nope.Value < 0, \"Red\", \"Black\")"];
+  [para.runs addObject:textRun];
+  tb.paragraphs = [NSMutableArray arrayWithObject:para];
+  [r.body.items addObject:tb];
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:r];
+  if (!RDLSawDiagnostic(ds, @"unknown-field", @"Nope"))
+    XCTFail(@"%@", @"a run's Color expression should be checked");
+  if (!RDLSawDiagnostic(ds, @"unknown-field", @"Alignless"))
+    XCTFail(@"%@", @"a paragraph's TextAlign expression should be checked");
+}
+
+
+// A run's Label, ToolTip and link are expressions like any other.
+- (void)testRunLabelsToolTipsAndLinksAreChecked {
+  RDLReport *r = RDLCheckableReport();
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *textRun = [[RDLTextRun alloc] init];
+  textRun.value = @"Total";
+  textRun.label = [RDLValue valueWithSource:@"=Fields!NoLabel.Value"];
+  textRun.toolTip = [RDLValue valueWithSource:@"=Fields!NoTip.Value"];
+  textRun.hyperlink = [RDLValue valueWithSource:@"=Fields!NoLink.Value"];
+  [para.runs addObject:textRun];
+  tb.paragraphs = [NSMutableArray arrayWithObject:para];
+  [r.body.items addObject:tb];
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:r];
+  for (NSString *field in @[ @"NoLabel", @"NoTip", @"NoLink" ])
+    if (!RDLSawDiagnostic(ds, @"unknown-field", field))
+      XCTFail(@"%@", [NSString stringWithFormat:@"the run's %@ should be checked", field]);
+}
+
+
+// The .NET members SSRS makes available to every expression: a value's own --
+// a string's Length and Substring, a date's Year and AddDays, ToString in a
+// format -- and the shared ones in Math, Convert and String, and the Visual
+// Basic runtime's Financial module. None was evaluated: a dot after a value
+// ended the expression, and Math.Sqrt(16) was an empty string.
+- (void)testDotNetMembersAreEvaluated {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDateComponents *parts = [[NSDateComponents alloc] init];
+  parts.year = 2024;
+  parts.month = 2;
+  parts.day = 28;
+  NSDate *when = [[NSCalendar currentCalendar] dateFromComponents:parts];
+  scope.executionTime = when;
+  scope.row = @{ @"Name" : @"Walnut shelf", @"When" : when, @"Amount" : @1234.5 };
+  [self expectNumber:@"=Fields!Name.Value.Length" scope:scope equals:12];
+  [self expectText:@"=Fields!Name.Value.Substring(0, 6).ToUpper()" scope:scope equals:@"WALNUT"];
+  [self expectText:@"=Fields!Name.Value.Replace(\"shelf\", \"desk\")" scope:scope equals:@"Walnut desk"];
+  [self expectNumber:@"=Fields!Name.Value.IndexOf(\"shelf\")" scope:scope equals:7];
+  [self expectTrue:@"=Fields!Name.Value.StartsWith(\"Wal\")" scope:scope];
+  [self expectText:@"=\"7\".PadLeft(3, \"0\")" scope:scope equals:@"007"];
+  [self expectNumber:@"=Fields!When.Value.Year" scope:scope equals:2024];
+  [self expectNumber:@"=Fields!When.Value.AddDays(2).Month" scope:scope equals:3];
+  // Across a change of offset the time on the clock holds, as .NET's does:
+  // noon on 9 March 2024 in New York plus a day is noon on the 10th, the day its
+  // clocks went forward, not one o'clock.
+  NSTimeZone *savedZone = [NSTimeZone defaultTimeZone];
+  [NSTimeZone setDefaultTimeZone:[NSTimeZone timeZoneWithName:@"America/New_York"]];
+  NSDateComponents *noon = [[NSDateComponents alloc] init];
+  noon.year = 2024;
+  noon.month = 3;
+  noon.day = 9;
+  noon.hour = 12;
+  RDLEvalScope *zoned = [[RDLEvalScope alloc] init];
+  zoned.row = @{ @"When" : [[NSCalendar currentCalendar] dateFromComponents:noon] };
+  [self expectNumber:@"=Fields!When.Value.AddDays(1).Hour" scope:zoned equals:12];
+  [NSTimeZone setDefaultTimeZone:savedZone];
+  [self expectNumber:@"=Globals!ExecutionTime.DayOfWeek" scope:scope equals:3];
+  [self expectNumber:@"=Globals!ExecutionTime.Value.Year" scope:scope equals:2024];
+  [self expectText:@"=Fields!When.Value.ToString(\"yyyy-MM-dd\")" scope:scope equals:@"2024-02-28"];
+  [self expectText:@"=Fields!Amount.Value.ToString(\"N2\")" scope:scope equals:@"1,234.50"];
+  [self expectNumber:@"=Math.Sqrt(16) + System.Math.Abs(-2)" scope:scope equals:6];
+  [self expectNumber:@"=Math.Round(2.5) + Math.Max(3, 7)" scope:scope equals:9];
+  [self expectNumber:@"=Math.PI" scope:scope equals:M_PI];
+  [self expectNumber:@"=Convert.ToInt32(\"2\") + Convert.ToDouble(\"1.5\")" scope:scope equals:3.5];
+  [self expectText:@"=String.Format(\"{0}...{1}\", \"a1\", \"a2\")" scope:scope equals:@"a1...a2"];
+  [self expectText:@"=String.Format(\"[{0:N2}|{1,4}|{2,-3}] {{x}}\", 1234.5, \"ab\", \"c\")"
+             scope:scope
+            equals:@"[1,234.50|  ab|c  ] {x}"];
+  [self expectNumber:@"=Financial.DDB(2400, 300, 10, 2, 1.5)" scope:scope equals:306];
+  double r = 0.08 / 12;
+  [self expectNumber:@"=Microsoft.VisualBasic.Financial.PV(0.08 / 12, 240, 500, 0, 0)"
+               scope:scope
+              equals:-500 * (1 - pow(1 + r, -240)) / r];
+  // A loan of 8000 at 10% over three years: the interest in the third payment,
+  // worked out by paying it down, and that interest and the principal together
+  // make the payment. A rate found by Rate gives back the loan it was found for.
+  double payment = 8000 * 0.1 / (1 - pow(1.1, -3));
+  double owedAfterTwo = (8000 * 1.1 - payment) * 1.1 - payment;
+  [self expectNumber:@"=Financial.IPmt(.1, 3, 3, 8000)" scope:scope equals:-owedAfterTwo * 0.1];
+  [self expectNumber:@"=Financial.IPmt(.1, 3, 3, 8000) + Financial.PPmt(.1, 3, 3, 8000)" scope:scope equals:-payment];
+  [self expectNumber:@"=Financial.IPmt(.1 / 12, 1, 36, 8000, 0, True)" scope:scope equals:0];
+  [self expectNumber:@"=Financial.PV(Financial.Rate(48, -200, 8000), 48, -200)" scope:scope equals:8000];
+  for (NSString *source in @[ @"=Fields!When.Value.AddDays(2).Month", @"=System.Math.Abs(-2) + 1",
+                              @"=Globals!ExecutionTime.Year" ])
+    if (![[RDLExpr expressionWithSource:source] parsedCompletely])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be understood to its end", source]);
+}
+
+// Half an expression is not an expression. The parser keeps what it
+// understood, because that is what the kit has always evaluated, but it now
+// says that something is missing rather than reporting the whole of "=1 +" as
+// understood -- so the checker, the expression editor and the filter panel all
+// refuse it.
+- (void)testAnUnfinishedExpressionIsNotComplete {
+  NSArray<NSString *> *unfinished = @[
+    @"=1 +",                       // nothing to add
+    @"=Fields!Amount.Value *",     // nothing to multiply by
+    @"=Sum(Fields!Amount.Value",   // the call is never closed
+    @"=(1 + 2",                    // neither is the bracket
+    @"=IIf(1 = 1, \"a\",",         // an argument short, and unclosed
+    @"=Not",                       // nothing to negate
+  ];
+  for (NSString *source in unfinished) {
+    RDLExpr *expr = [RDLExpr expressionWithSource:source];
+    if ([expr parsedCompletely] || expr.completeness != RDLExprCompletenessMissing)
+      XCTFail(@"%@ asks for something it has not got, completeness %ld", source,
+              (long)expr.completeness);
+  }
+
+  // Text left over is the other way an expression is not whole, and it is
+  // reported as its own kind, because there is something to point at.
+  RDLExpr *leftovers = [RDLExpr expressionWithSource:@"=1 2"];
+  if ([leftovers parsedCompletely] || leftovers.completeness != RDLExprCompletenessLeftovers)
+    XCTFail(@"text after the expression should read as leftovers, not %ld",
+            (long)leftovers.completeness);
+
+  // What is whole stays whole.
+  for (NSString *source in @[ @"=1 + 2", @"=Sum(Fields!Amount.Value)", @"=IIf(1 = 1, \"a\", \"b\")",
+                              @"=(1 + 2) * 3", @"=Not True", @"=-2 ^ 2" ]) {
+    RDLExpr *expr = [RDLExpr expressionWithSource:source];
+    if (![expr parsedCompletely])
+      XCTFail(@"%@ is a whole expression, read as %ld", source, (long)expr.completeness);
+  }
+
+  // And the checker says so, in the words that fit which way it is unfinished.
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=1 +", YES), @"syntax", @"not finished"))
+    XCTFail(@"%@", @"an expression that ends after an operator should be reported");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=1 2", YES), @"syntax", @"partly understood"))
+    XCTFail(@"%@", @"an expression with text left over should be reported as before");
+
+  // The reason worth naming: a single quote begins a comment in Visual Basic,
+  // so an expression that meant it as text ends at the quote -- which is what
+  // SSRS does with it, and what several reports written for other tools do.
+  RDLExpr *quoted = [RDLExpr expressionWithSource:@"=Globals!PageNumber + ' of ' + Globals!TotalPages"];
+  if ([quoted parsedCompletely])
+    XCTFail(@"%@", @"a single quote comments out the rest, so that expression is not finished");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Globals!PageNumber + ' of ' + Globals!TotalPages", YES),
+                        @"syntax", @"single quote"))
+    XCTFail(@"%@", @"the checker should say which quote ended the expression");
+}
+
+// A member no value has, or a shared one Math, Convert, String or Financial
+// does not have, is an error, and a known one given the wrong number of
+// arguments is too. Members were never checked at all.
+- (void)testDotNetMembersAreChecked {
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Fields!Region.Value.Frobnicate()", YES), @"unknown-member", @"Frobnicate"))
+    XCTFail(@"%@", @"a member no value has should be reported");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Math.Frob(1)", YES), @"unknown-member", @"Math.Frob"))
+    XCTFail(@"%@", @"a member Math does not have should be reported");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Math.Sqrt(1, 2)", YES), @"arity", @"Math.Sqrt"))
+    XCTFail(@"%@", @"Math.Sqrt with two arguments should be reported");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Fields.Region.Value", YES), @"syntax", @"Fields!Region.Value"))
+    XCTFail(@"%@", @"a field written with a dot should say how RDL writes it");
+  for (NSString *fine in @[ @"=Globals!PageNumber.Value", @"=Financial.Rate(48, -200, 8000)",
+                            @"=Math.Sqrt(Fields!Amount.Value)", @"=Fields!Region.Value.Substring(0, 2)",
+                            @"=String.Format(\"{0}\", Fields!Amount.Value)", @"=System.Convert.ToInt32(\"3\")" ]) {
+    NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(fine, YES);
+    for (NSString *rule in @[ @"unknown-member", @"syntax", @"arity", @"unknown-function" ])
+      if (RDLSawDiagnostic(ds, rule, nil))
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", fine, rule, ds]);
+  }
+}
+
+
+// A report's Code runs, in the subset of Visual Basic report helper functions
+// are written in. Code.Grade(...) used to be an empty string.
+// The lexer the Code element uses is the expression lexer, told to keep what
+// Visual Basic is written in: lines. A statement ends where its line does, so a
+// break is a token; a line ending in " _" joins the next, and REM comments out
+// the rest of one. Every token says which line it came from, which is what a
+// problem in a report's code is reported against.
+- (void)testTheCodeLexerKeepsVisualBasicsLines {
+  NSArray<RDLExprToken *> *toks = [RDLExpr codeTokensForSource:
+      @"Dim a As Integer ' first\n"
+      @"REM a whole line\n"
+      @"a = 1 + _\n"
+      @"    2\n"];
+  NSMutableArray<NSString *> *shape = [NSMutableArray array];
+  for (RDLExprToken *t in toks)
+    if (t.kind != RDLExprTokenKindTrivia)
+      [shape addObject:t.kind == RDLExprTokenKindNewline
+                          ? @"\n"
+                          : [NSString stringWithFormat:@"%@@%lu", t.text, (unsigned long)t.line]];
+  NSString *got = [shape componentsJoinedByString:@" "];
+
+  // The comment and the REM line leave nothing behind; the continuation joins
+  // lines 3 and 4 into one statement, so there is no break between them.
+  NSString *want = @"Dim@1 a@1 As@1 Integer@1 \n \n a@3 =@3 1@3 +@3 2@4 \n";
+  if (![got isEqualToString:want])
+    XCTFail(@"the code lexed as:\n  %@\nwanted:\n  %@", got, want);
+
+  // An expression is one line by construction and never sees a break, even
+  // when its source has one in it.
+  for (RDLExprToken *t in [RDLExpr tokensForSource:@"=1 +\n2"])
+    if (t.kind == RDLExprTokenKindNewline)
+      XCTFail(@"%@", @"an expression should not be given line breaks to parse");
+}
+
+// A derived scope is the same scope in another situation, so everything has to
+// come across -- asked of the class itself, because the next property somebody
+// adds to a scope is the one that would be forgotten, and forgetting one is a
+// wrong answer rather than a crash.
+- (void)testADerivedScopeCarriesEverythingAcross {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  RDLReport *report = [RDLReport emptyReportNamed:@"Derived"];
+  scope.report = report;
+  scope.row = @{@"N" : @1};
+  scope.previousRow = @{@"N" : @0};
+  scope.groupRows = @[ @{@"N" : @1} ];
+  scope.groupRowsByName = @{@"G" : @[ @{@"N" : @1} ]};
+  scope.nestedRegionRows = @[ @{@"N" : @2} ];
+  scope.variableValues = @{@"V" : @7};
+  scope.shownDuplicates = [@{@"T" : @[ @"x" ]} mutableCopy];
+  scope.activeScopes = @[ @"Jobs" ];
+  scope.recursionLevel = 2;
+  scope.recursiveRows = @[ @{@"N" : @3} ];
+  scope.rowNumber = 4;
+  scope.regionRowNumber = 5;
+  scope.pageNumber = 6;
+  scope.totalPages = 7;
+  scope.overallPageNumber = 8;
+  scope.overallTotalPages = 9;
+  scope.pageName = @"Sheet";
+  scope.executionTime = [NSDate dateWithTimeIntervalSince1970:1000];
+  scope.paramValues = @{@"P" : @"v"};
+  scope.userID = @"someone";
+  scope.language = @"en-GB";
+  scope.userLanguage = @"en-US";
+  // A frame of the report's code is internal; any one will do.
+  scope.codeFrame = [[NSClassFromString(@"RDLCodeFrame") alloc] init];
+  scope.renderFormat = RDLRenderFormatHTML;
+
+  RDLEvalScope *derived = [scope scopeBy:^(RDLEvalScope *s) { s.rowNumber = 99; }];
+  if (derived.rowNumber != 99)
+    XCTFail(@"%@", @"the change should be applied to the copy");
+  if (scope.rowNumber != 4)
+    XCTFail(@"%@", @"and not to the scope it came from");
+
+  unsigned int count = 0;
+  objc_property_t *list = class_copyPropertyList([RDLEvalScope class], &count);
+  for (unsigned int i = 0; i < count; i++) {
+    NSString *name = @(property_getName(list[i]));
+    if ([name isEqualToString:@"rowNumber"])
+      continue;  // the one the change altered
+    id mine = [scope valueForKey:name];
+    id theirs = [derived valueForKey:name];
+    if (mine != theirs && ![mine isEqual:theirs])
+      XCTFail(@"a derived scope lost %@: %@ became %@", name, mine, theirs);
+  }
+  free(list);
+
+  // What layout accumulates is shared rather than copied: a text box placed
+  // while evaluating in a derived scope is one the page header can still read.
+  derived.reportItemValues[@"Total"] = @42;
+  if (![scope.reportItemValues[@"Total"] isEqual:@42])
+    XCTFail(@"%@", @"the values layout records should be one thing, not a copy each");
+}
+
+- (void)testTheReportsCodeRuns {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Coded"];
+  r.code = @"Dim graded As Integer\n"
+           @"' A grade for a score.\n"
+           @"Function Grade(score As Object) As String\n"
+           @"    Dim n As Double = Convert.ToDouble(score)\n"
+           @"    graded += 1\n"
+           @"    If n >= 90 Then Return \"A\"\n"
+           @"    If n >= 80 Then\n"
+           @"        Return \"B\"\n"
+           @"    ElseIf n >= 70 Then\n"
+           @"        Grade = \"C\"\n"
+           @"    Else\n"
+           @"        Grade = IIf(n >= 60, \"D\", \"F\")\n"
+           @"    End If\n"
+           @"End Function\n"
+           @"Public Function Band(n As Integer) As String\n"
+           @"  Select Case n\n"
+           @"    Case Is < 0\n"
+           @"      Return \"negative\"\n"
+           @"    Case 0, 1\n"
+           @"      Return \"small\"\n"
+           @"    Case 2 To 9\n"
+           @"      Return \"medium\"\n"
+           @"    Case Else\n"
+           @"      Return \"large\"\n"
+           @"  End Select\n"
+           @"End Function\n"
+           @"Function Factorial(n As Integer) As Double\n"
+           @"  Dim total As Double = 1\n"
+           @"  For i As Integer = 2 To n\n"
+           @"    total *= i\n"
+           @"  Next\n"
+           @"  Return total\n"
+           @"End Function\n"
+           @"Function Initials(names As String) As String\n"
+           @"  Dim out As String = \"\"\n"
+           @"  For Each word In Split(names, \",\")\n"
+           @"    out &= word.Substring(0, 1).ToUpper()\n"
+           @"  Next\n"
+           @"  Return out\n"
+           @"End Function\n"
+           @"Function Halvings(n As Double) As Integer\n"
+           @"  Dim count As Integer = 0\n"
+           @"  Do While n > 1\n"
+           @"    n = n / 2\n"
+           @"    count = count + 1\n"
+           @"    If count > 100 Then Exit Do\n"
+           @"  Loop\n"
+           @"  Halvings = count\n"
+           @"End Function\n"
+           @"Function Countdown(n As Integer) As String\n"
+           @"  Dim s As String = \"\"\n"
+           @"  While True\n"
+           @"    If n = 0 Then Exit While\n"
+           @"    s = s & n\n"
+           @"    n -= 1\n"
+           @"  End While\n"
+           @"  Return s\n"
+           @"End Function\n"
+           @"Function Shout(text As String, Optional mark As String = \"!\") As String\n"
+           @"  Return UCase(text) & mark & _\n"
+           @"         Grade(95)\n"
+           @"End Function\n"
+           @"Function TimesGraded() As Integer\n"
+           @"  Return graded\n"
+           @"End Function\n";
+  if ([r.codeModule.problems count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the code should read cleanly: %@", r.codeModule.problems]);
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  [self expectText:@"=Code.Grade(95) & Code.Grade(85) & Code.Grade(72) & Code.Grade(65) & Code.Grade(10)"
+             scope:scope
+            equals:@"ABCDF"];
+  [self expectText:@"=Code.Band(-3) & \" \" & Code.Band(1) & \" \" & Code.Band(5) & \" \" & Code.Band(40)"
+             scope:scope
+            equals:@"negative small medium large"];
+  [self expectNumber:@"=Code.Factorial(5)" scope:scope equals:120];
+  [self expectText:@"=Code.Initials(\"ada,byron,lovelace\")" scope:scope equals:@"ABL"];
+  [self expectNumber:@"=Code.Halvings(10)" scope:scope equals:4];
+  [self expectText:@"=Code.Countdown(3)" scope:scope equals:@"321"];
+  [self expectText:@"=Code.Shout(\"hey\")" scope:scope equals:@"HEY!A"];
+  // Six grades so far: five asked for, and the one Shout asked for. A new render
+  // starts the module's variables afresh.
+  [self expectNumber:@"=Code.TimesGraded()" scope:scope equals:6];
+  [r.codeModule reset];
+  [self expectNumber:@"=Code.TimesGraded()" scope:scope equals:0];
+}
+
+// The report's code compiled onto the expression machine: where each Exit goes,
+// what a loop does to its counter, and what a name means -- a local once it has
+// been set, else the module's variable, else a function, else the name itself.
+// The values are the ones the statement-walking interpreter gave, which the
+// machine replaced without changing any of them.
+- (void)testTheReportsCodeKeepsItsControlFlowAndNames {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Flow"];
+  r.code = @"Dim counter As Integer\n"
+           @"Dim label = \"L\" & 1\n"
+           @"Function Down(n)\n"
+           @"  Dim s As String = \"\"\n"
+           @"  For i = n To 1 Step -2\n"
+           @"    s &= i\n"
+           @"  Next\n"
+           @"  Return s & \"|\" & i\n"
+           @"End Function\n"
+           @"Function Quarters()\n"
+           @"  Dim s = \"\"\n"
+           @"  For x As Double = 0 To 1 Step 0.25\n"
+           @"    s = s & x & \",\"\n"
+           @"  Next\n"
+           @"  Return s\n"
+           @"End Function\n"
+           @"Function WholeSteps()\n"
+           @"  Dim s = \"\"\n"
+           @"  For i As Integer = 1 To 2 Step 0.5\n"
+           @"    s &= i & \",\"\n"
+           @"  Next\n"
+           @"  Return s\n"
+           @"End Function\n"
+           @"Function MovedCounter()\n"
+           @"  Dim n = 0\n"
+           @"  For i = 1 To 10\n"
+           @"    i = i + 2\n"
+           @"    n = n + 1\n"
+           @"  Next\n"
+           @"  Return n & \"/\" & i\n"
+           @"End Function\n"
+           @"Function ExitMid(n)\n"
+           @"  Dim r = 0\n"
+           @"  For i = 1 To 10\n"
+           @"    If i > n Then Exit For\n"
+           @"    r = r + i\n"
+           @"  Next\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitForFromDo()\n"
+           @"  Dim r = 0\n"
+           @"  For i = 1 To 3\n"
+           @"    Do While True\n"
+           @"      r = r + 1\n"
+           @"      Exit For\n"
+           @"    Loop\n"
+           @"  Next\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitDoFromFor()\n"
+           @"  Dim r = 0\n"
+           @"  Do While r < 100\n"
+           @"    For i = 1 To 3\n"
+           @"      r = r + 10\n"
+           @"      Exit Do\n"
+           @"    Next\n"
+           @"  Loop\n"
+           @"  Return r\n"
+           @"End Function\n"
+           @"Function ExitForOutsideLoop()\n"
+           @"  ExitForOutsideLoop = 5\n"
+           @"  Exit For\n"
+           @"  ExitForOutsideLoop = 6\n"
+           @"End Function\n"
+           @"Function Reversed(t As String)\n"
+           @"  Dim out = \"\"\n"
+           @"  For Each c In t\n"
+           @"    out = c & out\n"
+           @"  Next\n"
+           @"  Return out\n"
+           @"End Function\n"
+           @"Function EachOne()\n"
+           @"  Dim n = 0\n"
+           @"  For Each v In 42\n"
+           @"    n = v + 1\n"
+           @"  Next\n"
+           @"  Return n\n"
+           @"End Function\n"
+           @"Function EachNothing()\n"
+           @"  Dim n = 3\n"
+           @"  For Each v In Nothing\n"
+           @"    n = 99\n"
+           @"  Next\n"
+           @"  Return n\n"
+           @"End Function\n"
+           @"Function UntilLoop(n)\n"
+           @"  Dim i = 0\n"
+           @"  Do Until i >= n\n"
+           @"    i += 1\n"
+           @"  Loop\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function WhileAtEnd(n)\n"
+           @"  Dim i = 10\n"
+           @"  Do\n"
+           @"    i += 1\n"
+           @"  Loop While i < n\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function UntilAtEnd(n)\n"
+           @"  Dim i = 0\n"
+           @"  Do\n"
+           @"    i += 2\n"
+           @"  Loop Until i >= n\n"
+           @"  Return i\n"
+           @"End Function\n"
+           @"Function NoCaseMatches(a)\n"
+           @"  NoCaseMatches = \"none\"\n"
+           @"  Select Case a\n"
+           @"    Case 1\n"
+           @"      NoCaseMatches = \"one\"\n"
+           @"  End Select\n"
+           @"End Function\n"
+           @"Function Nested(a, b)\n"
+           @"  Select Case a\n"
+           @"    Case 1\n"
+           @"      Select Case b\n"
+           @"        Case 1\n"
+           @"          Return \"11\"\n"
+           @"        Case Else\n"
+           @"          Return \"1x\"\n"
+           @"      End Select\n"
+           @"    Case Else\n"
+           @"      Return \"xx\"\n"
+           @"  End Select\n"
+           @"End Function\n"
+           @"Function Bump()\n"
+           @"  counter = counter + 1\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Shadow()\n"
+           @"  Dim counter = 100\n"
+           @"  counter = counter + 1\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function LoopOverModuleName()\n"
+           @"  For counter = 1 To 3\n"
+           @"  Next\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Relabel()\n"
+           @"  label = label & \"x\"\n"
+           @"  Return label & label.Length\n"
+           @"End Function\n"
+           @"Function Implicit()\n"
+           @"  fresh = 7\n"
+           @"  Return fresh + 1\n"
+           @"End Function\n"
+           @"Function ReadBeforeSet()\n"
+           @"  Dim r = before\n"
+           @"  before = 3\n"
+           @"  Return r & \"/\" & before\n"
+           @"End Function\n"
+           @"Function NoBrackets()\n"
+           @"  Return Bump + 0\n"
+           @"End Function\n"
+           @"Function Tripled(a, Optional b = a * 3)\n"
+           @"  Return b\n"
+           @"End Function\n"
+           @"Function BadDim()\n"
+           @"  Dim x As Integer = \"abc\"\n"
+           @"  Return 1\n"
+           @"End Function\n"
+           @"Function BadCondition()\n"
+           @"  If \"maybe\" Then\n"
+           @"    Return 1\n"
+           @"  End If\n"
+           @"  Return 2\n"
+           @"End Function\n"
+           @"Function Twice(x As Integer) As Integer\n"
+           @"  Return x * 2\n"
+           @"End Function\n"
+           @"Function BadCall()\n"
+           @"  Twice(\"nope\")\n"
+           @"  Return 1\n"
+           @"End Function\n"
+           @"Function Rounded() As Integer\n"
+           @"  Rounded = 2.6\n"
+           @"End Function\n"
+           @"Function KeptOnExit()\n"
+           @"  KeptOnExit = 9\n"
+           @"  Exit Function\n"
+           @"  KeptOnExit = 10\n"
+           @"End Function\n"
+           @"Function BareReturn()\n"
+           @"  BareReturn = 4\n"
+           @"  Return\n"
+           @"End Function\n"
+           @"Sub Add(n)\n"
+           @"  counter = counter + n\n"
+           @"  Exit Sub\n"
+           @"  counter = counter + 500\n"
+           @"End Sub\n"
+           @"Function AfterSub()\n"
+           @"  Add(1000)\n"
+           @"  Return counter\n"
+           @"End Function\n"
+           @"Function Member()\n"
+           @"  Dim w As String = \"Hello\"\n"
+           @"  Return w.Substring(1, 3) & w.Length\n"
+           @"End Function\n"
+           @"Function Forever()\n"
+           @"  Return Forever()\n"
+           @"End Function\n";
+  if ([r.codeModule.problems count])
+    XCTFail(@"the code should read cleanly: %@", r.codeModule.problems);
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+
+  // A loop's counter: worked out from the variable each time round, and what
+  // is left in it is the last value the loop gave it.
+  [self expectText:@"=Code.Down(7)" scope:scope equals:@"7531|1"];
+  [self expectText:@"=Code.Quarters()" scope:scope equals:@"0,0.25,0.5,0.75,1,"];
+  [self expectText:@"=Code.WholeSteps()" scope:scope equals:@"1,2,"];
+  [self expectText:@"=Code.MovedCounter()" scope:scope equals:@"4/12"];
+  // Exit For and Exit Do leave the innermost loop of their own kind, through
+  // any of the other kind; with none, the function.
+  [self expectNumber:@"=Code.ExitMid(3)" scope:scope equals:6];
+  [self expectNumber:@"=Code.ExitForFromDo()" scope:scope equals:1];
+  [self expectNumber:@"=Code.ExitDoFromFor()" scope:scope equals:10];
+  [self expectNumber:@"=Code.ExitForOutsideLoop()" scope:scope equals:5];
+  // For Each over a text's characters, one value, and nothing at all.
+  [self expectText:@"=Code.Reversed(\"abc\")" scope:scope equals:@"cba"];
+  [self expectNumber:@"=Code.EachOne()" scope:scope equals:43];
+  [self expectNumber:@"=Code.EachNothing()" scope:scope equals:3];
+  // Conditions at the top and at the bottom: the bottom one runs the body once
+  // whatever it says.
+  [self expectNumber:@"=Code.UntilLoop(4)" scope:scope equals:4];
+  [self expectNumber:@"=Code.WhileAtEnd(5)" scope:scope equals:11];
+  [self expectNumber:@"=Code.WhileAtEnd(15)" scope:scope equals:15];
+  [self expectNumber:@"=Code.UntilAtEnd(5)" scope:scope equals:6];
+  [self expectText:@"=Code.NoCaseMatches(2) & Code.NoCaseMatches(1)" scope:scope equals:@"noneone"];
+  [self expectText:@"=Code.Nested(1, 1) & Code.Nested(1, 2) & Code.Nested(2, 1)" scope:scope equals:@"111xxx"];
+
+  // Names. A local hides the module's variable; a For over an unset name
+  // declares a local rather than counting with the module's.
+  [self expectNumber:@"=Code.Bump()" scope:scope equals:1];
+  [self expectNumber:@"=Code.Shadow()" scope:scope equals:101];
+  [self expectNumber:@"=Code.LoopOverModuleName()" scope:scope equals:3];
+  [self expectNumber:@"=Code.Bump()" scope:scope equals:2];
+  // Assigning to a module's variable changes it, and a member of it is read.
+  [self expectText:@"=Code.Relabel()" scope:scope equals:@"L1x3"];
+  [self expectText:@"=Code.Relabel()" scope:scope equals:@"L1xx4"];
+  // A name assigned without Dim is a local; read before it is set, it is only
+  // its own name.
+  [self expectNumber:@"=Code.Implicit()" scope:scope equals:8];
+  [self expectText:@"=Code.ReadBeforeSet()" scope:scope equals:@"before/3"];
+  // A function named without brackets is called.
+  [self expectNumber:@"=Code.NoBrackets()" scope:scope equals:3];
+  [self expectNumber:@"=Code.Tripled(2)" scope:scope equals:6];
+
+  // Where VB would throw, the function ends with the error.
+  for (NSString *failing in @[ @"=Code.BadDim()", @"=Code.BadCondition()", @"=Code.BadCall()" ])
+    if (![[RDLExpression evaluate:failing scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@ should be #Error", failing);
+
+  // What a function gives back: its own name converted to its type, unless a
+  // Return said otherwise.
+  [self expectNumber:@"=Code.Rounded()" scope:scope equals:3];
+  [self expectNumber:@"=Code.KeptOnExit()" scope:scope equals:9];
+  [self expectNumber:@"=Code.BareReturn()" scope:scope equals:4];
+  [self expectNumber:@"=Code.AfterSub()" scope:scope equals:1003];
+  [self expectText:@"=Code.Member()" scope:scope equals:@"ell5"];
+  // Calls nest only so deep, and then give up rather than overflow.
+  if ([RDLExpression evaluate:@"=Code.Forever()" scope:scope] != nil)
+    XCTFail(@"%@", @"a call nested too deep should come to Nothing");
+}
+
+// What the code is written in beyond the subset is reported with its line, and
+// a call into the code is checked against the functions it defines. Neither
+// was checked: Code.Anything(...) passed.
+- (void)testTheReportsCodeIsChecked {
+  RDLReport *r = RDLCheckableReport();
+  r.code = @"Function Twice(n As Double) As Double\n"
+           @"  Return n * 2\n"
+           @"End Function\n"
+           @"Function Risky(n As Double) As Double\n"
+           @"  Try\n"
+           @"    Return 1 / n\n"
+           @"  End Try\n"
+           @"End Function\n";
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"T";
+  tb.width = 2;
+  tb.height = 0.3;
+  tb.value = @"=Code.Twice(1, 2) & Code.Missing(1) & Code.Twice(3)";
+  [r.body.items addObject:tb];
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:r];
+  if (!RDLSawDiagnostic(ds, @"code", @"line 5"))
+    XCTFail(@"%@", [NSString stringWithFormat:@"Try on line 5 is outside the subset: %@", ds]);
+  if (!RDLSawDiagnostic(ds, @"arity", @"Code.Twice"))
+    XCTFail(@"%@", @"Code.Twice given two arguments should be reported");
+  if (!RDLSawDiagnostic(ds, @"unknown-member", @"Missing"))
+    XCTFail(@"%@", @"a function the code does not define should be reported");
+}
+
+
+// VB's literals, each in the type VB gives it: a whole number is an Integer, or
+// a Long when it is too large; a fraction or an exponent makes a Double; a type
+// character says otherwise, D exactly; &H, &O and &B are Integers, &HFFFFFFFF
+// being -1; and #1/31/2020# is a date. 1E3 used to read as 1, the based and
+// date literals were not understood at all, and every number was a Double.
+- (void)testLiteralsHaveVBsTypes {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  NSArray<NSArray *> *cases = @[
+    @[ @"=42", @42, @(RDLNumericTypeInteger) ],
+    @[ @"=2147483648", @2147483648LL, @(RDLNumericTypeLong) ],
+    @[ @"=1_000_000", @1000000, @(RDLNumericTypeInteger) ],
+    @[ @"=2.5", @2.5, @(RDLNumericTypeDouble) ],
+    @[ @"=1E3", @1000, @(RDLNumericTypeDouble) ],
+    @[ @"=2.5e-1", @0.25, @(RDLNumericTypeDouble) ],
+    @[ @"=7S", @7, @(RDLNumericTypeShort) ],
+    @[ @"=7%", @7, @(RDLNumericTypeInteger) ],
+    @[ @"=7L", @7, @(RDLNumericTypeLong) ],
+    @[ @"=7&", @7, @(RDLNumericTypeLong) ],
+    @[ @"=1.25D", @1.25, @(RDLNumericTypeDecimal) ],
+    @[ @"=1.25@", @1.25, @(RDLNumericTypeDecimal) ],
+    @[ @"=1.5F", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=1.5!", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=3R", @3, @(RDLNumericTypeDouble) ],
+    @[ @"=3#", @3, @(RDLNumericTypeDouble) ],
+    @[ @"=&HFF", @255, @(RDLNumericTypeInteger) ],
+    @[ @"=&O17", @15, @(RDLNumericTypeInteger) ],
+    @[ @"=&B101", @5, @(RDLNumericTypeInteger) ],
+    @[ @"=&HFFFFFFFF", @-1, @(RDLNumericTypeInteger) ],
+    @[ @"=&H1_0000_0000", @4294967296LL, @(RDLNumericTypeLong) ],
+  ];
+  for (NSArray *c in cases) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 || RDLNumericTypeOfValue(value) != [c[2] integerValue] ||
+        ![[RDLExpr expressionWithSource:c[0]] parsedCompletely])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
+  }
+  if (![[RDLExpression evaluate:@"=0.1D" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.1"]])
+    XCTFail(@"%@", @"0.1D should be exactly a tenth");
+
+  NSCalendar *cal = [NSCalendar currentCalendar];
+  NSDateComponents *day = [[NSDateComponents alloc] init];
+  day.year = 2020;
+  day.month = 1;
+  day.day = 31;
+  NSDate *want = [cal dateFromComponents:day];
+  for (NSString *source in @[ @"=#1/31/2020#", @"=#2020-01-31#", @"=# 1/31/2020 #" ])
+    if (![[RDLExpression evaluate:source scope:scope] isEqual:want])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want %@", source, [RDLExpression evaluate:source scope:scope], want]);
+  id afternoon = [RDLExpression evaluate:@"=#1/31/2020 1:15:30 PM#" scope:scope];
+  id clock = [RDLExpression evaluate:@"=#13:15:30#" scope:scope];
+  if (![afternoon isKindOfClass:[NSDate class]] || ![clock isKindOfClass:[NSDate class]]) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"the times should be dates: %@ and %@", afternoon, clock]);
+  } else {
+    NSDateComponents *a = [cal components:NSYearCalendarUnit | NSHourCalendarUnit | NSMinuteCalendarUnit fromDate:afternoon];
+    NSDateComponents *b = [cal components:NSYearCalendarUnit | NSHourCalendarUnit | NSSecondCalendarUnit fromDate:clock];
+    if (a.year != 2020 || a.hour != 13 || a.minute != 15 || b.year != 1 || b.hour != 13 || b.second != 30)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the times: %@ and %@", afternoon, clock]);
+  }
+  [self expectNumber:@"=Year(#3/1/2024#) + 1E3 + &H10" scope:scope equals:2024 + 1000 + 16];
+  [self expectTrue:@"=#1/31/2020# < #2/1/2020#" scope:scope];
+
+  NSArray<RDLExprToken *> *tokens = [RDLExpr tokensForSource:@"=#1/31/2020# + 1.5D"];
+  NSMutableArray<NSString *> *kinds = [NSMutableArray array];
+  for (RDLExprToken *t in tokens)
+    if (t.kind != RDLExprTokenKindTrivia)
+      [kinds addObject:[NSString stringWithFormat:@"%@:%ld", t.text, (long)t.kind]];
+  NSArray *wantKinds = @[ [NSString stringWithFormat:@"=:%ld", (long)RDLExprTokenKindPunctuation],
+                          [NSString stringWithFormat:@"#1/31/2020#:%ld", (long)RDLExprTokenKindNumber],
+                          [NSString stringWithFormat:@"+:%ld", (long)RDLExprTokenKindOperator],
+                          [NSString stringWithFormat:@"1.5D:%ld", (long)RDLExprTokenKindNumber] ];
+  if (![kinds isEqualToArray:wantKinds])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the literals are one token each: %@", kinds]);
+
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=#1/31/2020# * 2", YES), @"type", nil))
+    XCTFail(@"%@", @"a date literal is a date to the checker, and multiplying one is reported");
+  NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(@"=IIf(#1/31/2020# < Now(), 1E3, &HFF)", YES);
+  for (NSString *rule in @[ @"syntax", @"type" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"the literals should raise no %@: %@", rule, ds]);
+}
+
+
+// VB's operators, each result in the type VB gives it: the wider of the two
+// operand types, / a Double for whole numbers and \ a whole number for
+// anything, ^ always a Double; True is -1; text that reads as a number adds as a
+// Double, and two pieces of text join; And, Or, Xor and Not work bit by bit on
+// numbers; Decimal is exact. Every result used to be a Double, True was 1,
+// "1" + "2" was 3, and 6 And 3 was True.
+- (void)testOperatorsFollowVBsTypes {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSArray<NSArray *> *cases = @[
+    @[ @"=2 + 3", @5, @(RDLNumericTypeInteger) ],
+    @[ @"=2S + 3S", @5, @(RDLNumericTypeShort) ],
+    @[ @"=2S * 3", @6, @(RDLNumericTypeInteger) ],
+    @[ @"=2 - 3L", @-1, @(RDLNumericTypeLong) ],
+    @[ @"=2 + 0.5D", @2.5, @(RDLNumericTypeDecimal) ],
+    @[ @"=1.5F + 1", @2.5, @(RDLNumericTypeSingle) ],
+    @[ @"=1.5F + 1R", @2.5, @(RDLNumericTypeDouble) ],
+    @[ @"=7 / 2", @3.5, @(RDLNumericTypeDouble) ],
+    @[ @"=7D / 2", @3.5, @(RDLNumericTypeDecimal) ],
+    @[ @"=7 \\ 2", @3, @(RDLNumericTypeInteger) ],
+    @[ @"=7.5 \\ 2", @4, @(RDLNumericTypeLong) ],
+    @[ @"=-7 Mod 3", @-1, @(RDLNumericTypeInteger) ],
+    @[ @"=7.5 Mod 2", @1.5, @(RDLNumericTypeDouble) ],
+    @[ @"=-7.5D Mod 2", @-1.5, @(RDLNumericTypeDecimal) ],
+    @[ @"=2 ^ 3", @8, @(RDLNumericTypeDouble) ],
+    @[ @"=-(5S)", @-5, @(RDLNumericTypeShort) ],
+    @[ @"=True + 1", @0, @(RDLNumericTypeInteger) ],
+    @[ @"=\"5\" + 1", @6, @(RDLNumericTypeDouble) ],
+    @[ @"=6 And 3", @2, @(RDLNumericTypeInteger) ],
+    @[ @"=6 Or 3", @7, @(RDLNumericTypeInteger) ],
+    @[ @"=6 Xor 3", @5, @(RDLNumericTypeInteger) ],
+    @[ @"=Not 5", @-6, @(RDLNumericTypeInteger) ],
+  ];
+  for (NSArray *c in cases) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 || RDLNumericTypeOfValue(value) != [c[2] integerValue])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
+  }
+  if (![[RDLExpression evaluate:@"=0.1D + 0.2D" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.3"]])
+    XCTFail(@"%@", @"0.1D + 0.2D should be exactly 0.3");
+  [self expectText:@"=\"1\" + \"2\"" scope:scope equals:@"12"];
+  [self expectText:@"=\"a\" & 1 & True" scope:scope equals:@"a1True"];
+  [self expectTrue:@"=5 = 5.0" scope:scope];
+  [self expectTrue:@"=(True And False) = False" scope:scope];
+  [self expectText:@"=1 / 0" scope:scope equals:@"Infinity"];
+  [self expectText:@"=-1 / 0" scope:scope equals:@"-Infinity"];
+  [self expectText:@"=0 / 0" scope:scope equals:@"NaN"];
+}
+
+// Where VB throws -- whole-number overflow, a whole number or a Decimal divided
+// by zero, text used as a number that is not one -- the expression is #Error,
+// and anything given that error gives it back. Each of these used to come to
+// a number: 1 \ 0 was 0, 2147483647 + 1 was 2147483648, "a" + 1 was "a1".
+- (void)testWhereVBThrowsTheExpressionIsAnError {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  for (NSString *source in @[
+         @"=1 \\ 0", @"=5 Mod 0", @"=1D / 0", @"=2147483647 + 1", @"=32767S + 1S", @"=9223372036854775807 + 1",
+         @"=-(-2147483647 - 1)", @"=\"a\" + 1", @"=\"abc\" * 2", @"=\"abc\" = 5", @"=Len(1 \\ 0)",
+         @"=IIf(1 \\ 0 > 1, \"a\", \"b\")", @"=\"x\" & (1 \\ 0)", @"=(1 \\ 0).ToString()", @"=Math.Abs(1 \\ 0)"
+       ]) {
+    id value = [RDLExpression evaluate:source scope:scope];
+    if (![value isKindOfClass:[RDLExprError class]] || ![[RDLExpression evaluateText:source scope:scope] isEqualToString:@"#Error"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, value]);
+  }
+  // IIf works out both branches before choosing, as SSRS does, so an error in
+  // the one not taken is still the result.
+  if (![[RDLExpression evaluate:@"=IIf(True, \"fine\", 1 \\ 0)" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"an error in the branch IIf does not take should still be the result");
+}
+
+// VB's conversions give the type they name: CInt an Integer, rounded to even;
+// CByte, CUShort and the rest in the type that holds their range; CDec
+// exactly, a Double at .NET's 15 digits. Convert's members follow .NET, where
+// True is 1. Int, Fix and Abs keep their argument's type, and a Double is
+// written as .NET Framework writes one. Every conversion used to be a Double,
+// CStr(0.1 + 0.2) was 0.30000000000000004, and Sqrt(-1) was 0.
+- (void)testConversionsGiveVBsTypes {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSArray<NSArray *> *cases = @[
+    @[ @"=CInt(2.5)", @2, @(RDLNumericTypeInteger) ],
+    @[ @"=CInt(3.5)", @4, @(RDLNumericTypeInteger) ],
+    @[ @"=CInt(\"7.5\")", @8, @(RDLNumericTypeInteger) ],
+    @[ @"=CInt(True)", @-1, @(RDLNumericTypeInteger) ],
+    @[ @"=CInt(-2.5D)", @-2, @(RDLNumericTypeInteger) ],
+    @[ @"=CInt(2147483647.4)", @2147483647, @(RDLNumericTypeInteger) ],
+    @[ @"=CShort(12)", @12, @(RDLNumericTypeShort) ],
+    @[ @"=CByte(200)", @200, @(RDLNumericTypeShort) ],
+    @[ @"=CByte(True)", @255, @(RDLNumericTypeShort) ],
+    @[ @"=CUShort(True)", @65535, @(RDLNumericTypeInteger) ],
+    @[ @"=CLng(2147483648D)", @2147483648, @(RDLNumericTypeLong) ],
+    @[ @"=CUInt(4000000000)", @4000000000, @(RDLNumericTypeLong) ],
+    @[ @"=CULng(1)", @1, @(RDLNumericTypeDecimal) ],
+    @[ @"=CDbl(7)", @7, @(RDLNumericTypeDouble) ],
+    @[ @"=CSng(1.5)", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=CDec(\"1.25\")", @1.25, @(RDLNumericTypeDecimal) ],
+    @[ @"=Val(\"12abc\")", @12, @(RDLNumericTypeDouble) ],
+    @[ @"=Convert.ToInt32(True)", @1, @(RDLNumericTypeInteger) ],
+    @[ @"=Convert.ToInt32(\" 42 \")", @42, @(RDLNumericTypeInteger) ],
+    @[ @"=Convert.ToInt32(2.5)", @2, @(RDLNumericTypeInteger) ],
+    @[ @"=Convert.ToInt16(7)", @7, @(RDLNumericTypeShort) ],
+    @[ @"=Int(-2.7)", @-3, @(RDLNumericTypeDouble) ],
+    @[ @"=Fix(-2.7)", @-2, @(RDLNumericTypeDouble) ],
+    @[ @"=Int(-2.5D)", @-3, @(RDLNumericTypeDecimal) ],
+    @[ @"=Fix(-2.5D)", @-2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Int(2.5D)", @2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Int(7S)", @7, @(RDLNumericTypeShort) ],
+    @[ @"=Abs(-5)", @5, @(RDLNumericTypeInteger) ],
+    @[ @"=Abs(-1.5F)", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=Math.Abs(-5L)", @5, @(RDLNumericTypeLong) ],
+    @[ @"=Abs(-2.5D)", @2.5, @(RDLNumericTypeDecimal) ],
+    @[ @"=Math.Log(8, 2)", @3, @(RDLNumericTypeDouble) ],
+  ];
+  for (NSArray *c in cases) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 || RDLNumericTypeOfValue(value) != [c[2] integerValue])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
+  }
+  if (![[RDLExpression evaluate:@"=CDec(0.1 + 0.2)" scope:scope] isEqual:[RDLNumber decimalWithText:@"0.3"]])
+    XCTFail(@"%@", @"CDec(0.1 + 0.2) should be exactly 0.3, a Double taken at 15 digits");
+  NSDictionary<NSString *, NSString *> *texts = @{
+    @"=CStr(0.1 + 0.2)" : @"0.3",
+    @"=CStr(1 / 3)" : @"0.333333333333333",
+    @"=CStr(1E+15)" : @"1E+15",
+    @"=CStr(2.5E+20)" : @"2.5E+20",
+    @"=CStr(123456789012345.6)" : @"123456789012346",
+    @"=CStr(0.0001)" : @"0.0001",
+    @"=CStr(0.00001)" : @"1E-05",
+    @"=CStr(-0.5)" : @"-0.5",
+    @"=CStr(100.0)" : @"100",
+    @"=CStr(1.1F)" : @"1.1",
+    @"=CStr(CULng(18446744073709551615D))" : @"18446744073709551615",
+    @"=Sqrt(-1)" : @"NaN",
+    @"=Log(0)" : @"-Infinity",
+    @"=Math.Log(2, 1)" : @"NaN",
+  };
+  for (NSString *source in texts)
+    [self expectText:source scope:scope equals:texts[source]];
+  [self expectNumber:@"=Year(CDate(\"January 5, 2020\"))" scope:scope equals:2020];
+  [self expectNumber:@"=Hour(CDate(\"1/31/2020 3:15 PM\"))" scope:scope equals:15];
+  [self expectNumber:@"=Year(CDate(Nothing))" scope:scope equals:1];
+  [self expectTrue:@"=IsDate(\"January 5, 2020\")" scope:scope];
+  [self expectTrue:@"=Not IsDate(\"soon\")" scope:scope];
+  NSString *checked = @"=CShort(1) + CSByte(2) + CULng(3) + Convert.ToUInt16(4)";
+  NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(checked, YES);
+  for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", checked, rule, ds]);
+}
+
+// Where a conversion throws -- a value outside the type, text that writes no
+// number or no date, a date made a number, whole-number text Convert cannot
+// read -- the expression is #Error, as is an aggregate over an error. CInt
+// of text that was not a number used to be 0, CByte(-1) was -1, CDate of
+// anything unreadable was the time the report ran, and Sum over 1 \ 0 was 0.
+- (void)testWhereAConversionFailsTheExpressionIsAnError {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSArray<NSString *> *failing = @[
+    @"=CInt(\"abc\")", @"=CInt(2147483647.5)", @"=CInt(-2147483649)", @"=CShort(40000)", @"=CByte(-1)",
+    @"=CByte(256)", @"=CLng(1E+19)", @"=CULng(-1)", @"=CDec(1E+30)", @"=CDbl(\"abc\")", @"=CDec(\"x\")",
+    @"=CInt(#1/31/2020#)", @"=CInt(0 / 0)", @"=Convert.ToInt32(\"2.5\")", @"=Convert.ToDouble(\"abc\")",
+    @"=CDate(\"not a date\")", @"=CDate(True)", @"=Int(\"abc\")", @"=Sqrt(\"abc\")", @"=Log(2, \"x\")",
+    @"=Abs(-2147483647 - 1)"
+  ];
+  RDLReport *r = RDLSalesWithRenamedColumns();
+  RDLEvalScope *rows = [[RDLEvalScope alloc] init];
+  rows.report = r;
+  rows.dataSet = [r dataSetNamed:@"Sales"];
+  NSArray<NSString *> *failingOverRows = @[
+    @"=Sum(Fields!Amount.Value \\ 0)", @"=Max(CInt(\"x\"))", @"=Count(1 \\ 0)", @"=CountDistinct(1 \\ 0)",
+    @"=RunningValue(1 \\ 0, \"Sum\")"
+  ];
+  for (NSString *source in [failing arrayByAddingObjectsFromArray:failingOverRows]) {
+    RDLEvalScope *s = [failingOverRows containsObject:source] ? rows : scope;
+    id value = [RDLExpression evaluate:source scope:s];
+    if (![value isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, value]);
+  }
+  [self expectNumber:@"=Sum(Fields!Amount.Value \\ 1)" scope:rows equals:205];
+}
+
+// A field's values are in the type the report declares for it -- the text
+// "12" in an Integer field is an Integer, a Decimal field is exact, text that
+// is not a number is #Error -- and Sum, Avg and the counts give VB's types over
+// them: Sum keeps its values' type, going on as a Decimal where a whole-number
+// total outgrows it; Avg skips Nothing; Count is an Integer. Parameters and
+// the report code's As types are converted the same way. Every field value used
+// to be whatever the data held, every aggregate and parameter a Double, and
+// Avg counted Nothing as 0.
+- (void)testDataIsInTheTypeTheReportDeclares {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Typed"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Typed";
+  NSArray<NSArray *> *declared = @[
+    @[ @"Small", @(RDLFieldDataTypeShort) ], @[ @"Tally", @(RDLFieldDataTypeInteger) ],
+    @[ @"Big", @(RDLFieldDataTypeLong) ], @[ @"Ratio", @(RDLFieldDataTypeSingle) ],
+    @[ @"Measure", @(RDLFieldDataTypeFloat) ], @[ @"Price", @(RDLFieldDataTypeDecimal) ],
+    @[ @"Broken", @(RDLFieldDataTypeInteger) ], @[ @"Free", @(RDLFieldDataTypeUnknown) ]
+  ];
+  NSMutableArray *fields = [NSMutableArray array];
+  for (NSArray *d in declared) {
+    RDLField *f = [[RDLField alloc] init];
+    f.name = d[0];
+    f.dataField = d[0];
+    f.dataType = (RDLFieldDataType)[d[1] integerValue];
+    [fields addObject:f];
+  }
+  ds.fields = fields;
+  ds.rows = @[
+    @{ @"Small" : @"12", @"Tally" : @2000000000, @"Big" : @"3000000000", @"Ratio" : @"1.5", @"Measure" : @2,
+       @"Price" : @"0.1", @"Broken" : @"abc", @"Free" : @"7" },
+    @{ @"Small" : @3, @"Tally" : @2000000000, @"Big" : @1, @"Ratio" : @0.5, @"Measure" : @3.5, @"Price" : @0.2 },
+    @{ @"Small" : [NSNull null], @"Tally" : @1, @"Big" : @2, @"Ratio" : @1, @"Measure" : @1 },
+  ];
+  [r.dataSets addObject:ds];
+  RDLParameter *copies = [[RDLParameter alloc] init];
+  copies.name = @"Copies";
+  copies.dataType = RDLParameterDataTypeInteger;
+  RDLParameter *rate = [[RDLParameter alloc] init];
+  rate.name = @"Rate";
+  rate.dataType = RDLParameterDataTypeFloat;
+  [r.parameters addObjectsFromArray:@[ copies, rate ]];
+  r.code = @"Function Whole(x As Double) As Integer\n  Return x\nEnd Function\n"
+           @"Function Exact() As Decimal\n  Dim a As Decimal = 0.1D\n  Return a + 0.2D\nEnd Function\n"
+           @"Function Small(n As Integer) As Byte\n  Return n\nEnd Function\n"
+           @"Function Tally() As Long\n  Dim total As Long\n  For i As Integer = 1 To 3\n    total += i\n  Next\n  Return total\nEnd Function\n";
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  scope.report = r;
+  scope.dataSet = ds;
+  scope.row = ds.rows[0];
+  scope.paramValues = @{ @"Copies" : @"7", @"Rate" : @"2.5" };
+  NSArray<NSArray *> *cases = @[
+    @[ @"=Fields!Small.Value", @12, @(RDLNumericTypeShort) ],
+    @[ @"=Fields!Tally.Value", @2000000000, @(RDLNumericTypeInteger) ],
+    @[ @"=Fields!Big.Value", @3000000000, @(RDLNumericTypeLong) ],
+    @[ @"=Fields!Ratio.Value", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=Fields!Measure.Value", @2, @(RDLNumericTypeDouble) ],
+    @[ @"=Fields!Price.Value", @0.1, @(RDLNumericTypeDecimal) ],
+    @[ @"=Sum(Fields!Small.Value)", @15, @(RDLNumericTypeShort) ],
+    @[ @"=Sum(Fields!Tally.Value)", @4000000001, @(RDLNumericTypeDecimal) ],
+    @[ @"=Sum(Fields!Big.Value)", @3000000003, @(RDLNumericTypeLong) ],
+    @[ @"=Sum(Fields!Ratio.Value)", @3, @(RDLNumericTypeSingle) ],
+    @[ @"=Sum(Fields!Measure.Value)", @6.5, @(RDLNumericTypeDouble) ],
+    @[ @"=Avg(Fields!Small.Value)", @7.5, @(RDLNumericTypeDouble) ],
+    @[ @"=Avg(Fields!Price.Value)", @0.15, @(RDLNumericTypeDecimal) ],
+    @[ @"=Count(Fields!Small.Value)", @2, @(RDLNumericTypeInteger) ],
+    @[ @"=CountRows()", @3, @(RDLNumericTypeInteger) ],
+    @[ @"=CountDistinct(Fields!Big.Value)", @3, @(RDLNumericTypeInteger) ],
+    @[ @"=Parameters!Copies.Value", @7, @(RDLNumericTypeInteger) ],
+    @[ @"=Parameters!Rate.Value", @2.5, @(RDLNumericTypeDouble) ],
+    @[ @"=Parameters!Copies.Value \\ 2", @3, @(RDLNumericTypeInteger) ],
+    @[ @"=Code.Whole(2.5)", @2, @(RDLNumericTypeInteger) ],
+    @[ @"=Code.Small(200)", @200, @(RDLNumericTypeShort) ],
+    @[ @"=Code.Tally()", @6, @(RDLNumericTypeLong) ],
+  ];
+  for (NSArray *c in cases) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-6 ||
+        RDLNumericTypeOfValue(value) != [c[2] integerValue])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
+  }
+  RDLNumber *third = [RDLNumber decimalWithText:@"0.3"];
+  if (![[RDLExpression evaluate:@"=Sum(Fields!Price.Value)" scope:scope] isEqual:third])
+    XCTFail(@"%@", @"a Decimal field's 0.1 and 0.2 should total exactly 0.3");
+  if (![[RDLExpression evaluate:@"=Code.Exact()" scope:scope] isEqual:third])
+    XCTFail(@"%@", @"a Decimal in the report's code should be exact");
+  if (![[RDLExpression evaluate:@"=Fields!Free.Value" scope:scope] isEqual:@"7"])
+    XCTFail(@"%@", @"a field declared no type should be as the data has it");
+  scope.row = ds.rows[1];
+  [self expectNumber:@"=RunningValue(Fields!Measure.Value, \"Sum\")" scope:scope equals:5.5];
+  if (RDLNumericTypeOfValue([RDLExpression evaluate:@"=RunningValue(Fields!Small.Value, \"Count\")" scope:scope]) !=
+      RDLNumericTypeInteger)
+    XCTFail(@"%@", @"a running count should be an Integer");
+  scope.row = ds.rows[0];
+  for (NSString *source in @[ @"=Fields!Broken.Value", @"=Sum(Fields!Broken.Value)", @"=Code.Small(300)" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be #Error", source]);
+  scope.paramValues = @{ @"Copies" : @"many" };
+  if (![[RDLExpression evaluate:@"=Parameters!Copies.Value" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"an Integer parameter that is not a number should be #Error");
+}
+
+// In the report's code, what VB would throw stops the function, and its result
+// is #Error: an If whose condition overflowed takes no branch, and a Dim that
+// does not fit its type ends there. The error used to read as True.
+- (void)testAnErrorInTheReportsCodeEndsTheFunction {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Failing"];
+  r.code = @"Function Sized(n As Integer) As String\n  If n * 100000 > 5 Then\n    Return \"big\"\n  End If\n"
+           @"  Return \"small\"\nEnd Function\n"
+           @"Function Stored() As String\n  Dim b As Byte = 300\n  Return \"kept\"\nEnd Function\n"
+           @"Function Counted() As String\n  Dim i As Integer = 0\n  Do While i \\ 0 < 3\n    i += 1\n  Loop\n"
+           @"  Return \"looped\"\nEnd Function\n";
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  [self expectText:@"=Code.Sized(1)" scope:scope equals:@"big"];
+  for (NSString *source in @[ @"=Code.Sized(100000)", @"=Code.Stored()", @"=Code.Counted()" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source,
+                                                [RDLExpression evaluate:source scope:scope]]);
+}
+
+// The .NET type a field is declared in, with or without System., keeps its
+// size -- Int64 is Long, Single is Single -- and the data's own numbers are
+// Long when a whole number will not fit an Integer. Int16, Int64 and Single
+// all used to be read as Integer or Float, and written back that way.
+- (void)testAFieldsTypeKeepsItsSize {
+  NSDictionary<NSString *, NSNumber *> *names = @{
+    @"System.Int16" : @(RDLFieldDataTypeShort), @"System.Byte" : @(RDLFieldDataTypeShort),
+    @"System.Int32" : @(RDLFieldDataTypeInteger), @"System.Int64" : @(RDLFieldDataTypeLong),
+    @"System.UInt32" : @(RDLFieldDataTypeLong), @"System.Single" : @(RDLFieldDataTypeSingle),
+    @"System.Double" : @(RDLFieldDataTypeFloat), @"System.Decimal" : @(RDLFieldDataTypeDecimal),
+    @"Long" : @(RDLFieldDataTypeLong), @"Single" : @(RDLFieldDataTypeSingle)
+  };
+  for (NSString *name in names)
+    if (RDLFieldDataTypeFromString(name) != (RDLFieldDataType)[names[name] integerValue])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ read as %ld", name, (long)RDLFieldDataTypeFromString(name)]);
+  for (RDLFieldDataType t = RDLFieldDataTypeBoolean; t <= RDLFieldDataTypeString; t++)
+    if (RDLFieldDataTypeFromString(RDLStringFromFieldDataType(t)) != t)
+      XCTFail(@"%@", [NSString stringWithFormat:@"type %ld does not come back as itself", (long)t]);
+  if (RDLInferredFieldType(@[ @{@"N" : @1}, @{@"N" : @3000000000} ], @"N") != RDLFieldDataTypeLong)
+    XCTFail(@"%@", @"a column with a whole number past Integer's range should be Long");
+  if (RDLInferredFieldType(@[ @{@"N" : @1}, @{@"N" : @2} ], @"N") != RDLFieldDataTypeInteger)
+    XCTFail(@"%@", @"small whole numbers should be Integer");
+  if (RDLInferredFieldType(@[ @{@"N" : @3000000000}, @{@"N" : @2.5} ], @"N") != RDLFieldDataTypeFloat)
+    XCTFail(@"%@", @"a fraction among them should make the column Float");
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=Year(Fields!Units.Value)", YES), @"type", nil))
+    XCTFail(@"%@", @"a Long field is a number to the checker, and Year of one is reported");
+}
+
+// Math's members give the type .NET's overload for their argument gives:
+// Round, Floor, Ceiling and Truncate a Decimal for a whole number or a Decimal
+// and a Double otherwise; Sign an Integer; Max and Min the wider type. Round
+// takes MidpointRounding, and refuses digits .NET refuses. Each of these used
+// to be a Double, Round(2.675D, 2) was 2.67 or 2.68 as the binary fell, and
+// MidpointRounding.AwayFromZero was not known at all.
+- (void)testMathFollowsDotNetsOverloads {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSArray<NSArray *> *cases = @[
+    @[ @"=Round(2.5)", @2, @(RDLNumericTypeDouble) ],
+    @[ @"=Round(5)", @5, @(RDLNumericTypeDecimal) ],
+    @[ @"=Round(2.5D)", @2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Round(1.5F)", @2, @(RDLNumericTypeDouble) ],
+    @[ @"=Round(2.5, MidpointRounding.AwayFromZero)", @3, @(RDLNumericTypeDouble) ],
+    @[ @"=Math.Round(-2.5D, MidpointRounding.AwayFromZero)", @-3, @(RDLNumericTypeDecimal) ],
+    @[ @"=Math.Round(1.25, 1, MidpointRounding.AwayFromZero)", @1.3, @(RDLNumericTypeDouble) ],
+    @[ @"=Math.Round(1.25, 1)", @1.2, @(RDLNumericTypeDouble) ],
+    @[ @"=System.Math.Round(2.5D, 0, MidpointRounding.ToEven)", @2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Sign(-4)", @-1, @(RDLNumericTypeInteger) ],
+    @[ @"=Sign(2.5D)", @1, @(RDLNumericTypeInteger) ],
+    @[ @"=Sign(0.0)", @0, @(RDLNumericTypeInteger) ],
+    @[ @"=Math.Sign(-3L)", @-1, @(RDLNumericTypeInteger) ],
+    @[ @"=Floor(1.9)", @1, @(RDLNumericTypeDouble) ],
+    @[ @"=Floor(-1.5D)", @-2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Ceiling(7)", @7, @(RDLNumericTypeDecimal) ],
+    @[ @"=Ceiling(-1.5D)", @-1, @(RDLNumericTypeDecimal) ],
+    @[ @"=Ceiling(1.1F)", @2, @(RDLNumericTypeDouble) ],
+    @[ @"=Math.Truncate(-2.7)", @-2, @(RDLNumericTypeDouble) ],
+    @[ @"=Math.Truncate(-2.7D)", @-2, @(RDLNumericTypeDecimal) ],
+    @[ @"=Math.Max(3, 7)", @7, @(RDLNumericTypeInteger) ],
+    @[ @"=Math.Max(2S, 3S)", @3, @(RDLNumericTypeShort) ],
+    @[ @"=Math.Min(2, 3L)", @2, @(RDLNumericTypeLong) ],
+    @[ @"=Math.Max(1, 2.5D)", @2.5, @(RDLNumericTypeDecimal) ],
+    @[ @"=Math.Min(1.5F, 2)", @1.5, @(RDLNumericTypeSingle) ],
+    @[ @"=Math.Max(1, 2.5)", @2.5, @(RDLNumericTypeDouble) ],
+    @[ @"=Pow(2, 3)", @8, @(RDLNumericTypeDouble) ],
+    @[ @"=Math.Atan2(0, 1)", @0, @(RDLNumericTypeDouble) ],
+  ];
+  for (NSArray *c in cases) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [c[1] doubleValue]) > 1e-9 ||
+        RDLNumericTypeOfValue(value) != [c[2] integerValue])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want %@ of type %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1], c[2]]);
+  }
+  if (![[RDLExpression evaluate:@"=Round(2.675D, 2)" scope:scope] isEqual:[RDLNumber decimalWithText:@"2.68"]])
+    XCTFail(@"%@", @"Round(2.675D, 2) should be exactly 2.68, a Decimal rounded to even");
+  if (![[RDLExpression evaluate:@"=Round(2.665D, 2, MidpointRounding.AwayFromZero)" scope:scope]
+          isEqual:[RDLNumber decimalWithText:@"2.67"]])
+    XCTFail(@"%@", @"Round(2.665D, 2, AwayFromZero) should be exactly 2.67");
+  [self expectText:@"=Math.Max(1, 0 / 0)" scope:scope equals:@"NaN"];
+  [self expectText:@"=MidpointRounding.AwayFromZero" scope:scope equals:@"AwayFromZero"];
+  for (NSString *source in @[
+         @"=Sign(0 / 0)", @"=Round(1.5, 16)", @"=Round(1.5D, 29)", @"=Round(1, -1)", @"=Round(\"abc\")",
+         @"=Floor(\"abc\")", @"=Math.Max(\"a\", 1)", @"=Pow(\"a\", 2)", @"=Math.Asin(\"x\")"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source,
+                                                [RDLExpression evaluate:source scope:scope]]);
+  for (NSString *fine in @[ @"=Math.Round(Fields!Amount.Value, 2, MidpointRounding.AwayFromZero)",
+                            @"=Round(1.25, 1, MidpointRounding.ToEven)" ]) {
+    NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(fine, YES);
+    for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity", @"type", @"syntax" ])
+      if (RDLSawDiagnostic(ds, rule, nil))
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", fine, rule, ds]);
+  }
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=MidpointRounding.Sideways", YES), @"unknown-member", nil))
+    XCTFail(@"%@", @"a MidpointRounding there is not should be reported");
+}
+
+// .NET's standard number formats, as .NET Framework writes them for SSRS: C,
+// D, E, F, G, N, P, R and X with their precision, in the value's own type --
+// a Double at 15 significant digits, a Decimal exactly, halves away from zero
+// -- with the culture's separators, symbols and patterns. D and X of a
+// fraction, R of a whole number and a letter .NET does not know are #Error;
+// text and True take no number format. D of a number used to format it as a
+// date, E, G, R and X passed it through unformatted, P had no decimals, and
+// text was formatted as the number it read as.
+- (void)testStandardNumberFormatsAreDotNets {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDictionary<NSString *, NSString *> *cases = @{
+    @"=Format(1234.5, \"C\")" : @"$1,234.50",
+    @"=Format(-1234.5, \"C\")" : @"-$1,234.50",
+    @"=Format(1234.567, \"C0\")" : @"$1,235",
+    @"=Format(2.5, \"C0\")" : @"$3",
+    @"=Format(0.125, \"C2\")" : @"$0.13",
+    @"=Format(1234.5D, \"c3\")" : @"$1,234.500",
+    @"=Format(42, \"D5\")" : @"00042",
+    @"=Format(-42, \"d\")" : @"-42",
+    @"=Format(1052.0329112756, \"E\")" : @"1.052033E+003",
+    @"=Format(1052.0329112756, \"e2\")" : @"1.05e+003",
+    @"=Format(-0.00012, \"E2\")" : @"-1.20E-004",
+    @"=Format(0, \"E\")" : @"0.000000E+000",
+    @"=Format(1234.567, \"F\")" : @"1234.57",
+    @"=Format(18934, \"F1\")" : @"18934.0",
+    @"=Format(-0.001, \"F2\")" : @"0.00",
+    @"=Format(2.675, \"F2\")" : @"2.68",
+    @"=Format(12345.6789, \"G\")" : @"12345.6789",
+    @"=Format(12345.6789, \"G4\")" : @"1.235E+04",
+    @"=Format(0.00001, \"G\")" : @"1E-05",
+    @"=Format(123456789, \"G\")" : @"123456789",
+    @"=Format(1.5F, \"G\")" : @"1.5",
+    @"=Format(2.5D, \"g\")" : @"2.5",
+    @"=Format(1234.5, \"N\")" : @"1,234.50",
+    @"=Format(-1234.567, \"N1\")" : @"-1,234.6",
+    @"=Format(1234567, \"N0\")" : @"1,234,567",
+    @"=Format(0.08, \"P\")" : @"8.00%",
+    @"=Format(0.1234, \"P1\")" : @"12.3%",
+    @"=Format(0.1 + 0.2, \"R\")" : @"0.30000000000000004",
+    @"=Format(1.5, \"R\")" : @"1.5",
+    @"=Format(255, \"X\")" : @"FF",
+    @"=Format(255, \"x4\")" : @"00ff",
+    @"=Format(-1, \"X\")" : @"FFFFFFFF",
+    @"=Format(-1S, \"X\")" : @"FFFF",
+    @"=Format(-1L, \"X\")" : @"FFFFFFFFFFFFFFFF",
+    @"=Format(0 / 0, \"N2\")" : @"NaN",
+    @"=Format(1 / 0, \"C\")" : @"Infinity",
+    @"=Format(\"12\", \"N2\")" : @"12",
+    @"=Format(True, \"N2\")" : @"True",
+    @"=(1234.5).ToString(\"N1\")" : @"1,234.5",
+    @"=String.Format(\"{0:D3}|{1:P0}\", 7, 0.5)" : @"007|50%",
+  };
+  for (NSString *source in cases)
+    [self expectText:source scope:scope equals:cases[source]];
+  for (NSString *source in @[
+         @"=Format(1.5, \"D\")", @"=Format(1.5D, \"D2\")", @"=Format(5, \"R\")", @"=Format(1.5, \"X\")",
+         @"=Format(5, \"Z2\")", @"=(1.5).ToString(\"D\")", @"=String.Format(\"{0:X}\", 1.5)"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source,
+                                                [RDLExpression evaluate:source scope:scope]]);
+  if (![[RDLExpression formatValue:@1.5 format:@"D" language:@"en-US"] isEqualToString:@"#Error"])
+    XCTFail(@"%@", @"a textbox formatted in a way its value cannot take should read #Error");
+  NSString *german = [RDLExpression formatValue:@1234.5 format:@"N2" language:@"de-DE"];
+  NSString *euros = [RDLExpression formatValue:@1234.5 format:@"C" language:@"de-DE"];
+  if (![german isEqualToString:@"1.234,50"] || [euros rangeOfString:@"1.234,50"].location == NSNotFound ||
+      [euros rangeOfString:@"€"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"de-DE N2 → %@, C → %@", german, euros]);
+}
+
+// .NET's custom number formats, laid out as .NET Framework lays them out:
+// placeholders from the decimal point, literal text where it stands, grouping
+// and scaling commas, % and ‰, exponents, quoted and escaped text, and up to
+// three sections with a zero one for what rounds to nothing. A picture used to
+// give only its decimals and whether to group, so "#,##0.00 kg" was
+// 1,234.50000, "00000.00" did not pad, and sections, %, E+0 and literals were
+// not read at all.
+- (void)testCustomNumberFormatsAreDotNets {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDictionary<NSString *, NSString *> *cases = @{
+    @"=Format(1234.5, \"#,##0.00\")" : @"1,234.50",
+    @"=Format(1234.5, \"#,##0.00 kg\")" : @"1,234.50 kg",
+    @"=Format(1234.567, \"00000.00\")" : @"01234.57",
+    @"=Format(12, \"0000\")" : @"0012",
+    @"=Format(0, \"#\")" : @"",
+    @"=Format(0, \"0\")" : @"0",
+    @"=Format(0, \"$#,###\")" : @"$",
+    @"=Format(0.5, \"#.##\")" : @".5",
+    @"=Format(-0.5, \"0\")" : @"-1",
+    @"=Format(5, \"#0.0\")" : @"5.0",
+    @"=Format(1.5, \"#,##0.0000\")" : @"1.5000",
+    @"=Format(1234567, \"#,#\")" : @"1,234,567",
+    @"=Format(1234567, \"#,##0,\")" : @"1,235",
+    @"=Format(1234567890, \"#,##0,,\")" : @"1,235",
+    @"=Format(0.25, \"0%\")" : @"25%",
+    @"=Format(0.123, \"0.0%\")" : @"12.3%",
+    @"=Format(0.00123, \"0.0‰\")" : @"1.2‰",
+    @"=Format(12345, \"0.00E+00\")" : @"1.23E+04",
+    @"=Format(0.00012, \"0.0e-0\")" : @"1.2e-4",
+    @"=Format(12345, \"0.0E0\")" : @"1.2E4",
+    @"=Format(-5, \"#;(#)\")" : @"(5)",
+    @"=Format(0, \"#;(#);zero\")" : @"zero",
+    @"=Format(-0.001, \"0.00;(0.00);zero\")" : @"zero",
+    @"=Format(-5, \"#;;zero\")" : @"-5",
+    @"=Format(5, \"\\\"$\\\"#\")" : @"$5",
+    @"=Format(5, \"'x'#\\\\#\")" : @"x5#",
+    @"=Format(-1234.5, \"$#,##0.00\")" : @"-$1,234.50",
+    @"=Format(5551234567, \"(###) ###-####\")" : @"(555) 123-4567",
+    @"=Format(1.5D, \"0.000\")" : @"1.500",
+    @"=Format(2.675, \"0.00\")" : @"2.68",
+    @"=Format(123, \"None\")" : @"None",
+    @"=Format(1.23456789E+20, \"#,##0\")" : @"123,456,789,000,000,000,000",
+    @"=Format(\"text\", \"#,##0\")" : @"text",
+  };
+  for (NSString *source in cases)
+    [self expectText:source scope:scope equals:cases[source]];
+  NSString *german = [RDLExpression formatValue:@1234.5 format:@"#,##0.00" language:@"de-DE"];
+  if (![german isEqualToString:@"1.234,50"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"de-DE #,##0.00 → %@", german]);
+}
+
+// .NET's date formats, as .NET Framework writes them: the standard letters made
+// of the culture's patterns (d, D, f, F, g, G, M, Y, t, T), the fixed ones (o, r,
+// s, u) and U in UTC; and every custom specifier, with the culture's names and
+// separators, quoted and escaped text, %c, and #Error where .NET throws. An
+// unformatted date is G, as .NET's ToString writes one, and CStr leaves out a
+// midnight's time. t, T, g, G, f, F, s, u, o, r, M and Y used to write the
+// platform's medium date and short time; ddd was a three-digit day; fff, zzz,
+// K and quoted text were dropped or cut the output short.
+- (void)testDateFormatsAreDotNets {
+  NSTimeZone *saved = [NSTimeZone defaultTimeZone];
+  [NSTimeZone setDefaultTimeZone:[NSTimeZone timeZoneForSecondsFromGMT:6 * 3600]];
+  @try {
+    NSDateComponents *parts = [[NSDateComponents alloc] init];
+    parts.year = 2026;
+    parts.month = 9;
+    parts.day = 15;
+    parts.hour = 13;
+    parts.minute = 5;
+    parts.second = 7;
+    NSDate *afternoon = [[[NSCalendar currentCalendar] dateFromComponents:parts] dateByAddingTimeInterval:0.25];
+    parts.hour = 0;
+    parts.minute = 0;
+    parts.second = 0;
+    NSDate *midnight = [[NSCalendar currentCalendar] dateFromComponents:parts];
+    NSDictionary<NSString *, NSString *> *english = @{
+      @"d" : @"9/15/2026",
+      @"D" : @"Tuesday, September 15, 2026",
+      @"f" : @"Tuesday, September 15, 2026 1:05 PM",
+      @"F" : @"Tuesday, September 15, 2026 1:05:07 PM",
+      @"g" : @"9/15/2026 1:05 PM",
+      @"G" : @"9/15/2026 1:05:07 PM",
+      @"M" : @"September 15",
+      @"Y" : @"September 2026",
+      @"t" : @"1:05 PM",
+      @"T" : @"1:05:07 PM",
+      @"s" : @"2026-09-15T13:05:07",
+      @"u" : @"2026-09-15 13:05:07Z",
+      @"o" : @"2026-09-15T13:05:07.2500000",
+      @"r" : @"Tue, 15 Sep 2026 13:05:07 GMT",
+      @"U" : @"Tuesday, September 15, 2026 7:05:07 AM",
+      @"dddd, MMMM dd, yyyy HH:mm:ss" : @"Tuesday, September 15, 2026 13:05:07",
+      @"ddd d MMM yy" : @"Tue 15 Sep 26",
+      @"hh:mm tt" : @"01:05 PM",
+      @"h t" : @"1 P",
+      @"yyyyy" : @"02026",
+      @"%y" : @"26",
+      @"fff" : @"250",
+      @"HH:mm:ss.FFF" : @"13:05:07.25",
+      @"'Day' d" : @"Day 15",
+      @"\"at\" H\\h" : @"at 13h",
+      @"%d" : @"15",
+      @"MM/dd/yyyy" : @"09/15/2026",
+      @"zzz|zz|%z" : @"+06:00|+06|+6",
+      @"%K" : @"",
+    };
+    for (NSString *format in english) {
+      NSString *text = [RDLExpression formatValue:afternoon format:format language:@"en-US"];
+      if (![text isEqualToString:english[format]])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ → '%@', want '%@'", format, text, english[format]]);
+    }
+    NSString *fraction = [RDLExpression formatValue:midnight format:@"HH:mm:ss.FFF" language:@"en-US"];
+    if (![fraction isEqualToString:@"00:00:00"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"F with no fraction should take its point with it: %@", fraction]);
+    NSString *unformatted = [RDLExpression formatValue:afternoon format:nil language:@"en-US"];
+    if (![unformatted isEqualToString:@"9/15/2026 1:05:07 PM"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"an unformatted date should be G: %@", unformatted]);
+    NSDictionary<NSString *, NSString *> *german = @{
+      @"D" : @"Dienstag, 15. September 2026",
+      @"d" : @"15.9.2026",
+      @"MM/dd/yyyy" : @"09.15.2026",
+    };
+    for (NSString *format in german) {
+      NSString *text = [RDLExpression formatValue:afternoon format:format language:@"de-DE"];
+      if (![text isEqualToString:german[format]])
+        XCTFail(@"%@", [NSString stringWithFormat:@"de-DE %@ → '%@', want '%@'", format, text, german[format]]);
+    }
+    for (NSString *format in @[ @"N", @"ffffffff", @"'open", @"d\\", @"%" ])
+      if (![[RDLExpression formatValue:afternoon format:format language:@"en-US"] isEqualToString:@"#Error"])
+        XCTFail(@"%@", [NSString stringWithFormat:@"a date in %@ should be #Error", format]);
+    RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+    scope.language = @"en-US";
+    [self expectText:@"=Format(\"2026-06-03\", \"yyyy/MM/dd\")" scope:scope equals:@"2026-06-03"];
+    [self expectText:@"=Format(\"2026-06-03\", \"N2\")" scope:scope equals:@"2026-06-03"];
+    NSString *dateOnly = [RDLExpression evaluateText:@"=CStr(#6/3/2026#)" scope:scope];
+    NSString *withTime = [RDLExpression evaluateText:@"=CStr(#6/3/2026 1:05:07 PM#)" scope:scope];
+    NSString *timeOnly = [RDLExpression evaluateText:@"=CStr(#1:05:07 PM#)" scope:scope];
+    if ([dateOnly rangeOfString:@":"].location != NSNotFound || [dateOnly rangeOfString:@"2026"].location == NSNotFound ||
+        [withTime rangeOfString:@":"].location == NSNotFound || [timeOnly rangeOfString:@"2026"].location != NSNotFound ||
+        [timeOnly rangeOfString:@"0001"].location != NSNotFound || [timeOnly rangeOfString:@":"].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"CStr: date '%@', both '%@', time '%@'", dateOnly, withTime, timeOnly]);
+  } @finally {
+    [NSTimeZone setDefaultTimeZone:saved];
+  }
+}
+
+// VB's own formatting functions, which are not the Format property:
+// FormatNumber, FormatCurrency and FormatPercent take their decimals and three
+// TriStates; FormatDateTime its DateFormat; Format VB's named formats, "" for
+// Nothing, and .NET's formats otherwise. Every argument after the first used
+// to be ignored, FormatDateTime was not there, and Format("Currency") read as C
+// only by the accident of starting with a c.
+- (void)testVisualBasicsFormattingFunctions {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDictionary<NSString *, NSString *> *cases = @{
+    @"=FormatNumber(1234.5)" : @"1,234.50",
+    @"=FormatNumber(1234.5, 0)" : @"1,235",
+    @"=FormatNumber(-1234.5, 1, TriState.UseDefault, TriState.True)" : @"(1,234.5)",
+    @"=FormatNumber(0.5, 2, TriState.False)" : @".50",
+    @"=FormatNumber(1234.5, 2, vbTrue, vbFalse, vbFalse)" : @"1234.50",
+    @"=FormatNumber(\"12.345\", 2)" : @"12.35",
+    @"=FormatNumber(Nothing)" : @"",
+    @"=FormatCurrency(-1234.5)" : @"-$1,234.50",
+    @"=FormatCurrency(-1234.5, 0, TriState.UseDefault, TriState.True)" : @"($1,235)",
+    @"=FormatCurrency(0.5, 2, TriState.False)" : @"$.50",
+    @"=FormatPercent(0.1234)" : @"12.34%",
+    @"=FormatPercent(0.1234, 0)" : @"12%",
+    @"=FormatPercent(-0.5, 1, TriState.UseDefault, TriState.True)" : @"(50.0%)",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#)" : @"9/15/2026 1:05:07 PM",
+    @"=FormatDateTime(#9/15/2026#)" : @"9/15/2026",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#, DateFormat.LongDate)" : @"Tuesday, September 15, 2026",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#, DateFormat.ShortDate)" : @"9/15/2026",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#, DateFormat.LongTime)" : @"1:05:07 PM",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#, DateFormat.ShortTime)" : @"13:05",
+    @"=FormatDateTime(#9/15/2026 1:05:07 PM#, vbShortTime)" : @"13:05",
+    @"=Format(1234.5, \"Currency\")" : @"$1,234.50",
+    @"=Format(1234.5, \"Fixed\")" : @"1234.50",
+    @"=Format(1234.5, \"Standard\")" : @"1,234.50",
+    @"=Format(0.1234, \"Percent\")" : @"12.34%",
+    @"=Format(12345, \"Scientific\")" : @"1.23E+04",
+    @"=Format(1234.5, \"General Number\")" : @"1234.5",
+    @"=Format(0, \"Yes/No\")" : @"No",
+    @"=Format(5, \"On/Off\")" : @"On",
+    @"=Format(1, \"True/False\")" : @"True",
+    @"=Format(#9/15/2026 1:05:07 PM#, \"Long Date\")" : @"Tuesday, September 15, 2026",
+    @"=Format(#9/15/2026 1:05:07 PM#, \"Short Date\")" : @"9/15/2026",
+    @"=Format(#9/15/2026 1:05:07 PM#, \"Short Time\")" : @"1:05 PM",
+    @"=Format(#9/15/2026 1:05:07 PM#, \"Long Time\")" : @"1:05:07 PM",
+    @"=Format(#9/15/2026#, \"General Date\")" : @"9/15/2026",
+    @"=Format(#9/15/2026#, \"yyyy\")" : @"2026",
+    @"=Format(1234.5, \"#,##0.0\")" : @"1,234.5",
+    @"=Format(Nothing, \"N2\")" : @"",
+  };
+  for (NSString *source in cases)
+    [self expectText:source scope:scope equals:cases[source]];
+  for (NSString *source in @[ @"=FormatNumber(\"abc\")", @"=FormatDateTime(#9/15/2026#, 7)", @"=Format(\"abc\", \"Currency\")",
+                              @"=FormatNumber(1, 100)", @"=FormatNumber(1, 2, \"yes\")", @"=FormatPercent(1, 2, 0, \"x\")" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+  // The Format property is .NET's alone: "Currency" there is a picture with no
+  // placeholders, written as it stands.
+  NSString *property = [RDLExpression formatValue:@1234.5 format:@"Currency" language:@"en-US"];
+  if (![property isEqualToString:@"Currency"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the Format property's Currency → %@", property]);
+  NSString *checked = @"=FormatNumber(1.5, 2, TriState.True, vbFalse, TriState.UseDefault) & FormatDateTime(Now, DateFormat.ShortTime)";
+  NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(checked, YES);
+  for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity", @"syntax" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", checked, rule, ds]);
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=DateFormat.Weekly", YES), @"unknown-member", nil))
+    XCTFail(@"%@", @"a DateFormat there is not should be reported");
+}
+
+// A DateTime field's values are dates, as SSRS's typed data is: "2026-06-03"
+// and an ISO time with its offset read as dates and take a date format, text
+// that is no date there is #Error, and Nothing stays Nothing. They were the
+// text the data held, which took a date format only by being parsed on the way.
+- (void)testADateTimeFieldIsADate {
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Voyages";
+  RDLField *sailed = [[RDLField alloc] init];
+  sailed.name = @"Sailed";
+  sailed.dataField = @"Sailed";
+  sailed.dataType = RDLFieldDataTypeDateTime;
+  RDLField *note = [[RDLField alloc] init];
+  note.name = @"Note";
+  note.dataField = @"Note";
+  note.dataType = RDLFieldDataTypeString;
+  ds.fields = @[ sailed, note ];
+  ds.rows = @[
+    @{ @"Sailed" : @"2026-06-03", @"Note" : @"2026-06-03" }, @{ @"Sailed" : @"2026-06-03T09:30:00Z" },
+    @{ @"Sailed" : @"soon" }, @{ @"Sailed" : [NSNull null] }
+  ];
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  scope.dataSet = ds;
+  scope.row = ds.rows[0];
+  if (![[RDLExpression evaluate:@"=Fields!Sailed.Value" scope:scope] isKindOfClass:[NSDate class]])
+    XCTFail(@"%@", @"a DateTime field's text should be read as a date");
+  [self expectText:@"=Format(Fields!Sailed.Value, \"yyyy/MM/dd\")" scope:scope equals:@"2026/06/03"];
+  [self expectText:@"=Format(Fields!Note.Value, \"yyyy/MM/dd\")" scope:scope equals:@"2026-06-03"];
+  scope.row = ds.rows[1];
+  if (![[RDLExpression evaluate:@"=Fields!Sailed.Value" scope:scope] isKindOfClass:[NSDate class]])
+    XCTFail(@"%@", @"an ISO time with its offset should be read as a date");
+  scope.row = ds.rows[2];
+  if (![[RDLExpression evaluate:@"=Fields!Sailed.Value" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"text that is no date in a DateTime field should be #Error");
+  scope.row = ds.rows[3];
+  [self expectTrue:@"=IsNothing(Fields!Sailed.Value)" scope:scope];
+}
+
+// Text compares as VB does under Option Compare Binary, which is how SSRS
+// compiles expressions: Like with its lists and ranges, InStr, InStrRev,
+// Replace and Lookup's keys are case-sensitive unless CompareMethod.Text says
+// otherwise, and a pattern or argument VB refuses is #Error. Like, InStr,
+// InStrRev and Lookup used to ignore case, [...] in a pattern matched itself,
+// and Replace ignored its start, count and compare.
+- (void)testTextComparesAsVisualBasicDoes {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  for (NSString *source in @[
+         @"=\"Walnut\" Like \"W*\"", @"=\"W1\" Like \"W#\"", @"=\"Wa\" Like \"W[a-c]\"", @"=\"Wd\" Like \"W[!a-c]\"",
+         @"=\"a*b\" Like \"a[*]b\"", @"=\"a-b\" Like \"a[-x]b\"", @"=\"x.y\" Like \"x.y\"", @"=\"ab\" Like \"a[]b\"",
+         @"=(\"line\" & vbCrLf & \"x\") Like \"line*\"", @"=\"é\" Like \"?\"", @"=Not (\"walnut\" Like \"W*\")",
+         @"=Not (\"Wb\" Like \"W[!a-c]\")", @"=Not (\"xzy\" Like \"x.y\")",
+         @"=\"x😀y\" Like \"x😀y\"", @"=\"x😀y\" Like \"x[😀]y\""
+       ])
+    [self expectTrue:source scope:scope];
+  NSArray<NSArray *> *numbers = @[
+    @[ @"=InStr(\"Hello\", \"LL\")", @0 ], @[ @"=InStr(\"Hello\", \"ll\")", @3 ],
+    @[ @"=InStr(\"Hello\", \"LL\", CompareMethod.Text)", @3 ], @[ @"=InStr(3, \"Hello\", \"l\")", @3 ],
+    @[ @"=InStr(4, \"Hello\", \"l\")", @4 ], @[ @"=InStr(1, \"Hello\", \"LL\", vbTextCompare)", @3 ],
+    @[ @"=InStr(\"Hello\", \"\")", @1 ], @[ @"=InStr(9, \"Hello\", \"l\")", @0 ],
+    @[ @"=InStrRev(\"abcabc\", \"bc\")", @5 ], @[ @"=InStrRev(\"abcABC\", \"bc\")", @2 ],
+    @[ @"=InStrRev(\"abcABC\", \"bc\", -1, CompareMethod.Text)", @5 ], @[ @"=InStrRev(\"abcabc\", \"bc\", 4)", @2 ],
+    @[ @"=Len(\"abc\")", @3 ], @[ @"=Asc(\"A\")", @65 ],
+  ];
+  for (NSArray *c in numbers) {
+    id value = [RDLExpression evaluate:c[0] scope:scope];
+    if (![value isKindOfClass:[RDLNumber class]] || [value integerValue] != [c[1] integerValue] ||
+        RDLNumericTypeOfValue(value) != RDLNumericTypeInteger)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Integer %@", c[0], value,
+                                                (long)RDLNumericTypeOfValue(value), c[1]]);
+  }
+  [self expectText:@"=Replace(\"Walnut walnut\", \"walnut\", \"oak\")" scope:scope equals:@"Walnut oak"];
+  [self expectText:@"=Replace(\"Walnut walnut\", \"walnut\", \"oak\", 1, -1, CompareMethod.Text)" scope:scope equals:@"oak oak"];
+  [self expectText:@"=Replace(\"a-b-c\", \"-\", \"+\", 1, 1)" scope:scope equals:@"a+b-c"];
+  [self expectText:@"=Replace(\"a-b-c\", \"-\", \"+\", 3)" scope:scope equals:@"b+c"];
+  for (NSString *source in @[
+         @"=\"a\" Like \"[a\"", @"=\"a\" Like \"[z-a]\"", @"=InStr(0, \"a\", \"a\")", @"=InStr(\"a\", \"a\", 5)",
+         @"=InStrRev(\"a\", \"a\", 0)", @"=Replace(\"a\", \"a\", \"b\", 0)"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+
+  RDLReport *r = [RDLReport emptyReportNamed:@"Keys"];
+  RDLDataSet *catalog = [[RDLDataSet alloc] init];
+  catalog.name = @"Catalog";
+  catalog.rows = @[ @{ @"Sku" : @"W1", @"Kind" : @"Desk" } ];
+  RDLDataSet *orders = [[RDLDataSet alloc] init];
+  orders.name = @"Orders";
+  orders.rows = @[ @{ @"Sku" : @"w1" }, @{ @"Sku" : @"W1" } ];
+  [r.dataSets addObjectsFromArray:@[ catalog, orders ]];
+  RDLEvalScope *keyed = [[RDLEvalScope alloc] init];
+  keyed.report = r;
+  keyed.dataSet = orders;
+  NSString *lookup = @"=Lookup(Fields!Sku.Value, Fields!Sku.Value, Fields!Kind.Value, \"Catalog\")";
+  keyed.row = orders.rows[0];
+  if (!RDLIsNothingValue([RDLExpression evaluate:lookup scope:keyed]))
+    XCTFail(@"%@", [NSString stringWithFormat:@"a key differing in case should find nothing: %@", [RDLExpression evaluate:lookup scope:keyed]]);
+  keyed.row = orders.rows[1];
+  [self expectText:lookup scope:keyed equals:@"Desk"];
+
+  NSString *checked = @"=InStr(1, \"a\", \"b\", CompareMethod.Text) + InStrRev(\"a\", \"b\", -1, vbBinaryCompare) & Replace(\"a\", \"b\", \"c\", 1, -1, CompareMethod.Binary)";
+  NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(checked, YES);
+  for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity", @"syntax" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", checked, rule, ds]);
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=CompareMethod.Fuzzy", YES), @"unknown-member", nil))
+    XCTFail(@"%@", @"a CompareMethod there is not should be reported");
+}
+
+// Booleans are VB's: CBool reads True and False, a number and a number
+// written as text, and throws for anything else -- Convert.ToBoolean reads only
+// "True" and "False" -- and a condition anywhere, in IIf, Switch, Not, And,
+// AndAlso or the report's code, is read the way CBool reads it. IIf, Switch and
+// Choose work out every argument, so an error in a branch not taken is still
+// the result. A Boolean field's text is read as CBool reads it and a String
+// field's value is text. CBool of any text was True, "abc" was a true
+// condition, IIf and Switch looked only at the branch they took, and a filter's
+// Like knew only * and ?.
+- (void)testBooleansAreVisualBasics {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  for (NSString *source in @[
+         @"=CBool(\"True\")", @"=Not CBool(\" false \")", @"=CBool(\"1\")", @"=Not CBool(\"0\")", @"=CBool(2.5)",
+         @"=Not CBool(0D)", @"=Not CBool(Nothing)", @"=Convert.ToBoolean(\"true\")", @"=Convert.ToBoolean(5)",
+         @"=IIf(\"True\", True, False)", @"=IIf(1, True, False)", @"=Not \"False\"", @"=Not (\"true\" And \"false\")",
+         @"=Not (False AndAlso (1 \\ 0 > 0))", @"=IsNothing(Choose(4, \"a\"))"
+       ])
+    [self expectTrue:source scope:scope];
+  [self expectText:@"=Choose(2.7, \"a\", \"b\", \"c\")" scope:scope equals:@"b"];
+  [self expectText:@"=Switch(False, \"a\", \"1\", \"b\")" scope:scope equals:@"b"];
+  for (NSString *source in @[
+         @"=CBool(\"yes\")", @"=CBool(#1/1/2020#)", @"=Convert.ToBoolean(\"1\")", @"=IIf(\"abc\", 1, 2)", @"=Not \"abc\"",
+         @"=\"abc\" And True", @"=\"abc\" AndAlso True", @"=False OrElse \"x\"", @"=Switch(True, 1, False, 1 \\ 0)",
+         @"=Switch(True)", @"=Choose(1, \"a\", 1 \\ 0)", @"=Choose(\"x\", \"a\")"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Flags";
+  RDLField *paid = [[RDLField alloc] init];
+  paid.name = @"Paid";
+  paid.dataField = @"Paid";
+  paid.dataType = RDLFieldDataTypeBoolean;
+  RDLField *code = [[RDLField alloc] init];
+  code.name = @"Code";
+  code.dataField = @"Code";
+  code.dataType = RDLFieldDataTypeString;
+  ds.fields = @[ paid, code ];
+  ds.rows = @[ @{ @"Paid" : @"true", @"Code" : @12 }, @{ @"Paid" : @"yes" }, @{ @"Paid" : @YES } ];
+  RDLReport *r = [RDLReport emptyReportNamed:@"Truths"];
+  r.code = @"Function Truth(x As Object) As Boolean\n  Return x\nEnd Function\n"
+           @"Function Pick(x As Object) As String\n  If x Then\n    Return \"on\"\n  End If\n  Return \"off\"\nEnd Function\n";
+  scope.report = r;
+  scope.dataSet = ds;
+  scope.row = ds.rows[0];
+  if (![RDLExpression evaluate:@"=Fields!Paid.Value" scope:scope] || !RDLNumberIsBooleanValue([RDLExpression evaluate:@"=Fields!Paid.Value" scope:scope]))
+    XCTFail(@"%@", @"a Boolean field's \"true\" should be True");
+  if (![[RDLExpression evaluate:@"=Fields!Code.Value" scope:scope] isEqual:@"12"])
+    XCTFail(@"%@", @"a String field's number should be its text");
+  scope.row = ds.rows[1];
+  if (![[RDLExpression evaluate:@"=Fields!Paid.Value" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"a Boolean field's \"yes\" should be #Error");
+  scope.row = ds.rows[2];
+  [self expectTrue:@"=Fields!Paid.Value" scope:scope];
+  [self expectText:@"=Code.Pick(\"True\")" scope:scope equals:@"on"];
+  for (NSString *source in @[ @"=Code.Pick(\"abc\")", @"=Code.Truth(\"yes\")" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+
+  if (!RDLTextMatchesLikePattern(@"europe", @"E[u]*", YES) || RDLTextMatchesLikePattern(@"europe", @"E[u]*", NO))
+    XCTFail(@"%@", @"a filter's Like should know lists and ignore case, and an expression's should not ignore case");
+}
+
+// VB.NET's date functions: Year to Second, Weekday and DatePart are Integers,
+// DateDiff a Long; DateDiff counts days, hours, minutes and seconds as time on
+// the clock, truncated, and ww as weeks between the starts of the dates' weeks;
+// DatePart numbers weeks by .NET's rules; Weekday, DatePart and WeekdayName
+// take a first day of the week, and WeekdayName and MonthName the culture's
+// names. An interval VB does not know, and a date or argument it refuses, are
+// #Error. Every part used to be a Double, an unreadable date was today, "week"
+// was an interval, ww was elapsed weeks, and names were always English.
+- (void)testDateFunctionsAreVisualBasics {
+  NSTimeZone *saved = [NSTimeZone defaultTimeZone];
+  [NSTimeZone setDefaultTimeZone:[NSTimeZone timeZoneForSecondsFromGMT:6 * 3600]];
+  @try {
+    RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+    scope.language = @"en-US";
+    NSArray<NSArray *> *integers = @[
+      @[ @"=Year(#9/15/2026 1:05:07 PM#)", @2026 ], @[ @"=Month(#9/15/2026 1:05:07 PM#)", @9 ],
+      @[ @"=Day(#9/15/2026 1:05:07 PM#)", @15 ], @[ @"=Hour(#9/15/2026 1:05:07 PM#)", @13 ],
+      @[ @"=Minute(#9/15/2026 1:05:07 PM#)", @5 ], @[ @"=Second(#9/15/2026 1:05:07 PM#)", @7 ],
+      @[ @"=Weekday(#9/15/2026#)", @3 ], @[ @"=Weekday(#9/15/2026#, FirstDayOfWeek.Monday)", @2 ],
+      @[ @"=Weekday(#9/15/2026#, vbSaturday)", @4 ], @[ @"=DatePart(\"q\", #9/15/2026#)", @3 ],
+      @[ @"=DatePart(\"y\", #9/15/2026#)", @258 ], @[ @"=DatePart(\"ww\", #1/1/2026#)", @1 ],
+      @[ @"=DatePart(\"ww\", #9/15/2026#)", @38 ],
+      @[ @"=DatePart(\"ww\", #1/1/2027#, vbMonday, vbFirstFourDays)", @53 ],
+      @[ @"=DatePart(DateInterval.WeekOfYear, #1/1/2027#, FirstDayOfWeek.Monday, FirstWeekOfYear.FirstFullWeek)", @52 ],
+      @[ @"=DatePart(\"w\", #9/15/2026#, FirstDayOfWeek.Monday)", @2 ], @[ @"=DatePart(\"h\", #9/15/2026 1:05:07 PM#)", @13 ],
+    ];
+    for (NSArray *c in integers) {
+      id value = [RDLExpression evaluate:c[0] scope:scope];
+      if (![value isKindOfClass:[RDLNumber class]] || [value integerValue] != [c[1] integerValue] ||
+          RDLNumericTypeOfValue(value) != RDLNumericTypeInteger)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Integer %@", c[0], value,
+                                                  (long)RDLNumericTypeOfValue(value), c[1]]);
+    }
+    NSArray<NSArray *> *longs = @[
+      @[ @"=DateDiff(\"d\", #1/1/2020#, #1/11/2020#)", @10 ], @[ @"=DateDiff(\"d\", #1/11/2020#, #1/1/2020#)", @-10 ],
+      @[ @"=DateDiff(\"d\", #1/1/2020 11:00 PM#, #1/2/2020 1:00 AM#)", @0 ],
+      @[ @"=DateDiff(\"yyyy\", #12/31/2020#, #1/1/2021#)", @1 ], @[ @"=DateDiff(\"m\", #1/31/2020#, #2/1/2020#)", @1 ],
+      @[ @"=DateDiff(\"q\", #3/31/2020#, #4/1/2020#)", @1 ], @[ @"=DateDiff(\"w\", #1/1/2020#, #1/15/2020#)", @2 ],
+      @[ @"=DateDiff(\"ww\", #1/4/2020#, #1/5/2020#)", @1 ],
+      @[ @"=DateDiff(\"ww\", #1/4/2020#, #1/5/2020#, FirstDayOfWeek.Monday)", @0 ],
+      @[ @"=DateDiff(DateInterval.Hour, #1/1/2020#, #1/2/2020#)", @24 ], @[ @"=DateDiff(\"n\", #1/1/2020#, #1/1/2020 1:30 AM#)", @90 ],
+    ];
+    for (NSArray *c in longs) {
+      id value = [RDLExpression evaluate:c[0] scope:scope];
+      if (![value isKindOfClass:[RDLNumber class]] || [value longLongValue] != [c[1] longLongValue] ||
+          RDLNumericTypeOfValue(value) != RDLNumericTypeLong)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@ of type %ld, want the Long %@", c[0], value,
+                                                  (long)RDLNumericTypeOfValue(value), c[1]]);
+    }
+    [self expectNumber:@"=Day(DateAdd(\"m\", 1, #1/31/2020#))" scope:scope equals:29];
+    [self expectNumber:@"=Day(DateAdd(\"ww\", 2, #1/1/2020#))" scope:scope equals:15];
+    [self expectNumber:@"=Month(DateAdd(DateInterval.Quarter, 1, #1/15/2020#))" scope:scope equals:4];
+    [self expectNumber:@"=Day(DateAdd(\"d\", 1.9, #1/1/2020#))" scope:scope equals:2];
+    NSDictionary<NSString *, NSString *> *names = @{
+      @"=WeekdayName(1)" : @"Sunday", @"=WeekdayName(1, True)" : @"Sun", @"=WeekdayName(1, False, vbMonday)" : @"Monday",
+      @"=MonthName(9)" : @"September", @"=MonthName(9, True)" : @"Sep", @"=MonthName(13)" : @""
+    };
+    for (NSString *source in names)
+      [self expectText:source scope:scope equals:names[source]];
+    RDLEvalScope *german = [[RDLEvalScope alloc] init];
+    german.language = @"de-DE";
+    [self expectText:@"=WeekdayName(1)" scope:german equals:@"Montag"];
+    [self expectText:@"=MonthName(3)" scope:german equals:@"März"];
+    for (NSString *source in @[
+           @"=Year(\"soon\")", @"=DateDiff(\"week\", #1/1/2020#, #1/2/2020#)", @"=DatePart(\"z\", #1/1/2020#)",
+           @"=DateAdd(\"x\", 1, #1/1/2020#)", @"=Weekday(#1/1/2020#, 8)", @"=WeekdayName(0)", @"=MonthName(14)",
+           @"=DatePart(\"ww\", #1/1/2020#, 1, 9)"
+         ])
+      if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+    [NSTimeZone setDefaultTimeZone:[NSTimeZone timeZoneWithName:@"America/New_York"]];
+    id acrossTheChange = [RDLExpression evaluate:@"=DateDiff(\"h\", #3/7/2026 12:00 PM#, #3/8/2026 12:00 PM#)" scope:scope];
+    if ([acrossTheChange longLongValue] != 24)
+      XCTFail(@"%@", [NSString stringWithFormat:@"a day across the clocks changing is 24 hours on the clock: %@", acrossTheChange]);
+    NSString *checked = @"=DateDiff(DateInterval.Day, Now, Now, FirstDayOfWeek.Monday) + DatePart(\"ww\", Now, vbMonday, FirstWeekOfYear.FirstFourDays) & WeekdayName(1, True, vbSunday) & DateAdd(DateInterval.Month, 1, Now)";
+    NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(checked, YES);
+    for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity", @"syntax" ])
+      if (RDLSawDiagnostic(ds, rule, nil))
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", checked, rule, ds]);
+    if (!RDLSawDiagnostic(RDLCheckExpression(@"=FirstDayOfWeek.Someday", YES), @"unknown-member", nil))
+      XCTFail(@"%@", @"a FirstDayOfWeek there is not should be reported");
+  } @finally {
+    [NSTimeZone setDefaultTimeZone:saved];
+  }
+}
+
+// Aggregates leave Nothing out, and over nothing at all are Nothing, as in SSRS
+// -- Sum, Avg, Min, Max, First, Last and the rest -- while the counts are 0; and
+// RunningValue takes every aggregate that summarises, over the rows up to the
+// current one, and is #Error for one that does not. Over no rows every one of
+// these used to be 0 or "", Min over a Nothing was that Nothing, and
+// RunningValue took only Sum, Count, Avg, Min and Max and read anything else as
+// Sum.
+- (void)testAggregatesLeaveNothingOutAndRunOverEveryFunction {
+  RDLDataSet *empty = [[RDLDataSet alloc] init];
+  empty.name = @"Empty";
+  empty.rows = @[];
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  scope.dataSet = empty;
+  scope.groupRows = @[];
+  for (NSString *source in @[
+         @"=IsNothing(Sum(Fields!A.Value))", @"=IsNothing(Avg(Fields!A.Value))", @"=IsNothing(Min(Fields!A.Value))",
+         @"=IsNothing(Max(Fields!A.Value))", @"=IsNothing(First(Fields!A.Value))", @"=IsNothing(Last(Fields!A.Value))",
+         @"=IsNothing(StDevP(Fields!A.Value))", @"=IsNothing(Var(Fields!A.Value))", @"=Count(Fields!A.Value) = 0",
+         @"=CountRows() = 0"
+       ])
+    [self expectTrue:source scope:scope];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Values";
+  ds.rows = @[ @{ @"A" : [NSNull null] }, @{ @"A" : @2 }, @{ @"A" : @2 }, @{ @"A" : @5 } ];
+  scope.dataSet = ds;
+  scope.groupRows = ds.rows;
+  scope.row = ds.rows[3];
+  [self expectNumber:@"=Min(Fields!A.Value)" scope:scope equals:2];
+  [self expectNumber:@"=Max(Fields!A.Value)" scope:scope equals:5];
+  [self expectNumber:@"=RunningValue(Fields!A.Value, \"CountDistinct\")" scope:scope equals:2];
+  [self expectNumber:@"=RunningValue(Fields!A.Value, \"Max\")" scope:scope equals:5];
+  [self expectNumber:@"=RunningValue(Fields!A.Value, \"StDevP\")" scope:scope equals:sqrt(2)];
+  [self expectNumber:@"=RunningValue(Fields!A.Value, \"Var\")" scope:scope equals:3];
+  scope.row = ds.rows[2];
+  [self expectNumber:@"=RunningValue(Fields!A.Value, \"Sum\")" scope:scope equals:4];
+  if (![[RDLExpression evaluate:@"=RunningValue(Fields!A.Value, \"Median\")" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"RunningValue of an aggregate it does not take should be #Error");
+}
+
+// Globals!RenderFormat says what the report is rendered as, as SSRS names its
+// renderers -- PDF, HTML5, and RPL for the preview, which is what SSRS's own
+// viewer renders -- and whether that is read on screen; and User!UserID is the
+// account running the report unless the host says who. RenderFormat was not
+// known at all, and UserID was always "RDLDesigner".
+- (void)testGlobalsSayHowAndForWhomTheReportIsRendered {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.renderFormat = RDLRenderFormatPDF;
+  [self expectText:@"=Globals!RenderFormat.Name" scope:scope equals:@"PDF"];
+  [self expectTrue:@"=Not Globals!RenderFormat.IsInteractive" scope:scope];
+  scope.renderFormat = RDLRenderFormatHTML;
+  [self expectText:@"=Globals!RenderFormat.Name" scope:scope equals:@"HTML5"];
+  [self expectTrue:@"=Globals!RenderFormat.IsInteractive" scope:scope];
+  scope.renderFormat = RDLRenderFormatPreview;
+  [self expectText:@"=Globals!RenderFormat.Name" scope:scope equals:@"RPL"];
+  [self expectText:@"=User!UserID" scope:scope equals:NSUserName()];
+  scope.userID = @"ann";
+  [self expectText:@"=User!UserID" scope:scope equals:@"ann"];
+  [self expectText:@"=Globals!ReportFolder & Globals!ReportServerUrl" scope:scope equals:@""];
+
+  RDLReport *r = [RDLReport emptyReportNamed:@"Rendered"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"How";
+  tb.width = 4;
+  tb.height = 0.3;
+  tb.value = @"=Globals!RenderFormat.Name & \"|\" & User!UserID";
+  [r.body.items addObject:tb];
+  [r adoptItems];
+  NSData *htmlData = [RDLGenerator renderReport:r parameters:@{} usingBackend:[RDLGenerator backendNamed:@"HTML"]];
+  NSString *html = [[NSString alloc] initWithData:htmlData encoding:NSUTF8StringEncoding];
+  NSString *htmlWant = [NSString stringWithFormat:@"HTML5|%@", NSUserName()];
+  if ([html rangeOfString:htmlWant].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"rendered as HTML the report should say %@", htmlWant]);
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.userID = @"ann";
+  environment.renderFormat = RDLRenderFormatPDF;
+  BOOL said = NO;
+  for (RDLLaidOutPage *page in [RDLGenerator pagesForReport:r parameters:@{} environment:environment])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]] && [[(RDLLaidOutTextbox *)item text] isEqualToString:@"PDF|ann"])
+        said = YES;
+  if (!said)
+    XCTFail(@"%@", @"laid out for ann as a PDF the report should say PDF|ann");
+  NSArray<RDLDiagnostic *> *ds =
+      RDLCheckExpression(@"=Globals!RenderFormat.Name & Globals!RenderFormat.IsInteractive & Globals!ReportFolder", NO);
+  for (NSString *rule in @[ @"unknown-global", @"unknown-member", @"syntax" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"RenderFormat should raise no %@: %@", rule, ds]);
+}
+
+// The functions are Report Builder's: VB's text, date and inspection functions
+// -- Str, StrComp, StrConv, StrDup, LSet, RSet, AscW, ChrW, GetChar, Filter,
+// TimeValue, TimeOfDay, Timer, DateString, TimeString, IsArray, IsError,
+// IsDBNull, CObj -- and Math's and Financial's members by name alone, NPV, IRR
+// and MIRR among them; DateSerial reads two-digit and negative years as VB
+// does, TimeSerial and TimeValue give a time on 1 January 0001, and a function
+// there is not is #Error. None of these was here; String, Substring, Atn and
+// RowCount were, and are not SSRS's; and a function there was not returned its
+// first argument.
+- (void)testTheFunctionLibraryIsReportBuilders {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDateComponents *parts = [[NSDateComponents alloc] init];
+  parts.year = 2026;
+  parts.month = 9;
+  parts.day = 15;
+  parts.hour = 13;
+  parts.minute = 5;
+  parts.second = 7;
+  scope.executionTime = [[[NSCalendar currentCalendar] dateFromComponents:parts] dateByAddingTimeInterval:0.5];
+  NSDictionary<NSString *, NSString *> *texts = @{
+    @"=Str(12)" : @" 12", @"=Str(-1.5)" : @"-1.5", @"=StrDup(3, \"ab\")" : @"aaa", @"=LSet(\"ab\", 4) & \"|\"" : @"ab  |",
+    @"=RSet(\"ab\", 4)" : @"  ab", @"=LSet(\"abcdef\", 3)" : @"abc", @"=StrConv(\"hello world\", vbProperCase)" : @"Hello World",
+    @"=StrConv(\"Hi\", VbStrConv.Uppercase)" : @"HI", @"=ChrW(233)" : @"é", @"=GetChar(\"abc\", 2)" : @"b",
+    @"=Join(Filter(Split(\"apple,banana,cherry\", \",\"), \"an\"), \"|\")" : @"banana",
+    @"=Join(Filter(Split(\"apple,banana,cherry\", \",\"), \"AN\", False, CompareMethod.Text), \"|\")" : @"apple|cherry",
+    @"=DateString" : @"09-15-2026", @"=TimeString" : @"13:05:07", @"=CObj(\"x\")" : @"x"
+  };
+  for (NSString *source in texts)
+    [self expectText:source scope:scope equals:texts[source]];
+  NSDictionary<NSString *, NSNumber *> *numbers = @{
+    @"=StrComp(\"a\", \"B\")" : @1, @"=StrComp(\"a\", \"B\", CompareMethod.Text)" : @-1, @"=AscW(\"é\")" : @233,
+    @"=Truncate(-2.7)" : @-2, @"=Sinh(0)" : @0, @"=Atan2(0, 1)" : @0, @"=BigMul(100000, 100000)" : @10000000000,
+    @"=IEEERemainder(10, 3)" : @1, @"=Pmt(0.1, 3, 8000)" : @(-8000 * 0.1 / (1 - pow(1.1, -3))),
+    @"=NPV(0.1, Split(\"-1000,500,700\", \",\"))" : @(-1000 / 1.1 + 500 / 1.21 + 700 / 1.331),
+    @"=IRR(Split(\"-1000,500,700\", \",\"))" : @(1 / ((-500 + sqrt(250000 + 2800000)) / 1400) - 1),
+    @"=MIRR(Split(\"-1000,500,700\", \",\"), 0.1, 0.12)" :
+        @(pow((500 / pow(1.12, 2) + 700 / pow(1.12, 3)) * pow(1.12, 3) / ((1000 / 1.1) * 1.1), 0.5) - 1),
+    @"=Timer" : @(13 * 3600 + 5 * 60 + 7.5), @"=Year(TimeValue(\"1:05 PM\"))" : @1, @"=Hour(TimeValue(\"1:05 PM\"))" : @13,
+    @"=Year(TimeOfDay)" : @1, @"=Hour(TimeSerial(25, 0, 0))" : @1, @"=Day(TimeSerial(25, 0, 0))" : @2,
+    @"=Year(DateSerial(29, 1, 1))" : @2029, @"=Year(DateSerial(30, 1, 1))" : @1930, @"=Year(DateSerial(-1, 1, 1))" : @2025,
+    @"=Day(DateValue(\"January 5, 2020 3:00 PM\"))" : @5, @"=Hour(DateValue(\"January 5, 2020 3:00 PM\"))" : @0
+  };
+  for (NSString *source in numbers) {
+    id value = [RDLExpression evaluate:source scope:scope];
+    if (![value isKindOfClass:[RDLNumber class]] || fabs([value doubleValue] - [numbers[source] doubleValue]) > 1e-4)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want %@", source, value, numbers[source]]);
+  }
+  for (NSString *source in @[ @"=IsArray(Split(\"a,b\", \",\"))", @"=Not IsArray(\"a\")", @"=Not IsError(1)", @"=Not IsDBNull(Nothing)" ])
+    [self expectTrue:source scope:scope];
+  for (NSString *source in @[
+         @"=Frob(1, 2)", @"=Substring(\"abc\", 1, 1)", @"=String(3, \"*\")", @"=Atn(1)", @"=StrDup(-1, \"a\")",
+         @"=GetChar(\"abc\", 4)", @"=StrConv(\"a\", 4)", @"=IRR(Split(\"1,2\", \",\"))", @"=DateValue(\"soon\")",
+         @"=TimeSerial(-1, 0, 0)"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ → %@, want #Error", source, [RDLExpression evaluate:source scope:scope]]);
+  NSString *checked = @"=Str(1) & StrComp(\"a\", \"b\") & StrConv(\"a\", vbUpperCase) & LSet(\"a\", 2) & Truncate(1.5) & Pmt(0.1, 3, 8000) & NPV(0.1, Split(\"1,2\", \",\")) & TimeOfDay & DateString & CObj(1) & Join(Filter(Split(\"a\", \",\"), \"a\"), \",\") & Log10(10) & VbStrConv.ProperCase";
+  NSArray<RDLDiagnostic *> *ds = RDLCheckExpression(checked, YES);
+  for (NSString *rule in @[ @"unknown-member", @"unknown-function", @"arity", @"syntax" ])
+    if (RDLSawDiagnostic(ds, rule, nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should raise no %@: %@", checked, rule, ds]);
+  NSMutableSet<NSString *> *offered = [NSMutableSet set];
+  for (RDLFunctionInfo *f in [RDLExpressionCatalog functions])
+    [offered addObject:f.name];
+  for (NSString *name in @[ @"PageNumber", @"TotalPages", @"UserID", @"Language", @"Substring", @"String", @"Atn", @"RowCount" ])
+    if ([offered containsObject:name])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue should not offer %@", name]);
+  for (NSString *name in @[ @"NPV", @"StrComp", @"Truncate", @"TimeOfDay", @"Log10" ])
+    if (![offered containsObject:name])
+      XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue should offer %@", name]);
+  for (NSString *gone in @[ @"=Quarter(Now)", @"=Week(Now)", @"=Substring(\"a\", 1, 1)", @"=IsMissing(1)", @"=RowCount(\"Sales\")" ])
+    if (!RDLSawDiagnostic(RDLCheckExpression(gone, YES), @"unknown-function", nil))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not SSRS's and should be reported", gone]);
+}
+
+// Style.Calendar, NumeralLanguage and NumeralVariant, as MS-RDL defines them:
+// dates in the calendar the style names -- the culture's own when it names
+// none, Korean years counted from 2333 BC, a Gregorian variant's names in its
+// language -- and digits in the variant it names for the numeral language: 2
+// the ASCII digits, 3 the script's own for the cultures MS-RDL lists, 4 the
+// ideographic digits and 6 the wide ones for Chinese, Japanese and Korean. They
+// are read, written back and laid out. None of the three was read at all.
+- (void)testCalendarAndNumeralsWriteValuesAsTheStyleSays {
+  RDLTextFormatting *number = [[RDLTextFormatting alloc] init];
+  number.format = @"N2";
+  number.language = @"en-US";
+  NSArray<NSArray *> *digits = @[
+    @[ @"ar-SA", @3, @"١,٢٣٤.٥٠" ], @[ @"ar-SA", @2, @"1,234.50" ],
+    @[ @"ja-JP", @6, @"１,２３４.５０" ], @[ @"zh-CHS", @4, @"一,二三四.五〇" ],
+    @[ @"en-US", @3, @"1,234.50" ], @[ @"ko-KR", @7, @"1,234.50" ]
+  ];
+  for (NSArray *c in digits) {
+    number.numeralLanguage = c[0];
+    number.numeralVariant = [c[1] integerValue];
+    NSString *text = [RDLExpression formatValue:@1234.5 formatting:number];
+    if (![text isEqualToString:c[2]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ variant %@ → %@, want %@", c[0], c[1], text, c[2]]);
+  }
+  NSDateComponents *parts = [[NSDateComponents alloc] init];
+  parts.year = 2026;
+  parts.month = 9;
+  parts.day = 15;
+  parts.hour = 12;
+  NSDate *date = [[NSCalendar currentCalendar] dateFromComponents:parts];
+  RDLTextFormatting *dated = [[RDLTextFormatting alloc] init];
+  dated.language = @"en-US";
+  NSArray<NSArray *> *calendars = @[
+    @[ @(RDLCalendarThaiBuddhist), @"yyyy", @"2569" ], @[ @(RDLCalendarKorean), @"yyyy", @"4359" ],
+    @[ @(RDLCalendarTaiwan), @"yyyy", @"0115" ], @[ @(RDLCalendarGregorianMiddleEastFrench), @"MMMM", @"septembre" ],
+    @[ @(RDLCalendarGregorian), @"yyyy-MM-dd", @"2026-09-15" ]
+  ];
+  for (NSArray *c in calendars) {
+    dated.calendar = (RDLCalendar)[c[0] integerValue];
+    dated.format = c[1];
+    NSString *text = [RDLExpression formatValue:date formatting:dated];
+    if (![text isEqualToString:c[2]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"calendar %@ in %@ → %@, want %@", c[0], c[1], text, c[2]]);
+  }
+
+  RDLReport *r = [RDLReport emptyReportNamed:@"Numerals"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Wide";
+  tb.width = 3;
+  tb.height = 0.3;
+  tb.value = @"=1234";
+  tb.style.calendar = RDLCalendarHebrew;
+  tb.style.numeralLanguage = @"ja-JP";
+  tb.style.numeralVariant = 6;
+  [r.body.items addObject:tb];
+  [r adoptItems];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:r] error:NULL];
+  RDLStyle *read = [(RDLItem *)[back.body.items firstObject] style];
+  if (read.calendar != RDLCalendarHebrew || ![read.numeralLanguage isEqualToString:@"ja-JP"] || read.numeralVariant != 6)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the three should come back as written: %ld %@ %ld", (long)read.calendar,
+                                              read.numeralLanguage, (long)read.numeralVariant]);
+  BOOL wide = NO;
+  for (RDLLaidOutPage *page in [RDLGenerator pagesForReport:back parameters:@{}])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]] &&
+          [[(RDLLaidOutTextbox *)item text] isEqualToString:@"１２３４"])
+        wide = YES;
+  if (!wide)
+    XCTFail(@"%@", @"a text box whose style asks for Japanese wide digits should be laid out in them");
+
+  // The same asked for in part and in whole by expressions, and by a text box
+  // for the runs in it.
+  RDLTextbox *expressed = [[RDLTextbox alloc] init];
+  expressed.name = @"Expressed";
+  expressed.top = 0.5;
+  expressed.width = 3;
+  expressed.height = 0.3;
+  expressed.value = @"=1234";
+  expressed.style.expressions.numeralLanguage = [RDLExpr expressionWithSource:@"=\"ja-JP\""];
+  expressed.style.numeralVariant = 6;
+  RDLTextbox *variant = [[RDLTextbox alloc] init];
+  variant.name = @"Variant";
+  variant.top = 1.5;
+  variant.width = 3;
+  variant.height = 0.3;
+  variant.value = @"=90";
+  variant.style.numeralLanguage = @"ja-JP";
+  variant.style.expressions.numeralVariant = [RDLExpr expressionWithSource:@"=3 + 3"];
+  RDLTextbox *runs = [[RDLTextbox alloc] init];
+  runs.name = @"Runs";
+  runs.top = 1;
+  runs.width = 3;
+  runs.height = 0.3;
+  runs.style.numeralLanguage = @"ja-JP";
+  runs.style.numeralVariant = 6;
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *textRun = [[RDLTextRun alloc] init];
+  textRun.value = @"=5678";
+  [para.runs addObject:textRun];
+  runs.paragraphs = [NSMutableArray arrayWithObject:para];
+  RDLReport *laid = [RDLReport emptyReportNamed:@"Numerals"];
+  [laid.body.items addObjectsFromArray:@[ expressed, runs, variant ]];
+  [laid adoptItems];
+  NSMutableSet<NSString *> *texts = [NSMutableSet set];
+  for (RDLLaidOutPage *page in [RDLGenerator pagesForReport:laid parameters:@{}])
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutTextbox class]]) {
+        RDLLaidOutTextbox *box = (RDLLaidOutTextbox *)item;
+        if (box.text)
+          [texts addObject:box.text];
+        for (RDLParagraph *span in box.spans)
+          for (RDLTextRun *run in span.runs)
+            if (run.value)
+              [texts addObject:run.value];
+      }
+  if (![texts containsObject:@"\uFF11\uFF12\uFF13\uFF14"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a numeral language given by an expression should be used: %@", texts]);
+  if (![texts containsObject:@"\uFF19\uFF10"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a numeral variant given by an expression should be used: %@", texts]);
+  if (![texts containsObject:@"\uFF15\uFF16\uFF17\uFF18"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a run should take its text box's digits: %@", texts]);
+
+  // And the checker reads the three expressions as it reads any style's.
+  RDLReport *checked = RDLCheckableReport();
+  RDLTextbox *styled = [[RDLTextbox alloc] init];
+  styled.name = @"Styled";
+  styled.width = 2;
+  styled.height = 0.3;
+  styled.value = @"=1";
+  styled.style.expressions.calendar = [RDLExpr expressionWithSource:@"=Fields!NoCalendar.Value"];
+  styled.style.expressions.numeralLanguage = [RDLExpr expressionWithSource:@"=Fields!NoNumerals.Value"];
+  styled.style.expressions.numeralVariant = [RDLExpr expressionWithSource:@"=Fields!NoVariant.Value"];
+  [checked.body.items addObject:styled];
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:checked];
+  for (NSString *field in @[ @"NoCalendar", @"NoNumerals", @"NoVariant" ])
+    if (!RDLSawDiagnostic(ds, @"unknown-field", field))
+      XCTFail(@"%@", [NSString stringWithFormat:@"the style's %@ expression should be checked", field]);
+}
+
+// The empty string is a string, as it is in VB: IsNothing("") is False, Count
+// counts it, and arithmetic cannot read it as a number. A typed column's empty
+// value is Nothing, as a data extension hands it over. Is compares references:
+// Nothing Is Nothing, and a value is the same object only as itself. "" was
+// Nothing everywhere, and Is only asked whether each side was Nothing, so
+// 5 Is 6 was True.
+- (void)testAnEmptyStringIsNotNothingAndIsComparesReferences {
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Notes";
+  NSMutableArray<RDLField *> *fields = [NSMutableArray array];
+  for (NSArray *spec in @[ @[ @"Note", @(RDLFieldDataTypeString) ], @[ @"Twin", @(RDLFieldDataTypeString) ],
+                           @[ @"Tally", @(RDLFieldDataTypeInteger) ] ]) {
+    RDLField *field = [[RDLField alloc] init];
+    field.name = spec[0];
+    field.dataField = spec[0];
+    field.dataType = (RDLFieldDataType)[spec[1] integerValue];
+    [fields addObject:field];
+  }
+  ds.fields = fields;
+  // Long enough that the runtime cannot make one object of the two.
+  NSString *one = [NSString stringWithFormat:@"%@ %d", @"a note long enough to be an object of its own", 1];
+  NSString *other = [NSString stringWithFormat:@"%@ %d", @"a note long enough to be an object of its own", 1];
+  ds.rows = @[
+    @{ @"Note" : @"", @"Tally" : @"" }, @{ @"Note" : [NSNull null], @"Tally" : @"3" },
+    @{ @"Note" : one, @"Twin" : other, @"Tally" : @"4" }
+  ];
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  scope.dataSet = ds;
+  scope.groupRows = ds.rows;
+  scope.row = ds.rows[0];
+  for (NSString *source in @[
+         @"=Not IsNothing(Fields!Note.Value)", @"=IsNothing(Fields!Tally.Value)", @"=Len(Fields!Note.Value) = 0",
+         @"=Fields!Note.Value = Nothing", @"=Nothing = 0", @"=String.IsNullOrEmpty(Fields!Note.Value)",
+         @"=String.IsNullOrEmpty(Nothing)", @"=Not String.IsNullOrEmpty(\"a\")", @"=Not IsNothing(\"\")",
+         @"=Nothing Is Nothing", @"=\"\" IsNot Nothing", @"=Fields!Note.Value IsNot Nothing",
+         @"=Not (Fields!Note.Value Is Nothing)", @"=Count(Fields!Note.Value) = 2",
+         @"=CountDistinct(Fields!Note.Value) = 2", @"=Nothing + 1 = 1"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isEqual:@YES])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be True: %@", source,
+                                                [RDLExpression evaluate:source scope:scope]]);
+  for (NSString *source in @[ @"=\"\" + 1", @"=CDate(\"\")", @"=CInt(\"\")", @"=Sum(Fields!Note.Value)" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be #Error: %@", source,
+                                                [RDLExpression evaluate:source scope:scope]]);
+  scope.row = ds.rows[1];
+  for (NSString *source in @[ @"=IsNothing(Fields!Note.Value)", @"=Fields!Note.Value Is Nothing" ])
+    if (![[RDLExpression evaluate:source scope:scope] isEqual:@YES])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be True for a null", source]);
+  scope.row = ds.rows[2];
+  for (NSString *source in @[
+         @"=Fields!Note.Value Is Fields!Note.Value", @"=Fields!Note.Value IsNot Fields!Twin.Value",
+         @"=Fields!Note.Value = Fields!Twin.Value", @"=Not (\"a\" Is Nothing)"
+       ])
+    if (![[RDLExpression evaluate:source scope:scope] isEqual:@YES])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be True", source]);
+  if (!RDLIsNothingValue([RDLExpression evaluate:@"=Nothing" scope:scope]))
+    XCTFail(@"%@", @"Nothing should come back as Nothing, not as \"\"");
+
+  if (!RDLSawDiagnostic(RDLCheckExpression(@"=5 Is Nothing", YES), @"type", @"compares references"))
+    XCTFail(@"%@", @"Is on a number written as a literal should be reported, as VB will not compile it");
+  if (RDLSawDiagnostic(RDLCheckExpression(@"=Fields!Amount.Value Is Nothing", YES), @"type", nil))
+    XCTFail(@"%@", @"Is on a field's value, which is an object, should not be reported");
+}
+
+// What MS-RDL requires of a parameter's settings, reported: a default or list
+// of valid values may read only the parameters declared before it; a
+// DataSetReference names a dataset and its fields; a value written in the
+// parameter is not a blank or a Nothing it refuses; MultiValue is not Nullable;
+// a parameter nobody is asked for has a default; and a single value has one
+// default. None was reported.
+- (void)testParameterSettingsAreChecked {
+  RDLReport *r = RDLCheckableReport();
+  RDLParameter * (^parameter)(NSString *) = ^RDLParameter *(NSString *name) {
+    RDLParameter *p = [[RDLParameter alloc] init];
+    p.name = name;
+    p.prompt = name;
+    p.dataType = RDLParameterDataTypeString;
+    p.defaultValue = [RDLValue literal:@"x"];
+    [r.parameters addObject:p];
+    return p;
+  };
+  parameter(@"Early").defaultValue = [RDLValue valueWithSource:@"=Parameters!Later.Value"];
+  parameter(@"Later").defaultValue = [RDLValue valueWithSource:@"=Parameters!Early.Value"];
+  RDLParameter *elsewhere = parameter(@"Elsewhere");
+  elsewhere.validValuesReference = [[RDLDataSetReference alloc] init];
+  elsewhere.validValuesReference.dataSetName = @"Nope";
+  elsewhere.validValuesReference.valueField = @"Code";
+  RDLParameter *field = parameter(@"Field");
+  field.defaultValue = nil;
+  field.defaultValuesReference = [[RDLDataSetReference alloc] init];
+  field.defaultValuesReference.dataSetName = @"Sales";
+  field.defaultValuesReference.valueField = @"Missing";
+  parameter(@"Blank").defaultValue = [RDLValue literal:@""];
+  RDLParameter *allowed = parameter(@"Allowed");
+  allowed.defaultValue = [RDLValue literal:@""];
+  allowed.allowBlank = YES;
+  RDLParameter *nothing = parameter(@"Nothing");
+  nothing.dataType = RDLParameterDataTypeInteger;
+  nothing.defaultValue = [RDLValue valueWithSource:@"=Nothing"];
+  RDLParameter *both = parameter(@"Both");
+  both.multiValue = YES;
+  both.nullable = YES;
+  RDLParameter *unasked = parameter(@"Unasked");
+  unasked.prompt = nil;
+  unasked.defaultValue = nil;
+  RDLParameter *two = parameter(@"Two");
+  two.defaultValue = nil;
+  [two.defaultValues addObjectsFromArray:@[ [RDLValue literal:@"a"], [RDLValue literal:@"b"] ]];
+
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:r];
+  NSArray<NSArray<NSString *> *> *expected = @[
+    @[ @"parameter-dependency", @"'Later' is not declared before" ], @[ @"unknown-dataset", @"'Nope'" ],
+    @[ @"unknown-field", @"'Missing'" ], @[ @"parameter-value", @"'Blank' does not allow a blank" ],
+    @[ @"parameter-value", @"'Nothing' is not Nullable" ], @[ @"parameter-definition", @"'Both' is both" ],
+    @[ @"parameter-definition", @"'Unasked' is not asked for" ], @[ @"parameter-value", @"'Two' takes one value" ]
+  ];
+  for (NSArray<NSString *> *want in expected)
+    if (!RDLSawDiagnostic(ds, want[0], want[1]))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be reported: %@", want[1], ds]);
+  for (NSArray<NSString *> *quiet in @[ @[ @"parameter-dependency", @"'Early' is not declared before" ],
+                                        @[ @"parameter-value", @"'Allowed' does not allow" ] ])
+    if (RDLSawDiagnostic(ds, quiet[0], quiet[1]))
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should not be reported", quiet[1]]);
+}
+
+// A report's parameters, worked out as a report server works them out before it
+// renders: each in its type; Nothing and "" only where Nullable and AllowBlank
+// allow them; one of its valid values, written or read from a dataset whose
+// filters read an earlier parameter, so one list cascades from another; its
+// default where none is given, from a dataset or written, dropped whole when a
+// value in it is not valid; and a value given to a parameter with no Prompt
+// refused. What is wrong is said, and the value given still reaches the report.
+// Parameters were read one at a time as expressions asked for them: no valid
+// values but written ones, no default from a dataset, and nothing checked.
+- (void)testParametersAreWorkedOutAsTheReportDefinesThem {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Resolved"];
+  RDLDataSet *regions = [[RDLDataSet alloc] init];
+  regions.name = @"Regions";
+  NSMutableArray<RDLField *> *fields = [NSMutableArray array];
+  for (NSString *name in @[ @"Code", @"Name", @"Zone" ]) {
+    RDLField *field = [[RDLField alloc] init];
+    field.name = name;
+    field.dataField = name;
+    field.dataType = RDLFieldDataTypeString;
+    [fields addObject:field];
+  }
+  regions.fields = fields;
+  regions.rows = @[
+    @{ @"Code" : @"N", @"Name" : @"North", @"Zone" : @"A" }, @{ @"Code" : @"S", @"Name" : @"South", @"Zone" : @"B" },
+    @{ @"Code" : @"E", @"Name" : @"East", @"Zone" : @"B" }
+  ];
+  RDLFilter *zoned = [[RDLFilter alloc] init];
+  zoned.expression = [RDLValue valueWithSource:@"=Fields!Zone.Value"];
+  zoned.oper = RDLFilterOperatorEqual;
+  [zoned.values addObject:[RDLValue valueWithSource:@"=Parameters!Zone.Value"]];
+  regions.filters = [NSMutableArray arrayWithObject:zoned];
+  [r.dataSets addObject:regions];
+  RDLDataSetReference * (^reference)(NSString *) = ^RDLDataSetReference *(NSString *label) {
+    RDLDataSetReference *ref = [[RDLDataSetReference alloc] init];
+    ref.dataSetName = @"Regions";
+    ref.valueField = @"Code";
+    ref.labelField = label;
+    return ref;
+  };
+  RDLParameter * (^parameter)(NSString *, RDLParameterDataType) = ^RDLParameter *(NSString *name, RDLParameterDataType type) {
+    RDLParameter *p = [[RDLParameter alloc] init];
+    p.name = name;
+    p.prompt = name;
+    p.dataType = type;
+    [r.parameters addObject:p];
+    return p;
+  };
+  parameter(@"Zone", RDLParameterDataTypeString).defaultValue = [RDLValue literal:@"A"];
+  RDLParameter *region = parameter(@"Region", RDLParameterDataTypeString);
+  region.validValuesReference = reference(@"Name");
+  region.defaultValuesReference = reference(nil);
+  RDLParameter *several = parameter(@"Regions", RDLParameterDataTypeString);
+  several.multiValue = YES;
+  several.validValuesReference = reference(nil);
+  several.defaultValuesReference = reference(nil);
+  parameter(@"Copies", RDLParameterDataTypeInteger).defaultValue = [RDLValue literal:@"2"];
+  parameter(@"Note", RDLParameterDataTypeString);
+  parameter(@"Rate", RDLParameterDataTypeFloat).nullable = YES;
+  parameter(@"Rush", RDLParameterDataTypeBoolean).nullable = YES;
+  parameter(@"Due", RDLParameterDataTypeDateTime).nullable = YES;
+  RDLParameter *season = parameter(@"Season", RDLParameterDataTypeString);
+  [season.validValues addObjectsFromArray:@[ [RDLValue literal:@"Spring"], [RDLValue literal:@"Summer"] ]];
+  season.defaultValue = [RDLValue literal:@"Winter"];
+  season.nullable = YES;
+  RDLParameter *fixed = parameter(@"Fixed", RDLParameterDataTypeString);
+  fixed.prompt = nil;
+  fixed.defaultValue = [RDLValue literal:@"as written"];
+
+  RDLParameterValues * (^resolve)(NSDictionary *) = ^RDLParameterValues *(NSDictionary *given) {
+    return [[RDLParameterValues alloc] initWithReport:r supplied:given environment:nil];
+  };
+  NSString * (^said)(RDLParameterValues *) = ^NSString *(RDLParameterValues *values) {
+    NSMutableArray *lines = [NSMutableArray array];
+    for (RDLParameterValue *v in values.values)
+      [lines addObject:[NSString stringWithFormat:@"%@=%@ (%ld)", v.parameter.name, v.value, (long)v.problem]];
+    return [lines componentsJoinedByString:@"; "];
+  };
+
+  RDLParameterValues *first =
+      resolve(@{ @"Note" : @"hello", @"Rate" : @"2.5", @"Rush" : @"True", @"Due" : @"2026-03-01" });
+  if ([first.problems count] || ![[first valueNamed:@"zone"].value isEqual:@"A"] ||
+      ![[first valueNamed:@"Region"].value isEqual:@"N"] || ![[first valueNamed:@"Region"].labels isEqual:@[ @"North" ]] ||
+      [[first valueNamed:@"Region"].validValues count] != 1 || ![[first valueNamed:@"Regions"].value isEqual:@[ @"N" ]] ||
+      ![[first valueNamed:@"Copies"].value isEqual:[RDLNumber numberWithInteger:2]] ||
+      RDLNumericTypeOfValue([first valueNamed:@"Copies"].value) != RDLNumericTypeInteger ||
+      ![[first valueNamed:@"Rate"].value isEqual:[RDLNumber numberWithDouble:2.5]] || ![[first valueNamed:@"Rush"].value isEqual:@YES] ||
+      ![[first valueNamed:@"Due"].value isKindOfClass:[NSDate class]] || [first valueNamed:@"Season"].value != nil ||
+      ![[first valueNamed:@"Fixed"].value isEqual:@"as written"] || ![first valueNamed:@"Region"].defaulted)
+    XCTFail(@"%@", [NSString stringWithFormat:@"defaults, types and a list read from a dataset: %@", said(first)]);
+
+  RDLParameterValues *second = resolve(@{
+    @"Zone" : @"B", @"Region" : @"E", @"Regions" : @[ @"S", @"N" ], @"Note" : @"", @"Copies" : @"two",
+    @"Fixed" : @"changed"
+  });
+  if (![[second valueNamed:@"Region"].value isEqual:@"E"] || ![[second valueNamed:@"Region"].labels isEqual:@[ @"East" ]] ||
+      [second valueNamed:@"Region"].problem != RDLParameterProblemUnspecified ||
+      [[second valueNamed:@"Region"].validValues count] != 2 ||
+      [second valueNamed:@"Regions"].problem != RDLParameterProblemNotValid ||
+      [second valueNamed:@"Note"].problem != RDLParameterProblemBlank ||
+      [second valueNamed:@"Copies"].problem != RDLParameterProblemWrongType ||
+      ![[second valueNamed:@"Copies"].value isKindOfClass:[RDLExprError class]] ||
+      [second valueNamed:@"Fixed"].problem != RDLParameterProblemReadOnly)
+    XCTFail(@"%@", [NSString stringWithFormat:@"a list that cascades, and what is refused: %@", said(second)]);
+
+  RDLParameterValues *third = resolve(@{ @"Zone" : @"B", @"Note" : [NSNull null], @"Rush" : @"maybe", @"Due" : @"soon" });
+  if (![[third valueNamed:@"Region"].value isEqual:@"S"] || ![[third valueNamed:@"Regions"].value isEqual:(@[ @"S", @"E" ])] ||
+      [third valueNamed:@"Note"].problem != RDLParameterProblemNull ||
+      [third valueNamed:@"Rush"].problem != RDLParameterProblemWrongType ||
+      [third valueNamed:@"Due"].problem != RDLParameterProblemWrongType)
+    XCTFail(@"%@", [NSString stringWithFormat:@"defaults from the cascaded list, and more refused: %@", said(third)]);
+  if ([resolve(@{}) valueNamed:@"Note"].problem != RDLParameterProblemMissingValue ||
+      [[resolve(@{}) valueNamed:@"Note"].problemDescription rangeOfString:@"'Note' parameter is missing a value"].location == NSNotFound)
+    XCTFail(@"%@", @"a parameter with no value, no default and no Nullable is missing a value");
+
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.report = r;
+  scope.paramValues = @{ @"Zone" : @"B", @"Region" : @"S", @"Note" : @"x" };
+  [self expectText:@"=Parameters!Region.Label" scope:scope equals:@"South"];
+  [self expectNumber:@"=Parameters!Regions.Count" scope:scope equals:2];
+  [self expectText:@"=Join(Parameters!Regions.Label, \",\")" scope:scope equals:@"S,E"];
+  [self expectTrue:@"=Parameters!Regions.IsMultiValue" scope:scope];
+  [self expectNumber:@"=Parameters!Copies.Value + 1" scope:scope equals:3];
+  scope.paramValues = @{ @"Zone" : @"A", @"Note" : @"x" };
+  [self expectText:@"=Parameters!Region.Value" scope:scope equals:@"N"];
+}
+
+// A QueryParameter's value may read the report's parameters and nothing the
+// query runs before: no field, report item, variable or aggregate, as MS-RDL's
+// rsFieldInQueryParameterExpression and its kin say. None was checked.
+- (void)testQueryParameterValuesAreChecked {
+  RDLReport *r = RDLCheckableReport();
+  NSMutableArray<RDLQueryParameter *> *given = [NSMutableArray array];
+  for (NSArray<NSString *> *spec in @[
+         @[ @"Year", @"=Parameters!Year.Value" ], @[ @"Field", @"=Fields!Amount.Value" ], @[ @"Total", @"=Sum(1)" ],
+         @[ @"Item", @"=ReportItems!T.Value" ]
+       ]) {
+    RDLQueryParameter *qp = [[RDLQueryParameter alloc] init];
+    qp.name = spec[0];
+    qp.value = [RDLValue valueWithSource:spec[1]];
+    [given addObject:qp];
+  }
+  r.dataSets[0].queryParameters = given;
+  NSArray<RDLDiagnostic *> *ds = [RDLChecker checkReport:r];
+  NSUInteger reported = 0;
+  for (RDLDiagnostic *d in ds)
+    if ([d.rule isEqualToString:@"query-parameter"])
+      reported += 1;
+  if (reported != 3 || !RDLSawDiagnostic(ds, @"query-parameter", @"Fields!Amount") ||
+      !RDLSawDiagnostic(ds, @"query-parameter", @"may not read Sum") ||
+      !RDLSawDiagnostic(ds, @"query-parameter", @"ReportItems!T"))
+    XCTFail(@"%@", [NSString stringWithFormat:@"a field, an aggregate and a report item should be reported, and a parameter not: %lu",
+                                              (unsigned long)reported]);
+}
+
+// Bytes from base-64 text and back, which is how an image read from data is
+// written where data can hold only text. Neither was known.
+- (void)testBase64ConvertsToBytesAndBack {
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  [self expectText:@"=Convert.ToBase64String(Convert.FromBase64String(\"aGVs bG8=\"))" scope:scope equals:@"aGVsbG8="];
+  if (![[RDLExpression evaluate:@"=Convert.FromBase64String(\"aGVsbG8=\")" scope:scope]
+          isEqual:[@"hello" dataUsingEncoding:NSUTF8StringEncoding]])
+    XCTFail(@"%@", @"FromBase64String should give the bytes");
+  for (NSString *source in @[ @"=Convert.FromBase64String(\"!!\")", @"=Convert.ToBase64String(\"text\")" ])
+    if (![[RDLExpression evaluate:source scope:scope] isKindOfClass:[RDLExprError class]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be #Error", source]);
+  if (RDLSawDiagnostic(RDLCheckExpression(@"=Convert.ToBase64String(Convert.FromBase64String(\"aGk=\"))", NO), @"unknown-member", nil))
+    XCTFail(@"%@", @"the checker should know both");
+}
+
+@end
+
+// One line of the Decimal fixture worked out by RDLNumber, written as the
+// fixture writes .NET's answer.
+static NSString *RDLDecimalCaseText(NSArray<NSString *> *p) {
+  NSString *op = p[0];
+  RDLNumber *a = [p count] > 1 ? [RDLNumber decimalWithText:p[1]] : nil;
+  RDLNumber *b = [p count] > 2 ? [RDLNumber decimalWithText:p[2]] : nil;
+  RDLNumberFailure failure = RDLNumberFailureUnspecified;
+  RDLNumber *r = nil;
+  if ([op isEqualToString:@"fromdouble"])
+    // strtod, not -[NSString doubleValue]: GNUstep's doubleValue drops digits
+    // past ~18 on a large-magnitude literal (123456789012345680000 parses as
+    // 1.23...e17), which would misread the fixture's operand, not the result.
+    r = [[RDLNumber numberWithDouble:strtod([p[1] UTF8String], NULL)] numberConvertedTo:RDLConversionTargetDecimal failure:&failure];
+  else if ([op isEqualToString:@"fromsingle"])
+    r = [[RDLNumber numberWithSingle:strtof([p[1] UTF8String], NULL)] numberConvertedTo:RDLConversionTargetDecimal
+                                                                         failure:&failure];
+  else if ([op isEqualToString:@"parse"])
+    r = a;
+  else if (a == nil)
+    return @"!overflow";
+  else if ([op isEqualToString:@"cmp"])
+    return [NSString stringWithFormat:@"%ld", (long)[a compare:b]];
+  else if ([op isEqualToString:@"add"])
+    r = [a numberByAdding:b failure:&failure];
+  else if ([op isEqualToString:@"sub"])
+    r = [a numberBySubtracting:b failure:&failure];
+  else if ([op isEqualToString:@"mul"])
+    r = [a numberByMultiplyingBy:b failure:&failure];
+  else if ([op isEqualToString:@"div"])
+    r = [a numberByDividingBy:b failure:&failure];
+  else if ([op isEqualToString:@"mod"])
+    r = [a numberByModulo:b failure:&failure];
+  else if ([op isEqualToString:@"round"])
+    r = [a numberRoundedToDigits:[p[2] integerValue]
+                        midpoint:[p[3] isEqualToString:@"away"] ? RDLMidpointRoundingAwayFromZero : RDLMidpointRoundingToEven
+                         failure:&failure];
+  else if ([op isEqualToString:@"floor"] || [op isEqualToString:@"int"])
+    r = [a numberByRounding:RDLWholeRoundingFloor];
+  else if ([op isEqualToString:@"ceiling"])
+    r = [a numberByRounding:RDLWholeRoundingCeiling];
+  else if ([op isEqualToString:@"truncate"] || [op isEqualToString:@"fix"])
+    r = [a numberByRounding:RDLWholeRoundingTruncate];
+  else if ([op isEqualToString:@"neg"])
+    r = [a negatedWithFailure:&failure];
+  else if ([op isEqualToString:@"abs"])
+    r = [a absoluteValueWithFailure:&failure];
+  else if ([op isEqualToString:@"clng"])
+    r = [a numberConvertedTo:RDLConversionTargetLong failure:&failure];
+  else
+    return [@"unknown operation " stringByAppendingString:op];
+  if (r)
+    return [r description];
+  return failure == RDLNumberFailureDivisionByZero ? @"!divzero" : @"!overflow";
+}
+
+@implementation RDLExpressionTests (Decimal)
+
+// Decimal is .NET's own: a 96-bit whole number, 0 to 28 places and a sign. Its
+// places are part of its text, and its rounding, overflow, Mod and conversion
+// from a Double are .NET's, which the fixture holds it to case by case --
+// operands at random and at the edges, each with what .NET 8 made of them.
+// Decimal used to be NSDecimalNumber, which kept no places (1.10D wrote "1.1"),
+// and whose text GNUstep writes in scientific notation.
+- (void)testDecimalArithmeticIsDotNets {
+  NSString *fixture = [[NSString alloc] initWithData:[self fixtureNamed:@"decimal-dotnet.txt"]
+                                            encoding:NSUTF8StringEncoding];
+  NSMutableArray<NSString *> *wrong = [NSMutableArray array];
+  NSUInteger cases = 0;
+  for (NSString *line in [fixture componentsSeparatedByString:@"\n"]) {
+    NSRange arrow = [line rangeOfString:@" => "];
+    if ([line hasPrefix:@"#"] || arrow.location == NSNotFound)
+      continue;
+    cases += 1;
+    NSString *want = [line substringFromIndex:NSMaxRange(arrow)];
+    NSString *got = RDLDecimalCaseText([[line substringToIndex:arrow.location] componentsSeparatedByString:@" "]);
+    if (![got isEqualToString:want])
+      [wrong addObject:[NSString stringWithFormat:@"%@, not %@", line, got]];
+  }
+  if (cases == 0)
+    XCTFail(@"%@", @"the Decimal fixture should have cases");
+  if ([wrong count])
+    XCTFail(@"%lu of %lu Decimal cases differ from .NET: %@", (unsigned long)[wrong count], (unsigned long)cases,
+            [wrong subarrayWithRange:NSMakeRange(0, MIN([wrong count], (NSUInteger)10))]);
+
+  // And through the expression language, as CStr and Format write the results.
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
+  scope.language = @"en-US";
+  NSDictionary<NSString *, NSString *> *written = @{
+    @"=CStr(1.10D)" : @"1.10",
+    @"=CStr(1.10D + 1D)" : @"2.10",
+    @"=CStr(100D * 1.00D)" : @"100.00",
+    @"=CStr(0.00D * 5D)" : @"0.00",
+    @"=CStr(2D / 3D)" : @"0.6666666666666666666666666667",
+    @"=CStr(1.0D / 4D)" : @"0.25",
+    @"=CStr(10.00D / 4D)" : @"2.50",
+    @"=CStr(7.50D Mod 2.0D)" : @"1.50",
+    @"=CStr(1.5D Mod 2D)" : @"1.5",
+    @"=CStr(CDec(661777.4807356275))" : @"661777.480735628",
+    @"=CStr(CDec(\"1.0000000000000000000000000000001\"))" : @"1.0000000000000000000000000000",
+    @"=CStr(79228162514264337593543950335D + 0.1D)" : @"79228162514264337593543950335",
+    @"=CStr(1.10D = 1.1D)" : @"True",
+    @"=Format(1.10D, \"G\")" : @"1.10",
+    @"=Format(1.10D, \"G5\")" : @"1.1",
+  };
+  for (NSString *source in written) {
+    NSString *got = [RDLExpression evaluateText:source scope:scope];
+    if (![got isEqualToString:written[source]])
+      XCTFail(@"%@ → %@, want %@", source, got, written[source]);
+  }
+  if (![[RDLExpression evaluate:@"=79228162514264337593543950335D + 0.5D" scope:scope] isKindOfClass:[RDLExprError class]])
+    XCTFail(@"%@", @"a Decimal that rounds past the largest should be the overflow VB throws");
+}
+
+
+// Renaming a report item has to follow it everywhere it is named: in any
+// expression -- a value, a run, a style, a visibility, a group, a variable --
+// in any band, inside rectangles and tablix cells, and in every ToggleItem.
+// Found by token, so a string that happens to say ReportItems!Total, and a name
+// that only starts the same, are left alone.
+- (void)testAReportItemsReferencesAreFoundAndRenamed {
+  RDLExpr *e = [RDLExpr expressionWithSource:
+      @"=ReportItems!Total.Value &  reportitems!Total.Value + \"ReportItems!Total\" & ReportItems!Totals.Value & Fields!Total.Value"];
+  NSString *renamed = [e sourceRenamingReferenceIn:@"ReportItems" from:@"Total" to:@"Sum"];
+  if (![renamed isEqualToString:
+          @"=ReportItems!Sum.Value &  reportitems!Sum.Value + \"ReportItems!Total\" & ReportItems!Totals.Value & Fields!Total.Value"])
+    XCTFail(@"renamed to %@", renamed);
+  if ([[RDLExpr expressionWithSource:@"=Fields!Total.Value"] sourceRenamingReferenceIn:@"ReportItems"
+                                                                                   from:@"Total"
+                                                                                     to:@"Sum"] != nil)
+    XCTFail(@"%@", @"an expression that does not refer to it should say so");
+
+  NSString *ref = @"=ReportItems!Total.Value";
+  RDLReport *r = [RDLReport emptyReportNamed:@"Refs"];
+  RDLTextbox *total = [[RDLTextbox alloc] init];
+  total.name = @"Total";
+  total.value = @"=Sum(Fields!A.Value)";
+  RDLTextbox *header = [[RDLTextbox alloc] init];
+  header.value = ref;
+  [r.pageHeader.items addObject:header];
+  RDLTextbox *rich = [[RDLTextbox alloc] init];
+  RDLTextRun *run = [[RDLTextRun alloc] init];
+  run.value = ref;
+  run.toolTip = [RDLValue valueWithSource:ref];
+  RDLParagraph *paragraph = [[RDLParagraph alloc] init];
+  paragraph.runs = [@[ run ] mutableCopy];
+  rich.paragraphs = [@[ paragraph ] mutableCopy];
+  rich.value = ref;
+  rich.style.expressions = [[RDLStyleExpressions alloc] init];
+  rich.style.expressions.color = [RDLExpr expressionWithSource:@"=IIf(ReportItems!Total.Value > 1, \"Red\", \"Black\")"];
+  RDLRectangle *panel = [[RDLRectangle alloc] init];
+  panel.hidden = [RDLValue valueWithSource:@"=ReportItems!Total.Value = 0"];
+  panel.toggleItem = @"Total";
+  RDLImage *picture = [[RDLImage alloc] init];
+  picture.hyperlink = [RDLValue valueWithSource:@"=\"#\" & ReportItems!Total.Value"];
+  panel.items = [@[ picture ] mutableCopy];
+  RDLTablix *tablix = [[RDLTablix alloc] init];
+  tablix.tablixBody = [[RDLTablixBody alloc] init];
+  RDLTablixRow *row = [[RDLTablixRow alloc] init];
+  RDLTablixCell *cell = [[RDLTablixCell alloc] init];
+  RDLTextbox *inCell = [[RDLTextbox alloc] init];
+  inCell.value = ref;
+  cell.item = inCell;
+  row.cells = [@[ cell ] mutableCopy];
+  tablix.tablixBody.rows = [@[ row ] mutableCopy];
+  tablix.rowHierarchy = [[RDLTablixHierarchy alloc] init];
+  RDLTablixMember *member = [[RDLTablixMember alloc] init];
+  member.toggleItem = @"Total";
+  member.groupExpressions = [@[ [RDLValue literal:@"ReportItems!Total"], [RDLValue valueWithSource:ref] ] mutableCopy];
+  tablix.rowHierarchy.members = [@[ member ] mutableCopy];
+  RDLTextbox *other = [[RDLTextbox alloc] init];
+  other.value = @"=ReportItems!Totals.Value";
+  other.toggleItem = @"Totals";
+  [r.body.items addObjectsFromArray:@[ total, rich, panel, tablix, other ]];
+  RDLVariable *variable = [[RDLVariable alloc] init];
+  variable.name = @"Doubled";
+  variable.value = [RDLValue valueWithSource:@"=ReportItems!Total.Value * 2"];
+  r.variables = [@[ variable ] mutableCopy];
+
+  NSUInteger changed = 0;
+  for (RDLReferenceSite *site in [r referenceSites]) {
+    id next = [site valueRenamingReportItem:@"Total" to:@"Sum"];
+    if (next) {
+      [site setValue:next];
+      changed += 1;
+    }
+  }
+  NSString *want = @"=ReportItems!Sum.Value";
+  NSDictionary<NSString *, NSString *> *seen = @{
+    @"page header" : header.value ?: @"",
+    @"run" : run.value ?: @"",
+    @"run tooltip" : [run.toolTip source] ?: @"",
+    @"text box" : rich.value ?: @"",
+    @"cell" : inCell.value ?: @"",
+    @"group expression" : [member.groupExpressions[1] source] ?: @"",
+  };
+  for (NSString *where in seen)
+    if (![seen[where] isEqualToString:want])
+      XCTFail(@"the %@ reads %@", where, seen[where]);
+  if (![[rich.style.expressions.color source] isEqualToString:@"=IIf(ReportItems!Sum.Value > 1, \"Red\", \"Black\")"])
+    XCTFail(@"the style reads %@", [rich.style.expressions.color source]);
+  if (![[panel.hidden source] isEqualToString:@"=ReportItems!Sum.Value = 0"] ||
+      ![[picture.hyperlink source] isEqualToString:@"=\"#\" & ReportItems!Sum.Value"])
+    XCTFail(@"the rectangle reads %@ and its image %@", [panel.hidden source], [picture.hyperlink source]);
+  if (![[variable.value source] isEqualToString:@"=ReportItems!Sum.Value * 2"])
+    XCTFail(@"the variable reads %@", [variable.value source]);
+  if (![panel.toggleItem isEqualToString:@"Sum"] || ![member.toggleItem isEqualToString:@"Sum"])
+    XCTFail(@"the toggles read %@ and %@", panel.toggleItem, member.toggleItem);
+  // What was not a reference to it is as it was.
+  if (![[member.groupExpressions[0] source] isEqualToString:@"ReportItems!Total"] ||
+      ![other.value isEqualToString:@"=ReportItems!Totals.Value"] || ![other.toggleItem isEqualToString:@"Totals"] ||
+      ![total.value isEqualToString:@"=Sum(Fields!A.Value)"])
+    XCTFail(@"%@", @"what did not refer to Total should not have changed");
+  if (changed != 12)
+    XCTFail(@"%lu places changed, not 12", (unsigned long)changed);
 }
 
 @end

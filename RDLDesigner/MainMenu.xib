@@ -76,9 +76,14 @@
                                 <menu key="submenu" title="Samples" id="samplesMenu"/>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="fileSep3"/>
-                            <menuItem title="Preview" keyEquivalent="p" id="previewItem">
+                            <menuItem title="Preview" keyEquivalent="P" id="previewItem">
                                 <connections>
                                     <action selector="preview:" target="-2" id="previewAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Print…" keyEquivalent="p" id="printItem">
+                                <connections>
+                                    <action selector="printDocument:" target="-1" id="printAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Export PDF…" keyEquivalent="e" id="exportItem">
@@ -128,6 +133,102 @@
                                     <action selector="duplicate:" target="-1" id="duplicateAction"/>
                                 </connections>
                             </menuItem>
+                            <menuItem isSeparatorItem="YES" id="arrangeSep"/>
+                            <menuItem title="Bring to Front" keyEquivalent="F" id="bringToFrontItem">
+                                <connections>
+                                    <action selector="bringToFront:" target="-1" id="bringToFrontItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Bring Forward" keyEquivalent="f" id="bringForwardItem">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="bringForward:" target="-1" id="bringForwardItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send Backward" keyEquivalent="b" id="sendBackwardItem">
+                                <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
+                                <connections>
+                                    <action selector="sendBackward:" target="-1" id="sendBackwardItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send to Back" keyEquivalent="B" id="sendToBackItem">
+                                <connections>
+                                    <action selector="sendToBack:" target="-1" id="sendToBackItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align" id="alignMenuItem">
+                                <menu key="submenu" title="Align" id="alignMenuItemMenu">
+                                    <items>
+                            <menuItem title="Left Edges" keyEquivalent="" id="alignLeftItem">
+                                <connections>
+                                    <action selector="alignLeftEdges:" target="-1" id="alignLeftItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Centres" keyEquivalent="" id="alignCentresItem">
+                                <connections>
+                                    <action selector="alignHorizontalCenters:" target="-1" id="alignCentresItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Right Edges" keyEquivalent="" id="alignRightItem">
+                                <connections>
+                                    <action selector="alignRightEdges:" target="-1" id="alignRightItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Top Edges" keyEquivalent="" id="alignTopItem">
+                                <connections>
+                                    <action selector="alignTopEdges:" target="-1" id="alignTopItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Middles" keyEquivalent="" id="alignMiddlesItem">
+                                <connections>
+                                    <action selector="alignVerticalCenters:" target="-1" id="alignMiddlesItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Bottom Edges" keyEquivalent="" id="alignBottomItem">
+                                <connections>
+                                    <action selector="alignBottomEdges:" target="-1" id="alignBottomItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Make Same Size" id="sameSizeMenuItem">
+                                <menu key="submenu" title="Make Same Size" id="sameSizeMenuItemMenu">
+                                    <items>
+                            <menuItem title="Width" keyEquivalent="" id="sameWidthItem">
+                                <connections>
+                                    <action selector="makeSameWidth:" target="-1" id="sameWidthItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Height" keyEquivalent="" id="sameHeightItem">
+                                <connections>
+                                    <action selector="makeSameHeight:" target="-1" id="sameHeightItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Both" keyEquivalent="" id="sameSizeItem">
+                                <connections>
+                                    <action selector="makeSameSize:" target="-1" id="sameSizeItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
+                            <menuItem title="Distribute" id="distributeMenuItem">
+                                <menu key="submenu" title="Distribute" id="distributeMenuItemMenu">
+                                    <items>
+                            <menuItem title="Across" keyEquivalent="" id="distributeAcrossItem">
+                                <connections>
+                                    <action selector="distributeHorizontally:" target="-1" id="distributeAcrossItemAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Down" keyEquivalent="" id="distributeDownItem">
+                                <connections>
+                                    <action selector="distributeVertically:" target="-1" id="distributeDownItemAction"/>
+                                </connections>
+                            </menuItem>
+                                    </items>
+                                </menu>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="editSep2"/>
                             <menuItem title="Add Element…" keyEquivalent="A" id="addElementItem">
                                 <connections>
@@ -139,6 +240,12 @@
                                     <action selector="delete:" target="-2" id="deleteAction"/>
                                 </connections>
                             </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="View" id="viewMenuItem">
+                    <menu key="submenu" title="View" id="viewMenu">
+                        <items>
                             <menuItem title="Toggle Grid" keyEquivalent="g" id="toggleGridItem">
                                 <connections>
                                     <action selector="toggleGrid:" target="-2" id="toggleGridAction"/>
@@ -152,6 +259,12 @@
                             <menuItem title="Zoom Out" keyEquivalent="-" id="zoomOutItem">
                                 <connections>
                                     <action selector="zoomOut:" target="-2" id="zoomOutAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="viewSep1"/>
+                            <menuItem title="Row and Column Groups" keyEquivalent="G" id="groupsPaneItem">
+                                <connections>
+                                    <action selector="toggleGroupsPane:" target="-2" id="groupsPaneAction"/>
                                 </connections>
                             </menuItem>
                         </items>

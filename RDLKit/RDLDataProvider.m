@@ -42,36 +42,126 @@ NSString *RDLStringFromDataProviderKind(RDLDataProviderKind kind) {
   return @"";
 }
 
+// A quoted value starting at `*at`: up to its closing quote, a doubled quote
+// being one of it. `*at` ends past the closing quote.
+static NSString *RDLConnectionQuoted(NSString *text, NSUInteger *at) {
+  NSString *quote = [text substringWithRange:NSMakeRange(*at, 1)];
+  NSMutableString *out = [NSMutableString string];
+  NSUInteger i = *at + 1, n = [text length];
+  while (i < n) {
+    NSRange next = [text rangeOfString:quote options:0 range:NSMakeRange(i, n - i)];
+    if (next.location == NSNotFound) {
+      [out appendString:[text substringFromIndex:i]];
+      i = n;
+      break;
+    }
+    [out appendString:[text substringWithRange:NSMakeRange(i, next.location - i)]];
+    i = next.location + 1;
+    if (i < n && [text characterAtIndex:i] == [quote characterAtIndex:0]) {
+      [out appendString:quote];
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  *at = i;
+  return out;
+}
+
+static BOOL RDLIsQuote(unichar c) {
+  return c == '"' || c == '\'';
+}
+
 NSDictionary<NSString *, NSString *> *RDLConnectionProperties(NSString *connectString) {
   NSMutableDictionary *out = [NSMutableDictionary dictionary];
   NSCharacterSet *space = [NSCharacterSet whitespaceAndNewlineCharacterSet];
-  for (NSString *part in [connectString componentsSeparatedByString:@";"]) {
-    NSString *token = [part stringByTrimmingCharactersInSet:space];
-    if ([token length] == 0)
-      continue;
-    NSRange eq = [token rangeOfString:@"="];
-    // A bare token is the document: "data.csv;HasHeaders=true" names its file
-    // that way, and so does a path someone pasted in whole.
-    if (eq.location == NSNotFound) {
-      if (out[@""] == nil)
-        out[@""] = token;
+  NSString *text = connectString ?: @"";
+  NSUInteger n = [text length], i = 0;
+  while (i < n) {
+    unichar c = [text characterAtIndex:i];
+    if ([space characterIsMember:c] || c == ';') {
+      i += 1;
       continue;
     }
-    NSString *key = [[[token substringToIndex:eq.location] stringByTrimmingCharactersInSet:space]
-        lowercaseString];
-    NSString *value =
-        [[token substringFromIndex:eq.location + 1] stringByTrimmingCharactersInSet:space];
-    if ([key length])
-      out[key] = value;
+    // A bare token is the document: "data.csv;HasHeaders=true" names its file
+    // that way, and so does a path someone pasted in whole -- quoted, when it
+    // holds a ";".
+    if (RDLIsQuote(c)) {
+      NSString *document = RDLConnectionQuoted(text, &i);
+      while (i < n && [text characterAtIndex:i] != ';')
+        i += 1;
+      if (out[@""] == nil)
+        out[@""] = document;
+      continue;
+    }
+    NSMutableString *key = [NSMutableString string];
+    BOOL paired = NO;
+    while (i < n) {
+      unichar k = [text characterAtIndex:i];
+      if (k == ';')
+        break;
+      if (k == '=') {
+        if (i + 1 < n && [text characterAtIndex:i + 1] == '=') {
+          [key appendString:@"="];
+          i += 2;
+          continue;
+        }
+        paired = YES;
+        i += 1;
+        break;
+      }
+      [key appendFormat:@"%C", k];
+      i += 1;
+    }
+    NSString *name = [key stringByTrimmingCharactersInSet:space];
+    if (!paired) {
+      if ([name length] && out[@""] == nil)
+        out[@""] = name;
+      continue;
+    }
+    while (i < n && [space characterIsMember:[text characterAtIndex:i]] && [text characterAtIndex:i] != ';')
+      i += 1;
+    NSString *value = nil;
+    if (i < n && RDLIsQuote([text characterAtIndex:i])) {
+      value = RDLConnectionQuoted(text, &i);
+      while (i < n && [text characterAtIndex:i] != ';')
+        i += 1;
+    } else {
+      NSUInteger start = i;
+      while (i < n && [text characterAtIndex:i] != ';')
+        i += 1;
+      value = [[text substringWithRange:NSMakeRange(start, i - start)] stringByTrimmingCharactersInSet:space];
+    }
+    if ([name length])
+      out[[name lowercaseString]] = value;
   }
   return out;
+}
+
+// A value as DbConnectionStringBuilder writes it: as it is, unless it holds a
+// ";" or a control character, or starts or ends with a space or a quote.
+static NSString *RDLConnectionValue(NSString *value) {
+  NSUInteger n = [value length];
+  if (n == 0)
+    return value;
+  NSCharacterSet *space = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+  unichar first = [value characterAtIndex:0], last = [value characterAtIndex:n - 1];
+  BOOL quoted = [value rangeOfString:@";"].location != NSNotFound ||
+                [value rangeOfCharacterFromSet:[NSCharacterSet controlCharacterSet]].location != NSNotFound ||
+                [space characterIsMember:first] || [space characterIsMember:last] || RDLIsQuote(first) ||
+                RDLIsQuote(last);
+  if (!quoted)
+    return value;
+  if ([value rangeOfString:@"\""].location != NSNotFound && [value rangeOfString:@"'"].location == NSNotFound)
+    return [NSString stringWithFormat:@"'%@'", value];
+  return [NSString stringWithFormat:@"\"%@\"", [value stringByReplacingOccurrencesOfString:@"\"" withString:@"\"\""]];
 }
 
 NSString *RDLConnectionString(NSDictionary<NSString *, NSString *> *properties) {
   NSMutableArray<NSString *> *parts = [NSMutableArray array];
   NSString *document = properties[@""];
   if ([document length])
-    [parts addObject:document];
+    [parts addObject:RDLConnectionValue(document)];
   // Everything else in name order, so the same settings always write the same
   // line and a saved report does not churn.
   for (NSString *key in [[properties allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
@@ -80,7 +170,8 @@ NSString *RDLConnectionString(NSDictionary<NSString *, NSString *> *properties) 
     NSString *value = properties[key];
     if ([value length] == 0)
       continue;
-    [parts addObject:[NSString stringWithFormat:@"%@=%@", key, value]];
+    [parts addObject:[NSString stringWithFormat:@"%@=%@", [key stringByReplacingOccurrencesOfString:@"=" withString:@"=="],
+                                                RDLConnectionValue(value)]];
   }
   return [parts componentsJoinedByString:@";"];
 }
@@ -154,8 +245,10 @@ static RDLFieldDataType RDLTypeOfValue(id value) {
     return RDLFieldDataTypeBoolean;
   if ([value isKindOfClass:[NSNumber class]]) {
     const char *kind = [(NSNumber *)value objCType];
-    BOOL fractional = kind != NULL && (*kind == 'f' || *kind == 'd');
-    return fractional ? RDLFieldDataTypeFloat : RDLFieldDataTypeInteger;
+    if (kind != NULL && (*kind == 'f' || *kind == 'd'))
+      return RDLFieldDataTypeFloat;
+    long long whole = [(NSNumber *)value longLongValue];
+    return whole < INT_MIN || whole > INT_MAX ? RDLFieldDataTypeLong : RDLFieldDataTypeInteger;
   }
   if ([value isKindOfClass:[NSDate class]])
     return RDLFieldDataTypeDateTime;
@@ -163,6 +256,10 @@ static RDLFieldDataType RDLTypeOfValue(id value) {
     return RDLLooksLikeADate(value) ? RDLFieldDataTypeDateTime : RDLFieldDataTypeString;
   // An object or a list: rows of its own, which RDL has no type name for.
   return RDLFieldDataTypeUnknown;
+}
+
+static BOOL RDLIsInferredNumber(RDLFieldDataType type) {
+  return type == RDLFieldDataTypeInteger || type == RDLFieldDataTypeLong || type == RDLFieldDataTypeFloat;
 }
 
 RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
@@ -181,13 +278,23 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
       continue;
     // Whole numbers among fractional ones are still numbers; anything else
     // disagreeing means the column holds more than one kind of thing.
-    BOOL bothNumbers = (agreed == RDLFieldDataTypeInteger || agreed == RDLFieldDataTypeFloat) &&
-                       (here == RDLFieldDataTypeInteger || here == RDLFieldDataTypeFloat);
-    agreed = bothNumbers ? RDLFieldDataTypeFloat : RDLFieldDataTypeString;
+    // Whole numbers too large for an Integer make the column Long.
+    BOOL bothNumbers = RDLIsInferredNumber(agreed) && RDLIsInferredNumber(here);
+    agreed = !bothNumbers                                                           ? RDLFieldDataTypeString
+             : (agreed == RDLFieldDataTypeFloat || here == RDLFieldDataTypeFloat) ? RDLFieldDataTypeFloat
+                                                                                    : RDLFieldDataTypeLong;
     if (!bothNumbers)
       break;
   }
   return agreed;
+}
+
+NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems) {
+  if (url == nil || [queryItems count] == 0)
+    return url;
+  NSURLComponents *components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:YES];
+  components.queryItems = [(components.queryItems ?: @[]) arrayByAddingObjectsFromArray:queryItems];
+  return components.URL ?: url;
 }
 
 #pragma mark - Binding
@@ -220,6 +327,13 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
   for (id<RDLDataProvider> provider in _providers)
     if ([[provider name] caseInsensitiveCompare:name] == NSOrderedSame)
       return provider;
+  // Another name the same kind goes by: Text, as Report Builder writes a
+  // delimited-text source, is the CSV provider.
+  RDLDataProviderKind kind = RDLDataProviderKindFromString(name);
+  if (kind != RDLDataProviderKindUnspecified)
+    for (id<RDLDataProvider> provider in _providers)
+      if (RDLDataProviderKindFromString([provider name]) == kind)
+        return provider;
   return nil;
 }
 
@@ -228,6 +342,7 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
 // fetched when the host has said that is allowed.
 - (NSData *)documentForProperties:(NSDictionary<NSString *, NSString *> *)properties
                              kind:(RDLDataProviderKind)kind
+                       queryItems:(NSArray<NSURLQueryItem *> *)queryItems
                             error:(NSError **)error {
   NSString *inlineKey = kind == RDLDataProviderKindXML ? @"xmldata" : @"jsondata";
   NSString *inlineText = properties[inlineKey] ?: properties[@"data"];
@@ -242,6 +357,16 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
       *error = RDLDataError(32, @"the connect string names no document");
     return nil;
   }
+  return [self dataAtLocation:location queryItems:queryItems error:error];
+}
+
+- (NSData *)dataAtLocation:(NSString *)location error:(NSError **)error {
+  return [self dataAtLocation:location queryItems:nil error:error];
+}
+
+- (NSData *)dataAtLocation:(NSString *)location
+                queryItems:(NSArray<NSURLQueryItem *> *)queryItems
+                     error:(NSError **)error {
   NSURL *url = nil;
   if ([location hasPrefix:@"http://"] || [location hasPrefix:@"https://"]) {
     if (!_allowsRemoteDocuments) {
@@ -252,7 +377,7 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
                                            location]);
       return nil;
     }
-    url = [NSURL URLWithString:location];
+    url = RDLURLAddingQueryItems([NSURL URLWithString:location], queryItems);
   } else if ([location hasPrefix:@"file://"]) {
     url = [NSURL URLWithString:location];
   } else {
@@ -274,6 +399,19 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
 }
 
 - (BOOL)bindDataSet:(RDLDataSet *)dataSet inReport:(RDLReport *)report error:(NSError **)error {
+  return [self bindDataSet:dataSet inReport:report scope:nil error:error];
+}
+
+- (BOOL)dataSetReadsParameters:(RDLDataSet *)dataSet inReport:(RDLReport *)report {
+  [report resolveDataSources];
+  return [[RDLValue valueWithSource:dataSet.dataSource.connectString] isExpression] ||
+         [[RDLValue valueWithSource:dataSet.commandText] isExpression] || [dataSet.queryParameters count] > 0;
+}
+
+- (BOOL)bindDataSet:(RDLDataSet *)dataSet
+           inReport:(RDLReport *)report
+              scope:(RDLEvalScope *)scope
+              error:(NSError **)error {
   // Cheap and idempotent: a report built in code has never been resolved, and
   // one whose sources were edited may be out of date.
   [report resolveDataSources];
@@ -293,11 +431,27 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
                                                            source.dataProvider ?: @""]);
     return NO;
   }
-  NSDictionary *properties = RDLConnectionProperties(source.connectString);
-  NSData *document = [self documentForProperties:properties kind:kind error:error];
+  // A ConnectString and a CommandText may be expressions, and a QueryParameter's
+  // value is one: evaluated here, in the scope of the parameters.
+  RDLEvalScope *evaluating = scope ?: [[RDLEvalScope alloc] init];
+  NSString *connectString = [[RDLValue valueWithSource:source.connectString] evaluateTextInScope:evaluating] ?: @"";
+  NSString *query = [[RDLValue valueWithSource:dataSet.commandText] evaluateTextInScope:evaluating] ?: @"";
+  NSMutableArray<NSURLQueryItem *> *queryItems = [NSMutableArray array];
+  for (RDLQueryParameter *parameter in dataSet.queryParameters) {
+    id value = [parameter.value evaluateInScope:evaluating];
+    // A MultiValue parameter's values are each one.
+    for (id one in ([value isKindOfClass:[NSArray class]] ? value : @[ value ?: [NSNull null] ]))
+      [queryItems addObject:[NSURLQueryItem queryItemWithName:parameter.name ?: @""
+                                                        value:one == [NSNull null]
+                                                                  ? nil
+                                                                  : [RDLExpression formatValue:one format:nil language:nil]]];
+  }
+  NSDictionary *properties = RDLConnectionProperties(connectString);
+  NSData *document = [self documentForProperties:properties kind:kind queryItems:queryItems error:error];
   if (document == nil)
     return NO;
   NSArray *rows = [provider rowsFromData:document
+                                   query:query
                                  dataSet:dataSet
                               properties:properties
                                    error:error];
@@ -325,9 +479,11 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
     // hand, or one whose fields were named before there was a document to read.
     // A field that says what it holds is left alone; one that says nothing has
     // nothing to lose by being told.
+    // Read off the field's own column -- its DataField -- not a column that
+    // happens to share the field's name. A calculated field has no column.
     for (RDLField *field in dataSet.fields)
-      if (field.dataType == RDLFieldDataTypeUnknown)
-        field.dataType = RDLInferredFieldType(rows, field.name);
+      if (field.dataType == RDLFieldDataTypeUnknown && [field rowKey] != nil)
+        field.dataType = RDLInferredFieldType(rows, [field rowKey]);
   }
   return YES;
 }
@@ -344,6 +500,9 @@ RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field) {
     if (source == nil || [self providerNamed:source.dataProvider] == nil)
       continue;
     if ([source.connectString length] == 0)
+      continue;
+    // Its data waits for the parameters: RDLDataEvaluation binds it.
+    if ([self dataSetReadsParameters:dataSet inReport:report])
       continue;
     attempted += 1;
     NSError *one = nil;

@@ -91,6 +91,44 @@
                                               [third source]]);
 }
 
+// The editor checks the expression as it is written, against the dataset it
+// reads: a field that dataset lacks is said in the status line, and a sound
+// expression is said to be one.
+- (void)testTheEditorChecksAsItIsWritten {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Checked"];
+  for (NSString *name in @[ @"Orders", @"Kilns" ]) {
+    RDLDataSet *ds = [[RDLDataSet alloc] init];
+    ds.name = name;
+    ds.dataSourceName = @"Inline";
+    [ds setFieldNames:[name isEqualToString:@"Orders"] ? @[ @"Amount" ] : @[ @"Temperature" ]];
+    [r.dataSets addObject:ds];
+  }
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [r.dataSources addObject:source];
+  RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@"=Sum(Fields!Temperature.Value)"
+                                                         context:RDLExpressionContextText
+                                                          report:r
+                                                     dataSetName:@"Orders"];
+  if ([ed.diagnostics count] == 0 || [ed.status rangeOfString:@"Temperature"].location == NSNotFound)
+    XCTFail(@"a field Orders lacks should be said, status reads %@", ed.status);
+  NSTextStorage *storage = ed.sourceStorage;
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Sum(Fields!Amount.Value)"];
+  // Plain id, not id<NSTextViewDelegate>: GNUstep declares -textDidChange: in
+  // the informal NSObject(NSTextDelegate) category rather than in the formal
+  // NSTextViewDelegate protocol, so the protocol-typed send won't compile there.
+  [(id)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+                                                                          object:nil]];
+  if ([ed.diagnostics count] || ![ed.status hasPrefix:@"An expression"])
+    XCTFail(@"a field Orders has should pass, status reads %@ (%@)", ed.status,
+            [ed.diagnostics valueForKey:@"message"]);
+  [storage replaceCharactersInRange:NSMakeRange(0, [storage length]) withString:@"=Frobnicate(1) + Nope(2)"];
+  [(id)ed textDidChange:[NSNotification notificationWithName:NSTextDidChangeNotification
+                                                                          object:nil]];
+  if ([ed.diagnostics count] < 2 || [ed.status rangeOfString:@"more"].location == NSNotFound)
+    XCTFail(@"two problems should be counted, status reads %@", ed.status);
+}
+
 - (void)testCompletion {
   RDLReport *r = [RDLReport emptyReportNamed:@"Completion"];
   RDLDataSet *ds = [[RDLDataSet alloc] init];
@@ -175,6 +213,55 @@
 
   if ([RDLExpressionFunctionNames() count] < 50)
     XCTFail(@"%@", @"the function vocabulary looks truncated");
+}
+
+// Completion reaches the rest of what an expression can read: the report's
+// text boxes, its variables and its code's functions -- and every function the
+// catalogue lists, not a list kept apart from it.
+- (void)testCompletionReachesReportItemsVariablesAndCode {
+  RDLReport *r = [RDLSamples workshopByFinish];
+  RDLVariable *rate = [[RDLVariable alloc] init];
+  rate.name = @"FiringRate";
+  rate.value = [RDLValue literal:@"4"];
+  [r.variables addObject:rate];
+  r.code = @"Public Function Glaze(ByVal kind As String) As String\n  Return kind\nEnd Function\n"
+           @"Public Sub Reset()\nEnd Sub\n";
+  RDLExpressionScope *scope = [RDLExpressionScope scopeWithReport:r dataSetName:nil];
+  NSString *textbox = nil;
+  for (RDLItem *item in [r allItemsIncludingNested])
+    if (textbox == nil && [item isKindOfClass:[RDLTextbox class]])
+      textbox = item.name;
+  NSArray<NSString *> *(^complete)(NSString *) = ^(NSString *text) {
+    return RDLExpressionCompletions(text, RDLExpressionCompletionRange(text, [text length]), scope);
+  };
+  if (![complete(@"=ReportItems!") containsObject:[NSString stringWithFormat:@"ReportItems!%@.Value", textbox]])
+    XCTFail(@"the report's text boxes should complete, give %@", complete(@"=ReportItems!"));
+  if (![complete(@"=Variables!Fir") isEqualToArray:@[ @"Variables!FiringRate.Value" ]])
+    XCTFail(@"the report's variables should complete, give %@", complete(@"=Variables!Fir"));
+  if (![complete(@"=Code.") isEqualToArray:@[ @"Code.Glaze(" ]] || [complete(@"=Code.R") count])
+    XCTFail(@"the code's functions, and not its subs, should complete, give %@", complete(@"=Code."));
+  if (!RDLShouldAutoComplete(@"=Code.", NSMakeRange(6, 0)) || !RDLShouldAutoComplete(@"=Code.Gl", NSMakeRange(8, 0)))
+    XCTFail(@"%@", @"the list should come up after Code. as after a bang");
+  NSArray<NSString *> *top = complete(@"=Va");
+  if (![top containsObject:@"Variables!"])
+    XCTFail(@"the collections should be offered by name, give %@", top);
+  for (RDLFunctionInfo *function in [RDLExpressionCatalog functions])
+    if (![RDLExpressionFunctionNames() containsObject:function.name])
+      XCTFail(@"%@ is in the catalogue but does not complete", function.name);
+
+  // The editor's picker offers the same, and a function goes in called.
+  RDLExpressionEditor *ed = [RDLExpressionEditor editorForSource:@""
+                                                         context:RDLExpressionContextText
+                                                          report:r];
+  for (NSString *category in @[ @"Report Items", @"Variables", @"Code" ])
+    if (![[ed categoryNames] containsObject:category])
+      XCTFail(@"the picker should offer %@, offers %@", category, [ed categoryNames]);
+  [ed selectCategoryNamed:@"Code"];
+  NSTableView *rows = [ed valueForKey:@"itemTable"];
+  [rows selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+  [ed insert:nil];
+  if (![[ed source] isEqualToString:@"=Code.Glaze("])
+    XCTFail(@"the code's function should go in called, reads %@", [ed source]);
 }
 
 - (void)testTextInput {

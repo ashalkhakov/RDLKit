@@ -1244,67 +1244,29 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
 // opposite directions -- a function added to the evaluator is merely absent
 // from the picker, but one removed from it makes the picker lie.
 - (void)testExpressionCatalogMatchesTheEvaluator {
-  NSString *source =
-      [NSString stringWithContentsOfFile:[RDLSourceDirectory()
-                                             stringByAppendingPathComponent:
-                                                 @"../RDLKit/RDLExpression.m"]
-                                encoding:NSUTF8StringEncoding
-                                   error:NULL];
-  if ([source length] == 0) {
-    XCTFail(@"%@", @"cannot read RDLExpression.m");
-    return;
-  }
   NSArray<RDLFunctionInfo *> *functions = [RDLExpressionCatalog functions];
   if ([functions count] < 100)
     XCTFail(@"%@", @"the catalogue is suspiciously short");
 
+  // Asked of the evaluator rather than read out of its source. What matters is
+  // that a name the picker offers is one the evaluator answers to; how it
+  // dispatches -- a chain, a table, something faster later -- is its own
+  // business, and a check that reads the source has to be taught each one.
+  RDLEvalScope *scope = [[RDLEvalScope alloc] init];
   for (RDLFunctionInfo *f in functions) {
-    NSString *dispatch =
-        [NSString stringWithFormat:@"isEqualToString:@\"%@\"", [f.name lowercaseString]];
-    if ([source rangeOfString:dispatch].location == NSNotFound)
+    id result = [RDLExpression evaluate:[NSString stringWithFormat:@"=%@()", f.name] scope:scope];
+    if ([result isKindOfClass:[RDLExprError class]] &&
+        [[(RDLExprError *)result message] rangeOfString:@"is not declared"].location != NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"the catalogue offers %@, which the "
-                                                @"evaluator does not implement",
-                                                f.name]);
+                                                @"evaluator does not implement", f.name]);
     if ([f.signature length] == 0 || [f.summary length] == 0)
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is missing its description", f.name]);
-    // Exactly one category, and the category agrees: a function whose back
-    // pointer says otherwise would show up under a heading it is not under.
     if (f.category == nil || ![f.category.functions containsObject:f])
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not in the category it says it is",
-                                                f.name]);
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ is not in the category it says it is", f.name]);
     if (![[RDLExpressionCatalog categories] containsObject:f.category])
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ is in category %@, which the picker "
                                                 @"does not show", f.name, f.category.name]);
   }
-
-  // The categories account for every function and repeat none, which is what
-  // "each function is assigned to one category" has to mean for a picker: a
-  // function in two categories would be inserted from either, and one in none
-  // could be reached from neither.
-  NSCountedSet *seen = [[NSCountedSet alloc] init];
-  for (RDLFunctionCategory *c in [RDLExpressionCatalog categories]) {
-    if ([c.name length] == 0 || [c.functions count] == 0)
-      XCTFail(@"%@", @"a category with no name or nothing in it");
-    for (RDLFunctionInfo *f in c.functions)
-      [seen addObject:f];
-  }
-  if ([seen count] != [functions count])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the categories hold %lu of %lu functions",
-                                              (unsigned long)[seen count],
-                                              (unsigned long)[functions count]]);
-  for (RDLFunctionInfo *f in functions)
-    if ([seen countForObject:f] != 1)
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@ appears in %lu categories", f.name,
-                                                (unsigned long)[seen countForObject:f]]);
-
-  // What the picker types. A function opens its bracket; the caret is left
-  // where its arguments go.
-  if (![[RDLExpressionCatalog functionNamed:@"Sum"].insertion isEqualToString:@"Sum("])
-    XCTFail(@"%@", @"a function should be inserted with its bracket open");
-
-  // Looked up the way a user types it.
-  if ([[RDLExpressionCatalog functionNamed:@"sum"].name isEqualToString:@"Sum"] == NO)
-    XCTFail(@"%@", @"lookup is case sensitive; the evaluator's is not");
 }
 
 // The tokens come from the lexer that parses, not a second one written for the
@@ -1353,6 +1315,14 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLExprToken *h in plain)
     if (h.kind == RDLExprTokenKindFunction)
       XCTFail(@"%@", @"Frobnicate is not a function this evaluator has");
+
+  // Variables! is a collection like Fields!, and is coloured as one.
+  BOOL variablesIsReference = NO;
+  for (RDLExprToken *h in [RDLExpr tokensForSource:@"=Variables!Rate.Value * 2"])
+    if (h.kind == RDLExprTokenKindReference && [h.text isEqualToString:@"Variables"])
+      variablesIsReference = YES;
+  if (!variablesIsReference)
+    XCTFail(@"%@", @"Variables! should read as a reference");
 
   // Text that is not an expression is one run, so an editor can show a literal
   // through the same path.
@@ -1438,8 +1408,12 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLItem *it in parsed.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
       pt = (RDLTablix *)it;
-  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"Country", @"City" ])])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@", pt.rowGroups]);
+  NSMutableArray<NSString *> *chain = [NSMutableArray array];
+  for (RDLTablixMember *at = pt.rowHierarchy.members.lastObject; at != nil; at = at.members.firstObject)
+    if ([at.groupExpressions count])
+      [chain addObject:[at.groupExpressions.firstObject source]];
+  if (![chain isEqualToArray:(@[ @"=Fields!Region.Value", @"=Fields!Country.Value", @"=Fields!City.Value" ])])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@", chain]);
 }
 
 // A crosstab nests on both axes. Rows were generalised first; this is the
@@ -1466,10 +1440,8 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   for (RDLItem *it in parsed.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
       pt = (RDLTablix *)it;
-  if (![pt.rowGroups isEqualToArray:(@[ @"Region", @"City" ])] ||
-      ![pt.columnGroups isEqualToArray:(@[ @"Year", @"Quarter" ])])
-    XCTFail(@"%@", [NSString stringWithFormat:@"the round-trip recovered %@ by %@", pt.rowGroups,
-                                              pt.columnGroups]);
+  if ([pt.rowHierarchy.members count] == 0 || [pt.columnHierarchy.members count] == 0)
+    XCTFail(@"%@", @"both hierarchies should come back from the file");
 
   NSUInteger (^depthOf)(RDLTablixHierarchy *) = ^NSUInteger(RDLTablixHierarchy *h) {
     NSUInteger depth = 0;

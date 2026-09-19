@@ -2,7 +2,7 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = RDLDesigner
 RDLDesigner_NEEDS_GUI = yes
-RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -Werror=logical-not-parentheses
+RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -I../RDLKit/MiniVB -Werror=logical-not-parentheses
 RDLDesigner_OBJC_FILES = \
   main.m \
   RDLEditingContext.m \
@@ -10,9 +10,11 @@ RDLDesigner_OBJC_FILES = \
   RDLSelection.m \
   RDLDocument.m \
   RDLEditor.m \
+  RDLTablixStructure.m \
   RDLItemFactory.m \
   RDLPageGeometry.m \
   RDLRichTextCodec.m \
+  RDLPlainTextEdit.m \
   RDLRichTextFormatter.m \
   RDLCanvasView.m \
   RDLCanvasRenderer.m \
@@ -26,7 +28,6 @@ RDLDesigner_OBJC_FILES = \
   RDLInspectorView.m \
   RDLInspectorFields.m \
   RDLExpressionHelper.m \
-  RDLTablixEditor.m \
   RDLNewReport.m \
   RDLNewReportPanel.m \
   RDLRichTextEditor.m \
@@ -37,6 +38,24 @@ RDLDesigner_OBJC_FILES = \
   RDLExpressionCell.m \
   RDLExpressionField.m \
   RDLFilterEditor.m \
+  RDLSortEditor.m \
+  RDLValueListEditor.m \
+  RDLEmbeddedImages.m \
+  RDLEmbeddedImagesEditor.m \
+  RDLDatasetOptionsEditor.m \
+  RDLVariablesEditor.m \
+  RDLCodeEditor.m \
+  RDLStylePanel.m \
+  RDLPreviewWindow.m \
+  RDLGroupsView.m \
+  RDLProblemsView.m \
+  RDLPropertiesView.m \
+  RDLSourceView.m \
+  RDLSnapGuides.m \
+  RDLChartAxisEditor.m \
+  RDLChartSeriesEditor.m \
+  RDLGroupPropertiesEditor.m \
+  RDLBordersEditor.m \
   RDLSubreportParametersEditor.m \
   RDLToolbarIcons.m \
   RDLPane.m \
@@ -88,6 +107,21 @@ RDLDesigner_RESOURCE_FILES += \
   RDLGeneratorWindow.xib \
   RDLInspectorSections.xib \
   RDLFilterEditor.xib \
+  RDLSortEditor.xib \
+  RDLValueListEditor.xib \
+  RDLEmbeddedImagesEditor.xib \
+  RDLDatasetOptionsEditor.xib \
+  RDLVariablesEditor.xib \
+  RDLCodeEditor.xib \
+  RDLStylePanel.xib \
+  RDLGroupsView.xib \
+  RDLProblemsView.xib \
+  RDLPropertiesView.xib \
+  RDLSourceView.xib \
+  RDLChartAxisEditor.xib \
+  RDLChartSeriesEditor.xib \
+  RDLGroupPropertiesEditor.xib \
+  RDLBordersEditor.xib \
   RDLSubreportParametersEditor.xib \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \
@@ -99,7 +133,6 @@ RDLDesigner_RESOURCE_FILES += \
   RDLFieldInspectorView.xib \
   RDLAddElementPanel.xib \
   RDLPreviewWindow.xib \
-  RDLTablixEditor.xib \
   RDLRichTextEditor.xib \
   RDLNewReportPanel.xib
 

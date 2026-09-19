@@ -1,4 +1,6 @@
 #import "RDLInspectorView.h"
+#import "RDLBordersEditor.h"
+#import "RDLTablixStructure.h"
 #import "RDLChange.h"
 #import "RDLEditor.h"
 #import "RDLItemFactory.h"
@@ -7,8 +9,16 @@
 #import "RDLKit.h"
 #import "RDLToolbarIcons.h"
 #import "RDLFilterEditor.h"
+#import "RDLSortEditor.h"
+#import "RDLChartAxisEditor.h"
+#import "RDLChartSeriesEditor.h"
+#import "RDLValueListEditor.h"
+#import "RDLEmbeddedImages.h"
+#import "RDLEmbeddedImagesEditor.h"
+#import "RDLCodeEditor.h"
+#import "RDLVariablesEditor.h"
+#import "RDLStylePanel.h"
 #import "RDLSubreportParametersEditor.h"
-#import "RDLTablixEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
 #import "RDLExpressionField.h"
@@ -26,22 +36,52 @@
 @property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
+// A text box's own background, which the engine paints and the pane did not
+// offer; how its text sits in the box; whether it is italic; and what is drawn
+// through or under it.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *textBGField;
+// The four sides of a text box's padding, each its own length or expression.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *padLeftField, *padRightField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *padTopField, *padBottomField;
+@property (nonatomic, strong) IBOutlet NSButton *padLeftExprButton, *padRightExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *padTopExprButton, *padBottomExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *textBordersButton, *rectBordersButton;
+@property (nonatomic, strong) IBOutlet NSButton *textBGExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *verticalPop, *decorationPop;
+@property (nonatomic, strong) IBOutlet NSButton *italicCheck;
 @property (nonatomic, strong) IBOutlet NSButton *sizeExprButton;
-// The selected tablix column. A cell is an entry in columnSpecs rather than an
-// item, so these are applied by hand rather than through a key path binding.
+// The column of the selected cell. A column is part of the tablix's body rather
+// than an item's property, so it is applied by hand rather than through a key
+// path binding -- as are the tablix's row heights.
 @property (nonatomic, strong) IBOutlet NSView *cellBox;
-@property (nonatomic, strong) IBOutlet NSTextField *cellHeaderField, *cellWidthField;
-@property (nonatomic, strong) IBOutlet RDLExpressionField *cellValueField;
-@property (nonatomic, strong) IBOutlet NSPopUpButton *cellAlignPop, *cellAggPop;
-@property (nonatomic, strong) IBOutlet NSButton *cellExprButton;
+@property (nonatomic, strong) IBOutlet NSTextField *cellWidthField;
+// Borders for a cell whose contents have no section that offers them: an empty
+// cell, or an image, chart or other region in one.
+@property (nonatomic, strong) IBOutlet NSButton *cellBordersButton;
+// The height of the row the cell is in, whichever row that is.
+@property (nonatomic, strong) IBOutlet NSTextField *cellRowHeightField, *cellRowHeightLabel;
 // Report section
 @property (nonatomic, strong) IBOutlet NSView *docBox;
 @property (nonatomic, strong) IBOutlet NSTextField *docNameField, *authorField, *descField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *pagePop;
-@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *bodyHField, *footerHField, *marginField;
+@property (nonatomic, strong) IBOutlet NSTextField *headerHField, *bodyHField, *footerHField;
+// The paper: its size and which way up, its margins and columns, and what the
+// pages say before anything names them.
+@property (nonatomic, strong) IBOutlet NSView *paperBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *orientationPop;
+@property (nonatomic, strong) IBOutlet NSTextField *pageBGField, *paperWidthField, *paperHeightField;
+@property (nonatomic, strong) IBOutlet NSTextField *leftMarginField, *rightMarginField, *topMarginField,
+    *bottomMarginField, *columnsField, *columnSpacingField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *initialPageNameField;
+@property (nonatomic, strong) IBOutlet NSButton *initialPageNameExprButton, *consumeWhitespaceCheck;
+@property (nonatomic, strong) IBOutlet NSTextField *paperWidthLabel, *paperHeightLabel, *leftMarginLabel,
+    *rightMarginLabel, *topMarginLabel, *bottomMarginLabel, *columnSpacingLabel;
 // Band section
 @property (nonatomic, strong) IBOutlet NSView *bandBox;
 @property (nonatomic, strong) IBOutlet NSTextField *bandHField, *bandBGField;
+// Whether the page header or footer appears on the first and the last page.
+@property (nonatomic, strong) IBOutlet NSView *printBox;
+@property (nonatomic, strong) IBOutlet NSButton *printOnFirstPageCheck, *printOnLastPageCheck;
 // Common item geometry section
 @property (nonatomic, strong) IBOutlet NSView *geoBox;
 @property (nonatomic, strong) IBOutlet NSTextField *nameField;
@@ -56,24 +96,40 @@
 // matter of what the author reads and types, not of what the file means.
 @property (nonatomic, strong) IBOutlet NSPopUpButton *unitPop;
 @property (nonatomic, strong) IBOutlet NSTextField *headerHLabel, *bodyHLabel, *footerHLabel,
-    *marginLabel, *bandHeightLabel, *cellWidthLabel, *tablixHeaderLabel, *tablixRowLabel;
+    *bandHeightLabel, *cellWidthLabel, *tablixHeaderLabel, *tablixRowLabel;
 @property (nonatomic, strong) IBOutlet NSButton *docLanguageExprButton, *languageExprButton;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *sizeField;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *weightPop, *alignPop;
 // Line section
 @property (nonatomic, strong) IBOutlet NSView *lineBox;
 @property (nonatomic, strong) IBOutlet NSTextField *lineColorField;
+// A line's own thickness and dash, which the canvas has always drawn and the
+// inspector never offered.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *lineWidthField;
+@property (nonatomic, strong) IBOutlet NSButton *lineWidthExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *lineDashPop;
 // Rectangle section
 @property (nonatomic, strong) IBOutlet NSView *rectBox;
 @property (nonatomic, strong) IBOutlet RDLExpressionField *rectBGField;
 // Image section
 @property (nonatomic, strong) IBOutlet NSView *imageBox;
-@property (nonatomic, strong) IBOutlet NSTextField *imageValueField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *imageValueField;
+@property (nonatomic, strong) IBOutlet NSButton *imageValueExprButton, *imageImportButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *imageSourcePop, *imageSizingPop;
+// The report's own pictures to show, and what kind a field's bytes are.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *imageEmbeddedPop, *imageMimePop;
+// The rest of an item's style, in a panel of its own.
+@property (nonatomic, strong) IBOutlet NSView *moreStyleBox;
+// The report's own pictures, code and variables, each in a panel of its own.
+@property (nonatomic, strong) IBOutlet NSButton *embeddedImagesButton, *reportCodeButton, *reportVariablesButton;
+// What a subreport shows with no rows, and how it breaks and reads.
+@property (nonatomic, strong) IBOutlet RDLExpressionField *subreportNoRowsField;
+@property (nonatomic, strong) IBOutlet NSButton *subreportNoRowsExprButton, *subreportOmitBorderCheck;
+@property (nonatomic, strong) IBOutlet NSButton *subreportMergeCheck;
 // Chart section
 @property (nonatomic, strong) IBOutlet NSView *chartBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *chartDatasetPop, *chartKindPop;
-@property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton;
+@property (nonatomic, strong) IBOutlet NSButton *chartFiltersButton, *tablixFiltersButton;
 @property (nonatomic, strong) IBOutlet NSTextField *titleField, *catField, *valField;
 // Subreport section. Which report it shows, and the two things a person does
 // with it: pass values to it, and open it -- because its contents belong to
@@ -85,6 +141,40 @@
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
 @property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
+// A tablix's own settings: what it shows with no rows, which way its columns
+// run, and how its headers behave across pages and when scrolled.
+@property (nonatomic, strong) IBOutlet NSView *tablixOptionsBox;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *noRowsMessageField;
+@property (nonatomic, strong) IBOutlet NSButton *noRowsMessageExprButton;
+// A text box's growing and shrinking, and the scope within which a value
+// repeated from the row before is hidden.
+@property (nonatomic, strong) IBOutlet NSView *textOptionsBox;
+@property (nonatomic, strong) IBOutlet NSButton *canGrowCheck, *canShrinkCheck;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *hideDuplicatesPop;
+// A chart's own settings: how its series combine, its colours, where its title
+// and legend go, and what it says with no data.
+@property (nonatomic, strong) IBOutlet NSView *chartOptionsBox;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *chartSubtypePop, *chartPalettePop, *chartTitlePositionPop;
+@property (nonatomic, strong) IBOutlet NSButton *showLegendCheck;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *legendPositionPop, *legendLayoutPop;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *noDataMessageField;
+@property (nonatomic, strong) IBOutlet NSButton *noDataMessageExprButton, *chartAxesButton;
+@property (nonatomic, strong) IBOutlet NSButton *chartSeriesButton, *customColorsButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *layoutDirectionPop;
+@property (nonatomic, strong) IBOutlet NSTextField *groupsBeforeRowHeadersField;
+@property (nonatomic, strong) IBOutlet NSButton *tablixSortingButton;
+@property (nonatomic, strong) IBOutlet NSButton *repeatColumnHeadersCheck, *repeatRowHeadersCheck,
+    *fixedColumnHeadersCheck, *fixedRowHeadersCheck, *omitBorderCheck;
+// What every report item has, in the sections that apply to its kind: whether
+// it shows and what toggles it; a link (a text box's or an image's); keeping it
+// on one page; and the page breaks and page name of a region or rectangle.
+@property (nonatomic, strong) IBOutlet NSView *nameBox, *visibilityBox, *linkBox, *keepBox, *pageBox;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *hiddenField, *hyperlinkField;
+@property (nonatomic, strong) IBOutlet RDLExpressionField *pageBreakDisabledField, *pageNameField;
+@property (nonatomic, strong) IBOutlet NSButton *hiddenExprButton, *hyperlinkExprButton;
+@property (nonatomic, strong) IBOutlet NSButton *pageBreakDisabledExprButton, *pageNameExprButton;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *toggleItemPop, *pageBreakPop;
+@property (nonatomic, strong) IBOutlet NSButton *keepTogetherCheck, *resetPageNumberCheck;
 @end
 
 @implementation RDLInspectorView {
@@ -139,23 +229,101 @@
   // way to know; the dataset popups are filled per report in -reload.
   for (NSDictionary *size in [RDLPage standardSizes])
     [_pagePop addItemWithTitle:size[@"name"]];
+  // Last, for a page that is none of them; choosing it changes nothing.
+  [_pagePop addItemWithTitle:@"Custom"];
+  [_orientationPop addItemWithTitle:@"Portrait"];
+  [_orientationPop addItemWithTitle:@"Landscape"];
   [_unitPop addItemWithTitle:@"Inches"];
   [_unitPop addItemWithTitle:@"Centimeters"];
   // f(x) is a picture, not two letters and two brackets: at 24 points wide the
   // title is the platform's to draw, and GNUstep draws its own instead.
   for (NSButton *b in @[ _valueExprButton, _fontExprButton, _colorExprButton, _formatExprButton,
                          _languageExprButton, _docLanguageExprButton,
-                         _rectBGExprButton, _sizeExprButton, _cellExprButton ])
+                         _rectBGExprButton, _sizeExprButton, _textBGExprButton,
+                         _padLeftExprButton, _padRightExprButton, _padTopExprButton,
+                         _padBottomExprButton, _lineWidthExprButton, _hiddenExprButton,
+                         _hyperlinkExprButton, _pageBreakDisabledExprButton, _pageNameExprButton,
+                         _initialPageNameExprButton, _noRowsMessageExprButton, _noDataMessageExprButton,
+                         _imageValueExprButton, _subreportNoRowsExprButton ])
     RDLSetToolbarIcon(b, RDLToolbarGlyphExpression);
   // One list, kept once: -stackBoxes: hides everything in it and then shows
   // the sections the selection calls for. It used to be written out twice, and
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
-  _sections = @[ _docBox, _bandBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _subreportBox, _chartBox, _tablixBox, _cellBox ];
+  _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
+                 _textOptionsBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
+                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
+}
+
+// A button that opens a sort says how many keys it holds, since a sort is
+// otherwise invisible from here.
+- (void)syncSortingButton:(NSButton *)button count:(NSUInteger)count {
+  [button setTitle:count ? [NSString stringWithFormat:@"Sorting (%lu)…", (unsigned long)count] : @"Sorting…"];
+}
+
+- (void)syncFiltersButton:(NSButton *)button count:(NSUInteger)count {
+  [button setTitle:count ? [NSString stringWithFormat:@"Filters (%lu)…", (unsigned long)count] : @"Filters…"];
+}
+
+// The rows of a tablix, sorted before any group sees them.
+- (void)editTablixSorting:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTablix class]])
+    return;
+  RDLTablix *tablix = (RDLTablix *)item;
+  RDLDataSet *ds = [_context.report dataSetNamed:tablix.dataSetName];
+  NSArray<RDLSortExpression *> *edited =
+      [RDLSortEditor runForSortExpressions:tablix.sortExpressions
+                                     title:tablix.name
+                                    fields:[(ds ?: [_context.report.dataSets firstObject]) fieldNames]
+                                    report:_context.report];
+  if (edited == nil || RDLSortExpressionsEqual(edited, tablix.sortExpressions))
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"sortExpressions" ofItem:tablix];
+  [self reload];
+}
+
+// A chart's series, and its axes, in panels of their own: a chart may have
+// several of each, and there are a dozen settings to each.
+- (void)editChartSeries:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  if ([RDLChartSeriesEditor runForChart:(RDLChart *)item context:_context])
+    [self reload];
+}
+
+// A Custom palette's colours, in order; each a colour or an expression.
+- (void)editCustomColors:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  RDLChart *chart = (RDLChart *)item;
+  NSArray<RDLValue *> *edited =
+      [RDLValueListEditor runForValues:chart.customPaletteColors
+                                 title:[NSString stringWithFormat:@"Custom Colours — %@", chart.name ?: @"Chart"]
+                               heading:@"The series are drawn in these colours, in turn."
+                               context:RDLExpressionContextColor
+                                report:_context.report];
+  if (edited == nil || RDLValueListsEqual(edited, chart.customPaletteColors))
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"customPaletteColors" ofItem:chart];
+  [self reload];
+}
+
+- (void)editChartAxes:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLChart class]])
+    return;
+  if ([RDLChartAxisEditor runForChart:(RDLChart *)item context:_context])
+    [self reload];
 }
 
 // A chart is a data region too, and RDL filters it in the same terms. The
@@ -240,18 +408,24 @@
   [self reload];
 }
 
-// Opens the Report-Builder-style tablix editor for the selected tablix.
-- (void)editTablix:(id)sender {
+// The rows a table keeps, in the panel every data region filters through.
+// Report Builder has this in Tablix Properties; here the region's properties
+// are the inspector, which is where the chart's filters are too.
+- (void)editTablixFilters:(id)sender {
   (void)sender;
-  RDLItem *it = [_context selectedItem];
-  if (it == nil || ![it isKindOfClass:[RDLTablix class]])
+  RDLItem *item = [_context selectedItem];
+  if (![item isKindOfClass:[RDLTablix class]])
     return;
-  if ([RDLTablixEditor runForTablix:(RDLTablix *)it context:_context]) {
-    // -documentDidChange: suppresses reload for a property edit of the item on
-    // show, which is right while the user is typing in a field but wrong when
-    // a modal has just rewritten several of them.
-    [self reload];
-  }
+  RDLTablix *tablix = (RDLTablix *)item;
+  RDLDataSet *ds = [_context.report dataSetNamed:tablix.dataSetName];
+  NSArray<RDLFilter *> *edited =
+      [RDLFilterEditor runForFilters:tablix.filters
+                               title:tablix.name
+                              fields:[(ds ?: [_context.report.dataSets firstObject]) fieldNames]
+                              report:_context.report];
+  if (edited == nil)
+    return;
+  [_context.editor setValue:[edited mutableCopy] forKeyPath:@"filters" ofItem:tablix];
 }
 
 #pragma mark - Field bindings
@@ -263,6 +437,59 @@
 // -changed: below, because each is a composite that must undo as one step.
 - (void)declareBindings {
   _bindings = [[RDLFieldBindings alloc] init];
+  // What every item has. Hidden and the break's Disabled are True, False or an
+  // expression; the rest of the pagination is a box to tick and a list.
+  [_bindings bind:_hiddenField keyPath:@"hidden" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"False"];
+  [_bindings bind:_hyperlinkField keyPath:@"hyperlink" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"https://"];
+  [_bindings bind:_keepTogetherCheck keyPath:@"keepTogether" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_resetPageNumberCheck keyPath:@"resetPageNumber" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_pageBreakPop
+          keyPath:@"pageBreak"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_pageBreakPop, RDLPageBreakLocationNone, RDLPageBreakLocationBetween,
+                               ^(NSInteger v) { return RDLStringFromPageBreakLocation((RDLPageBreakLocation)v); })
+      placeholder:nil];
+  [_bindings bind:_pageBreakDisabledField keyPath:@"pageBreakDisabled" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:@"False"];
+  [_bindings bind:_pageNameField keyPath:@"pageName" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_noRowsMessageField keyPath:@"noRowsMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText values:nil placeholder:nil];
+  [_bindings bind:_layoutDirectionPop
+          keyPath:@"layoutDirection"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_layoutDirectionPop, RDLLayoutDirectionLTR, RDLLayoutDirectionRTL,
+                               ^(NSInteger v) {
+                                 return v == RDLLayoutDirectionRTL ? @"Right to left" : @"Left to right";
+                               })
+      placeholder:nil];
+  [_bindings bind:_groupsBeforeRowHeadersField keyPath:@"groupsBeforeRowHeaders" scope:RDLFieldScopeItem
+             kind:RDLFieldKindInteger values:nil placeholder:nil];
+  for (NSArray *pair in @[ @[ @"repeatColumnHeadersCheck", @"repeatColumnHeaders" ],
+                           @[ @"repeatRowHeadersCheck", @"repeatRowHeaders" ],
+                           @[ @"fixedColumnHeadersCheck", @"fixedColumnHeaders" ],
+                           @[ @"fixedRowHeadersCheck", @"fixedRowHeaders" ],
+                           @[ @"omitBorderCheck", @"omitBorderOnPageBreak" ] ])
+    [_bindings bind:[self valueForKey:pair[0]] keyPath:pair[1] scope:RDLFieldScopeItem
+               kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_canGrowCheck keyPath:@"canGrow" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_canShrinkCheck keyPath:@"canShrink" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_printOnFirstPageCheck keyPath:@"printOnFirstPage" scope:RDLFieldScopeBand
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_printOnLastPageCheck keyPath:@"printOnLastPage" scope:RDLFieldScopeBand
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_initialPageNameField keyPath:@"initialPageName" scope:RDLFieldScopeReport
+             kind:RDLFieldKindValue values:nil placeholder:nil];
+  [_bindings bind:_consumeWhitespaceCheck keyPath:@"consumeContainerWhitespace" scope:RDLFieldScopeReport
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
 
   // Item geometry.
   [_bindings bind:_leftField keyPath:@"left" scope:RDLFieldScopeItem
@@ -281,14 +508,57 @@
              kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"10pt"];
   // Vocabulary popups map menu index to the enum case, so the model value and
   // the menu title no longer have to be the same word ("Roman" shows Normal).
-  [_bindings bind:_weightPop keyPath:@"style.fontWeight" scope:RDLFieldScopeItem
+  // Each holds its whole vocabulary, filled from the enumeration: a popup that
+  // did not offer a value showed the first entry instead, and the next edit of
+  // anything in the section wrote that wrong value into the file.
+  [_bindings bind:_weightPop
+          keyPath:@"style.fontWeight"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLFontWeightNormal), @(RDLFontWeightBold) ]
+           values:RDLFillPopUp(_weightPop, RDLFontWeightLighter, RDLFontWeightExtraBold,
+                               ^(NSInteger v) { return RDLStringFromFontWeight((RDLFontWeight)v); })
       placeholder:nil];
-  [_bindings bind:_alignPop keyPath:@"style.textAlign" scope:RDLFieldScopeItem
+  [_bindings bind:_alignPop
+          keyPath:@"style.textAlign"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLTextAlignLeft), @(RDLTextAlignCenter), @(RDLTextAlignRight) ]
+           values:RDLFillPopUp(_alignPop, RDLTextAlignGeneral, RDLTextAlignJustify,
+                               ^(NSInteger v) { return RDLStringFromTextAlign((RDLTextAlign)v); })
       placeholder:nil];
+  [_bindings bind:_verticalPop
+          keyPath:@"style.verticalAlign"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_verticalPop, RDLVerticalAlignTop, RDLVerticalAlignBottom,
+                               ^(NSInteger v) { return RDLStringFromVerticalAlign((RDLVerticalAlign)v); })
+      placeholder:nil];
+  [_bindings bind:_decorationPop
+          keyPath:@"style.textDecoration"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_decorationPop, RDLTextDecorationNone, RDLTextDecorationLineThrough,
+                               ^(NSInteger v) { return RDLStringFromTextDecoration((RDLTextDecoration)v); })
+      placeholder:nil];
+  // Italic is one of two, so it is a box to tick rather than a list of two.
+  [_bindings bind:_italicCheck
+          keyPath:@"style.fontStyle"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck
+           values:@[ @(RDLFontStyleNormal), @(RDLFontStyleItalic) ]
+      placeholder:nil];
+  [_bindings bind:_textBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindTextOrExpression];
+  // Padding, which the engine has always drawn and the inspector never showed:
+  // 2pt a side is what a style that says nothing gets, so that is what the
+  // empty field means rather than none.
+  [_bindings bind:_padLeftField keyPath:@"style.paddingLeft" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padRightField keyPath:@"style.paddingRight" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padTopField keyPath:@"style.paddingTop" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+  [_bindings bind:_padBottomField keyPath:@"style.paddingBottom" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
   [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem
@@ -302,8 +572,25 @@
              kind:RDLFieldKindTextOrExpression values:nil placeholder:nil];
 
   // Line and Rectangle each expose one style property.
-  [_bindings bind:_lineColorField keyPath:@"style.color" scope:RDLFieldScopeItem
+  // A line is drawn in its border's colour, at its border's width, dashed as
+  // its border says -- which is what MS-RDL means by a Line's style, and what
+  // every backend reads. The ink field used to write style.color, where only a
+  // line with no border colour of its own would ever show it.
+  [_bindings bind:_lineColorField keyPath:@"style.border.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindText values:nil placeholder:@"#1a1916"];
+  [_bindings bind:_lineWidthField keyPath:@"style.border.width" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"1pt"];
+  // None, Dotted, Dashed and Solid: the whole of what a line can be drawn as.
+  // The treatments past Solid -- Double, Groove and the rest -- shade an edge
+  // of a box, and a line stroked in any of them comes out solid, so offering
+  // them would be offering something that does not happen.
+  [_bindings bind:_lineDashPop
+          keyPath:@"style.border.style"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_lineDashPop, RDLBorderStyleNone, RDLBorderStyleSolid,
+                               ^(NSInteger v) { return RDLStringFromBorderStyle((RDLBorderStyle)v); })
+      placeholder:nil];
   [_bindings bind:_rectBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
   [_bindings bind:_bgColorWell keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
@@ -312,32 +599,100 @@
   // Image.
   [_bindings bind:_imageValueField keyPath:@"value" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
-  [_bindings bind:_imageSourcePop keyPath:@"source" scope:RDLFieldScopeItem
+  [_bindings bind:_imageSourcePop
+          keyPath:@"source"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLImageSourceEmbedded), @(RDLImageSourceExternal) ]
+           values:RDLFillPopUp(_imageSourcePop, RDLImageSourceExternal, RDLImageSourceDatabase,
+                               ^(NSInteger v) { return RDLStringFromImageSource((RDLImageSource)v); })
       placeholder:nil];
-  [_bindings bind:_imageSizingPop keyPath:@"sizing" scope:RDLFieldScopeItem
+  [_bindings bind:_imageSizingPop
+          keyPath:@"sizing"
+            scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLImageSizingFit), @(RDLImageSizingFitProportional),
-                     @(RDLImageSizingClip), @(RDLImageSizingAutoSize) ]
+           values:RDLFillPopUp(_imageSizingPop, RDLImageSizingAutoSize, RDLImageSizingClip,
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromImageSizing((RDLImageSizing)v)); })
       placeholder:nil];
+  [_imageMimePop removeAllItems];
+  [_imageMimePop addItemsWithTitles:RDLImageMIMETypes()];
+  [_bindings bind:_imageMimePop keyPath:@"mimeType" scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpTitle];
 
   // Subreport. The name is a file beside this report, written the way MS-RDL
   // writes it: without the .rdl.
   [_bindings bind:_subreportNameField keyPath:@"reportName" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
+  [_bindings bind:_subreportNoRowsField keyPath:@"noRowsMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText values:nil placeholder:nil];
+  [_bindings bind:_subreportOmitBorderCheck keyPath:@"omitBorderOnPageBreak" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
+  [_bindings bind:_subreportMergeCheck keyPath:@"mergeTransactions" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @NO, @YES ] placeholder:nil];
 
   // Chart.
   [_bindings bind:_chartDatasetPop keyPath:@"dataSetName" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpTitle];
   [_bindings bind:_titleField keyPath:@"title" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
+  // Every type the kit models, from the enumeration rather than from a list
+  // typed into the XIB: a chart of a type the popup did not offer showed as
+  // Column, and the first edit of any chart field wrote that back.
+  [_chartKindPop removeAllItems];
+  NSMutableArray<NSNumber *> *chartTypes = [NSMutableArray array];
+  for (RDLChartType type = RDLChartTypeColumn; type <= RDLChartTypeRadar; type++) {
+    [_chartKindPop addItemWithTitle:RDLStringFromChartType(type)];
+    [chartTypes addObject:@(type)];
+  }
   [_bindings bind:_chartKindPop keyPath:@"chartType" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpIndex
-           values:@[ @(RDLChartTypeColumn), @(RDLChartTypeBar), @(RDLChartTypeLine),
-                     @(RDLChartTypeArea), @(RDLChartTypePie), @(RDLChartTypeDoughnut),
-                     @(RDLChartTypeScatter) ]
+           values:chartTypes
       placeholder:nil];
+  [_bindings bind:_chartSubtypePop
+          keyPath:@"subtype"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartSubtypePop, RDLChartSubtypePlain, RDLChartSubtypeStepped,
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromChartSubtype((RDLChartSubtype)v)); })
+      placeholder:nil];
+  [_bindings bind:_chartPalettePop
+          keyPath:@"palette"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartPalettePop, RDLChartPaletteDefault, RDLChartPaletteSeaGreen,
+                               ^(NSInteger v) { return RDLWordsOfName(RDLStringFromChartPalette((RDLChartPalette)v)); })
+      placeholder:nil];
+  [_bindings bind:_chartTitlePositionPop
+          keyPath:@"titlePosition"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_chartTitlePositionPop, RDLChartTitlePositionTopCenter, RDLChartTitlePositionBottomLeft,
+                               ^(NSInteger v) {
+                                 return RDLWordsOfName(RDLStringFromChartTitlePosition((RDLChartTitlePosition)v));
+                               })
+      placeholder:nil];
+  // Shown is the box ticked, and hidden what the model stores.
+  [_bindings bind:_showLegendCheck keyPath:@"legendHidden" scope:RDLFieldScopeItem
+             kind:RDLFieldKindCheck values:@[ @YES, @NO ] placeholder:nil];
+  [_bindings bind:_legendPositionPop
+          keyPath:@"legendPosition"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_legendPositionPop, RDLChartLegendPositionTopLeft, RDLChartLegendPositionBottomRight,
+                               ^(NSInteger v) {
+                                 return RDLWordsOfName(RDLStringFromChartLegendPosition((RDLChartLegendPosition)v));
+                               })
+      placeholder:nil];
+  [_bindings bind:_legendLayoutPop
+          keyPath:@"legendLayout"
+            scope:RDLFieldScopeItem
+             kind:RDLFieldKindPopUpIndex
+           values:RDLFillPopUp(_legendLayoutPop, RDLChartLegendLayoutAutoTable, RDLChartLegendLayoutTallTable,
+                               ^(NSInteger v) {
+                                 return RDLWordsOfName(RDLStringFromChartLegendLayout((RDLChartLegendLayout)v));
+                               })
+      placeholder:nil];
+  [_bindings bind:_noDataMessageField keyPath:@"noDataMessage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindValue values:nil placeholder:nil];
   [_bindings bind:_catField keyPath:@"categoryField" scope:RDLFieldScopeItem
              kind:RDLFieldKindText];
   [_bindings bind:_valField keyPath:@"valueField" scope:RDLFieldScopeItem
@@ -346,10 +701,6 @@
   // Tablix.
   [_bindings bind:_tablixDatasetPop keyPath:@"dataSetName" scope:RDLFieldScopeItem
              kind:RDLFieldKindPopUpTitle];
-  [_bindings bind:_tablixHeaderHField keyPath:@"headerHeight" scope:RDLFieldScopeItem
-             kind:RDLFieldKindNumber];
-  [_bindings bind:_tablixRowHField keyPath:@"rowHeight" scope:RDLFieldScopeItem
-             kind:RDLFieldKindNumber];
 
   // Band and report.
   [_bindings bind:_bandHField keyPath:@"height" scope:RDLFieldScopeBand
@@ -376,6 +727,19 @@
              kind:RDLFieldKindNumber];
   [_bindings bind:_footerHField keyPath:@"pageFooter.height" scope:RDLFieldScopeReport
              kind:RDLFieldKindNumber];
+}
+
+// A popup holding a whole vocabulary: every case from `first` to `last`, named
+// as the model names it, and the matching values for the binding to write.
+static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NSInteger last,
+                                         NSString *(^name)(NSInteger)) {
+  [pop removeAllItems];
+  NSMutableArray<NSNumber *> *values = [NSMutableArray array];
+  for (NSInteger value = first; value <= last; value++) {
+    [pop addItemWithTitle:name(value) ?: @""];
+    [values addObject:@(value)];
+  }
+  return values;
 }
 
 #pragma mark - Fill (model → UI)
@@ -416,9 +780,16 @@
     @"headerHLabel" : @"Header",
     @"bodyHLabel" : @"Body",
     @"footerHLabel" : @"Footer",
-    @"marginLabel" : @"Margin",
+    @"paperWidthLabel" : @"Width",
+    @"paperHeightLabel" : @"Height",
+    @"leftMarginLabel" : @"Left",
+    @"rightMarginLabel" : @"Right",
+    @"topMarginLabel" : @"Top",
+    @"bottomMarginLabel" : @"Bottom",
+    @"columnSpacingLabel" : @"Spacing",
+    @"cellRowHeightLabel" : @"Row height",
     @"bandHeightLabel" : @"Height",
-    @"cellWidthLabel" : @"Width",
+    @"cellWidthLabel" : @"Column width",
     @"tablixHeaderLabel" : @"Header",
     @"tablixRowLabel" : @"Row"
   };
@@ -450,7 +821,8 @@
     // cell decides both. Offering the boxes would be offering to change
     // numbers nothing reads.
     RDLTablix *cellTablix = nil;
-    BOOL inCell = [report cellContainingItem:it tablix:&cellTablix] != nil;
+    RDLTablixCell *cell = [report cellContainingItem:it tablix:&cellTablix];
+    BOOL inCell = cell != nil;
     [_kindLabel setStringValue:inCell
                                    ? [NSString stringWithFormat:@"%@ · %@ · in %@",
                                                                 it.rdlElementName, it.name,
@@ -458,36 +830,62 @@
                                    : [NSString stringWithFormat:@"%@ · %@", it.rdlElementName,
                                                                 it.name]];
     [_nameField setStringValue:it.name ?: @""];
-    NSMutableArray *boxes = inCell ? [NSMutableArray array]
-                                   : [NSMutableArray arrayWithObject:_geoBox];
+    // Its name, which an item in a cell has too; its geometry, which it does not.
+    NSMutableArray *boxes = [NSMutableArray arrayWithObject:_nameBox];
+    if (!inCell)
+      [boxes addObject:_geoBox];
     // The dataset popups are populated from the report before filling, since
     // their contents depend on it rather than being fixed at build time.
     if ([it isKindOfClass:[RDLTextbox class]]) {
       [boxes addObject:_textBox];
-        [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+      [boxes addObject:_textOptionsBox];
+      [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+      [self rebuildHideDuplicatesPopFor:(RDLTextbox *)it];
     } else if ([it isKindOfClass:[RDLLine class]]) {
       [boxes addObject:_lineBox];
     } else if ([it isKindOfClass:[RDLRectangle class]]) {
       [boxes addObject:_rectBox];
     } else if ([it isKindOfClass:[RDLImage class]]) {
       [boxes addObject:_imageBox];
+      [self rebuildEmbeddedImagePopFor:(RDLImage *)it];
     } else if ([it isKindOfClass:[RDLSubreport class]]) {
       [boxes addObject:_subreportBox];
       [self fillSubreportStatus:(RDLSubreport *)it];
     } else if ([it isKindOfClass:[RDLChart class]]) {
       [boxes addObject:_chartBox];
-        [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
+      [boxes addObject:_chartOptionsBox];
+      [self rebuildDatasetPop:_chartDatasetPop selecting:[(RDLChart *)it dataSetName]];
     } else if ([it isKindOfClass:[RDLTablix class]]) {
       [boxes addObject:_tablixBox];
-      if ([self fillCellFromTablix:(RDLTablix *)it column:sel.tablixColumn])
-        [boxes addObject:_cellBox];
-        [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
+      [boxes addObject:_tablixOptionsBox];
+      [self syncSortingButton:_tablixSortingButton count:[[(RDLTablix *)it sortExpressions] count]];
+      // The count, because a filter is otherwise invisible from here and a
+      // table that shows nothing is a mystery worth one word.
+      [self syncFiltersButton:_tablixFiltersButton count:[[(RDLTablix *)it filters] count]];
+      [self rebuildDatasetPop:_tablixDatasetPop selecting:[(RDLTablix *)it dataSetName]];
+      [self fillRowHeightsOfTablix:(RDLTablix *)it];
+    }
+    [boxes addObjectsFromArray:[self commonBoxesForItem:it]];
+    [boxes addObject:_moreStyleBox];
+    [self syncDependentControls];
+    [self rebuildTogglePopFor:it];
+    // An item in a tablix cell: the column it is in, whose width is the cell's.
+    NSUInteger cellRow = 0, cellColumn = 0;
+    if (cell != nil && [cellTablix getRow:&cellRow column:&cellColumn ofCell:cell] &&
+        [self fillColumn:(NSInteger)cellColumn ofTablix:cellTablix]) {
+      [self fillRow:(NSInteger)cellRow ofTablix:cellTablix];
+      // A text box and a rectangle carry the button in their own sections, and
+      // a line's border is the line, edited in its section.
+      BOOL ownSectionHasBorders = [it isKindOfClass:[RDLTextbox class]] ||
+                                  [it isKindOfClass:[RDLRectangle class]] ||
+                                  [it isKindOfClass:[RDLLine class]];
+      [self showCellBorders:!ownSectionHasBorders];
+      [boxes addObject:_cellBox];
     }
     [self stackBoxes:boxes];
   } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && !_showsReportOnly) {
     // An empty cell: nothing in it to describe, so what is shown is the column
-    // it belongs to -- its width, its heading, what its cells show -- and the
-    // label says where in the table it is.
+    // it belongs to -- its width -- and the label says where in the table it is.
     [_kindLabel setStringValue:[NSString stringWithFormat:@"Empty cell · %@ · row %ld, column %ld",
                                                           sel.tablix.name ?: @"table",
                                                           (long)sel.cellRow + 1,
@@ -495,91 +893,295 @@
     NSMutableArray *boxes = [NSMutableArray array];
     NSInteger bodyColumn = [RDLTablixGeometry bodyColumnOf:sel.tablix
                                              forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
-    if (bodyColumn >= 0 && [self fillCellFromTablix:sel.tablix column:bodyColumn])
+    if (bodyColumn >= 0 && [self fillColumn:bodyColumn ofTablix:sel.tablix]) {
+      [self fillRow:[RDLTablixGeometry bodyRowOf:sel.tablix forGridRow:(NSUInteger)MAX(sel.cellRow, 0)]
+           ofTablix:sel.tablix];
+      [self showCellBorders:YES];
       [boxes addObject:_cellBox];
+    }
     [self stackBoxes:boxes];
   } else if (band != nil) {
     [_kindLabel setStringValue:[RDLItemFactory titleForBandKey:sel.bandKey]];
-    // Only the Body carries a background in RDL, so the field is disabled
-    // elsewhere rather than silently doing nothing.
-    BOOL isBody = [RDLReport bandKeySupportsBackground:sel.bandKey];
-    [_bandBGField setEditable:isBody];
-    [_bandBGField setEnabled:isBody];
-    [_bandBGField setStringValue:isBody ? (band.style.backgroundColor ?: @"") : @""];
-    [_bandBGField setToolTip:isBody ? nil : @"Background is supported on the Body band only"];
-    [self stackBoxes:@[ _bandBox ]];
+    BOOL hasStyle = [RDLReport bandKeySupportsBackground:sel.bandKey];
+    [_bandBGField setEditable:hasStyle];
+    [_bandBGField setEnabled:hasStyle];
+    [_bandBGField setStringValue:hasStyle ? (band.style.backgroundColor ?: @"") : @""];
+    // The page header and footer choose the pages they appear on; the body is
+    // on all of them.
+    BOOL pageSection = ![sel.bandKey isEqualToString:@"body"];
+    [self stackBoxes:pageSection ? @[ _bandBox, _printBox ] : @[ _bandBox ]];
   } else {
     [_kindLabel setStringValue:report.name ?: @"Report"];
-    NSDictionary *size = [report.page matchingStandardSize];
-    NSUInteger sizeIndex = size ? [[RDLPage standardSizes] indexOfObject:size] : NSNotFound;
-    if (sizeIndex != NSNotFound)
-      [_pagePop selectItemAtIndex:(NSInteger)sizeIndex];
-    [_marginField setStringValue:[NSString stringWithFormat:@"%.3f", report.page.leftMargin]];
-    [self stackBoxes:@[ _docBox ]];
+    [self fillPaper:report.page];
+    NSUInteger pictures = [report.embeddedImages count];
+    [_embeddedImagesButton setTitle:pictures ? [NSString stringWithFormat:@"Embedded Images (%lu)…",
+                                                                          (unsigned long)pictures]
+                                             : @"Embedded Images…"];
+    NSUInteger variables = [report.variables count];
+    [_reportVariablesButton
+        setTitle:variables ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)variables] : @"Variables…"];
+    [self stackBoxes:@[ _docBox, _paperBox ]];
   }
 
   [_bindings fillFromItem:it band:band report:report];
   _reloading = NO;
 }
 
-// The selected column's spec, or NO when the selection names no column -- in
-// which case the section is not shown at all rather than shown empty.
-- (BOOL)fillCellFromTablix:(RDLTablix *)tablix column:(NSInteger)column {
-  NSArray *specs = tablix.columnSpecs ?: @[];
-  if (column < 0 || column >= (NSInteger)[specs count])
+// What MS-RDL lets each kind say. Visibility is every item's; a link is a text
+// box's or an image's; KeepTogether is on a text box, a subreport, a rectangle
+// and a data region; page breaks and a page name only on a rectangle or a
+// data region.
+- (NSArray<NSView *> *)commonBoxesForItem:(RDLItem *)it {
+  NSMutableArray<NSView *> *boxes = [NSMutableArray arrayWithObject:_visibilityBox];
+  BOOL region = [it isKindOfClass:[RDLRectangle class]] || [it isKindOfClass:[RDLTablix class]] ||
+                [it isKindOfClass:[RDLChart class]];
+  if ([it isKindOfClass:[RDLTextbox class]] || [it isKindOfClass:[RDLImage class]])
+    [boxes addObject:_linkBox];
+  if (region || [it isKindOfClass:[RDLTextbox class]] || [it isKindOfClass:[RDLSubreport class]])
+    [boxes addObject:_keepBox];
+  if (region)
+    [boxes addObject:_pageBox];
+  return boxes;
+}
+
+// The text boxes that could toggle `it`: every one in the report but itself,
+// by name, after None. A ToggleItem naming something else -- a text box the
+// report no longer has -- is listed too, so showing it does not lose it.
+// The scopes a text box can hide repeated values within: the report's
+// datasets and groups, by name, and whatever the file names that is not one.
+- (void)rebuildHideDuplicatesPopFor:(RDLTextbox *)textbox {
+  [_hideDuplicatesPop removeAllItems];
+  [_hideDuplicatesPop addItemWithTitle:@"Nothing: show every value"];
+  NSMutableArray<NSString *> *scopes = [NSMutableArray array];
+  NSSet<NSString *> *regions = [NSSet setWithArray:[[[_context.report allItemsIncludingNested]
+      filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(id item, NSDictionary *bindings) {
+        (void)bindings;
+        return [item isKindOfClass:[RDLDataRegion class]];
+      }]] valueForKey:@"name"]];
+  for (NSString *scope in [[[_context.report scopeNames] allObjects] sortedArrayUsingSelector:@selector(compare:)])
+    if (![regions containsObject:scope])
+      [scopes addObject:scope];
+  NSString *current = textbox.hideDuplicates;
+  if ([current length] && ![scopes containsObject:current])
+    [scopes addObject:current];
+  for (NSString *scope in scopes)
+    [[_hideDuplicatesPop menu] addItemWithTitle:scope action:NULL keyEquivalent:@""];
+  [_hideDuplicatesPop selectItemAtIndex:[current length] ? (NSInteger)[scopes indexOfObject:current] + 1 : 0];
+}
+
+- (BOOL)applyHideDuplicatesControl:(id)sender item:(RDLItem *)it {
+  if (sender != _hideDuplicatesPop || ![it isKindOfClass:[RDLTextbox class]])
     return NO;
-  NSDictionary *spec = specs[(NSUInteger)column];
-  [_cellHeaderField setStringValue:spec[@"header"] ?: @""];
-  [_cellValueField setStringValue:spec[@"value"] ?: @""];
-  [_cellWidthField setStringValue:[NSString stringWithFormat:@"%.3f",
-                                                            [spec[@"width"] doubleValue]]];
-  NSString *align = spec[@"align"] ?: @"Default";
-  [_cellAlignPop selectItemWithTitle:[_cellAlignPop itemWithTitle:align] ? align : @"Default"];
-  NSString *agg = spec[@"aggregate"] ?: @"None";
-  [_cellAggPop selectItemWithTitle:[_cellAggPop itemWithTitle:agg] ? agg : @"None"];
+  NSString *scope = [_hideDuplicatesPop indexOfSelectedItem] > 0 ? [_hideDuplicatesPop titleOfSelectedItem] : nil;
+  NSString *was = [(RDLTextbox *)it hideDuplicates];
+  if (!(scope == was || [scope isEqualToString:was]))
+    [_context.editor setValue:scope forKeyPath:@"hideDuplicates" ofItem:it];
   return YES;
 }
 
-// One column changed: the whole spec array goes back, because that is the unit
-// -rebuildTablix reads and the unit the inverse restores.
-- (BOOL)applyCellControl:(id)sender {
-  RDLSelection *sel = _context.selection;
-  // The column is named either by a tablix selection (a click in its preview)
-  // or by an empty-cell selection; both edit the same column spec.
+#pragma mark - Images
+
+- (void)rebuildEmbeddedImagePopFor:(RDLImage *)image {
+  [_imageEmbeddedPop removeAllItems];
+  NSArray<RDLEmbeddedImage *> *images = _context.report.embeddedImages;
+  [_imageEmbeddedPop addItemWithTitle:[images count] ? @"Choose a picture" : @"None in this report"];
+  for (RDLEmbeddedImage *embedded in images)
+    [[_imageEmbeddedPop menu] addItemWithTitle:embedded.name ?: @"" action:NULL keyEquivalent:@""];
+  RDLEmbeddedImage *shown =
+      image.source == RDLImageSourceEmbedded ? [_context.report embeddedImageNamed:image.value] : nil;
+  NSUInteger at = shown ? [images indexOfObjectIdenticalTo:shown] : NSNotFound;
+  [_imageEmbeddedPop selectItemAtIndex:at == NSNotFound ? 0 : (NSInteger)at + 1];
+}
+
+- (BOOL)applyEmbeddedImageControl:(id)sender item:(RDLItem *)it {
+  if (sender != _imageEmbeddedPop || ![it isKindOfClass:[RDLImage class]])
+    return NO;
+  NSInteger chosen = [_imageEmbeddedPop indexOfSelectedItem];
+  if (chosen > 0 && ![[_imageEmbeddedPop titleOfSelectedItem] isEqualToString:[(RDLImage *)it value]])
+    [_context.editor setValue:[_imageEmbeddedPop titleOfSelectedItem] forKeyPath:@"value" ofItem:it];
+  [self reload];
+  return YES;
+}
+
+- (void)editMoreStyle:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  if (item != nil && [RDLStylePanel runForItem:item context:_context])
+    [self reload];
+}
+
+- (void)editReportCode:(id)sender {
+  (void)sender;
+  RDLReport *report = _context.report;
+  NSString *edited = [RDLCodeEditor runForCode:report.code
+                                         title:[NSString stringWithFormat:@"Code — %@", report.name ?: @"Report"]];
+  NSString *code = [edited length] ? edited : nil;
+  if (edited == nil || code == report.code || [code isEqualToString:report.code])
+    return;
+  [_context.editor setReportValue:code forKeyPath:@"code"];
+  [self reload];
+}
+
+- (void)editReportVariables:(id)sender {
+  (void)sender;
+  RDLReport *report = _context.report;
+  NSArray<RDLVariable *> *edited =
+      [RDLVariablesEditor runForVariables:report.variables
+                                    title:[NSString stringWithFormat:@"Variables — %@", report.name ?: @"Report"]
+                                 writable:YES
+                                   report:report];
+  if (edited == nil || RDLVariablesEqual(edited, report.variables))
+    return;
+  [_context.editor setReportValue:[edited mutableCopy] forKeyPath:@"variables"];
+  [self reload];
+}
+
+- (void)editEmbeddedImages:(id)sender {
+  (void)sender;
+  if ([RDLEmbeddedImagesEditor runWithContext:_context])
+    [self reload];
+}
+
+- (void)importImage:(id)sender {
+  (void)sender;
+  NSOpenPanel *panel = [NSOpenPanel openPanel];
+  [panel setAllowsMultipleSelection:NO];
+  [panel setCanChooseDirectories:NO];
+  [panel setAllowedFileTypes:@[ @"png", @"jpg", @"jpeg", @"gif", @"bmp" ]];
+  if ([panel runModal] != NSModalResponseOK || [[panel URLs] count] == 0)
+    return;
+  NSError *error = nil;
+  if (![self importImageFromURL:[[panel URLs] firstObject] error:&error] && error != nil)
+    [[NSAlert alertWithError:error] runModal];
+}
+
+- (BOOL)importImageFromURL:(NSURL *)url error:(NSError **)error {
   RDLItem *it = [_context selectedItem];
-  NSInteger column = sel.tablixColumn;
-  if (![it isKindOfClass:[RDLTablix class]] && sel.scope == RDLSelectionScopeTablixCell) {
-    it = sel.tablix;
-    column = [RDLTablixGeometry bodyColumnOf:sel.tablix
-                               forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+  if (![it isKindOfClass:[RDLImage class]])
+    return NO;
+  RDLEmbeddedImage *embedded = RDLEmbeddedImageFromFile(url, _context.report.embeddedImages, error);
+  if (embedded == nil)
+    return NO;
+  RDLEditor *editor = _context.editor;
+  [editor beginGroup:@"Import Image"];
+  [editor addEmbeddedImage:embedded];
+  [editor setValue:@(RDLImageSourceEmbedded) forKeyPath:@"source" ofItem:it];
+  [editor setValue:embedded.name forKeyPath:@"value" ofItem:it];
+  [editor endGroup];
+  [self reload];
+  return YES;
+}
+
+- (void)rebuildTogglePopFor:(RDLItem *)it {
+  [_toggleItemPop removeAllItems];
+  [_toggleItemPop addItemWithTitle:@"None"];
+  NSMutableArray<NSString *> *names = [NSMutableArray array];
+  for (RDLBand *band in [_context.report allBands])
+    for (RDLItem *top in band.items)
+      for (RDLItem *candidate in [top itemsIncludingNested])
+        if ([candidate isKindOfClass:[RDLTextbox class]] && candidate != it && [candidate.name length] &&
+            ![names containsObject:candidate.name])
+          [names addObject:candidate.name];
+  if ([it.toggleItem length] && ![names containsObject:it.toggleItem])
+    [names addObject:it.toggleItem];
+  for (NSString *name in names) {
+    // addItemWithTitle: would fold a name into one already there.
+    [[_toggleItemPop menu] addItemWithTitle:name action:NULL keyEquivalent:@""];
   }
-  if (![it isKindOfClass:[RDLTablix class]] || column < 0)
+  if ([it.toggleItem length])
+    [_toggleItemPop selectItemAtIndex:(NSInteger)[names indexOfObject:it.toggleItem] + 1];
+  else
+    [_toggleItemPop selectItemAtIndex:0];
+}
+
+- (BOOL)applyToggleControl:(id)sender item:(RDLItem *)it {
+  if (sender != _toggleItemPop)
     return NO;
-  if (sender != _cellHeaderField && sender != _cellValueField && sender != _cellWidthField &&
-      sender != _cellAlignPop && sender != _cellAggPop)
+  NSInteger index = [_toggleItemPop indexOfSelectedItem];
+  NSString *name = index > 0 ? [_toggleItemPop titleOfSelectedItem] : nil;
+  if (it != nil && !(name == it.toggleItem || [name isEqualToString:it.toggleItem]))
+    [_context.editor setValue:name forKeyPath:@"toggleItem" ofItem:it];
+  return YES;
+}
+
+// The width of a tablix's body column, or NO when there is no such column --
+// in which case the section is not shown at all rather than shown empty. What
+// the column's cells show and how they align are the cells' own, and are edited
+// by selecting what is in them.
+// A measurement as the inspector shows it: in the report's unit.
+- (NSString *)stringFromInches:(CGFloat)inches {
+  return [NSString stringWithFormat:@"%.3f", RDLUnitsFromInches(inches, _context.report.unit)];
+}
+
+- (BOOL)fillColumn:(NSInteger)column ofTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixColumn *> *columns = tablix.tablixBody.columns;
+  if (column < 0 || column >= (NSInteger)[columns count])
     return NO;
+  [_cellWidthField setStringValue:[self stringFromInches:columns[(NSUInteger)column].width]];
+  return YES;
+}
+
+- (void)fillRow:(NSInteger)row ofTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  [_cellRowHeightField setStringValue:row >= 0 && row < (NSInteger)[rows count]
+                                          ? [self stringFromInches:rows[(NSUInteger)row].height]
+                                          : @""];
+}
+
+// The two rows a tablix's columns are described by: the heading row and the
+// value row. A field is blank where the tablix has no such row -- a
+// crosstab's headings are its column groups' headers.
+- (void)fillRowHeightsOfTablix:(RDLTablix *)tablix {
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  NSInteger heading = [RDLTablixStructure headingRowOfTablix:tablix];
+  NSInteger value = [RDLTablixStructure valueRowOfTablix:tablix];
+  [_tablixHeaderHField setStringValue:heading >= 0 ? [self stringFromInches:rows[(NSUInteger)heading].height] : @""];
+  [_tablixRowHField setStringValue:value >= 0 ? [self stringFromInches:rows[(NSUInteger)value].height] : @""];
+}
+
+// A height typed into one of them: that row's, set in place.
+- (BOOL)applyRowHeightControl:(id)sender {
+  if (sender != _tablixHeaderHField && sender != _tablixRowHField)
+    return NO;
+  RDLItem *it = [_context selectedItem];
+  if (![it isKindOfClass:[RDLTablix class]])
+    return YES;
   RDLTablix *tablix = (RDLTablix *)it;
-  NSMutableArray *specs = [(tablix.columnSpecs ?: @[]) mutableCopy];
-  if (column >= (NSInteger)[specs count])
+  NSInteger row = sender == _tablixHeaderHField ? [RDLTablixStructure headingRowOfTablix:tablix]
+                                                : [RDLTablixStructure valueRowOfTablix:tablix];
+  CGFloat height = RDLInchesFromUnits([[(NSTextField *)sender stringValue] doubleValue], _context.report.unit);
+  if (row >= 0 && height > 0)
+    [_context.editor setTablixRow:(NSUInteger)row height:height ofTablix:tablix];
+  return YES;
+}
+
+// A column's width typed in: the column the selected cell item, or the selected
+// empty cell, is in -- set exactly, and in place.
+- (BOOL)applyCellControl:(id)sender {
+  if (sender != _cellWidthField && sender != _cellRowHeightField)
     return NO;
-  NSMutableDictionary *spec = [specs[(NSUInteger)column] mutableCopy];
-  spec[@"header"] = [_cellHeaderField stringValue];
-  spec[@"value"] = [_cellValueField stringValue];
-  CGFloat width = [[_cellWidthField stringValue] doubleValue];
-  if (width > 0)
-    spec[@"width"] = @(width);
-  NSString *align = [_cellAlignPop titleOfSelectedItem];
-  if ([align isEqualToString:@"Default"])
-    [spec removeObjectForKey:@"align"];
-  else
-    spec[@"align"] = align;
-  NSString *agg = [_cellAggPop titleOfSelectedItem];
-  if ([agg isEqualToString:@"None"])
-    [spec removeObjectForKey:@"aggregate"];
-  else
-    spec[@"aggregate"] = agg;
-  specs[(NSUInteger)column] = spec;
-  [_context.editor setColumnSpecs:specs ofTablix:tablix];
+  RDLSelection *sel = _context.selection;
+  RDLTablix *tablix = nil;
+  NSInteger column = -1, row = -1;
+  if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil) {
+    tablix = sel.tablix;
+    column = [RDLTablixGeometry bodyColumnOf:tablix forGridColumn:(NSUInteger)MAX(sel.cellColumn, 0)];
+    row = [RDLTablixGeometry bodyRowOf:tablix forGridRow:(NSUInteger)MAX(sel.cellRow, 0)];
+  } else {
+    RDLTablixCell *cell = [_context.report cellContainingItem:[_context selectedItem] tablix:&tablix];
+    NSUInteger bodyRow = 0, bodyColumn = 0;
+    if (cell != nil && [tablix getRow:&bodyRow column:&bodyColumn ofCell:cell]) {
+      column = (NSInteger)bodyColumn;
+      row = (NSInteger)bodyRow;
+    }
+  }
+  CGFloat size = RDLInchesFromUnits([[(NSTextField *)sender stringValue] doubleValue], _context.report.unit);
+  if (tablix == nil || size <= 0)
+    return YES;
+  if (sender == _cellWidthField && column >= 0)
+    [_context.editor setTablixColumn:(NSUInteger)column width:size ofTablix:tablix];
+  else if (sender == _cellRowHeightField && row >= 0)
+    [_context.editor setTablixRow:(NSUInteger)row height:size ofTablix:tablix];
   return YES;
 }
 
@@ -622,6 +1224,30 @@
   return RDLExpressionCompletions([textView string], charRange, scope);
 }
 
+// Controls whose state follows another's value.
+- (void)syncDependentControls {
+  RDLItem *it = [_context selectedItem];
+  if ([it isKindOfClass:[RDLImage class]]) {
+    // The report's pictures are what an Embedded image shows, and a type is
+    // what a Database image's bytes need.
+    RDLImageSource source = [(RDLImage *)it source];
+    [_imageEmbeddedPop setEnabled:source == RDLImageSourceEmbedded];
+    [_imageImportButton setEnabled:source == RDLImageSourceEmbedded];
+    [_imageMimePop setEnabled:source == RDLImageSourceDatabase];
+    return;
+  }
+  if (![it isKindOfClass:[RDLChart class]])
+    return;
+  RDLChart *chart = (RDLChart *)it;
+  // A title's position is written with the title, and there may be none.
+  [_chartTitlePositionPop setEnabled:chart.chartTitle != nil];
+  // Only a Custom palette reads its colours; the button says how many there are.
+  NSUInteger colors = [chart.customPaletteColors count];
+  [_customColorsButton setEnabled:chart.palette == RDLChartPaletteCustom];
+  [_customColorsButton setTitle:colors ? [NSString stringWithFormat:@"Custom Colours (%lu)…", (unsigned long)colors]
+                                       : @"Custom Colours…"];
+}
+
 - (void)changed:(id)sender {
   if (_reloading)
     return;
@@ -629,12 +1255,26 @@
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];
 
-  // Most fields are a plain read-and-write of one model value.
-  if ([_bindings applyControl:sender editor:editor item:it bandKey:sel.bandKey])
+  // Most fields are a plain read-and-write of one model value. A change like
+  // that does not reload the inspector, so what depends on it is updated here.
+  if ([_bindings applyControl:sender editor:editor item:it bandKey:sel.bandKey]) {
+    [self syncDependentControls];
     return;
+  }
 
   // The rest are composites: each writes more than one property and must undo
   // as a single step.
+  if (sender == _nameField && it != nil) {
+    // A name that is not an RDL name, or is another item's, is refused and the
+    // field goes back to the name the item has.
+    NSString *name = [[_nameField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (![editor renameItem:it to:name]) {
+      NSBeep();
+      [_nameField setStringValue:it.name ?: @""];
+    }
+    return;
+  }
   if (sender == _valueField && it != nil) {
     // -controlTextDidEndEditing: fires whenever the field resigns first
     // responder, not only when something was typed, and opening the rich-text
@@ -646,12 +1286,16 @@
 
   if (sender == _bandBGField && sel.scope == RDLSelectionScopeBand) {
     RDLBand *band = [_context.report bandWithKey:sel.bandKey];
+    // Read before anything changes: making the style is an edit, the inspector
+    // reloads on it, and the field then shows the colour the band had -- none.
+    NSString *color = [[_bandBGField stringValue]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
     [editor beginGroup:@"Band Background"];
     // Creating the style belongs to the same step, so undoing does not leave
     // an empty Style behind for the writer to emit.
     if (band.style == nil)
       [editor setValue:[[RDLStyle alloc] init] forKeyPath:@"style" ofBandWithKey:sel.bandKey];
-    [editor setValue:[_bandBGField stringValue]
+    [editor setValue:[color length] ? color : nil
           forKeyPath:@"style.backgroundColor"
        ofBandWithKey:sel.bandKey];
     [editor endGroup];
@@ -660,23 +1304,75 @@
 
   // Page dimensions and margins carry the body width with them, so the
   // dependency lives in RDLEditor rather than here.
-  if ([self applyCellControl:sender])
+  if ([self applyCellControl:sender] || [self applyRowHeightControl:sender] ||
+      [self applyToggleControl:sender item:it] || [self applyHideDuplicatesControl:sender item:it] ||
+      [self applyEmbeddedImageControl:sender item:it])
     return;
-  if (sender == _marginField) {
-    [editor setUniformMargin:[[_marginField stringValue] doubleValue]];
-    return;
-  }
+  [self applyPaperControl:sender];
+}
 
+#pragma mark - The paper
+
+- (void)fillPaper:(RDLPage *)page {
+  NSDictionary *size = [page matchingStandardSize];
+  NSUInteger sizeIndex = size ? [[RDLPage standardSizes] indexOfObject:size] : NSNotFound;
+  [_pagePop selectItemAtIndex:sizeIndex != NSNotFound ? (NSInteger)sizeIndex : [_pagePop numberOfItems] - 1];
+  [_orientationPop selectItemAtIndex:[page isLandscape] ? 1 : 0];
+  [_paperWidthField setStringValue:[self stringFromInches:page.pageWidth]];
+  [_paperHeightField setStringValue:[self stringFromInches:page.pageHeight]];
+  [_leftMarginField setStringValue:[self stringFromInches:page.leftMargin]];
+  [_rightMarginField setStringValue:[self stringFromInches:page.rightMargin]];
+  [_topMarginField setStringValue:[self stringFromInches:page.topMargin]];
+  [_bottomMarginField setStringValue:[self stringFromInches:page.bottomMargin]];
+  [_columnsField setStringValue:[NSString stringWithFormat:@"%ld", (long)MAX(page.columns, (NSInteger)1)]];
+  [_columnSpacingField setStringValue:[self stringFromInches:page.columnSpacing]];
+  [_pageBGField setStringValue:page.style.backgroundColor ?: @""];
+}
+
+- (CGFloat)inchesInField:(NSTextField *)field {
+  return RDLInchesFromUnits([[field stringValue] doubleValue], _context.report.unit);
+}
+
+// The paper's controls, each through the editor, which keeps the body's width
+// in step with the page. A size keeps the page the way up it is.
+- (BOOL)applyPaperControl:(id)sender {
+  RDLEditor *editor = _context.editor;
+  RDLPage *page = _context.report.page;
   if (sender == _pagePop) {
     NSArray *sizes = [RDLPage standardSizes];
     NSInteger i = [_pagePop indexOfSelectedItem];
     if (i >= 0 && i < (NSInteger)[sizes count]) {
-      NSDictionary *size = sizes[(NSUInteger)i];
-      [editor setPageWidth:[size[@"width"] doubleValue]
-                    height:[size[@"height"] doubleValue]];
+      CGFloat shorter = [sizes[(NSUInteger)i][@"width"] doubleValue];
+      CGFloat longer = [sizes[(NSUInteger)i][@"height"] doubleValue];
+      BOOL landscape = [page isLandscape];
+      [editor setPageWidth:landscape ? longer : shorter height:landscape ? shorter : longer];
     }
-    return;
+  } else if (sender == _orientationPop) {
+    BOOL landscape = [_orientationPop indexOfSelectedItem] == 1;
+    if (landscape != [page isLandscape])
+      [editor setPageWidth:page.pageHeight height:page.pageWidth];
+  } else if (sender == _paperWidthField || sender == _paperHeightField) {
+    [editor setPageWidth:[self inchesInField:_paperWidthField] height:[self inchesInField:_paperHeightField]];
+  } else if (sender == _leftMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeLeft];
+  } else if (sender == _rightMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeRight];
+  } else if (sender == _topMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeTop];
+  } else if (sender == _bottomMarginField) {
+    [editor setMargin:[self inchesInField:sender] forEdge:RDLBoxEdgeBottom];
+  } else if (sender == _columnsField || sender == _columnSpacingField) {
+    [editor setColumns:[[_columnsField stringValue] integerValue]
+               spacing:[self inchesInField:_columnSpacingField]];
+  } else if (sender == _pageBGField) {
+    [editor setPageBackgroundColor:[[_pageBGField stringValue]
+                                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
+  } else {
+    return NO;
   }
+  // A value the editor refused, or put right, shows as it is.
+  [self fillPaper:page];
+  return YES;
 }
 
 // What each expression-capable field has to produce. Set once: it is a
@@ -690,7 +1386,15 @@
   _languageField.expressionContext = RDLExpressionContextText;
   _docLanguageField.expressionContext = RDLExpressionContextText;
   _sizeField.expressionContext = RDLExpressionContextLength;
-  _cellValueField.expressionContext = RDLExpressionContextText;
+  _hiddenField.expressionContext = RDLExpressionContextBoolean;
+  _hyperlinkField.expressionContext = RDLExpressionContextText;
+  _pageBreakDisabledField.expressionContext = RDLExpressionContextBoolean;
+  _pageNameField.expressionContext = RDLExpressionContextText;
+  _initialPageNameField.expressionContext = RDLExpressionContextText;
+  _noRowsMessageField.expressionContext = RDLExpressionContextText;
+  _noDataMessageField.expressionContext = RDLExpressionContextText;
+  _imageValueField.expressionContext = RDLExpressionContextText;
+  _subreportNoRowsField.expressionContext = RDLExpressionContextText;
 }
 
 // Which field each f(x) button belongs to. One action for all of them: the
@@ -704,9 +1408,60 @@
   if (sender == _languageExprButton) return _languageField;
   if (sender == _docLanguageExprButton) return _docLanguageField;
   if (sender == _rectBGExprButton) return _rectBGField;
+  if (sender == _textBGExprButton) return _textBGField;
   if (sender == _sizeExprButton) return _sizeField;
-  if (sender == _cellExprButton) return _cellValueField;
+  if (sender == _padLeftExprButton) return _padLeftField;
+  if (sender == _padRightExprButton) return _padRightField;
+  if (sender == _padTopExprButton) return _padTopField;
+  if (sender == _padBottomExprButton) return _padBottomField;
+  if (sender == _lineWidthExprButton) return _lineWidthField;
+  if (sender == _hiddenExprButton) return _hiddenField;
+  if (sender == _hyperlinkExprButton) return _hyperlinkField;
+  if (sender == _pageBreakDisabledExprButton) return _pageBreakDisabledField;
+  if (sender == _pageNameExprButton) return _pageNameField;
+  if (sender == _initialPageNameExprButton) return _initialPageNameField;
+  if (sender == _noRowsMessageExprButton) return _noRowsMessageField;
+  if (sender == _noDataMessageExprButton) return _noDataMessageField;
+  if (sender == _imageValueExprButton) return _imageValueField;
+  if (sender == _subreportNoRowsExprButton) return _subreportNoRowsField;
   return nil;
+}
+
+// The borders of the selected item: the default and the four edges, in a panel
+// of their own because there are fifteen values behind them and the section
+// has room for a button.
+- (void)editBorders:(id)sender {
+  (void)sender;
+  RDLItem *item = [_context selectedItem];
+  BOOL accepted = item != nil ? [RDLBordersEditor runForItem:item context:_context]
+                              : [RDLBordersEditor runForSelectedEmptyCellInContext:_context];
+  if (accepted)
+    [self reload];
+}
+
+// The cell section's Borders… button, shown only where the cell's contents
+// have no section of their own that offers it, and the section sized to match
+// so a hidden button leaves no gap.
+- (void)showCellBorders:(BOOL)shown {
+  [_cellBordersButton setHidden:!shown];
+  // The box grows and shrinks over the button, which is the topmost thing in
+  // it; everything else stays where the XIB put it. Left to autoresizing, a
+  // shrink moved the width field out of the box, and the next height worked
+  // out from the moved frames came out short.
+  [_cellBox setAutoresizesSubviews:NO];
+  NSRect button = [_cellBordersButton frame];
+  CGFloat gap = NSMinY(button) - NSMaxY([_cellWidthField frame]);
+  NSRect box = [_cellBox frame];
+  box.size.height = shown ? NSMaxY(button) + gap : NSMinY(button);
+  [_cellBox setFrame:box];
+}
+
+// The dataset an item's expressions read: its own, for a data region, or that
+// of the table it sits in. nil leaves it to the report's only dataset.
+- (NSString *)dataSetNameReadBy:(RDLItem *)item {
+  if ([item isKindOfClass:[RDLDataRegion class]])
+    return [(RDLDataRegion *)item dataSetName];
+  return [_context.report tablixHoldingItem:item].dataSetName;
 }
 
 - (void)editExpression:(id)sender {
@@ -715,7 +1470,8 @@
     return;
   NSString *edited = [RDLExpressionEditor runForSource:[field stringValue]
                                                context:field.expressionContext
-                                                report:_context.report];
+                                                report:_context.report
+                                           dataSetName:[self dataSetNameReadBy:[_context selectedItem]]];
   if (edited == nil)
     return;  // cancelled: the field keeps what it had
   [field setStringValue:edited];

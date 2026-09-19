@@ -35,7 +35,51 @@
 @property (nonatomic, strong) IBOutlet NSButton *alignCenterButton;
 @property (nonatomic, strong) IBOutlet NSButton *alignRightButton;
 @property (nonatomic, strong) IBOutlet NSButton *alignJustifyButton;
+// The paragraph bar: a list or none, and moving the paragraphs in and out.
+@property (nonatomic, strong) IBOutlet NSPopUpButton *listPop;
+@property (nonatomic, strong) IBOutlet NSButton *outdentButton, *indentButton;
 @end
+
+// How far a paragraph that is not a list moves in or out with one step.
+static const CGFloat kRDLIndentStepInches = 0.25;
+// The list kinds the popup offers, in order: not a list first.
+static NSArray<NSNumber *> *RDLListStyles(void) {
+  return @[ @(RDLListStyleNone), @(RDLListStyleBulleted), @(RDLListStyleNumbered) ];
+}
+
+// The paragraphs of `string` -- each with the newline that ends it -- that
+// `range` touches; a caret touches the one it is in.
+static NSArray<NSValue *> *RDLParagraphRangesTouching(NSString *string, NSRange range) {
+  NSMutableArray<NSValue *> *out = [NSMutableArray array];
+  NSUInteger length = [string length], start = 0;
+  NSUInteger last = range.length ? NSMaxRange(range) - 1 : range.location;
+  while (start <= length) {
+    NSRange nl = [string rangeOfString:@"\n" options:0 range:NSMakeRange(start, length - start)];
+    NSUInteger end = nl.location == NSNotFound ? length : NSMaxRange(nl);
+    NSUInteger textEnd = nl.location == NSNotFound ? length : nl.location;
+    if (textEnd >= range.location && start <= last)
+      [out addObject:[NSValue valueWithRange:NSMakeRange(start, end - start)]];
+    if (nl.location == NSNotFound || start > last)
+      break;
+    start = end;
+  }
+  return out;
+}
+
+// Where each paragraph of `string` starts, and one past the end.
+static NSArray<NSNumber *> *RDLParagraphStarts(NSString *string) {
+  NSMutableArray<NSNumber *> *starts = [NSMutableArray arrayWithObject:@0];
+  NSUInteger at = 0, length = [string length];
+  while (at < length) {
+    NSRange nl = [string rangeOfString:@"\n" options:0 range:NSMakeRange(at, length - at)];
+    if (nl.location == NSNotFound)
+      break;
+    at = NSMaxRange(nl);
+    [starts addObject:@(at)];
+  }
+  [starts addObject:@(length)];
+  return starts;
+}
 
 @implementation RDLRichTextEditor
 
@@ -45,6 +89,107 @@
 
 + (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLTextbox *)item {
   [RDLRichTextCodec applyAttributedString:text toItem:item];
+}
+
+#pragma mark - Paragraphs
+
++ (NSAttributedString *)text:(NSAttributedString *)text
+                     forItem:(RDLTextbox *)item
+    changingParagraphsInRange:(NSRange)range
+                        with:(void (^)(RDLParagraph *layout))change
+                   selection:(NSRange *)selection {
+  NSMutableAttributedString *marked = [text mutableCopy];
+  NSString *string = [marked string];
+  NSUInteger firstIndex = [[string substringToIndex:MIN(range.location, [string length])]
+                              componentsSeparatedByString:@"\n"].count - 1;
+  NSArray<NSValue *> *touched = RDLParagraphRangesTouching(string, range);
+  for (NSValue *value in touched) {
+    NSRange paragraph = [value rangeValue];
+    RDLParagraph *layout = [[RDLParagraph alloc] init];
+    RDLParagraph *was = paragraph.length ? [marked attribute:RDLParagraphLayoutAttributeName
+                                                     atIndex:paragraph.location
+                                              effectiveRange:NULL]
+                                         : nil;
+    if ([was isKindOfClass:[RDLParagraph class]])
+      [layout takeLayoutFrom:was];
+    change(layout);
+    // A paragraph with nothing in it and nothing after has no character to
+    // carry its layout.
+    if (paragraph.length)
+      [marked addAttribute:RDLParagraphLayoutAttributeName value:layout range:paragraph];
+  }
+  // Read back as paragraphs and shown again, so the markers and indents are the
+  // ones the new layout draws.
+  RDLRichTextResult *result = [RDLRichTextCodec resultForAttributedString:marked item:item];
+  RDLTextbox *scratch = [[RDLTextbox alloc] init];
+  scratch.style = item.style;
+  scratch.value = result.text;
+  scratch.paragraphs = result.paragraphs;
+  NSAttributedString *out = [RDLRichTextCodec attributedStringForItem:scratch];
+  if (selection) {
+    NSArray<NSNumber *> *starts = RDLParagraphStarts([out string]);
+    NSUInteger lastIndex = firstIndex + MAX([touched count], 1) - 1;
+    NSUInteger length = [[out string] length];
+    NSUInteger from = firstIndex < [starts count] ? [starts[firstIndex] unsignedIntegerValue] : length;
+    NSUInteger to = lastIndex + 1 < [starts count] ? [starts[lastIndex + 1] unsignedIntegerValue] : length;
+    // Up to the paragraph's own newline, not over it.
+    if (to > from && to <= [[out string] length] && [[out string] characterAtIndex:to - 1] == '\n' &&
+        lastIndex + 2 < [starts count])
+      to -= 1;
+    *selection = NSMakeRange(from, to - from);
+  }
+  return out;
+}
+
+- (void)changeSelectedParagraphs:(void (^)(RDLParagraph *layout))change {
+  NSTextView *tv = _textView;
+  NSRange selection = [tv selectedRange];
+  NSAttributedString *changed = [RDLRichTextEditor text:[tv textStorage]
+                                                forItem:_item
+                              changingParagraphsInRange:selection
+                                                   with:change
+                                              selection:&selection];
+  if (![tv shouldChangeTextInRange:NSMakeRange(0, [[tv textStorage] length]) replacementString:[changed string]])
+    return;
+  [[tv textStorage] setAttributedString:changed];
+  [tv didChangeText];
+  [tv setSelectedRange:selection];
+  [self retintExpressionRuns];
+  [self syncToolbar];
+}
+
+- (void)listStyleChanged:(id)sender {
+  (void)sender;
+  NSInteger at = [_listPop indexOfSelectedItem];
+  RDLListStyle style = at > 0 ? (RDLListStyle)[RDLListStyles()[(NSUInteger)at] integerValue] : RDLListStyleNone;
+  [self changeSelectedParagraphs:^(RDLParagraph *layout) {
+    BOOL list = style != RDLListStyleNone;
+    layout.listStyle = list ? style : RDLListStyleUnspecified;
+    layout.listLevel = list ? MAX(layout.listLevel, 1) : 0;
+  }];
+}
+
+// In and out: a list item a level, any other paragraph a quarter of an inch.
+- (void)moveSelectedParagraphsBy:(NSInteger)steps {
+  [self changeSelectedParagraphs:^(RDLParagraph *layout) {
+    BOOL list = layout.listStyle == RDLListStyleBulleted || layout.listStyle == RDLListStyleNumbered;
+    if (list) {
+      layout.listLevel = MAX(layout.listLevel + steps, 1);
+      return;
+    }
+    CGFloat inches = (layout.leftIndent ? [layout.leftIndent inches] : 0) + steps * kRDLIndentStepInches;
+    layout.leftIndent = inches > 0 ? [RDLLength inches:inches] : nil;
+  }];
+}
+
+- (void)indent:(id)sender {
+  (void)sender;
+  [self moveSelectedParagraphsBy:1];
+}
+
+- (void)outdent:(id)sender {
+  (void)sender;
+  [self moveSelectedParagraphsBy:-1];
 }
 
 #pragma mark - Toolbar
@@ -76,6 +221,12 @@
   NSArray<NSButton *> *buttons = [self allToolbarButtons];
   for (NSUInteger i = 0; i < [buttons count] && i < [glyphs count]; i++)
     RDLSetToolbarIcon(buttons[i], (RDLToolbarGlyph)[glyphs[i] integerValue]);
+  RDLSetToolbarIcon(_outdentButton, RDLToolbarGlyphMoveLeft);
+  RDLSetToolbarIcon(_indentButton, RDLToolbarGlyphMoveRight);
+  [_listPop removeAllItems];
+  [_listPop addItemsWithTitles:@[ @"Not a list", @"Bulleted list", @"Numbered list" ]];
+  for (NSControl *control in @[ _listPop, _outdentButton, _indentButton ])
+    [control setRefusesFirstResponder:YES];
 
   for (NSButton *b in buttons) {
     // Push-on/push-off so a button can show that the selection is already
@@ -115,6 +266,17 @@
   [_alignCenterButton setState:(!mixed && a == NSCenterTextAlignment) ? NSOnState : NSOffState];
   [_alignRightButton setState:(!mixed && a == NSRightTextAlignment) ? NSOnState : NSOffState];
   [_alignJustifyButton setState:(!mixed && a == NSJustifiedTextAlignment) ? NSOnState : NSOffState];
+  // The list the caret's paragraph is in, if any.
+  NSUInteger caret = MIN([_textView selectedRange].location, [[_textView textStorage] length]);
+  NSUInteger probe = caret < [[_textView textStorage] length] ? caret : (caret > 0 ? caret - 1 : 0);
+  RDLParagraph *layout = [[_textView textStorage] length]
+                             ? [[_textView textStorage] attribute:RDLParagraphLayoutAttributeName
+                                                          atIndex:probe
+                                                   effectiveRange:NULL]
+                             : nil;
+  NSUInteger list = [layout isKindOfClass:[RDLParagraph class]] ? [RDLListStyles() indexOfObject:@(layout.listStyle)]
+                                                                : NSNotFound;
+  [_listPop selectItemAtIndex:list == NSNotFound ? 0 : (NSInteger)list];
 }
 
 - (void)textViewDidChangeSelection:(NSNotification *)note {

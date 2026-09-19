@@ -17,6 +17,9 @@
 @class RDLReport;
 @class RDLEditingContext;
 
+@class RDLParameterValues;
+@class RDLDataBinder;
+
 @interface RDLDocument : NSDocument
 // Replacing the report wholesale (open, revert) is a load, not an edit: it
 // clears undo and dirty. Use RDLEditor for anything smaller.
@@ -33,6 +36,12 @@
 // are the bindings the user is trying out, so editing them is not a document
 // edit and does not dirty the file.
 @property (nonatomic, readonly, copy) NSDictionary<NSString *, NSString *> *paramValues;
+// The same for a parameter of several values: each value as text, in order.
+// A parameter is in one of the two, never both.
+@property (nonatomic, readonly, copy) NSDictionary<NSString *, NSArray<NSString *> *> *multiParamValues;
+// Both, as a render is given them: text for a parameter of one value, an array
+// of text for one of several -- what RDLParameterValues reads.
+- (NSDictionary<NSString *, id> *)suppliedParameters;
 
 - (instancetype)initWithReport:(RDLReport *)report;
 
@@ -48,6 +57,12 @@
 
 - (void)loadReport:(RDLReport *)report;
 - (void)loadReport:(RDLReport *)report originURL:(NSURL *)originURL;
+// The report swapped for another as an *edit* rather than a load: undo and the
+// file stand, and the document is dirtied by whoever notes the change. What
+// re-parsing the edited source does, since a report typed out afresh is a new
+// object graph rather than a change to the one that is open. Everything else
+// edits the report in place through RDLEditor.
+- (void)takeReport:(RDLReport *)report;
 - (BOOL)openURL:(NSURL *)url error:(NSError **)error;
 - (BOOL)saveToURL:(NSURL *)url error:(NSError **)error;
 // Save back to `fileURL`; NO with a nil-safe error when there is no file yet.
@@ -55,7 +70,19 @@
 
 - (void)syncParamValuesFromReport;
 - (void)setParamValue:(NSString *)value forName:(NSString *)name;
+- (void)setParamValues:(NSArray<NSString *> *)values forName:(NSString *)name;
+// The report's parameters worked out from the values given so far: defaults
+// where none is given, the valid values to choose from, and what is wrong.
+- (RDLParameterValues *)parameterValues;
+// A binder for this document: documents beside its file, and remote ones as the
+// last reading of its data allowed. What previews and exports read images with.
+- (RDLDataBinder *)dataBinder;
 
+
+// Whether reading this document's data may fetch remote (http/https)
+// documents. Set by the last read, so anything that renders again -- a
+// preview, an export -- does it on the terms the reader already agreed to.
+@property (nonatomic, assign) BOOL fetchesRemoteDocuments;
 
 // Read every data source the report names -- all of them, not the first: a
 // report with three datasets needs three, and one that fails should not stop

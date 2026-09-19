@@ -143,26 +143,33 @@
   NSUInteger index = [fields indexOfObject:_field];
   if (index == NSNotFound)
     return;
+  // What is edited is a copy, put in the list in the field's place: the field
+  // the report holds stays as it was until the editor is told, and that is
+  // what the editor keeps for undo.
+  RDLField *edited = [_field copy];
+  fields[index] = edited;
   NSString *name = [[_nameField stringValue]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   if ([name length])
-    _field.name = name;
+    edited.name = name;
   RDLFieldDataType type = RDLFieldDataTypeFromString([_typePop titleOfSelectedItem]);
   if (type != RDLFieldDataTypeUnknown)
-    _field.dataType = type;
+    edited.dataType = type;
   // Whichever kind it is, only that kind's box is written back: the other one
   // is not on screen, and a stale value left in it would change the field
   // behind the user.
   if ([_kindPop indexOfSelectedItem] == 1) {
     NSString *value = [_valueField stringValue];
-    _field.value = [RDLValue valueWithSource:[value length] ? value : @"=Nothing"];
-    _field.dataField = nil;
+    edited.value = [RDLValue valueWithSource:[value length] ? value : @"=Nothing"];
+    edited.dataField = nil;
   } else {
     NSString *dataField = [_dataFieldField stringValue];
-    _field.dataField = [dataField length] ? dataField : _field.name;
-    _field.value = nil;
+    edited.dataField = [dataField length] ? dataField : edited.name;
+    edited.value = nil;
   }
   [_context.editor setFields:fields ofDataSet:_dataSet];
+  // The pane goes on editing the field the dataset now holds.
+  _field = edited;
 }
 
 - (void)controlTextDidEndEditing:(NSNotification *)note {

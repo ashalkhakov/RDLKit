@@ -5,6 +5,7 @@
 #import "RDLKit.h"
 #import "RDLPane.h"
 #import "RDLFilterEditor.h"
+#import "RDLDatasetOptionsEditor.h"
 #import "RDLDocument.h"
 #import "RDLToolbarIcons.h"
 
@@ -14,6 +15,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *addButton;
 @property (nonatomic, strong) IBOutlet NSButton *addCalculatedButton;
 @property (nonatomic, strong) IBOutlet NSButton *filtersButton;
+@property (nonatomic, strong) IBOutlet NSButton *optionsButton;
 @property (nonatomic, strong) IBOutlet NSButton *removeButton;
 // Where the rows come from. A local report viewer binds to documents, so this
 // is the whole of a data source: what kind, which document, and what to take
@@ -176,6 +178,14 @@
   [self reload];
 }
 
+// The rest of what a dataset says -- its query's parameters, how long it may
+// run, and how it compares text -- in a panel of its own.
+- (void)editOptions:(id)sender {
+  (void)sender;
+  if (_dataSet != nil && [RDLDatasetOptionsEditor runForDataSet:_dataSet context:_context])
+    [self reload];
+}
+
 - (void)tableViewSelectionDidChange:(NSNotification *)note {
   (void)note;
   [_delegate datasetFieldsView:self didSelectField:[self selectedField]];
@@ -290,7 +300,10 @@
   if (row < 0 || row >= (NSInteger)[fields count])
     return;
   NSMutableArray *edited = [fields mutableCopy];
-  RDLField *f = edited[(NSUInteger)row];
+  // A copy, edited in place of the original: the field the report holds stays
+  // as it was until the editor is told, which is what it keeps for undo.
+  RDLField *f = [edited[(NSUInteger)row] copy];
+  edited[(NSUInteger)row] = f;
   NSString *text = [value description];
   if ([[column identifier] isEqualToString:@"type"]) {
     RDLFieldDataType type = RDLFieldDataTypeFromString(text);

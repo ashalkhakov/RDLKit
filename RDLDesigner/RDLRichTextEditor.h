@@ -30,6 +30,20 @@
 + (NSColor *)paperColorForItem:(RDLTextbox *)item;
 + (NSColor *)inkColorForItem:(RDLTextbox *)item;
 
+// The text with the layout of the paragraphs `range` touches changed by
+// `change` -- a list made or ended, an indent moved -- and markers and indents
+// shown again to match. `selection`, when given, comes back as those
+// paragraphs' range in the result.
++ (NSAttributedString *)text:(NSAttributedString *)text
+                     forItem:(RDLTextbox *)item
+    changingParagraphsInRange:(NSRange)range
+                        with:(void (^)(RDLParagraph *layout))change
+                   selection:(NSRange *)selection;
+// What the list and indent controls do to the selected paragraphs.
+- (void)listStyleChanged:(id)sender;
+- (void)indent:(id)sender;
+- (void)outdent:(id)sender;
+
 // Conversion helpers (exposed for checks).
 + (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item;
 + (void)applyAttributedString:(NSAttributedString *)text toItem:(RDLTextbox *)item;

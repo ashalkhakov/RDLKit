@@ -54,10 +54,12 @@ static id RDLRowFromElement(NSXMLElement *el) {
 }
 
 - (NSArray *)rowsFromData:(NSData *)documentData
+                   query:(NSString *)query
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error {
   RDL_UNUSED(properties);
+  RDL_UNUSED(dataSet);
   if (documentData == nil) {
     if (error)
       *error = RDLDataError(27, @"there is no XML to read");
@@ -72,10 +74,9 @@ static id RDLRowFromElement(NSXMLElement *el) {
       *error = xmlError ?: RDLDataError(28, @"the document is not XML");
     return nil;
   }
-  NSString *query = [dataSet.commandText
-      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  NSString *xpath = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   NSArray *nodes = nil;
-  if ([query length] == 0) {
+  if ([xpath length] == 0) {
     // No XPath: the root's element children are the rows, which is what
     // <Orders><Order/><Order/></Orders> means without having to say so.
     NSMutableArray *children = [NSMutableArray array];
@@ -85,13 +86,13 @@ static id RDLRowFromElement(NSXMLElement *el) {
     nodes = children;
   } else {
     NSError *pathError = nil;
-    nodes = [doc nodesForXPath:query error:&pathError];
+    nodes = [doc nodesForXPath:xpath error:&pathError];
     if (nodes == nil) {
       if (error)
         *error = pathError ?: RDLDataError(29, [NSString stringWithFormat:
                                                              @"'%@' is not an XPath this "
                                                              @"document understands",
-                                                             query]);
+                                                             xpath]);
       return nil;
     }
   }

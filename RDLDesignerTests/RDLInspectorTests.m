@@ -3,6 +3,14 @@
 // The element inspector: what its fields are bound to, in both directions, and
 // that its hand-written sections do not overlap.
 #import "RDLDesignerTestSupport.h"
+#import "RDLBordersEditor.h"
+#import "RDLChartAxisEditor.h"
+#import "RDLChartSeriesEditor.h"
+#import "RDLValueListEditor.h"
+#import "RDLEmbeddedImagesEditor.h"
+#import "RDLVariablesEditor.h"
+#import "RDLCodeEditor.h"
+#import "RDLStylePanel.h"
 
 
 
@@ -158,12 +166,12 @@
   if ([pdoc.report.page matchingStandardSize] != nil)
     XCTFail(@"%@", @"a custom size should match no preset");
 
-  // Only the Body carries a background in the RDL this writes.
-  if (![RDLReport bandKeySupportsBackground:@"body"])
-    XCTFail(@"%@", @"the body should support a background");
-  if ([RDLReport bandKeySupportsBackground:@"pageHeader"] ||
-      [RDLReport bandKeySupportsBackground:@"pageFooter"])
-    XCTFail(@"%@", @"header and footer bands should not claim background support");
+  // Every band has a Style of its own, written and painted.
+  for (NSString *key in [RDLReport bandKeys])
+    if (![RDLReport bandKeySupportsBackground:key])
+      XCTFail(@"the %@ should support a background", key);
+  if ([RDLReport bandKeySupportsBackground:@"sidebar"])
+    XCTFail(@"%@", @"a band the report does not have supports nothing");
 
   // An unbound control is reported as unhandled, so the caller can deal with
   // the composite fields itself.
@@ -524,6 +532,1519 @@
   // What a text box does show: its geometry and its own settings.
   if ([[inspector valueForKey:@"geoBox"] isHidden] || [[inspector valueForKey:@"textBox"] isHidden])
     XCTFail(@"%@", @"a text box shows the geometry and text sections");
+}
+
+// Padding, in the real inspector rather than a field made for the check: the
+// four outlets have to be connected in the XIB and bound to the right side, or
+// the section shows boxes that quietly do nothing. The engine has drawn padding
+// all along and the inspector never showed it.
+- (void)testThePaddingFieldsAreConnectedAndBindBothWays {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Padded"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Padded";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  box.style.paddingLeft = [RDLLength points:6];
+  [report.body.items addObject:box];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  for (NSString *name in @[ @"padLeftField", @"padRightField", @"padTopField", @"padBottomField",
+                            @"padLeftExprButton", @"padRightExprButton", @"padTopExprButton",
+                            @"padBottomExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+
+  // Model -> field, on the side that was set and not on the others.
+  NSTextField *left = [inspector valueForKey:@"padLeftField"];
+  if (![[left stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"the left padding shows %@", [left stringValue]);
+  // A side nobody set still holds the 2pt MS-RDL gives every style, so that is
+  // what the field shows: the box says what the item has, not what is left
+  // over once the defaults are taken away.
+  NSTextField *top = [inspector valueForKey:@"padTopField"];
+  if (![[top stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"an unset padding should show the 2pt default, shows %@", [top stringValue]);
+
+  // Field -> model, as a length rather than the string that was typed.
+  [top setStringValue:@"3pt"];
+  [inspector changed:top];
+  if (![box.style.paddingTop isKindOfClass:[RDLLength class]])
+    XCTFail(@"%@", @"a string was written where an RDLLength belongs");
+  if (![[box.style.paddingTop stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"the top padding reads %@", [box.style.paddingTop stringValue]);
+  // And the other sides were left where they were.
+  if (![[box.style.paddingRight stringValue] isEqualToString:@"2pt"])
+    XCTFail(@"the right padding moved to %@", [box.style.paddingRight stringValue]);
+  if (![[box.style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"the left padding moved to %@", [box.style.paddingLeft stringValue]);
+
+  // Each side takes an expression too, which belongs in the expressions and
+  // not in the measurement.
+  NSTextField *bottom = [inspector valueForKey:@"padBottomField"];
+  [bottom setStringValue:@"=IIf(Fields!Tight.Value, \"1pt\", \"6pt\")"];
+  [inspector changed:bottom];
+  if (box.style.expressions.paddingBottom == nil)
+    XCTFail(@"%@", @"the expression was not written to style.expressions.paddingBottom");
+  if (box.style.paddingBottom != nil)
+    XCTFail(@"%@", @"the measurement survived the expression");
+}
+
+// The borders panel says what each edge states, not what it ends up drawing:
+// an edge that gives only a width shows that width and no style, because the
+// style it draws in is the default's and is not the edge's to claim. Leaving
+// it blank is how an edge says nothing, which is not the same as None.
+- (void)testTheBordersPanelStatesEachEdgeAndAppliesTogether {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Edged"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Edged";
+  box.value = @"Hello";
+  box.width = 2;
+  box.height = 0.25;
+  box.style.border = [RDLBorder solidColor:@"#336699"];
+  box.style.borderTop = [[RDLBorder alloc] init];
+  box.style.borderTop.width = [RDLLength points:5];
+  [report.body.items addObject:box];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLBordersEditor *panel = [RDLBordersEditor editorForItem:box context:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an item in the report");
+    return;
+  }
+
+  // The default states a style and a colour; the top edge states only a width.
+  RDLBorder *shownDefault = [panel borderForEdge:RDLBoxEdgeUnspecified];
+  if (shownDefault.style != RDLBorderStyleSolid ||
+      ![shownDefault.color isEqualToString:@"#336699"])
+    XCTFail(@"the default row shows style %ld colour %@", (long)shownDefault.style,
+            shownDefault.color);
+  RDLBorder *shownTop = [panel borderForEdge:RDLBoxEdgeTop];
+  if (shownTop.style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"an edge that states no style should show none, not the default's");
+  if (![[shownTop.width stringValue] isEqualToString:@"5pt"])
+    XCTFail(@"the top row shows width %@", [shownTop.width stringValue]);
+  // An edge that states nothing at all stays blank.
+  if ([panel borderForEdge:RDLBoxEdgeRight].style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"an edge nobody set should state nothing");
+
+  // A colour is chosen the way it is chosen everywhere else in this designer:
+  // a well beside the field, showing what the field holds, and writing what is
+  // picked back into it -- the field is still where the colour is stated.
+  NSColorWell *defaultWell = [panel valueForKey:@"defaultColorWell"];
+  NSTextField *defaultColor = [panel valueForKey:@"defaultColorField"];
+  if (defaultWell == nil) {
+    XCTFail(@"%@", @"the borders panel should offer a colour well, as the inspector does");
+    return;
+  }
+  if (![RDLHexFromColor([defaultWell color]) isEqualToString:@"#336699"])
+    XCTFail(@"the well should show the colour stated, shows %@",
+            RDLHexFromColor([defaultWell color]));
+  [defaultWell setColor:RDLColorFromHex(@"#c0392b")];
+  [panel colorWellPicked:defaultWell];
+  if (![[defaultColor stringValue] isEqualToString:@"#c0392b"])
+    XCTFail(@"choosing a colour should fill the field beside it, it reads %@",
+            [defaultColor stringValue]);
+  // Put back, so what follows tests the panel as it was found.
+  [defaultColor setStringValue:@"#336699"];
+
+  // Applying an untouched panel changes nothing and records nothing.
+  if (![panel apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  if (box.style.borderRight != nil)
+    XCTFail(@"%@", @"an edge nobody set should not be written just by opening the panel");
+  if (box.style.borderTop.style != RDLBorderStyleUnspecified)
+    XCTFail(@"%@", @"and the top edge should still state only its width");
+
+  // Turn the left edge off: None is a style, so it is written, and the item's
+  // other edges are left as they were.
+  [[panel valueForKey:@"leftStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleNone)];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply");
+  if (box.style.borderLeft.style != RDLBorderStyleNone)
+    XCTFail(@"the left edge reads %ld", (long)box.style.borderLeft.style);
+  if ([box.style borderForEdge:RDLBoxEdgeLeft] != nil)
+    XCTFail(@"%@", @"an edge turned off draws nothing, whatever the default says");
+  if ([box.style borderForEdge:RDLBoxEdgeTop].style != RDLBorderStyleSolid)
+    XCTFail(@"%@", @"the top edge should still draw in the default's style");
+  if (box.style.borderRight != nil)
+    XCTFail(@"%@", @"the edges nobody touched should still state nothing");
+}
+
+// A cell's style is the style of the item in it: MS-RDL has no style of its
+// own on TablixCell, so the padding fields and the borders panel reach a cell
+// through its text box. An empty cell is the next test.
+- (void)testACellIsStyledThroughTheItemInIt {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  RDLTextbox *inCell = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  if (tablix == nil) {
+    XCTFail(@"%@", @"the sample should have a tablix");
+    return;
+  }
+  for (RDLTablixRow *row in tablix.tablixBody.rows)
+    for (RDLTablixCell *cell in row.cells)
+      if (inCell == nil && [cell.item isKindOfClass:[RDLTextbox class]])
+        inCell = (RDLTextbox *)cell.item;
+  if (inCell == nil) {
+    XCTFail(@"%@", @"the sample's tablix should have a text box in a cell");
+    return;
+  }
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:inCell inBandWithKey:@"body"];
+
+  // The text section is shown for an item in a cell, which is what carries the
+  // padding fields and the Borders… button; the geometry section is not, since
+  // the cell decides where the item is.
+  if ([[inspector valueForKey:@"textBox"] isHidden])
+    XCTFail(@"%@", @"a text box in a cell should show the text section");
+  if (![[inspector valueForKey:@"geoBox"] isHidden])
+    XCTFail(@"%@", @"an item in a cell has no geometry of its own to offer");
+  if ([[inspector valueForKey:@"cellBox"] isHidden])
+    XCTFail(@"%@", @"and the cell's own section should be shown beside it");
+
+  // Padding reaches it like any other text box.
+  NSTextField *left = [inspector valueForKey:@"padLeftField"];
+  [left setStringValue:@"4pt"];
+  [inspector changed:left];
+  if (![[inCell.style.paddingLeft stringValue] isEqualToString:@"4pt"])
+    XCTFail(@"the cell's padding reads %@", [inCell.style.paddingLeft stringValue]);
+
+  // And so does the borders panel, edge by edge.
+  RDLBordersEditor *panel = [RDLBordersEditor editorForItem:inCell context:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an item in a cell");
+    return;
+  }
+  [[panel valueForKey:@"topStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleDouble)];
+  [[panel valueForKey:@"topWidthField"] setStringValue:@"3pt"];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply to a cell's text box");
+  if (inCell.style.borderTop.style != RDLBorderStyleDouble)
+    XCTFail(@"the cell's top edge reads %ld", (long)inCell.style.borderTop.style);
+  if (![[[inCell.style borderForEdge:RDLBoxEdgeTop].width stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"%@", @"the cell's top edge should draw at the width it was given");
+}
+
+// An empty cell has nothing to carry a style, so its borders go on the blank
+// text box Report Builder keeps in every cell -- put there only when the panel
+// changes something, and taken away with the borders by a single undo. The
+// cell section offers the button wherever the contents' own section does not.
+- (void)testAnEmptyCellIsGivenBordersThroughABlankTextbox {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]]) {
+      tablix = (RDLTablix *)it;
+      break;
+    }
+  NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
+  if ([rows count] < 2 || [rows[1].cells count] < 2) {
+    XCTFail(@"%@", @"the sample should have a tablix of at least two rows and columns");
+    return;
+  }
+  // The fixture: one cell emptied, another holding an image, whose own section
+  // has no borders to offer.
+  RDLTablixCell *empty = rows[1].cells[0];
+  empty.item = nil;
+  RDLTablixCell *pictured = rows[1].cells[1];
+  RDLImage *image = [[RDLImage alloc] init];
+  image.name = @"CellPicture";
+  pictured.item = image;
+  RDLTextbox *text = nil;
+  for (RDLTablixCell *cell in rows[0].cells)
+    if (text == nil && [cell.item isKindOfClass:[RDLTextbox class]])
+      text = (RDLTextbox *)cell.item;
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  NSButton *button = [inspector valueForKey:@"cellBordersButton"];
+  if (button == nil || [button action] != @selector(editBorders:)) {
+    XCTFail(@"%@", @"the cell section's Borders… button should be connected to editBorders:");
+    return;
+  }
+  NSView *cellBox = [inspector valueForKey:@"cellBox"];
+  NSTextField *widthField = [inspector valueForKey:@"cellWidthField"];
+
+  // Shown for the image, whose section has no borders; hidden for a text box,
+  // whose section does -- and the section is no taller than what it shows.
+  [ctx.selection selectItem:image inBandWithKey:@"body"];
+  if ([cellBox isHidden] || [button isHidden])
+    XCTFail(@"%@", @"an image in a cell should be offered borders by the cell section");
+  if (NSMaxY([button frame]) > NSHeight([cellBox frame]))
+    XCTFail(@"%@", @"the button should fit inside the cell section");
+  CGFloat withButton = NSHeight([cellBox frame]);
+  NSRect fieldAt = [widthField frame];
+  if (text != nil) {
+    [ctx.selection selectItem:text inBandWithKey:@"body"];
+    if (![button isHidden])
+      XCTFail(@"%@", @"a text box in a cell has the button in its own section already");
+    if (NSHeight([cellBox frame]) > NSMinY([button frame]))
+      XCTFail(@"%@", @"a hidden button should leave no gap in the cell section");
+  }
+
+  [ctx.selection selectCellOfTablix:tablix
+                                row:(NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:1]
+                             column:(NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:0]
+                      inBandWithKey:@"body"];
+  if ([cellBox isHidden] || [button isHidden])
+    XCTFail(@"%@", @"an empty cell should be offered borders");
+  // Hiding the button and showing it again leaves the section as it was: the
+  // same height, and the width field where it started, inside the section.
+  if (NSHeight([cellBox frame]) != withButton)
+    XCTFail(@"the section is %.0f tall after showing the button again, not %.0f",
+            NSHeight([cellBox frame]), withButton);
+  if (!NSEqualRects([widthField frame], fieldAt))
+    XCTFail(@"the width field moved from %@ to %@", NSStringFromRect(fieldAt),
+            NSStringFromRect([widthField frame]));
+
+  // Opening the panel, and applying it untouched, leave the cell empty.
+  RDLBordersEditor *panel = [RDLBordersEditor editorForSelectedEmptyCellInContext:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the borders panel should open for an empty cell");
+    return;
+  }
+  if (![panel apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  if (empty.item != nil)
+    XCTFail(@"%@", @"a panel that changed nothing should put nothing in the cell");
+
+  // A border given: the cell now holds a blank text box that draws it.
+  [[panel valueForKey:@"defaultStylePop"] selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleSolid)];
+  [[panel valueForKey:@"defaultColorField"] setStringValue:@"#336699"];
+  if (![panel apply])
+    XCTFail(@"%@", @"the panel should apply to an empty cell");
+  if (![empty.item isKindOfClass:[RDLTextbox class]]) {
+    XCTFail(@"the cell holds %@ rather than a text box", empty.item);
+    return;
+  }
+  RDLTextbox *blank = (RDLTextbox *)empty.item;
+  // Blank the way a file's blank cell is: an empty value, not a missing one,
+  // which the canvas would label "Textbox".
+  if (![blank.value isEqualToString:@""])
+    XCTFail(@"the cell's text box should have an empty value, not %@", blank.value);
+  if ([blank.style borderForEdge:RDLBoxEdgeBottom].style != RDLBorderStyleSolid ||
+      ![[blank.style borderForEdge:RDLBoxEdgeBottom].color isEqualToString:@"#336699"])
+    XCTFail(@"%@", @"the cell should draw the border it was given on every edge");
+  if (ctx.selection.item != blank)
+    XCTFail(@"%@", @"the new text box should be what is selected, so its own section shows");
+  if ([[tablix structuralProblems] count])
+    XCTFail(@"the table should stay consistent: %@", [tablix structuralProblems]);
+
+  // One undo takes the borders and the text box away together.
+  [ctx.document.undoManager undo];
+  if (empty.item != nil)
+    XCTFail(@"one undo should leave the cell empty again, not holding %@", empty.item);
+  // And with no empty cell selected there is no panel to open.
+  [ctx.selection selectItem:image inBandWithKey:@"body"];
+  if ([RDLBordersEditor editorForSelectedEmptyCellInContext:ctx] != nil)
+    XCTFail(@"%@", @"a cell that holds something is not an empty cell");
+}
+
+// What every report item has: whether it shows and what toggles it, a link,
+// keeping it on one page, and a region's page breaks and page name -- each in
+// the sections of the kinds MS-RDL gives it to, and each written through the
+// editor. The model has carried all of them; the inspector had none.
+- (void)testTheInspectorEditsWhatEveryItemHas {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Common"];
+  RDLTextbox *heading = [[RDLTextbox alloc] init];
+  heading.name = @"Heading";
+  RDLTextbox *detail = [[RDLTextbox alloc] init];
+  detail.name = @"Detail";
+  RDLRectangle *box = [[RDLRectangle alloc] init];
+  box.name = @"Panel";
+  RDLLine *rule = [[RDLLine alloc] init];
+  rule.name = @"Rule";
+  [report.body.items addObjectsFromArray:@[ heading, detail, box, rule ]];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  for (NSString *name in @[ @"visibilityBox", @"linkBox", @"keepBox", @"pageBox", @"hiddenField",
+                            @"hiddenExprButton", @"toggleItemPop", @"hyperlinkField", @"keepTogetherCheck",
+                            @"pageBreakPop", @"resetPageNumberCheck", @"pageBreakDisabledField",
+                            @"pageNameField", @"pageNameExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+  BOOL (^shown)(NSString *) = ^BOOL(NSString *section) {
+    return ![[inspector valueForKey:section] isHidden];
+  };
+  void (^type)(NSString *, NSString *) = ^(NSString *fieldName, NSString *text) {
+    NSTextField *field = [inspector valueForKey:fieldName];
+    [field setStringValue:text];
+    [inspector changed:field];
+  };
+
+  // A text box: shown or not, a link, keeping together -- no page breaks.
+  [ctx.selection selectItem:detail inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || !shown(@"linkBox") || !shown(@"keepBox") || shown(@"pageBox"))
+    XCTFail(@"%@", @"a text box shows visibility, a link and keep-together, and no page breaks");
+  type(@"hiddenField", @"=Parameters!Brief.Value");
+  if (![detail.hidden isExpression] || ![[detail.hidden source] isEqualToString:@"=Parameters!Brief.Value"])
+    XCTFail(@"hidden reads %@", [detail.hidden source]);
+  type(@"hiddenField", @"True");
+  if ([detail.hidden isExpression] || ![[detail.hidden literal] isEqualToString:@"True"])
+    XCTFail(@"hidden reads %@", [detail.hidden source]);
+  type(@"hyperlinkField", @"https://example.org");
+  if (![[detail.hyperlink literal] isEqualToString:@"https://example.org"])
+    XCTFail(@"the link reads %@", [detail.hyperlink source]);
+  NSButton *keep = [inspector valueForKey:@"keepTogetherCheck"];
+  [keep setState:NSOnState];
+  [inspector changed:keep];
+  if (!detail.keepTogether)
+    XCTFail(@"%@", @"ticking keep-together should set it");
+
+  // What toggles it: the other text boxes, not itself, and None.
+  NSPopUpButton *toggle = [inspector valueForKey:@"toggleItemPop"];
+  if (![[toggle itemTitles] isEqualToArray:@[ @"None", @"Heading" ]])
+    XCTFail(@"the toggle list is %@", [toggle itemTitles]);
+  [toggle selectItemWithTitle:@"Heading"];
+  [inspector changed:toggle];
+  if (![detail.toggleItem isEqualToString:@"Heading"])
+    XCTFail(@"toggled by %@", detail.toggleItem);
+  [ctx.document.undoManager undo];
+  if (detail.toggleItem != nil)
+    XCTFail(@"%@", @"undo should take the toggle away again");
+  // One the report does not have is kept and shown, not dropped.
+  detail.toggleItem = @"Gone";
+  [ctx.selection selectItem:heading inBandWithKey:@"body"];
+  [ctx.selection selectItem:detail inBandWithKey:@"body"];
+  if (![[toggle titleOfSelectedItem] isEqualToString:@"Gone"])
+    XCTFail(@"a toggle the report lacks shows as %@", [toggle titleOfSelectedItem]);
+  [toggle selectItemAtIndex:0];
+  [inspector changed:toggle];
+  if (detail.toggleItem != nil)
+    XCTFail(@"%@", @"None should clear the toggle");
+
+  // A rectangle: page breaks and a page name, and no link.
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || shown(@"linkBox") || !shown(@"keepBox") || !shown(@"pageBox"))
+    XCTFail(@"%@", @"a rectangle shows visibility, keep-together and page breaks, and no link");
+  NSPopUpButton *breaks = [inspector valueForKey:@"pageBreakPop"];
+  [breaks selectItemWithTitle:RDLStringFromPageBreakLocation(RDLPageBreakLocationEnd)];
+  [inspector changed:breaks];
+  if (box.pageBreak != RDLPageBreakLocationEnd)
+    XCTFail(@"the break is %ld", (long)box.pageBreak);
+  NSButton *restart = [inspector valueForKey:@"resetPageNumberCheck"];
+  [restart setState:NSOnState];
+  [inspector changed:restart];
+  if (!box.resetPageNumber)
+    XCTFail(@"%@", @"ticking restart should reset the page numbers");
+  type(@"pageBreakDisabledField", @"=Globals!PageNumber = 1");
+  type(@"pageNameField", @"=Fields!Region.Value");
+  if (![box.pageBreakDisabled isExpression] || ![box.pageName isExpression])
+    XCTFail(@"disabled reads %@, page name %@", [box.pageBreakDisabled source], [box.pageName source]);
+  // And each kept on a round trip through the file.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *panel = nil, *detailBack = nil;
+  for (RDLItem *item in back.body.items) {
+    if ([item.name isEqualToString:@"Panel"])
+      panel = item;
+    if ([item.name isEqualToString:@"Detail"])
+      detailBack = item;
+  }
+  if (panel.pageBreak != RDLPageBreakLocationEnd || !panel.resetPageNumber ||
+      ![[panel.pageName source] isEqualToString:@"=Fields!Region.Value"])
+    XCTFail(@"%@", @"the rectangle's page settings should survive a save");
+  if (!detailBack.keepTogether || ![[detailBack.hyperlink literal] isEqualToString:@"https://example.org"])
+    XCTFail(@"%@", @"the text box's keep-together and link should survive a save");
+
+  // A line: whether it shows, and nothing else of these.
+  [ctx.selection selectItem:rule inBandWithKey:@"body"];
+  if (!shown(@"visibilityBox") || shown(@"linkBox") || shown(@"keepBox") || shown(@"pageBox"))
+    XCTFail(@"%@", @"a line shows only visibility");
+}
+
+// An item renamed in the inspector takes its references with it: a text box in
+// the page header reading ReportItems!Total, and a toggle naming it. A name RDL
+// does not accept, or another item's, is refused and the field shows the name
+// again; one undo puts every reference back. An item in a tablix cell has no
+// geometry of its own, but it has a name.
+- (void)testRenamingAnItemRenamesWhatRefersToIt {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Renamed"];
+  RDLTextbox *total = [[RDLTextbox alloc] init];
+  total.name = @"Total";
+  total.value = @"=Sum(Fields!A.Value)";
+  RDLTextbox *detail = [[RDLTextbox alloc] init];
+  detail.name = @"Detail";
+  detail.toggleItem = @"Total";
+  detail.value = @"=\"of \" & ReportItems!Total.Value";
+  RDLTextbox *footer = [[RDLTextbox alloc] init];
+  footer.name = @"Footer";
+  footer.value = @"=ReportItems!Total.Value";
+  [report.body.items addObjectsFromArray:@[ total, detail ]];
+  [report.pageFooter.items addObject:footer];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  NSTextField *nameField = [inspector valueForKey:@"nameField"];
+  if (![nameField isEditable])
+    XCTFail(@"%@", @"the name field should be editable");
+  [ctx.selection selectItem:total inBandWithKey:@"body"];
+
+  // Refused: not a name, and a name another item has.
+  for (NSString *refused in @[ @"Grand total", @"2nd", @"Detail" ]) {
+    [nameField setStringValue:refused];
+    [inspector changed:nameField];
+    if (![total.name isEqualToString:@"Total"] || ![[nameField stringValue] isEqualToString:@"Total"])
+      XCTFail(@"%@ should be refused, and the field show Total again", refused);
+  }
+
+  [nameField setStringValue:@"GrandTotal"];
+  [inspector changed:nameField];
+  if (![total.name isEqualToString:@"GrandTotal"])
+    XCTFail(@"the item is called %@", total.name);
+  if (![detail.toggleItem isEqualToString:@"GrandTotal"] ||
+      ![detail.value isEqualToString:@"=\"of \" & ReportItems!GrandTotal.Value"] ||
+      ![footer.value isEqualToString:@"=ReportItems!GrandTotal.Value"])
+    XCTFail(@"the references read %@, %@ and %@", detail.toggleItem, detail.value, footer.value);
+
+  [ctx.document.undoManager undo];
+  if (![total.name isEqualToString:@"Total"] || ![detail.toggleItem isEqualToString:@"Total"] ||
+      ![footer.value isEqualToString:@"=ReportItems!Total.Value"])
+    XCTFail(@"%@", @"one undo should put the name and every reference back");
+
+  // A text box in a cell shows its name, and not its geometry.
+  RDLReport *sample = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in sample.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLItem *inCell = tablix.tablixBody.rows[0].cells[0].item;
+  RDLEditingContext *sampleCtx = [[RDLEditingContext alloc] initWithReport:sample];
+  RDLInspectorView *sampleInspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                      context:sampleCtx];
+  [sampleCtx.selection selectItem:inCell inBandWithKey:@"body"];
+  if ([[sampleInspector valueForKey:@"nameBox"] isHidden] || ![[sampleInspector valueForKey:@"geoBox"] isHidden])
+    XCTFail(@"%@", @"an item in a cell should show its name and not its geometry");
+}
+
+// The paper, in the report's own section: its size either way up, each
+// margin, the columns, the page's background, the first page's name and
+// whether containers consume whitespace. The body's width follows the space
+// the side margins and the columns leave.
+- (void)testThePaperSectionSetsUpThePage {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Paper"];
+  report.page.pageWidth = 8.5;
+  report.page.pageHeight = 11;
+  report.page.leftMargin = report.page.rightMargin = 1;
+  report.page.topMargin = report.page.bottomMargin = 1;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  [ctx.selection selectReport];
+  if ([[inspector valueForKey:@"paperBox"] isHidden] || [[inspector valueForKey:@"docBox"] isHidden])
+    XCTFail(@"%@", @"the report should show its own section and the paper's");
+  void (^type)(NSString *, NSString *) = ^(NSString *fieldName, NSString *text) {
+    NSTextField *field = [inspector valueForKey:fieldName];
+    [field setStringValue:text];
+    [inspector changed:field];
+  };
+  RDLPage *page = report.page;
+  NSPopUpButton *paper = [inspector valueForKey:@"pagePop"];
+  NSPopUpButton *orientation = [inspector valueForKey:@"orientationPop"];
+
+  // Landscape turns the paper, and a size chosen then stays landscape.
+  [orientation selectItemWithTitle:@"Landscape"];
+  [inspector changed:orientation];
+  if (page.pageWidth != 11 || page.pageHeight != 8.5)
+    XCTFail(@"landscape Letter is %gx%g", page.pageWidth, page.pageHeight);
+  [paper selectItemWithTitle:@"Legal 8.5 × 14"];
+  [inspector changed:paper];
+  if (page.pageWidth != 14 || page.pageHeight != 8.5 || ![[paper titleOfSelectedItem] hasPrefix:@"Legal"])
+    XCTFail(@"landscape Legal is %gx%g, shown as %@", page.pageWidth, page.pageHeight, [paper titleOfSelectedItem]);
+  if (fabs(report.width - 12) > 1e-6)
+    XCTFail(@"the body is %g wide, not the 12 the margins leave", report.width);
+
+  // A size typed in is Custom.
+  type(@"paperWidthField", @"9");
+  if (page.pageWidth != 9 || ![[paper titleOfSelectedItem] isEqualToString:@"Custom"])
+    XCTFail(@"a typed width gives %g, shown as %@", page.pageWidth, [paper titleOfSelectedItem]);
+  [orientation selectItemWithTitle:@"Portrait"];
+  [inspector changed:orientation];
+
+  // Each margin on its own; the side ones carry the body's width.
+  type(@"leftMarginField", @"0.5");
+  type(@"topMarginField", @"0.25");
+  if (page.leftMargin != 0.5 || page.rightMargin != 1 || page.topMargin != 0.25 || page.bottomMargin != 1)
+    XCTFail(@"the margins are %g %g %g %g", page.leftMargin, page.rightMargin, page.topMargin, page.bottomMargin);
+  if (fabs(report.width - (8.5 - 1.5)) > 1e-6)
+    XCTFail(@"the body is %g wide after the left margin", report.width);
+
+  // Two columns a quarter inch apart share what the margins leave.
+  type(@"columnsField", @"2");
+  type(@"columnSpacingField", @"0.25");
+  if (page.columns != 2 || page.columnSpacing != 0.25 || fabs(report.width - 3.375) > 1e-6)
+    XCTFail(@"%ld columns %g apart leave a body %g wide", (long)page.columns, page.columnSpacing, report.width);
+  [ctx.document.undoManager undo];
+  if (page.columnSpacing != 0.5 || fabs(report.width - 3.25) > 1e-6)
+    XCTFail(@"undo should put the default spacing back, and the width with it: %g, %g", page.columnSpacing,
+            report.width);
+  type(@"columnsField", @"0");
+  if (page.columns != 1)
+    XCTFail(@"%@", @"a page has at least one column");
+
+  // The page's background, the first page's name, and whitespace.
+  type(@"pageBGField", @"#f0f0f0");
+  if (![page.style.backgroundColor isEqualToString:@"#f0f0f0"])
+    XCTFail(@"the page background is %@", page.style.backgroundColor);
+  type(@"initialPageNameField", @"=Parameters!Region.Value");
+  if (![report.initialPageName isExpression])
+    XCTFail(@"the first page's name is %@", [report.initialPageName source]);
+  NSButton *consume = [inspector valueForKey:@"consumeWhitespaceCheck"];
+  [consume setState:NSOnState];
+  [inspector changed:consume];
+  if (!report.consumeContainerWhitespace)
+    XCTFail(@"%@", @"ticking the box should consume container whitespace");
+
+  // All of it kept through a save.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (back.page.leftMargin != 0.5 || back.page.topMargin != 0.25 || back.page.pageWidth != 8.5 ||
+      ![back.page.style.backgroundColor isEqualToString:@"#f0f0f0"] || !back.consumeContainerWhitespace ||
+      ![[back.initialPageName source] isEqualToString:@"=Parameters!Region.Value"])
+    XCTFail(@"%@", @"the page setup should survive a save");
+}
+
+// The page header and footer: which pages they are on, and a background --
+// set in the band's section and kept through a save.
+- (void)testThePageHeaderSaysWhereItPrints {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Heads"];
+  report.pageHeader.height = 0.5;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                context:ctx];
+  [ctx.selection selectBandWithKey:@"body"];
+  if (![[inspector valueForKey:@"printBox"] isHidden])
+    XCTFail(@"%@", @"the body is on every page, and says nothing about it");
+  [ctx.selection selectBandWithKey:@"pageHeader"];
+  if ([[inspector valueForKey:@"printBox"] isHidden])
+    XCTFail(@"%@", @"the page header should say which pages it is on");
+  NSButton *first = [inspector valueForKey:@"printOnFirstPageCheck"];
+  NSButton *last = [inspector valueForKey:@"printOnLastPageCheck"];
+  [first setState:NSOnState];
+  [inspector changed:first];
+  [last setState:NSOnState];
+  [inspector changed:last];
+  if (!report.pageHeader.printOnFirstPage || !report.pageHeader.printOnLastPage)
+    XCTFail(@"%@", @"ticking the boxes should print the header on the first and last pages");
+  NSTextField *background = [inspector valueForKey:@"bandBGField"];
+  if (![background isEnabled])
+    XCTFail(@"%@", @"a page header can have a background");
+  [background setStringValue:@"#eeeeee"];
+  [inspector changed:background];
+  if (![report.pageHeader.style.backgroundColor isEqualToString:@"#eeeeee"])
+    XCTFail(@"the header's background is %@", report.pageHeader.style.backgroundColor);
+  [ctx.document.undoManager undo];
+  if (report.pageHeader.style.backgroundColor != nil)
+    XCTFail(@"%@", @"undo should take the background away");
+  [ctx.document.undoManager redo];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (!back.pageHeader.printOnFirstPage || !back.pageHeader.printOnLastPage ||
+      ![back.pageHeader.style.backgroundColor isEqualToString:@"#eeeeee"])
+    XCTFail(@"%@", @"the header's settings should survive a save");
+}
+
+// A tablix's own settings, in a section of their own: its no-rows message,
+// which way its columns run, how many column groups come before the row
+// headers, and how its headers behave across pages and when scrolled.
+- (void)testTheTablixOptionsAreEdited {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1200)
+                                                                context:ctx];
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  if ([[inspector valueForKey:@"tablixOptionsBox"] isHidden])
+    XCTFail(@"%@", @"a tablix should show its options");
+  NSTextField *message = [inspector valueForKey:@"noRowsMessageField"];
+  [message setStringValue:@"=\"Nothing for \" & Parameters!Region.Value"];
+  [inspector changed:message];
+  NSPopUpButton *direction = [inspector valueForKey:@"layoutDirectionPop"];
+  [direction selectItemWithTitle:@"Right to left"];
+  [inspector changed:direction];
+  NSTextField *before = [inspector valueForKey:@"groupsBeforeRowHeadersField"];
+  [before setStringValue:@"2"];
+  [inspector changed:before];
+  for (NSString *name in @[ @"repeatColumnHeadersCheck", @"repeatRowHeadersCheck", @"fixedColumnHeadersCheck",
+                            @"fixedRowHeadersCheck", @"omitBorderCheck" ]) {
+    NSButton *check = [inspector valueForKey:name];
+    [check setState:NSOnState];
+    [inspector changed:check];
+  }
+  if (![tablix.noRowsMessage hasPrefix:@"=\"Nothing for"] || tablix.layoutDirection != RDLLayoutDirectionRTL ||
+      tablix.groupsBeforeRowHeaders != 2 || !tablix.repeatColumnHeaders || !tablix.repeatRowHeaders ||
+      !tablix.fixedColumnHeaders || !tablix.fixedRowHeaders || !tablix.omitBorderOnPageBreak)
+    XCTFail(@"%@", @"each option should be written to the tablix");
+  [before setStringValue:@"-3"];
+  [inspector changed:before];
+  if (tablix.groupsBeforeRowHeaders != 0)
+    XCTFail(@"a count below zero is zero, not %ld", (long)tablix.groupsBeforeRowHeaders);
+  [ctx.document.undoManager undo];
+  if (tablix.groupsBeforeRowHeaders != 2)
+    XCTFail(@"%@", @"undo should put the count back");
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTablix *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      saved = (RDLTablix *)it;
+  if (saved.layoutDirection != RDLLayoutDirectionRTL || saved.groupsBeforeRowHeaders != 2 ||
+      !saved.repeatColumnHeaders || !saved.omitBorderOnPageBreak || ![saved.noRowsMessage hasPrefix:@"=\"Nothing for"])
+    XCTFail(@"%@", @"the options should survive a save");
+}
+
+// A chart's own settings, in a section of their own: how its series combine,
+// its palette, where its title and legend go, whether it has a legend, and
+// what it says with no data -- each named in words, and each saved.
+- (void)testTheChartOptionsAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1200)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  if (![chart isKindOfClass:[RDLChart class]] || [[inspector valueForKey:@"chartOptionsBox"] isHidden]) {
+    XCTFail(@"%@", @"a new chart should be selected and show its options");
+    return;
+  }
+  // Where a title goes means nothing without one.
+  NSPopUpButton *titlePosition = [inspector valueForKey:@"chartTitlePositionPop"];
+  if (chart.chartTitle == nil && [titlePosition isEnabled])
+    XCTFail(@"%@", @"an untitled chart's title position should be off");
+  NSTextField *title = [inspector valueForKey:@"titleField"];
+  [title setStringValue:@"Firings"];
+  [inspector changed:title];
+  // What it plots: RDL keeps a chart's subtype on its series.
+  NSTextField *value = [inspector valueForKey:@"valField"];
+  [value setStringValue:@"Pieces"];
+  [inspector changed:value];
+  if (![titlePosition isEnabled])
+    XCTFail(@"%@", @"a titled chart's title position should be on");
+  NSDictionary<NSString *, NSString *> *choices = @{
+    @"chartSubtypePop" : @"Percent stacked",
+    @"chartPalettePop" : @"Earth tones",
+    @"chartTitlePositionPop" : @"Bottom left",
+    @"legendPositionPop" : @"Right center",
+    @"legendLayoutPop" : @"Tall table",
+  };
+  for (NSString *name in choices) {
+    NSPopUpButton *pop = [inspector valueForKey:name];
+    if ([pop itemWithTitle:choices[name]] == nil) {
+      XCTFail(@"%@ should offer %@, offers %@", name, choices[name], [pop itemTitles]);
+      continue;
+    }
+    [pop selectItemWithTitle:choices[name]];
+    [inspector changed:pop];
+  }
+  NSButton *legend = [inspector valueForKey:@"showLegendCheck"];
+  if ([legend state] != NSOnState)
+    XCTFail(@"%@", @"a new chart's legend should show as shown");
+  [legend setState:NSOffState];
+  [inspector changed:legend];
+  NSTextField *message = [inspector valueForKey:@"noDataMessageField"];
+  [message setStringValue:@"No firings this quarter"];
+  [inspector changed:message];
+  if (chart.subtype != RDLChartSubtypePercentStacked || chart.palette != RDLChartPaletteEarthTones ||
+      chart.titlePosition != RDLChartTitlePositionBottomLeft ||
+      chart.legendPosition != RDLChartLegendPositionRightCenter ||
+      chart.legendLayout != RDLChartLegendLayoutTallTable || !chart.legendHidden ||
+      ![[chart.noDataMessage source] isEqualToString:@"No firings this quarter"])
+    XCTFail(@"%@", @"each option should be written to the chart");
+  [ctx.document.undoManager undo];
+  if (chart.noDataMessage != nil)
+    XCTFail(@"%@", @"undo should take the message away");
+  [ctx.document.undoManager redo];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLChart *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = (RDLChart *)it;
+  if (saved.subtype != RDLChartSubtypePercentStacked || saved.palette != RDLChartPaletteEarthTones ||
+      saved.titlePosition != RDLChartTitlePositionBottomLeft ||
+      saved.legendPosition != RDLChartLegendPositionRightCenter ||
+      saved.legendLayout != RDLChartLegendLayoutTallTable || !saved.legendHidden ||
+      ![[saved.noDataMessage source] isEqualToString:@"No firings this quarter"])
+    XCTFail(@"%@", @"the options should survive a save");
+}
+
+// The axis panel: every axis the chart has, each one's title, range,
+// interval, format, margins, grid lines, tick marks and side, applied as one
+// step -- and a range that is no number refused, with the panel saying so.
+- (void)testTheAxisPanelSetsEachAxis {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  RDLChartAxis *secondary = [[RDLChartAxis alloc] init];
+  secondary.name = @"Secondary";
+  [chart.secondaryValueAxes addObject:secondary];
+  NSString *before = [RDLEditor XMLStringForItem:chart];
+
+  RDLChartAxisEditor *panel = [RDLChartAxisEditor editorForChart:chart context:ctx];
+  NSPopUpButton *axisPop = [panel valueForKey:@"axisPop"];
+  if ([axisPop numberOfItems] != 3 || ![[axisPop itemTitleAtIndex:2] containsString:@"Secondary"]) {
+    XCTFail(@"the panel should offer three axes, offers %@", [axisPop itemTitles]);
+    return;
+  }
+  [axisPop selectItemAtIndex:1];
+  [panel selectAxis:axisPop];
+  NSDictionary<NSString *, NSString *> *typed = @{
+    @"titleField" : @"Pieces",
+    @"minimumField" : @"0",
+    @"maximumField" : @"=Max(Fields!Pieces.Value) * 1.1",
+    @"intervalField" : @"a few",
+    @"formatField" : @"N0",
+  };
+  for (NSString *name in typed)
+    [(NSTextField *)[panel valueForKey:name] setStringValue:typed[name]];
+  [(NSPopUpButton *)[panel valueForKey:@"marginPop"] selectItemWithTitle:@"None"];
+  [(NSPopUpButton *)[panel valueForKey:@"majorTicksPop"] selectItemWithTitle:@"Across"];
+  [(NSButton *)[panel valueForKey:@"minorGridCheck"] setState:NSOnState];
+  [(NSButton *)[panel valueForKey:@"oppositeCheck"] setState:NSOnState];
+  [(NSButton *)[panel valueForKey:@"showAxisCheck"] setState:NSOffState];
+  if ([panel apply] || ![[[panel valueForKey:@"messageLabel"] stringValue] containsString:@"interval"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"an interval that is no number should be refused, and the chart left alone");
+  // Nor can the panel leave that axis for another until it is put right.
+  [axisPop selectItemAtIndex:2];
+  [panel selectAxis:axisPop];
+  if (panel.shownAxis != panel.axes[1])
+    XCTFail(@"%@", @"the panel should stay on the axis whose interval is wrong");
+  [(NSTextField *)[panel valueForKey:@"intervalField"] setStringValue:@"5"];
+  [axisPop selectItemAtIndex:2];
+  [panel selectAxis:axisPop];
+  if (panel.shownAxis != panel.axes[2] || [[[panel valueForKey:@"titleField"] stringValue] length])
+    XCTFail(@"%@", @"the panel should show the secondary axis, untitled");
+  [(NSTextField *)[panel valueForKey:@"titleField"] setStringValue:@"Share"];
+  [(NSTextField *)[panel valueForKey:@"formatField"] setStringValue:@"=Parameters!Format.Value"];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+
+  RDLChartAxis *value = chart.valueAxis;
+  if (![[value.title source] isEqualToString:@"Pieces"] || ![[value.minimum source] isEqualToString:@"0"] ||
+      ![value.maximum isExpression] || ![[value.majorInterval source] isEqualToString:@"5"] ||
+      ![value.style.format isEqualToString:@"N0"] || value.margin != RDLChartAxisMarginFalse ||
+      value.majorTickMarks != RDLChartTickMarksCross || !value.showMinorGridLines ||
+      value.location != RDLChartAxisLocationOpposite || !value.hidden)
+    XCTFail(@"%@", @"the value axis should be set as typed");
+  RDLChartAxis *second = [chart.secondaryValueAxes firstObject];
+  if (![[second.title source] isEqualToString:@"Share"] || second.style.format != nil ||
+      ![[second.style.expressions.format source] isEqualToString:@"=Parameters!Format.Value"] ||
+      ![second.name isEqualToString:@"Secondary"])
+    XCTFail(@"%@", @"the secondary axis should be titled and formatted by an expression, keeping its name");
+  if (chart.categoryAxis.title != nil)
+    XCTFail(@"%@", @"the category axis was not touched");
+  NSString *after = [RDLEditor XMLStringForItem:chart];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = it;
+  if (![[RDLEditor XMLStringForItem:saved] isEqualToString:after])
+    XCTFail(@"%@", @"the axes should survive a save");
+
+  // One step back, and forward again.
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the axes back");
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"redo should set them again");
+  // A panel changed in nothing records nothing: the next undo is still the one above.
+  RDLChartAxisEditor *untouched = [RDLChartAxisEditor editorForChart:chart context:ctx];
+  if (![untouched apply])
+    XCTFail(@"%@", @"an untouched panel should apply");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"an untouched panel should record nothing to undo");
+}
+
+// The series panel: series added, retyped, put on another axis, coloured,
+// marked and labelled, moved and removed, applied as one step -- and a marker
+// size that is no size, or two series of one name, refused.
+- (void)testTheSeriesPanelSetsEachSeries {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  RDLField *pieces = [[RDLField alloc] init];
+  pieces.name = @"Pieces";
+  pieces.dataField = @"Pieces";
+  [report dataSetNamed:chart.dataSetName].fields = @[ pieces ];
+  chart.valueField = @"Pieces";
+  RDLChartAxis *share = [[RDLChartAxis alloc] init];
+  share.name = @"Share";
+  [chart.secondaryValueAxes addObject:share];
+  NSString *before = [RDLEditor XMLStringForItem:chart];
+
+  RDLChartSeriesEditor *panel = [RDLChartSeriesEditor editorForChart:chart context:ctx];
+  NSPopUpButton *typePop = [panel valueForKey:@"typePop"];
+  NSPopUpButton *subtypePop = [panel valueForKey:@"subtypePop"];
+  if (panel.shownSeries != panel.chart.series[0] || [typePop indexOfSelectedItem] != 0 || [subtypePop isEnabled])
+    XCTFail(@"%@", @"the first series should show, following the chart's type");
+
+  [panel addSeries:nil];
+  RDLChartSeries *added = panel.shownSeries;
+  if ([panel.chart.series count] != 2 || added != panel.chart.series[1] ||
+      ![[added.value source] isEqualToString:@"=Sum(Fields!Pieces.Value)"] ||
+      [added.name isEqualToString:[panel.chart.series[0] name]])
+    XCTFail(@"a new series should be selected, summing the first field under a name of its own, reads %@ %@",
+            added.name, [added.value source]);
+  [typePop selectItemWithTitle:@"Line"];
+  [panel typeChanged:typePop];
+  if (![subtypePop isEnabled] || [[panel valueForKey:@"xField"] isEnabled] ||
+      [[panel valueForKey:@"highField"] isEnabled])
+    XCTFail(@"%@", @"a line of its own should have a variant, and no X or high value");
+  [subtypePop selectItemWithTitle:@"Smooth"];
+  [(NSPopUpButton *)[panel valueForKey:@"axisPop"] selectItemWithTitle:@"Share"];
+  [(NSTextField *)[panel valueForKey:@"colorField"] setStringValue:@"#c0392b"];
+  [(NSPopUpButton *)[panel valueForKey:@"markerPop"] selectItemWithTitle:@"Diamond"];
+  [(NSTextField *)[panel valueForKey:@"markerSizeField"] setStringValue:@"big"];
+  [(NSButton *)[panel valueForKey:@"labelsCheck"] setState:NSOnState];
+  [(NSPopUpButton *)[panel valueForKey:@"labelPositionPop"] selectItemWithTitle:@"Top"];
+  [(NSTextField *)[panel valueForKey:@"labelTextField"] setStringValue:@"=FormatPercent(Fields!Pieces.Value)"];
+  if ([panel apply] || ![[[panel valueForKey:@"messageLabel"] stringValue] containsString:@"marker size"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"a marker size that is no size should be refused, and the chart left alone");
+  if ([panel showSeriesAtIndex:0] || panel.shownSeries != added)
+    XCTFail(@"%@", @"the panel should stay on the series whose marker size is wrong");
+  [(NSTextField *)[panel valueForKey:@"markerSizeField"] setStringValue:@"6pt"];
+  // A bubble plots an X and a size; the line keeps what it was set to.
+  if (![panel showSeriesAtIndex:0])
+    XCTFail(@"%@", @"the first series should show again");
+  [typePop selectItemWithTitle:@"Bubble"];
+  [panel typeChanged:typePop];
+  if (![[panel valueForKey:@"xField"] isEnabled] || ![[panel valueForKey:@"sizeField"] isEnabled])
+    XCTFail(@"%@", @"a bubble should take an X value and a size");
+  [typePop selectItemAtIndex:0];
+  [panel typeChanged:typePop];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+
+  RDLChartSeries *line = chart.series[1];
+  if ([chart.series count] != 2 || [chart.series[0] type] != RDLChartTypeUnspecified ||
+      line.type != RDLChartTypeLine || line.subtype != RDLChartSubtypeSmooth ||
+      ![line.valueAxisName isEqualToString:@"Share"] || ![line.pointStyle.color isEqualToString:@"#c0392b"] ||
+      line.marker.type != RDLChartMarkerTypeDiamond || ![[line.marker.size source] isEqualToString:@"6pt"] ||
+      !line.dataLabel.visible || line.dataLabel.position != RDLChartDataLabelPositionTop ||
+      ![line.dataLabel.label isExpression])
+    XCTFail(@"%@", @"the series should be set as the panel had them");
+  NSString *after = [RDLEditor XMLStringForItem:chart];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLItem *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = it;
+  if (![[RDLEditor XMLStringForItem:saved] isEqualToString:after])
+    XCTFail(@"%@", @"the series should survive a save");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the series back");
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"redo should set them again");
+
+  // Two series of one name are refused; moved and removed, they are kept.
+  RDLChartSeriesEditor *again = [RDLChartSeriesEditor editorForChart:chart context:ctx];
+  id<NSTableViewDataSource> rows = (id<NSTableViewDataSource>)again;
+  NSTableView *table = [again valueForKey:@"table"];
+  NSTableColumn *nameColumn = [table tableColumnWithIdentifier:@"name"];
+  [rows tableView:table setObjectValue:[chart.series[0] name] forTableColumn:nameColumn row:1];
+  if ([again apply] || ![[[again valueForKey:@"messageLabel"] stringValue] containsString:@"Two series"] ||
+      ![[RDLEditor XMLStringForItem:chart] isEqualToString:after])
+    XCTFail(@"%@", @"two series of one name should be refused");
+  [rows tableView:table setObjectValue:@"Trend" forTableColumn:nameColumn row:1];
+  [again showSeriesAtIndex:1];
+  [again moveSeriesUp:nil];
+  [again showSeriesAtIndex:1];
+  [again removeSeries:nil];
+  if (![again apply] || [chart.series count] != 1 || ![[chart.series[0] name] isEqualToString:@"Trend"] ||
+      [chart.series[0] type] != RDLChartTypeLine)
+    XCTFail(@"%@", @"the line, renamed and moved first, should be all that is left");
+}
+
+// A Custom palette's colours: the button is on only for that palette and says
+// how many there are, and the list panel adds, types, reorders and removes
+// them, leaving out a row left empty.
+- (void)testCustomPaletteColoursAreListed {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Charted"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindChart];
+  RDLChart *chart = (RDLChart *)[ctx selectedItem];
+  NSButton *colours = [inspector valueForKey:@"customColorsButton"];
+  if ([colours isEnabled])
+    XCTFail(@"%@", @"the colours are the Custom palette's alone");
+  NSPopUpButton *palette = [inspector valueForKey:@"chartPalettePop"];
+  [palette selectItemWithTitle:@"Custom"];
+  [inspector changed:palette];
+  if (![colours isEnabled])
+    XCTFail(@"%@", @"a Custom palette should offer its colours");
+
+  RDLValueListEditor *list = [RDLValueListEditor editorForValues:chart.customPaletteColors
+                                                           title:@"Colours"
+                                                         heading:nil
+                                                         context:RDLExpressionContextColor
+                                                          report:report];
+  [list addValue:nil];
+  [list setText:@"#1f4e79" atRow:0];
+  [list addValue:nil];
+  [list setText:@"=IIf(Parameters!Dark.Value, \"White\", \"Black\")" atRow:1];
+  [list addValue:nil];  // left empty
+  [list addValue:nil];
+  [list setText:@"Teal" atRow:3];
+  [list moveValueUp:nil];
+  [list selectRow:0];
+  [list moveValueDown:nil];
+  NSArray<NSString *> *sources = [list.values valueForKey:@"source"];
+  NSArray<NSString *> *expected = @[ @"=IIf(Parameters!Dark.Value, \"White\", \"Black\")", @"#1f4e79", @"Teal" ];
+  if (![sources isEqualToArray:expected])
+    XCTFail(@"the list should read %@, reads %@", expected, sources);
+  [list selectRow:2];
+  [list removeValue:nil];
+  if ([list.values count] != 2 || ![list.values[0] isExpression])
+    XCTFail(@"removing should leave two, the expression first; leaves %@", [list.values valueForKey:@"source"]);
+
+  [ctx.editor setValue:[list.values mutableCopy] forKeyPath:@"customPaletteColors" ofItem:chart];
+  [inspector reload];
+  if (![[colours title] containsString:@"(2)"])
+    XCTFail(@"the button should count two colours, says %@", [colours title]);
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLChart *saved = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLChart class]])
+      saved = (RDLChart *)it;
+  if (!RDLValueListsEqual(saved.customPaletteColors, chart.customPaletteColors) ||
+      saved.palette != RDLChartPaletteCustom)
+    XCTFail(@"%@", @"the colours should survive a save");
+  [ctx.document.undoManager undo];
+  if ([chart.customPaletteColors count])
+    XCTFail(@"%@", @"undo should take the colours away");
+}
+
+// A text box grows and shrinks, and hides a value repeated from the row
+// before within a dataset or group it names -- which it is offered by name,
+// and not the data regions, which it cannot name.
+- (void)testATextBoxGrowsShrinksAndHidesDuplicates {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  RDLTablix *tablix = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)it;
+  RDLTablixMember *group = nil;
+  for (RDLTablixMember *member in [tablix.rowHierarchy leafMembers])
+    for (RDLTablixMember *m in [tablix.rowHierarchy pathToMember:member])
+      if (group == nil && [m.groupName length])
+        group = m;
+  RDLTextbox *textbox = (RDLTextbox *)[tablix.tablixBody.rows lastObject].cells[0].item;
+  if (![textbox isKindOfClass:[RDLTextbox class]] || group == nil) {
+    XCTFail(@"%@", @"the sample should have a grouped table with a text box in its last row");
+    return;
+  }
+  [ctx.selection selectItem:textbox inBandWithKey:@"body"];
+  if ([[inspector valueForKey:@"textOptionsBox"] isHidden])
+    XCTFail(@"%@", @"a text box should show its options");
+  NSButton *grow = [inspector valueForKey:@"canGrowCheck"];
+  NSButton *shrink = [inspector valueForKey:@"canShrinkCheck"];
+  BOOL grew = textbox.canGrow;
+  [grow setState:grew ? NSOffState : NSOnState];
+  [inspector changed:grow];
+  [shrink setState:NSOnState];
+  [inspector changed:shrink];
+  NSPopUpButton *scopes = [inspector valueForKey:@"hideDuplicatesPop"];
+  NSArray<NSString *> *offered = [scopes itemTitles];
+  if (![offered containsObject:group.groupName] || ![offered containsObject:tablix.dataSetName] ||
+      [offered containsObject:tablix.name] || [scopes indexOfSelectedItem] != 0)
+    XCTFail(@"the scopes should be the datasets and groups, and none chosen; offers %@", offered);
+  [scopes selectItemWithTitle:group.groupName];
+  [inspector changed:scopes];
+  if (textbox.canGrow == grew || !textbox.canShrink || ![textbox.hideDuplicates isEqualToString:group.groupName])
+    XCTFail(@"%@", @"the options should be written to the text box");
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTextbox *saved = (RDLTextbox *)[back itemNamed:textbox.name inBand:NULL];
+  if (saved == nil)
+    for (RDLItem *it in [back allItemsIncludingNested])
+      if ([it.name isEqualToString:textbox.name])
+        saved = (RDLTextbox *)it;
+  if (saved.canGrow == grew || !saved.canShrink || ![saved.hideDuplicates isEqualToString:group.groupName])
+    XCTFail(@"%@", @"the options should survive a save");
+  [ctx.document.undoManager undo];
+  if (textbox.hideDuplicates != nil)
+    XCTFail(@"%@", @"undo should show every value again");
+  [scopes selectItemAtIndex:0];
+  if ([scopes indexOfSelectedItem] != 0)
+    XCTFail(@"%@", @"the popup should come back to showing every value");
+}
+
+// A picture of two red pixels, as PNG.
+static NSData *RDLTinyPNG(void) {
+  static NSString *const base64 = @"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9"
+                                  @"i18U1AAAAABJRU5ErkJggg==";
+  return [[NSData alloc] initWithBase64EncodedString:base64 options:NSDataBase64DecodingIgnoreUnknownCharacters];
+}
+
+// An image shows one of the report's own pictures, chosen by name or imported
+// from a file -- named after it, and not after one already there -- or a field's
+// bytes of a type it is told; and a picture renamed is still shown.
+- (void)testAnImageShowsAnEmbeddedOrADatabasePicture {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Pictured"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindImage];
+  RDLImage *image = (RDLImage *)[ctx selectedItem];
+  NSPopUpButton *source = [inspector valueForKey:@"imageSourcePop"];
+  NSPopUpButton *embedded = [inspector valueForKey:@"imageEmbeddedPop"];
+  NSPopUpButton *mime = [inspector valueForKey:@"imageMimePop"];
+  if (![image isKindOfClass:[RDLImage class]] || ![[source itemTitles] containsObject:@"Database"]) {
+    XCTFail(@"an image should be selected with every source offered, offers %@", [source itemTitles]);
+    return;
+  }
+  NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
+  NSURL *photo = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"Kiln Photo.png"]];
+  NSURL *notes = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"notes.txt"]];
+  [RDLTinyPNG() writeToURL:photo atomically:YES];
+  [[@"not a picture" dataUsingEncoding:NSUTF8StringEncoding] writeToURL:notes atomically:YES];
+
+  NSError *error = nil;
+  if (![inspector importImageFromURL:photo error:&error] || [report.embeddedImages count] != 1)
+    XCTFail(@"the picture should be embedded: %@", error);
+  RDLEmbeddedImage *first = [report.embeddedImages firstObject];
+  if (![first.name isEqualToString:@"Kiln_Photo"] || ![first.mimeType isEqualToString:@"image/png"] ||
+      ![first.imageData isEqualToData:RDLTinyPNG()] || image.source != RDLImageSourceEmbedded ||
+      ![image.value isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"the image should show the embedded picture, shows %@ from %ld", image.value, (long)image.source);
+  if (![embedded isEnabled] || ![[embedded titleOfSelectedItem] isEqualToString:@"Kiln_Photo"] || [mime isEnabled])
+    XCTFail(@"%@", @"the embedded picture should be chosen, and no type asked for");
+  [inspector importImageFromURL:photo error:NULL];
+  if (![[report.embeddedImages[1] name] isEqualToString:@"Kiln_Photo2"] || ![image.value isEqualToString:@"Kiln_Photo2"])
+    XCTFail(@"a second import should be named apart, is %@", [report.embeddedImages[1] name]);
+  [ctx.document.undoManager undo];
+  if ([report.embeddedImages count] != 1 || ![image.value isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"%@", @"one undo should take back the second import, picture and all");
+  if ([inspector importImageFromURL:notes error:&error] || error == nil || [report.embeddedImages count] != 1)
+    XCTFail(@"%@", @"a file that is no picture should be refused, saying why");
+
+  // Renamed, the picture is still the one shown.
+  RDLEmbeddedImage *renamed = [[RDLEmbeddedImage alloc] init];
+  renamed.name = @"Kiln";
+  renamed.mimeType = first.mimeType;
+  renamed.imageData = first.imageData;
+  [ctx.editor setEmbeddedImages:@[ renamed ] renaming:@{@"Kiln_Photo" : @"Kiln"}];
+  if (![image.value isEqualToString:@"Kiln"])
+    XCTFail(@"the image should follow its picture's new name, shows %@", image.value);
+  [ctx.document.undoManager undo];
+  if (![image.value isEqualToString:@"Kiln_Photo"] || ![[report.embeddedImages firstObject].name isEqualToString:@"Kiln_Photo"])
+    XCTFail(@"%@", @"undo should put the old name back, on both");
+  [ctx.document.undoManager redo];
+  [inspector reload];
+
+  // From a field: the bytes' type is asked for.
+  [source selectItemWithTitle:@"Database"];
+  [inspector changed:source];
+  if (![mime isEnabled] || [embedded isEnabled])
+    XCTFail(@"%@", @"a field's picture should be given a type, and no embedded one chosen");
+  [mime selectItemWithTitle:@"image/jpeg"];
+  [inspector changed:mime];
+  NSTextField *value = [inspector valueForKey:@"imageValueField"];
+  [value setStringValue:@"=Fields!Photo.Value"];
+  [inspector changed:value];
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLImage *saved = (RDLImage *)[back itemNamed:image.name inBand:NULL];
+  if (saved.source != RDLImageSourceDatabase || ![saved.mimeType isEqualToString:@"image/jpeg"] ||
+      ![saved.value isEqualToString:@"=Fields!Photo.Value"] || ![[back embeddedImageNamed:@"Kiln"].imageData
+                                                                     isEqualToData:RDLTinyPNG()])
+    XCTFail(@"%@", @"the image and the embedded picture should survive a save");
+  [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
+}
+
+// The report's pictures, in a panel: imported, renamed -- which the images
+// showing one follow -- and removed, as one step; a name a report cannot use,
+// or one two pictures share, refused.
+- (void)testTheEmbeddedImagesPanelKeepsTheReportsPictures {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Pictured"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  NSString *folder = [NSTemporaryDirectory() stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:NULL];
+  NSURL *logo = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"logo.png"]];
+  NSURL *seal = [NSURL fileURLWithPath:[folder stringByAppendingPathComponent:@"seal.gif"]];
+  [RDLTinyPNG() writeToURL:logo atomically:YES];
+  [RDLTinyPNG() writeToURL:seal atomically:YES];
+  [ctx addItemOfKind:RDLItemKindImage];
+  RDLImage *image = (RDLImage *)[ctx selectedItem];
+  [inspector importImageFromURL:logo error:NULL];
+  NSString *before = [RDLWriter XMLStringFromReport:report];
+
+  RDLEmbeddedImagesEditor *panel = [RDLEmbeddedImagesEditor editorWithContext:ctx];
+  if (![panel importFromURL:seal error:NULL] || [panel.images count] != 2 ||
+      ![[panel.images[1] mimeType] isEqualToString:@"image/gif"])
+    XCTFail(@"%@", @"the panel should import a second picture");
+  [panel setName:@"seal" atRow:1];
+  [panel setName:@"LOGO" atRow:1];
+  if ([panel apply] || ![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"two pictures of one name, whatever its case, should be refused");
+  [panel setName:@"1st" atRow:1];
+  if ([panel apply])
+    XCTFail(@"%@", @"a name a report cannot use should be refused");
+  [panel setName:@"Seal" atRow:1];
+  [panel setName:@"Letterhead" atRow:0];
+  if (![panel apply] || [report.embeddedImages count] != 2 || ![image.value isEqualToString:@"Letterhead"] ||
+      ![[report embeddedImageNamed:@"Seal"].mimeType isEqualToString:@"image/gif"])
+    XCTFail(@"the pictures should be kept as the panel had them, the image following, shows %@", image.value);
+  [ctx.selection selectReport];
+  if (![[[inspector valueForKey:@"embeddedImagesButton"] title] containsString:@"(2)"])
+    XCTFail(@"%@", @"the report's button should count two pictures");
+  [ctx.document.undoManager undo];
+  if (![[RDLWriter XMLStringFromReport:report] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the pictures and the image back");
+  [ctx.document.undoManager redo];
+
+  RDLEmbeddedImagesEditor *again = [RDLEmbeddedImagesEditor editorWithContext:ctx];
+  NSString *kept = [RDLWriter XMLStringFromReport:report];
+  [again apply];
+  [ctx.document.undoManager undo];
+  if ([[RDLWriter XMLStringFromReport:report] isEqualToString:kept])
+    XCTFail(@"%@", @"an untouched panel should record nothing, so undo takes the panel's edit back");
+  [ctx.document.undoManager redo];
+  [again selectRow:1];
+  [again removeImage:nil];
+  if (![again apply] || [report.embeddedImages count] != 1 || [report embeddedImageNamed:@"Seal"] != nil)
+    XCTFail(@"%@", @"removing should leave the letterhead alone");
+  [[NSFileManager defaultManager] removeItemAtPath:folder error:NULL];
+}
+
+// A subreport says what it shows with no rows, whether its border is left off
+// where it breaks, and whether it reads in this report's transaction.
+- (void)testASubreportsSettingsAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Parent"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindSubreport];
+  RDLSubreport *sub = (RDLSubreport *)[ctx selectedItem];
+  NSTextField *message = [inspector valueForKey:@"subreportNoRowsField"];
+  [message setStringValue:@"=\"No firings for \" & Parameters!Kiln.Value"];
+  [inspector changed:message];
+  for (NSString *name in @[ @"subreportOmitBorderCheck", @"subreportMergeCheck" ]) {
+    NSButton *check = [inspector valueForKey:name];
+    [check setState:NSOnState];
+    [inspector changed:check];
+  }
+  if (![sub.noRowsMessage hasPrefix:@"=\"No firings"] || !sub.omitBorderOnPageBreak || !sub.mergeTransactions)
+    XCTFail(@"%@", @"the settings should be written to the subreport");
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLSubreport *saved = (RDLSubreport *)[back itemNamed:sub.name inBand:NULL];
+  if (![saved.noRowsMessage isEqualToString:sub.noRowsMessage] || !saved.omitBorderOnPageBreak ||
+      !saved.mergeTransactions)
+    XCTFail(@"%@", @"the settings should survive a save");
+  [ctx.document.undoManager undo];
+  if (sub.mergeTransactions)
+    XCTFail(@"%@", @"undo should take the last setting back");
+}
+
+// The report's variables and code, each in a panel: variables named, valued and
+// made writable, a clash or a bad name refused; code read as it is written,
+// saying what cannot be read. Both saved.
+- (void)testTheReportsVariablesAndCodeAreEdited {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Coded"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLVariablesEditor *panel = [RDLVariablesEditor editorForVariables:report.variables
+                                                               title:nil
+                                                            writable:YES
+                                                              report:report];
+  if ([[panel valueForKey:@"table"] numberOfColumns] != 3)
+    XCTFail(@"%@", @"a report's variables should offer a Writable column");
+  [panel addVariable:nil];
+  [panel addVariable:nil];
+  [panel setName:@"Rate" value:@"=4 * 2" writable:YES atRow:0];
+  [panel setName:@"rate" value:@"=Variables!Rate.Value + 1" writable:NO atRow:1];
+  if ([panel validate])
+    XCTFail(@"%@", @"two variables of one name should be refused");
+  [panel setName:@"2nd" value:@"1" writable:NO atRow:1];
+  if ([panel validate])
+    XCTFail(@"%@", @"a name a report cannot use should be refused");
+  [panel setName:@"Doubled" value:@"=Variables!Rate.Value * 2" writable:NO atRow:1];
+  if (![panel validate] || [panel.variables count] != 2 || !panel.variables[0].writable)
+    XCTFail(@"%@", @"two sound variables should be kept, the first writable");
+  [ctx.editor setReportValue:[panel.variables mutableCopy] forKeyPath:@"variables"];
+
+  RDLCodeEditor *code = [RDLCodeEditor editorForCode:nil title:nil];
+  code.code = @"Public Function Twice(ByVal n As Integer) As Integer\n  Return n * 2\nEnd Function\n";
+  if ([code.problems count] || ![code.status isEqualToString:@"1 function to call."])
+    XCTFail(@"sound code should read clean, says %@ (%@)", code.status, code.problems);
+  code.code = @"Public Function Broken(\n";
+  if ([code.problems count] == 0 || [code.status length] == 0)
+    XCTFail(@"%@", @"code that cannot be read should say so");
+  code.code = @"Public Function Twice(ByVal n As Integer) As Integer\n  Return n * 2\nEnd Function\n";
+  [ctx.editor setReportValue:code.code forKeyPath:@"code"];
+
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  if (!RDLVariablesEqual(back.variables, report.variables) || ![[back codeFunctionNames] isEqualToArray:@[ @"Twice" ]])
+    XCTFail(@"%@", @"the variables and the code should survive a save");
+  [ctx.document.undoManager undo];
+  if (report.code != nil)
+    XCTFail(@"%@", @"undo should take the code away");
+
+  // A group's variables have no Writable column.
+  RDLVariablesEditor *group = [RDLVariablesEditor editorForVariables:@[] title:nil writable:NO report:report];
+  if ([[group valueForKey:@"table"] numberOfColumns] != 2)
+    XCTFail(@"%@", @"a group's variables should not offer a Writable column");
+}
+
+// The rest of an item's style, in a panel: text spacing, direction and
+// shadow, calendar and digits, gradient and background picture -- each left
+// unset or set, a length or an expression, applied as one step and saved.
+- (void)testTheStylePanelSetsTheRestOfAStyle {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Styled"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
+                                                                context:ctx];
+  [ctx addItemOfKind:RDLItemKindTextbox];
+  RDLTextbox *box = (RDLTextbox *)[ctx selectedItem];
+  if ([[inspector valueForKey:@"moreStyleBox"] isHidden])
+    XCTFail(@"%@", @"an item should offer the rest of its style");
+  NSString *before = [RDLEditor XMLStringForItem:box];
+  RDLStylePanel *panel = [RDLStylePanel panelForItem:box context:ctx];
+  NSDictionary<NSString *, NSString *> *texts = @{
+    @"lineHeightField" : @"=IIf(Parameters!Dense.Value, \"10pt\", \"14pt\")",
+    @"shadowColorField" : @"#333333",
+    @"shadowOffsetField" : @"wide",
+    @"numeralLanguageField" : @"ar-SA",
+    @"gradientEndField" : @"LightBlue",
+    @"imageValueField" : @"Letterhead",
+  };
+  for (NSString *name in texts)
+    [(NSTextField *)[panel valueForKey:name] setStringValue:texts[name]];
+  NSDictionary<NSString *, NSString *> *choices = @{
+    @"directionPop" : @"Right to left",
+    @"writingModePop" : @"Vertical",
+    @"textEffectPop" : @"Shadow",
+    @"calendarPop" : @"Hijri",
+    @"numeralVariantPop" : @"3",
+    @"gradientPop" : @"Top bottom",
+    @"imageSourcePop" : @"Embedded",
+    @"imageRepeatPop" : @"No repeat",
+  };
+  for (NSString *name in choices) {
+    NSPopUpButton *pop = [panel valueForKey:name];
+    if ([pop itemWithTitle:choices[name]] == nil)
+      XCTFail(@"%@ should offer %@, offers %@", name, choices[name], [pop itemTitles]);
+    [pop selectItemWithTitle:choices[name]];
+  }
+  if ([panel apply] || ![[RDLEditor XMLStringForItem:box] isEqualToString:before])
+    XCTFail(@"%@", @"a shadow offset that is no length should be refused, and nothing set");
+  [(NSTextField *)[panel valueForKey:@"shadowOffsetField"] setStringValue:@"2pt"];
+  if (![panel apply])
+    XCTFail(@"the panel should apply, says %@", [[panel valueForKey:@"messageLabel"] stringValue]);
+  RDLStyle *style = box.style;
+  if (style.lineHeight != nil || ![style.expressions.lineHeight source] || style.direction != RDLLayoutDirectionRTL ||
+      style.writingMode != RDLWritingModeVertical || style.textEffect != RDLTextEffectShadow ||
+      ![style.shadowColor isEqualToString:@"#333333"] || ![[style.shadowOffset stringValue] isEqualToString:@"2pt"] ||
+      style.calendar != RDLCalendarHijri || ![style.numeralLanguage isEqualToString:@"ar-SA"] ||
+      style.numeralVariant != 3 || style.backgroundGradientType != RDLGradientTypeTopBottom ||
+      ![style.backgroundGradientEndColor isEqualToString:@"LightBlue"] ||
+      style.backgroundImage.source != RDLImageSourceEmbedded ||
+      ![style.backgroundImage.value isEqualToString:@"Letterhead"] ||
+      style.backgroundImage.repeat != RDLBackgroundRepeatNoRepeat || style.unicodeBiDi != RDLUnicodeBiDiUnspecified)
+    XCTFail(@"%@", @"the style should be set as the panel had it, what was not chosen left unset");
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  // Compared by value: a text box read back keeps its box's style apart from
+  // its runs', which one made in the designer writes as one.
+  RDLStyle *saved = [back itemNamed:box.name inBand:NULL].style;
+  for (NSString *key in @[ @"direction", @"writingMode", @"textEffect", @"shadowColor", @"calendar",
+                           @"numeralLanguage", @"numeralVariant", @"backgroundGradientType",
+                           @"backgroundGradientEndColor" ])
+    if (![[saved valueForKey:key] isEqual:[style valueForKey:key]])
+      XCTFail(@"%@ should survive a save, reads %@", key, [saved valueForKey:key]);
+  if (![[saved.shadowOffset stringValue] isEqualToString:@"2pt"] ||
+      ![[saved.expressions.lineHeight source] isEqualToString:[style.expressions.lineHeight source]] ||
+      saved.backgroundImage.repeat != RDLBackgroundRepeatNoRepeat ||
+      ![saved.backgroundImage.value isEqualToString:@"Letterhead"])
+    XCTFail(@"%@", @"the lengths, the expression and the picture should survive a save");
+  [ctx.document.undoManager undo];
+  if (![[RDLEditor XMLStringForItem:box] isEqualToString:before])
+    XCTFail(@"%@", @"one undo should put the style back");
+  [ctx.document.undoManager redo];
+  // Cleared again: "Not set", and the picture's name taken away.
+  RDLStylePanel *again = [RDLStylePanel panelForItem:box context:ctx];
+  [(NSPopUpButton *)[again valueForKey:@"directionPop"] selectItemAtIndex:0];
+  [(NSTextField *)[again valueForKey:@"imageValueField"] setStringValue:@""];
+  [(NSTextField *)[again valueForKey:@"lineHeightField"] setStringValue:@"12pt"];
+  [again apply];
+  if (box.style.direction != RDLLayoutDirectionUnspecified || box.style.backgroundImage != nil ||
+      box.style.expressions.lineHeight != nil || ![[box.style.lineHeight stringValue] isEqualToString:@"12pt"])
+    XCTFail(@"%@", @"a property set back to unset, a picture taken away and an expression made a length should read so");
+  // An untouched panel records nothing.
+  NSString *kept = [RDLEditor XMLStringForItem:box];
+  [[RDLStylePanel panelForItem:box context:ctx] apply];
+  [ctx.document.undoManager undo];
+  if ([[RDLEditor XMLStringForItem:box] isEqualToString:kept])
+    XCTFail(@"%@", @"an untouched panel should record nothing, so undo takes back the edit before");
+}
+
+// A line's thickness, dash and ink, in the real inspector. All three belong to
+// its border, which is where every backend reads them from; the ink field used
+// to write style.color, so on a line whose file gave a border colour, typing a
+// colour changed nothing anyone could see.
+- (void)testTheLineSectionEditsTheBorderItIsDrawnWith {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Ruled"];
+  RDLLine *line = [[RDLLine alloc] init];
+  line.name = @"Rule";
+  line.left = 0.5;
+  line.top = 0.5;
+  line.width = 2.0;
+  line.height = 0;
+  line.style.border = [RDLBorder solidColor:@"#336699"];
+  line.style.border.width = [RDLLength points:3];
+  [report.body.items addObject:line];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:line inBandWithKey:@"body"];
+
+  for (NSString *name in @[ @"lineColorField", @"lineWidthField", @"lineDashPop",
+                            @"lineWidthExprButton" ])
+    if ([inspector valueForKey:name] == nil) {
+      XCTFail(@"%@ is not connected in the XIB", name);
+      return;
+    }
+  if ([[inspector valueForKey:@"lineBox"] isHidden])
+    XCTFail(@"%@", @"a line should show the line section");
+
+  // Model -> fields, from the border rather than from the item's own colour.
+  if (![[[inspector valueForKey:@"lineColorField"] stringValue] isEqualToString:@"#336699"])
+    XCTFail(@"the ink shows %@", [[inspector valueForKey:@"lineColorField"] stringValue]);
+  if (![[[inspector valueForKey:@"lineWidthField"] stringValue] isEqualToString:@"3pt"])
+    XCTFail(@"the thickness shows %@", [[inspector valueForKey:@"lineWidthField"] stringValue]);
+
+  // Fields -> model, onto the border, leaving the item's own colour alone.
+  NSTextField *ink = [inspector valueForKey:@"lineColorField"];
+  [ink setStringValue:@"#b00020"];
+  [inspector changed:ink];
+  if (![line.style.border.color isEqualToString:@"#b00020"])
+    XCTFail(@"the border's colour reads %@", line.style.border.color);
+  // The item's own Color is left where it was. Every style carries the
+  // #000000 MS-RDL gives it, so the check is that editing the ink did not
+  // reach for it, not that nothing is there.
+  if (![line.style.color isEqualToString:@"#000000"])
+    XCTFail(@"editing the ink moved the item's own colour to %@", line.style.color);
+
+  NSTextField *thick = [inspector valueForKey:@"lineWidthField"];
+  [thick setStringValue:@"4pt"];
+  [inspector changed:thick];
+  if (![[line.style.border.width stringValue] isEqualToString:@"4pt"])
+    XCTFail(@"the thickness reads %@", [line.style.border.width stringValue]);
+
+  // The dash list offers what a line can actually be drawn as, and no more.
+  NSPopUpButton *dash = [inspector valueForKey:@"lineDashPop"];
+  if ([dash numberOfItems] != RDLBorderStyleSolid - RDLBorderStyleNone + 1)
+    XCTFail(@"the dash list holds %ld styles", (long)[dash numberOfItems]);
+  [dash selectItemWithTitle:RDLStringFromBorderStyle(RDLBorderStyleDashed)];
+  [inspector changed:dash];
+  if (line.style.border.style != RDLBorderStyleDashed)
+    XCTFail(@"the dash reads %ld", (long)line.style.border.style);
+}
+
+// The same section on a line that states no border at all, which is what a
+// freshly drawn one is. Every field here writes through style.border, so if
+// nothing is there to write through, the section is a row of controls that
+// quietly do nothing -- the failure this whole section exists to remove.
+- (void)testTheLineSectionWorksOnALineWithNoBorderYet {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Bare"];
+  RDLLine *line = [[RDLLine alloc] init];
+  line.name = @"Fresh";
+  line.left = 0.5;
+  line.top = 0.5;
+  line.width = 2.0;
+  line.height = 0;
+  [report.body.items addObject:line];
+
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
+                                                                context:ctx];
+  [ctx.selection selectItem:line inBandWithKey:@"body"];
+
+  NSTextField *thick = [inspector valueForKey:@"lineWidthField"];
+  [thick setStringValue:@"5pt"];
+  [inspector changed:thick];
+  if (line.style.border == nil) {
+    XCTFail(@"%@", @"a thickness typed on a line with no border went nowhere");
+    return;
+  }
+  if (![[line.style.border.width stringValue] isEqualToString:@"5pt"])
+    XCTFail(@"the thickness reads %@", [line.style.border.width stringValue]);
+
+  NSTextField *ink = [inspector valueForKey:@"lineColorField"];
+  [ink setStringValue:@"#b00020"];
+  [inspector changed:ink];
+  if (![line.style.border.color isEqualToString:@"#b00020"])
+    XCTFail(@"the ink reads %@", line.style.border.color);
+}
+
+// A property of two values is a box to tick: what off and on mean is the
+// binding's, so the model keeps its own vocabulary and the pane shows a state.
+- (void)testACheckboxBindsATwoValuedProperty {
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Check"]];
+  RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Box";
+  item.style.fontStyle = RDLFontStyleItalic;
+  [doc.report.body.items addObject:item];
+
+  NSButton *italic = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 80, 20)];
+  [italic setButtonType:NSSwitchButton];
+  RDLFieldBindings *bindings = [[RDLFieldBindings alloc] init];
+  [bindings bind:italic keyPath:@"style.fontStyle" scope:RDLFieldScopeItem
+            kind:RDLFieldKindCheck
+          values:@[ @(RDLFontStyleNormal), @(RDLFontStyleItalic) ]
+     placeholder:nil];
+
+  [bindings fillFromItem:item band:doc.report.body report:doc.report];
+  if ([italic state] != NSOnState)
+    XCTFail(@"%@", @"an italic textbox should show the box ticked");
+  [italic setState:NSOffState];
+  [bindings applyControl:italic editor:editor item:item bandKey:@"body"];
+  if (item.style.fontStyle != RDLFontStyleNormal)
+    XCTFail(@"unticking should write the off value, not %ld", (long)item.style.fontStyle);
+  [doc.undoManager undo];
+  if (item.style.fontStyle != RDLFontStyleItalic)
+    XCTFail(@"%@", @"and undo should put it back");
+
+  // A value that is neither shows as off, rather than as the on value.
+  item.style.fontStyle = RDLFontStyleUnspecified;
+  [bindings fillFromItem:item band:doc.report.body report:doc.report];
+  if ([italic state] != NSOffState)
+    XCTFail(@"%@", @"a property that is neither should not show as ticked");
 }
 
 @end

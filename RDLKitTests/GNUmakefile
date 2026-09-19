@@ -18,7 +18,7 @@ RDLKitTests_OBJC_FILES = \
   RDLJSONPathTests.m \
   RDLSubreportTests.m
 RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
-RDLKitTests_INCLUDE_DIRS = -I../RDLKit
+RDLKitTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
 # The PDF backend and text measurement are AppKit.

@@ -6,6 +6,7 @@
 #import "RDLDatasetFieldsView.h"
 
 @class RDLEditingContext;
+@class RDLReport;
 @class RDLSubreport;
 
 // The navigators' delegate. Two things in a report are edited rather than
@@ -17,6 +18,10 @@
                                                   RDLDatasetFieldsViewDelegate>
 @property (nonatomic, readonly, strong) RDLEditingContext *context;
 - (instancetype)initWithContext:(RDLEditingContext *)context;
+// What reading a report noted -- parts kept to write back but not edited
+// here, placeholders for items this kit does not draw -- as a message to show
+// once the window is open. nil when reading it noted nothing.
++ (NSString *)openingNotesForReport:(RDLReport *)report;
 - (void)showPreview:(id)sender;
 - (void)toggleDesignPreview:(id)sender;
 - (void)exportPDF:(id)sender;
@@ -33,7 +38,7 @@
 // Cancel, and the height that holds them. Published because the panel runs a
 // modal session, and this is the part of it a check can drive.
 - (BOOL)loadAddElementPanel;
-- (void)layOutAddElementPanelForKinds:(NSArray<NSString *> *)kinds;
+- (void)layOutAddElementPanelForKinds:(NSArray<NSNumber *> *)kinds;
 - (void)removeElement:(id)sender;
 // Open the report the selected Subreport names, in a window of its own beside
 // this one. A subreport is a separate file, so it is edited as a separate
@@ -49,4 +54,10 @@
 // pane, and one placed half off the screen loses whatever hangs over the edge.
 // Published so where a second window lands can be checked without a screen.
 - (void)placeBesideMe:(NSWindow *)other;
+// The groups pane under the canvas shows or hides. Report Builder keeps its
+// grouping pane in view; a report with no tablix in it has no use for the
+// space, so the pane collapses -- by dragging its divider shut, by
+// double-clicking the divider, or from the View menu.
+- (void)toggleGroupsPane:(id)sender;
+- (BOOL)groupsPaneIsShowing;
 @end

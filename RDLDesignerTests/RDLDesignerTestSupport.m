@@ -15,6 +15,49 @@ NSString *RDLColorMismatch(NSColor *actual, NSColor *expected, NSString *what) {
   return nil;
 }
 
+NSBitmapImageRep *RDLRenderViewRegion(NSView *view, NSRect rect) {
+#if defined(__APPLE__)
+  NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:rect];
+  [view cacheDisplayInRect:rect toBitmapImageRep:rep];
+  return rep;
+#else
+  NSInteger w = (NSInteger)ceil(NSWidth(rect));
+  NSInteger h = (NSInteger)ceil(NSHeight(rect));
+  NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
+                                                                  pixelsWide:w
+                                                                  pixelsHigh:h
+                                                               bitsPerSample:8
+                                                             samplesPerPixel:4
+                                                                    hasAlpha:YES
+                                                                    isPlanar:NO
+                                                              colorSpaceName:NSCalibratedRGBColorSpace
+                                                                 bytesPerRow:0
+                                                                bitsPerPixel:0];
+  NSGraphicsContext *gc = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext setCurrentContext:gc];
+  NSAffineTransform *t = [NSAffineTransform transform];
+  // -colorAtX:y: counts rows from the top; a raw bitmap context draws from the
+  // bottom. Calling -drawRect: directly does not install the view's own flip, so
+  // a flipped view (whose drawing code counts down from the top) has to be
+  // turned over here for its top-down coordinates to land on top-down rows. A
+  // non-flipped view already counts up and needs no turn.
+  if ([view isFlipped]) {
+    [t translateXBy:0 yBy:h];
+    [t scaleXBy:1 yBy:-1];
+  }
+  // The requested region's own origin becomes the bitmap's (0, 0).
+  [t translateXBy:-NSMinX(rect) yBy:-NSMinY(rect)];
+  [t concat];
+  // -drawRect: rather than -displayRectIgnoringOpacity:inContext:, which comes
+  // back blank on GNUstep; the canvas paints all of itself in -drawRect:.
+  [view drawRect:rect];
+  [gc flushGraphics];
+  [NSGraphicsContext restoreGraphicsState];
+  return rep;
+#endif
+}
+
 NSButton *RDLFindButtonTitled(NSView *view, NSString *title) {
   for (NSView *v in [view subviews]) {
     if ([v isKindOfClass:[NSButton class]] &&

@@ -12,6 +12,7 @@
                 <outlet property="addCalculatedButton" destination="addCalculatedButton" id="addCalculatedButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
+                <outlet property="optionsButton" destination="optionsButton" id="optionsButtonOutlet"/>
                 <outlet property="loadButton" destination="loadButton" id="loadButtonOutlet"/>
                 <outlet property="queryField" destination="queryField" id="queryFieldOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
@@ -145,6 +146,17 @@
                     </buttonCell>
                     <connections>
                         <action selector="editFilters:" target="-2" id="filtersButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="The query's parameters, how long it may run, and how the dataset compares text" id="optionsButton">
+                    <rect key="frame" x="198" y="1" width="110" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="square" title="Properties…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="optionsButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editOptions:" target="-2" id="optionsButtonAction"/>
                     </connections>
                 </button>
                 <button toolTip="Remove the selected field" id="removeButton">

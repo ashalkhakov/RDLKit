@@ -1,6 +1,10 @@
 #import "RDLDesignerWindow.h"
 #import "RDLChange.h"
 #import "RDLSelection.h"
+#import "RDLPreviewWindow.h"
+#import "RDLGroupsView.h"
+#import "RDLPropertiesView.h"
+#import "RDLSourceView.h"
 #import "RDLCanvasView.h"
 #import "RDLEditingContext.h"
 #import "RDLInspectorView.h"
@@ -15,6 +19,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLDataSourceNavigator.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLProblemsView.h"
 #import "RDLParameterNavigator.h"
 #import "RDLDataSourceView.h"
 #import "RDLDatasetFieldsView.h"
@@ -28,6 +33,11 @@
 // How narrow a side pane may be dragged. Named because two delegate methods
 // have to agree on it.
 static const CGFloat kRDLSidePaneMinimum = 160.0;
+// The centre, top and bottom: what the canvas keeps for the page, how tall the
+// groups pane opens, and the least it can be dragged to before it shuts.
+static const CGFloat kRDLCanvasMinimumHeight = 200.0;
+static const CGFloat kRDLGroupsPaneHeight = 140.0;
+static const CGFloat kRDLGroupsPaneMinimum = 60.0;
 // What the two side panes open at. The right one has to clear the inspector's
 // sections, which are 260 points wide with a scroller beside them.
 static const CGFloat kRDLLeftPaneWidth = 220.0;
@@ -49,6 +59,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong, readwrite) RDLEditingContext *context;
 // RDLDesignerWindow.xib
 @property (nonatomic, strong) IBOutlet NSSplitView *split;
+// The centre's own split: the canvas, and the groups pane under it, which
+// collapses.
+@property (nonatomic, strong) IBOutlet NSSplitView *centerSplit;
 @property (nonatomic, strong) IBOutlet RDLCanvasView *canvas;
 @property (nonatomic, strong) IBOutlet NSScrollView *canvasScroll;
 @property (nonatomic, strong) IBOutlet NSOutlineView *outline;
@@ -79,8 +92,16 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 - (void)showDatasetFields:(BOOL)show;
 @property (nonatomic, strong) RDLInsertPalette *palette;
 @property (nonatomic, strong) RDLFieldInspectorView *fieldInspector;
-@property (nonatomic, strong) IBOutlet NSTextView *sourceText;
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
+// The report as RDL, and the way back: what is typed there becomes the report.
+@property (nonatomic, strong) RDLSourceView *sourceView;
+@property (nonatomic, strong) IBOutlet NSView *problemsHost, *propertiesHost, *groupsHost;
+// How the region being worked in groups, under the canvas.
+@property (nonatomic, strong) RDLGroupsView *groupsView;
+// Every property of what is selected, beside the inspector's chosen few.
+@property (nonatomic, strong) RDLPropertiesView *propertiesView;
+// What is wrong with the report, listed beside the ways into it.
+@property (nonatomic, strong) RDLProblemsView *problemsView;
 // Data sources sit above the datasets, which is the order they are made in: a
 // source says where data comes from, and a dataset then names one.
 @property (nonatomic, strong) IBOutlet NSView *dataSourceNavigatorHost, *dataSourceHost;
@@ -88,9 +109,8 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSView *parameterNavigatorHost, *parameterInspectorHost;
 @property (nonatomic, strong) IBOutlet NSView *reportInspectorHost, *datasetInspectorHost;
 @property (nonatomic, strong) RDLOutlineDataSource *outlineSource;
-// RDLPreviewWindow.xib
-@property (nonatomic, strong) IBOutlet NSWindow *previewWindow;
-@property (nonatomic, strong) IBOutlet RDLView *previewView;
+// The report as it comes out, in a window of its own.
+@property (nonatomic, strong) RDLPreviewWindow *preview;
 // RDLAddElementPanel.xib -- reloaded per use, since its height depends on how
 // many element kinds the selection allows.
 @property (nonatomic, strong) IBOutlet NSWindow *palettePanel;
@@ -98,8 +118,15 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSButton *paletteCancelButton;
 @end
 
+// How many of a report's notes the opening message lists before it counts
+// the rest.
+static const NSUInteger kRDLOpeningNotesShown = 8;
+
 @implementation RDLDesignerWindow {
-  BOOL _sourceNeedsRewrite;
+  // How tall the groups pane was when it was last shut, so it comes back that
+  // size.
+  CGFloat _groupsPaneHeight;
+  BOOL _presentedOpeningNotes;
   RDLExpressionFieldEditor *_fieldEditor;
 }
 
@@ -184,6 +211,10 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 // all do with their side panes.
 - (BOOL)splitView:(NSSplitView *)splitView shouldAdjustSizeOfSubview:(NSView *)subview {
   NSArray<NSView *> *panes = [splitView subviews];
+  // In the centre, a taller window is for more page: the groups pane keeps the
+  // height it was dragged to and the canvas takes the rest.
+  if (splitView == _centerSplit)
+    return subview != [panes lastObject];
   // Once there is not enough width for all three, holding the sides at their
   // size means the centre absorbs the whole shortfall and collapses to
   // nothing. Below that everyone gives way together, so a window that is too
@@ -193,19 +224,165 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
   return subview != [panes firstObject] && subview != [panes lastObject];
 }
 
+#if !defined(__APPLE__)
+// GNUstep's -adjustSubviews always sizes the last subview to whatever space is
+// left and never asks -shouldAdjustSizeOfSubview: about it, so a trailing side
+// pane (the inspector) cannot hold its width there. Distribute by hand to the
+// same rule the method above states: keep the subviews that should not adjust
+// at their current span, and share what is left among those that should, in
+// proportion to the spans they had.
+- (void)splitView:(NSSplitView *)splitView resizeSubviewsWithOldSize:(NSSize)oldSize {
+  RDL_UNUSED(oldSize);
+  NSArray<NSView *> *subs = [splitView subviews];
+  NSUInteger n = [subs count];
+  if (n == 0)
+    return;
+  BOOL vertical = [splitView isVertical];
+  NSRect bounds = [splitView bounds];
+  CGFloat divider = [splitView dividerThickness];
+  CGFloat total = (vertical ? NSWidth(bounds) : NSHeight(bounds)) - divider * (CGFloat)(n - 1);
+  CGFloat spans[n];
+  BOOL adjust[n];
+  CGFloat oldAdjustable = 0, fixed = 0;
+  NSUInteger adjustableCount = 0;
+  for (NSUInteger i = 0; i < n; i++) {
+    NSRect f = [subs[i] frame];
+    spans[i] = vertical ? NSWidth(f) : NSHeight(f);
+    adjust[i] = ![splitView isSubviewCollapsed:subs[i]] &&
+                [self splitView:splitView shouldAdjustSizeOfSubview:subs[i]];
+    if (adjust[i]) {
+      oldAdjustable += spans[i];
+      adjustableCount++;
+    } else {
+      fixed += spans[i];
+    }
+  }
+  CGFloat forAdjustable = MAX(0, total - fixed);
+  CGFloat running = 0;
+  for (NSUInteger i = 0; i < n; i++) {
+    CGFloat span = spans[i];
+    if (adjust[i])
+      span = oldAdjustable > 0.5 ? forAdjustable * (spans[i] / oldAdjustable)
+                                 : forAdjustable / (CGFloat)adjustableCount;
+    NSRect r = vertical ? NSMakeRect(running, 0, span, NSHeight(bounds))
+                        : NSMakeRect(0, running, NSWidth(bounds), span);
+    [subs[i] setFrame:[splitView centerScanRect:r]];
+    running += span + divider;
+  }
+}
+#endif
+
 // A pane dragged down to nothing is a pane nobody can get back without knowing
 // the divider is still there, so each side has a floor. They are the widths
 // the XIB opens at, less what a pane can lose and still read.
 - (CGFloat)splitView:(NSSplitView *)splitView
     constrainMinCoordinate:(CGFloat)proposed
                ofSubviewAt:(NSInteger)index {
-  RDL_UNUSED(splitView);
+  // The canvas keeps a page's worth of room; dragging the divider further than
+  // that collapses the groups pane rather than squeezing the page away.
+  if (splitView == _centerSplit)
+    return MAX(proposed, kRDLCanvasMinimumHeight);
   return index == 0 ? MAX(proposed, kRDLSidePaneMinimum) : proposed;
+}
+
+// The groups pane is the one thing here that collapses: it is about the region
+// being worked in, and a report with no tablix in it has no use for the space.
+// Dragging it shut, double-clicking the divider and the View menu item are
+// three ways to the same state.
+- (BOOL)splitView:(NSSplitView *)splitView canCollapseSubview:(NSView *)subview {
+  return splitView == _centerSplit && subview == [[splitView subviews] lastObject];
+}
+
+- (BOOL)splitView:(NSSplitView *)splitView
+    shouldCollapseSubview:(NSView *)subview
+    forDoubleClickOnDividerAtIndex:(NSInteger)index {
+  RDL_UNUSED(index);
+  return [self splitView:splitView canCollapseSubview:subview];
+}
+
+// Whether the groups pane is showing, and the two ways it changes.
+- (BOOL)groupsPaneIsShowing {
+  return _centerSplit != nil && ![_centerSplit isSubviewCollapsed:_groupsHost];
+}
+
+// How tall the groups pane may be here: what is asked for, less whatever the
+// canvas needs to keep. A window too short for both gives the canvas its floor
+// and the pane what is left.
+- (CGFloat)groupsPaneHeightFitting:(CGFloat)wanted {
+  CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
+  return MAX(0, MIN(wanted, room));
+}
+
+// Where the divider goes for a pane of that height. Which way the split counts
+// from is AppKit's business and has not been the same on every machine this
+// runs on, so the height is measured afterwards and the divider corrected by
+// what it came out wrong by, rather than the arithmetic being trusted once.
+- (void)setGroupsPaneHeight:(CGFloat)wanted {
+  CGFloat target = [self groupsPaneHeightFitting:wanted];
+  CGFloat position = NSHeight([_centerSplit bounds]) - target - [_centerSplit dividerThickness];
+  CGFloat lastGood = position;
+  for (NSUInteger pass = 0; pass < 3; pass++) {
+    [_centerSplit setPosition:position ofDividerAtIndex:0];
+    CGFloat got = [_centerSplit isSubviewCollapsed:_groupsHost] ? 0 : NSHeight([_groupsHost frame]);
+    CGFloat wrongBy = got - target;
+    if (fabs(wrongBy) < 0.5)
+      return;
+    // A pass that shut the pane went too far: the one before it stands.
+    if (got <= 0) {
+      [_centerSplit setPosition:lastGood ofDividerAtIndex:0];
+      return;
+    }
+    lastGood = position;
+    position += wrongBy;
+  }
+}
+
+- (void)showGroupsPane:(BOOL)show {
+  if (_centerSplit == nil || show == [self groupsPaneIsShowing])
+    return;
+  if (!show) {
+    // Remembered, so it comes back the size it was rather than the size the
+    // XIB opened at -- and not a height it was only squeezed to by a window
+    // too short to hold it.
+    // A height the window squeezed it to is the window's, not a choice, so it
+    // is not remembered: a pane shut in a short window and opened in a tall one
+    // comes back the size it was last given room for.
+    CGFloat height = NSHeight([_groupsHost frame]);
+    CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
+    if (height > kRDLGroupsPaneMinimum && height < room - 0.5)
+      _groupsPaneHeight = height;
+    [_centerSplit setPosition:NSHeight([_centerSplit bounds]) ofDividerAtIndex:0];
+    return;
+  }
+  [self setGroupsPaneHeight:_groupsPaneHeight > kRDLGroupsPaneMinimum ? _groupsPaneHeight
+                                                                     : kRDLGroupsPaneHeight];
+}
+
+- (void)toggleGroupsPane:(id)sender {
+  RDL_UNUSED(sender);
+  [self showGroupsPane:![self groupsPaneIsShowing]];
+}
+
+// The menu item says which way it goes, the way a Mac menu does.
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if ([item action] == @selector(toggleGroupsPane:)) {
+    [item setState:[self groupsPaneIsShowing] ? NSOnState : NSOffState];
+    return YES;
+  }
+  return YES;
 }
 
 - (CGFloat)splitView:(NSSplitView *)splitView
     constrainMaxCoordinate:(CGFloat)proposed
                ofSubviewAt:(NSInteger)index {
+  // The centre split stacks the canvas over the groups pane, so what is left
+  // to the divider is measured down the window, not across it. This used to
+  // answer for it with the side panes' rule -- a width -- which capped the
+  // divider at the canvas's own width and left the pane as tall as the window
+  // was narrow.
+  if (splitView == _centerSplit)
+    return MIN(proposed, NSHeight([splitView bounds]) - kRDLGroupsPaneMinimum -
+                             [splitView dividerThickness]);
   NSArray<NSView *> *panes = [splitView subviews];
   if (index != (NSInteger)[panes count] - 2)
     return proposed;
@@ -230,6 +407,40 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
   [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
   [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
+  // Once the window is on screen, not while it is being put there.
+  [self performSelector:@selector(presentOpeningNotes) withObject:nil afterDelay:0];
+}
+
++ (NSString *)openingNotesForReport:(RDLReport *)report {
+  NSArray<NSString *> *notes = report.warnings;
+  if ([notes count] == 0)
+    return nil;
+  NSMutableArray<NSString *> *lines = [NSMutableArray array];
+  for (NSString *note in notes) {
+    if ([lines count] == kRDLOpeningNotesShown)
+      break;
+    NSString *sentence = [note length] ? [[[note substringToIndex:1] uppercaseString]
+                                             stringByAppendingString:[note substringFromIndex:1]]
+                                       : note;
+    [lines addObject:[NSString stringWithFormat:@"• %@", sentence]];
+  }
+  if ([notes count] > kRDLOpeningNotesShown)
+    [lines addObject:[NSString stringWithFormat:@"… and %lu more.",
+                                                (unsigned long)([notes count] - kRDLOpeningNotesShown)]];
+  return [lines componentsJoinedByString:@"\n"];
+}
+
+// What reading the report noted, said once, on a window someone can see.
+- (void)presentOpeningNotes {
+  NSString *notes = [RDLDesignerWindow openingNotesForReport:_context.report];
+  if (_presentedOpeningNotes || notes == nil || ![[self window] isVisible])
+    return;
+  _presentedOpeningNotes = YES;
+  NSAlert *alert = [[NSAlert alloc] init];
+  [alert setMessageText:@"Some of this report is kept as it was written"];
+  [alert setInformativeText:notes];
+  [alert addButtonWithTitle:@"OK"];
+  [alert beginSheetModalForWindow:[self window] completionHandler:nil];
 }
 
 // The outline mirrors the report tree, so it only needs rebuilding when the
@@ -280,9 +491,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 
   NSString *showing = [[_centerTabView selectedTabViewItem] identifier];
   if (dataset)
-    [_centerTabView selectTabViewItemAtIndex:2];
+    [self showCentreTab:2];
   else if (source)
-    [_centerTabView selectTabViewItemAtIndex:3];
+    [self showCentreTab:3];
   else if ([showing isEqualToString:@"dataset"] || [showing isEqualToString:@"dataSource"])
     [self centerModeChanged:nil];  // back to whatever Preview/Source says
 }
@@ -486,7 +697,7 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
   // than anything that names this line. The next -addElement: loads the nib
   // again and the outlet's old panel goes then, well clear of all that.
   if (code >= 1 && code <= (NSInteger)[kinds count])
-    [_context addItemOfKind:kinds[(NSUInteger)(code - 1)]];
+    [_context addItemOfKind:(RDLItemKind)[kinds[(NSUInteger)(code - 1)] integerValue]];
 }
 
 // The panel itself, from its XIB. Its own method because a check needs the
@@ -509,7 +720,7 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 //
 // Published so the arithmetic can be checked without a modal session -- which
 // is the only way to check it at all, since the panel runs one.
-- (void)layOutAddElementPanelForKinds:(NSArray<NSString *> *)kinds {
+- (void)layOutAddElementPanelForKinds:(NSArray<NSNumber *> *)kinds {
   const CGFloat margin = 12, captionHeight = 20, buttonHeight = 26, gap = 4, width = 260;
   NSUInteger count = [kinds count];
   CGFloat buttons = count ? count * buttonHeight + (count - 1) * gap : 0;
@@ -529,9 +740,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 
   CGFloat y = height - margin - captionHeight - gap - buttonHeight;
   NSInteger tag = 1;
-  for (NSString *kind in kinds) {
+  for (NSNumber *kind in kinds) {
     NSButton *b = [[NSButton alloc] initWithFrame:NSMakeRect(14, y, width - 28, buttonHeight)];
-    [b setTitle:kind];
+    [b setTitle:RDLTitleOfItemKind((RDLItemKind)[kind integerValue])];
     [b setBezelStyle:NSShadowlessSquareBezelStyle];
     [b setTag:tag];
     [b setTarget:self];
@@ -556,15 +767,9 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 
 - (void)showPreview:(id)sender {
   (void)sender;
-  if (_previewWindow == nil) {
-    NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLPreviewWindow"
-                                          bundle:[NSBundle bundleForClass:[self class]]];
-    [nib instantiateWithOwner:self topLevelObjects:NULL];
-  }
-  _previewView.report = _context.report;
-  _previewView.paramValues = _context.document.paramValues;
-  [_previewView reloadLayout];
-  [_previewWindow makeKeyAndOrderFront:nil];
+  if (_preview == nil)
+    _preview = [[RDLPreviewWindow alloc] initWithContext:_context];
+  [_preview show];
 }
 
 // The bar draws icons rather than labels, so each pane gets a lettered badge
@@ -686,6 +891,20 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _reportInspector.showsReportOnly = YES;
   RDLFillHost(_reportInspectorHost, _reportInspector);
 
+  // How the tablix being worked in groups, under the canvas where the region
+  // it is about is.
+  _groupsView = [[RDLGroupsView alloc] initWithFrame:[_groupsHost bounds] context:_context];
+  RDLFillHost(_groupsHost, _groupsView);
+
+  // Every property of what is selected, for the ones the inspector has no
+  // field for.
+  _propertiesView = [[RDLPropertiesView alloc] initWithFrame:[_propertiesHost bounds] context:_context];
+  RDLFillHost(_propertiesHost, _propertiesView);
+
+  // What is wrong with the whole report, beside the ways into it.
+  _problemsView = [[RDLProblemsView alloc] initWithFrame:[_problemsHost bounds] context:_context];
+  RDLFillHost(_problemsHost, _problemsView);
+
   _datasetNavigator = [[RDLDatasetNavigator alloc] initWithFrame:[_datasetNavigatorHost bounds]
                                                          context:_context];
   _datasetNavigator.delegate = self;
@@ -736,18 +955,9 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
   RDLFillHost(_paletteHost, _palette);
 
-  // The source pane's text view and its scrollers are in the XIB. What is set
-  // here is not layout: the pane shows what the report would be written as,
-  // read-only for now -- editing it means parsing the result and deciding what
-  // to do when it does not parse, which is its own piece of work -- and source
-  // is read in a fixed pitch, in lines that are as long as they are rather than
-  // wrapped.
-  [_sourceText setEditable:NO];
-  [_sourceText setRichText:NO];
-  [_sourceText setFont:[NSFont userFixedPitchFontOfSize:11] ?: [NSFont systemFontOfSize:11]];
-  [[_sourceText textContainer] setWidthTracksTextView:NO];
-  [[_sourceText textContainer] setContainerSize:NSMakeSize(CGFLOAT_MAX, CGFLOAT_MAX)];
-  [_sourceText setHorizontallyResizable:YES];
+  _sourceView = [[RDLSourceView alloc] initWithFrame:[_sourceHost bounds] context:_context];
+  RDLFillHost(_sourceHost, _sourceView);
+  _sourceView.live = [self sourceIsVisible];
   [self reloadPanes];
 }
 
@@ -760,27 +970,18 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_parameterNavigator reload];
   [_parameterInspector showParameter:_parameterInspector.parameter];
   [_palette reload];
-  // The source is written when it is being looked at, not on every edit.
-  // Serialising the whole report to answer a change nobody can see is waste on
-  // any platform; on GNUstep it is worse than waste, because building and
-  // discarding an NSXMLDocument repeatedly damages the heap there -- see
+  // The source pane follows the report on its own, and writes it out only
+  // when it is the pane being looked at. Serialising the whole report to
+  // answer a change nobody can see is waste on any platform; on GNUstep it is
+  // worse than waste, because building and discarding an NSXMLDocument
+  // repeatedly damages the heap there -- see
   // Patches/gnustep-patch-repros/empty-loop.m, which kills a process in six
-  // rounds with no RDLKit UI in it at all. Doing it only when the pane is in
-  // front takes the fault off the path of every edit.
-  _sourceNeedsRewrite = YES;
-  [self rewriteSourceIfVisible];
+  // rounds with no RDLKit UI in it at all.
 }
 
 // Index 1 of the centre tabs is the source; 0 is the canvas and 2 the dataset.
 - (BOOL)sourceIsVisible {
   return [_centerTabView indexOfTabViewItem:[_centerTabView selectedTabViewItem]] == 1;
-}
-
-- (void)rewriteSourceIfVisible {
-  if (!_sourceNeedsRewrite || ![self sourceIsVisible])
-    return;
-  _sourceNeedsRewrite = NO;
-  [_sourceText setString:[RDLWriter XMLStringFromReport:_context.report] ?: @""];
 }
 
 // The centre's Dataset tab shows one of the two, never both.
@@ -854,12 +1055,14 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
     @[ @"I", @"Insert", @0.32, @0.60, @0.53 ],
+    @[ @"P", @"Problems", @0.72, @0.42, @0.40 ],
   ]);
   // Report first -- page size and margins, which belong to the document rather
   // than to anything in it -- then the attributes of whatever is selected.
   RDLFillTabBar(_rightTabBar, self, @selector(rightTabChanged:), 1, @[
     @[ @"R", @"Report", @0.47, @0.53, @0.64 ],
     @[ @"A", @"Attributes", @0.36, @0.49, @0.72 ],
+    @[ @"P", @"Properties", @0.36, @0.60, @0.49 ],
   ]);
 }
 
@@ -869,13 +1072,18 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // again" when a dataset was showing.
 - (void)centerModeChanged:(id)sender {
   RDL_UNUSED(sender);
-  [_centerTabView selectTabViewItemAtIndex:[_centerMode selectedSegment] == 1 ? 1 : 0];
-  // Switching to the source is when it gets written.
-  [self rewriteSourceIfVisible];
+  [self showCentreTab:[_centerMode selectedSegment] == 1 ? 1 : 0];
+}
+
+// The one way the centre is switched, so the source pane always learns whether
+// it is the pane being looked at -- which is when it writes the report out.
+- (void)showCentreTab:(NSInteger)index {
+  [_centerTabView selectTabViewItemAtIndex:index];
+  _sourceView.live = [self sourceIsVisible];
 }
 
 - (void)showDatasetPane {
-  [_centerTabView selectTabViewItemAtIndex:2];
+  [self showCentreTab:2];
 }
 
 - (void)rightTabChanged:(id)sender {
@@ -896,6 +1104,10 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 // shows, so there is nothing to bring forward.
 - (void)showAttributesForSelection {
   if (_context.selection.scope == RDLSelectionScopeReport)
+    return;
+  // The properties grid shows the selection too, so there is nothing to bring
+  // forward when it is the tab someone is working in.
+  if ([_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]] == 2)
     return;
   [_rightTabView selectTabViewItemAtIndex:1];
   [_rightTabBar setValue:@1 forKey:@"selectedIndex"];

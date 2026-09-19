@@ -42,6 +42,7 @@ NSString *const RDLReportDocumentType = @"rdl";
     [self setFileType:RDLReportDocumentType];
 
     _paramValues = @{};
+    _multiParamValues = @{};
     [self syncParamValuesFromReport];
   }
   return self;
@@ -99,13 +100,15 @@ NSString *const RDLReportDocumentType = @"rdl";
   return [[self XMLString] dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-// A report's name is the file it lives in, so saving under a new name renames
-// it. NSDocument tells us here rather than in -writeToURL:, which also runs
-// for autosave and for a temporary write.
+// A report that has no name of its own takes the file's, so a new report is
+// not called nothing. One that has a name keeps it: the name is the report's,
+// written in the file and read by `Globals!ReportName`, and saving -- which
+// also happens for autosave and for a temporary write -- used to overwrite a
+// name typed in the inspector with the file's basename.
 - (void)setFileURL:(NSURL *)url {
   [super setFileURL:url];
   NSString *base = [[url lastPathComponent] stringByDeletingPathExtension];
-  if ([base length] && ![base isEqualToString:_report.name]) {
+  if ([base length] && [_report.name length] == 0) {
     _report.name = base;
     [self postChange:[RDLChange reportChange:@[ @"name" ]]];
   }
@@ -132,6 +135,16 @@ NSString *const RDLReportDocumentType = @"rdl";
   self.dirty = NO;
   [self syncParamValuesFromReport];
   [self postChange:[RDLChange changeWithScope:RDLChangeScopeReport]];
+}
+
+- (void)takeReport:(RDLReport *)report {
+  if (report == nil || report == _report)
+    return;
+  _report = report;
+  // The parameters a preview is run with belong to the report, so a report
+  // typed out afresh brings its own; the file, undo and dirty are untouched
+  // because this is an edit of the open document, not another document.
+  [self syncParamValuesFromReport];
 }
 
 // Reading into a document that already exists, rather than making one. The
@@ -176,15 +189,41 @@ NSString *const RDLReportDocumentType = @"rdl";
 
 #pragma mark - Parameters and data
 
+// A newly loaded report has been given no values: its parameters have their
+// defaults, which the report works out -- an expression's by evaluating it,
+// not as the text of its source.
 - (void)syncParamValuesFromReport {
-  NSMutableDictionary *pv = [NSMutableDictionary dictionary];
-  for (RDLParameter *p in _report.parameters) {
-    // The binding is text the user can edit, so an expression default seeds
-    // the field with its source rather than a value nothing could reproduce.
-    if ([p.name length])
-      pv[p.name] = [p.defaultValue source] ?: @"";
-  }
-  _paramValues = pv;
+  _paramValues = @{};
+  _multiParamValues = @{};
+}
+
+- (NSDictionary<NSString *, id> *)suppliedParameters {
+  NSMutableDictionary<NSString *, id> *supplied = [NSMutableDictionary dictionaryWithDictionary:_paramValues ?: @{}];
+  [supplied addEntriesFromDictionary:_multiParamValues ?: @{}];
+  return supplied;
+}
+
+// Evaluating the data sources as it goes: a parameter's list may come from a
+// query that reads the parameters before it.
+- (RDLParameterValues *)parameterValues {
+  return [[[RDLDataEvaluation alloc] initWithReport:_report binder:[self dataBinder]] evaluateWithParameters:[self suppliedParameters]
+                                                                                                environment:nil];
+}
+
+- (RDLDataBinder *)dataBinder {
+  RDLDataBinder *binder = [[RDLDataBinder alloc] initWithBaseURL:[self baseURL]];
+  binder.allowsRemoteDocuments = self.fetchesRemoteDocuments;
+  return binder;
+}
+
+// A parameter's value is in one of the two dictionaries, so giving it in one
+// takes it out of the other.
+static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
+  if (values[key] == nil)
+    return values;
+  NSMutableDictionary *without = [values mutableCopy];
+  [without removeObjectForKey:key];
+  return without;
 }
 
 - (void)setParamValue:(NSString *)value forName:(NSString *)name {
@@ -193,6 +232,24 @@ NSString *const RDLReportDocumentType = @"rdl";
   NSMutableDictionary *pv = [_paramValues mutableCopy] ?: [NSMutableDictionary dictionary];
   pv[name] = value ?: @"";
   _paramValues = pv;
+  _multiParamValues = RDLWithoutKey(_multiParamValues, name);
+  [self parameterValuesDidChange];
+}
+
+- (void)setParamValues:(NSArray<NSString *> *)values forName:(NSString *)name {
+  if ([name length] == 0)
+    return;
+  NSMutableDictionary *pv = [_multiParamValues mutableCopy] ?: [NSMutableDictionary dictionary];
+  pv[name] = [values copy] ?: @[];
+  _multiParamValues = pv;
+  _paramValues = RDLWithoutKey(_paramValues, name);
+  [self parameterValuesDidChange];
+}
+
+- (void)parameterValuesDidChange {
+  // A query that reads the parameter reads the new value before anything is
+  // shown with it.
+  [self parameterValues];
   // A preview binding, not a document edit: publish but do not dirty.
   [self postChange:[RDLChange dataChange]];
 }
@@ -204,10 +261,15 @@ NSString *const RDLReportDocumentType = @"rdl";
   RDLDataBinder *binder = [[RDLDataBinder alloc]
       initWithBaseURL:[self baseURL]];
   binder.allowsRemoteDocuments = fetchRemote;
+  self.fetchesRemoteDocuments = fetchRemote;
   BOOL ok = [binder bindReport:_report error:error];
+  // The sources that read the parameters, for the values given so far.
+  RDLDataEvaluation *evaluation = [[RDLDataEvaluation alloc] initWithReport:_report binder:binder];
+  [evaluation evaluateWithParameters:[self suppliedParameters] environment:nil];
   // A subreport is data too, in the sense that matters here: nothing shows
   // until its definition has been found and its own sources read.
   NSMutableArray *all = [[binder notes] mutableCopy] ?: [NSMutableArray array];
+  [all addObjectsFromArray:evaluation.notes];
   [all addObjectsFromArray:[self loadSubreports]];
   if (notes)
     *notes = all;
@@ -298,18 +360,58 @@ NSString *const RDLReportDocumentType = @"rdl";
   return [base stringByAppendingPathExtension:backend.pathExtension];
 }
 
+// Printing is NSDocument's, which is how the File menu, Cmd-P and the print
+// panel all reach it. The report is laid out into a view of its own for the
+// occasion -- the preview's view belongs to the preview window, which may not
+// be open -- with its subreports found first, as any render needs.
+// The keys are NSPrintInfo's own; spelt as strings because GNUstep has no
+// NSPrintInfoAttributeKey and on macOS that name is a typedef of NSString.
+- (NSPrintOperation *)printOperationWithSettings:(NSDictionary<NSString *, id> *)settings
+                                           error:(NSError **)error {
+  RDL_UNUSED(error);
+  [self loadSubreports];
+  RDLView *view = [[RDLView alloc] initWithFrame:NSZeroRect];
+  view.report = _report;
+  view.paramValues = [self suppliedParameters];
+  view.documentBinder = [self dataBinder];
+  [view reloadLayout];
+  NSPrintInfo *from = [self printInfo] ?: [NSPrintInfo sharedPrintInfo];
+  NSPrintInfo *info = [[NSPrintInfo alloc] initWithDictionary:[from dictionary] ?: @{}];
+  if ([settings count])
+    [[info dictionary] addEntriesFromDictionary:settings];
+  return [view printOperationWithPrintInfo:info];
+}
+
 - (NSData *)exportDataUsingBackend:(id<RDLBackend>)backend {
   if (backend == nil)
     return nil;
   [self loadSubreports];
+  // External images are read as the data is: beside the report, and remote
+  // ones only if reading the data was allowed to fetch them.
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.documentBinder = [self dataBinder];
   return [RDLGenerator renderReport:_report
-                         parameters:_paramValues
-                       usingBackend:backend];
+                         parameters:[self suppliedParameters]
+                       usingBackend:backend
+                        environment:environment];
 }
 
 - (BOOL)exportUsingBackend:(id<RDLBackend>)backend
                      toURL:(NSURL *)url
                      error:(NSError **)error {
+  // What a report server would refuse to render, this refuses to export.
+  NSArray<RDLParameterValue *> *refused = [[self parameterValues] problems];
+  if ([refused count]) {
+    if (error) {
+      NSMutableArray<NSString *> *reasons = [NSMutableArray array];
+      for (RDLParameterValue *value in refused)
+        [reasons addObject:value.problemDescription ?: @""];
+      *error = [NSError errorWithDomain:@"RDLDocument" code:4 userInfo:@{
+        NSLocalizedDescriptionKey : [reasons componentsJoinedByString:@"\n"]
+      }];
+    }
+    return NO;
+  }
   NSData *data = [self exportDataUsingBackend:backend];
   if (data == nil || url == nil) {
     if (error)

@@ -59,6 +59,20 @@
   return [RDLLayoutEngine pagesForReport:report paramValues:params userLanguage:userLanguage];
 }
 
++ (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
+                                   parameters:(NSDictionary<NSString *, NSString *> *)params
+                                  environment:(RDLRenderEnvironment *)environment {
+  return [RDLLayoutEngine pagesForReport:report paramValues:params environment:environment];
+}
+
++ (RDLRenderFormat)renderFormatForBackend:(id<RDLBackend>)backend {
+  if ([backend.name caseInsensitiveCompare:@"PDF"] == NSOrderedSame)
+    return RDLRenderFormatPDF;
+  if ([backend.name caseInsensitiveCompare:@"HTML"] == NSOrderedSame)
+    return RDLRenderFormatHTML;
+  return RDLRenderFormatUnspecified;
+}
+
 + (NSArray<id<RDLBackend>> *)backends {
   return @[ [[RDLPDFBackend alloc] init], [[RDLHTMLBackend alloc] init] ];
 }
@@ -89,7 +103,24 @@
               parameters:(NSDictionary<NSString *, NSString *> *)params
              usingBackend:(id<RDLBackend>)backend
             userLanguage:(NSString *)userLanguage {
-  NSArray *pages = [self pagesForReport:report parameters:params userLanguage:userLanguage];
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.userLanguage = userLanguage;
+  return [self renderReport:report parameters:params usingBackend:backend environment:environment];
+}
+
++ (NSData *)renderReport:(RDLReport *)report
+              parameters:(NSDictionary<NSString *, NSString *> *)params
+             usingBackend:(id<RDLBackend>)backend
+             environment:(RDLRenderEnvironment *)environment {
+  if (backend == nil)
+    backend = [self backendNamed:@"PDF"];
+  RDLRenderEnvironment *rendering = [[RDLRenderEnvironment alloc] init];
+  rendering.userLanguage = environment.userLanguage;
+  rendering.userID = environment.userID;
+  rendering.documentBinder = environment.documentBinder;
+  rendering.renderFormat = environment.renderFormat != RDLRenderFormatUnspecified ? environment.renderFormat
+                                                                                  : [self renderFormatForBackend:backend];
+  NSArray *pages = [self pagesForReport:report parameters:params environment:rendering];
   return [self renderPages:pages title:report.name ?: @"Report" usingBackend:backend];
 }
 
@@ -100,7 +131,9 @@
 
 + (NSString *)HTMLStringForReport:(RDLReport *)report
                        parameters:(NSDictionary<NSString *, NSString *> *)params {
-  NSArray *pages = [self pagesForReport:report parameters:params];
+  RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+  environment.renderFormat = RDLRenderFormatHTML;
+  NSArray *pages = [self pagesForReport:report parameters:params environment:environment];
   return [RDLHTMLBackend HTMLStringForPages:pages title:report.name ?: @"Report"];
 }
 

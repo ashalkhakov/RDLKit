@@ -7,9 +7,10 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = RDLDesignerTests
 
-# The app's plain objects are compiled in directly: the test target holds the
-# editing logic, not the window shell, which is why RDLAppDelegate and the
-# window controllers are absent.
+# The app's objects are compiled in directly, so the checks can drive the same
+# classes the app runs. Only main.m is left out -- its main() would collide
+# with the test runner's -- so the window controllers and app delegate the
+# window checks exercise are all present.
 RDLDesignerTests_OBJC_FILES = \
   RDLEditingCoreTests.m \
   RDLCanvasTests.m \
@@ -25,6 +26,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLDocument.m \
   ../RDLDesigner/RDLEditingContext.m \
   ../RDLDesigner/RDLEditor.m \
+  ../RDLDesigner/RDLTablixStructure.m \
   ../RDLDesigner/RDLExpressionHelper.m \
   ../RDLDesigner/RDLInspectorFields.m \
   ../RDLDesigner/RDLItemFactory.m \
@@ -32,6 +34,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLNewReportPanel.m \
   ../RDLDesigner/RDLPageGeometry.m \
   ../RDLDesigner/RDLRichTextCodec.m \
+  ../RDLDesigner/RDLPlainTextEdit.m \
   ../RDLDesigner/RDLRichTextFormatter.m \
   ../RDLDesigner/RDLSamples.m \
   ../RDLDesigner/RDLSelection.m \
@@ -41,6 +44,23 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLExpressionCell.m \
   ../RDLDesigner/RDLExpressionField.m \
   ../RDLDesigner/RDLFilterEditor.m \
+  ../RDLDesigner/RDLSortEditor.m \
+  ../RDLDesigner/RDLValueListEditor.m \
+  ../RDLDesigner/RDLEmbeddedImages.m \
+  ../RDLDesigner/RDLEmbeddedImagesEditor.m \
+  ../RDLDesigner/RDLDatasetOptionsEditor.m \
+  ../RDLDesigner/RDLVariablesEditor.m \
+  ../RDLDesigner/RDLCodeEditor.m \
+  ../RDLDesigner/RDLStylePanel.m \
+  ../RDLDesigner/RDLPreviewWindow.m \
+  ../RDLDesigner/RDLGroupsView.m \
+  ../RDLDesigner/RDLProblemsView.m \
+  ../RDLDesigner/RDLPropertiesView.m \
+  ../RDLDesigner/RDLSourceView.m \
+  ../RDLDesigner/RDLSnapGuides.m \
+  ../RDLDesigner/RDLChartAxisEditor.m \
+  ../RDLDesigner/RDLChartSeriesEditor.m \
+  ../RDLDesigner/RDLGroupPropertiesEditor.m \
   ../RDLDesigner/RDLToolbarIcons.m \
   ../RDLDesigner/RDLPane.m \
   ../RDLDesigner/RDLExpressionTheme.m \
@@ -59,11 +79,19 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
   ../RDLDesigner/RDLFieldInspectorView.m \
   ../RDLDesigner/RDLDatasetFieldsView.m \
-  ../RDLDesigner/RDLTablixEditor.m
+  ../RDLDesigner/RDLGeneratorWindow.m \
+  ../RDLDesigner/RDLParameterNavigator.m \
+  ../RDLDesigner/RDLDataSourceNavigator.m \
+  ../RDLDesigner/RDLDataSourceView.m \
+  ../RDLDesigner/RDLParameterInspectorView.m \
+  ../RDLDesigner/RDLBordersEditor.m \
+  ../RDLDesigner/RDLSubreportParametersEditor.m \
+  ../RDLDesigner/RDLAppDelegate.m \
+  ../RDLDesigner/RDLWelcomeWindow.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
 # Xcode resolves through its header map and gnustep-make has no equivalent for.
-RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLDesigner \
+RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB -I../RDLDesigner \
                                 -I../RDLDesigner/ThirdParty/DMTabBar
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesignerTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
@@ -75,14 +103,39 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLDesignerWindow.xib \
   ../RDLDesigner/RDLInspectorSections.xib \
   ../RDLDesigner/RDLFilterEditor.xib \
+  ../RDLDesigner/RDLSortEditor.xib \
+  ../RDLDesigner/RDLValueListEditor.xib \
+  ../RDLDesigner/RDLEmbeddedImagesEditor.xib \
+  ../RDLDesigner/RDLDatasetOptionsEditor.xib \
+  ../RDLDesigner/RDLVariablesEditor.xib \
+  ../RDLDesigner/RDLCodeEditor.xib \
+  ../RDLDesigner/RDLStylePanel.xib \
+  ../RDLDesigner/RDLPreviewWindow.xib \
+  ../RDLDesigner/RDLGroupsView.xib \
+  ../RDLDesigner/RDLProblemsView.xib \
+  ../RDLDesigner/RDLPropertiesView.xib \
+  ../RDLDesigner/RDLSourceView.xib \
+  ../RDLDesigner/RDLChartAxisEditor.xib \
+  ../RDLDesigner/RDLChartSeriesEditor.xib \
+  ../RDLDesigner/RDLGroupPropertiesEditor.xib \
+  ../RDLDesigner/RDLBordersEditor.xib \
   ../RDLDesigner/RDLDatasetNavigator.xib \
   ../RDLDesigner/RDLInsertPalette.xib \
   ../RDLDesigner/RDLDatasetFieldsView.xib \
   ../RDLDesigner/RDLFieldInspectorView.xib \
   ../RDLDesigner/RDLExpressionEditor.xib \
   ../RDLDesigner/RDLRichTextEditor.xib \
-  ../RDLDesigner/RDLTablixEditor.xib \
-  ../RDLDesigner/RDLNewReportPanel.xib
+  ../RDLDesigner/RDLNewReportPanel.xib \
+  ../RDLDesigner/RDLDataSourceNavigator.xib \
+  ../RDLDesigner/RDLParameterNavigator.xib \
+  ../RDLDesigner/RDLParameterInspectorView.xib \
+  ../RDLDesigner/RDLDataSourceView.xib \
+  ../RDLDesigner/RDLSubreportParametersEditor.xib \
+  ../RDLDesigner/RDLGeneratorWindow.xib \
+  ../RDLDesigner/RDLWelcomeWindow.xib \
+  ../RDLDesigner/RDLAddElementPanel.xib \
+  ../RDLDesigner/MainMenu.xib \
+  ../RDLDesigner/Samples
 
 # Heap corruption does not name itself: "malloc_consolidate(): unaligned
 # fastbin chunk" is reported by whichever allocation happens to notice, long
