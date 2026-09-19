@@ -2612,42 +2612,25 @@ static NSTabView *_centerTabViewOf(id wc) {
   for (RDLItem *item in report.body.items)
     if ([item isKindOfClass:[RDLTablix class]])
       tablix = (RDLTablix *)item;
-  RDLPageGeometry *geometry = [RDLPageGeometry geometryForReport:report
-paperOrigin:NSMakePoint(0, 0)];
-  NSRect rect = NSZeroRect;
-  if (![geometry findRectOfItem:tablix rect:&rect]) {
-    XCTFail(@"%@", @"the tablix should have a rect");
-    return;
-  }
   // The band belongs to the region being worked in, so the region is selected
   // before anything is drawn -- an unselected tablix draws its cells and
   // nothing else.
   [ctx.selection selectItem:tablix inBandWithKey:@"body"];
   NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
-  NSBitmapImageRep *bitmap =
-      [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
-                                              pixelsWide:(NSInteger)size.width
-                                              pixelsHigh:(NSInteger)size.height
-                                           bitsPerSample:8
-                                         samplesPerPixel:4
-                                                hasAlpha:YES
-                                                isPlanar:NO
-                                          colorSpaceName:NSCalibratedRGBColorSpace
-                                             bytesPerRow:0
-                                            bitsPerPixel:0];
-  [NSGraphicsContext saveGraphicsState];
-  [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap]];
-  // The canvas is a flipped view and a bitmap is not, so the drawing is turned
-  // over to match -- otherwise every pixel read here is from somewhere else.
-  NSAffineTransform *flip = [NSAffineTransform transform];
-  [flip translateXBy:0 yBy:size.height];
-  [flip scaleXBy:1 yBy:-1];
-  [flip concat];
-  RDLCanvasRenderer *renderer = [[RDLCanvasRenderer alloc] initWithContext:ctx];
-  [renderer drawGeometry:geometry
-                 overlay:[[RDLCanvasOverlay alloc] init]
-                  bounds:NSMakeRect(0, 0, size.width, size.height)];
-  [NSGraphicsContext restoreGraphicsState];
+  // Rendered through the canvas view itself, and read against the geometry that
+  // view drew with, so the pixels line up with where the tablix landed. (An
+  // earlier version drove the renderer into a hand-made bitmap context; that
+  // path crashed GNUstep's gstate stack, and RDLRenderViewRegion is the same
+  // draw the other canvas checks use.)
+  RDLCanvasView *view =
+      [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) context:ctx];
+  RDLPageGeometry *geometry = [view geometry];
+  NSRect rect = NSZeroRect;
+  if (![geometry findRectOfItem:tablix rect:&rect]) {
+    XCTFail(@"%@", @"the tablix should have a rect");
+    return;
+  }
+  NSBitmapImageRep *bitmap = RDLRenderViewRegion(view, [view bounds]);
 
   // The band runs the whole width above the grid, so what it is compared
   // against is the page itself: the canvas paints paper #f6f1e8, and a band

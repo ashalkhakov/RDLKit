@@ -2152,8 +2152,7 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
   // And drawn where they are.
   NSSize size = [RDLPageGeometry canvasSizeForReport:report zoom:1.0];
   RDLCanvasView *view = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, size.width, size.height) context:ctx];
-  NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:[view bounds]];
-  [view cacheDisplayInRect:[view bounds] toBitmapImageRep:rep];
+  NSBitmapImageRep *rep = RDLRenderViewRegion(view, [view bounds]);
   if (rep == nil)
     XCTFail(@"%@", @"the canvas should draw a report with nested regions");
 }

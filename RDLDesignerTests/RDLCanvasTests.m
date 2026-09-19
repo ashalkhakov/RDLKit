@@ -94,12 +94,9 @@
     // A thin strip a little way down the paper, so the scan crosses its left
     // edge rather than the empty canvas above it.
     NSRect strip = NSMakeRect(0, origin.y * zoom + 20, MIN(400.0, size.width), 4);
-    NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:strip];
-    // -cacheDisplayInRect:toBitmapImageRep: rather than a context set up here:
-    // it is what puts the view's coordinates onto a bitmap that starts
-    // somewhere other than the view's own origin. Drawing into a context made
-    // by hand does not, and the strip came back empty.
-    [view cacheDisplayInRect:strip toBitmapImageRep:rep];
+    // Renders `strip` of the view to a bitmap, the same on Cocoa and GNUstep;
+    // see RDLRenderViewRegion for why the two platforms take different routes.
+    NSBitmapImageRep *rep = RDLRenderViewRegion(view, strip);
 
     NSInteger edge = -1;
     for (NSInteger x = 0; x < [rep pixelsWide] && edge < 0; x++)
@@ -157,8 +154,7 @@
     // A tall, narrow strip down from the line's top-left. A line running down
     // inks nearly every row of it; one running across inks only the first few.
     NSRect strip = NSMakeRect(NSMinX(lineRect) - 6, NSMinY(lineRect), 12, 60);
-    NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:strip];
-    [view cacheDisplayInRect:strip toBitmapImageRep:rep];
+    NSBitmapImageRep *rep = RDLRenderViewRegion(view, strip);
 
     NSInteger inked = 0;
     for (NSInteger row = 0; row < [rep pixelsHigh]; row++)

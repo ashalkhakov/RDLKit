@@ -133,6 +133,8 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLSubreportParametersEditor.xib \
   ../RDLDesigner/RDLGeneratorWindow.xib \
   ../RDLDesigner/RDLWelcomeWindow.xib \
+  ../RDLDesigner/RDLAddElementPanel.xib \
+  ../RDLDesigner/MainMenu.xib \
   ../RDLDesigner/Samples
 
 # Heap corruption does not name itself: "malloc_consolidate(): unaligned

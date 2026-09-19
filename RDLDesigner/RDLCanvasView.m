@@ -403,14 +403,17 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
 
 // Arrange: which way each command moves the selection among what it is
 // stacked with.
+// sel_isEqual, not ==: a method's own _cmd is a typed selector on GNUstep and
+// an @selector() literal is untyped, so pointer comparison misses even when the
+// names match. sel_isEqual compares by name and is correct on both runtimes.
 static RDLStackingMove RDLStackingMoveForAction(SEL action) {
-  if (action == @selector(bringToFront:))
+  if (sel_isEqual(action, @selector(bringToFront:)))
     return RDLStackingMoveToFront;
-  if (action == @selector(bringForward:))
+  if (sel_isEqual(action, @selector(bringForward:)))
     return RDLStackingMoveForward;
-  if (action == @selector(sendBackward:))
+  if (sel_isEqual(action, @selector(sendBackward:)))
     return RDLStackingMoveBackward;
-  if (action == @selector(sendToBack:))
+  if (sel_isEqual(action, @selector(sendToBack:)))
     return RDLStackingMoveToBack;
   return RDLStackingMoveUnspecified;
 }
@@ -438,35 +441,35 @@ static RDLStackingMove RDLStackingMoveForAction(SEL action) {
 // Lining up, sizing and spreading out what is selected: which command means
 // which, in one place, so the actions below and the menu validation agree.
 static RDLAlignEdge RDLAlignEdgeForAction(SEL action) {
-  if (action == @selector(alignLeftEdges:))
+  if (sel_isEqual(action, @selector(alignLeftEdges:)))
     return RDLAlignEdgeLeft;
-  if (action == @selector(alignHorizontalCenters:))
+  if (sel_isEqual(action, @selector(alignHorizontalCenters:)))
     return RDLAlignEdgeHorizontalCenter;
-  if (action == @selector(alignRightEdges:))
+  if (sel_isEqual(action, @selector(alignRightEdges:)))
     return RDLAlignEdgeRight;
-  if (action == @selector(alignTopEdges:))
+  if (sel_isEqual(action, @selector(alignTopEdges:)))
     return RDLAlignEdgeTop;
-  if (action == @selector(alignVerticalCenters:))
+  if (sel_isEqual(action, @selector(alignVerticalCenters:)))
     return RDLAlignEdgeVerticalCenter;
-  if (action == @selector(alignBottomEdges:))
+  if (sel_isEqual(action, @selector(alignBottomEdges:)))
     return RDLAlignEdgeBottom;
   return RDLAlignEdgeUnspecified;
 }
 
 static RDLSizeMatch RDLSizeMatchForAction(SEL action) {
-  if (action == @selector(makeSameWidth:))
+  if (sel_isEqual(action, @selector(makeSameWidth:)))
     return RDLSizeMatchWidth;
-  if (action == @selector(makeSameHeight:))
+  if (sel_isEqual(action, @selector(makeSameHeight:)))
     return RDLSizeMatchHeight;
-  if (action == @selector(makeSameSize:))
+  if (sel_isEqual(action, @selector(makeSameSize:)))
     return RDLSizeMatchBoth;
   return RDLSizeMatchUnspecified;
 }
 
 static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
-  if (action == @selector(distributeHorizontally:))
+  if (sel_isEqual(action, @selector(distributeHorizontally:)))
     return RDLDistributeAxisHorizontal;
-  if (action == @selector(distributeVertically:))
+  if (sel_isEqual(action, @selector(distributeVertically:)))
     return RDLDistributeAxisVertical;
   return RDLDistributeAxisUnspecified;
 }
