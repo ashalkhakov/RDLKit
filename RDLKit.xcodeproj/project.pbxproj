@@ -325,6 +325,8 @@
 		69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 100D491C6266FCC1718678EA /* RDLRoundTripTests.m */; };
 		C01C79BD576D3C75B35597A8 /* RDLParameterPrompts.m in Sources */ = {isa = PBXBuildFile; fileRef = 27982D059C03CCE6BCC64AED /* RDLParameterPrompts.m */; };
 		554BCB3E24BC68478B2792A2 /* RDLParameterPrompts.m in Sources */ = {isa = PBXBuildFile; fileRef = 27982D059C03CCE6BCC64AED /* RDLParameterPrompts.m */; };
+		09D910329A1F4BCE8F9BF356 /* RDLOutlineView.m in Sources */ = {isa = PBXBuildFile; fileRef = 2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */; };
+		7FB887BB19BEE1424969CC2B /* RDLOutlineView.m in Sources */ = {isa = PBXBuildFile; fileRef = 2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -676,6 +678,8 @@
 		100D491C6266FCC1718678EA /* RDLRoundTripTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRoundTripTests.m; sourceTree = "<group>"; };
 		27982D059C03CCE6BCC64AED /* RDLParameterPrompts.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLParameterPrompts.m; sourceTree = "<group>"; };
 		DC24CEB7FFE16AF37B23FB6A /* RDLParameterPrompts.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLParameterPrompts.h; sourceTree = "<group>"; };
+		2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLOutlineView.m; sourceTree = "<group>"; };
+		10CA4CA664F2E21963944794 /* RDLOutlineView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLOutlineView.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -911,6 +915,8 @@
 				84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */,
 				27982D059C03CCE6BCC64AED /* RDLParameterPrompts.m */,
 				DC24CEB7FFE16AF37B23FB6A /* RDLParameterPrompts.h */,
+				2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */,
+				10CA4CA664F2E21963944794 /* RDLOutlineView.h */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1457,6 +1463,7 @@
 				9346D5BC55A9CE47D73B2B30 /* RDLPreviewWindow.m in Sources */,
 				4025B2933AAEB9C04A8AB0D7 /* RDLGroupsView.m in Sources */,
 				C01C79BD576D3C75B35597A8 /* RDLParameterPrompts.m in Sources */,
+				09D910329A1F4BCE8F9BF356 /* RDLOutlineView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1541,6 +1548,7 @@
 				C4CCB62E9679B7452F8B4454 /* RDLGroupsView.m in Sources */,
 				69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */,
 				554BCB3E24BC68478B2792A2 /* RDLParameterPrompts.m in Sources */,
+				7FB887BB19BEE1424969CC2B /* RDLOutlineView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

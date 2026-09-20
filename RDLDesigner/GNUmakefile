@@ -22,6 +22,7 @@ RDLDesigner_OBJC_FILES = \
   RDLCanvasInteraction.m \
   RDLDesignerWindow.m \
   RDLOutlineDataSource.m \
+  RDLOutlineView.m \
   RDLGeneratorWindow.m \
   RDLAppDelegate.m \
   RDLSamples.m \

@@ -51,7 +51,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | WIN-02 | Panes keep their width | Widen the window | The sides stay; the centre takes the extra. Drag a divider and it stays where you put it. *Guarded by `testTheWindowsPanesFollowTheWindow`, `testTheWindowWillNotShrinkAPaneAway`* |
 | WIN-03 | The groups pane collapses | View > Row and Column Groups; then double-click its divider; then drag the divider shut | Three ways to the same state; the menu item is ticked while it shows, and it reopens at the height you left it. *Guarded by `testTheGroupsPaneCollapsesAndComesBack`* |
 | WIN-04 | Zoom | ⌘= and ⌘- , and the zoom control | 40% to 400%; the rulers, grid, handles and tablix band all scale with it. *Guarded by `testTheCanvasZoomsToFourHundredPercent`, `testPreviewZoomAndRulers`, `testTheTablixHandleBandScalesWithTheZoom`* |
-| WIN-05 | Grid | View > Toggle Grid | The grid appears and disappears; positions still snap to it either way |
+| WIN-05 | Grid | View > Toggle Grid | The grid appears and disappears, the menu item ticked while it shows; positions still snap to it either way. *Guarded by `testToggleGridSaysWhetherTheGridIsOn`* |
 | WIN-06 | Selecting brings the settings forward | Click an element while the Report tab is showing | The right pane switches to Attributes — except when the Style tab is the one you are working in. *Guarded by `testSelectingAnythingBringsTheAttributesForward`* |
 | WIN-07 | Dark mode | Switch macOS to dark and back | Every pane, panel and the canvas stay readable; no black text on a dark ground |
 
@@ -61,7 +61,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 |---|---|---|---|
 | PAG-01 | Paper and orientation | Report tab > page size | The paper redraws; the body width follows the margins. *Guarded by `testThePaperSectionSetsUpThePage`* |
 | PAG-02 | Margins | Set all four, then one | One margin changes the body width with it, as one undo step. *Guarded by `testThePaperSectionSetsUpThePage`* |
-| PAG-03 | Page header and footer | Add each, set heights, set "print on first/last page" | The bands appear on the canvas and the preview respects where they print. *Guarded by `testThePageHeaderSaysWhereItPrints`* |
+| PAG-03 | Page header and footer | Add each, set heights, set "print on first/last page"; then pick one out in the outline and press Delete | The bands appear on the canvas and the preview respects where they print; Delete takes one off the report, and undo puts it back. *Guarded by `testThePageHeaderSaysWhereItPrints`, `testAPageHeaderIsDeletedAndComesBack`* |
 | PAG-04 | Units | Switch the report between inches and centimetres | Every measurement field in the inspector is shown in the report's unit. *Guarded by `testMeasurementFieldsAreInTheReportsUnit`* |
 | PAG-05 | Page background | Set the page's background colour | The paper draws in it, and it survives a save and reopen |
 
@@ -91,7 +91,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | CAN-08 | Stacking | Edit > Bring Forward / Send to Back on overlapping items | The drawing order changes; ZIndex is written. *Guarded by `testItemsStackByZIndex`* |
 | CAN-09 | Type in a textbox | Double-click one on the canvas | Edit in place; Tab moves on; Escape abandons. *Guarded by `testTextInput`, `testDoubleClickingACellEditsWhatIsInIt`* |
 | CAN-10 | Cut, copy, paste, duplicate | ⌘X ⌘C ⌘V ⌘D on an item, then into a cell | A paste is a deep copy with fresh names, offset so it is not hidden behind the original; into a selected cell it goes in the cell. *Guarded by `testItemTransfer`, `testPastingIntoACellPutsItInTheCell`* |
-| CAN-11 | Delete | Select and press Delete | Gone, and one undo brings it back. Several selected go together |
+| CAN-11 | Delete | Select and press Delete, on the canvas and in the outline, with either delete key | Gone, and one undo brings it back. Several selected go together. *Guarded by `testBothDeleteKeysDeleteWhatIsSelected`* |
 | CAN-12 | Lines | Draw a line, set its slope by its box, give it a border style | The canvas draws it the way its box says it runs. *Guarded by `testTheCanvasDrawsALineTheWayItsBoxSaysItRuns`, `testTheLineSectionEditsTheBorderItIsDrawnWith`* |
 | CAN-13 | What the canvas draws is what renders | Put borders, padding and a background on a textbox; preview it | Canvas and preview agree — both go through the same painters |
 

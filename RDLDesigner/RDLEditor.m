@@ -152,6 +152,21 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   [self noteChange:[RDLChange bandChange:bandKey keys:@[ keyPath ]]];
 }
 
+- (BOOL)removePageSectionWithKey:(NSString *)bandKey {
+  RDLBand *band = [_document.report bandWithKey:bandKey];
+  if (band == nil || [bandKey isEqualToString:@"body"])
+    return NO;
+  if (band.height <= 0 && [band.items count] == 0)
+    return NO;
+  [self beginGroup:@"Delete"];
+  for (RDLItem *item in [band.items copy])
+    [self removeItem:item];
+  [self setValue:@(0) forKeyPath:@"height" ofBandWithKey:bandKey];
+  [self endGroup];
+  [self noteChange:[RDLChange changeWithScope:RDLChangeScopeStructure]];
+  return YES;
+}
+
 - (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath {
   RDLReport *report = _document.report;
   if (report == nil || [keyPath length] == 0)

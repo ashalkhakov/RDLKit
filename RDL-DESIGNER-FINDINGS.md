@@ -30,7 +30,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | DAT-07, DAT-09 | Preview renders without asking for parameter values | **fixed** — the values were asked for, but in a pane of the designer window, which is not where a report is rendered. The preview has the bar a report server puts above the pages: the prompts, on the values the render is using, and View Report to render again with what has been given. The prompts are one view now, shown in both places, so the pane and the bar cannot disagree |
 | INSP-02 | Rename: a name with spaces is refused silently, and an accepted one does not undo | **fixed** — a refused name now says why under the field ("A name holds letters, digits and underscores only — no spaces", or what is already called that); the refusal was a beep, which on GNUstep is nothing at all. The undo half was the inspector not showing changes it had not made itself, fixed with UND-01, and a test now renames, undoes, and reads the field back |
 | INSP-05 | The colour well and the hex field disagree after a manual edit; the edit does not undo | **fixed** — a control written to now brings along the other controls bound to the same property, so the well follows a typed colour and the field follows a picked one, undo included |
-| PAG-03 | A page header or footer cannot be deleted; the outline ignores the delete key | open |
+| PAG-03 | A page header or footer cannot be deleted; the outline ignores the delete key | **fixed** — an outline view maps no key to a command on its own, so Delete over the outline did nothing while the same key over the canvas deleted. The outline answers both delete keys now, and a band picked out and deleted is emptied and loses its height, which is how a report without a header is written. The body is refused: a report is its body |
 | PRB-02 | Clicking a problem starts editing the row | open (GS) |
 | SRC-01 | The source pane is black text on a black ground | open (GS) |
 
@@ -41,13 +41,13 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | PAG-02 | No margin fields | **fixed** — they were there, below the fold: the Report inspector had nowhere to scroll, so anything past the window's height could not be reached. It scrolls now, and so does the dataset-field inspector |
 | PAG-05 | No page background colour | **fixed** — same cause as PAG-02: the field was below the fold in a pane that would not scroll |
 | INSP-06 | No padding fields | **fixed** — they exist, and now live in a Style tab of their own rather than at the bottom of a pane full of everything else |
-| WIN-05 | No preferences, and Toggle Grid has no tick | open |
+| WIN-05 | No preferences, and Toggle Grid has no tick | **half fixed** — Toggle Grid says whether the grid is on, the way a Mac menu does. Found on the way: with nothing in front the View and Edit menu commands did nothing at all, because "the report in front" is the main window's and there are moments when there is no main window; with one report open there is no doubt about which it is. Preferences: still none |
 | — | Lines are always drawn slanted, and are hard to select | **fixed** — three causes, all in our own code: every sample wrote its rules 0.02in high (a real diagonal, in the canvas and in every backend), a new line was inserted the same way, and `-[RDLEditor resizeItem:toWidth:height:]` clamped *every* item's height to 0.02, so any drag re-slanted a flat line. A line is now horizontal or vertical and nothing else: insertion, dragging and the samples. For selection its box is a point thick and the hit test is given four points either side — selection only |
 | — | A tablix cannot be resized as a whole | open |
 | — | A drag handle under another item selects that item instead | open |
 | INS-04 | The drag shows "cannot drop" while dropping works | open |
 | CAN-04 | Holding an arrow key stutters | open |
-| CAN-11 | Delete is Backspace, not Delete | open |
+| CAN-11 | Delete is Backspace, not Delete | **fixed** — the canvas answered the delete character and backspace, and not the forward-delete key a full keyboard marks "Delete". One rule for both keys now, shared by the canvas and the outline |
 | WIN-03 | The groups pane can open too short for its own buttons | open |
 | WIN-04 | Zoom steps are smaller than the zoom control's, so it updates every second press | open |
 

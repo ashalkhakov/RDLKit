@@ -1,4 +1,5 @@
 #import "RDLCanvasInteraction.h"
+#import "RDLOutlineView.h"
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
@@ -424,7 +425,9 @@ static BOOL RDLEventToggles(NSEvent *event) {
       return YES;
     }
   }
-  if ([ch isEqualToString:[NSString stringWithFormat:@"%C", 0x007f]] || [ch isEqualToString:@"\b"]) {
+  // Both delete keys: the one most Mac keyboards mark "delete", and the
+  // forward-delete key a full keyboard marks "Delete", which nothing answered.
+  if (RDLIsDeleteKeyEvent(event)) {
     [_ctx deleteSelectedItem];
     return YES;
   }

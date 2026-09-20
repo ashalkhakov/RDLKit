@@ -962,4 +962,56 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"the lines should go when the mouse comes up");
 }
 
+// A key event as a keyboard sends one, for the two keys that mean delete.
+static NSEvent *RDLKeyDownEvent(unichar c) {
+  NSString *text = [NSString stringWithFormat:@"%C", c];
+  return [NSEvent keyEventWithType:NSKeyDown
+                          location:NSZeroPoint
+                     modifierFlags:0
+                         timestamp:0
+                      windowNumber:0
+                           context:nil
+                        characters:text
+       charactersIgnoringModifiers:text
+                         isARepeat:NO
+                           keyCode:0];
+}
+
+// Both keys that say delete delete. The canvas answered the key most Mac
+// keyboards mark "delete" -- backspace -- and not the forward-delete key a
+// full keyboard marks "Delete", so on one keyboard the key did nothing.
+- (void)testBothDeleteKeysDeleteWhatIsSelected {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Keys"];
+  RDLTextbox * (^box)(NSString *, CGFloat) = ^RDLTextbox *(NSString *name, CGFloat top) {
+    RDLTextbox *b = [[RDLTextbox alloc] init];
+    b.name = name;
+    b.value = name;
+    b.left = 1;
+    b.top = top;
+    b.width = 2;
+    b.height = 0.3;
+    [report.body.items addObject:b];
+    return b;
+  };
+  RDLTextbox *first = box(@"First", 1);
+  RDLTextbox *second = box(@"Second", 2);
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200)
+                                                       context:ctx];
+  [ctx.selection selectItem:first inBandWithKey:@"body"];
+  [canvas keyDown:RDLKeyDownEvent(NSBackspaceCharacter)];
+  if ([report.body.items containsObject:first])
+    XCTFail(@"%@", @"backspace should delete what is selected");
+  [ctx.selection selectItem:second inBandWithKey:@"body"];
+  [canvas keyDown:RDLKeyDownEvent(NSDeleteFunctionKey)];
+  if ([report.body.items containsObject:second])
+    XCTFail(@"%@", @"the key marked Delete should delete it too");
+  // A key that is not a delete key still does not.
+  RDLTextbox *third = box(@"Third", 3);
+  [ctx.selection selectItem:third inBandWithKey:@"body"];
+  [canvas keyDown:RDLKeyDownEvent('x')];
+  if (![report.body.items containsObject:third])
+    XCTFail(@"%@", @"typing x is not deleting");
+}
+
 @end

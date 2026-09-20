@@ -11,6 +11,7 @@
 #import "RDLDesignerTestSupport.h"
 #import "RDLDataSourceNavigator.h"
 #import "RDLAppDelegate.h"
+#import "RDLOutlineView.h"
 #import "RDLDataView.h"
 #import "RDLInsertPalette.h"
 #import "RDLFilterEditor.h"
@@ -63,6 +64,22 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 @interface RDLWindowTests : RDLDesignerTestCase
 @end
 static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
+
+// A key event as a keyboard sends one.
+static NSEvent *RDLKeyDownEventForWindowTests(unichar c) {
+  NSString *text = [NSString stringWithFormat:@"%C", c];
+  return [NSEvent keyEventWithType:NSKeyDown
+                          location:NSZeroPoint
+                     modifierFlags:0
+                         timestamp:0
+                      windowNumber:0
+                           context:nil
+                        characters:text
+       charactersIgnoringModifiers:text
+                         isARepeat:NO
+                           keyCode:0];
+}
+
 
 // Every view inside a pane, in the order they were added. The controls a pane
 // offers are not all its own children any more -- the parameter prompts are a
@@ -2825,6 +2842,83 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"and show the field's own settings");
   if ([attributes indexOfTabViewItem:[attributes selectedTabViewItem]] != 1)
     XCTFail(@"%@", @"with the dataset field pane in front");
+}
+
+// A page header is deleted by picking it out and pressing Delete, and there is
+// no other way to be rid of one: the inspector sets its height, and a height of
+// nothing with something still in it is not a report without a header. Delete
+// over the outline used to do nothing at all, because an outline view maps no
+// key to a command on its own.
+- (void)testAPageHeaderIsDeletedAndComesBack {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Headed"];
+  report.pageHeader.height = 0.5;
+  RDLTextbox *stamp = [[RDLTextbox alloc] init];
+  stamp.name = @"Stamp";
+  stamp.value = @"Quarterly";
+  stamp.left = 0.5;
+  stamp.top = 0.1;
+  stamp.width = 2;
+  stamp.height = 0.25;
+  [report.pageHeader.items addObject:stamp];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  if ([[RDLWriter XMLStringFromReport:report] rangeOfString:@"<PageHeader>"].location == NSNotFound) {
+    XCTFail(@"%@", @"the report should start with a page header in it");
+    return;
+  }
+  // The outline is where a band is picked out, and where the key has to work.
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  if (![[wc valueForKey:@"outline"] isKindOfClass:[RDLOutlineView class]])
+    XCTFail(@"%@", @"the outline should be the one that answers the delete keys");
+  if (!RDLIsDeleteKeyEvent(RDLKeyDownEventForWindowTests(NSDeleteFunctionKey)) ||
+      !RDLIsDeleteKeyEvent(RDLKeyDownEventForWindowTests(NSBackspaceCharacter)) ||
+      RDLIsDeleteKeyEvent(RDLKeyDownEventForWindowTests('q')))
+    XCTFail(@"%@", @"both delete keys mean delete, and q does not");
+
+  [ctx.selection selectBandWithKey:@"pageHeader"];
+  [ctx deleteSelectedItem];
+  if ([report.pageHeader.items count] != 0 || report.pageHeader.height != 0)
+    XCTFail(@"deleting the header should empty it and take its height: %lu items, %g high",
+            (unsigned long)[report.pageHeader.items count], report.pageHeader.height);
+  if ([[RDLWriter XMLStringFromReport:report] rangeOfString:@"<PageHeader>"].location != NSNotFound)
+    XCTFail(@"%@", @"a band with no height and nothing in it is not written");
+
+  // One undo step, not one per item.
+  [[ctx.document undoManager] undo];
+  if ([report.pageHeader.items count] != 1 || report.pageHeader.height != 0.5)
+    XCTFail(@"undo should put the header back as it was: %lu items, %g high",
+            (unsigned long)[report.pageHeader.items count], report.pageHeader.height);
+
+  // The body is not one of these: a report is its body.
+  [ctx.selection selectBandWithKey:@"body"];
+  NSUInteger was = [report.body.items count];
+  [ctx deleteSelectedItem];
+  if ([report.body.items count] != was)
+    XCTFail(@"%@", @"the body cannot be deleted");
+}
+
+// A menu item that turns something on and off says which it is. Toggle Grid
+// had no tick, so the only way to know whether the grid was on was to look at
+// the canvas and guess.
+- (void)testToggleGridSaysWhetherTheGridIsOn {
+  RDLAppDelegate *app = [[RDLAppDelegate alloc] init];
+  RDLDocument *doc = [app openDocumentWithReport:[RDLReport emptyReportNamed:@"Gridded"]];
+  [doc showWindows];
+  [[[[doc windowControllers] firstObject] window] makeKeyAndOrderFront:nil];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:@"Toggle Grid"
+                                                action:@selector(toggleGrid:)
+                                         keyEquivalent:@""];
+  [app validateMenuItem:item];
+  if ([item state] != NSOnState)
+    XCTFail(@"%@", @"a new report shows its grid, so the item is ticked");
+  [app toggleGrid:nil];
+  [app validateMenuItem:item];
+  if ([item state] != NSOffState)
+    XCTFail(@"%@", @"and unticked once the grid is off");
+  [doc close];
 }
 
 // Opening a sample opens it for editing, in a document of its own. It used to

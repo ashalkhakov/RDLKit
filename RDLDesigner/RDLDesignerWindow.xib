@@ -105,7 +105,7 @@
                                                                 <rect key="frame" x="1" y="1" width="203" height="663"/>
                                                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                                 <subviews>
-                                                                    <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLDesignerWindowHeader1" indentationPerLevel="12" outlineTableColumn="outlineNameColumn" id="outline">
+                                                                    <outlineView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="RDLDesignerWindowHeader1" indentationPerLevel="12" outlineTableColumn="outlineNameColumn" id="outline" customClass="RDLOutlineView">
                                                                         <rect key="frame" x="0.0" y="0.0" width="208" height="640"/>
                                                                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                                         <size key="intercellSpacing" width="3" height="2"/>

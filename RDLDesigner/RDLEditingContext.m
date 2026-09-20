@@ -318,6 +318,13 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
 }
 
 - (void)deleteSelectedItem {
+  // A band selected is the band itself: deleting a page header or footer is
+  // the only way to be rid of one, and it is what Delete on its row in the
+  // outline means. The body is not one of these -- a report is its body.
+  if (_selection.scope == RDLSelectionScopeBand) {
+    [_editor removePageSectionWithKey:_selection.bandKey];
+    return;
+  }
   // Everything selected goes, as one step: a box drawn round five things and
   // Delete is one act, and one undo puts them all back.
   NSArray<RDLItem *> *items = _selection.items;

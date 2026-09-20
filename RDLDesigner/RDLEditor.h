@@ -67,6 +67,11 @@ typedef NS_ENUM(NSInteger, RDLStackingMove) {
 - (BOOL)moveItem:(RDLItem *)item inStacking:(RDLStackingMove)move;
 - (BOOL)canMoveItem:(RDLItem *)item inStacking:(RDLStackingMove)move;
 - (void)setValue:(id)value forKeyPath:(NSString *)keyPath ofBandWithKey:(NSString *)bandKey;
+// Takes a page header or footer off the report: what is in it goes and its
+// height goes to nothing, which is how a band that is not there is written --
+// an empty PageHeader in the file is half an inch of blank paper on every
+// page. One undo step, and NO for the body, which a report cannot be without.
+- (BOOL)removePageSectionWithKey:(NSString *)bandKey;
 - (void)setReportValue:(id)value forKeyPath:(NSString *)keyPath;
 
 // Which edge or middle several items are lined up on, and along which axis
