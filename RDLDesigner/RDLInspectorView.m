@@ -182,6 +182,12 @@
   // What -stackBoxes: hides before showing the ones that apply.
   NSArray<NSView *> *_sections;
   BOOL _reloading;
+  // Set while this inspector is writing a field through the editor. The change
+  // comes back as a notification while the write is still on the stack, and
+  // filling the fields again from the model then would fight the cursor.
+  // Anything else that changes the item -- an undo, another pane, the canvas --
+  // arrives with this clear and does reload, which is what makes an undo show.
+  BOOL _applying;
   BOOL _completing; // Cocoa re-posts controlTextDidChange: during complete:
 }
 
@@ -402,7 +408,7 @@
 // reload when the change was not a property edit of what is already shown.
 - (void)documentDidChange:(NSNotification *)note {
   RDLChange *change = [note userInfo][RDLChangeKey];
-  if (change.scope == RDLChangeScopeItem && change.item == [_context selectedItem] &&
+  if (_applying && change.scope == RDLChangeScopeItem && change.item == [_context selectedItem] &&
       [change.keys count] > 0)
     return;
   [self reload];
@@ -1251,6 +1257,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 - (void)changed:(id)sender {
   if (_reloading)
     return;
+  _applying = YES;
+  [self applyChangeFrom:sender];
+  _applying = NO;
+}
+
+- (void)applyChangeFrom:(id)sender {
   RDLEditor *editor = _context.editor;
   RDLSelection *sel = _context.selection;
   RDLItem *it = [_context selectedItem];

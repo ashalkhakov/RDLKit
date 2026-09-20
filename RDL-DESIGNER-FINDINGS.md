@@ -13,7 +13,8 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | PRB-04 | The quarterly ledger reports "kept 2 parts … ChartAxis (2)" and the app dies moments later | **fixed** — the kept parts were live `NSXML` nodes held in the report long after the document they came from; they are plain data now, and the ledger keeps nothing at all, because those axes *are* read. Found on the way: every open-and-save duplicated the chart's axes (2 → 3 → 4), since the file leaves `ChartAxis` unnamed and this kit names it `Primary` |
 | TBL-16 | Filters and the no-rows message are not saved | **next** |
 | GET-03 | A text box shows its expressions in the rich-text editor but plain text in `f(x)` and the inspector field | **next** — the plain paths must not be able to overwrite runs |
-| UND-01, UND-05 | Undo does nothing for an inspector property edit or a rich-text edit | **next** |
+| UND-01 | Undo does nothing for an inspector property edit | **fixed** — the model did go back; the inspector did not, because it skipped every change to the item on show, unable to tell its own writing from anyone else's. It now skips only while it is itself writing, so an undo, the canvas or another pane all reach the fields |
+| UND-05 | Undo does nothing for a rich-text edit | **next** |
 
 ## Broken
 
@@ -28,7 +29,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | DAT-03 | XPaths in an XML data source do not select anything | open |
 | DAT-07, DAT-09 | Preview renders without asking for parameter values | open |
 | INSP-02 | Rename: a name with spaces is refused silently, and an accepted one does not undo | open |
-| INSP-05 | The colour well and the hex field disagree after a manual edit; the edit does not undo | open |
+| INSP-05 | The colour well and the hex field disagree after a manual edit; the edit does not undo | **fixed** — a control written to now brings along the other controls bound to the same property, so the well follows a typed colour and the field follows a picked one, undo included |
 | PAG-03 | A page header or footer cannot be deleted; the outline ignores the delete key | open |
 | PRB-02 | Clicking a problem starts editing the row | open (GS) |
 | SRC-01 | The source pane is black text on a black ground | open (GS) |

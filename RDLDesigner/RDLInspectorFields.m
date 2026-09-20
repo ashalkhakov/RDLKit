@@ -154,12 +154,21 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
 }
 
 - (void)fillFromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
-  for (RDLFieldBinding *b in _bindings) {
+  for (RDLFieldBinding *b in _bindings)
+    [self fill:b fromItem:item band:band report:report];
+}
+
+// One control, from the model. Also used after a write, to bring the controls
+// that show the same property along with the one that was typed into: a
+// colour is a well beside a field, and a colour typed in has to reach the well
+// as surely as one picked reaches the field.
+- (void)fill:(RDLFieldBinding *)b fromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
+  {
     id target = [self targetForBinding:b item:item band:band report:report];
     if (target == nil)
-      continue;
+      return;
     if (!RDLCanReadKeyPath(target, b.keyPath))
-      continue;
+      return;
     id value = [target valueForKeyPath:b.keyPath];
     switch (b.kind) {
       case RDLFieldKindText: {
@@ -249,10 +258,27 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
 
 #pragma mark - UI -> model
 
+// The other controls that show the property just written -- a colour well
+// beside the field that was typed into -- filled from the model, so the pair
+// agrees without waiting for a reload that a live edit deliberately skips.
+- (void)bringAlongControlsSharing:(RDLFieldBinding *)applied
+                             item:(RDLItem *)item
+                             band:(RDLBand *)band
+                           report:(RDLReport *)report {
+  for (RDLFieldBinding *other in _bindings) {
+    if (other == applied || other.control == applied.control || other.scope != applied.scope)
+      continue;
+    if (![other.keyPath isEqualToString:applied.keyPath])
+      continue;
+    [self fill:other fromItem:item band:band report:report];
+  }
+}
+
 - (BOOL)applyControl:(id)control
               editor:(RDLEditor *)editor
                 item:(RDLItem *)item
              bandKey:(NSString *)bandKey {
+  RDLBand *band = [bandKey length] ? [editor.document.report bandWithKey:bandKey] : nil;
   for (RDLFieldBinding *b in _bindings) {
     if (b.control != control)
       continue;
@@ -320,6 +346,7 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
                         forKeyPath:b.keyPath];
             break;
         }
+        [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
         return YES;
       }
       case RDLFieldKindLengthOrExpression: {
@@ -348,6 +375,7 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
             [editor setReportValue:length forKeyPath:b.keyPath];
             break;
         }
+        [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
         return YES;
       }
       case RDLFieldKindValue: {
@@ -391,6 +419,7 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
         [editor setReportValue:value forKeyPath:b.keyPath];
         break;
     }
+    [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
     return YES;
   }
   return NO;

@@ -18,6 +18,61 @@
 @end
 @implementation RDLInspectorTests
 
+// An undo has to show. The inspector used to ignore every change to the item
+// on show -- it could not tell its own writing from anyone else's -- so after
+// ⌘Z the report went back and the fields still read what had been undone,
+// which is indistinguishable from undo not working.
+- (void)testUndoOfAnInspectorEditShowsInTheInspector {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Undoing"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Title";
+  box.value = @"Before";
+  box.left = 1;
+  box.top = 1;
+  box.width = 2;
+  box.height = 0.3;
+  box.style.backgroundColor = @"#ffffff";
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                                context:ctx];
+  [inspector reload];
+
+  // Typed into and committed, the way a field reports itself.
+  NSTextField *value = [inspector valueForKey:@"valueField"];
+  [value setStringValue:@"After"];
+  [inspector changed:value];
+  if (![[box.value description] isEqualToString:@"After"])
+    XCTFail(@"the edit should reach the model, it reads %@", box.value);
+
+  [[ctx.document undoManager] undo];
+  if (![[box.value description] isEqualToString:@"Before"])
+    XCTFail(@"undo should put the value back, it reads %@", box.value);
+  if (![[value stringValue] isEqualToString:@"Before"])
+    XCTFail(@"the field should show what the report now says, it shows %@", [value stringValue]);
+
+  // The same for a colour, where the well and the field have to agree
+  // afterwards as well.
+  NSTextField *colour = [inspector valueForKey:@"colorField"];
+  NSColorWell *well = [inspector valueForKey:@"colorWell"];
+  [colour setStringValue:@"#c0392b"];
+  NSString *wasColour = box.style.color;
+  [inspector changed:colour];
+  if (![box.style.color isEqualToString:@"#c0392b"])
+    XCTFail(@"the colour should reach the model, it is %@", box.style.color);
+  if (![RDLHexFromColor([well color]) isEqualToString:@"#c0392b"])
+    XCTFail(@"the well should show the colour that was typed, it shows %@",
+            RDLHexFromColor([well color]));
+  [[ctx.document undoManager] undo];
+  if (![(box.style.color ?: @"") isEqualToString:wasColour ?: @""])
+    XCTFail(@"undo should put the colour back to %@, it is %@", wasColour, box.style.color);
+  if (![[colour stringValue] isEqualToString:wasColour ?: @""])
+    XCTFail(@"the field should show %@ again, it shows %@", wasColour, [colour stringValue]);
+  if (![RDLHexFromColor([well color]) isEqualToString:wasColour ?: @""])
+    XCTFail(@"and so should the well, it shows %@", RDLHexFromColor([well color]));
+}
+
 - (void)testFieldBinding {
   RDLDocument *doc = [[RDLDocument alloc] initWithReport:[RDLReport emptyReportNamed:@"Fields"]];
   RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
