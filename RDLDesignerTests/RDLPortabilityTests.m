@@ -5,6 +5,7 @@
 #import "DMTabBarItem.h"
 #import "RDLToolbarIcons.h"
 #import "RDLDesignerWindow.h"
+#import "RDLSourceView.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 
@@ -80,6 +81,96 @@
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ has a user font with no size, which "
                                                 @"GNUstep cannot size", file]);
   }
+}
+
+// A text view that says nothing about its colours takes the platform's, and
+// GNUstep's are not Cocoa's: the source pane came out black on black, which is
+// a pane that appears to be empty. Every text view in the designer says what
+// it draws in, and the two are not the same colour.
+- (void)testEveryTextViewSaysWhatItDrawsIn {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLReport emptyReportNamed:@"Read"]];
+  RDLSourceView *source = [[RDLSourceView alloc] initWithFrame:NSMakeRect(0, 0, 600, 400)
+                                                       context:ctx];
+  NSTextView *text = [source valueForKey:@"text"];
+  if (text == nil) {
+    XCTFail(@"%@", @"the source pane should have its text view");
+    return;
+  }
+  if (![text drawsBackground])
+    XCTFail(@"%@", @"a pane that draws no background of its own takes whatever is behind it");
+  NSColor *ink = [[text textColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *paper = [[text backgroundColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (ink == nil || paper == nil) {
+    XCTFail(@"%@", @"the text view should say both its colours");
+    return;
+  }
+  // Not the same colour, which is what "black on black" was.
+  CGFloat difference = fabs([ink redComponent] - [paper redComponent]) +
+                       fabs([ink greenComponent] - [paper greenComponent]) +
+                       fabs([ink blueComponent] - [paper blueComponent]);
+  if (difference < 0.3)
+    XCTFail(@"the text and its ground are the same colour: %@ on %@", ink, paper);
+}
+
+// A column nobody can take an edit from must not be editable. On Cocoa a
+// click in a table selects the row and a second one starts editing, so an
+// editable column that goes nowhere is invisible; on GNUstep the first click
+// starts editing, and clicking a problem to be taken to its cause put the row
+// into a text field instead.
+- (void)testNoTableOffersAnEditNobodyTakes {
+  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
+                            stringByDeletingLastPathComponent]
+                           stringByAppendingPathComponent:@"RDLDesigner"];
+  NSArray<NSString *> *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer
+                                                                                   error:NULL];
+  if ([names count] == 0)
+    return;  // the source tree is not readable here; the other platform's run has it
+  NSUInteger looked = 0;
+  for (NSString *name in names) {
+    if (![[name pathExtension] isEqualToString:@"xib"])
+      continue;
+    NSString *xml = [NSString stringWithContentsOfFile:[designer stringByAppendingPathComponent:name]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    if (xml == nil)
+      continue;
+    // Only a column's data cell is typed into by clicking a row; a text field
+    // of its own is a different thing and is editable on purpose.
+    NSRange editable = [xml rangeOfString:@"key=\"dataCell\""];
+    BOOL offers = NO;
+    while (editable.location != NSNotFound) {
+      NSUInteger end = NSMaxRange(editable);
+      NSRange rest = NSMakeRange(end, MIN((NSUInteger)200, [xml length] - end));
+      NSRange stop = [xml rangeOfString:@">" options:0 range:rest];
+      NSRange cell = NSMakeRange(editable.location,
+                                 (stop.location == NSNotFound ? NSMaxRange(rest) : stop.location) -
+                                     editable.location);
+      if ([xml rangeOfString:@"editable=\"YES\"" options:0 range:cell].location != NSNotFound)
+        offers = YES;
+      NSRange after = NSMakeRange(end, [xml length] - end);
+      editable = [xml rangeOfString:@"key=\"dataCell\"" options:0 range:after];
+    }
+    if (!offers)
+      continue;
+    looked += 1;
+    // Whose table it is: the File's Owner, which is the pane or the panel.
+    NSRange ownerClass = [xml rangeOfString:@"userLabel=\"File's Owner\" customClass=\""];
+    if (ownerClass.location == NSNotFound)
+      continue;
+    NSUInteger from = NSMaxRange(ownerClass);
+    NSRange quote = [xml rangeOfString:@"\"" options:0 range:NSMakeRange(from, [xml length] - from)];
+    NSString *owner = [xml substringWithRange:NSMakeRange(from, quote.location - from)];
+    Class cls = NSClassFromString(owner);
+    if (cls == Nil)
+      continue;
+    if (![cls instancesRespondToSelector:@selector(tableView:setObjectValue:forTableColumn:row:)] &&
+        ![cls instancesRespondToSelector:@selector(outlineView:setObjectValue:forTableColumn:byItem:)])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ offers an editable column and %@ takes no "
+                                                @"edit from it", name, owner]);
+  }
+  if (looked == 0)
+    XCTFail(@"%@", @"nothing was looked at, so this checks nothing");
 }
 
 // API that only Cocoa has. The designer is one source tree for two platforms,
