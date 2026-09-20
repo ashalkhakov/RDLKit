@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <AppKit/AppKit.h>
 
-@class RDLEditingContext, RDLView;
+@class RDLEditingContext, RDLView, RDLParameterPrompts;
 
 // The preview: the report as it will come out, page by page, with the way to
 // walk through it and the way to print it.
@@ -42,4 +42,9 @@
 - (void)goToNextPage:(id)sender;
 - (void)goToLastPage:(id)sender;
 - (void)printReport:(id)sender;
+// What the report is asked for through, above the pages: the prompts a report
+// server would show, and the button that renders again with what has been
+// given. The bar is there only when the report asks for something.
+@property (nonatomic, readonly, strong) RDLParameterPrompts *prompts;
+- (void)viewReport:(id)sender;
 @end

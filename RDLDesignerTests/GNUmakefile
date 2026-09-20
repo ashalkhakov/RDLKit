@@ -73,6 +73,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLInPlaceEditor.m \
   ../RDLDesigner/RDLInspectorView.m \
   ../RDLDesigner/RDLDataView.m \
+  ../RDLDesigner/RDLParameterPrompts.m \
   ../RDLDesigner/RDLOutlineDataSource.m \
   ../RDLDesigner/RDLTabBadge.m \
   ../RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m \

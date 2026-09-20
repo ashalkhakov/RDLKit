@@ -32,6 +32,7 @@ RDLDesigner_OBJC_FILES = \
   RDLNewReportPanel.m \
   RDLRichTextEditor.m \
   RDLDataView.m \
+  RDLParameterPrompts.m \
   RDLWelcomeWindow.m \
   RDLExpressionEditor.m \
   RDLInsertPalette.m \

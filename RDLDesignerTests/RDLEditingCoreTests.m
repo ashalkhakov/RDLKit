@@ -5,6 +5,20 @@
 #import "RDLDocument.h"
 #import "RDLDesignerTestSupport.h"
 
+// Every view inside a pane, in the order they were added. The controls a pane
+// offers are not all its own children any more -- the parameter prompts are a
+// view of their own, shared with the preview's bar -- and what a check wants
+// to know is what the pane offers, not which view holds it.
+static NSArray<NSView *> *RDLEveryViewUnder(NSView *view) {
+  NSMutableArray<NSView *> *found = [NSMutableArray array];
+  for (NSView *v in [view subviews]) {
+    [found addObject:v];
+    [found addObjectsFromArray:RDLEveryViewUnder(v)];
+  }
+  return found;
+}
+
+
 // A grouped-jobs report, mirroring the kit checks' fixture, so the editing
 // checks have a tablix with a row group to work on.
 // A textbox in the body, plus a rectangle holding one child, so the checks can
@@ -1348,7 +1362,7 @@ static RDLReport *RDLGroupedJobs(void) {
 
   // The headings come in the order they are laid out, top first.
   NSMutableArray<NSString *> *headings = [NSMutableArray array];
-  for (NSView *v in [stack subviews]) {
+  for (NSView *v in RDLEveryViewUnder(stack)) {
     if (![v isKindOfClass:[NSTextField class]])
       continue;
     NSString *text = [(NSTextField *)v stringValue];
@@ -1358,7 +1372,7 @@ static RDLReport *RDLGroupedJobs(void) {
   if (![headings isEqualToArray:@[ @"Parameters", @"Data" ]])
     XCTFail(@"%@", [NSString stringWithFormat:@"headings came out as %@", headings]);
   NSTextField *parametersHeading = nil, *dataHeading = nil;
-  for (NSView *v in [stack subviews]) {
+  for (NSView *v in RDLEveryViewUnder(stack)) {
     if (![v isKindOfClass:[NSTextField class]])
       continue;
     if ([[(NSTextField *)v stringValue] isEqualToString:@"Parameters"])
@@ -1372,7 +1386,7 @@ static RDLReport *RDLGroupedJobs(void) {
 
   // And the manifest asks for its season, so the pane offers it.
   BOOL asked = NO;
-  for (NSView *v in [stack subviews])
+  for (NSView *v in RDLEveryViewUnder(stack))
     if ([v isKindOfClass:[NSPopUpButton class]] &&
         [(NSPopUpButton *)v itemWithTitle:@"Summer 2026"] != nil)
       asked = YES;

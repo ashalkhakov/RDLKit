@@ -17,6 +17,7 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
+#import "RDLParameterPrompts.h"
 #import "RDLPreviewWindow.h"
 #import "RDLProblemsView.h"
 #import "RDLGroupsView.h"
@@ -62,6 +63,19 @@ static NSEvent *RDLMouseEventInView(NSView *view, NSPoint point, NSEventType typ
 @interface RDLWindowTests : RDLDesignerTestCase
 @end
 static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
+
+// Every view inside a pane, in the order they were added. The controls a pane
+// offers are not all its own children any more -- the parameter prompts are a
+// view of their own, shared with the preview's bar -- and what a check wants
+// to know is what the pane offers, not which view holds it.
+static NSArray<NSView *> *RDLEveryViewUnder(NSView *view) {
+  NSMutableArray<NSView *> *found = [NSMutableArray array];
+  for (NSView *v in [view subviews]) {
+    [found addObject:v];
+    [found addObjectsFromArray:RDLEveryViewUnder(v)];
+  }
+  return found;
+}
 
 @implementation RDLWindowTests
 
@@ -1267,6 +1281,75 @@ static NSTabView *_centerTabViewOf(id wc) {
 // The preview: the report as it comes out, walked through page by page, with
 // what could not be read said rather than left to be puzzled over, and a print
 // operation that is paginated rather than one tall image.
+// A report server asks for a report's parameters before it renders it, and the
+// preview is where this designer renders: the prompts sit above the pages, on
+// the values the render is using, and what is given there is what comes out.
+// Values used to be given only in a pane of the designer window, which is why
+// a preview of a report that asks for a season rendered without asking.
+- (void)testThePreviewAsksForTheParametersBeforeItRenders {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Asked"];
+  RDLTextbox *shown = [[RDLTextbox alloc] init];
+  shown.name = @"Shown";
+  shown.value = @"=Parameters!Season.Value";
+  shown.left = 0.5;
+  shown.top = 0.5;
+  shown.width = 3;
+  shown.height = 0.3;
+  [report.body.items addObject:shown];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLPreviewWindow *bare = [[RDLPreviewWindow alloc] initWithContext:ctx];
+  [bare refresh];
+  // Nothing to ask for is no bar at all: a report with no parameters looks
+  // exactly as it did.
+  if ([[bare prompts] askedCount] != 0 || ![[bare prompts] isHiddenOrHasHiddenAncestor])
+    XCTFail(@"%@", @"a report that asks for nothing should show no bar");
+  CGFloat wholeHeight = NSHeight([[bare valueForKey:@"scroll"] frame]);
+
+  RDLParameter *season = [[RDLParameter alloc] init];
+  season.name = @"Season";
+  season.prompt = @"Which season?";
+  season.dataType = RDLParameterDataTypeString;
+  season.defaultValue = [RDLValue literal:@"Spring"];
+  [report.parameters addObject:season];
+  RDLPreviewWindow *preview = [[RDLPreviewWindow alloc] initWithContext:ctx];
+  [preview refresh];
+  RDLParameterPrompts *prompts = [preview prompts];
+  if ([prompts askedCount] != 1 || [prompts isHiddenOrHasHiddenAncestor])
+    XCTFail(@"%@", @"the report asks for a season, so the bar should ask for it");
+  NSTextField *asked = nil, *typed = nil;
+  for (NSView *v in RDLEveryViewUnder(prompts)) {
+    if (![v isKindOfClass:[NSTextField class]])
+      continue;
+    if ([[(NSTextField *)v stringValue] isEqualToString:@"Which season?"])
+      asked = (NSTextField *)v;
+    else if ([(NSTextField *)v isEditable])
+      typed = (NSTextField *)v;
+  }
+  if (asked == nil || typed == nil) {
+    XCTFail(@"%@", @"it should be asked for by its prompt, with a box to give it in");
+    return;
+  }
+  // On the value the render is using, not empty.
+  if (![[typed stringValue] isEqualToString:@"Spring"])
+    XCTFail(@"the box should start on the value the report works out, starts on '%@'",
+            [typed stringValue]);
+  // The pages get what the bar does not take.
+  if (NSHeight([[preview valueForKey:@"scroll"] frame]) >= wholeHeight)
+    XCTFail(@"%@", @"the bar should take its height from the pages below it");
+
+  // What is given there is what the render uses.
+  [typed setStringValue:@"Autumn"];
+  [prompts paramChanged:typed];
+  if (![ctx.document.paramValues[@"Season"] isEqualToString:@"Autumn"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the value should reach the document: %@",
+                                              ctx.document.paramValues]);
+  [preview viewReport:nil];
+  if ([[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Spring"] ||
+      ![[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Autumn"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the render should use what was given: %@",
+                                              preview.view.paramValues]);
+}
+
 - (void)testThePreviewWalksThroughThePagesAndPrints {
   RDLReport *report = [RDLReport emptyReportNamed:@"Long"];
   report.page.pageWidth = 8.5;
@@ -2018,7 +2101,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 
   NSMutableArray<NSButton *> *boxes = [NSMutableArray array];
   NSTextView *list = nil;
-  for (NSView *v in [[[pane subviews] firstObject] subviews]) {
+  for (NSView *v in RDLEveryViewUnder(pane)) {
     if ([v isKindOfClass:[NSButton class]])
       [boxes addObject:(NSButton *)v];
     if ([v isKindOfClass:[NSScrollView class]] && [[(NSScrollView *)v documentView] isKindOfClass:[NSTextView class]])
@@ -2390,7 +2473,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   }
   RDLDataView *inputs = [gen valueForKey:@"dataView"];
   NSPopUpButton *season = nil;
-  for (NSView *v in [[[inputs subviews] firstObject] subviews])
+  for (NSView *v in RDLEveryViewUnder(inputs))
     if ([v isKindOfClass:[NSPopUpButton class]])
       season = (NSPopUpButton *)v;
   if (season == nil) {
@@ -2441,7 +2524,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 
   NSPopUpButton *chooser = nil;
   BOOL askedByPrompt = NO;
-  NSArray *stack = [[[pane subviews] firstObject] subviews];
+  NSArray *stack = RDLEveryViewUnder(pane);
   for (NSView *v in stack) {
     if ([v isKindOfClass:[NSPopUpButton class]])
       chooser = (NSPopUpButton *)v;
@@ -2467,7 +2550,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   // that -- destroying the popup mid-click, which is why a choice looked as
   // though it had not taken.
   BOOL sameChooser = NO;
-  for (NSView *v in [[[pane subviews] firstObject] subviews])
+  for (NSView *v in RDLEveryViewUnder(pane))
     if (v == chooser)
       sameChooser = YES;
   if (!sameChooser)
@@ -2484,7 +2567,7 @@ static NSTabView *_centerTabViewOf(id wc) {
   [report.parameters addObject:title];
   [pane reload];
   NSTextField *typed = nil;
-  for (NSView *v in [[[pane subviews] firstObject] subviews])
+  for (NSView *v in RDLEveryViewUnder(pane))
     if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable])
       typed = (NSTextField *)v;
   if (typed == nil) {
@@ -4198,7 +4281,7 @@ paperOrigin:NSMakePoint(0, 0)];
 
   NSMutableArray<NSString *> *texts = [NSMutableArray array];
   NSPopUpButton *chooser = nil;
-  for (NSView *v in [[[pane subviews] firstObject] subviews]) {
+  for (NSView *v in RDLEveryViewUnder(pane)) {
     if ([v isKindOfClass:[NSPopUpButton class]])
       chooser = (NSPopUpButton *)v;
     else if ([v isKindOfClass:[NSTextField class]])
