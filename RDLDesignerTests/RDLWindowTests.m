@@ -3194,6 +3194,81 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"zoom out should reach the minimum again");
 }
 
+// A command that quietly does nothing is worse than one that is not there. A
+// details group groups on nothing, so nothing goes inside it, nothing totals
+// it and it cannot be deleted -- and the pane neither offers those nor lets
+// them fail in silence.
+- (void)testThePaneOffersOnlyWhatCanBeDoneToAGroup {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+  NSOutlineView *outline = [pane valueForKey:@"outline"];
+
+  // The table starts with its details group, which the pane names for what it
+  // is rather than by the name the file gave it.
+  RDLTablixMember *details = [[pane allGroupsOnAxis:RDLTablixAxisRows] firstObject];
+  if (details == nil || [details.groupExpressions count]) {
+    XCTFail(@"%@", @"a plain table's one row group is its details");
+    return;
+  }
+  id<NSOutlineViewDataSource> source = (id<NSOutlineViewDataSource>)pane;
+  NSString *shown = [source outlineView:outline
+              objectValueForTableColumn:[[outline tableColumns] firstObject]
+                                 byItem:details];
+  if (![shown isEqualToString:@"(Details)"])
+    XCTFail(@"the details group should read as what it is, it reads %@", shown);
+
+  // Picked out, the menu offers what can be done to it and nothing else.
+  [pane selectGroup:details axis:RDLTablixAxisRows];
+  NSMenu *menu = [outline menu];
+  [(id<NSMenuDelegate>)pane menuNeedsUpdate:menu];
+  NSMenu *places = [[menu itemWithTitle:@"Add Group"] submenu];
+  if ([places indexOfItemWithTitle:@"Child Group"] >= 0)
+    XCTFail(@"%@", @"nothing goes inside a details group, so it should not be offered");
+  if ([places indexOfItemWithTitle:@"Parent Group"] < 0)
+    XCTFail(@"%@", @"a group can still go round the details, which is how a table is grouped");
+  if ([menu itemWithTitle:@"Add Total"] != nil)
+    XCTFail(@"%@", @"a details group has nothing to total");
+  // Deleting it is offered: a table whose rows are not grouped at all is a
+  // table of one static row, which is a thing a person may want.
+  if ([menu itemWithTitle:@"Delete Group"] == nil)
+    XCTFail(@"%@", @"the details group can go, as Report Builder allows");
+
+  // And what is refused anyway is said, rather than doing nothing at all.
+  [pane addTotalFromMenu:[[NSMenuItem alloc] initWithTitle:@"After" action:NULL keyEquivalent:@""]];
+  if ([pane.heading rangeOfString:@"nothing to total"].location == NSNotFound)
+    XCTFail(@"the pane should say why a details group has no total, it says %@", pane.heading);
+  NSUInteger was = [[pane allGroupsOnAxis:RDLTablixAxisRows] count];
+  if ([pane addGroupWithExpression:@"=Fields!Port.Value" placement:RDLGroupPlacementChild] != nil)
+    XCTFail(@"%@", @"nothing goes inside a details group");
+  if ([pane.heading rangeOfString:@"groups on nothing"].location == NSNotFound)
+    XCTFail(@"the pane should say why nothing went inside it, it says %@", pane.heading);
+  if ([[pane allGroupsOnAxis:RDLTablixAxisRows] count] != was)
+    XCTFail(@"%@", @"and nothing should have happened to the table");
+
+  // A real group takes all of them.
+  [pane selectAxis:RDLTablixAxisRows];
+  RDLTablixMember *region = [pane addGroupWithExpression:@"=Fields!Port.Value"
+                                               placement:RDLGroupPlacementChild];
+  if (region == nil) {
+    XCTFail(@"%@", @"a group should still go round the details");
+    return;
+  }
+  [pane selectGroup:region axis:RDLTablixAxisRows];
+  [(id<NSMenuDelegate>)pane menuNeedsUpdate:menu];
+  for (NSString *wanted in @[ @"Add Total", @"Delete Group" ])
+    if ([menu itemWithTitle:wanted] == nil)
+      XCTFail(@"a group that groups on something should offer %@", wanted);
+  if ([[[menu itemWithTitle:@"Add Group"] submenu] indexOfItemWithTitle:@"Child Group"] < 0)
+    XCTFail(@"%@", @"and a group inside it");
+  NSUInteger rows = [tablix.tablixBody.rows count];
+  [pane addTotalFromMenu:[[[menu itemWithTitle:@"Add Total"] submenu] itemWithTitle:@"After"]];
+  if ([tablix.tablixBody.rows count] <= rows)
+    XCTFail(@"%@", @"a total beside a real group should add a row");
+}
+
 // The groups pane under the canvas collapses, because a report with no table
 // in it has no use for the space, and comes back the height it was.
 - (void)testTheGroupsPaneCollapsesAndComesBack {

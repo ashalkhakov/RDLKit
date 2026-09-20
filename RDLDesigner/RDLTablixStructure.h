@@ -118,6 +118,24 @@ typedef NS_ENUM(NSInteger, RDLGroupPlacement) {
 // that shows it. Returns the new member; nil, changing nothing, when it cannot
 // go there: a child inside a member that groups on nothing, a member that is
 // not in the hierarchy.
+// Whether a group may go there at all, and whether a total may go beside one.
+// A details group groups on nothing, so nothing goes inside it and nothing
+// totals it; a member the hierarchy does not hold takes neither. The pane asks
+// before it offers the command, because a command that quietly does nothing is
+// worse than one that is not there.
++ (BOOL)canAddGroupWithPlacement:(RDLGroupPlacement)placement
+                        toMember:(RDLTablixMember *)member
+                            axis:(RDLTablixAxis)axis
+                        inTablix:(RDLTablix *)tablix;
++ (BOOL)canAddTotalBesideGroup:(RDLTablixMember *)member
+                          axis:(RDLTablixAxis)axis
+                      inTablix:(RDLTablix *)tablix;
+// Whether the group can go, with or without the rows or columns it owns.
++ (BOOL)canDeleteGroup:(RDLTablixMember *)member
+             withLines:(BOOL)withLines
+                  axis:(RDLTablixAxis)axis
+              inTablix:(RDLTablix *)tablix;
+
 + (RDLTablixMember *)addGroupWithExpression:(NSString *)expression
                                   placement:(RDLGroupPlacement)placement
                                    toMember:(RDLTablixMember *)member

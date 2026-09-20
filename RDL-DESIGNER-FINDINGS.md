@@ -21,7 +21,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 |---|---|---|
 | TBL-05 | A column border cannot be dragged to resize | open |
 | TBL-06 | Merge empties the cell to the right instead of merging; split does nothing | open |
-| TBL-08, TBL-09, TBL-12 | Child group, adjacent group and totals do nothing from the pane's menu | open |
+| TBL-08, TBL-09, TBL-12 | Child group, adjacent group and totals do nothing from the pane's menu | **fixed** — they were being offered on the details group, which groups on nothing, so the structure refused them in silence. The pane now offers only what can be done to the row picked out, names that row "(Details)" as Report Builder does, and says why when something is refused anyway |
 | TBL-13 | The pane's buttons (Group Inside, Group Beside, Delete, Properties) do nothing | open |
 | TBL-17 | A field dropped in a list lands beside the group rather than in its cell | open |
 | TBL-19 | A parameter dropped on a full cell replaces what is there instead of wrapping both | open |

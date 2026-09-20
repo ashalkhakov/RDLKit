@@ -668,6 +668,55 @@ static BOOL RDLSpanCrosses(RDLTablix *tablix, NSUInteger left) {
 
 #pragma mark - Groups
 
++ (BOOL)canAddGroupWithPlacement:(RDLGroupPlacement)placement
+                        toMember:(RDLTablixMember *)member
+                            axis:(RDLTablixAxis)axis
+                        inTablix:(RDLTablix *)tablix {
+  RDLTablixHierarchy *hierarchy = [self hierarchyOfTablix:tablix axis:axis];
+  if (!RDLIsConsistent(tablix) || hierarchy == nil || member == nil ||
+      RDLSiblingsOf(member, hierarchy) == nil)
+    return NO;
+  switch (placement) {
+  case RDLGroupPlacementChild:
+    // Inside a static member or a details group there is nothing grouped to go
+    // around.
+    return [member.groupExpressions count] > 0;
+  case RDLGroupPlacementParent:
+  case RDLGroupPlacementBefore:
+  case RDLGroupPlacementAfter:
+    return YES;
+  case RDLGroupPlacementUnspecified:
+    break;
+  }
+  return NO;
+}
+
++ (BOOL)canAddTotalBesideGroup:(RDLTablixMember *)member
+                          axis:(RDLTablixAxis)axis
+                      inTablix:(RDLTablix *)tablix {
+  RDLTablixHierarchy *hierarchy = [self hierarchyOfTablix:tablix axis:axis];
+  return RDLIsConsistent(tablix) && hierarchy != nil && member != nil &&
+         RDLSiblingsOf(member, hierarchy) != nil && [member.groupExpressions count] > 0;
+}
+
++ (BOOL)canDeleteGroup:(RDLTablixMember *)member
+             withLines:(BOOL)withLines
+                  axis:(RDLTablixAxis)axis
+              inTablix:(RDLTablix *)tablix {
+  RDLTablixHierarchy *hierarchy = [self hierarchyOfTablix:tablix axis:axis];
+  NSMutableArray<RDLTablixMember *> *siblings = hierarchy ? RDLSiblingsOf(member, hierarchy) : nil;
+  if (!RDLIsConsistent(tablix) || siblings == nil || [member.groupName length] == 0)
+    return NO;
+  if (!withLines)
+    return YES;
+  // Its lines cannot all be the tablix's, and a group that is the only member
+  // inside another cannot take them either: that would leave the group around
+  // it owning nothing.
+  NSRange range = [hierarchy leafRangeOfMember:member];
+  return range.length < RDLLineCount(tablix, axis) &&
+         !([siblings count] == 1 && siblings != hierarchy.members);
+}
+
 + (RDLTablixMember *)addGroupWithExpression:(NSString *)expression
                                   placement:(RDLGroupPlacement)placement
                                    toMember:(RDLTablixMember *)member
