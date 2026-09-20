@@ -704,8 +704,16 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
   return edge == RDLAlignEdgeTop || edge == RDLAlignEdgeVerticalCenter || edge == RDLAlignEdgeBottom;
 }
 
+- (BOOL)canArrangeItems:(NSArray<RDLItem *> *)items {
+  RDLReport *report = _document.report;
+  for (RDLItem *item in items)
+    if ([report cellContainingItem:item tablix:NULL] != nil)
+      return NO;
+  return [items count] > 0;
+}
+
 - (BOOL)alignItems:(NSArray<RDLItem *> *)items toEdge:(RDLAlignEdge)edge {
-  if ([items count] < 2 || edge == RDLAlignEdgeUnspecified)
+  if ([items count] < 2 || edge == RDLAlignEdgeUnspecified || ![self canArrangeItems:items])
     return NO;
   RDLItem *anchor = [items firstObject];
   CGFloat to = RDLEdgeOf(anchor, edge);
@@ -728,7 +736,7 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
 }
 
 - (BOOL)sizeItems:(NSArray<RDLItem *> *)items like:(RDLSizeMatch)match {
-  if ([items count] < 2 || match == RDLSizeMatchUnspecified)
+  if ([items count] < 2 || match == RDLSizeMatchUnspecified || ![self canArrangeItems:items])
     return NO;
   RDLItem *anchor = [items firstObject];
   [self beginGroup:@"Make Same Size"];
@@ -751,7 +759,7 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
 // are, and the rest are spread between them in the order they lie, not the
 // order they were selected in.
 - (BOOL)distributeItems:(NSArray<RDLItem *> *)items along:(RDLDistributeAxis)axis {
-  if ([items count] < 3 || axis == RDLDistributeAxisUnspecified)
+  if ([items count] < 3 || axis == RDLDistributeAxisUnspecified || ![self canArrangeItems:items])
     return NO;
   BOOL horizontal = axis == RDLDistributeAxisHorizontal;
   NSArray<RDLItem *> *inOrder = [items sortedArrayUsingComparator:^NSComparisonResult(RDLItem *a, RDLItem *b) {

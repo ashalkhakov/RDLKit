@@ -353,7 +353,7 @@
 }
 
 - (void)testInspectorColorBinding {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -452,7 +452,7 @@
 }
 
 - (void)testStyleExpressionBinding {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -513,7 +513,7 @@
 }
 
 - (void)testLengthExpressionBinding {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -559,7 +559,7 @@
 // property like Format, so both directions of both are checked here rather
 // than only that the fields exist.
 - (void)testLanguageBindings {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -613,7 +613,7 @@
 // default all measure in them -- so the conversion happens at the two edges,
 // and this is the test that they agree.
 - (void)testMeasurementFieldsAreInTheReportsUnit {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLItem *item = [report.body.items firstObject];
   item.width = 2.0;  // inches, always
 

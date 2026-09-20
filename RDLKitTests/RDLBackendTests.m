@@ -660,7 +660,11 @@ static NSString *RDLEnt(NSString *name) {
   kt.page.pageWidth = 8.5;
   kt.page.topMargin = 0.5;
   kt.page.bottomMargin = 0.5;
-  // bodyTop = 0.5 + default header 0.55; bodyBottom = 5 - 0.5 - default footer 0.4; avail ≈ 3.05
+  // A head and a foot of its own: a new report has neither, and what this is
+  // about is the room they leave. bodyTop = 0.5 + 0.55; bodyBottom = 5 - 0.5 -
+  // 0.4; avail ≈ 3.05.
+  kt.pageHeader.height = 0.55;
+  kt.pageFooter.height = 0.4;
   RDLTextbox *keep = [[RDLTextbox alloc] init];
   keep.name = @"KeepMe";
   keep.value = @"kept";

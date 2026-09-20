@@ -416,7 +416,7 @@
 // The panels here already used it for Return on the OK button while setting
 // Escape by hand two lines away.
 - (void)testPanelsCarryTheirOwnEscape {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
 
   RDLExpressionEditor *expr = [RDLExpressionEditor editorForSource:@""

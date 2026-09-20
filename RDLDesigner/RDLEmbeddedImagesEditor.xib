@@ -8,9 +8,9 @@
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="RDLEmbeddedImagesEditor">
             <connections>
-                <outlet property="table" destination="table" id="tableOutlet"/>
-                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
                 <outlet property="messageLabel" destination="messageLabel" id="messageLabelOutlet"/>
+                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
+                <outlet property="table" destination="table" id="tableOutlet"/>
                 <outlet property="window" destination="imagesPanel" id="windowOutlet"/>
             </connections>
         </customObject>
@@ -37,11 +37,11 @@
                         <rect key="frame" x="14" y="116" width="432" height="190"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <clipView key="contentView" copiesOnScroll="NO" id="tableClip">
-                            <rect key="frame" x="1" y="1" width="430" height="188"/>
+                            <rect key="frame" x="1" y="1" width="415" height="173"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
                                 <tableView verticalHuggingPriority="750" allowsExpansionToolTips="YES" columnAutoresizingStyle="lastColumnOnly" multipleSelection="NO" autosaveColumns="NO" headerView="tableHeader" id="table">
-                                    <rect key="frame" x="0.0" y="0.0" width="430" height="165"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="428" height="150"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                     <size key="intercellSpacing" width="3" height="2"/>
                                     <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -63,7 +63,7 @@
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                             </tableHeaderCell>
-                                            <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" editable="NO" alignment="left" title="Text Cell" id="tabletypeColCell">
+                                            <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Text Cell" id="tabletypeColCell">
                                                 <font key="font" metaFont="system"/>
                                                 <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -74,7 +74,7 @@
                                                 <color key="textColor" name="headerTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="headerColor" catalog="System" colorSpace="catalog"/>
                                             </tableHeaderCell>
-                                            <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" editable="NO" alignment="left" title="Text Cell" id="tablesizeColCell">
+                                            <textFieldCell key="dataCell" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Text Cell" id="tablesizeColCell">
                                                 <font key="font" metaFont="system"/>
                                                 <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                 <color key="backgroundColor" name="controlBackgroundColor" catalog="System" colorSpace="catalog"/>
@@ -89,11 +89,11 @@
                             </subviews>
                         </clipView>
                         <scroller key="verticalScroller" verticalHuggingPriority="750" horizontal="NO" id="tableV">
-                            <rect key="frame" x="415" y="24" width="15" height="165"/>
+                            <rect key="frame" x="416" y="24" width="15" height="150"/>
                             <autoresizingMask key="autoresizingMask" flexibleMinX="YES" heightSizable="YES"/>
                         </scroller>
                         <tableHeaderView key="headerView" wantsLayer="YES" id="tableHeader">
-                            <rect key="frame" x="0.0" y="0.0" width="430" height="23"/>
+                            <rect key="frame" x="0.0" y="0.0" width="428" height="23"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                         </tableHeaderView>
                     </scrollView>
@@ -131,7 +131,7 @@
                     <button toolTip="Leave the pictures as they were" id="cancelButton">
                         <rect key="frame" x="262" y="12" width="84" height="26"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
-                        <buttonCell key="cell" type="push" bezelStyle="rounded" title="Cancel" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
+                        <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="smallSystem"/>
                         </buttonCell>
@@ -142,7 +142,7 @@
                     <button toolTip="Keep these pictures" id="okButton">
                         <rect key="frame" x="354" y="12" width="92" height="26"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
-                        <buttonCell key="cell" type="push" bezelStyle="rounded" title="OK" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="okButtonCell">
+                        <buttonCell key="cell" type="push" title="OK" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="okButtonCell">
                             <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="smallSystem"/>
                         </buttonCell>

@@ -35,7 +35,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | # | Case | Steps | Expected |
 |---|---|---|---|
 | GET-01 | The welcome screen | Launch the app | Two choices: Designer and Generator. Choosing Designer asks where the report comes from |
-| GET-02 | A blank report | Welcome > Designer > blank | An empty letter-sized page with body, and no page header or footer until asked for. *Guarded by `testNewReport`, `testNewReportPanel`* |
+| GET-02 | A blank report | Welcome > Designer > blank | An empty letter-sized page with a body, and no page header or footer until one is given a height — which is what a blank report is in Report Builder. *Guarded by `testNewReport`, `testNewReportPanel`* |
 | GET-03 | A report from a Word document | New Report > from a `.docx` | The wizard shows what the import made — items found, notes, and the checker's verdict — before anything is committed. *Guarded by `testNewReport`* |
 | GET-04 | Open a sample | File > Samples > Harbor Manifest | It opens as a document with its data beside it; nothing renders until previewed. *Guarded by `testOpeningASampleOpensADocumentAndDoesNotRunIt`, `testEverySampleInTheCatalogueIsAFileThatParses`* |
 | GET-05 | Open a file | File > Open, pick any `.rdl` | Opens in its own window; a second open of the same file brings the first window forward |
@@ -69,7 +69,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| INS-01 | Add each kind | Edit > Add Element… | A panel offering exactly the kinds allowed where the selection is; each one lands selected with sensible defaults. *Guarded by `testInsertion`, `testTheInsertPanelIsTallEnoughForEveryKind`, `testAddingADatasetThenFieldsThenATablix`* |
+| INS-01 | Add each kind | Edit > Add Element…, with the body selected and then with a cell selected | A panel offering exactly the kinds allowed where the selection is; each one lands selected with sensible defaults, and with a cell selected it becomes that cell's contents — a chart and a subreport included. *Guarded by `testInsertion`, `testTheInsertPanelIsTallEnoughForEveryKind`, `testAddingADatasetThenFieldsThenATablix`, `testAChartOrASubreportGoesIntoTheCellThatIsSelected`* |
 | INS-02 | Where a new item lands | Select an item, add another | The new one goes after it in the same band rather than at the end. *Guarded by `testInsertion`* |
 | INS-03 | Into a rectangle | Select a rectangle, add a textbox | It goes inside the rectangle; a data region is refused there. *Guarded by `testDataRegionsGoInsideCellsAndRectangles`* |
 | INS-04 | Drag a field onto the page | Insert tab > drag a dataset field to the body | A textbox bound to `=Fields!X.Value`, named after the field, selected, where you dropped it. *Guarded by `testInsertPaletteBinding`, `testDroppedItemIsWhereItWasDropped`* |
@@ -87,7 +87,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | CAN-04 | Nudge | Arrow keys, then hold | Moves by the grid step; a burst of keys is one undo step |
 | CAN-05 | Resize | Drag each of the eight handles, on a box and on a table | Each handle moves the edges it should and nothing else; nothing shrinks below a hair's width. *Guarded by `testAWholeRegionIsResizedBySharingOutTheChange`, `testAnItemIsResizedFromAnyOfItsEightHandles`* |
 | CAN-06 | Smart guides | Drag an item near another's edge, middle, or size | It lines up, and a guide line is drawn the length of what it lined up with. *Guarded by `testDragsLineUpWithWhatIsNearThem`, `testDraggingOnTheCanvasLinesUpWithNeighbours`* |
-| CAN-07 | Align, size, distribute | Select several; Edit > Align / Make Same Size / Distribute | Everything follows the first selected. *Guarded by `testSelectedItemsAreAlignedSizedAndSpread`* |
+| CAN-07 | Align, size, distribute | Select several; Edit > Align / Make Same Size / Distribute | Everything follows the first selected; over a tablix cell's contents the commands are not offered, since a cell's row and column decide its size and place. *Guarded by `testSelectedItemsAreAlignedSizedAndSpread`, `testACellsContentsAreNotArrangedLikeItemsOnThePage`* |
 | CAN-08 | Stacking | Edit > Bring Forward / Send to Back on overlapping items | The drawing order changes; ZIndex is written. *Guarded by `testItemsStackByZIndex`* |
 | CAN-09 | Type in a textbox | Double-click one on the canvas | Edit in place; Tab moves on; Escape abandons. *Guarded by `testTextInput`, `testDoubleClickingACellEditsWhatIsInIt`* |
 | CAN-10 | Cut, copy, paste, duplicate | ⌘X ⌘C ⌘V ⌘D on an item, then into a cell | A paste is a deep copy with fresh names, offset so it is not hidden behind the original; into a selected cell it goes in the cell. *Guarded by `testItemTransfer`, `testPastingIntoACellPutsItInTheCell`* |

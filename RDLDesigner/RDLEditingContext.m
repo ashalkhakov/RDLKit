@@ -13,7 +13,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 - (instancetype)initWithDocument:(RDLDocument *)document {
   self = [super init];
   if (self) {
-    _document = document ?: [[RDLDocument alloc] initWithReport:[RDLSamples blankLetter]];
+    _document = document ?: [[RDLDocument alloc] initWithReport:[RDLSamples blankReport]];
     _selection = [[RDLSelection alloc] init];
     _editor = [[RDLEditor alloc] initWithDocument:_document];
     _zoom = 1.0;
@@ -47,7 +47,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 
 - (instancetype)initWithReport:(RDLReport *)report {
   return [self initWithDocument:[[RDLDocument alloc]
-                                    initWithReport:report ?: [RDLSamples blankLetter]]];
+                                    initWithReport:report ?: [RDLSamples blankReport]]];
 }
 
 - (instancetype)init {
@@ -73,7 +73,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 }
 
 - (void)loadBlankReport {
-  [self loadReport:[RDLSamples blankLetter]];
+  [self loadReport:[RDLSamples blankReport]];
 }
 
 - (void)loadSampleWithId:(NSString *)sampleId {

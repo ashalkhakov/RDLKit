@@ -22,6 +22,24 @@
       XCTFail(@"%@", @"a blank report has nothing to report");
     if ([[outcome summary] length] == 0)
       XCTFail(@"%@", @"every outcome needs a summary line");
+    // A body and nothing else, which is what a blank report is in Report
+    // Builder: a head is something you add when you want one, and one nobody
+    // asked for is half an inch of blank paper on every page.
+    RDLReport *blank = outcome.report;
+    if (blank.body.height <= 0)
+      XCTFail(@"%@", @"a blank report has a body to put things in");
+    if (blank.pageHeader.height != 0 || [blank.pageHeader.items count] ||
+        blank.pageFooter.height != 0 || [blank.pageFooter.items count])
+      XCTFail(@"a blank report has no head and no foot: %g high and %g high",
+              blank.pageHeader.height, blank.pageFooter.height);
+    NSString *xml = [RDLWriter XMLStringFromReport:blank];
+    if ([xml rangeOfString:@"<PageHeader>"].location != NSNotFound ||
+        [xml rangeOfString:@"<PageFooter>"].location != NSNotFound)
+      XCTFail(@"%@", @"and neither is written to the file");
+    // Adding one is giving it a height, which is what the Report tab does.
+    blank.pageHeader.height = 0.5;
+    if ([[RDLWriter XMLStringFromReport:blank] rangeOfString:@"<PageHeader>"].location == NSNotFound)
+      XCTFail(@"%@", @"a head with a height is a head");
   }
 
   // From a Word document: the report arrives named after the file, carrying

@@ -707,6 +707,60 @@ paperOrigin:NSMakePoint(0, 0)];
 }
 
 
+// What fills a tablix cell is sized and placed by its row and its column, so
+// lining it up or sizing it like something else says nothing the report can
+// mean: those commands are not offered over one, as Report Builder does not
+// offer them. An image is a box like any other and is arranged like one.
+- (void)testACellsContentsAreNotArrangedLikeItemsOnThePage {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900)
+                                                       context:ctx];
+  NSMenuItem *(^menuItem)(SEL) = ^NSMenuItem *(SEL action) {
+    return [[NSMenuItem alloc] initWithTitle:@"x" action:action keyEquivalent:@""];
+  };
+  RDLTablix *region = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      region = (RDLTablix *)it;
+  RDLItem *inACell = region.tablixBody.rows[0].cells[0].item;
+  RDLItem *inACellToo = region.tablixBody.rows[0].cells[1].item;
+  if (inACell == nil || inACellToo == nil) {
+    XCTFail(@"%@", @"the sample's table should have something in its first two cells");
+    return;
+  }
+  [ctx.selection selectItems:@[ inACell, inACellToo ] inBandWithKey:@"body"];
+  if ([canvas validateMenuItem:menuItem(@selector(makeSameSize:))] ||
+      [canvas validateMenuItem:menuItem(@selector(alignLeftEdges:))])
+    XCTFail(@"%@", @"a cell's contents are not arranged with these");
+  CGFloat was = inACellToo.width;
+  [canvas makeSameSize:nil];
+  if (fabs(inACellToo.width - was) > 0.001)
+    XCTFail(@"%@", @"and the command does nothing if it is reached another way");
+
+  // An image on the page is arranged like any other box.
+  RDLImage *picture = [[RDLImage alloc] init];
+  picture.name = @"Picture";
+  picture.left = 4;
+  picture.top = 5;
+  picture.width = 1;
+  picture.height = 1;
+  [report.body.items addObject:picture];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Caption";
+  box.left = 1;
+  box.top = 5;
+  box.width = 2;
+  box.height = 0.4;
+  [report.body.items addObject:box];
+  [ctx.selection selectItems:@[ box, picture ] inBandWithKey:@"body"];
+  if (![canvas validateMenuItem:menuItem(@selector(makeSameSize:))])
+    XCTFail(@"%@", @"two things on the page can be sized alike, an image among them");
+  [canvas makeSameSize:nil];
+  if (fabs(picture.width - 2) > 0.001 || fabs(picture.height - 0.4) > 0.001)
+    XCTFail(@"the image should take the first's size: %g x %g", picture.width, picture.height);
+}
+
 // Lined up, sized and spread out: each follows the first item selected, each
 // is one undo step, and the commands are off until enough is selected.
 - (void)testSelectedItemsAreAlignedSizedAndSpread {

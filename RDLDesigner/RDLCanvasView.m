@@ -596,12 +596,17 @@ static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
     return [_context canMoveSelectedItemInStacking:move];
   // Two items to line up or size alike; three to spread out, since the two at
   // the ends stay where they are.
-  NSUInteger selected = [_context.selection.items count];
+  NSArray<RDLItem *> *chosen = _context.selection.items;
+  NSUInteger selected = [chosen count];
+  // What fills a tablix cell is sized and placed by its row and its column,
+  // so these say nothing there and are not offered, as Report Builder does not
+  // offer them.
+  BOOL arrangeable = [_context.editor canArrangeItems:chosen];
   if (RDLAlignEdgeForAction(a) != RDLAlignEdgeUnspecified ||
       RDLSizeMatchForAction(a) != RDLSizeMatchUnspecified)
-    return selected >= 2;
+    return selected >= 2 && arrangeable;
   if (RDLDistributeAxisForAction(a) != RDLDistributeAxisUnspecified)
-    return selected >= 3;
+    return selected >= 3 && arrangeable;
   return YES;
 }
 

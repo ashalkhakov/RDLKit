@@ -722,6 +722,47 @@ static NSData *RDLDocxWithBody(NSString *bodyXML) {
   }
 }
 
+// Every dataset an import scaffolds reads from a source of its own. One source
+// shared by all of them says the tables all read the same document, which is
+// not what a scaffold means: each came from somewhere different, and the
+// person points each at its own file.
+- (void)testEachScaffoldedDatasetHasASourceOfItsOwn {
+  NSString *row = @"<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc>"
+                   "<w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr>";
+  NSString *headings = @"<w:tr><w:tc><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:tc>"
+                        "<w:tc><w:p><w:r><w:t>Price</w:t></w:r></w:p></w:tc></w:tr>";
+  NSString *table = [NSString stringWithFormat:@"<w:tbl>%@%@%@</w:tbl>", headings, row, row];
+  // Two tables and a placeholder, so there are three datasets to tell apart.
+  NSString *body = [NSString stringWithFormat:@"%@%@<w:p><w:r><w:t>{{Total}}</w:t></w:r></w:p>",
+                                              table, table];
+  NSError *err = nil;
+  RDLReport *r = [RDLImporter reportFromDocxData:RDLDocxWithBody(body) error:&err];
+  if (r == nil || [r.dataSets count] < 3) {
+    XCTFail(@"the import should scaffold a dataset each: %lu (%@)",
+            (unsigned long)[r.dataSets count], err);
+    return;
+  }
+  NSMutableSet *sources = [NSMutableSet set];
+  for (RDLDataSet *ds in r.dataSets) {
+    if ([ds.dataSourceName length] == 0) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' names no source", ds.name]);
+      return;
+    }
+    if ([sources containsObject:ds.dataSourceName])
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' shares its source with another dataset",
+                                                ds.name]);
+    [sources addObject:ds.dataSourceName];
+    // And the source it names is in the report, with a document to read.
+    RDLDataSource *source = [r dataSourceNamed:ds.dataSourceName];
+    if (source == nil || [source.connectString length] == 0)
+      XCTFail(@"%@", [NSString stringWithFormat:@"'%@' names a source that is not there: %@",
+                                                ds.name, ds.dataSourceName]);
+  }
+  if ([r.dataSources count] != [r.dataSets count])
+    XCTFail(@"one source a dataset: %lu sources for %lu datasets",
+            (unsigned long)[r.dataSources count], (unsigned long)[r.dataSets count]);
+}
+
 - (void)testTableBinding {
   NSError *err = nil;
   NSString *(^table)(NSString *, NSString *) = ^(NSString *headings, NSString *body) {

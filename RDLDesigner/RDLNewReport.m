@@ -68,7 +68,7 @@
 + (RDLNewReportOutcome *)blankReport {
   RDLNewReportOutcome *outcome = [[RDLNewReportOutcome alloc] init];
   outcome.source = RDLNewReportSourceBlank;
-  outcome.report = [RDLSamples blankLetter];
+  outcome.report = [RDLSamples blankReport];
   outcome.notes = @[];
   outcome.problems = @[];
   return outcome;

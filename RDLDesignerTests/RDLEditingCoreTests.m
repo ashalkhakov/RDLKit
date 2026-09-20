@@ -303,7 +303,8 @@ static RDLReport *RDLGroupedJobs(void) {
   if (fabs(doc.report.pageHeader.height - 2.5) > 0.0001)
     XCTFail(@"%@", @"band edit did not apply");
   [doc.undoManager undo];
-  if (fabs(doc.report.pageHeader.height - 0.55) > 0.0001)
+  // Back to nothing, which is the height a report with no head has.
+  if (fabs(doc.report.pageHeader.height) > 0.0001)
     XCTFail(@"%@", @"undo should restore the band height");
 }
 
@@ -2114,6 +2115,69 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
 // A table or a chart goes into a tablix cell and a rectangle, as MS-RDL
 // allows, and is drawn there; a region the factory could bind to nothing gets
 // an empty dataset of its own, undone with it.
+// A chart and a subreport go into a cell like anything else -- MS-RDL allows
+// either in CellContents, and the engine lays one out per row of the group --
+// and with the region itself selected they go into the band beside it rather
+// than inside it. Which of the two happens is what is selected, and nothing
+// else.
+- (void)testAChartOrASubreportGoesIntoTheCellThatIsSelected {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *region = nil;
+  for (RDLItem *it in report.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      region = (RDLTablix *)it;
+  if (region == nil || [region.tablixBody.rows[0].cells count] < 2) {
+    XCTFail(@"%@", @"the sample should have a table of several columns");
+    return;
+  }
+  void (^intoCell)(NSUInteger, RDLItemKind) = ^(NSUInteger column, RDLItemKind kind) {
+    RDLTablixCell *cell = region.tablixBody.rows[0].cells[column];
+    cell.item = nil;
+    [ctx.selection selectCellOfTablix:region
+                                  row:(NSInteger)[RDLTablixGeometry gridRowOf:region forBodyRow:0]
+                               column:(NSInteger)[RDLTablixGeometry gridColumnOf:region
+                                                                  forBodyColumn:column]
+                        inBandWithKey:@"body"];
+    NSUInteger was = [report.body.items count];
+    [ctx addItemOfKind:kind];
+    if (cell.item == nil)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should have filled the cell",
+                                                RDLTitleOfItemKind(kind)]);
+    if ([report.body.items count] != was)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ went into the band as well",
+                                                RDLTitleOfItemKind(kind)]);
+  };
+  intoCell(0, RDLItemKindChart);
+  intoCell(1, RDLItemKindSubreport);
+  if (![region.tablixBody.rows[0].cells[0].item isKindOfClass:[RDLChart class]] ||
+      ![region.tablixBody.rows[0].cells[1].item isKindOfClass:[RDLSubreport class]])
+    XCTFail(@"%@", @"each cell should hold what was put in it");
+  if ([[region structuralProblems] count])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the region should still be sound: %@",
+                                              [region structuralProblems]]);
+  // Kept by a save, in the cell rather than beside the region.
+  RDLReport *back = [RDLParser reportFromXMLString:[RDLWriter XMLStringFromReport:report] error:NULL];
+  RDLTablix *again = nil;
+  for (RDLItem *it in back.body.items)
+    if ([it isKindOfClass:[RDLTablix class]])
+      again = (RDLTablix *)it;
+  if (![again.tablixBody.rows[0].cells[0].item isKindOfClass:[RDLChart class]] ||
+      ![again.tablixBody.rows[0].cells[1].item isKindOfClass:[RDLSubreport class]])
+    XCTFail(@"%@", @"both should come back in their cells");
+
+  // The region selected is not a cell: what goes in next goes beside it.
+  [ctx.selection selectItem:region inBandWithKey:@"body"];
+  NSUInteger was = [report.body.items count];
+  [ctx addItemOfKind:RDLItemKindChart];
+  if ([report.body.items count] != was + 1)
+    XCTFail(@"%@", @"with the region selected the chart goes into the band");
+  RDLItem *beside = [ctx selectedItem];
+  if (beside.top < region.top + region.height - 0.001)
+    XCTFail(@"it should land after the region, not on top of it: %g against %g", beside.top,
+            region.top + region.height);
+}
+
 - (void)testDataRegionsGoInsideCellsAndRectangles {
   RDLReport *bare = [RDLReport emptyReportNamed:@"Bare"];
   [bare.dataSets removeAllObjects];

@@ -104,6 +104,12 @@ typedef NS_ENUM(NSInteger, RDLDistributeAxis) {
 // NO, changing nothing, when there are too few to arrange or they are arranged
 // that way already. The first item is the one the others follow, which is how
 // Report Builder and every drawing program do it.
+// Whether these can be lined up, sized alike or spread out at all. What fills
+// a tablix cell cannot: its size and its place are the row's and the column's,
+// so moving or resizing it on its own says something the report cannot mean --
+// which is why Report Builder greys these commands out over a cell. Everything
+// else on the page can, an image like any other box.
+- (BOOL)canArrangeItems:(NSArray<RDLItem *> *)items;
 - (BOOL)alignItems:(NSArray<RDLItem *> *)items toEdge:(RDLAlignEdge)edge;
 - (BOOL)sizeItems:(NSArray<RDLItem *> *)items like:(RDLSizeMatch)match;
 - (BOOL)distributeItems:(NSArray<RDLItem *> *)items along:(RDLDistributeAxis)axis;

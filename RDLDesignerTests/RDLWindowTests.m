@@ -653,7 +653,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 }
 
 - (void)testDesignerWindowPanesRespond {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
   if ([wc window] == nil) {
@@ -756,7 +756,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 }
 
 - (void)testDatasetPanes {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   // A dataset reads from a data source, so the report needs one before it can
   // have datasets -- the order the designer now requires.
   RDLDataSource *source = [[RDLDataSource alloc] init];
@@ -805,7 +805,7 @@ static NSTabView *_centerTabViewOf(id wc) {
 }
 
 - (void)testPreviewZoomAndRulers {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
   if ([wc window] == nil) {

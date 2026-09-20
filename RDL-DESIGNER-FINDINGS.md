@@ -60,16 +60,16 @@ Style tab held what the More Style button had been hiding, what was left was a
 fourth tab that duplicated the other three; anything genuinely missing belongs
 in Attributes or Style as a field, not in a grid beside them.
 
-## Decisions to make
+## Decisions, and what was done about them
 
 | Case | The question |
 |---|---|
-| GET-02 | A new report comes with a page header and footer. Should it? |
-| GET-03 | A `.docx` import makes two datasets on one data source, which is not a valid report |
+| GET-02 | *Answered: no, do what Report Builder does.* A blank report is a body and nothing else. It used to be the Letter sample — a branded head, a rule, a folio and a salutation — which is a template, not a blank page, and left every new report with a page header nobody asked for. Letter is still there as a sample |
+| GET-03 | *Answered: a source each.* A `.docx` import gives every dataset it scaffolds a data source of its own. One source shared by all of them says the tables read the same document, which is not what a scaffold means: each came from somewhere different, and the person points each at its own file |
 | INSP-06, INSP-09 | *Answered: yes.* The right pane is Report · Attributes · Style · Properties. Attributes holds what a thing is; Style holds type, colour, alignment, padding, borders and the rest of its style |
 | PAG-03 | *Answered: yes.* The Attributes tab no longer shows the report's own settings; it says they are in the Report tab, which shows them whatever is selected |
-| CAN-07 | What should Make Same Size do to a tablix cell or an image? |
-| INS-01 | Should a chart or a subreport be insertable into a tablix cell at all? |
+| CAN-07 | *Answered: what Report Builder does.* What fills a tablix cell is sized and placed by its row and its column, so Make Same Size, the alignments and the distributions are not offered over one — and do nothing if they are reached another way. An image is a box like any other and is arranged like one |
+| INS-01 | *Answered: yes, and it already goes into the cell.* A chart or a subreport put in while a cell is selected becomes that cell's contents, is written inside `CellContents`, and comes back there; with the region itself selected it goes into the band after it, not inside it. Now guarded by `testAChartOrASubreportGoesIntoTheCellThatIsSelected` — if what you saw was a chart landing as a child of the region, say which pane you inserted it from and I will chase that path |
 | I | The chart cases need a sample: the quarterly ledger has one, and it was the sample that crashed |
 
 ## Verified working

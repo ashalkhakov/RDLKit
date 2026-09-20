@@ -732,7 +732,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // A pill is one thing: the caret does not rest inside it and a selection that
 // crosses an edge takes the whole of it.
 - (void)testRichTextPillsAreAtomic {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -779,7 +779,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The rich-text editor has its own way into the expression editor, because an
 // expression nests inside a run and the run is what is being edited.
 - (void)testRichTextEditorTakesExpressions {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -802,7 +802,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 }
 
 - (void)testRichTextEditorPaper {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {

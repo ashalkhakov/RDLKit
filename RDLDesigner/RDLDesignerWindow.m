@@ -606,7 +606,7 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   [alert addButtonWithTitle:@"Cancel"];
   if ([alert runModal] != NSAlertFirstButtonReturn)
     return NO;
-  RDLReport *blank = [RDLSamples blankLetter];
+  RDLReport *blank = [RDLSamples blankReport];
   blank.name = [[url lastPathComponent] stringByDeletingPathExtension];
   RDLDocument *doc = [[RDLDocument alloc] initWithReport:blank];
   NSError *err = nil;

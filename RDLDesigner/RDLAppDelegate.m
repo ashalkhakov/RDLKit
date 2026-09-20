@@ -161,7 +161,7 @@
   (void)sender;
   RDLDocument *doc = [self currentDocument];
   if (doc == nil)
-    doc = [self openDocumentWithReport:[RDLSamples blankLetter]];
+    doc = [self openDocumentWithReport:[RDLSamples blankReport]];
   // The generator follows the report in front: opening it on a different one
   // means a different window, not a window that quietly swapped its report.
   if (_generator != nil && _generator.reportDocument != doc) {

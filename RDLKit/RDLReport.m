@@ -2324,17 +2324,19 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.reportDescription = @"";
   r.width = 7.5;
   r.page = [[RDLPage alloc] init];
+  // A new report is a body and nothing else, which is what a blank report is
+  // in Report Builder: a header is something you add when you want one, and
+  // one nobody asked for is half an inch of blank paper on every page. The
+  // bands exist so that giving one a height is all it takes to add it; with no
+  // height and nothing in them they are not written to the file at all.
   r.pageHeader = [[RDLBand alloc] init];
-  r.pageHeader.height = 0.55;
-  // Said rather than assumed: MS-RDL's default is neither end, and a new
-  // report wants its running head on every page. Written into the file, which
-  // is where a decision like this belongs.
+  // Said rather than assumed: MS-RDL's default is neither end, and a head
+  // someone adds wants to print on every page.
   r.pageHeader.printOnFirstPage = YES;
   r.pageHeader.printOnLastPage = YES;
   r.body = [[RDLBand alloc] init];
   r.body.height = 4.0;
   r.pageFooter = [[RDLBand alloc] init];
-  r.pageFooter.height = 0.4;
   r.pageFooter.printOnFirstPage = YES;
   r.pageFooter.printOnLastPage = YES;
   // No data sources and no datasets: a new report has no data, and a source
