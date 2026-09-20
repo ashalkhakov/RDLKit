@@ -2921,6 +2921,55 @@ static NSTabView *_centerTabViewOf(id wc) {
   [doc close];
 }
 
+// Zoom In and Zoom Out step through the zooms the control lists, so a press
+// always moves the control. It used to step by a tenth while the control knew
+// only 50, 75, 100, 125 and so on, and showed the nearest of them -- so half
+// the presses appeared to do nothing at all.
+- (void)testZoomingStepsThroughWhatTheControlLists {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Zoomed"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSPopUpButton *pop = [wc valueForKey:@"zoomPop"];
+  NSMutableArray<NSNumber *> *listed = [NSMutableArray array];
+  for (NSInteger i = 0; i < [pop numberOfItems]; i++)
+    [listed addObject:@([[[[pop itemAtIndex:i] title] stringByReplacingOccurrencesOfString:@"%"
+                                                                               withString:@""]
+                            doubleValue] /
+                        100.0)];
+  if (![listed isEqualToArray:RDLZoomStops()])
+    XCTFail(@"the control should list the steps: %@ against %@", listed, RDLZoomStops());
+
+  // Every press lands on a listed zoom, and the control moves with it.
+  ctx.zoom = 1.0;
+  for (NSNumber *stop in RDLZoomStops()) {
+    if ([stop doubleValue] <= 1.0)
+      continue;
+    [ctx zoomIn];
+    if (fabs(ctx.zoom - [stop doubleValue]) > 0.001) {
+      XCTFail(@"zooming in should go to %@, went to %g", stop, ctx.zoom);
+      return;
+    }
+    [wc syncZoomControl];
+    if (fabs([[[pop titleOfSelectedItem] stringByReplacingOccurrencesOfString:@"%"
+                                                                   withString:@""] doubleValue] /
+                 100.0 -
+             ctx.zoom) > 0.001)
+      XCTFail(@"the control should show %g, shows %@", ctx.zoom, [pop titleOfSelectedItem]);
+  }
+  // And neither end is passed.
+  [ctx zoomIn];
+  if (fabs(ctx.zoom - RDLMaximumZoom) > 0.001)
+    XCTFail(@"%@", @"there is nothing past the largest zoom");
+  for (NSUInteger i = 0; i < 20; i++)
+    [ctx zoomOut];
+  if (fabs(ctx.zoom - RDLMinimumZoom) > 0.001)
+    XCTFail(@"%@", @"nor below the smallest");
+}
+
 // Opening a sample opens it for editing, in a document of its own. It used to
 // run it as well -- the generator was brought to the front and laid the whole
 // report out -- which is a different thing to ask for, and the slower one.

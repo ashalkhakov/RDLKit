@@ -725,8 +725,9 @@ static RDLReport *RDLGroupedJobs(void) {
   // 2. View state does not dirty the document (the old code needed a
   //  noteChange-then-reset-dirty workaround for this).
   [ctx zoomIn];
-  if (!(fabs(ctx.zoom - 1.1) < 0.0001))
-    XCTFail(@"%@", @"context: zoomIn steps by 0.1");
+  // To the next zoom the control lists, so a press always moves the control.
+  if (!(fabs(ctx.zoom - 1.25) < 0.0001))
+    XCTFail(@"%@", @"context: zoomIn steps to the next zoom the control lists");
   if (!(!ctx.document.isDirty))
     XCTFail(@"%@", @"context: zoom must not dirty the document");
   if (!(!ctx.document.undoManager.canUndo))

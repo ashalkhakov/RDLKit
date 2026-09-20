@@ -28,6 +28,10 @@
 - (void)leftTabChanged:(id)sender;
 - (void)rightTabChanged:(id)sender;
 - (void)zoomChanged:(id)sender;
+// The zoom control follows the report's zoom, however it was changed --
+// the menu, the keyboard, or the control itself. Declared so a check can see
+// that it keeps up.
+- (void)syncZoomControl;
 - (void)centerModeChanged:(id)sender;
 // Put the inspector on whatever is selected -- an element, a dataset field, or
 // a parameter. Declared because a selection made in code has to be able to ask

@@ -48,8 +48,8 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | INS-04 | The drag shows "cannot drop" while dropping works | open |
 | CAN-04 | Holding an arrow key stutters | open |
 | CAN-11 | Delete is Backspace, not Delete | **fixed** — the canvas answered the delete character and backspace, and not the forward-delete key a full keyboard marks "Delete". One rule for both keys now, shared by the canvas and the outline |
-| WIN-03 | The groups pane can open too short for its own buttons | open |
-| WIN-04 | Zoom steps are smaller than the zoom control's, so it updates every second press | open |
+| WIN-03 | The groups pane can open too short for its own buttons | **not reproducible here; floor raised** — on Cocoa the buttons stay in the pane at every height the split allows, so nothing here shows the fault; it is GNUstep's layout or none. What has changed is the floor: the pane may no longer be squeezed below the height its heading, a row of the tree and its buttons need (96 points), and a window with no room for that gives the canvas the difference. Worth re-checking on Linux |
+| WIN-04 | Zoom steps are smaller than the zoom control's, so it updates every second press | **fixed** — the keyboard stepped by a tenth while the control knew only 50, 75, 100, 125 … and showed the nearest of them. There is one list now, in `RDLEditingContext`: the control is filled from it and the keyboard steps through it, so every press moves both. 40% is on it, which is where zooming out already stopped |
 
 ## Dropped
 

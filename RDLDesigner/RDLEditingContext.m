@@ -93,9 +93,6 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 // of zooming in far enough.
 const CGFloat RDLMinimumZoom = 0.4;
 const CGFloat RDLMaximumZoom = 4.0;
-static const CGFloat kRDLZoomFineStep = 0.1;
-static const CGFloat kRDLZoomCoarseStep = 0.25;
-static const CGFloat kRDLZoomCoarseAbove = 2.0;
 
 - (RDLTablix *)engagedTablix {
   RDLSelection *selection = self.selection;
@@ -144,19 +141,33 @@ static const CGFloat kRDLZoomCoarseAbove = 2.0;
   [self postViewStateChange];
 }
 
-// Above 200% a tenth of the paper is a small step and there is a lot of range
-// left, so the step grows with the zoom rather than making the keyboard press
-// the same key twenty times to cross it.
-static CGFloat RDLZoomStepFrom(CGFloat zoom) {
-  return zoom >= kRDLZoomCoarseAbove ? kRDLZoomCoarseStep : kRDLZoomFineStep;
+NSArray<NSNumber *> *RDLZoomStops(void) {
+  // The whole range, smallest first: what the zoom control lists is what the
+  // keyboard steps through, so a press always moves both.
+  return @[ @0.4, @0.5, @0.75, @1.0, @1.25, @1.5, @2.0, @3.0, @4.0 ];
 }
 
+// A zoom counts as being on a stop when it is within this of it, so a zoom
+// typed or arrived at by other means still steps to the next stop rather than
+// to itself.
+static const CGFloat kRDLZoomSame = 0.001;
+
 - (void)zoomIn {
-  self.zoom = _zoom + RDLZoomStepFrom(_zoom);
+  for (NSNumber *stop in RDLZoomStops())
+    if ([stop doubleValue] > _zoom + kRDLZoomSame) {
+      self.zoom = [stop doubleValue];
+      return;
+    }
+  self.zoom = RDLMaximumZoom;
 }
 
 - (void)zoomOut {
-  self.zoom = _zoom - RDLZoomStepFrom(_zoom - kRDLZoomFineStep / 2);
+  for (NSNumber *stop in [RDLZoomStops() reverseObjectEnumerator])
+    if ([stop doubleValue] < _zoom - kRDLZoomSame) {
+      self.zoom = [stop doubleValue];
+      return;
+    }
+  self.zoom = RDLMinimumZoom;
 }
 
 - (void)toggleGrid {

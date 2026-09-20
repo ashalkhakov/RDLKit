@@ -36,7 +36,10 @@ static const CGFloat kRDLSidePaneMinimum = 160.0;
 // groups pane opens, and the least it can be dragged to before it shuts.
 static const CGFloat kRDLCanvasMinimumHeight = 200.0;
 static const CGFloat kRDLGroupsPaneHeight = 140.0;
-static const CGFloat kRDLGroupsPaneMinimum = 60.0;
+// What the pane needs to be any use: its heading, a row or two of the tree,
+// and the row of buttons under it. Less than this and the buttons are the part
+// that goes, which is the pane's only way of doing anything.
+static const CGFloat kRDLGroupsPaneMinimum = 96.0;
 // What the two side panes open at. The right one has to clear the inspector's
 // sections, which are 260 points wide with a scroller beside them.
 static const CGFloat kRDLLeftPaneWidth = 220.0;
@@ -309,8 +312,14 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 // canvas needs to keep. A window too short for both gives the canvas its floor
 // and the pane what is left.
 - (CGFloat)groupsPaneHeightFitting:(CGFloat)wanted {
+  if (wanted <= 0)
+    return 0;
   CGFloat room = NSHeight([_centerSplit bounds]) - kRDLCanvasMinimumHeight - [_centerSplit dividerThickness];
-  return MAX(0, MIN(wanted, room));
+  // A pane shorter than it needs is a pane with its buttons cut off, which is
+  // worse than a canvas shorter than it likes: a window with no room for both
+  // gives the pane what it needs and the canvas the rest. Shutting it is the
+  // way to give the canvas the window back.
+  return MAX(kRDLGroupsPaneMinimum, MIN(wanted, room));
 }
 
 // Where the divider goes for a pane of that height. Which way the split counts
@@ -404,6 +413,7 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   // items in code, and its icons are drawn rather than loaded.
   [self buildTabBars];
   [self buildPanes];
+  [self fillZoomControl];
   [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
   [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
@@ -816,6 +826,16 @@ static void RDLSelectTab(id sender, NSTabView *tabView) {
 // parallel array: the two would drift, and the title is already the number.
 static CGFloat RDLZoomFromTitle(NSString *title) {
   return [[title stringByReplacingOccurrencesOfString:@"%" withString:@""] doubleValue] / 100.0;
+}
+
+// The control lists what the keyboard steps through: one list, in
+// RDLEditingContext, filled in here rather than written out in the XIB, where
+// it would drift from the steps the moment either changed.
+- (void)fillZoomControl {
+  [_zoomPop removeAllItems];
+  for (NSNumber *stop in RDLZoomStops())
+    [_zoomPop addItemWithTitle:[NSString stringWithFormat:@"%g%%", [stop doubleValue] * 100]];
+  [self syncZoomControl];
 }
 
 - (void)zoomChanged:(id)sender {

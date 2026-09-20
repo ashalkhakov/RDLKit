@@ -28,6 +28,11 @@ extern NSString * const RDLViewStateDidChangeNotification;
 // nested group structure is read rather than squinted at.
 FOUNDATION_EXPORT const CGFloat RDLMinimumZoom;
 FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
+// The zooms the zoom control lists, smallest first -- and the steps Zoom In
+// and Zoom Out take, so the two agree. Stepping by a fixed tenth meant the
+// control only moved on every second press, because it shows the nearest zoom
+// it knows about.
+FOUNDATION_EXPORT NSArray<NSNumber *> *RDLZoomStops(void);
 
 @interface RDLEditingContext : NSObject
 @property (nonatomic, readonly, strong) RDLDocument *document;
