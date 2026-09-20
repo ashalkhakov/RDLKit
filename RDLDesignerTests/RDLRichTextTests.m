@@ -65,6 +65,55 @@ static NSString *RDLRunsOf(NSArray<RDLParagraph *> *paragraphs) {
 @end
 @implementation RDLRichTextTests
 
+// UND-05, reported as: rich text changed, nothing in undo. What the panel
+// does on OK, and what one undo does to it.
+- (void)testARichTextEditUndoesAsOneStep {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Undoing rich text"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Note";
+  box.value = @"Plain words";
+  box.width = 2.5;
+  box.height = 0.4;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  RDLRichTextEditor *editor = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the rich-text panel should build for a text box");
+    return;
+  }
+  // Bold the first word, the way the formatting bar does, then apply as OK
+  // does -- through the editor, which is what makes it one undoable step.
+  NSTextView *view = [editor valueForKey:@"textView"];
+  NSMutableAttributedString *storage = [view textStorage];
+  [RDLRichTextFormatter setTrait:RDLRichTextTraitBold
+                              on:YES
+                          inText:storage
+                           range:NSMakeRange(0, 5)
+                typingAttributes:nil];
+  [ctx.editor setAttributedString:storage ofItem:box];
+
+  if ([box.paragraphs count] == 0)
+    XCTFail(@"%@", @"the formatted text should have reached the box as runs");
+  if (![ctx.document.undoManager canUndo]) {
+    XCTFail(@"%@", @"a rich-text edit should be on the undo stack");
+    return;
+  }
+  NSString *wrote = [RDLEditor XMLStringForItem:box];
+
+  [ctx.document.undoManager undo];
+  if ([box.paragraphs count])
+    XCTFail(@"one undo should take the runs back off, %lu paragraphs remain",
+            (unsigned long)[box.paragraphs count]);
+  if (![[box.value description] isEqualToString:@"Plain words"])
+    XCTFail(@"and the words should be as they were, they read %@", box.value);
+
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:box] isEqualToString:wrote])
+    XCTFail(@"%@", @"redo should put the formatted text back exactly");
+}
+
 // GET-03, reported as: the rich editor shows the expressions, but the
 // inspector's Value field and f(x) show plain text without them -- and typing
 // there would write the runs away. A box whose text holds an expression or a

@@ -14,7 +14,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | TBL-16 | Filters and the no-rows message are not saved | **fixed** — both were written by the modal Edit Tablix screen, which has since gone; the paths that replaced it (the inspector's no-rows field, its Filters… and Sorting… buttons) write through the editor and survive the file. Now guarded by a round-trip test that types the message, sets a filter and a sort, saves, reopens and undoes all three |
 | GET-03 | A text box shows its expressions in the rich-text editor but plain text in `f(x)` and the inspector field | **fixed** — a box whose text holds an expression or a styled run cannot be shown as one line without dropping what it holds, so the Value field and its `f(x)` are closed on such a box and say to edit it as rich text. A plain box is unchanged |
 | UND-01 | Undo does nothing for an inspector property edit | **fixed** — the model did go back; the inspector did not, because it skipped every change to the item on show, unable to tell its own writing from anyone else's. It now skips only while it is itself writing, so an undo, the canvas or another pane all reach the fields |
-| UND-05 | Undo does nothing for a rich-text edit | **next** |
+| UND-05 | Undo does nothing for a rich-text edit | **probably fixed; needs a look on Linux** — the panel's OK applies through the editor as one step, and a test now formats a word, applies, undoes and redoes it. What was almost certainly seen is the inspector not showing the undo, which is fixed above; if it persists on the next AppImage it is GNUstep's own and I will chase it there |
 
 ## Broken
 
