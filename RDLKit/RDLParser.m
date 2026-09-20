@@ -1447,16 +1447,27 @@ static NSUInteger RDLOrdinalAmongAlike(NSXMLElement *element, NSArray<NSXMLEleme
 }
 
 // The same element among what this kit wrote: the one with the same step, or --
-// for an element whose Name this kit does not write, a ChartArea's say -- the
-// unnamed one of the same local name in the same place among its kind.
+// where the Names do not line up -- the one in the same place among its kind.
+//
+// They fail to line up both ways round. This kit does not write every Name a
+// file carries (a ChartArea's), and it writes Names a file may leave off: an
+// unnamed ChartAxis comes back as Primary, because that is what it is. Either
+// way the nth ChartAxis of the file is the nth this kit wrote, and pairing
+// them is what keeps the rest of that element from being kept as unread --
+// which, being kept, was then written *beside* the one this kit wrote, so
+// every round trip through the file grew another axis.
 static NSXMLElement *RDLCounterpart(NSXMLElement *original, NSArray<NSXMLElement *> *originals,
                                     NSArray<NSXMLElement *> *writtens, NSDictionary<NSString *, NSXMLElement *> *byStep) {
   NSXMLElement *exact = byStep[RDLStepOf(original, originals)];
-  if (exact || [original attributeForName:@"Name"] == nil)
+  if (exact)
     return exact;
+  // Only where exactly one of the two carries a Name: two elements that both
+  // have one, and differ, are two different things.
+  BOOL named = [original attributeForName:@"Name"] != nil;
   NSUInteger ordinal = RDLOrdinalAmongAlike(original, originals);
   for (NSXMLElement *written in writtens)
-    if ([written.localName isEqualToString:original.localName] && [written attributeForName:@"Name"] == nil &&
+    if ([written.localName isEqualToString:original.localName] &&
+        ([written attributeForName:@"Name"] != nil) != named &&
         RDLOrdinalAmongAlike(written, writtens) == ordinal)
       return written;
   return nil;
@@ -1505,9 +1516,8 @@ static void RDLCollectUnread(NSXMLElement *original, NSXMLElement *written, NSAr
     if ([attribute.name hasPrefix:@"xmlns"] || [prefix isEqualToString:@"xsi"] || [prefix isEqualToString:@"xml"] ||
         [written attributeForName:attribute.name] != nil)
       continue;
-    RDLPreservedNode *node = [[RDLPreservedNode alloc] init];
+    RDLPreservedNode *node = [RDLPreservedNode pieceOfNode:attribute];
     node.parentPath = path;
-    node.node = RDLPlainCopy(attribute);
     RDLCollectPrefixes(attribute, original, namespaces);
     [kept addObject:node];
   }
@@ -1521,9 +1531,8 @@ static void RDLCollectUnread(NSXMLElement *original, NSXMLElement *written, NSAr
       RDLCollectUnread(child, counterpart, [path arrayByAddingObject:RDLStepOf(counterpart, writtens)], keepingRDL, kept,
                        namespaces);
     } else if ([[child prefix] length] || (keepingRDL && !RDLWasRead(child))) {
-      RDLPreservedNode *node = [[RDLPreservedNode alloc] init];
+      RDLPreservedNode *node = [RDLPreservedNode pieceOfNode:child];
       node.parentPath = path;
-      node.node = RDLPlainCopy(child);
       RDLCollectPrefixes(child, child, namespaces);
       [kept addObject:node];
     }
@@ -1554,26 +1563,31 @@ static NSXMLNode *RDLPlainCopy(NSXMLNode *node) {
   return copy;
 }
 
-// Append a kept node under `parent`, building top-down: the element is attached
+// Write a kept piece under `parent`, building top-down: the element is attached
 // to `parent` before its children so a prefixed name (am:Name) resolves against
 // the namespace already in scope on the writer's tree, rather than GNUstep
-// minting a fresh prefix (am_1) with a redundant xmlns redeclaration on the
-// detached copy RDLPlainCopy would otherwise hand back.
-static void RDLAppendPlainCopy(NSXMLElement *parent, NSXMLNode *node) {
-  if (node.kind != NSXMLElementKind) {
-    NSXMLNode *copy = RDLPlainCopy(node);
-    if (copy)
-      [parent addChild:copy];
+// minting a fresh prefix (am_1) with a redundant xmlns redeclaration on a
+// detached element.
+static void RDLAppendKeptPiece(NSXMLElement *parent, RDLPreservedNode *piece) {
+  switch (piece.kind) {
+  case NSXMLTextKind:
+    [parent addChild:[NSXMLNode textWithStringValue:piece.value ?: @""]];
+    return;
+  case NSXMLCommentKind:
+    [parent addChild:[NSXMLNode commentWithStringValue:piece.value ?: @""]];
+    return;
+  case NSXMLElementKind:
+    break;
+  default:
     return;
   }
-  NSXMLElement *element = (NSXMLElement *)node;
-  NSXMLElement *copy = [NSXMLElement elementWithName:element.name];
-  [parent addChild:copy];
-  for (NSXMLNode *attribute in [element attributes])
-    if (![attribute.name hasPrefix:@"xmlns"])
-      [copy addAttribute:RDLPlainCopy(attribute)];
-  for (NSXMLNode *child in [element children])
-    RDLAppendPlainCopy(copy, child);
+  NSXMLElement *element = [NSXMLElement elementWithName:piece.name ?: @""];
+  [parent addChild:element];
+  for (RDLPreservedNode *attribute in piece.attributes)
+    [element addAttribute:[NSXMLNode attributeWithName:attribute.name
+                                          stringValue:attribute.value ?: @""]];
+  for (RDLPreservedNode *child in piece.children)
+    RDLAppendKeptPiece(element, child);
 }
 
 static NSXMLElement *RDLElementAtPath(NSXMLElement *root, NSArray<NSString *> *path) {
@@ -1591,6 +1605,12 @@ static NSXMLElement *RDLElementAtPath(NSXMLElement *root, NSArray<NSString *> *p
     here = found;
   }
   return here;
+}
+
+static NSString *RDLKeptPieceKey(RDLPreservedNode *piece) {
+  NSString *name = piece.kind == NSXMLElementKind ? [piece attributeNamed:@"Name"] : nil;
+  return [NSString stringWithFormat:@"%@%@", piece.name ?: @"",
+                                    name ? [NSString stringWithFormat:@"[%@]", name] : @""];
 }
 
 static NSString *RDLKeptKey(NSXMLNode *node) {
@@ -1626,14 +1646,14 @@ static void RDLPutBackPreserved(NSXMLElement *root, RDLReport *report) {
   for (NSArray *pair in placed) {
     RDLPreservedNode *kept = pair[0];
     NSXMLElement *parent = pair[1];
-    if (kept.node.kind == NSXMLAttributeKind) {
-      if ([parent attributeForName:kept.node.name] == nil)
-        [parent addAttribute:RDLPlainCopy(kept.node)];
+    if (kept.kind == NSXMLAttributeKind) {
+      if ([parent attributeForName:kept.name] == nil)
+        [parent addAttribute:[NSXMLNode attributeWithName:kept.name stringValue:kept.value ?: @""]];
       continue;
     }
-    if ([[writtenUnder objectForKey:parent] containsObject:RDLKeptKey(kept.node)])
+    if ([[writtenUnder objectForKey:parent] containsObject:RDLKeptPieceKey(kept)])
       continue;
-    RDLAppendPlainCopy(parent, kept.node);
+    RDLAppendKeptPiece(parent, kept);
   }
 }
 
@@ -1891,8 +1911,8 @@ static void RDLPutBackPreserved(NSXMLElement *root, RDLReport *report) {
   NSCountedSet<NSString *> *names = [NSCountedSet set];
   NSUInteger elements = 0;
   for (RDLPreservedNode *node in kept)
-    if (node.node.kind == NSXMLElementKind) {
-      [names addObject:node.node.name];
+    if (node.kind == NSXMLElementKind) {
+      [names addObject:node.name];
       elements += 1;
     }
   if (elements) {

@@ -2158,6 +2158,43 @@ static BOOL RDLFindCellInRows(NSArray<NSArray<RDLTablixCell *> *> *rows, RDLTabl
 @end
 
 @implementation RDLPreservedNode
+
+// Written down from what was read, a piece at a time. The node itself is not
+// kept: what a report carries between a read and a write is data.
++ (instancetype)pieceOfNode:(NSXMLNode *)node {
+  if (node == nil)
+    return nil;
+  RDLPreservedNode *piece = [[self alloc] init];
+  piece.kind = node.kind;
+  piece.name = node.name ?: @"";
+  if (node.kind != NSXMLElementKind) {
+    piece.value = node.stringValue ?: @"";
+    return piece;
+  }
+  NSXMLElement *element = (NSXMLElement *)node;
+  NSMutableArray<RDLPreservedNode *> *attributes = [NSMutableArray array];
+  for (NSXMLNode *attribute in [element attributes])
+    // A namespace declaration is not a piece: the prefixes go on the root.
+    if (![attribute.name hasPrefix:@"xmlns"])
+      [attributes addObject:[self pieceOfNode:attribute]];
+  NSMutableArray<RDLPreservedNode *> *children = [NSMutableArray array];
+  for (NSXMLNode *child in [element children]) {
+    RDLPreservedNode *kid = [self pieceOfNode:child];
+    if (kid != nil)
+      [children addObject:kid];
+  }
+  piece.attributes = attributes;
+  piece.children = children;
+  return piece;
+}
+
+- (NSString *)attributeNamed:(NSString *)name {
+  for (RDLPreservedNode *attribute in _attributes)
+    if ([attribute.name isEqualToString:name])
+      return attribute.value;
+  return nil;
+}
+
 @end
 
 @implementation RDLQueryParameter
@@ -2407,7 +2444,11 @@ static void RDLCollectChartGroupNames(NSArray<RDLChartMember *> *members, NSMuta
     }
     RDLPreservedNode *moved = [[RDLPreservedNode alloc] init];
     moved.parentPath = path;
-    moved.node = kept.node;
+    moved.kind = kept.kind;
+    moved.name = kept.name;
+    moved.value = kept.value;
+    moved.attributes = kept.attributes;
+    moved.children = kept.children;
     [renamed addObject:moved];
   }
   _preservedNodes = renamed;

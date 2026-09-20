@@ -326,6 +326,7 @@
 		CCAD574DF3ABF0DB57D729E7 /* RDLGroupsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */; };
 		C4CCB62E9679B7452F8B4454 /* RDLGroupsView.m in Sources */ = {isa = PBXBuildFile; fileRef = C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */; };
 		AA0C4EEB1968693BAE3F3180 /* RDLGroupsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */; };
+		69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 100D491C6266FCC1718678EA /* RDLRoundTripTests.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -677,6 +678,7 @@
 		C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLGroupsView.m; sourceTree = "<group>"; };
 		1C482E801780987D9FCDA1DA /* RDLGroupsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLGroupsView.h; sourceTree = "<group>"; };
 		84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLGroupsView.xib; sourceTree = "<group>"; };
+		100D491C6266FCC1718678EA /* RDLRoundTripTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRoundTripTests.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1061,6 +1063,7 @@
 				7CF29ABD1AD1599F2EDE93D3 /* RDLDesignerTestSupport.h */,
 				A896A40DCA2AB0F57532ECFA /* Info.plist */,
 				18F13C0ED4E70F80B9FCF4C0 /* README.md */,
+				100D491C6266FCC1718678EA /* RDLRoundTripTests.m */,
 			);
 			path = RDLDesignerTests;
 			sourceTree = "<group>";
@@ -1543,6 +1546,7 @@
 				E5DF38EF4BA598100BDDB0D4 /* RDLPreviewWindow.m in Sources */,
 				CBCFE3365DE78249F971A79D /* RDLPropertiesView.m in Sources */,
 				C4CCB62E9679B7452F8B4454 /* RDLGroupsView.m in Sources */,
+				69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

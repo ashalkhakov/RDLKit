@@ -250,9 +250,9 @@ The strongest single check, and the easiest to automate further.
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| RND-01 | Open, save, compare | Open each sample, save it under a new name without editing | The file is byte-for-byte what it was, apart from formatting the writer is entitled to |
-| RND-02 | Open, edit, save, reopen | Make one edit of each kind, save, close, reopen | Everything is as you left it |
-| RND-03 | What the designer does not show | Open a report with merged cells, custom items or a gauge, edit something else, save | What the designer cannot edit is still in the file. *Guarded by `testGroupingKeepsWhatThePaneDoesNotShow`* |
+| RND-01 | Open, save, compare | Open each sample, save it under a new name without editing | The report that comes back is the same one, and saving it again writes the same file. *Guarded by `testEverySampleSurvivesOpenAndSave`* |
+| RND-02 | Open, edit, save, reopen | Make one edit of each kind, save, close, reopen | Everything is as you left it. *Guarded by `testAnEditOfEachKindSurvivesSaveAndReopen`* |
+| RND-03 | What the designer does not show | Open a report with merged cells, custom items or an element from another namespace, edit something else, save | What the designer cannot edit is still in the file, written once. *Guarded by `testWhatTheDesignerDoesNotShowSurvivesAnEdit`, `testGroupingKeepsWhatThePaneDoesNotShow`* |
 | RND-04 | Another tool's file | Open a report written by Report Builder, save, open it in Report Builder again | It opens there without complaint |
 
 ---
@@ -261,9 +261,10 @@ The strongest single check, and the easiest to automate further.
 
 The cases with no **Guarded by** note, in the order they would pay off:
 
-1. **RND-01/02/04** — round trip over the whole sample set and a corpus file, as
-   a data-driven test. The kit has this for rendering; the designer does not have
-   it for editing.
+1. **RND-04** — a file written by Report Builder, opened here, saved, and
+   opened there again. RND-01 to RND-03 are automated now
+   (`RDLRoundTripTests`), and RND-01 found that a chart's axes were being
+   duplicated on every round trip.
 2. **SRC-02/03/04** — the Source pane's apply, refusal and revert paths beyond
    the one test that exists.
 3. **PRE-02/03** — page navigation and the print operation, driven headlessly.

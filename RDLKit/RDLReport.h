@@ -1487,9 +1487,31 @@ FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *i
 // element to the one it belongs under, a step at a time, each step written
 // "LocalName#n" or "LocalName[Name]#n": the element's local name, its Name
 // attribute when it has one, and which of the siblings alike it is.
+//
+// Held as plain data rather than as an NSXMLNode. A report outlives by far the
+// document it was parsed from, and an NSXML object kept across that has been
+// trouble on both platforms: it crashed `rdlgen --check` on teardown here
+// until the nodes were rebuilt standalone, and GNUstep's NSXML is the one the
+// kit already keeps off the path of every edit (see the note in
+// -[RDLDesignerWindow reloadPanes]). What is kept is small and its shape is
+// exactly what the writer walks, so it is written down as itself.
 @interface RDLPreservedNode : NSObject
 @property (nonatomic, copy) NSArray<NSString *> *parentPath;
-@property (nonatomic, strong) NSXMLNode *node;
+// Element, attribute, text or comment -- the four an RDL file can hold here.
+@property (nonatomic, assign) NSXMLNodeKind kind;
+// An element's or an attribute's name, in the file's own spelling, prefix and
+// all. Empty for text and comments.
+@property (nonatomic, copy) NSString *name;
+// An attribute's value, or the text of a text or comment node.
+@property (nonatomic, copy) NSString *value;
+// An element's attributes and children, in the order the file has them.
+@property (nonatomic, copy) NSArray<RDLPreservedNode *> *attributes;
+@property (nonatomic, copy) NSArray<RDLPreservedNode *> *children;
+
+// The piece as it stands, written down from a node the parser read; and the
+// Name attribute an element carries, which is part of how it is found again.
++ (instancetype)pieceOfNode:(NSXMLNode *)node;
+- (NSString *)attributeNamed:(NSString *)name;
 @end
 
 @interface RDLReport : NSObject

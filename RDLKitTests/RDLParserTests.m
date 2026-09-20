@@ -2625,9 +2625,9 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
   [r.body.items removeObject:gone];
   [(RDLParameter *)[r.parameters firstObject] setNullable:YES];
   // A kept piece of a name the writer now writes itself gives way to it.
-  RDLPreservedNode *stale = [[RDLPreservedNode alloc] init];
+  RDLPreservedNode *stale =
+      [RDLPreservedNode pieceOfNode:[NSXMLElement elementWithName:@"Nullable" stringValue:@"false"]];
   stale.parentPath = @[ @"ReportParameters#0", @"ReportParameter[P]#0" ];
-  stale.node = [NSXMLElement elementWithName:@"Nullable" stringValue:@"false"];
   r.preservedNodes = [r.preservedNodes arrayByAddingObject:stale];
   NSString *written = [RDLWriter XMLStringFromReport:r];
   NSString * (^block)(NSString *) = ^NSString *(NSString *pattern) {
