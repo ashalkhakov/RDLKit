@@ -20,12 +20,12 @@ decision before it can be fixed) · **GS** (GNUstep only).
 
 | Case | What was seen | Status |
 |---|---|---|
-| TBL-05 | A column border cannot be dragged to resize | open |
-| TBL-06 | Merge empties the cell to the right instead of merging; split does nothing | open |
+| TBL-05 | A column border cannot be dragged to resize | **fixed as far as this machine can tell** — the border answered only within three model points of itself and only inside the grid, so at a small zoom it was a target a pixel or two wide. It is five points now, and answers in the handle band above the grid as well, where Report Builder's column handles are. Worth re-checking on Linux |
+| TBL-06 | Merge empties the cell to the right instead of merging; split does nothing | **fixed** — the model was merging; the canvas drew every grid place as its own cell, so the merged cell kept its width, the covered place drew nothing and the lines ran through the middle. Everything that shows a cell now asks what it covers |
 | TBL-08, TBL-09, TBL-12 | Child group, adjacent group and totals do nothing from the pane's menu | **fixed** — they were being offered on the details group, which groups on nothing, so the structure refused them in silence. The pane now offers only what can be done to the row picked out, names that row "(Details)" as Report Builder does, and says why when something is refused anyway |
 | TBL-13 | The pane's buttons (Group Inside, Group Beside, Delete, Properties) do nothing | open |
-| TBL-17 | A field dropped in a list lands beside the group rather than in its cell | open |
-| TBL-19 | A parameter dropped on a full cell replaces what is there instead of wrapping both | open |
+| TBL-17 | A field dropped in a list lands beside the group rather than in its cell | **fixed** — a list is a tablix of one cell holding a rectangle, and a field dropped on it now goes inside that rectangle, under whatever is already there |
+| TBL-19 | A parameter dropped on a full cell replaces what is there instead of wrapping both | **as designed, and the use case was wrong** — dragging a *field or parameter* onto a cell binds what is in it, which is what Report Builder does; *inserting an item* into a full cell is the case that wraps both in a rectangle. The use case has been reworded |
 | DAT-03 | XPaths in an XML data source do not select anything | open |
 | DAT-07, DAT-09 | Preview renders without asking for parameter values | open |
 | INSP-02 | Rename: a name with spaces is refused silently, and an accepted one does not undo | open |

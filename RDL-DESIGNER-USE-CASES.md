@@ -140,9 +140,9 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | TBL-14 | Group properties | Pane menu > Group Properties… | Name, what it groups on, filters, sorting, page breaks, visibility and variables, applied as one undo step. *Guarded by `testTheGroupPropertiesPanelAppliesAsOneStep`, `testTheGroupPropertiesPanelSetsPagesSortAndVisibility`, `testAGroupsNameAndExpressionsChangeTogether`* |
 | TBL-15 | A row's own settings | Right-click a row: repeat on each page, keep with group, hide if no rows, keep in view | Each is set and undone. *Guarded by `testARowsOwnSettingsAreSet`, `testTheTablixMenuSetsAColumnsAndARowsOwnSettings`* |
 | TBL-16 | Region properties | Inspector: dataset, heights, no-rows message, Sorting…, Filters… | Each writes through; the filter count shows on the button. *Guarded by `testTheTablixOptionsAreEdited`, `testTheTablixHeightsAreItsRows`, `testTheSortPanelEditsRowsInOrder`, `testFiltersAtEveryLevel`* |
-| TBL-17 | A list | Add Element > List | A tablix of one repeated rectangle you can drop items into. *Guarded by `testAListIsATablixOfOneRepeatedRectangle`* |
+| TBL-17 | A list | Add Element > List, then drag a field onto it | A tablix of one repeated rectangle; a field dropped on it goes inside that rectangle, under what is already there. *Guarded by `testAListIsATablixOfOneRepeatedRectangle`, `testAFieldDroppedOnAListGoesInWhatItRepeats`* |
 | TBL-18 | Empty a cell | Select a cell's item and delete it | The cell stays and is selected, ready to take something else. *Guarded by `testEmptyingACellLeavesTheCellSelected`* |
-| TBL-19 | Two things in one cell | Drop a second item into a filled cell | What was there is wrapped in a rectangle and both are in it. *Guarded by `testASecondItemInACellWrapsWhatIsThereInARectangle`* |
+| TBL-19 | Two things in one cell | Paste or insert a second item into a filled cell — not a field drag, which binds what is there instead | What was there is wrapped in a rectangle and both are in it. *Guarded by `testASecondItemInACellWrapsWhatIsThereInARectangle`* |
 | TBL-20 | Style a cell | Select an empty cell and give it borders | A blank textbox is put in the cell to carry them, in the same undo step. *Guarded by `testAnEmptyCellIsGivenBordersThroughABlankTextbox`, `testACellIsStyledThroughTheItemInIt`* |
 
 ## I. Charts

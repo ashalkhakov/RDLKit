@@ -763,6 +763,59 @@
 // first cell's contents -- or taking the neighbour's when the first had none --
 // and back again with a text box in each cell uncovered. A merge never
 // reaches into a group's own row.
+// TBL-05, reported as: a column border cannot be dragged to resize. The border
+// answers within five points of itself, and in the handle band above the grid
+// as well -- which is where Report Builder's column handles are, and where a
+// hand goes for them.
+- (void)testAColumnBorderIsFoundWhereAHandGoesForIt {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  NSRect itemRect = NSZeroRect;
+  if (tablix == nil || ![[canvas geometry] findRectOfItem:tablix rect:&itemRect]) {
+    XCTFail(@"%@", @"the manifest's table should be on the page");
+    return;
+  }
+  CGFloat border = NSMinX(itemRect) + [RDLTablixGeometry widthOfBodyColumn:0 of:tablix];
+  NSUInteger column = NSNotFound;
+  // Inside the grid, a little to either side of the line.
+  for (CGFloat dx = -4; dx <= 4; dx += 4) {
+    column = NSNotFound;
+    if (![RDLTablixGeometry tablix:tablix
+                          itemRect:itemRect
+               columnBorderAtPoint:NSMakePoint(border + dx, NSMidY(itemRect))
+                            column:&column] ||
+        column != 0)
+      XCTFail(@"the border should answer %g points away, it did not", dx);
+  }
+  // And in the handle band over it.
+  if (![RDLTablixGeometry tablix:tablix
+                        itemRect:itemRect
+             columnBorderAtPoint:NSMakePoint(border, NSMinY(itemRect) - RDLTablixHandleBand / 2)
+                          column:&column])
+    XCTFail(@"%@", @"the border should answer in the handle band, where the column handles are");
+  // Not somewhere else entirely.
+  if ([RDLTablixGeometry tablix:tablix
+                       itemRect:itemRect
+            columnBorderAtPoint:NSMakePoint(border, NSMinY(itemRect) - RDLTablixHandleBand * 3)
+                         column:&column])
+    XCTFail(@"%@", @"and not above the band");
+
+  // What the drag then does, through the editor that records it.
+  CGFloat was = tablix.tablixBody.columns[0].width;
+  [ctx.editor setTablixColumn:0 width:was + 0.5 ofTablix:tablix];
+  if (fabs(tablix.tablixBody.columns[0].width - (was + 0.5)) > 0.001)
+    XCTFail(@"the column should be half an inch wider, it is %g",
+            tablix.tablixBody.columns[0].width);
+  [ctx.document.undoManager undo];
+  if (fabs(tablix.tablixBody.columns[0].width - was) > 0.001)
+    XCTFail(@"%@", @"and undo should put the width back");
+}
+
 // TBL-06, reported as: merging removes the contents of the cell to the right
 // and the table is drawn exactly as before. The model was merging; the canvas
 // was not showing it, because every grid position was drawn as its own cell

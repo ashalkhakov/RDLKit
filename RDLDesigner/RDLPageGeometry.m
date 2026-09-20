@@ -45,7 +45,11 @@ NSString * const RDLHandleSouth = @"s";
 static const CGFloat kCanvasPadding = 48.0;
 static const CGFloat kPaperTopInset = 36.0;
 static const CGFloat kHandleSize = 8.0;
-static const CGFloat kColumnBorderSlop = 3.0;
+// How near a column's border counts as being on it. Three points was a target
+// a tenth of an inch wide on paper and thinner than that on screen at a small
+// zoom; five is still precise enough to pick one border out of two a quarter
+// of an inch apart.
+static const CGFloat kColumnBorderSlop = 5.0;
 
 @interface RDLBandFrame ()
 @property (nonatomic, copy) NSString *bandKey;
@@ -830,7 +834,9 @@ static void RDLCollectGroupLabels(NSArray<RDLTablixMember *> *members, NSUIntege
   NSUInteger rows = [self rowCountOf:tablix];
   for (NSUInteger r = 0; r < rows; r++)
     gridBottom += [self heightOfRow:r of:tablix];
-  if (point.y < NSMinY(itemRect) || point.y > gridBottom)
+  // The handle band above the grid answers as well: that is where Report
+  // Builder's column handles are, and where a hand goes to resize a column.
+  if (point.y < NSMinY(itemRect) - RDLTablixHandleBand || point.y > gridBottom)
     return NO;
   CGFloat x = NSMinX(itemRect);
   for (NSUInteger c = 0; c < headers; c++)

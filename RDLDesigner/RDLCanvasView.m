@@ -224,6 +224,12 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
   NSString *expression = binding[RDLPaletteExpressionKey];
   NSString *label = binding[RDLPaletteLabelKey] ?: @"Field";
   RDLItem *held = cell.item;
+  // A list is a tablix of one cell holding a rectangle, and what is dropped on
+  // a list belongs in that rectangle -- which is the thing the list repeats.
+  // Dropping it in the band instead put a text box on top of the region, where
+  // it drew nothing of the data.
+  if ([held isKindOfClass:[RDLRectangle class]])
+    return [self bind:binding intoRectangle:(RDLRectangle *)held];
   if (held != nil && ![held isKindOfClass:[RDLTextbox class]])
     return NO;  // something that is not text: let the drop land in the band instead
 
@@ -241,6 +247,29 @@ static NSInteger RDLCellTag(NSUInteger row, NSUInteger column) {
   [self nameColumnAbove:row column:column ofTablix:tablix as:label];
   [_context.editor endGroup];
   [_context.selection selectItem:held inBandWithKey:_context.selection.bandKey];
+  return YES;
+}
+
+// A bound text box inside a rectangle -- a list's repeated contents, or a cell
+// that holds several things -- under whatever is already in it.
+- (BOOL)bind:(NSDictionary *)binding intoRectangle:(RDLRectangle *)box {
+  NSString *expression = binding[RDLPaletteExpressionKey];
+  NSString *label = binding[RDLPaletteLabelKey] ?: @"Field";
+  RDLTextbox *made = [[RDLTextbox alloc] init];
+  made.name = [RDLItemFactory uniqueNameWithPrefix:label inReport:_context.report];
+  [RDLItemFactory applyDefaultsTo:made report:_context.report];
+  made.value = expression;
+  made.left = 0;
+  CGFloat top = 0;
+  for (RDLItem *sibling in box.items)
+    top = MAX(top, sibling.top + sibling.height);
+  made.top = top;
+  if (made.width > box.width && box.width > 0)
+    made.width = box.width;
+  [_context.editor beginGroup:@"Bind Cell"];
+  [_context.editor addItem:made into:box.items bandKey:_context.selection.bandKey];
+  [_context.editor endGroup];
+  [_context.selection selectItem:made inBandWithKey:_context.selection.bandKey];
   return YES;
 }
 

@@ -1193,6 +1193,66 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"a document that is not there should be reported");
 }
 
+// TBL-17, reported as: a field dropped on a list lands beside it and draws
+// nothing. A list is a tablix of one cell holding a rectangle, and what it
+// repeats is what is in that rectangle -- so that is where a dropped field
+// belongs.
+- (void)testAFieldDroppedOnAListGoesInWhatItRepeats {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Listing"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Inline";
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Crates";
+  ds.dataSourceName = @"Inline";
+  [ds setFieldNames:@[ @"Crate", @"Weight" ]];
+  [report.dataSets addObject:ds];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindList];
+  RDLTablix *list = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      list = (RDLTablix *)item;
+  RDLRectangle *repeated = list ? (RDLRectangle *)[RDLTablixGeometry itemOf:list inRow:0 column:0] : nil;
+  if (![repeated isKindOfClass:[RDLRectangle class]]) {
+    XCTFail(@"a list should repeat a rectangle, it holds %@", repeated);
+    return;
+  }
+
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  NSRect itemRect = NSZeroRect;
+  [[canvas geometry] findRectOfItem:list rect:&itemRect];
+  NSRect cell = [RDLTablixGeometry cellRectOf:list itemRect:itemRect row:0 column:0];
+  NSUInteger inBand = [report.body.items count], inRectangle = [repeated.items count];
+
+  if (![canvas dropBinding:@{ @"expression" : @"=Fields!Crate.Value", @"label" : @"Crate" }
+                   atPoint:NSMakePoint(NSMidX(cell), NSMidY(cell))]) {
+    XCTFail(@"%@", @"the canvas refused a field dropped on a list");
+    return;
+  }
+  if ([report.body.items count] != inBand)
+    XCTFail(@"%@", @"nothing should have landed in the band on top of the list");
+  if ([repeated.items count] != inRectangle + 1) {
+    XCTFail(@"the field should be in what the list repeats, it holds %lu",
+            (unsigned long)[repeated.items count]);
+    return;
+  }
+  RDLTextbox *made = (RDLTextbox *)[repeated.items lastObject];
+  if (![[made.value description] isEqualToString:@"=Fields!Crate.Value"])
+    XCTFail(@"it should be bound to the field, it reads %@", made.value);
+  if (made.left < 0 || made.top < 0 || made.width > repeated.width)
+    XCTFail(@"%@", @"and should fit inside the rectangle it was put in");
+  if ([ctx selectedItem] != made)
+    XCTFail(@"%@", @"what was just dropped should be selected");
+
+  // A second field goes under the first rather than on top of it.
+  [canvas dropBinding:@{ @"expression" : @"=Fields!Weight.Value", @"label" : @"Weight" }
+              atPoint:NSMakePoint(NSMidX(cell), NSMidY(cell))];
+  RDLTextbox *second = (RDLTextbox *)[repeated.items lastObject];
+  if (second == made || second.top < made.top + made.height - 0.001)
+    XCTFail(@"the second should sit under the first, at %.3f against %.3f", second.top, made.top);
+}
+
 // A field dropped on a table goes in the cell it was dropped on -- which is
 // what a table is for -- and names the column above it when that heading is
 // still blank.
