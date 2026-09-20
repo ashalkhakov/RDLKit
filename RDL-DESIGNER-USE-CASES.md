@@ -47,12 +47,12 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| WIN-01 | The three panes | Look at the window | Left: Outline, Datasets, Insert, Problems. Centre: canvas (or Source, or a dataset). Right: Report, Attributes, Style, Properties. *Guarded by `testDesignerWindowShell`, `testPanesComeFromTheirXIBs`* |
+| WIN-01 | The three panes | Look at the window | Left: Outline, Datasets, Insert, Problems. Centre: canvas (or Source, or a dataset). Right: Report, Attributes, Style. *Guarded by `testDesignerWindowShell`, `testPanesComeFromTheirXIBs`* |
 | WIN-02 | Panes keep their width | Widen the window | The sides stay; the centre takes the extra. Drag a divider and it stays where you put it. *Guarded by `testTheWindowsPanesFollowTheWindow`, `testTheWindowWillNotShrinkAPaneAway`* |
 | WIN-03 | The groups pane collapses | View > Row and Column Groups; then double-click its divider; then drag the divider shut | Three ways to the same state; the menu item is ticked while it shows, and it reopens at the height you left it. *Guarded by `testTheGroupsPaneCollapsesAndComesBack`* |
 | WIN-04 | Zoom | ⌘= and ⌘- , and the zoom control | 40% to 400%; the rulers, grid, handles and tablix band all scale with it. *Guarded by `testTheCanvasZoomsToFourHundredPercent`, `testPreviewZoomAndRulers`, `testTheTablixHandleBandScalesWithTheZoom`* |
 | WIN-05 | Grid | View > Toggle Grid | The grid appears and disappears; positions still snap to it either way |
-| WIN-06 | Selecting brings the settings forward | Click an element while the Report tab is showing | The right pane switches to Attributes — except when the Properties tab is the one you are working in. *Guarded by `testSelectingAnythingBringsTheAttributesForward`* |
+| WIN-06 | Selecting brings the settings forward | Click an element while the Report tab is showing | The right pane switches to Attributes — except when the Style tab is the one you are working in. *Guarded by `testSelectingAnythingBringsTheAttributesForward`* |
 | WIN-07 | Dark mode | Switch macOS to dark and back | Every pane, panel and the canvas stay readable; no black text on a dark ground |
 
 ## C. Page setup
@@ -190,7 +190,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | PRB-03 | It follows the report | Put the error right | The row goes, a moment after the change |
 | PRB-04 | The samples are clean | Open each sample and look at Problems | Nothing to report, for all eleven. *Guarded by `testEverySamplePassesTheChecker`* |
 
-## M. Source and Properties
+## M. Source
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
@@ -198,7 +198,6 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | SRC-02 | Edit and apply | Change a value in the text, press Apply | The report becomes what is written, in one undo step; the canvas follows |
 | SRC-03 | Apply something broken | Delete a closing tag, press Apply | Nothing changes and the pane says why |
 | SRC-04 | Revert | Type, then press Revert | The text goes back to the report |
-| SRC-05 | The properties grid | Right pane > Properties, with an item selected | Every property of the element and its style, editable where the model can take text; a list of child items is shown but not typed into. *Guarded by `testThePropertiesGridShowsAndSetsEveryProperty`* |
 
 ## N. Outline
 

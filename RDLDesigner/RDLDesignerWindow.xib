@@ -24,7 +24,6 @@
                 <outlet property="leftTabView" destination="leftTabView" id="leftTabViewOutlet"/>
                 <outlet property="outline" destination="outline" id="outlineOutlet"/>
                 <outlet property="problemsHost" destination="problemsHost" id="problemsHostOutlet"/>
-                <outlet property="propertiesHost" destination="propertiesHost" id="propertiesHostOutlet"/>
                 <outlet property="styleInspectorHost" destination="styleInspectorHost" id="styleInspectorHostOutlet"/>
                 <outlet property="groupsHost" destination="groupsHost" id="groupsHostOutlet"/>
                 <outlet property="centerSplit" destination="centerSplit" id="centerSplitOutlet"/>
@@ -522,18 +521,6 @@
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                     <subviews>
                                                         <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="styleInspectorHost">
-                                                            <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
-                                                            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                        </customView>
-                                                    </subviews>
-                                                </view>
-                                            </tabViewItem>
-                                            <tabViewItem label="Properties" identifier="properties" id="rightPropertiesItem">
-                                                <view key="view" id="rightPropertiesItemView">
-                                                    <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
-                                                    <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                                    <subviews>
-                                                        <customView fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="propertiesHost">
                                                             <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                         </customView>

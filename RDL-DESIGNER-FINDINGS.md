@@ -51,6 +51,15 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | WIN-03 | The groups pane can open too short for its own buttons | open |
 | WIN-04 | Zoom steps are smaller than the zoom control's, so it updates every second press | open |
 
+## Dropped
+
+The Properties grid (the right pane's fourth tab) is gone. It listed every
+property of the selected item, read from the class rather than from a list,
+and it was built for the gaps document's "full properties grid". Once the
+Style tab held what the More Style button had been hiding, what was left was a
+fourth tab that duplicated the other three; anything genuinely missing belongs
+in Attributes or Style as a field, not in a grid beside them.
+
 ## Decisions to make
 
 | Case | The question |

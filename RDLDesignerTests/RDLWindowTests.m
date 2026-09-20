@@ -20,7 +20,6 @@
 #import "RDLPreviewWindow.h"
 #import "RDLProblemsView.h"
 #import "RDLGroupsView.h"
-#import "RDLPropertiesView.h"
 #import "RDLSourceView.h"
 #import "RDLOutlineDataSource.h"
 #import "RDLValueListEditor.h"
@@ -342,7 +341,7 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   NSTabView *right = [wc valueForKey:@"rightTabView"];
   NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
   DMTabBar *bar = [wc valueForKey:@"rightTabBar"];
-  NSArray<NSString *> *wanted = @[ @"report", @"attributes", @"style", @"properties" ];
+  NSArray<NSString *> *wanted = @[ @"report", @"attributes", @"style" ];
   if ([right numberOfTabViewItems] != (NSInteger)[wanted count])
     XCTFail(@"the right pane should hold %lu tabs, it holds %ld", (unsigned long)[wanted count],
             (long)[right numberOfTabViewItems]);
@@ -373,9 +372,6 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   RDLInspectorView *style = [wc valueForKey:@"styleInspector"];
   if (![style isDescendantOf:[[right tabViewItemAtIndex:2] view]])
     XCTFail(@"%@", @"the Style tab should hold the Style inspector");
-  RDLPropertiesView *grid = [wc valueForKey:@"propertiesView"];
-  if (![grid isDescendantOf:[[right tabViewItemAtIndex:3] view]])
-    XCTFail(@"%@", @"and the Properties tab the properties grid");
 }
 
 // A line drawn on the canvas is a rule, across or down. Dragging a corner
@@ -607,10 +603,10 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
   // Left: outline, datasets, insert, problems. Centre: preview, source,
   // dataset, data source -- the two things that are edited rather than drawn.
-  // Right: report, attributes, style, properties -- and inside attributes,
-  // element, dataset field and parameter.
-  if (items != 15)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 15 panes across the four tab views, got %lu",
+  // Right: report, attributes, style -- and inside attributes, element,
+  // dataset field and parameter.
+  if (items != 14)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 14 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
   // Both navigators have somewhere to live, and the data source pane has a
   // host of its own: a pane with no host is one nothing can reach.
@@ -643,9 +639,9 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"the tab bars did not come out of the XIB as DMTabBars");
     return;
   }
-  // Outline, Datasets, Insert and Problems on the left; Report, Attributes,
-  // Style and Properties on the right.
-  if ([[leftBar tabBarItems] count] != 4 || [[rightBar tabBarItems] count] != 4)
+  // Outline, Datasets, Insert and Problems on the left; Report, Attributes and
+  // Style on the right.
+  if ([[leftBar tabBarItems] count] != 4 || [[rightBar tabBarItems] count] != 3)
     XCTFail(@"%@", [NSString stringWithFormat:@"the bars hold %lu and %lu items",
                                               (unsigned long)[[leftBar tabBarItems] count],
                                               (unsigned long)[[rightBar tabBarItems] count]]);
@@ -1266,67 +1262,6 @@ static NSTabView *_centerTabViewOf(id wc) {
                                                                       context:ctx];
   if (editor == nil)
     XCTFail(@"%@", @"the group the pane has picked out should open in the properties panel");
-}
-
-// The properties grid: every property of what is selected, read from the class
-// rather than from a list, and written back through the editor.
-- (void)testThePropertiesGridShowsAndSetsEveryProperty {
-  RDLReport *report = [RDLReport emptyReportNamed:@"Everything"];
-  RDLTextbox *box = [[RDLTextbox alloc] init];
-  box.name = @"Title";
-  box.value = @"Hello";
-  box.left = 1;
-  box.top = 0.5;
-  box.width = 2;
-  box.height = 0.3;
-  box.style.fontFamily = @"Helvetica";
-  [report.body.items addObject:box];
-  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
-  RDLPropertiesView *grid =
-      [[RDLPropertiesView alloc] initWithFrame:NSMakeRect(0, 0, 260, 500) context:ctx];
-
-  // Nothing selected, nothing to show.
-  if ([grid.keyPaths count])
-    XCTFail(@"%@", @"the grid should be empty when nothing is selected");
-  [ctx.selection selectItem:box inBandWithKey:@"body"];
-  for (NSString *keyPath in @[ @"name", @"left", @"top", @"width", @"height", @"style.fontFamily" ])
-    if (![grid.keyPaths containsObject:keyPath])
-      XCTFail(@"the grid should list %@; it lists %@", keyPath, grid.keyPaths);
-  if (![[grid textForKeyPath:@"style.fontFamily"] isEqualToString:@"Helvetica"])
-    XCTFail(@"the font family should read as it is set, reads %@",
-            [grid textForKeyPath:@"style.fontFamily"]);
-  if (![[grid textForKeyPath:@"left"] isEqualToString:@"1"])
-    XCTFail(@"an inch measurement should read as a number, reads %@",
-            [grid textForKeyPath:@"left"]);
-
-  // Typed into, it edits the model through the editor, so it undoes.
-  if (![grid setText:@"2.5" forKeyPath:@"top"])
-    XCTFail(@"%@", @"the grid should have set the top");
-  if (fabs(box.top - 2.5) > 0.0001)
-    XCTFail(@"the top should be 2.5, is %.3f", box.top);
-  [[ctx.document undoManager] undo];
-  if (fabs(box.top - 0.5) > 0.0001)
-    XCTFail(@"%@", @"undo should put the top back");
-
-  // A name follows the rename rule rather than being written straight in.
-  if (![grid setText:@"Heading" forKeyPath:@"name"] || ![box.name isEqualToString:@"Heading"])
-    XCTFail(@"the grid should rename the element, it is called %@", box.name);
-
-  // A property the grid can only show is not written into: a list of items is
-  // not text, and typing over it would mean nothing.
-  RDLRectangle *boxOfThings = [[RDLRectangle alloc] init];
-  boxOfThings.name = @"Group";
-  boxOfThings.width = 2;
-  boxOfThings.height = 1;
-  [boxOfThings.items addObject:[[RDLTextbox alloc] init]];
-  [report.body.items addObject:boxOfThings];
-  [ctx.selection selectItem:boxOfThings inBandWithKey:@"body"];
-  if (![[grid textForKeyPath:@"items"] isEqualToString:@"1 item"])
-    XCTFail(@"a list should say how much of it there is, says %@", [grid textForKeyPath:@"items"]);
-  if ([grid setText:@"nonsense" forKeyPath:@"items"])
-    XCTFail(@"%@", @"a list should not be typed into");
-  if ([boxOfThings.items count] != 1)
-    XCTFail(@"%@", @"the list should be untouched");
 }
 
 // The preview: the report as it comes out, walked through page by page, with

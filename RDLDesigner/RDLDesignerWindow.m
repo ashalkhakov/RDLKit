@@ -3,7 +3,6 @@
 #import "RDLSelection.h"
 #import "RDLPreviewWindow.h"
 #import "RDLGroupsView.h"
-#import "RDLPropertiesView.h"
 #import "RDLSourceView.h"
 #import "RDLCanvasView.h"
 #import "RDLEditingContext.h"
@@ -95,14 +94,12 @@ static NSSize RDLDesignerWindowMinimumSize(void) {
 @property (nonatomic, strong) IBOutlet NSView *datasetNavigatorHost, *sourceHost, *paletteHost;
 // The report as RDL, and the way back: what is typed there becomes the report.
 @property (nonatomic, strong) RDLSourceView *sourceView;
-@property (nonatomic, strong) IBOutlet NSView *problemsHost, *propertiesHost, *groupsHost;
+@property (nonatomic, strong) IBOutlet NSView *problemsHost, *groupsHost;
 @property (nonatomic, strong) IBOutlet NSView *styleInspectorHost;
 // How what is selected looks, in a tab of its own.
 @property (nonatomic, strong) RDLInspectorView *styleInspector;
 // How the region being worked in groups, under the canvas.
 @property (nonatomic, strong) RDLGroupsView *groupsView;
-// Every property of what is selected, beside the inspector's chosen few.
-@property (nonatomic, strong) RDLPropertiesView *propertiesView;
 // What is wrong with the report, listed beside the ways into it.
 @property (nonatomic, strong) RDLProblemsView *problemsView;
 // Data sources sit above the datasets, which is the order they are made in: a
@@ -908,10 +905,6 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _styleInspector.shows = RDLInspectorShowsStyle;
   RDLFillHostScrolling(_styleInspectorHost, _styleInspector);
 
-  // Every property of what is selected, for the ones the inspector has no
-  // field for.
-  _propertiesView = [[RDLPropertiesView alloc] initWithFrame:[_propertiesHost bounds] context:_context];
-  RDLFillHost(_propertiesHost, _propertiesView);
 
   // What is wrong with the whole report, beside the ways into it.
   _problemsView = [[RDLProblemsView alloc] initWithFrame:[_problemsHost bounds] context:_context];
@@ -1076,7 +1069,6 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
     @[ @"R", @"Report", @0.47, @0.53, @0.64 ],
     @[ @"A", @"Attributes", @0.36, @0.49, @0.72 ],
     @[ @"S", @"Style", @0.72, @0.52, @0.36 ],
-    @[ @"P", @"Properties", @0.36, @0.60, @0.49 ],
   ]);
 }
 
@@ -1121,9 +1113,10 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
     return;
   // The properties grid shows the selection too, so there is nothing to bring
   // forward when it is the tab someone is working in.
-  NSInteger showing = [_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]];
-  if (showing == 2 || showing == 3)
-    return;  // Style and Properties show the selection too
+  // The Style tab shows the selection too, so there is nothing to bring
+  // forward when that is the tab being worked in.
+  if ([_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]] == 2)
+    return;
   [_rightTabView selectTabViewItemAtIndex:1];
   [_rightTabBar setValue:@1 forKey:@"selectedIndex"];
 }

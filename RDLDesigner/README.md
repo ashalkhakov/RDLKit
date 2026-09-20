@@ -209,7 +209,6 @@ shows up in the master's next preview.
 | `RDLSubreportParametersEditor.xib` | The panel, its three columns and the buttons | The parameter names the subreport declares, and the expression cell in the Value column |
 | `RDLGroupsView.xib` | The pane: the group tree with its two columns, and the four buttons | The groups of the region being worked in, and the menu on a row |
 | `RDLSourceView.xib` | The pane: the text view, the status line, Apply and Revert | The report written out as RDL |
-| `RDLPropertiesView.xib` | The pane: the two-column grid and its heading | Every property of what is selected, read from its class |
 | `RDLRichTextEditor.xib` | The window, the formatting bar and its controls, the text view and the buttons | The installed font families, and the text being edited |
 | `RDLAddElementPanel.xib` | The panel, its caption and Cancel | One button per allowed element kind, and the height to hold them |
 | `RDLPreviewWindow.xib` | Everything | — |

@@ -524,11 +524,11 @@ a viewer -- it reads the report's data and loads its subreports before
 rendering, says what it could not read, walks through the pages with
 first/previous/next/last and a "Page n of m", and prints as a paginated
 document through NSDocument, which is what File > Print and Cmd-P now
-reach; a properties grid in the right pane, listing every property of
-what is selected -- the element's own and its style's, read from the
-class rather than from a list, so a property added to the model appears
-without anything being edited -- each editable where the model can take
-text back, through the editor so it undoes; a Row Groups / Column Groups
+reach; a Style tab in the right pane, holding how what is selected looks --
+type, colour, alignment, padding, borders, and the settings that were
+behind a More Style button -- beside an Attributes tab for what it is
+(a properties grid was built for this and then dropped: once Style had
+its own tab, the grid was a fourth pane repeating the other three); a Row Groups / Column Groups
 pane docked under the canvas, showing how the region being worked in
 groups -- the details group among them, as Report Builder lists it --
 with a group added inside or beside the one picked out, deleted with the

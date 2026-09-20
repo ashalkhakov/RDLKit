@@ -318,10 +318,6 @@
 		9346D5BC55A9CE47D73B2B30 /* RDLPreviewWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 8AEA3FE566BDB22C53C5B400 /* RDLPreviewWindow.m */; };
 		E5DF38EF4BA598100BDDB0D4 /* RDLPreviewWindow.m in Sources */ = {isa = PBXBuildFile; fileRef = 8AEA3FE566BDB22C53C5B400 /* RDLPreviewWindow.m */; };
 		2E28041BC0C83EC257065976 /* RDLPreviewWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = F3D38A29DDBE8ADCC484A10E /* RDLPreviewWindow.xib */; };
-		66F19EDE40B5D3400CDA3AAF /* RDLPropertiesView.m in Sources */ = {isa = PBXBuildFile; fileRef = 35652773988DD432182247E3 /* RDLPropertiesView.m */; };
-		CC2B87F393B7B527E2DCFD7F /* RDLPropertiesView.xib in Resources */ = {isa = PBXBuildFile; fileRef = E6C5D0C76AA2A25AA2579939 /* RDLPropertiesView.xib */; };
-		CBCFE3365DE78249F971A79D /* RDLPropertiesView.m in Sources */ = {isa = PBXBuildFile; fileRef = 35652773988DD432182247E3 /* RDLPropertiesView.m */; };
-		0968A448E16586173B6DA54B /* RDLPropertiesView.xib in Resources */ = {isa = PBXBuildFile; fileRef = E6C5D0C76AA2A25AA2579939 /* RDLPropertiesView.xib */; };
 		4025B2933AAEB9C04A8AB0D7 /* RDLGroupsView.m in Sources */ = {isa = PBXBuildFile; fileRef = C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */; };
 		CCAD574DF3ABF0DB57D729E7 /* RDLGroupsView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */; };
 		C4CCB62E9679B7452F8B4454 /* RDLGroupsView.m in Sources */ = {isa = PBXBuildFile; fileRef = C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */; };
@@ -672,9 +668,6 @@
 		B6419D402545800DB363DDE6 /* RDLSourceView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLSourceView.h; sourceTree = "<group>"; };
 		8AEA3FE566BDB22C53C5B400 /* RDLPreviewWindow.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPreviewWindow.m; sourceTree = "<group>"; };
 		15E3F14841BED3609EAA0D6E /* RDLPreviewWindow.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPreviewWindow.h; sourceTree = "<group>"; };
-		35652773988DD432182247E3 /* RDLPropertiesView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLPropertiesView.m; sourceTree = "<group>"; };
-		363AAFE622560D358F64E62E /* RDLPropertiesView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLPropertiesView.h; sourceTree = "<group>"; };
-		E6C5D0C76AA2A25AA2579939 /* RDLPropertiesView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLPropertiesView.xib; sourceTree = "<group>"; };
 		C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLGroupsView.m; sourceTree = "<group>"; };
 		1C482E801780987D9FCDA1DA /* RDLGroupsView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLGroupsView.h; sourceTree = "<group>"; };
 		84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLGroupsView.xib; sourceTree = "<group>"; };
@@ -909,9 +902,6 @@
 				B6419D402545800DB363DDE6 /* RDLSourceView.h */,
 				8AEA3FE566BDB22C53C5B400 /* RDLPreviewWindow.m */,
 				15E3F14841BED3609EAA0D6E /* RDLPreviewWindow.h */,
-				35652773988DD432182247E3 /* RDLPropertiesView.m */,
-				363AAFE622560D358F64E62E /* RDLPropertiesView.h */,
-				E6C5D0C76AA2A25AA2579939 /* RDLPropertiesView.xib */,
 				C0E49885ECA92CEDB45C7155 /* RDLGroupsView.m */,
 				1C482E801780987D9FCDA1DA /* RDLGroupsView.h */,
 				84EF314241950E6B0156B1D4 /* RDLGroupsView.xib */,
@@ -1315,7 +1305,6 @@
 				3909301127020DFAF9384DB2 /* RDLProblemsView.xib in Resources */,
 				02F457AD0524CBD22B2B8C6A /* RDLSourceView.xib in Resources */,
 				2E28041BC0C83EC257065976 /* RDLPreviewWindow.xib in Resources */,
-				0968A448E16586173B6DA54B /* RDLPropertiesView.xib in Resources */,
 				AA0C4EEB1968693BAE3F3180 /* RDLGroupsView.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1360,7 +1349,6 @@
 				F3EBBC2F011CBAE5CED1F5EF /* RDLStylePanel.xib in Resources */,
 				B6B7CD157690D1986C0E45A1 /* RDLProblemsView.xib in Resources */,
 				C33D0B314FB0CCBA794A4AF8 /* RDLSourceView.xib in Resources */,
-				CC2B87F393B7B527E2DCFD7F /* RDLPropertiesView.xib in Resources */,
 				CCAD574DF3ABF0DB57D729E7 /* RDLGroupsView.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1461,7 +1449,6 @@
 				FAF060289BBF517A5AF5CDD7 /* RDLSnapGuides.m in Sources */,
 				C97FD6B50BBB8518908CA149 /* RDLSourceView.m in Sources */,
 				9346D5BC55A9CE47D73B2B30 /* RDLPreviewWindow.m in Sources */,
-				66F19EDE40B5D3400CDA3AAF /* RDLPropertiesView.m in Sources */,
 				4025B2933AAEB9C04A8AB0D7 /* RDLGroupsView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1544,7 +1531,6 @@
 				727DE1D856A7E50C0397C1AC /* RDLSnapGuides.m in Sources */,
 				B8141BB9F495CEEE76015F3E /* RDLSourceView.m in Sources */,
 				E5DF38EF4BA598100BDDB0D4 /* RDLPreviewWindow.m in Sources */,
-				CBCFE3365DE78249F971A79D /* RDLPropertiesView.m in Sources */,
 				C4CCB62E9679B7452F8B4454 /* RDLGroupsView.m in Sources */,
 				69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */,
 			);

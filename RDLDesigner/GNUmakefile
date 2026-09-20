@@ -49,7 +49,6 @@ RDLDesigner_OBJC_FILES = \
   RDLPreviewWindow.m \
   RDLGroupsView.m \
   RDLProblemsView.m \
-  RDLPropertiesView.m \
   RDLSourceView.m \
   RDLSnapGuides.m \
   RDLChartAxisEditor.m \
@@ -116,7 +115,6 @@ RDLDesigner_RESOURCE_FILES += \
   RDLStylePanel.xib \
   RDLGroupsView.xib \
   RDLProblemsView.xib \
-  RDLPropertiesView.xib \
   RDLSourceView.xib \
   RDLChartAxisEditor.xib \
   RDLChartSeriesEditor.xib \
