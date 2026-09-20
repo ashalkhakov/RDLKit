@@ -4128,6 +4128,36 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"the dataset table shows the same column");
 }
 
+// A column of an XML dataset is an XPath from the row's element, and the pane
+// says so: the same box over a JSON source says only that it is a column.
+- (void)testTheColumnBoxSaysAnXMLColumnMayBeAnXPath {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Orders"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Doc";
+  source.dataProvider = @"XML";
+  source.connectString = @"xmldoc=orders.xml";
+  [report.dataSources addObject:source];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Orders";
+  ds.dataSourceName = @"Doc";
+  [ds setFieldNames:@[ @"No" ]];
+  [report.dataSets addObject:ds];
+  [report resolveDataSources];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLFieldInspectorView *inspector =
+      [[RDLFieldInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 400) context:ctx];
+  [inspector showField:[[ds fields] firstObject] ofDataSet:ds];
+  NSTextField *hint = [inspector valueForKey:@"kindHint"];
+  if ([[hint stringValue] rangeOfString:@"XPath"].location == NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"over XML the box should mention XPath; it says '%@'",
+                                              [hint stringValue]]);
+  // Over a source that has no paths in it, it does not offer any.
+  source.dataProvider = @"JSON";
+  [inspector showField:[[ds fields] firstObject] ofDataSet:ds];
+  if ([[hint stringValue] rangeOfString:@"XPath"].location != NSNotFound)
+    XCTFail(@"%@", @"a JSON column is not an XPath");
+}
+
 // The pane asks as a report server's prompt pane asks: not for a Hidden
 // parameter, nor one with no Prompt; from a list read from a dataset, shown by
 // its labels and giving its values; starting on the default the report works

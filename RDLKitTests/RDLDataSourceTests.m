@@ -96,6 +96,31 @@
       ![lines[0][@"Item"] isEqualToString:@"Bowl"])
     XCTFail(@"%@", [NSString stringWithFormat:@"nested lines: %@", rows[0][@"Line"]]);
 
+  // A column is an XPath from the row's own element: an attribute, a path
+  // through children, or one of a repeated child. This is how a dataset over
+  // XML says which part of the element each field reads.
+  RDLDataSet *pathed = [self dataSetNamed:@"Orders" query:@"//Order" source:@"S"];
+  NSMutableArray<RDLField *> *fields = [NSMutableArray array];
+  for (NSString *path in @[ @"@No", @"Line[1]/@Item", @"Customer/text()" ]) {
+    RDLField *f = [[RDLField alloc] init];
+    f.name = path;
+    f.dataField = path;
+    [fields addObject:f];
+  }
+  pathed.fields = fields;
+  NSArray *byPath = [provider rowsFromData:[self data:xml]
+                                     query:@"//Order"
+                                   dataSet:pathed
+                                properties:@{}
+                                     error:NULL];
+  if (![byPath[0][@"@No"] isEqualToString:@"A-1"] ||
+      ![byPath[0][@"Line[1]/@Item"] isEqualToString:@"Bowl"] ||
+      ![byPath[0][@"Customer/text()"] isEqualToString:@"Vale"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"columns read by XPath: %@", byPath[0]]);
+  // What the element answers to by name is still read by name.
+  if (![byPath[1][@"Customer"] isEqualToString:@"Reed"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"named columns as well: %@", byPath[1]]);
+
   // With no XPath, the root's children are the rows.
   NSArray *implied = [provider rowsFromData:[self data:xml]
                                     query:@""

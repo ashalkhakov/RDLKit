@@ -97,9 +97,19 @@
     [v setHidden:!any || calculated];
   for (NSView *v in @[ _valueField, _valueLabel, _valueExprButton ])
     [v setHidden:!any || !calculated];
-  [_kindHint setStringValue:
-      calculated ? @"An expression the report works out for every row."
-                 : @"A column of the query, read as it comes."];
+  [_kindHint setStringValue:calculated ? @"An expression the report works out for every row."
+                                       : [self columnHint]];
+}
+
+// What a column is depends on what the query reads: in XML it is an XPath from
+// the row's own element, and a field that says only "Total" is the short way
+// of writing a child of that name. Saying so here is the difference between a
+// pane that looks like it took the path and a report that comes out empty.
+- (NSString *)columnHint {
+  if (RDLDataProviderKindFromString(_dataSet.dataSource.dataProvider) == RDLDataProviderKindXML)
+    return @"A column of the query: a child or attribute of the row's element, "
+           @"or an XPath from it — @No, Customer/Name.";
+  return @"A column of the query, read as it comes.";
 }
 
 // Changing the kind rewrites the field as the other kind, because that is what

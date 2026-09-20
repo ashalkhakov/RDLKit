@@ -26,7 +26,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | TBL-13 | The pane's buttons (Group Inside, Group Beside, Delete, Properties) do nothing | open |
 | TBL-17 | A field dropped in a list lands beside the group rather than in its cell | **fixed** — a list is a tablix of one cell holding a rectangle, and a field dropped on it now goes inside that rectangle, under whatever is already there |
 | TBL-19 | A parameter dropped on a full cell replaces what is there instead of wrapping both | **as designed, and the use case was wrong** — dragging a *field or parameter* onto a cell binds what is in it, which is what Report Builder does; *inserting an item* into a full cell is the case that wraps both in a rectangle. The use case has been reworded |
-| DAT-03 | XPaths in an XML data source do not select anything | open |
+| DAT-03 | XPaths in an XML data source do not select anything | **fixed** — the query's XPath did select; a field's did not, because the provider read each element into a dictionary of its children and attributes and then looked the DataField up as a key. A column of an XML dataset is an XPath from the row's own element now (`@No`, `Customer/Name`, `Line[1]/@Item`), and a plain name still reads the child of that name. The field pane says so where it says what a column is |
 | DAT-07, DAT-09 | Preview renders without asking for parameter values | open |
 | INSP-02 | Rename: a name with spaces is refused silently, and an accepted one does not undo | open |
 | INSP-05 | The colour well and the hex field disagree after a manual edit; the edit does not undo | **fixed** — a control written to now brings along the other controls bound to the same property, so the well follows a typed colour and the field follows a picked one, undo included |
