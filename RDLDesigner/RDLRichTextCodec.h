@@ -53,3 +53,12 @@ extern NSString * const RDLExpressionRunAttributeName;
 // `item`'s style. Exposed so a caller can tell a no-op edit from a real one.
 + (BOOL)attributedStringIsRich:(NSAttributedString *)text forItem:(RDLTextbox *)item;
 @end
+
+// Whether a text box holds more than a plain value: an expression inside its
+// text, or runs styled apart from the box. Such a box cannot be shown or
+// edited as one line of text without throwing away what is in it -- the
+// inspector's Value field would read the words with the expressions missing,
+// and writing that back would be the loss -- so it is edited as rich text and
+// the field says so.
+FOUNDATION_EXPORT BOOL RDLTextboxHoldsRichText(RDLTextbox *box);
+

@@ -11,8 +11,8 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | Case | What was seen | Status |
 |---|---|---|
 | PRB-04 | The quarterly ledger reports "kept 2 parts … ChartAxis (2)" and the app dies moments later | **fixed** — the kept parts were live `NSXML` nodes held in the report long after the document they came from; they are plain data now, and the ledger keeps nothing at all, because those axes *are* read. Found on the way: every open-and-save duplicated the chart's axes (2 → 3 → 4), since the file leaves `ChartAxis` unnamed and this kit names it `Primary` |
-| TBL-16 | Filters and the no-rows message are not saved | **next** |
-| GET-03 | A text box shows its expressions in the rich-text editor but plain text in `f(x)` and the inspector field | **next** — the plain paths must not be able to overwrite runs |
+| TBL-16 | Filters and the no-rows message are not saved | **fixed** — both were written by the modal Edit Tablix screen, which has since gone; the paths that replaced it (the inspector's no-rows field, its Filters… and Sorting… buttons) write through the editor and survive the file. Now guarded by a round-trip test that types the message, sets a filter and a sort, saves, reopens and undoes all three |
+| GET-03 | A text box shows its expressions in the rich-text editor but plain text in `f(x)` and the inspector field | **fixed** — a box whose text holds an expression or a styled run cannot be shown as one line without dropping what it holds, so the Value field and its `f(x)` are closed on such a box and say to edit it as rich text. A plain box is unchanged |
 | UND-01 | Undo does nothing for an inspector property edit | **fixed** — the model did go back; the inspector did not, because it skipped every change to the item on show, unable to tell its own writing from anyone else's. It now skips only while it is itself writing, so an undo, the canvas or another pane all reach the fields |
 | UND-05 | Undo does nothing for a rich-text edit | **next** |
 

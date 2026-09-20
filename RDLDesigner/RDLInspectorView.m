@@ -21,6 +21,7 @@
 #import "RDLSubreportParametersEditor.h"
 #import "RDLExpressionHelper.h"
 #import "RDLInspectorFields.h"
+#import "RDLRichTextCodec.h"
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"
 #import "RDLRichTextEditor.h"
@@ -845,7 +846,16 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     if ([it isKindOfClass:[RDLTextbox class]]) {
       [boxes addObject:_textBox];
       [boxes addObject:_textOptionsBox];
+      // A box with expressions or styled runs inside its text cannot be shown
+      // as one line without dropping what it holds, so the field shows the
+      // words it has and says where to edit them; typing over it would write
+      // the runs away.
+      BOOL rich = RDLTextboxHoldsRichText((RDLTextbox *)it);
       [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
+      [_valueField setEditable:!rich];
+      [_valueField setToolTip:rich ? @"This text is formatted, or has expressions in it: "
+                                     @"edit it with Rich Text…" : nil];
+      [_valueExprButton setEnabled:!rich];
       [self rebuildHideDuplicatesPopFor:(RDLTextbox *)it];
     } else if ([it isKindOfClass:[RDLLine class]]) {
       [boxes addObject:_lineBox];

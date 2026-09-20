@@ -74,6 +74,18 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
 @implementation RDLRichTextResult
 @end
 
+BOOL RDLTextboxHoldsRichText(RDLTextbox *box) {
+  if (![box isKindOfClass:[RDLTextbox class]])
+    return NO;
+  for (RDLParagraph *paragraph in box.paragraphs)
+    for (RDLTextRun *run in paragraph.runs)
+      // An expression is the one a plain field cannot show at all; a run with
+      // a style of its own is the one it cannot keep.
+      if ([RDLExpr isExpressionSource:run.value] || run.style != nil)
+        return YES;
+  return NO;
+}
+
 @implementation RDLRichTextCodec
 
 + (RDLRichTextResult *)resultForAttributedString:(NSAttributedString *)text

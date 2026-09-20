@@ -10,6 +10,7 @@
 #import "RDLDesignerTestSupport.h"
 #import "RDLGroupsView.h"
 #import "RDLTablixStructure.h"
+#import "RDLInspectorView.h"
 
 @interface RDLRoundTripTests : RDLDesignerTestCase
 @end
@@ -40,6 +41,14 @@ static RDLDocument *RDLSaveAndOpen(RDLDocument *doc, NSString *name) {
   if (![doc saveToURL:url error:NULL])
     return nil;
   return RDLOpen(url);
+}
+
+// The first table of a report, which is what most of these edit.
+static RDLTablix *RDLFirstTablix(RDLReport *report) {
+  for (RDLItem *item in [report allItemsIncludingNested])
+    if ([item isKindOfClass:[RDLTablix class]])
+      return (RDLTablix *)item;
+  return nil;
 }
 
 // What a report holds, in the terms a person would count it in.
@@ -198,6 +207,76 @@ static NSDictionary<NSString *, NSNumber *> *RDLTally(RDLReport *report) {
   }
   if ([[theTablix structuralProblems] count])
     XCTFail(@"the table should still be sound: %@", [theTablix structuralProblems]);
+}
+
+// TBL-16, reported as "filters not being saved, no rows message doesn't
+// save". What a region's settings do between the inspector and the file:
+// typed in, applied through the editor, written, read back.
+- (void)testARegionsSettingsSurviveTheInspectorAndTheFile {
+  RDLDocument *doc = RDLOpen([RDLSamples URLForSampleWithId:@"manifest"]);
+  RDLEditingContext *ctx = doc ? [[RDLEditingContext alloc] initWithDocument:doc] : nil;
+  RDLTablix *tablix = doc ? RDLFirstTablix(doc.report) : nil;
+  if (tablix == nil) {
+    XCTFail(@"%@", @"the manifest sample should open and hold a table");
+    return;
+  }
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                                context:ctx];
+  [inspector reload];
+
+  // The no-rows message, typed where a person types it.
+  NSTextField *noRows = [inspector valueForKey:@"noRowsMessageField"];
+  [noRows setStringValue:@"Nothing shipped"];
+  [inspector changed:noRows];
+  if (![tablix.noRowsMessage isEqualToString:@"Nothing shipped"])
+    XCTFail(@"the message should reach the table, it is %@", tablix.noRowsMessage);
+
+  // Filters, as the panel hands them back.
+  RDLFilter *filter = [[RDLFilter alloc] init];
+  filter.expression = [RDLValue valueWithSource:@"=Fields!Port.Value"];
+  filter.oper = RDLFilterOperatorEqual;
+  [filter.values addObject:[RDLValue literal:@"Dover"]];
+  [ctx.editor setValue:[@[ filter ] mutableCopy] forKeyPath:@"filters" ofItem:tablix];
+  if ([tablix.filters count] != 1)
+    XCTFail(@"%@", @"the filter should reach the table");
+
+  // Sorting, the same way.
+  RDLSortExpression *sort = [[RDLSortExpression alloc] init];
+  sort.expression = [RDLValue valueWithSource:@"=Fields!Port.Value"];
+  sort.direction = RDLSortDirectionDescending;
+  [ctx.editor setValue:[@[ sort ] mutableCopy] forKeyPath:@"sortExpressions" ofItem:tablix];
+
+  RDLDocument *again = RDLSaveAndOpen(doc, @"settings.rdl");
+  RDLTablix *back = again ? RDLFirstTablix(again.report) : nil;
+  if (back == nil) {
+    XCTFail(@"%@", @"the report should save and open again");
+    return;
+  }
+  if (![back.noRowsMessage isEqualToString:@"Nothing shipped"])
+    XCTFail(@"the no-rows message should be in the file, it is %@", back.noRowsMessage);
+  if ([back.filters count] != 1)
+    XCTFail(@"the filter should be in the file, there are %lu", (unsigned long)[back.filters count]);
+  RDLFilter *backFilter = [back.filters firstObject];
+  if (![[backFilter.expression source] isEqualToString:@"=Fields!Port.Value"] ||
+      backFilter.oper != RDLFilterOperatorEqual ||
+      ![[[backFilter.values firstObject] source] isEqualToString:@"Dover"])
+    XCTFail(@"the filter should come back as it was written: %@ %ld %@",
+            [backFilter.expression source], (long)backFilter.oper,
+            [[backFilter.values firstObject] source]);
+  if ([back.sortExpressions count] != 1 ||
+      [[back.sortExpressions firstObject] direction] != RDLSortDirectionDescending)
+    XCTFail(@"the sort should be in the file, there are %lu",
+            (unsigned long)[back.sortExpressions count]);
+
+  // And undo takes each of them off again.
+  [[ctx.document undoManager] undo];
+  [[ctx.document undoManager] undo];
+  [[ctx.document undoManager] undo];
+  if ([tablix.filters count] || [tablix.sortExpressions count] || [tablix.noRowsMessage length])
+    XCTFail(@"undo should take all three back off: %lu filters, %lu sorts, %@",
+            (unsigned long)[tablix.filters count], (unsigned long)[tablix.sortExpressions count],
+            tablix.noRowsMessage);
 }
 
 // RND-03. What the designer cannot show is what a round trip loses most
