@@ -12,8 +12,8 @@
                 <outlet property="addCalculatedButton" destination="addCalculatedButton" id="addCalculatedButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="filtersButton" destination="filtersButton" id="filtersButtonOutlet"/>
-                <outlet property="optionsButton" destination="optionsButton" id="optionsButtonOutlet"/>
                 <outlet property="loadButton" destination="loadButton" id="loadButtonOutlet"/>
+                <outlet property="optionsButton" destination="optionsButton" id="optionsButtonOutlet"/>
                 <outlet property="queryField" destination="queryField" id="queryFieldOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
                 <outlet property="sourcePop" destination="sourcePop" id="sourcePopOutlet"/>

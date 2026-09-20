@@ -328,6 +328,75 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   }
 }
 
+// The Style tab in the window, not a pair of inspectors built by hand: it has
+// to be its own view, in its own host, showing its own sections.
+- (void)testTheStyleTabIsNotTheAttributesTab {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  RDLInspectorView *attributes = [wc valueForKey:@"inspector"];
+  RDLInspectorView *style = [wc valueForKey:@"styleInspector"];
+  NSView *host = [wc valueForKey:@"styleInspectorHost"];
+  if (style == nil || host == nil) {
+    XCTFail(@"%@", @"the Style tab should have an inspector and a host of its own");
+    return;
+  }
+  if (style == attributes || ![style isDescendantOf:host])
+    XCTFail(@"%@", @"the Style tab's inspector should be its own, inside its own host");
+  if (style.shows != RDLInspectorShowsStyle)
+    XCTFail(@"%@", @"and it should know which tab it is from the start");
+
+  RDLTextbox *box = nil;
+  for (RDLItem *item in ctx.report.body.items)
+    if (box == nil && [item isKindOfClass:[RDLTextbox class]])
+      box = (RDLTextbox *)item;
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  // Each shows what it is for, and neither shows the other's.
+  if ([[style valueForKey:@"textStyleBox"] isHidden] || ![[style valueForKey:@"textBox"] isHidden])
+    XCTFail(@"%@", @"Style should show how the text looks and not what it says");
+  if ([[attributes valueForKey:@"textBox"] isHidden] ||
+      ![[attributes valueForKey:@"textStyleBox"] isHidden])
+    XCTFail(@"%@", @"Attributes should show what it says and not how it looks");
+  // The two panes are not the same set of visible sections.
+  NSMutableArray<NSString *> *inStyle = [NSMutableArray array], *inAttributes = [NSMutableArray array];
+  for (NSString *name in @[ @"nameBox", @"geoBox", @"textBox", @"textStyleBox", @"moreStyleBox",
+                            @"visibilityBox", @"linkBox", @"keepBox" ]) {
+    if (![[style valueForKey:name] isHidden])
+      [inStyle addObject:name];
+    if (![[attributes valueForKey:name] isHidden])
+      [inAttributes addObject:name];
+  }
+  if ([inStyle isEqualToArray:inAttributes])
+    XCTFail(@"the two tabs show the same thing: %@", inStyle);
+  if ([inStyle count] == 0)
+    XCTFail(@"%@", @"the Style tab shows nothing at all");
+
+  // And the settings that used to be behind the More Style button are in the
+  // Style tab, not in Attributes.
+  if ([[style valueForKey:@"styleRestBox"] isHidden] ||
+      ![[attributes valueForKey:@"styleRestBox"] isHidden])
+    XCTFail(@"%@", @"the rest of a style belongs to the Style tab");
+
+  // Selecting the report: the Report tab has its settings, and neither other
+  // tab repeats them.
+  [ctx.selection selectReport];
+  RDLInspectorView *reportTab = [wc valueForKey:@"reportInspector"];
+  if ([[reportTab valueForKey:@"docBox"] isHidden] || [[reportTab valueForKey:@"paperBox"] isHidden])
+    XCTFail(@"%@", @"the Report tab should show the report's own settings");
+  for (RDLInspectorView *other in @[ attributes, style ])
+    for (NSString *section in @[ @"docBox", @"paperBox" ])
+      if (![[other valueForKey:section] isHidden])
+        XCTFail(@"%@ is shown in a tab that is not the Report tab", section);
+  if ([[[attributes valueForKey:@"kindLabel"] stringValue] rangeOfString:@"Report tab"].location ==
+      NSNotFound)
+    XCTFail(@"Attributes should say where they are, it says %@",
+            [[attributes valueForKey:@"kindLabel"] stringValue]);
+}
+
 - (void)testTheInspectorsStayAtTheTopOfTheirPanes {
   RDLEditingContext *ctx =
       [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];

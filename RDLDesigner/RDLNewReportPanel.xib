@@ -30,7 +30,7 @@
                 <rect key="frame" x="0.0" y="0.0" width="560" height="430"/>
                 <autoresizingMask key="autoresizingMask" flexibleMinY="YES" flexibleMaxY="YES"/>
                 <subviews>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="headingLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="headingLabel">
                         <rect key="frame" x="20" y="386" width="520" height="26"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="Start a new report" id="headingLabelCell">
@@ -49,7 +49,7 @@
                             <action selector="chooseBlank:" target="-2" id="chooseBlankAction"/>
                         </connections>
                     </button>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="blankHelpLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="blankHelpLabel">
                         <rect key="frame" x="40" y="326" width="500" height="16"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="An empty Letter-size page." id="blankHelpLabelCell">
@@ -68,15 +68,16 @@
                             <action selector="chooseDocument:" target="-2" id="chooseDocumentAction"/>
                         </connections>
                     </button>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="explainLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="explainLabel">
                         <rect key="frame" x="40" y="248" width="500" height="30"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" selectable="YES" title="A Word document is scaffolded, not converted: the text arrives where the document put it, and {placeholders} become fields you supply." id="explainLabelCell">
+                        <textFieldCell key="cell" selectable="YES" id="explainLabelCell">
                             <font key="font" metaFont="smallSystem"/>
+                            <string key="title">A Word document is scaffolded, not converted: the text arrives where the document put it, and {placeholders} become fields you supply.</string>
                             <color key="textColor" name="disabledControlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="fileLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="fileLabel">
                         <rect key="frame" x="20" y="216" width="400" height="20"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" selectable="YES" title="No document chosen" id="fileLabelCell">
@@ -95,26 +96,26 @@
                             <action selector="chooseFile:" target="-2" id="chooseFileAction"/>
                         </connections>
                     </button>
-                    <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="summaryLabel">
+                    <textField focusRingType="none" verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="summaryLabel">
                         <rect key="frame" x="20" y="186" width="520" height="20"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
-                        <textFieldCell key="cell" selectable="YES" title="" id="summaryLabelCell">
+                        <textFieldCell key="cell" selectable="YES" id="summaryLabelCell">
                             <font key="font" metaFont="system"/>
                             <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         </textFieldCell>
                     </textField>
-                    <scrollView fixedFrame="YES" hasHorizontalScroller="NO" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" translatesAutoresizingMaskIntoConstraints="NO" id="detailsScroll">
+                    <scrollView fixedFrame="YES" horizontalLineScroll="10" horizontalPageScroll="10" verticalLineScroll="10" verticalPageScroll="10" hasHorizontalScroller="NO" translatesAutoresizingMaskIntoConstraints="NO" id="detailsScroll">
                         <rect key="frame" x="20" y="52" width="520" height="126"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <clipView key="contentView" id="detailsClip">
                             <rect key="frame" x="1" y="1" width="503" height="124"/>
                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             <subviews>
-                                <textView importsGraphics="NO" verticallyResizable="YES" usesFontPanel="NO" allowsUndo="NO" id="detailsView">
+                                <textView importsGraphics="NO" verticallyResizable="YES" id="detailsView">
                                     <rect key="frame" x="0.0" y="0.0" width="503" height="124"/>
                                     <autoresizingMask key="autoresizingMask" widthSizable="YES"/>
                                     <size key="minSize" width="503" height="124"/>
-                                    <size key="maxSize" width="503" height="10000000"/>
+                                    <size key="maxSize" width="520" height="10000000"/>
                                     <color key="insertionPointColor" name="textColor" catalog="System" colorSpace="catalog"/>
                                 </textView>
                             </subviews>
@@ -130,10 +131,10 @@
                         <buttonCell key="cell" type="push" title="Cancel" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
                             <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
-                                                    <string key="keyEquivalent" base64-UTF8="YES">
+                            <string key="keyEquivalent" base64-UTF8="YES">
 Gw
 </string>
-</buttonCell>
+                        </buttonCell>
                         <connections>
                             <action selector="cancel:" target="-2" id="cancelAction"/>
                         </connections>
@@ -141,9 +142,12 @@ Gw
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="createButton">
                         <rect key="frame" x="460" y="14" width="80" height="26"/>
                         <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
-                        <buttonCell key="cell" type="push" title="Create" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" keyEquivalent="&#10;" id="createButtonCell">
+                        <buttonCell key="cell" type="push" title="Create" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="createButtonCell">
                             <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
                             <font key="font" metaFont="system"/>
+                            <string key="keyEquivalent" base64-UTF8="YES">
+Cg
+</string>
                         </buttonCell>
                         <connections>
                             <action selector="create:" target="-2" id="createAction"/>
@@ -151,6 +155,7 @@ Gw
                     </button>
                 </subviews>
             </view>
+            <point key="canvasLocation" x="140" y="144"/>
         </window>
     </objects>
 </document>

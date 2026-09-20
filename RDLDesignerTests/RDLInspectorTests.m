@@ -22,6 +22,62 @@
 // on show -- it could not tell its own writing from anyone else's -- so after
 // ⌘Z the report went back and the fields still read what had been undone,
 // which is indistinguishable from undo not working.
+// The settings that used to be behind the More Style button are in the Style
+// tab itself: set one, read it back off the item, undo it.
+- (void)testTheRestOfAStyleIsInTheStyleTab {
+  RDLReport *report = [RDLReport emptyReportNamed:@"All of it"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Title";
+  box.value = @"Words";
+  box.width = 2;
+  box.height = 0.3;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLInspectorView *style = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 1400)
+                                                            context:ctx];
+  style.shows = RDLInspectorShowsStyle;
+  [style reload];
+
+  if ([[style valueForKey:@"styleRestBox"] isHidden])
+    XCTFail(@"%@", @"the rest of a style should be shown, not hidden behind a button");
+
+  // A measurement, a colour and a choice: one of each kind the section holds.
+  NSTextField *lineHeight = [style valueForKey:@"styleLineHeightField"];
+  [lineHeight setStringValue:@"14pt"];
+  [style changed:lineHeight];
+  if (![[box.style.lineHeight stringValue] isEqualToString:@"14pt"])
+    XCTFail(@"the line height should be set, it is %@", [box.style.lineHeight stringValue]);
+
+  NSTextField *shadow = [style valueForKey:@"styleShadowColorField"];
+  [shadow setStringValue:@"#404040"];
+  [style changed:shadow];
+  if (![box.style.shadowColor isEqualToString:@"#404040"])
+    XCTFail(@"the shadow colour should be set, it is %@", box.style.shadowColor);
+  NSColorWell *shadowWell = [style valueForKey:@"styleShadowColorWell"];
+  if (![RDLHexFromColor([shadowWell color]) isEqualToString:@"#404040"])
+    XCTFail(@"and its well should agree, it shows %@", RDLHexFromColor([shadowWell color]));
+
+  NSPopUpButton *writing = [style valueForKey:@"styleWritingModePop"];
+  if ([writing numberOfItems] < 2) {
+    XCTFail(@"%@", @"the writing-mode popup should offer the model's own vocabulary");
+    return;
+  }
+  [writing selectItemAtIndex:2];  // "Not set" is first, so this is the second mode
+  [style changed:writing];
+  if (box.style.writingMode != RDLWritingModeVertical)
+    XCTFail(@"the writing mode should be the one chosen, it is %ld", (long)box.style.writingMode);
+
+  [[ctx.document undoManager] undo];
+  [[ctx.document undoManager] undo];
+  [[ctx.document undoManager] undo];
+  if (box.style.lineHeight != nil || [box.style.shadowColor length] ||
+      box.style.writingMode != RDLWritingModeUnspecified)
+    XCTFail(@"undo should take all three back off: %@ %@ %ld",
+            [box.style.lineHeight stringValue], box.style.shadowColor,
+            (long)box.style.writingMode);
+}
+
 // The right pane's tabs, as Xcode arranges them: what a thing *is* in
 // Attributes, how it *looks* in Style. Padding and borders were behind a More
 // Style button in a pane full of everything else, which is why they could not
@@ -50,7 +106,7 @@
     if ([[attributes valueForKey:section] isHidden])
       XCTFail(@"Attributes should show %@", section);
   // How it looks, and not in the other tab.
-  for (NSString *section in @[ @"textStyleBox", @"moreStyleBox" ]) {
+  for (NSString *section in @[ @"textStyleBox", @"styleRestBox" ]) {
     if ([[style valueForKey:section] isHidden])
       XCTFail(@"Style should show %@", section);
     if (![[attributes valueForKey:section] isHidden])
@@ -1959,7 +2015,9 @@ static NSData *RDLTinyPNG(void) {
   inspector.shows = RDLInspectorShowsStyle;
   [ctx addItemOfKind:RDLItemKindTextbox];
   RDLTextbox *box = (RDLTextbox *)[ctx selectedItem];
-  if ([[inspector valueForKey:@"moreStyleBox"] isHidden])
+  // The rest of a style is the Style tab's own section now, with the panel
+  // behind the Background Image… button for the one setting that is an object.
+  if ([[inspector valueForKey:@"styleRestBox"] isHidden])
     XCTFail(@"%@", @"an item should offer the rest of its style");
   NSString *before = [RDLEditor XMLStringForItem:box];
   RDLStylePanel *panel = [RDLStylePanel panelForItem:box context:ctx];

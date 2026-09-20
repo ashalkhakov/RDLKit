@@ -17,22 +17,44 @@
                 <outlet property="bgColorWell" destination="bgColorWell" id="bgColorWellOutlet"/>
                 <outlet property="bodyHField" destination="bodyHField" id="bodyHFieldOutlet"/>
                 <outlet property="bodyHLabel" destination="lbl6" id="bodyHLabelOutlet"/>
+                <outlet property="bottomMarginField" destination="bottomMarginField" id="bottomMarginFieldOutlet"/>
+                <outlet property="bottomMarginLabel" destination="bottomMarginLabel" id="bottomMarginLabelOutlet"/>
+                <outlet property="canGrowCheck" destination="canGrowCheck" id="canGrowCheckOutlet"/>
+                <outlet property="canShrinkCheck" destination="canShrinkCheck" id="canShrinkCheckOutlet"/>
                 <outlet property="catField" destination="catField" id="catFieldOutlet"/>
+                <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
                 <outlet property="cellBox" destination="cellBox" id="cellBoxOutlet"/>
+                <outlet property="cellRowHeightField" destination="cellRowHeightField" id="cellRowHeightFieldOutlet"/>
+                <outlet property="cellRowHeightLabel" destination="cellRowHeightLabel" id="cellRowHeightLabelOutlet"/>
                 <outlet property="cellWidthField" destination="cellWidthField" id="cellWidthFieldOutlet"/>
                 <outlet property="cellWidthLabel" destination="lblCell2" id="cellWidthLabelOutlet"/>
+                <outlet property="chartAxesButton" destination="chartAxesButton" id="chartAxesButtonOutlet"/>
                 <outlet property="chartBox" destination="chartBox" id="chartBoxOutlet"/>
                 <outlet property="chartDatasetPop" destination="chartDatasetPop" id="chartDatasetPopOutlet"/>
                 <outlet property="chartFiltersButton" destination="chartFiltersButton" id="chartFiltersButtonOutlet"/>
                 <outlet property="chartKindPop" destination="chartKindPop" id="chartKindPopOutlet"/>
+                <outlet property="chartOptionsBox" destination="chartOptionsBox" id="chartOptionsBoxOutlet"/>
+                <outlet property="chartPalettePop" destination="chartPalettePop" id="chartPalettePopOutlet"/>
+                <outlet property="chartSeriesButton" destination="chartSeriesButton" id="chartSeriesButtonOutlet"/>
+                <outlet property="chartSubtypePop" destination="chartSubtypePop" id="chartSubtypePopOutlet"/>
+                <outlet property="chartTitlePositionPop" destination="chartTitlePositionPop" id="chartTitlePositionPopOutlet"/>
                 <outlet property="colorExprButton" destination="colorExprButton" id="colorExprButtonOutlet"/>
                 <outlet property="colorField" destination="colorField" id="colorFieldOutlet"/>
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
+                <outlet property="columnSpacingField" destination="columnSpacingField" id="columnSpacingFieldOutlet"/>
+                <outlet property="columnSpacingLabel" destination="columnSpacingLabel" id="columnSpacingLabelOutlet"/>
+                <outlet property="columnsField" destination="columnsField" id="columnsFieldOutlet"/>
+                <outlet property="consumeWhitespaceCheck" destination="consumeWhitespaceCheck" id="consumeWhitespaceCheckOutlet"/>
+                <outlet property="customColorsButton" destination="customColorsButton" id="customColorsButtonOutlet"/>
+                <outlet property="decorationPop" destination="decorationPop" id="decorationPopOutlet"/>
                 <outlet property="descField" destination="descField" id="descFieldOutlet"/>
                 <outlet property="docBox" destination="docBox" id="docBoxOutlet"/>
                 <outlet property="docLanguageExprButton" destination="docLanguageExprButton" id="docLanguageExprButtonOutlet"/>
                 <outlet property="docLanguageField" destination="docLanguageField" id="docLanguageFieldOutlet"/>
                 <outlet property="docNameField" destination="docNameField" id="docNameFieldOutlet"/>
+                <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
+                <outlet property="fixedColumnHeadersCheck" destination="fixedColumnHeadersCheck" id="fixedColumnHeadersCheckOutlet"/>
+                <outlet property="fixedRowHeadersCheck" destination="fixedRowHeadersCheck" id="fixedRowHeadersCheckOutlet"/>
                 <outlet property="fontExprButton" destination="fontExprButton" id="fontExprButtonOutlet"/>
                 <outlet property="fontField" destination="fontField" id="fontFieldOutlet"/>
                 <outlet property="fontPanelButton" destination="fontPanelButton" id="fontPanelButtonOutlet"/>
@@ -41,159 +63,147 @@
                 <outlet property="formatExprButton" destination="formatExprButton" id="formatExprButtonOutlet"/>
                 <outlet property="formatField" destination="formatField" id="formatFieldOutlet"/>
                 <outlet property="geoBox" destination="geoBox" id="geoBoxOutlet"/>
+                <outlet property="groupsBeforeRowHeadersField" destination="groupsBeforeRowHeadersField" id="groupsBeforeRowHeadersFieldOutlet"/>
                 <outlet property="headerHField" destination="headerHField" id="headerHFieldOutlet"/>
                 <outlet property="headerHLabel" destination="lbl5" id="headerHLabelOutlet"/>
                 <outlet property="heightField" destination="heightField" id="heightFieldOutlet"/>
+                <outlet property="hiddenExprButton" destination="hiddenExprButton" id="hiddenExprButtonOutlet"/>
+                <outlet property="hiddenField" destination="hiddenField" id="hiddenFieldOutlet"/>
+                <outlet property="hideDuplicatesPop" destination="hideDuplicatesPop" id="hideDuplicatesPopOutlet"/>
+                <outlet property="hyperlinkExprButton" destination="hyperlinkExprButton" id="hyperlinkExprButtonOutlet"/>
+                <outlet property="hyperlinkField" destination="hyperlinkField" id="hyperlinkFieldOutlet"/>
                 <outlet property="imageBox" destination="imageBox" id="imageBoxOutlet"/>
-                <outlet property="imageValueExprButton" destination="imageValueExprButton" id="imageValueExprButtonOutlet"/>
                 <outlet property="imageEmbeddedPop" destination="imageEmbeddedPop" id="imageEmbeddedPopOutlet"/>
                 <outlet property="imageImportButton" destination="imageImportButton" id="imageImportButtonOutlet"/>
                 <outlet property="imageMimePop" destination="imageMimePop" id="imageMimePopOutlet"/>
-                <outlet property="embeddedImagesButton" destination="embeddedImagesButton" id="embeddedImagesButtonOutlet"/>
-                <outlet property="reportCodeButton" destination="reportCodeButton" id="reportCodeButtonOutlet"/>
-                <outlet property="moreStyleBox" destination="moreStyleBox" id="moreStyleBoxOutlet"/>
-                <outlet property="reportVariablesButton" destination="reportVariablesButton" id="reportVariablesButtonOutlet"/>
-                <outlet property="subreportNoRowsField" destination="subreportNoRowsField" id="subreportNoRowsFieldOutlet"/>
-                <outlet property="subreportNoRowsExprButton" destination="subreportNoRowsExprButton" id="subreportNoRowsExprButtonOutlet"/>
-                <outlet property="subreportOmitBorderCheck" destination="subreportOmitBorderCheck" id="subreportOmitBorderCheckOutlet"/>
-                <outlet property="subreportMergeCheck" destination="subreportMergeCheck" id="subreportMergeCheckOutlet"/>
                 <outlet property="imageSizingPop" destination="imageSizingPop" id="imageSizingPopOutlet"/>
                 <outlet property="imageSourcePop" destination="imageSourcePop" id="imageSourcePopOutlet"/>
+                <outlet property="imageValueExprButton" destination="imageValueExprButton" id="imageValueExprButtonOutlet"/>
                 <outlet property="imageValueField" destination="imageValueField" id="imageValueFieldOutlet"/>
+                <outlet property="initialPageNameExprButton" destination="initialPageNameExprButton" id="initialPageNameExprButtonOutlet"/>
+                <outlet property="initialPageNameField" destination="initialPageNameField" id="initialPageNameFieldOutlet"/>
+                <outlet property="italicCheck" destination="italicCheck" id="italicCheckOutlet"/>
+                <outlet property="keepBox" destination="keepBox" id="keepBoxOutlet"/>
+                <outlet property="keepTogetherCheck" destination="keepTogetherCheck" id="keepTogetherCheckOutlet"/>
                 <outlet property="kindLabel" destination="kindLabel" id="kindLabelOutlet"/>
                 <outlet property="languageExprButton" destination="languageExprButton" id="languageExprButtonOutlet"/>
                 <outlet property="languageField" destination="languageField" id="languageFieldOutlet"/>
+                <outlet property="layoutDirectionPop" destination="layoutDirectionPop" id="layoutDirectionPopOutlet"/>
                 <outlet property="leftField" destination="leftField" id="leftFieldOutlet"/>
+                <outlet property="leftMarginField" destination="leftMarginField" id="leftMarginFieldOutlet"/>
+                <outlet property="leftMarginLabel" destination="leftMarginLabel" id="leftMarginLabelOutlet"/>
+                <outlet property="legendLayoutPop" destination="legendLayoutPop" id="legendLayoutPopOutlet"/>
+                <outlet property="legendPositionPop" destination="legendPositionPop" id="legendPositionPopOutlet"/>
                 <outlet property="lineBox" destination="lineBox" id="lineBoxOutlet"/>
                 <outlet property="lineColorField" destination="lineColorField" id="lineColorFieldOutlet"/>
-                <outlet property="lineWidthField" destination="lineWidthField" id="lineWidthFieldOutlet"/>
-                <outlet property="lineWidthExprButton" destination="lineWidthExprButton" id="lineWidthExprButtonOutlet"/>
                 <outlet property="lineDashPop" destination="lineDashPop" id="lineDashPopOutlet"/>
-                <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
-                <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
-                <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
-                <outlet property="textBGField" destination="textBGField" id="textBGFieldOutlet"/>
-                <outlet property="textBGExprButton" destination="textBGExprButton" id="textBGExprButtonOutlet"/>
-                <outlet property="verticalPop" destination="verticalPop" id="verticalPopOutlet"/>
-                <outlet property="textBordersButton" destination="textBordersButton" id="textBordersButtonOutlet"/>
-                <outlet property="rectBordersButton" destination="rectBordersButton" id="rectBordersButtonOutlet"/>
-                <outlet property="cellBordersButton" destination="cellBordersButton" id="cellBordersButtonOutlet"/>
-                <outlet property="cellRowHeightLabel" destination="cellRowHeightLabel" id="cellRowHeightLabelOutlet"/>
-                <outlet property="cellRowHeightField" destination="cellRowHeightField" id="cellRowHeightFieldOutlet"/>
-                <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
+                <outlet property="lineWidthExprButton" destination="lineWidthExprButton" id="lineWidthExprButtonOutlet"/>
+                <outlet property="lineWidthField" destination="lineWidthField" id="lineWidthFieldOutlet"/>
+                <outlet property="linkBox" destination="linkBox" id="linkBoxOutlet"/>
+                <outlet property="moreStyleBox" destination="moreStyleBox" id="moreStyleBoxOutlet"/>
                 <outlet property="nameBox" destination="nameBox" id="nameBoxOutlet"/>
-                <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
-                <outlet property="textOptionsBox" destination="textOptionsBox" id="textOptionsBoxOutlet"/>
-                <outlet property="canGrowCheck" destination="canGrowCheck" id="canGrowCheckOutlet"/>
-                <outlet property="canShrinkCheck" destination="canShrinkCheck" id="canShrinkCheckOutlet"/>
-                <outlet property="hideDuplicatesPop" destination="hideDuplicatesPop" id="hideDuplicatesPopOutlet"/>
-                <outlet property="chartOptionsBox" destination="chartOptionsBox" id="chartOptionsBoxOutlet"/>
-                <outlet property="chartSubtypePop" destination="chartSubtypePop" id="chartSubtypePopOutlet"/>
-                <outlet property="chartPalettePop" destination="chartPalettePop" id="chartPalettePopOutlet"/>
-                <outlet property="chartTitlePositionPop" destination="chartTitlePositionPop" id="chartTitlePositionPopOutlet"/>
-                <outlet property="showLegendCheck" destination="showLegendCheck" id="showLegendCheckOutlet"/>
-                <outlet property="legendPositionPop" destination="legendPositionPop" id="legendPositionPopOutlet"/>
-                <outlet property="legendLayoutPop" destination="legendLayoutPop" id="legendLayoutPopOutlet"/>
-                <outlet property="noDataMessageField" destination="noDataMessageField" id="noDataMessageFieldOutlet"/>
+                <outlet property="nameField" destination="nameField" id="nameFieldOutlet"/>
                 <outlet property="noDataMessageExprButton" destination="noDataMessageExprButton" id="noDataMessageExprButtonOutlet"/>
-                <outlet property="chartAxesButton" destination="chartAxesButton" id="chartAxesButtonOutlet"/>
-                <outlet property="chartSeriesButton" destination="chartSeriesButton" id="chartSeriesButtonOutlet"/>
-                <outlet property="customColorsButton" destination="customColorsButton" id="customColorsButtonOutlet"/>
-                <outlet property="tablixSortingButton" destination="tablixSortingButton" id="tablixSortingButtonOutlet"/>
-                <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
+                <outlet property="noDataMessageField" destination="noDataMessageField" id="noDataMessageFieldOutlet"/>
                 <outlet property="noRowsMessageExprButton" destination="noRowsMessageExprButton" id="noRowsMessageExprButtonOutlet"/>
-                <outlet property="layoutDirectionPop" destination="layoutDirectionPop" id="layoutDirectionPopOutlet"/>
-                <outlet property="groupsBeforeRowHeadersField" destination="groupsBeforeRowHeadersField" id="groupsBeforeRowHeadersFieldOutlet"/>
-                <outlet property="repeatColumnHeadersCheck" destination="repeatColumnHeadersCheck" id="repeatColumnHeadersCheckOutlet"/>
-                <outlet property="repeatRowHeadersCheck" destination="repeatRowHeadersCheck" id="repeatRowHeadersCheckOutlet"/>
-                <outlet property="fixedColumnHeadersCheck" destination="fixedColumnHeadersCheck" id="fixedColumnHeadersCheckOutlet"/>
-                <outlet property="fixedRowHeadersCheck" destination="fixedRowHeadersCheck" id="fixedRowHeadersCheckOutlet"/>
+                <outlet property="noRowsMessageField" destination="noRowsMessageField" id="noRowsMessageFieldOutlet"/>
                 <outlet property="omitBorderCheck" destination="omitBorderCheck" id="omitBorderCheckOutlet"/>
+                <outlet property="orientationPop" destination="orientationPop" id="orientationPopOutlet"/>
+                <outlet property="padBottomExprButton" destination="padBottomExprButton" id="padBottomExprButtonOutlet"/>
+                <outlet property="padBottomField" destination="padBottomField" id="padBottomFieldOutlet"/>
+                <outlet property="padLeftExprButton" destination="padLeftExprButton" id="padLeftExprButtonOutlet"/>
+                <outlet property="padLeftField" destination="padLeftField" id="padLeftFieldOutlet"/>
+                <outlet property="padRightExprButton" destination="padRightExprButton" id="padRightExprButtonOutlet"/>
+                <outlet property="padRightField" destination="padRightField" id="padRightFieldOutlet"/>
+                <outlet property="padTopExprButton" destination="padTopExprButton" id="padTopExprButtonOutlet"/>
+                <outlet property="padTopField" destination="padTopField" id="padTopFieldOutlet"/>
+                <outlet property="pageBGField" destination="pageBGField" id="pageBGFieldOutlet"/>
+                <outlet property="pageBox" destination="pageBox" id="pageBoxOutlet"/>
+                <outlet property="pageBreakDisabledExprButton" destination="pageBreakDisabledExprButton" id="pageBreakDisabledExprButtonOutlet"/>
+                <outlet property="pageBreakDisabledField" destination="pageBreakDisabledField" id="pageBreakDisabledFieldOutlet"/>
+                <outlet property="pageBreakPop" destination="pageBreakPop" id="pageBreakPopOutlet"/>
+                <outlet property="pageNameExprButton" destination="pageNameExprButton" id="pageNameExprButtonOutlet"/>
+                <outlet property="pageNameField" destination="pageNameField" id="pageNameFieldOutlet"/>
+                <outlet property="pagePop" destination="pagePop" id="pagePopOutlet"/>
+                <outlet property="paperBox" destination="paperBox" id="paperBoxOutlet"/>
+                <outlet property="paperHeightField" destination="paperHeightField" id="paperHeightFieldOutlet"/>
+                <outlet property="paperHeightLabel" destination="paperHeightLabel" id="paperHeightLabelOutlet"/>
+                <outlet property="paperWidthField" destination="paperWidthField" id="paperWidthFieldOutlet"/>
+                <outlet property="paperWidthLabel" destination="paperWidthLabel" id="paperWidthLabelOutlet"/>
                 <outlet property="printBox" destination="printBox" id="printBoxOutlet"/>
                 <outlet property="printOnFirstPageCheck" destination="printOnFirstPageCheck" id="printOnFirstPageCheckOutlet"/>
                 <outlet property="printOnLastPageCheck" destination="printOnLastPageCheck" id="printOnLastPageCheckOutlet"/>
-                <outlet property="paperBox" destination="paperBox" id="paperBoxOutlet"/>
-                <outlet property="orientationPop" destination="orientationPop" id="orientationPopOutlet"/>
-                <outlet property="pageBGField" destination="pageBGField" id="pageBGFieldOutlet"/>
-                <outlet property="paperWidthField" destination="paperWidthField" id="paperWidthFieldOutlet"/>
-                <outlet property="paperHeightField" destination="paperHeightField" id="paperHeightFieldOutlet"/>
-                <outlet property="leftMarginField" destination="leftMarginField" id="leftMarginFieldOutlet"/>
-                <outlet property="rightMarginField" destination="rightMarginField" id="rightMarginFieldOutlet"/>
-                <outlet property="topMarginField" destination="topMarginField" id="topMarginFieldOutlet"/>
-                <outlet property="bottomMarginField" destination="bottomMarginField" id="bottomMarginFieldOutlet"/>
-                <outlet property="columnsField" destination="columnsField" id="columnsFieldOutlet"/>
-                <outlet property="columnSpacingField" destination="columnSpacingField" id="columnSpacingFieldOutlet"/>
-                <outlet property="initialPageNameField" destination="initialPageNameField" id="initialPageNameFieldOutlet"/>
-                <outlet property="initialPageNameExprButton" destination="initialPageNameExprButton" id="initialPageNameExprButtonOutlet"/>
-                <outlet property="consumeWhitespaceCheck" destination="consumeWhitespaceCheck" id="consumeWhitespaceCheckOutlet"/>
-                <outlet property="paperWidthLabel" destination="paperWidthLabel" id="paperWidthLabelOutlet"/>
-                <outlet property="paperHeightLabel" destination="paperHeightLabel" id="paperHeightLabelOutlet"/>
-                <outlet property="leftMarginLabel" destination="leftMarginLabel" id="leftMarginLabelOutlet"/>
-                <outlet property="rightMarginLabel" destination="rightMarginLabel" id="rightMarginLabelOutlet"/>
-                <outlet property="topMarginLabel" destination="topMarginLabel" id="topMarginLabelOutlet"/>
-                <outlet property="bottomMarginLabel" destination="bottomMarginLabel" id="bottomMarginLabelOutlet"/>
-                <outlet property="columnSpacingLabel" destination="columnSpacingLabel" id="columnSpacingLabelOutlet"/>
-                <outlet property="linkBox" destination="linkBox" id="linkBoxOutlet"/>
-                <outlet property="keepBox" destination="keepBox" id="keepBoxOutlet"/>
-                <outlet property="pageBox" destination="pageBox" id="pageBoxOutlet"/>
-                <outlet property="hiddenField" destination="hiddenField" id="hiddenFieldOutlet"/>
-                <outlet property="hiddenExprButton" destination="hiddenExprButton" id="hiddenExprButtonOutlet"/>
-                <outlet property="toggleItemPop" destination="toggleItemPop" id="toggleItemPopOutlet"/>
-                <outlet property="hyperlinkField" destination="hyperlinkField" id="hyperlinkFieldOutlet"/>
-                <outlet property="hyperlinkExprButton" destination="hyperlinkExprButton" id="hyperlinkExprButtonOutlet"/>
-                <outlet property="keepTogetherCheck" destination="keepTogetherCheck" id="keepTogetherCheckOutlet"/>
-                <outlet property="pageBreakPop" destination="pageBreakPop" id="pageBreakPopOutlet"/>
-                <outlet property="resetPageNumberCheck" destination="resetPageNumberCheck" id="resetPageNumberCheckOutlet"/>
-                <outlet property="pageBreakDisabledField" destination="pageBreakDisabledField" id="pageBreakDisabledFieldOutlet"/>
-                <outlet property="pageBreakDisabledExprButton" destination="pageBreakDisabledExprButton" id="pageBreakDisabledExprButtonOutlet"/>
-                <outlet property="pageNameField" destination="pageNameField" id="pageNameFieldOutlet"/>
-                <outlet property="pageNameExprButton" destination="pageNameExprButton" id="pageNameExprButtonOutlet"/>
-                <outlet property="padLeftField" destination="padLeftField" id="padLeftFieldOutlet"/>
-                <outlet property="padLeftExprButton" destination="padLeftExprButton" id="padLeftExprButtonOutlet"/>
-                <outlet property="padRightField" destination="padRightField" id="padRightFieldOutlet"/>
-                <outlet property="padRightExprButton" destination="padRightExprButton" id="padRightExprButtonOutlet"/>
-                <outlet property="padTopField" destination="padTopField" id="padTopFieldOutlet"/>
-                <outlet property="padTopExprButton" destination="padTopExprButton" id="padTopExprButtonOutlet"/>
-                <outlet property="padBottomField" destination="padBottomField" id="padBottomFieldOutlet"/>
-                <outlet property="padBottomExprButton" destination="padBottomExprButton" id="padBottomExprButtonOutlet"/>
-                <outlet property="decorationPop" destination="decorationPop" id="decorationPopOutlet"/>
-                <outlet property="italicCheck" destination="italicCheck" id="italicCheckOutlet"/>
+                <outlet property="rectBGExprButton" destination="rectBGExprButton" id="rectBGExprButtonOutlet"/>
                 <outlet property="rectBGField" destination="rectBGField" id="rectBGFieldOutlet"/>
+                <outlet property="rectBordersButton" destination="rectBordersButton" id="rectBordersButtonOutlet"/>
                 <outlet property="rectBox" destination="rectBox" id="rectBoxOutlet"/>
+                <outlet property="repeatColumnHeadersCheck" destination="repeatColumnHeadersCheck" id="repeatColumnHeadersCheckOutlet"/>
+                <outlet property="repeatRowHeadersCheck" destination="repeatRowHeadersCheck" id="repeatRowHeadersCheckOutlet"/>
+                <outlet property="reportCodeButton" destination="reportCodeButton" id="reportCodeButtonOutlet"/>
+                <outlet property="reportVariablesButton" destination="reportVariablesButton" id="reportVariablesButtonOutlet"/>
+                <outlet property="resetPageNumberCheck" destination="resetPageNumberCheck" id="resetPageNumberCheckOutlet"/>
                 <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
+                <outlet property="rightMarginField" destination="rightMarginField" id="rightMarginFieldOutlet"/>
+                <outlet property="rightMarginLabel" destination="rightMarginLabel" id="rightMarginLabelOutlet"/>
+                <outlet property="showLegendCheck" destination="showLegendCheck" id="showLegendCheckOutlet"/>
                 <outlet property="sizeExprButton" destination="sizeExprButton" id="sizeExprButtonOutlet"/>
                 <outlet property="sizeField" destination="sizeField" id="sizeFieldOutlet"/>
                 <outlet property="subreportBox" destination="subreportBox" id="subreportBoxOutlet"/>
                 <outlet property="subreportEditButton" destination="subreportEditButton" id="subreportEditButtonOutlet"/>
+                <outlet property="subreportMergeCheck" destination="subreportMergeCheck" id="subreportMergeCheckOutlet"/>
                 <outlet property="subreportNameField" destination="subreportNameField" id="subreportNameFieldOutlet"/>
+                <outlet property="subreportNoRowsExprButton" destination="subreportNoRowsExprButton" id="subreportNoRowsExprButtonOutlet"/>
+                <outlet property="subreportNoRowsField" destination="subreportNoRowsField" id="subreportNoRowsFieldOutlet"/>
+                <outlet property="subreportOmitBorderCheck" destination="subreportOmitBorderCheck" id="subreportOmitBorderCheckOutlet"/>
                 <outlet property="subreportParametersButton" destination="subreportParametersButton" id="subreportParametersButtonOutlet"/>
                 <outlet property="subreportStatusLabel" destination="subreportStatusLabel" id="subreportStatusLabelOutlet"/>
                 <outlet property="tablixBox" destination="tablixBox" id="tablixBoxOutlet"/>
                 <outlet property="tablixDatasetPop" destination="tablixDatasetPop" id="tablixDatasetPopOutlet"/>
                 <outlet property="tablixHeaderHField" destination="tablixHeaderHField" id="tablixHeaderHFieldOutlet"/>
                 <outlet property="tablixHeaderLabel" destination="lbl34" id="tablixHeaderLabelOutlet"/>
+                <outlet property="tablixOptionsBox" destination="tablixOptionsBox" id="tablixOptionsBoxOutlet"/>
                 <outlet property="tablixRowHField" destination="tablixRowHField" id="tablixRowHFieldOutlet"/>
                 <outlet property="tablixRowLabel" destination="lbl35" id="tablixRowLabelOutlet"/>
+                <outlet property="tablixSortingButton" destination="tablixSortingButton" id="tablixSortingButtonOutlet"/>
+                <outlet property="textBGExprButton" destination="textBGExprButton" id="textBGExprButtonOutlet"/>
+                <outlet property="textBGField" destination="textBGField" id="textBGFieldOutlet"/>
+                <outlet property="textBordersButton" destination="textBordersButton" id="textBordersButtonOutlet"/>
                 <outlet property="textBox" destination="textBox" id="textBoxOutlet"/>
+                <outlet property="textOptionsBox" destination="textOptionsBox" id="textOptionsBoxOutlet"/>
                 <outlet property="textStyleBox" destination="textStyleBox" id="textStyleBoxOutlet"/>
+                <outlet property="styleLineHeightField" destination="styleLineHeightField" id="styleLineHeightFieldOutlet"/>
+                <outlet property="styleShadowOffsetField" destination="styleShadowOffsetField" id="styleShadowOffsetFieldOutlet"/>
+                <outlet property="styleWritingModePop" destination="styleWritingModePop" id="styleWritingModePopOutlet"/>
+                <outlet property="styleDirectionPop" destination="styleDirectionPop" id="styleDirectionPopOutlet"/>
+                <outlet property="styleBidiPop" destination="styleBidiPop" id="styleBidiPopOutlet"/>
+                <outlet property="styleTextEffectPop" destination="styleTextEffectPop" id="styleTextEffectPopOutlet"/>
+                <outlet property="styleShadowColorWell" destination="styleShadowColorWell" id="styleShadowColorWellOutlet"/>
+                <outlet property="styleShadowColorField" destination="styleShadowColorField" id="styleShadowColorFieldOutlet"/>
+                <outlet property="styleCalendarPop" destination="styleCalendarPop" id="styleCalendarPopOutlet"/>
+                <outlet property="styleNumeralLanguageField" destination="styleNumeralLanguageField" id="styleNumeralLanguageFieldOutlet"/>
+                <outlet property="styleNumeralVariantPop" destination="styleNumeralVariantPop" id="styleNumeralVariantPopOutlet"/>
+                <outlet property="styleGradientPop" destination="styleGradientPop" id="styleGradientPopOutlet"/>
+                <outlet property="styleGradientEndWell" destination="styleGradientEndWell" id="styleGradientEndWellOutlet"/>
+                <outlet property="styleGradientEndField" destination="styleGradientEndField" id="styleGradientEndFieldOutlet"/>
+                <outlet property="styleImageButton" destination="styleImageButton" id="styleImageButtonOutlet"/>
+                <outlet property="styleRestBox" destination="styleRestBox" id="styleRestBoxOutlet"/>
                 <outlet property="titleField" destination="titleField" id="titleFieldOutlet"/>
+                <outlet property="toggleItemPop" destination="toggleItemPop" id="toggleItemPopOutlet"/>
                 <outlet property="topField" destination="topField" id="topFieldOutlet"/>
+                <outlet property="topMarginField" destination="topMarginField" id="topMarginFieldOutlet"/>
+                <outlet property="topMarginLabel" destination="topMarginLabel" id="topMarginLabelOutlet"/>
                 <outlet property="unitPop" destination="unitPop" id="unitPopOutlet"/>
                 <outlet property="valField" destination="valField" id="valFieldOutlet"/>
                 <outlet property="valueExprButton" destination="valueExprButton" id="valueExprButtonOutlet"/>
                 <outlet property="valueField" destination="valueField" id="valueFieldOutlet"/>
+                <outlet property="verticalPop" destination="verticalPop" id="verticalPopOutlet"/>
+                <outlet property="visibilityBox" destination="visibilityBox" id="visibilityBoxOutlet"/>
                 <outlet property="weightPop" destination="weightPop" id="weightPopOutlet"/>
                 <outlet property="widthField" destination="widthField" id="widthFieldOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
         <customObject id="-3" userLabel="Application" customClass="NSObject"/>
-        <!-- These are the inspector's sections, and RDLInspectorView, which
-             they are added to, is a flipped view. So min-Y is the TOP edge
-             here, and a section pinned with flexibleMinY sank down the pane
-             every time the window grew, which read as the inspector centring
-             itself. flexibleMaxY is what keeps a section at the top of a
-             flipped parent. -->
         <textField focusRingType="none" verticalHuggingPriority="750" id="kindLabel">
             <rect key="frame" x="0.0" y="0.0" width="240" height="16"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
@@ -396,7 +406,7 @@
                         <action selector="editEmbeddedImages:" target="-2" id="embeddedImagesButtonAction"/>
                     </connections>
                 </button>
-                <button toolTip="Functions the report&apos;s expressions call as Code.Name" id="reportCodeButton">
+                <button toolTip="Functions the report's expressions call as Code.Name" id="reportCodeButton">
                     <rect key="frame" x="10" y="362" width="114" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="Code…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="reportCodeButtonCell">
@@ -821,6 +831,296 @@
                         <action selector="changed:" target="-2" id="hideDuplicatesPopAction"/>
                     </connections>
                 </popUpButton>
+            </subviews>
+        </customView>
+        <customView id="styleRestBox">
+            <rect key="frame" x="0.0" y="28" width="260" height="302"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleLineHeightFieldLabel">
+                    <rect key="frame" x="10" y="4" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Line height" id="styleLineHeightFieldLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="styleLineHeightField">
+                    <rect key="frame" x="10" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="styleLineHeightFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleLineHeightFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="styleLineHeightFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleShadowOffsetFieldLabel">
+                    <rect key="frame" x="136" y="4" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Shadow offset" id="styleShadowOffsetFieldLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="styleShadowOffsetField">
+                    <rect key="frame" x="136" y="20" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="styleShadowOffsetFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleShadowOffsetFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="styleShadowOffsetFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleWritingModePopLabel">
+                    <rect key="frame" x="10" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Writing mode" id="styleWritingModePopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleWritingModePop">
+                    <rect key="frame" x="10" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleWritingModePopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleWritingModePopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleWritingModePopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleDirectionPopLabel">
+                    <rect key="frame" x="136" y="48" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Text runs" id="styleDirectionPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleDirectionPop">
+                    <rect key="frame" x="136" y="64" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleDirectionPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleDirectionPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleDirectionPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleBidiPopLabel">
+                    <rect key="frame" x="10" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Bidirectional" id="styleBidiPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleBidiPop">
+                    <rect key="frame" x="10" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleBidiPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleBidiPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleBidiPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleTextEffectPopLabel">
+                    <rect key="frame" x="136" y="92" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Text effect" id="styleTextEffectPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleTextEffectPop">
+                    <rect key="frame" x="136" y="108" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleTextEffectPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleTextEffectPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleTextEffectPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleShadowColorFieldLabel">
+                    <rect key="frame" x="10" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Shadow" id="styleShadowColorFieldLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="styleShadowColorField">
+                    <rect key="frame" x="10" y="152" width="86" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="styleShadowColorFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleShadowColorFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="styleShadowColorFieldDelegate"/>
+                    </connections>
+                </textField>
+                <colorWell toolTip="Choose a colour" id="styleShadowColorWell">
+                    <rect key="frame" x="100" y="152" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleShadowColorWellAction"/>
+                    </connections>
+                </colorWell>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleCalendarPopLabel">
+                    <rect key="frame" x="136" y="136" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Calendar" id="styleCalendarPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleCalendarPop">
+                    <rect key="frame" x="136" y="152" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleCalendarPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleCalendarPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleCalendarPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleNumeralLanguageFieldLabel">
+                    <rect key="frame" x="10" y="180" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Numerals" id="styleNumeralLanguageFieldLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="styleNumeralLanguageField">
+                    <rect key="frame" x="10" y="196" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="styleNumeralLanguageFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleNumeralLanguageFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="styleNumeralLanguageFieldDelegate"/>
+                    </connections>
+                </textField>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleNumeralVariantPopLabel">
+                    <rect key="frame" x="136" y="180" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Numeral variant" id="styleNumeralVariantPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleNumeralVariantPop">
+                    <rect key="frame" x="136" y="196" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleNumeralVariantPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleNumeralVariantPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleNumeralVariantPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleGradientPopLabel">
+                    <rect key="frame" x="10" y="224" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Gradient" id="styleGradientPopLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <popUpButton id="styleGradientPop">
+                    <rect key="frame" x="10" y="240" width="114" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="styleGradientPopCell">
+                        <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="message"/>
+                        <menu key="menu" id="styleGradientPopMenu"/>
+                    </popUpButtonCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleGradientPopAction"/>
+                    </connections>
+                </popUpButton>
+                <textField focusRingType="none" verticalHuggingPriority="750" id="styleGradientEndFieldLabel">
+                    <rect key="frame" x="136" y="224" width="114" height="14"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="Gradient to" id="styleGradientEndFieldLabelCell">
+                        <font key="font" metaFont="smallSystem"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <textField focusRingType="none" id="styleGradientEndField">
+                    <rect key="frame" x="136" y="240" width="86" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="styleGradientEndFieldCell">
+                        <font key="font" metaFont="user" size="11"/>
+                        <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleGradientEndFieldAction"/>
+                        <outlet property="delegate" destination="-2" id="styleGradientEndFieldDelegate"/>
+                    </connections>
+                </textField>
+                <colorWell toolTip="Choose a colour" id="styleGradientEndWell">
+                    <rect key="frame" x="226" y="240" width="24" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <color key="color" red="0.10000000000000001" green="0.098000000000000004" blue="0.085999999999999993" alpha="1" colorSpace="calibratedRGB"/>
+                    <connections>
+                        <action selector="changed:" target="-2" id="styleGradientEndWellAction"/>
+                    </connections>
+                </colorWell>
+                <button toolTip="The picture behind this item's contents" id="styleImageButton">
+                    <rect key="frame" x="10" y="272" width="240" height="22"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="push" title="Background Image…" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="styleImageButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="editMoreStyle:" target="-2" id="styleImageButtonAction"/>
+                    </connections>
+                </button>
             </subviews>
         </customView>
         <customView id="moreStyleBox">
@@ -2197,7 +2497,7 @@
                 <textField focusRingType="none" verticalHuggingPriority="750" id="subreportStatusLabel">
                     <rect key="frame" x="10" y="4" width="240" height="14"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" lineBreakMode="truncatingMiddle" title="" id="subreportStatusLabelCell">
+                    <textFieldCell key="cell" lineBreakMode="truncatingMiddle" id="subreportStatusLabelCell">
                         <font key="font" metaFont="user" size="10"/>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
@@ -2235,7 +2535,7 @@
                 <textField focusRingType="none" id="subreportNameField">
                     <rect key="frame" x="10" y="64" width="240" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" placeholderString="Crates" id="subreportNameFieldCell">
+                    <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Crates" drawsBackground="YES" id="subreportNameFieldCell">
                         <font key="font" metaFont="user" size="11"/>
                         <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>

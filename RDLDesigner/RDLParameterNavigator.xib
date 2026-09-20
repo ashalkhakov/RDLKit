@@ -10,10 +10,10 @@
             <connections>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
-                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
-                <outlet property="upButton" destination="upButton" id="upButtonOutlet"/>
                 <outlet property="downButton" destination="downButton" id="downButtonOutlet"/>
+                <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
                 <outlet property="table" destination="table" id="tableOutlet"/>
+                <outlet property="upButton" destination="upButton" id="upButtonOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>

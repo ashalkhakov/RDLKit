@@ -141,6 +141,18 @@
 // Tablix section
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
 @property (nonatomic, strong) IBOutlet NSView *textStyleBox;
+// The rest of a style, which used to be behind the More Style button: every
+// one of those settings, in the tab that is for them.
+@property (nonatomic, strong) IBOutlet NSView *styleRestBox;
+@property (nonatomic, strong) IBOutlet NSTextField *styleLineHeightField, *styleShadowOffsetField;
+@property (nonatomic, strong) IBOutlet NSTextField *styleShadowColorField, *styleNumeralLanguageField;
+@property (nonatomic, strong) IBOutlet NSTextField *styleGradientEndField;
+@property (nonatomic, strong) IBOutlet NSColorWell *styleShadowColorWell, *styleGradientEndWell;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *styleWritingModePop, *styleDirectionPop;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *styleBidiPop, *styleTextEffectPop;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *styleCalendarPop, *styleNumeralVariantPop;
+@property (nonatomic, strong) IBOutlet NSPopUpButton *styleGradientPop;
+@property (nonatomic, strong) IBOutlet NSButton *styleImageButton;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
 @property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
 // A tablix's own settings: what it shows with no rows, which way its columns
@@ -260,10 +272,12 @@
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
                  _textOptionsBox, _textStyleBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
-                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox ];
+                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox,
+                 _styleRestBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
+  [self declareRestOfStyle];
 }
 
 // A button that opens a sort says how many keys it holds, since a sort is
@@ -443,6 +457,84 @@
 // edges plus the body width), the page popup (two dimensions plus the width),
 // and the band background (which may have to create the style) -- stay in
 // -changed: below, because each is a composite that must undo as one step.
+// The rest of a style: the settings that used to be reachable only through the
+// More Style panel. Each is bound the way every other field is, and the popups
+// are filled from the model's own vocabulary, so "not set" is a choice and the
+// spellings are RDL's.
+static void RDLFillStyleChoices(NSPopUpButton *pop, NSInteger first, NSInteger last,
+                                NSString *(^name)(NSInteger)) {
+  [pop removeAllItems];
+  [pop addItemWithTitle:@"Not set"];
+  for (NSInteger value = first; value <= last; value++)
+    [[pop menu] addItemWithTitle:name(value) ?: @"" action:NULL keyEquivalent:@""];
+}
+
+- (void)declareRestOfStyle {
+  RDLFillStyleChoices(_styleWritingModePop, RDLWritingModeHorizontal, RDLWritingModeRotate270,
+                      ^NSString *(NSInteger v) {
+                        return RDLWordsOfName(RDLStringFromWritingMode((RDLWritingMode)v));
+                      });
+  RDLFillStyleChoices(_styleDirectionPop, RDLLayoutDirectionLTR, RDLLayoutDirectionRTL,
+                      ^NSString *(NSInteger v) {
+                        return v == RDLLayoutDirectionRTL ? @"Right to left" : @"Left to right";
+                      });
+  RDLFillStyleChoices(_styleBidiPop, RDLUnicodeBiDiNormal, RDLUnicodeBiDiBiDiOverride,
+                      ^NSString *(NSInteger v) {
+                        return RDLWordsOfName(RDLStringFromUnicodeBiDi((RDLUnicodeBiDi)v));
+                      });
+  RDLFillStyleChoices(_styleTextEffectPop, RDLTextEffectNone, RDLTextEffectFrame,
+                      ^NSString *(NSInteger v) {
+                        return RDLWordsOfName(RDLStringFromTextEffect((RDLTextEffect)v));
+                      });
+  RDLFillStyleChoices(_styleCalendarPop, RDLCalendarDefault, RDLCalendarThaiBuddhist,
+                      ^NSString *(NSInteger v) {
+                        return RDLWordsOfName(RDLStringFromCalendar((RDLCalendar)v));
+                      });
+  RDLFillStyleChoices(_styleNumeralVariantPop, 1, 7, ^NSString *(NSInteger v) {
+    return [NSString stringWithFormat:@"%ld", (long)v];
+  });
+  RDLFillStyleChoices(_styleGradientPop, RDLGradientTypeNone, RDLGradientTypeVerticalCenter,
+                      ^NSString *(NSInteger v) {
+                        return RDLWordsOfName(RDLStringFromGradientType((RDLGradientType)v));
+                      });
+
+  // "Not set" is the first item, so the model values start at the second.
+  NSArray<NSArray *> *choices = @[
+    @[ _styleWritingModePop, @"style.writingMode", @(RDLWritingModeHorizontal), @(RDLWritingModeRotate270) ],
+    @[ _styleDirectionPop, @"style.direction", @(RDLLayoutDirectionLTR), @(RDLLayoutDirectionRTL) ],
+    @[ _styleBidiPop, @"style.unicodeBiDi", @(RDLUnicodeBiDiNormal), @(RDLUnicodeBiDiBiDiOverride) ],
+    @[ _styleTextEffectPop, @"style.textEffect", @(RDLTextEffectNone), @(RDLTextEffectFrame) ],
+    @[ _styleCalendarPop, @"style.calendar", @(RDLCalendarDefault), @(RDLCalendarThaiBuddhist) ],
+    @[ _styleNumeralVariantPop, @"style.numeralVariant", @1, @7 ],
+    @[ _styleGradientPop, @"style.backgroundGradientType", @(RDLGradientTypeNone), @(RDLGradientTypeVerticalCenter) ],
+  ];
+  for (NSArray *choice in choices) {
+    NSMutableArray *values = [NSMutableArray arrayWithObject:[NSNull null]];
+    for (NSInteger v = [choice[2] integerValue]; v <= [choice[3] integerValue]; v++)
+      [values addObject:@(v)];
+    [_bindings bind:choice[0]
+            keyPath:choice[1]
+              scope:RDLFieldScopeItem
+               kind:RDLFieldKindPopUpIndex
+             values:values
+        placeholder:nil];
+  }
+  [_bindings bind:_styleLineHeightField keyPath:@"style.lineHeight" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression];
+  [_bindings bind:_styleShadowOffsetField keyPath:@"style.shadowOffset" scope:RDLFieldScopeItem
+             kind:RDLFieldKindLengthOrExpression];
+  [_bindings bind:_styleShadowColorField keyPath:@"style.shadowColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindTextOrExpression];
+  [_bindings bind:_styleShadowColorWell keyPath:@"style.shadowColor" scope:RDLFieldScopeItem
+             kind:RDLFieldKindColor];
+  [_bindings bind:_styleGradientEndField keyPath:@"style.backgroundGradientEndColor"
+            scope:RDLFieldScopeItem kind:RDLFieldKindTextOrExpression];
+  [_bindings bind:_styleGradientEndWell keyPath:@"style.backgroundGradientEndColor"
+            scope:RDLFieldScopeItem kind:RDLFieldKindColor];
+  [_bindings bind:_styleNumeralLanguageField keyPath:@"style.numeralLanguage" scope:RDLFieldScopeItem
+             kind:RDLFieldKindText];
+}
+
 - (void)declareBindings {
   _bindings = [[RDLFieldBindings alloc] init];
   // What every item has. Hidden and the break's Disabled are True, False or an
@@ -766,7 +858,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   NSMutableArray *style = [NSMutableArray array];
   for (NSView *box in [self styleSectionsOfItem:item])
     if ([boxes indexOfObjectIdenticalTo:box] != NSNotFound || box == _textStyleBox ||
-        box == _moreStyleBox)
+        box == _styleRestBox)
       [style addObject:box];
   return style;
 }
@@ -783,7 +875,11 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   if ([item isKindOfClass:[RDLRectangle class]])
     [style addObject:_rectBox];
   [style addObject:_cellBox];
-  [style addObject:_moreStyleBox];
+  // The rest of a style is a section of its own now; the More Style button it
+  // replaced is gone, and the panel behind it is reached from Background
+  // Image… for the one setting that is an object rather than a value.
+  if (item != nil)
+    [style addObject:_styleRestBox];
   return style;
 }
 
@@ -976,8 +1072,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // showing them here as well meant the same fields were editable in two
     // places at once, with nothing to say which was which.
     [self stackBoxes:_shows == RDLInspectorShowsReport ? @[ _docBox, _paperBox ] : @[]];
-    if (_shows != RDLInspectorShowsReport)
+    // Each tab says what it has to say about the report rather than repeating
+    // the Report tab's fields.
+    if (_shows == RDLInspectorShowsAttributes)
       [_kindLabel setStringValue:@"The report's own settings are in the Report tab."];
+    else if (_shows == RDLInspectorShowsStyle)
+      [_kindLabel setStringValue:@"A report has no style of its own; the page's background is in "
+                                 @"the Report tab."];
   }
 
   [_bindings fillFromItem:it band:band report:report];
