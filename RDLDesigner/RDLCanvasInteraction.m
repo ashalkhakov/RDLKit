@@ -281,7 +281,11 @@ static BOOL RDLEventToggles(NSEvent *event) {
     // The box the grip makes, in inches: a corner moves two edges, a side one,
     // and the ones on the top and the left move the item as they resize it.
     NSRect was = NSMakeRect(_origLeft, _origTop, _origW, _origH);
-    NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy), kRDLLeastItemSize);
+    // A line may be dragged flat: its box is the two ends, and a floor under
+    // its height is a floor under how level it can be. Everything else keeps
+    // its least size, because a box of no height is a box nobody can grab.
+    CGFloat least = [[_ctx selectedItem] isKindOfClass:[RDLLine class]] ? 0 : kRDLLeastItemSize;
+    NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy), least);
     // Lined up with the edges near it, or made the same size as a neighbour.
     // In the canvas's coordinates, where the neighbours are, and back again.
     NSRect inCanvas = NSMakeRect(NSMinX(_dragRect) + (NSMinX(now) - _origLeft) * RDLPointsPerInch,

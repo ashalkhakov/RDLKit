@@ -42,7 +42,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 | PAG-05 | No page background colour | **fixed** — same cause as PAG-02: the field was below the fold in a pane that would not scroll |
 | INSP-06 | No padding fields | **fixed** — they exist, and now live in a Style tab of their own rather than at the bottom of a pane full of everything else |
 | WIN-05 | No preferences, and Toggle Grid has no tick | open |
-| — | Lines are always drawn slanted, and are hard to select | open |
+| — | Lines are always drawn slanted, and are hard to select | **fixed (the slant)** — a line was inserted 0.02 high, which is a slope, and the resize floor of 0.05 meant it could never be dragged level. A line is inserted flat and may be dragged flat; the floor still holds for boxes. Selecting one is still fiddly |
 | — | A tablix cannot be resized as a whole | open |
 | — | A drag handle under another item selects that item instead | open |
 | INS-04 | The drag shows "cannot drop" while dropping works | open |

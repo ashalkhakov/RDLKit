@@ -272,8 +272,7 @@
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
                  _textOptionsBox, _textStyleBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
-                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox,
-                 _styleRestBox ];
+                 _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _styleRestBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
   [self declareBindings];
@@ -1014,7 +1013,9 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self fillRowHeightsOfTablix:(RDLTablix *)it];
     }
     [boxes addObjectsFromArray:[self commonBoxesForItem:it]];
-    [boxes addObject:_moreStyleBox];
+    // The rest of a style is a section of the Style tab now, so the button
+    // that used to open it in a panel is not stacked anywhere.
+    [boxes addObject:_styleRestBox];
     [self syncDependentControls];
     [self rebuildTogglePopFor:it];
     // An item in a tablix cell: the column it is in, whose width is the cell's.

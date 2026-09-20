@@ -25,6 +25,46 @@
 // that is the view transform's job -- and the bottom side used to be left out,
 // so text ran to the bottom edge on the canvas and stopped short of it
 // everywhere else.
+// A line runs from one corner of its box to the other, so a box with any
+// height at all is a slope. One inserted from the menu was given a height of
+// 0.02 -- a slight diagonal -- and the resize floor of 0.05 meant dragging
+// could only make it worse: there was no way to get a level line.
+- (void)testALineIsFlatAndCanBeDraggedFlat {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Ruled"];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx addItemOfKind:RDLItemKindLine];
+  RDLLine *line = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLLine class]])
+      line = (RDLLine *)item;
+  if (line == nil) {
+    XCTFail(@"%@", @"a line should be insertable");
+    return;
+  }
+  if (line.height != 0)
+    XCTFail(@"a line should be inserted flat, this one is %g high", line.height);
+  if (line.width <= 0)
+    XCTFail(@"%@", @"and long enough to be a rule across the page");
+
+  // Sloped by hand, then dragged level again: the floor that stops a box from
+  // shrinking away must not stop a line from lying flat.
+  [ctx.editor resizeItem:line toWidth:3 height:0.6];
+  if (fabs(line.height - 0.6) > 0.001) {
+    XCTFail(@"the line should have taken the slope, it is %g high", line.height);
+    return;
+  }
+  NSRect was = NSMakeRect(line.left, line.top, line.width, line.height);
+  NSRect flat = RDLRectResizedByHandle(was, RDLHandleSouth, NSMakeSize(0, -0.6), 0);
+  if (NSHeight(flat) > 0.0001)
+    XCTFail(@"dragging the bottom up to the top should leave no height, it leaves %g",
+            NSHeight(flat));
+  // The floor still holds for everything else: a box no one can grab is worse
+  // than a short one.
+  NSRect box = RDLRectResizedByHandle(was, RDLHandleSouth, NSMakeSize(0, -0.6), 0.05);
+  if (NSHeight(box) < 0.05 - 0.0001)
+    XCTFail(@"a box should keep its least size, this one is %g high", NSHeight(box));
+}
+
 - (void)testTheTextRectTakesPaddingOnAllFourSides {
   RDLStyle *style = [[RDLStyle alloc] init];
   style.paddingLeft = [RDLLength points:4];

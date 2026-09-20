@@ -338,7 +338,10 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
     [(RDLTextbox *)it setValue:@"Text"];
     it.style.fontSize = [RDLLength points:11];
   } else if ([it isKindOfClass:[RDLLine class]]) {
-    it.height = 0.02;
+    // Flat. A line runs from one corner of its box to the other, so any height
+    // at all is a slope -- and a line inserted from the menu is meant to be a
+    // rule across the page, not a diagonal.
+    it.height = 0.0;
     it.width = 3.0;
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
     it.width = 2.4;

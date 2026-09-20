@@ -511,7 +511,12 @@
                                                                         </subviews>
                                                                     </view>
                                                                 </tabViewItem>
-                                                                                                        <tabViewItem label="Style" identifier="style" id="rightStyleItem">
+</tabViewItems>
+                                                        </tabView>
+                                                    </subviews>
+                                                </view>
+                                            </tabViewItem>
+                                            <tabViewItem label="Style" identifier="style" id="rightStyleItem">
                                                 <view key="view" id="rightStyleItemView">
                                                     <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
                                                     <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -532,11 +537,6 @@
                                                             <rect key="frame" x="0.0" y="0.0" width="260" height="708"/>
                                                             <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                                                         </customView>
-                                                    </subviews>
-                                                </view>
-                                            </tabViewItem>
-</tabViewItems>
-                                                        </tabView>
                                                     </subviews>
                                                 </view>
                                             </tabViewItem>

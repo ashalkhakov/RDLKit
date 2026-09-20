@@ -328,6 +328,56 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   }
 }
 
+// Which tab view each tab belongs to. Counting tabs across the file said
+// nothing about where they sat: Style and Properties were added inside the
+// Attributes tab's own tab view, so the bar selected indices the right pane
+// did not have and clicking either did nothing at all.
+- (void)testTheRightPanesTabsAreItsOwn {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  NSTabView *right = [wc valueForKey:@"rightTabView"];
+  NSTabView *attributes = [wc valueForKey:@"attributeTabView"];
+  DMTabBar *bar = [wc valueForKey:@"rightTabBar"];
+  NSArray<NSString *> *wanted = @[ @"report", @"attributes", @"style", @"properties" ];
+  if ([right numberOfTabViewItems] != (NSInteger)[wanted count])
+    XCTFail(@"the right pane should hold %lu tabs, it holds %ld", (unsigned long)[wanted count],
+            (long)[right numberOfTabViewItems]);
+  for (NSUInteger i = 0; i < [wanted count] && i < (NSUInteger)[right numberOfTabViewItems]; i++)
+    if (![[[right tabViewItemAtIndex:(NSInteger)i] identifier] isEqualToString:wanted[i]])
+      XCTFail(@"tab %lu should be %@, it is %@", (unsigned long)i, wanted[i],
+              [[right tabViewItemAtIndex:(NSInteger)i] identifier]);
+  // The inner tab view is the one that swaps inspectors *inside* Attributes,
+  // and nothing else belongs in it.
+  if ([attributes numberOfTabViewItems] != 3)
+    XCTFail(@"the Attributes tab swaps between three inspectors, not %ld",
+            (long)[attributes numberOfTabViewItems]);
+  if ([[bar tabBarItems] count] != [wanted count])
+    XCTFail(@"the bar should have one item per tab, it has %lu",
+            (unsigned long)[[bar tabBarItems] count]);
+
+  // And clicking each one shows it, which is the thing that was broken.
+  for (NSUInteger i = 0; i < [wanted count]; i++) {
+    bar.selectedIndex = i;
+    [wc rightTabChanged:bar];
+    if ([right indexOfTabViewItem:[right selectedTabViewItem]] != (NSInteger)i)
+      XCTFail(@"choosing %@ in the bar should show it, the pane shows %@", wanted[i],
+              [[right selectedTabViewItem] identifier]);
+  }
+  // The Style tab shows the style inspector, not the one next to it.
+  bar.selectedIndex = 2;
+  [wc rightTabChanged:bar];
+  RDLInspectorView *style = [wc valueForKey:@"styleInspector"];
+  if (![style isDescendantOf:[[right tabViewItemAtIndex:2] view]])
+    XCTFail(@"%@", @"the Style tab should hold the Style inspector");
+  RDLPropertiesView *grid = [wc valueForKey:@"propertiesView"];
+  if (![grid isDescendantOf:[[right tabViewItemAtIndex:3] view]])
+    XCTFail(@"%@", @"and the Properties tab the properties grid");
+}
+
 // The Style tab in the window, not a pair of inspectors built by hand: it has
 // to be its own view, in its own host, showing its own sections.
 - (void)testTheStyleTabIsNotTheAttributesTab {
