@@ -142,7 +142,6 @@
                 <outlet property="reportCodeButton" destination="reportCodeButton" id="reportCodeButtonOutlet"/>
                 <outlet property="reportVariablesButton" destination="reportVariablesButton" id="reportVariablesButtonOutlet"/>
                 <outlet property="resetPageNumberCheck" destination="resetPageNumberCheck" id="resetPageNumberCheckOutlet"/>
-                <outlet property="richTextButton" destination="richTextButton" id="richTextButtonOutlet"/>
                 <outlet property="rightMarginField" destination="rightMarginField" id="rightMarginFieldOutlet"/>
                 <outlet property="rightMarginLabel" destination="rightMarginLabel" id="rightMarginLabelOutlet"/>
                 <outlet property="showLegendCheck" destination="showLegendCheck" id="showLegendCheckOutlet"/>
@@ -1859,7 +1858,7 @@
             </subviews>
         </customView>
         <customView id="textBox">
-            <rect key="frame" x="0.0" y="28" width="260" height="94"/>
+            <rect key="frame" x="0.0" y="28" width="260" height="50"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
             <subviews>
                 <textField focusRingType="none" verticalHuggingPriority="750" id="lbl16">
@@ -1871,7 +1870,7 @@
                     </textFieldCell>
                 </textField>
                 <textField focusRingType="none" id="valueField" customClass="RDLExpressionField">
-                    <rect key="frame" x="10" y="20" width="212" height="44"/>
+                    <rect key="frame" x="10" y="20" width="212" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="valueFieldCell">
                         <font key="font" metaFont="user" size="11"/>
@@ -1884,25 +1883,14 @@
                     </connections>
                 </textField>
                 <button toolTip="Edit this as an expression" id="valueExprButton">
-                    <rect key="frame" x="226" y="20" width="24" height="44"/>
+                    <rect key="frame" x="226" y="20" width="24" height="22"/>
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                     <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="valueExprButtonCell">
                         <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                         <font key="font" metaFont="smallSystem"/>
                     </buttonCell>
                     <connections>
-                        <action selector="editExpression:" target="-2" id="valueExprButtonAction"/>
-                    </connections>
-                </button>
-                <button toolTip="Edit this textbox as rich text" id="richTextButton">
-                    <rect key="frame" x="188" y="66" width="62" height="20"/>
-                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                    <buttonCell key="cell" type="push" title="Rich…" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="richTextButtonCell">
-                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
-                        <font key="font" metaFont="smallSystem"/>
-                    </buttonCell>
-                    <connections>
-                        <action selector="editRichText:" target="-2" id="richTextButtonAction"/>
+                        <action selector="editRichText:" target="-2" id="valueExprButtonAction"/>
                     </connections>
                 </button>
             </subviews>

@@ -471,7 +471,7 @@ static NSArray<NSNumber *> *RDLParagraphStarts(NSString *string) {
     return;
   [storage beginEditing];
   [storage removeAttribute:NSBackgroundColorAttributeName range:all];
-  NSColor *tint = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.18];
+  NSColor *tint = [RDLRichTextCodec expressionTint];
   RDLEnumerateAttribute(storage, RDLExpressionRunAttributeName, all,
                         ^(id value, NSRange range, BOOL *stop) {
                           (void)stop;

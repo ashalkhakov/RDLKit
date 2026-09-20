@@ -114,11 +114,11 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| RTF-01 | Format part of a textbox | Right-click > Edit Rich Text…; bold one word | Only that run changes; the rest keeps its formatting. *Guarded by `testAPlainEditChangesOnlyTheRunsItTouches`, `testRichTextFormatter`* |
+| RTF-01 | Format part of a textbox | Attributes > f(x) beside the value, or right-click > Edit Rich Text…; bold one word | Only that run changes; the rest keeps its formatting. *Guarded by `testAPlainEditChangesOnlyTheRunsItTouches`, `testRichTextFormatter`* |
 | RTF-02 | Paragraphs and lists | Indent, space, bullet and number paragraphs | They come back as written after a save and reopen. *Guarded by `testParagraphLayoutAndListsSurviveTheEditor`, `testParagraphsAreListedAndIndentedInTheEditor`* |
 | RTF-03 | An expression inside text | Insert an expression run | It shows as one atomic pill; typing around it does not break it. *Guarded by `testRichTextPillsAreAtomic`, `testRichTextExpressionRuns`, `testRichTextEditorTakesExpressions`* |
 | RTF-04 | Links and tooltips on a run | Set both on one run | They survive the editor and reach HTML. *Guarded by `testRunLabelsToolTipsLinksAndMarkupSurviveTheEditor`* |
-| RTF-05 | Plain edit of a rich box | Edit the value in the inspector instead | The runs are kept unless the text really changed. *Guarded by `testEditingARichTextBoxAsTextKeepsItRich`* |
+| RTF-05 | The value row | Look at a text box that mixes words and an expression | The field shows both on one line, the expression tinted as a pill, and is not typed into; f(x) beside it opens the rich-text editor, which edits all of it. *Guarded by `testTheValueRowShowsTheRunsAndOpensTheRichEditor`* |
 
 ## H. Tables, matrices and lists (tablix)
 

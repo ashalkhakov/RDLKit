@@ -38,6 +38,13 @@
 extern NSString * const RDLExpressionRunAttributeName;
 
 + (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item;
+// The same text on one line, for showing a text box's contents in a field:
+// every paragraph joined by a pilcrow, and each expression tinted as the
+// rich-text editor tints it, so an expression reads as one thing there too.
+// For reading, never for editing -- what it shows cannot be typed back.
++ (NSAttributedString *)oneLineForItem:(RDLTextbox *)item;
+// The tint an expression run is shown with, wherever one is shown.
++ (NSColor *)expressionTint;
 // An expression as a run of its own, ready to be inserted at the caret.
 + (NSAttributedString *)expressionRun:(NSString *)source
                             baseStyle:(RDLStyle *)style;

@@ -1,4 +1,5 @@
 #import "RDLRichTextCodec.h"
+#import "RDLRichTextFormatter.h"
 
 NSString * const RDLExpressionRunAttributeName = @"RDLExpressionRun";
 // The expressions in a run's style, and in a paragraph's, ride on their text:
@@ -87,6 +88,33 @@ BOOL RDLTextboxHoldsRichText(RDLTextbox *box) {
 }
 
 @implementation RDLRichTextCodec
+
++ (NSColor *)expressionTint {
+  return [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.18];
+}
+
++ (NSAttributedString *)oneLineForItem:(RDLTextbox *)item {
+  NSAttributedString *full = [self attributedStringForItem:item];
+  NSMutableAttributedString *line = [full mutableCopy];
+  // Paragraphs become one line with a mark between them: a field shows one
+  // line whatever it is given, and a silent join would read as one paragraph.
+  for (NSInteger at = (NSInteger)[line length] - 1; at >= 0; at--) {
+    unichar c = [[line string] characterAtIndex:(NSUInteger)at];
+    if (c == '\n' || c == '\r')
+      [line replaceCharactersInRange:NSMakeRange((NSUInteger)at, 1) withString:@" ¶ "];
+  }
+  NSRange all = NSMakeRange(0, [line length]);
+  if (all.length == 0)
+    return line;
+  // An expression reads as a pill here as it does in the editor.
+  [line removeAttribute:NSBackgroundColorAttributeName range:all];
+  RDLEnumerateAttribute(line, RDLExpressionRunAttributeName, all, ^(id value, NSRange range, BOOL *stop) {
+    (void)stop;
+    if (value)
+      [line addAttribute:NSBackgroundColorAttributeName value:[self expressionTint] range:range];
+  });
+  return line;
+}
 
 + (RDLRichTextResult *)resultForAttributedString:(NSAttributedString *)text
                                             item:(RDLTextbox *)item {

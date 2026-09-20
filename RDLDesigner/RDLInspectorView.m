@@ -34,7 +34,7 @@
 @property (nonatomic, strong) RDLFieldBindings *bindings;
 @property (nonatomic, strong) IBOutlet NSTextField *kindLabel;
 @property (nonatomic, strong) IBOutlet NSColorWell *colorWell, *bgColorWell;
-@property (nonatomic, strong) IBOutlet NSButton *fontPanelButton, *richTextButton;
+@property (nonatomic, strong) IBOutlet NSButton *fontPanelButton;
 @property (nonatomic, strong) IBOutlet NSButton *valueExprButton, *fontExprButton;
 @property (nonatomic, strong) IBOutlet NSButton *colorExprButton, *formatExprButton, *rectBGExprButton;
 // A text box's own background, which the engine paints and the pane did not
@@ -977,16 +977,17 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     if ([it isKindOfClass:[RDLTextbox class]]) {
       [boxes addObject:_textBox];
       [boxes addObject:_textOptionsBox];
-      // A box with expressions or styled runs inside its text cannot be shown
-      // as one line without dropping what it holds, so the field shows the
-      // words it has and says where to edit them; typing over it would write
-      // the runs away.
-      BOOL rich = RDLTextboxHoldsRichText((RDLTextbox *)it);
-      [_valueField setStringValue:[(RDLTextbox *)it value] ?: @""];
-      [_valueField setEditable:!rich];
-      [_valueField setToolTip:rich ? @"This text is formatted, or has expressions in it: "
-                                     @"edit it with Rich Text…" : nil];
-      [_valueExprButton setEnabled:!rich];
+      // What the box says, on one line: its runs as the rich-text editor shows
+      // them, with each expression tinted as a pill. Read-only, because a line
+      // of tinted runs cannot be typed back -- f(x) beside it opens the editor
+      // that can edit all of it, which is the one worth having for text that
+      // may carry formatting and expressions at once.
+      [_valueField setEditable:NO];
+      [_valueField setSelectable:YES];
+      [_valueField setAttributedStringValue:[RDLRichTextCodec oneLineForItem:(RDLTextbox *)it]];
+      [_valueField setToolTip:@"What this text box says. Edit it with f(x)."];
+      [_valueExprButton setEnabled:YES];
+      [_valueExprButton setToolTip:@"Edit the text, its formatting and its expressions"];
       [self rebuildHideDuplicatesPopFor:(RDLTextbox *)it];
     } else if ([it isKindOfClass:[RDLLine class]]) {
       [boxes addObject:_lineBox];

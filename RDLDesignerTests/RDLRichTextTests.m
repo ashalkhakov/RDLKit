@@ -114,61 +114,71 @@ static NSString *RDLRunsOf(NSArray<RDLParagraph *> *paragraphs) {
     XCTFail(@"%@", @"redo should put the formatted text back exactly");
 }
 
-// GET-03, reported as: the rich editor shows the expressions, but the
-// inspector's Value field and f(x) show plain text without them -- and typing
-// there would write the runs away. A box whose text holds an expression or a
-// styled run is edited as rich text, and the field says so rather than
-// offering a lossy edit.
-- (void)testAFormattedBoxIsNotEditedAsOneLineOfText {
+// The value row in the inspector: what the text box says, on one line, with
+// each expression tinted as the rich-text editor tints it -- and f(x) beside
+// it opening that editor. Typing into the field would have written the runs
+// away, and the expression editor alone could not describe text that carries
+// formatting and expressions at once.
+- (void)testTheValueRowShowsTheRunsAndOpensTheRichEditor {
   RDLReport *report = [RDLReport emptyReportNamed:@"Rich"];
-  RDLTextbox *plain = [[RDLTextbox alloc] init];
-  plain.name = @"Plain";
-  plain.value = @"Just words";
-  plain.width = 2;
-  plain.height = 0.3;
-  RDLTextbox *rich = [[RDLTextbox alloc] init];
-  rich.name = @"Rich";
-  rich.value = @"Total: ";
-  rich.top = 0.5;
-  rich.width = 2;
-  rich.height = 0.3;
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Total";
+  box.value = @"Total: ";
+  box.width = 2;
+  box.height = 0.3;
   RDLParagraph *paragraph = [[RDLParagraph alloc] init];
   RDLTextRun *words = [[RDLTextRun alloc] init];
   words.value = @"Total: ";
   RDLTextRun *sum = [[RDLTextRun alloc] init];
   sum.value = @"=Sum(Fields!Amount.Value)";
   paragraph.runs = [@[ words, sum ] mutableCopy];
-  rich.paragraphs = [@[ paragraph ] mutableCopy];
-  [report.body.items addObjectsFromArray:@[ plain, rich ]];
-
-  if (RDLTextboxHoldsRichText(plain) || !RDLTextboxHoldsRichText(rich))
-    XCTFail(@"%@", @"a box with an expression in its text is the formatted one");
-
+  box.paragraphs = [@[ paragraph ] mutableCopy];
+  [report.body.items addObject:box];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
                                                                 context:ctx];
+  [inspector reload];
+
   NSTextField *value = [inspector valueForKey:@"valueField"];
-  NSButton *fx = [inspector valueForKey:@"valueExprButton"];
+  NSAttributedString *shown = [value attributedStringValue];
+  if ([[shown string] rangeOfString:@"Total: "].location == NSNotFound ||
+      [[shown string] rangeOfString:@"=Sum(Fields!Amount.Value)"].location == NSNotFound)
+    XCTFail(@"the field should show what the box says, it shows %@", [shown string]);
+  if ([[shown string] rangeOfString:@"\n"].location != NSNotFound)
+    XCTFail(@"%@", @"and show it on one line");
+  // The expression is a pill there, as it is in the editor.
+  NSRange expression = [[shown string] rangeOfString:@"=Sum"];
+  id tint = [shown attribute:NSBackgroundColorAttributeName atIndex:expression.location
+              effectiveRange:NULL];
+  if (tint == nil)
+    XCTFail(@"%@", @"an expression should read as a pill in the field");
+  id wordsTint = [shown attribute:NSBackgroundColorAttributeName atIndex:0 effectiveRange:NULL];
+  if (wordsTint != nil)
+    XCTFail(@"%@", @"and the words around it should not");
 
-  [ctx.selection selectItem:plain inBandWithKey:@"body"];
-  [inspector reload];
-  if (![value isEditable] || ![fx isEnabled])
-    XCTFail(@"%@", @"a plain box is still edited where it always was");
-
-  [ctx.selection selectItem:rich inBandWithKey:@"body"];
-  [inspector reload];
+  // Nothing is typed there: the runs are edited in the editor f(x) opens.
   if ([value isEditable])
-    XCTFail(@"%@", @"a formatted box should not be typed over in the Value field");
-  if ([fx isEnabled])
-    XCTFail(@"%@", @"nor should its expression be edited as though it were the whole value");
-  if ([[value toolTip] rangeOfString:@"Rich Text"].location == NSNotFound)
-    XCTFail(@"the field should say where to edit it, it says %@", [value toolTip]);
+    XCTFail(@"%@", @"the value field is for reading, not for typing over the runs");
+  NSButton *fx = [inspector valueForKey:@"valueExprButton"];
+  if (![fx isEnabled])
+    XCTFail(@"%@", @"f(x) should be the way in, whatever the text holds");
+  if ([fx action] != @selector(editRichText:))
+    XCTFail(@"f(x) should open the rich-text editor, it sends %@",
+            NSStringFromSelector([fx action]));
 
-  // And what it holds is still what it held.
-  if ([[[[rich.paragraphs firstObject] runs] lastObject] value] == nil ||
-      ![[[[[rich.paragraphs firstObject] runs] lastObject] value]
-          isEqualToString:@"=Sum(Fields!Amount.Value)"])
-    XCTFail(@"%@", @"the expression run should be untouched");
+  // A plain box reads as plainly, and is edited the same way.
+  RDLTextbox *plain = [[RDLTextbox alloc] init];
+  plain.name = @"Plain";
+  plain.value = @"Just words";
+  plain.top = 1;
+  plain.width = 2;
+  plain.height = 0.3;
+  [report.body.items addObject:plain];
+  [ctx.selection selectItem:plain inBandWithKey:@"body"];
+  if (![[[value attributedStringValue] string] isEqualToString:@"Just words"])
+    XCTFail(@"a plain box should read as its words, it reads %@",
+            [[value attributedStringValue] string]);
 }
 
 - (void)testRichTextCodec {
