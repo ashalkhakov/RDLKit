@@ -11,6 +11,10 @@
                 <outlet property="content" destination="content" id="contentOutlet"/>
                 <outlet property="outline" destination="groupsOutline" id="outlineOutlet"/>
                 <outlet property="headingLabel" destination="headingLabel" id="headingLabelOutlet"/>
+                <outlet property="addGroupButton" destination="addGroupButton" id="addGroupButtonOutlet"/>
+                <outlet property="addAdjacentButton" destination="addAdjacentButton" id="addAdjacentButtonOutlet"/>
+                <outlet property="deleteGroupButton" destination="deleteGroupButton" id="deleteGroupButtonOutlet"/>
+                <outlet property="editGroupButton" destination="editGroupButton" id="editGroupButtonOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>

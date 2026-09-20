@@ -198,6 +198,20 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
   return used;
 }
 
++ (NSString *)whyName:(NSString *)name
+     isRefusedInReport:(RDLReport *)report
+               besides:(RDLItem *)item {
+  if ([name length] == 0)
+    return @"Every element needs a name.";
+  if (![[NSCharacterSet letterCharacterSet] characterIsMember:[name characterAtIndex:0]])
+    return @"A name starts with a letter.";
+  if (![self isValidName:name])
+    return @"A name holds letters, digits and underscores only — no spaces.";
+  if ([self name:name isTakenInReport:report besides:item])
+    return [NSString stringWithFormat:@"Something else in this report is already called %@.", name];
+  return nil;
+}
+
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report {
   return [self uniqueNameWithPrefix:prefix inReport:report besides:nil];
 }

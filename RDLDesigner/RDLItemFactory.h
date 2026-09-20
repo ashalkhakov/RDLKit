@@ -84,6 +84,13 @@ FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
 + (BOOL)isValidName:(NSString *)name;
 // Whether an item in the report, other than `item`, already has `name`.
 + (BOOL)name:(NSString *)name isTakenInReport:(RDLReport *)report besides:(RDLItem *)item;
+// Why a name cannot be given, in words to show the person who typed it, or nil
+// when it can. An RDL name starts with a letter and holds letters, digits and
+// underscores only -- which is why "Total price" is refused -- and no two items
+// in a report may share one.
++ (NSString *)whyName:(NSString *)name
+     isRefusedInReport:(RDLReport *)report
+               besides:(RDLItem *)item;
 // The same, kept apart from `item` and everything in it as well: an item being
 // edited away from the report, such as a dialog's working copy of a tablix.
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix

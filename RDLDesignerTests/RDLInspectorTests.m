@@ -2235,4 +2235,70 @@ static NSData *RDLTinyPNG(void) {
     XCTFail(@"%@", @"a property that is neither should not show as ticked");
 }
 
+// Renaming says why it will not take a name, and an accepted rename undoes.
+// A name with a space in it is the commonest thing to type, and it used to be
+// handed back with nothing but a beep -- which on some platforms is nothing at
+// all -- so the field looked as though it had eaten the edit.
+- (void)testRenamingSaysWhyItRefusesAndUndoes {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Named"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Title";
+  box.value = @"Words";
+  box.left = 1;
+  box.top = 1;
+  box.width = 2;
+  box.height = 0.3;
+  [report.body.items addObject:box];
+  RDLTextbox *other = [[RDLTextbox alloc] init];
+  other.name = @"Subtitle";
+  other.left = 1;
+  other.top = 2;
+  other.width = 2;
+  other.height = 0.3;
+  [report.body.items addObject:other];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                                context:ctx];
+  [inspector reload];
+  NSTextField *name = [inspector valueForKey:@"nameField"];
+  NSTextField *hint = [inspector valueForKey:@"nameHintLabel"];
+  if (name == nil || hint == nil) {
+    XCTFail(@"%@", @"the name row should have a field and somewhere to say what is wrong");
+    return;
+  }
+  if ([[hint stringValue] length])
+    XCTFail(@"nothing is wrong yet, but it says %@", [hint stringValue]);
+
+  // A space: refused, said out loud, and the field back on the name it has.
+  [name setStringValue:@"Total price"];
+  [inspector changed:name];
+  if (![box.name isEqualToString:@"Title"] || ![[name stringValue] isEqualToString:@"Title"])
+    XCTFail(@"the name should not have changed, it is %@ and the field shows %@", box.name,
+            [name stringValue]);
+  if ([[hint stringValue] rangeOfString:@"spaces"].location == NSNotFound)
+    XCTFail(@"it should say a name has no spaces in it, it says '%@'", [hint stringValue]);
+
+  // A name something else already has: refused, and said by name.
+  [name setStringValue:@"Subtitle"];
+  [inspector changed:name];
+  if (![box.name isEqualToString:@"Title"])
+    XCTFail(@"%@", @"two items cannot share a name");
+  if ([[hint stringValue] rangeOfString:@"Subtitle"].location == NSNotFound)
+    XCTFail(@"it should say what is already called that, it says '%@'", [hint stringValue]);
+
+  // A name that is a name: taken, nothing left to complain about, and undone.
+  [name setStringValue:@"Heading"];
+  [inspector changed:name];
+  if (![box.name isEqualToString:@"Heading"])
+    XCTFail(@"the rename should reach the model, it is %@", box.name);
+  if ([[hint stringValue] length])
+    XCTFail(@"the name was taken, so nothing should be said: '%@'", [hint stringValue]);
+  [[ctx.document undoManager] undo];
+  if (![box.name isEqualToString:@"Title"])
+    XCTFail(@"undo should put the name back, it is %@", box.name);
+  if (![[name stringValue] isEqualToString:@"Title"])
+    XCTFail(@"the field should show what the report now says, it shows %@", [name stringValue]);
+}
+
 @end

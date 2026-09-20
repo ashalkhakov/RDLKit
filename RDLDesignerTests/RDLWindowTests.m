@@ -3665,6 +3665,61 @@ paperOrigin:NSMakePoint(0, 0)];
     XCTFail(@"%@", @"and unticked once it is shut");
 }
 
+// The buttons under the tree are offered exactly when they would work. They
+// used to take the click and do nothing whatever was picked out -- the details
+// group cannot be grouped inside or deleted, and with an axis heading picked
+// out there is no group to delete or open -- which read as four dead buttons.
+- (void)testTheGroupsPanesButtonsSayWhatTheyCanDo {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = RDLFirstTablixOf(report);
+  [ctx.selection selectItem:tablix inBandWithKey:@"body"];
+  RDLGroupsView *pane = [[RDLGroupsView alloc] initWithFrame:NSMakeRect(0, 0, 700, 140) context:ctx];
+  NSButton *inside = [pane valueForKey:@"addGroupButton"];
+  NSButton *beside = [pane valueForKey:@"addAdjacentButton"];
+  NSButton *remove = [pane valueForKey:@"deleteGroupButton"];
+  NSButton *properties = [pane valueForKey:@"editGroupButton"];
+  if (inside == nil || beside == nil || remove == nil || properties == nil) {
+    XCTFail(@"%@", @"the pane's four buttons should be wired up");
+    return;
+  }
+  // An axis heading picked out: a first group can go round what the region
+  // shows, but there is no group to delete or to open.
+  [pane selectAxis:RDLTablixAxisRows];
+  if (![inside isEnabled] || [remove isEnabled] || [properties isEnabled])
+    XCTFail(@"%@", @"with a heading picked out only grouping is on offer");
+
+  // A group of its own: everything is on offer.
+  RDLTablixMember *added = [pane addGroupWithExpression:@"=Fields!Port.Value"
+                                              placement:RDLGroupPlacementChild];
+  if (added == nil) {
+    XCTFail(@"%@", @"the group should have been added");
+    return;
+  }
+  if (![inside isEnabled] || ![beside isEnabled] || ![remove isEnabled] || ![properties isEnabled])
+    XCTFail(@"%@", @"a group picked out can be grouped round, deleted and opened");
+  // ... and the button does what it offers.
+  NSUInteger was = [[pane allGroupsOnAxis:RDLTablixAxisRows] count];
+  [pane deleteGroup:nil];
+  if ([[pane allGroupsOnAxis:RDLTablixAxisRows] count] != was - 1)
+    XCTFail(@"%@", @"Delete should delete the group it offered to delete");
+
+  // The details group: it groups on nothing, so nothing can go inside it --
+  // there is no grouping there to go around.
+  RDLTablixMember *details = nil;
+  for (RDLTablixMember *m in [pane allGroupsOnAxis:RDLTablixAxisRows])
+    if ([m.groupExpressions count] == 0)
+      details = m;
+  if (details == nil || ![pane selectGroup:details axis:RDLTablixAxisRows]) {
+    XCTFail(@"%@", @"the pane should list the details group, as Report Builder does");
+    return;
+  }
+  if ([inside isEnabled])
+    XCTFail(@"%@", @"the details group groups on nothing, so nothing goes inside it");
+  if (![properties isEnabled] || ![beside isEnabled])
+    XCTFail(@"%@", @"a group may still go beside it, and its properties be looked at");
+}
+
 // The groups pane adds and removes groups along both axes, which is what makes
 // a table a grouped table and a crosstab a crosstab.
 - (void)testTheGroupsPaneEditsBothAxes {

@@ -30,6 +30,10 @@ static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
 @property (nonatomic, strong) IBOutlet NSView *content;
 @property (nonatomic, strong) IBOutlet NSOutlineView *outline;
 @property (nonatomic, strong) IBOutlet NSTextField *headingLabel;
+@property (nonatomic, strong) IBOutlet NSButton *addGroupButton;
+@property (nonatomic, strong) IBOutlet NSButton *addAdjacentButton;
+@property (nonatomic, strong) IBOutlet NSButton *deleteGroupButton;
+@property (nonatomic, strong) IBOutlet NSButton *editGroupButton;
 @end
 
 @implementation RDLGroupsView {
@@ -212,15 +216,32 @@ static NSUInteger RDLCountGroups(NSArray<RDLTablixMember *> *groups) {
   if ([item isKindOfClass:[RDLGroupsAxisNode class]]) {
     _selectedGroup = nil;
     _selectedAxis = [(RDLGroupsAxisNode *)item axis];
+    [self syncButtons];
     return;
   }
   if (![item isKindOfClass:[RDLTablixMember class]]) {
     _selectedGroup = nil;
     _selectedAxis = RDLTablixAxisUnspecified;
+    [self syncButtons];
     return;
   }
   _selectedGroup = item;
   _selectedAxis = [self axisOfGroup:item];
+  [self syncButtons];
+}
+
+// A button that cannot do anything is a button that says so: the commands
+// under the tree are offered exactly when they would work, which is how the
+// menu above them already behaves. A row picked out that a group cannot go
+// inside -- the details group -- greys Group Inside rather than taking the
+// click and doing nothing.
+- (void)syncButtons {
+  BOOL onATablix = [self tablix] != nil;
+  [_addGroupButton setEnabled:onATablix && [self canAddGroupWithPlacement:RDLGroupPlacementChild]];
+  [_addAdjacentButton setEnabled:onATablix &&
+                                 [self canAddGroupWithPlacement:RDLGroupPlacementAfter]];
+  [_deleteGroupButton setEnabled:onATablix && [self canDeleteSelectedGroup]];
+  [_editGroupButton setEnabled:onATablix && _selectedGroup != nil];
 }
 
 static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *group) {

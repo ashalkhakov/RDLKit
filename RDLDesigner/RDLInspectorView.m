@@ -86,6 +86,8 @@
 // Common item geometry section
 @property (nonatomic, strong) IBOutlet NSView *geoBox;
 @property (nonatomic, strong) IBOutlet NSTextField *nameField;
+// Why the name typed was not taken. Empty the rest of the time.
+@property (nonatomic, strong) IBOutlet NSTextField *nameHintLabel;
 @property (nonatomic, strong) IBOutlet NSTextField *leftField, *topField, *widthField, *heightField;
 // Textbox section
 @property (nonatomic, strong) IBOutlet NSView *textBox;
@@ -882,6 +884,13 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   return style;
 }
 
+// What is wrong with the name that was typed, under the field, or nothing at
+// all when there is nothing wrong. It clears as soon as another item is shown
+// or a name is taken, so it is always about what is in the box now.
+- (void)sayAboutTheName:(NSString *)why {
+  [_nameHintLabel setStringValue:why ?: @""];
+}
+
 - (void)stackBoxes:(NSArray *)boxes {
   for (NSView *v in _sections)
     [v setHidden:YES];
@@ -968,6 +977,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
                                    : [NSString stringWithFormat:@"%@ · %@", it.rdlElementName,
                                                                 it.name]];
     [_nameField setStringValue:it.name ?: @""];
+    [self sayAboutTheName:nil];
     // Its name, which an item in a cell has too; its geometry, which it does not.
     NSMutableArray *boxes = [NSMutableArray arrayWithObject:_nameBox];
     if (!inCell)
@@ -1435,7 +1445,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // field goes back to the name the item has.
     NSString *name = [[_nameField stringValue]
         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (![editor renameItem:it to:name]) {
+    // Refused in words, not in a beep: a name with a space in it is the
+    // commonest thing to type, and being handed the old name back with no
+    // reason reads as the field having eaten the edit.
+    NSString *why = [RDLItemFactory whyName:name isRefusedInReport:_context.report besides:it];
+    [self sayAboutTheName:why];
+    if (why != nil || ![editor renameItem:it to:name]) {
       NSBeep();
       [_nameField setStringValue:it.name ?: @""];
     }
