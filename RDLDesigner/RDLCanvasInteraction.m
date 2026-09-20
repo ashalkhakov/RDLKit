@@ -61,6 +61,19 @@ static const CGFloat kRDLSnapTolerance = 5.0;
 // what an item may measure at all.
 static const CGFloat kRDLLeastItemSize = 0.05;
 
+// The rule a dragged box means: the axis it already ran along stays, and the
+// other is flattened. A line that was flat both ways -- one just inserted --
+// runs the way the drag made it longer.
+static NSRect RDLRuleFromBox(NSRect now, NSRect was) {
+  BOOL wasVertical = NSHeight(was) > NSWidth(was);
+  BOOL vertical = NSWidth(was) == 0 && NSHeight(was) == 0 ? NSHeight(now) > NSWidth(now) : wasVertical;
+  if (vertical)
+    now.size.width = 0;
+  else
+    now.size.height = 0;
+  return now;
+}
+
 // What a click means when it lands on something: with Shift or Command held,
 // the item joins the selection or leaves it; without, it becomes the selection.
 static BOOL RDLEventToggles(NSEvent *event) {
@@ -281,11 +294,14 @@ static BOOL RDLEventToggles(NSEvent *event) {
     // The box the grip makes, in inches: a corner moves two edges, a side one,
     // and the ones on the top and the left move the item as they resize it.
     NSRect was = NSMakeRect(_origLeft, _origTop, _origW, _origH);
-    // A line may be dragged flat: its box is the two ends, and a floor under
-    // its height is a floor under how level it can be. Everything else keeps
-    // its least size, because a box of no height is a box nobody can grab.
-    CGFloat least = [[_ctx selectedItem] isKindOfClass:[RDLLine class]] ? 0 : kRDLLeastItemSize;
-    NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy), least);
+    // A line is a rule, across or down, and a drag changes how long it is --
+    // never how steep. Its box is the two ends, so the axis it does not run
+    // along is held at nothing rather than at the least size a box needs.
+    BOOL isLine = [[_ctx selectedItem] isKindOfClass:[RDLLine class]];
+    NSRect now = RDLRectResizedByHandle(was, _dragKind, NSMakeSize(dx, dy),
+                                        isLine ? 0 : kRDLLeastItemSize);
+    if (isLine)
+      now = RDLRuleFromBox(now, was);
     // Lined up with the edges near it, or made the same size as a neighbour.
     // In the canvas's coordinates, where the neighbours are, and back again.
     NSRect inCanvas = NSMakeRect(NSMinX(_dragRect) + (NSMinX(now) - _origLeft) * RDLPointsPerInch,

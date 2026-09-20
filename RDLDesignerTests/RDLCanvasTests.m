@@ -25,6 +25,24 @@
 // that is the view transform's job -- and the bottom side used to be left out,
 // so text ran to the bottom edge on the canvas and stopped short of it
 // everywhere else.
+// The samples' rules are rules, not slopes. Every one of them was written
+// 0.02in high -- 1.4 points of drop across 7.5 inches -- which the painter
+// draws as the slope it is, faithfully and wrongly.
+- (void)testNoSampleRulesAreSloped {
+  for (NSDictionary *entry in [RDLSamples catalog]) {
+    RDLReport *report = [RDLSamples reportWithId:entry[@"id"]];
+    for (RDLItem *item in [report allItemsIncludingNested]) {
+      if (![item isKindOfClass:[RDLLine class]])
+        continue;
+      // A line is a rule one way or the other: across, or down. Both at once
+      // is a diagonal, which no sample means to draw.
+      if (item.width > 0.001 && item.height > 0.001)
+        XCTFail(@"%@'s %@ is %gin by %gin, which is a slope", entry[@"id"], item.name, item.width,
+                item.height);
+    }
+  }
+}
+
 // A line runs from one corner of its box to the other, so a box with any
 // height at all is a slope. One inserted from the menu was given a height of
 // 0.02 -- a slight diagonal -- and the resize floor of 0.05 meant dragging
@@ -63,6 +81,47 @@
   NSRect box = RDLRectResizedByHandle(was, RDLHandleSouth, NSMakeSize(0, -0.6), 0.05);
   if (NSHeight(box) < 0.05 - 0.0001)
     XCTFail(@"a box should keep its least size, this one is %g high", NSHeight(box));
+}
+
+// A flat line is something a hand can hit. Its box has no height, so the hit
+// test is given a few points either side of it -- selection only: the line's
+// own box, and where its handles are drawn, are unchanged.
+- (void)testAFlatLineCanStillBeClicked {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rules"];
+  RDLLine *rule = [[RDLLine alloc] init];
+  rule.name = @"HRule";
+  rule.left = 0.5;
+  rule.top = 1;
+  rule.width = 3;
+  rule.height = 0;
+  [report.body.items addObject:rule];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  NSRect lineRect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:rule rect:&lineRect]) {
+    XCTFail(@"%@", @"the rule should be on the page");
+    return;
+  }
+  if (rule.height != 0)
+    XCTFail(@"the rule itself should have no height, it has %g", rule.height);
+  if (NSHeight(lineRect) > 2)
+    XCTFail(@"and its box should be a point tall, it is %g", NSHeight(lineRect));
+  NSString *kind = nil;
+  for (NSNumber *offset in @[ @3, @(-3) ]) {
+    CGFloat dy = [offset doubleValue];
+    RDLItem *hit = [[canvas geometry] itemAtPoint:NSMakePoint(NSMidX(lineRect), NSMidY(lineRect) + dy)
+                                             kind:&kind
+                                          bandKey:NULL
+                                             rect:NULL];
+    if (hit != rule)
+      XCTFail(@"a click %g points from the rule should select it, it found %@", dy, hit.name);
+  }
+  RDLItem *far = [[canvas geometry] itemAtPoint:NSMakePoint(NSMidX(lineRect), NSMidY(lineRect) - 30)
+                                           kind:&kind
+                                        bandKey:NULL
+                                           rect:NULL];
+  if (far == rule)
+    XCTFail(@"%@", @"but not half an inch away from it");
 }
 
 - (void)testTheTextRectTakesPaddingOnAllFourSides {

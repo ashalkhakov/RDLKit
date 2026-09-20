@@ -378,6 +378,58 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
     XCTFail(@"%@", @"and the Properties tab the properties grid");
 }
 
+// A line drawn on the canvas is a rule, across or down. Dragging a corner
+// makes it longer, never steeper: a designer that can make a diagonal makes
+// one every time a hand slips.
+- (void)testDraggingALineNeverSlopesIt {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rules"];
+  RDLLine *rule = [[RDLLine alloc] init];
+  rule.name = @"HRule";
+  rule.left = 0.5;
+  rule.top = 1;
+  rule.width = 3;
+  rule.height = 0;
+  [report.body.items addObject:rule];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  [ctx.selection selectItem:rule inBandWithKey:@"body"];
+  NSRect itemRect = NSZeroRect;
+  if (![[canvas geometry] findRectOfItem:rule rect:&itemRect]) {
+    XCTFail(@"%@", @"the rule should be on the page");
+    return;
+  }
+  // By the corner grip, which on any other item resizes both ways at once.
+  NSPoint grip = NSMakePoint(NSMaxX(itemRect), NSMaxY(itemRect));
+  NSPoint to = NSMakePoint(grip.x + 40, grip.y + 40);
+  [canvas mouseDown:RDLMouseEventInView(canvas, grip, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, to, NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, to, NSEventTypeLeftMouseUp, 1)];
+  if (rule.height > 0.0001)
+    XCTFail(@"a rule across the page should stay flat, it is %g high", rule.height);
+  if (rule.width <= 3.0)
+    XCTFail(@"and the drag should have made it longer, it is %g wide", rule.width);
+
+  // A rule down the page keeps its own axis the same way.
+  RDLLine *down = [[RDLLine alloc] init];
+  down.name = @"VRule";
+  down.left = 5;
+  down.top = 1;
+  down.width = 0;
+  down.height = 2;
+  [report.body.items addObject:down];
+  [ctx.selection selectItem:down inBandWithKey:@"body"];
+  [[canvas geometry] findRectOfItem:down rect:&itemRect];
+  grip = NSMakePoint(NSMaxX(itemRect), NSMaxY(itemRect));
+  to = NSMakePoint(grip.x + 40, grip.y + 40);
+  [canvas mouseDown:RDLMouseEventInView(canvas, grip, NSEventTypeLeftMouseDown, 1)];
+  [canvas mouseDragged:RDLMouseEventInView(canvas, to, NSEventTypeLeftMouseDragged, 1)];
+  [canvas mouseUp:RDLMouseEventInView(canvas, to, NSEventTypeLeftMouseUp, 1)];
+  if (down.width > 0.0001)
+    XCTFail(@"a rule down the page should stay upright, it is %g wide", down.width);
+  if (down.height <= 2.0)
+    XCTFail(@"and longer than it was, it is %g", down.height);
+}
+
 // The Style tab in the window, not a pair of inspectors built by hand: it has
 // to be its own view, in its own host, showing its own sections.
 - (void)testTheStyleTabIsNotTheAttributesTab {

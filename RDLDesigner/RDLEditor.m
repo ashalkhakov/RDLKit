@@ -785,8 +785,16 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
 - (void)resizeItem:(RDLItem *)item toWidth:(CGFloat)width height:(CGFloat)height {
   if (item == nil)
     return;
-  CGFloat newW = [RDLEditor snap:MAX(0.1, width)];
-  CGFloat newH = [RDLEditor snap:MAX(0.02, height)];
+  // A box has a least size, because a box of no size is one nobody can grab.
+  // A line is not a box: it runs across or down, and the axis it does not run
+  // along is nothing at all -- clamping that to a hundredth of an inch is what
+  // made every line in this designer a shallow diagonal.
+  BOOL isLine = [item isKindOfClass:[RDLLine class]];
+  CGFloat newW = [RDLEditor snap:MAX(isLine ? 0 : 0.1, width)];
+  CGFloat newH = [RDLEditor snap:MAX(isLine ? 0 : 0.02, height)];
+  // A line of no length either way is not a line.
+  if (isLine && newW <= 0 && newH <= 0)
+    return;
   if (newW == item.width && newH == item.height)
     return;
   [self beginGroup:@"Resize"];

@@ -931,7 +931,7 @@
                             <Top>0.50000in</Top>
                             <Left>0.00000in</Left>
                             <Width>7.50000in</Width>
-                            <Height>0.02000in</Height>
+                            <Height>0in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
                                 <Color>#1a1916</Color>
@@ -951,7 +951,7 @@
                             <Top>0.04000in</Top>
                             <Left>0.00000in</Left>
                             <Width>7.50000in</Width>
-                            <Height>0.02000in</Height>
+                            <Height>0in</Height>
                             <Style>
                                 <FontFamily>Georgia</FontFamily>
                                 <Color>#1a1916</Color>

@@ -135,8 +135,10 @@ static const CGFloat kRDLBracketGap = 3;
 
 - (NSRect)rectForItem:(RDLItem *)item origin:(NSPoint)origin {
   CGFloat scale = RDLPointsPerInch;
+  // A point of size either way, so a rule -- which is nothing at all across
+  // its own thickness -- still has a box to draw and to hit.
   return NSMakeRect(origin.x + item.left * scale, origin.y + item.top * scale,
-                    item.width * scale, MAX(1, item.height * scale));
+                    MAX(1, item.width * scale), MAX(1, item.height * scale));
 }
 
 #pragma mark - Reverse lookup
@@ -265,6 +267,23 @@ NSRect RDLRectResizedByHandle(NSRect r, NSString *kind, NSSize delta, CGFloat le
   return r;
 }
 
+// A rule has no thickness to aim at: a horizontal line's box is a few
+// hundredths of an inch tall at most, and a flat one has no height at all, so
+// clicking it is a matter of luck. The hit test is given a few points either
+// side of the thin axis -- selection only; the line's own box is untouched, and
+// so is where its handles are drawn.
+static const CGFloat kRDLLineGrabSlop = 4.0;
+
+static NSRect RDLGrabRectOfItem(RDLItem *item, NSRect r) {
+  if (![item isKindOfClass:[RDLLine class]])
+    return r;
+  if (NSHeight(r) < kRDLLineGrabSlop * 2)
+    r = NSInsetRect(r, 0, -kRDLLineGrabSlop);
+  if (NSWidth(r) < kRDLLineGrabSlop * 2)
+    r = NSInsetRect(r, -kRDLLineGrabSlop, 0);
+  return r;
+}
+
 // Which part of `rect` the point is on: a resize handle, the body, or nothing.
 // Only the item showing grips offers them.
 static NSString *RDLHandleAt(NSRect r, NSPoint p, BOOL hasHandles) {
@@ -314,7 +333,7 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p, BOOL hasHandles) {
         *outRect = r;
       return it;
     }
-    NSString *kind = RDLHandleAt(r, point, it == _itemWithHandles);
+    NSString *kind = RDLHandleAt(RDLGrabRectOfItem(it, r), point, it == _itemWithHandles);
     if (kind) {
       if (outKind)
         *outKind = kind;
