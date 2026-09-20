@@ -43,6 +43,12 @@ typedef NS_ENUM(NSInteger, RDLGroupPlacement) {
 
 + (BOOL)setWidth:(CGFloat)width ofColumn:(NSUInteger)column inTablix:(RDLTablix *)tablix;
 + (BOOL)setHeight:(CGFloat)height ofRow:(NSUInteger)row inTablix:(RDLTablix *)tablix;
+// The whole region to a size, in inches: the body's columns share out the
+// width its row headers leave, and its rows the height its column headings
+// leave, each keeping the share of it it had. A region is as wide as its
+// columns and as tall as its rows, so this is the only way to resize one --
+// setting the item's own width would leave the grid inside it the size it was.
++ (BOOL)setSize:(NSSize)size ofTablix:(RDLTablix *)tablix;
 
 // A column at `index`, from 0 to the column count, `width` wide: a cell in every
 // row -- an empty textbox, or where a merged cell reaches across the place, more

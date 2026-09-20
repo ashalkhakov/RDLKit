@@ -1152,4 +1152,63 @@ static RDLTablix *RDLFirstTablixIn(RDLReport *report) {
     XCTFail(@"%@", @"redoing both should leave the merged cell empty again");
 }
 
+// A region is resized as a whole by dragging its edge, which shares the change
+// out among its columns and rows. It used to set the region's own width and
+// height, which left the grid inside it the size it was: the table drew at one
+// size and its lines at another.
+- (void)testAWholeRegionIsResizedBySharingOutTheChange {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  if (tablix == nil || [tablix.tablixBody.columns count] < 2) {
+    XCTFail(@"%@", @"the sample should have a table of several columns");
+    return;
+  }
+  NSMutableArray<NSNumber *> *were = [NSMutableArray array];
+  for (RDLTablixColumn *c in tablix.tablixBody.columns)
+    [were addObject:@(c.width)];
+  CGFloat wasWide = tablix.width, wasTall = tablix.height;
+
+  [ctx.editor resizeItem:tablix toWidth:wasWide * 1.5 height:wasTall];
+  CGFloat total = 0;
+  for (RDLTablixColumn *c in tablix.tablixBody.columns)
+    total += c.width;
+  CGFloat headers = 0;
+  for (NSNumber *w in [tablix rowHeaderColumnWidths])
+    headers += [w doubleValue];
+  if (fabs(total + headers - tablix.width) > 0.001)
+    XCTFail(@"the region should be as wide as its columns: %g against %g", total + headers,
+            tablix.width);
+  if (fabs(tablix.width - wasWide * 1.5) > 0.06)
+    XCTFail(@"it should be about half again as wide, it is %g against %g", tablix.width,
+            wasWide * 1.5);
+  // Each column keeps its share.
+  CGFloat firstWas = [were[0] doubleValue] / wasWide;
+  CGFloat firstNow = tablix.tablixBody.columns[0].width / tablix.width;
+  if (fabs(firstWas - firstNow) > 0.02)
+    XCTFail(@"the first column should keep its share: %g of the width, was %g", firstNow, firstWas);
+
+  // And it undoes as one step, the grid with it.
+  [[ctx.document undoManager] undo];
+  if (fabs(tablix.width - wasWide) > 0.001 ||
+      fabs(tablix.tablixBody.columns[0].width - [were[0] doubleValue]) > 0.001)
+    XCTFail(@"undo should put the region and its columns back: %g wide, first column %g",
+            tablix.width, tablix.tablixBody.columns[0].width);
+
+  // Rows the same way.
+  [ctx.editor resizeItem:tablix toWidth:tablix.width height:wasTall * 2];
+  CGFloat rows = 0;
+  for (RDLTablixRow *r in tablix.tablixBody.rows)
+    rows += r.height;
+  CGFloat headings = 0;
+  for (NSNumber *h in [tablix columnHeaderRowHeights])
+    headings += [h doubleValue];
+  if (fabs(rows + headings - tablix.height) > 0.001)
+    XCTFail(@"the region should be as tall as its rows: %g against %g", rows + headings,
+            tablix.height);
+}
+
 @end

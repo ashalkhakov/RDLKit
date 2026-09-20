@@ -336,6 +336,73 @@ static NSString *RDLTotalFor(RDLItem *item, RDLDataSet *dataSet) {
   return YES;
 }
 
+// Shares `wanted` among `sizes`, each keeping its share of what they add up to
+// and none going below `least`. Returns NO when nothing moved.
+static BOOL RDLShareOut(NSMutableArray<NSNumber *> *sizes, CGFloat wanted, CGFloat least) {
+  NSUInteger count = [sizes count];
+  if (count == 0)
+    return NO;
+  CGFloat total = 0;
+  for (NSNumber *n in sizes)
+    total += [n doubleValue];
+  CGFloat floor = least * (CGFloat)count;
+  CGFloat target = MAX(floor, wanted);
+  // Shares of nothing are equal shares: a grid whose lines all measure zero
+  // has no proportions to keep.
+  BOOL moved = NO;
+  for (NSUInteger i = 0; i < count; i++) {
+    CGFloat was = [sizes[i] doubleValue];
+    CGFloat share = total > 0 ? was / total : 1.0 / (CGFloat)count;
+    CGFloat now = MAX(least, target * share);
+    if (fabs(now - was) > 1e-9)
+      moved = YES;
+    sizes[i] = @(now);
+  }
+  return moved;
+}
+
++ (BOOL)setSize:(NSSize)size ofTablix:(RDLTablix *)tablix {
+  RDLTablixBody *body = tablix.tablixBody;
+  if (body == nil)
+    return NO;
+  BOOL moved = NO;
+  // What the row headers and the column headings take is theirs: they are as
+  // wide and as tall as the grouping makes them, and the body has the rest.
+  CGFloat headerWidth = 0;
+  for (NSNumber *w in [tablix rowHeaderColumnWidths])
+    headerWidth += [w doubleValue];
+  CGFloat headingHeight = 0;
+  for (NSNumber *h in [tablix columnHeaderRowHeights])
+    headingHeight += [h doubleValue];
+
+  NSMutableArray<NSNumber *> *widths = [NSMutableArray array];
+  for (RDLTablixColumn *column in body.columns)
+    [widths addObject:@(column.width)];
+  if (RDLShareOut(widths, size.width - headerWidth, kRDLMinimumColumnWidth)) {
+    CGFloat total = headerWidth;
+    for (NSUInteger i = 0; i < [widths count]; i++) {
+      body.columns[i].width = [widths[i] doubleValue];
+      total += [widths[i] doubleValue];
+    }
+    tablix.width = total;
+    moved = YES;
+  }
+
+  NSMutableArray<NSNumber *> *heights = [NSMutableArray array];
+  for (RDLTablixRow *row in body.rows)
+    [heights addObject:@(row.height)];
+  if (RDLShareOut(heights, size.height - headingHeight, kRDLMinimumRowHeight)) {
+    CGFloat total = headingHeight;
+    for (NSUInteger i = 0; i < [heights count]; i++) {
+      body.rows[i].height = [heights[i] doubleValue];
+      total += [heights[i] doubleValue];
+    }
+    tablix.height = total;
+    moved = YES;
+  }
+  return moved;
+}
+
 + (BOOL)setHeight:(CGFloat)height ofRow:(NSUInteger)row inTablix:(RDLTablix *)tablix {
   NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
   if (row >= [rows count])

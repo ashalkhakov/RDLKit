@@ -807,6 +807,19 @@ static BOOL RDLEdgeIsVertical(RDLAlignEdge edge) {
   BOOL isLine = [item isKindOfClass:[RDLLine class]];
   CGFloat newW = [RDLEditor snap:MAX(isLine ? 0 : 0.1, width)];
   CGFloat newH = [RDLEditor snap:MAX(isLine ? 0 : 0.02, height)];
+  // A data region is as wide as its columns and as tall as its rows: setting
+  // its own width would leave the grid inside it the size it was and the two
+  // drawn on top of each other. Its lines share the change out instead.
+  if ([item isKindOfClass:[RDLTablix class]]) {
+    RDLTablix *tablix = (RDLTablix *)item;
+    [self changeStructureOfTablix:tablix
+                           action:@"Resize"
+                           change:^BOOL {
+                             return [RDLTablixStructure setSize:NSMakeSize(newW, newH)
+                                                       ofTablix:tablix];
+                           }];
+    return;
+  }
   // A line of no length either way is not a line.
   if (isLine && newW <= 0 && newH <= 0)
     return;

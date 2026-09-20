@@ -85,7 +85,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | CAN-02 | Multi-select | Shift-click three items; then drag a box round them | All three selected, the first as anchor; the marquee picks up what it touches. *Guarded by `testSeveralItemsAreSelectedTogether`* |
 | CAN-03 | Move | Drag one item; drag a multi-selection | Everything selected moves together, as one undo step |
 | CAN-04 | Nudge | Arrow keys, then hold | Moves by the grid step; a burst of keys is one undo step |
-| CAN-05 | Resize | Drag each of the eight handles | Each handle moves the edges it should and nothing else; nothing shrinks below a hair's width. *Guarded by `testAnItemIsResizedFromAnyOfItsEightHandles`* |
+| CAN-05 | Resize | Drag each of the eight handles, on a box and on a table | Each handle moves the edges it should and nothing else; nothing shrinks below a hair's width. *Guarded by `testAWholeRegionIsResizedBySharingOutTheChange`, `testAnItemIsResizedFromAnyOfItsEightHandles`* |
 | CAN-06 | Smart guides | Drag an item near another's edge, middle, or size | It lines up, and a guide line is drawn the length of what it lined up with. *Guarded by `testDragsLineUpWithWhatIsNearThem`, `testDraggingOnTheCanvasLinesUpWithNeighbours`* |
 | CAN-07 | Align, size, distribute | Select several; Edit > Align / Make Same Size / Distribute | Everything follows the first selected. *Guarded by `testSelectedItemsAreAlignedSizedAndSpread`* |
 | CAN-08 | Stacking | Edit > Bring Forward / Send to Back on overlapping items | The drawing order changes; ZIndex is written. *Guarded by `testItemsStackByZIndex`* |
