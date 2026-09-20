@@ -436,10 +436,10 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
   NSUInteger items = [[xib componentsSeparatedByString:@"<tabViewItem "] count] - 1;
   // Left: outline, datasets, insert, problems. Centre: preview, source,
   // dataset, data source -- the two things that are edited rather than drawn.
-  // Right: report, attributes, properties -- and inside attributes, element,
-  // dataset field and parameter.
-  if (items != 14)
-    XCTFail(@"%@", [NSString stringWithFormat:@"expected 14 panes across the four tab views, got %lu",
+  // Right: report, attributes, style, properties -- and inside attributes,
+  // element, dataset field and parameter.
+  if (items != 15)
+    XCTFail(@"%@", [NSString stringWithFormat:@"expected 15 panes across the four tab views, got %lu",
                                               (unsigned long)items]);
   // Both navigators have somewhere to live, and the data source pane has a
   // host of its own: a pane with no host is one nothing can reach.
@@ -472,9 +472,9 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"%@", @"the tab bars did not come out of the XIB as DMTabBars");
     return;
   }
-  // Outline, Datasets, Insert and Problems on the left; Report, Attributes and
-  // Properties on the right.
-  if ([[leftBar tabBarItems] count] != 4 || [[rightBar tabBarItems] count] != 3)
+  // Outline, Datasets, Insert and Problems on the left; Report, Attributes,
+  // Style and Properties on the right.
+  if ([[leftBar tabBarItems] count] != 4 || [[rightBar tabBarItems] count] != 4)
     XCTFail(@"%@", [NSString stringWithFormat:@"the bars hold %lu and %lu items",
                                               (unsigned long)[[leftBar tabBarItems] count],
                                               (unsigned long)[[rightBar tabBarItems] count]]);

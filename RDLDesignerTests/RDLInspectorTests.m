@@ -22,6 +22,62 @@
 // on show -- it could not tell its own writing from anyone else's -- so after
 // ⌘Z the report went back and the fields still read what had been undone,
 // which is indistinguishable from undo not working.
+// The right pane's tabs, as Xcode arranges them: what a thing *is* in
+// Attributes, how it *looks* in Style. Padding and borders were behind a More
+// Style button in a pane full of everything else, which is why they could not
+// be found.
+- (void)testStyleAndAttributesAreDifferentTabs {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Two tabs"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Title";
+  box.value = @"Words";
+  box.width = 2;
+  box.height = 0.3;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  RDLInspectorView *attributes = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                                 context:ctx];
+  RDLInspectorView *style = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                            context:ctx];
+  style.shows = RDLInspectorShowsStyle;
+  [attributes reload];
+  [style reload];
+
+  // What it is: its name, where it sits, what it says.
+  for (NSString *section in @[ @"nameBox", @"geoBox", @"textBox" ])
+    if ([[attributes valueForKey:section] isHidden])
+      XCTFail(@"Attributes should show %@", section);
+  // How it looks, and not in the other tab.
+  for (NSString *section in @[ @"textStyleBox", @"moreStyleBox" ]) {
+    if ([[style valueForKey:section] isHidden])
+      XCTFail(@"Style should show %@", section);
+    if (![[attributes valueForKey:section] isHidden])
+      XCTFail(@"Attributes should leave %@ to the Style tab", section);
+  }
+  if (![[style valueForKey:@"geoBox"] isHidden] || ![[style valueForKey:@"textBox"] isHidden])
+    XCTFail(@"%@", @"and Style should not repeat what a thing is");
+
+  // The fields that were hard to find are in the Style tab, and they work
+  // there: padding writes through, and so does a colour.
+  NSTextField *padLeft = [style valueForKey:@"padLeftField"];
+  [padLeft setStringValue:@"6pt"];
+  [style changed:padLeft];
+  if (![[box.style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"padding should be set from the Style tab, it is %@",
+            [box.style.paddingLeft stringValue]);
+  NSTextField *colour = [style valueForKey:@"colorField"];
+  [colour setStringValue:@"#336699"];
+  [style changed:colour];
+  if (![box.style.color isEqualToString:@"#336699"])
+    XCTFail(@"the colour should be set from the Style tab, it is %@", box.style.color);
+  [[ctx.document undoManager] undo];
+  [[ctx.document undoManager] undo];
+  if ([box.style.paddingLeft stringValue] != nil && [[box.style.paddingLeft stringValue] isEqualToString:@"6pt"])
+    XCTFail(@"%@", @"and both should undo");
+}
+
 - (void)testUndoOfAnInspectorEditShowsInTheInspector {
   RDLReport *report = [RDLReport emptyReportNamed:@"Undoing"];
   RDLTextbox *box = [[RDLTextbox alloc] init];
@@ -760,13 +816,15 @@
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
                                                                 context:ctx];
+  inspector.shows = RDLInspectorShowsStyle;
   [ctx.selection selectItem:inCell inBandWithKey:@"body"];
 
-  // The text section is shown for an item in a cell, which is what carries the
-  // padding fields and the Borders… button; the geometry section is not, since
-  // the cell decides where the item is.
-  if ([[inspector valueForKey:@"textBox"] isHidden])
-    XCTFail(@"%@", @"a text box in a cell should show the text section");
+  // The style of a text box in a cell is where every other text box's is --
+  // the Style tab, which carries the padding fields and the Borders… button --
+  // and the geometry section is shown nowhere for it, since the cell decides
+  // where the item is.
+  if ([[inspector valueForKey:@"textStyleBox"] isHidden])
+    XCTFail(@"%@", @"a text box in a cell should show its style");
   if (![[inspector valueForKey:@"geoBox"] isHidden])
     XCTFail(@"%@", @"an item in a cell has no geometry of its own to offer");
   if ([[inspector valueForKey:@"cellBox"] isHidden])
@@ -828,6 +886,7 @@
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
                                                                 context:ctx];
+  inspector.shows = RDLInspectorShowsStyle;
   NSButton *button = [inspector valueForKey:@"cellBordersButton"];
   if (button == nil || [button action] != @selector(editBorders:)) {
     XCTFail(@"%@", @"the cell section's Borders… button should be connected to editBorders:");
@@ -1106,7 +1165,7 @@
   // two panes at once.
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
                                                                 context:ctx];
-  inspector.showsReportOnly = YES;
+  inspector.shows = RDLInspectorShowsReport;
   [ctx.selection selectReport];
   [inspector reload];
   if ([[inspector valueForKey:@"paperBox"] isHidden] || [[inspector valueForKey:@"docBox"] isHidden])
@@ -1897,6 +1956,7 @@ static NSData *RDLTinyPNG(void) {
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 1400)
                                                                 context:ctx];
+  inspector.shows = RDLInspectorShowsStyle;
   [ctx addItemOfKind:RDLItemKindTextbox];
   RDLTextbox *box = (RDLTextbox *)[ctx selectedItem];
   if ([[inspector valueForKey:@"moreStyleBox"] isHidden])
@@ -1999,6 +2059,7 @@ static NSData *RDLTinyPNG(void) {
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 700)
                                                                 context:ctx];
+  inspector.shows = RDLInspectorShowsStyle;
   [ctx.selection selectItem:line inBandWithKey:@"body"];
 
   for (NSString *name in @[ @"lineColorField", @"lineWidthField", @"lineDashPop",

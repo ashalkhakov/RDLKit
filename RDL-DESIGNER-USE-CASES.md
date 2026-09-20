@@ -47,7 +47,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| WIN-01 | The three panes | Look at the window | Left: Outline, Datasets, Insert, Problems. Centre: canvas (or Source, or a dataset). Right: Report, Attributes, Properties. *Guarded by `testDesignerWindowShell`, `testPanesComeFromTheirXIBs`* |
+| WIN-01 | The three panes | Look at the window | Left: Outline, Datasets, Insert, Problems. Centre: canvas (or Source, or a dataset). Right: Report, Attributes, Style, Properties. *Guarded by `testDesignerWindowShell`, `testPanesComeFromTheirXIBs`* |
 | WIN-02 | Panes keep their width | Widen the window | The sides stay; the centre takes the extra. Drag a divider and it stays where you put it. *Guarded by `testTheWindowsPanesFollowTheWindow`, `testTheWindowWillNotShrinkAPaneAway`* |
 | WIN-03 | The groups pane collapses | View > Row and Column Groups; then double-click its divider; then drag the divider shut | Three ways to the same state; the menu item is ticked while it shows, and it reopens at the height you left it. *Guarded by `testTheGroupsPaneCollapsesAndComesBack`* |
 | WIN-04 | Zoom | ⌘= and ⌘- , and the zoom control | 40% to 400%; the rulers, grid, handles and tablix band all scale with it. *Guarded by `testTheCanvasZoomsToFourHundredPercent`, `testPreviewZoomAndRulers`, `testTheTablixHandleBandScalesWithTheZoom`* |
@@ -104,10 +104,10 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | INSP-03 | Rename | Rename a textbox another expression refers to | Everything that named it follows — expressions in any band, and a ToggleItem. *Guarded by `testRenamingAnItemRenamesWhatRefersToIt`* |
 | INSP-04 | Text style | Font, size, weight, style, alignment, decoration, vertical align | The popups hold the whole vocabulary — SemiBold stays SemiBold. *Guarded by `testTheTextSectionShowsEveryStyleItCanHold`* |
 | INSP-05 | Colours | Pick with the well; type a hex; type an expression | Well and field agree; an expression is kept as an expression. *Guarded by `testInspectorColorBinding`* |
-| INSP-06 | Padding | Set each of the four | The fields are connected both ways, and the text rect takes all four. *Guarded by `testThePaddingFieldsAreConnectedAndBindBothWays`, `testTheTextRectTakesPaddingOnAllFourSides`* |
+| INSP-06 | Padding | Style tab: set each of the four | The fields are connected both ways, and the text rect takes all four. *Guarded by `testThePaddingFieldsAreConnectedAndBindBothWays`, `testTheTextRectTakesPaddingOnAllFourSides`* |
 | INSP-07 | Borders | Borders… on a textbox and on a rectangle | Default plus four edges, each with style, width and colour — colour picked in a well; applied as one undo step. *Guarded by `testTheBordersPanelStatesEachEdgeAndAppliesTogether`* |
 | INSP-08 | Grow, shrink, hide duplicates | Set each on a textbox and preview with data | Text grows and shrinks; duplicates disappear within their scope. *Guarded by `testATextBoxGrowsShrinksAndHidesDuplicates`* |
-| INSP-09 | The rest of the style | Style… panel: line height, writing mode, direction, gradient, background image, shadow, calendar, numeral language | Each survives a save and reopen. *Guarded by `testTheStylePanelSetsTheRestOfAStyle`* |
+| INSP-09 | The rest of the style | Style tab > Style… panel: line height, writing mode, direction, gradient, background image, shadow, calendar, numeral language | Each survives a save and reopen. *Guarded by `testTheStylePanelSetsTheRestOfAStyle`* |
 | INSP-10 | f(x) everywhere | Click the f(x) beside any style property | The expression editor opens on that property, and what it returns is stored as an expression. *Guarded by `testStyleExpressionBinding`, `testLengthExpressionBinding`* |
 
 ## G. Rich text

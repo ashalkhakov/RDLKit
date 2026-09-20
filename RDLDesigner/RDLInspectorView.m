@@ -140,6 +140,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *subreportEditButton, *subreportParametersButton;
 // Tablix section
 @property (nonatomic, strong) IBOutlet NSView *tablixBox;
+@property (nonatomic, strong) IBOutlet NSView *textStyleBox;
 @property (nonatomic, strong) IBOutlet NSPopUpButton *tablixDatasetPop;
 @property (nonatomic, strong) IBOutlet NSTextField *tablixHeaderHField, *tablixRowHField;
 // A tablix's own settings: what it shows with no rows, which way its columns
@@ -258,7 +259,7 @@
   // a section missing from the second copy stayed on screen under the next
   // selection -- two inspectors drawn over each other.
   _sections = @[ _docBox, _paperBox, _bandBox, _printBox, _geoBox, _textBox, _lineBox, _rectBox, _imageBox,
-                 _textOptionsBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
+                 _textOptionsBox, _textStyleBox, _subreportBox, _chartBox, _chartOptionsBox, _tablixBox, _tablixOptionsBox,
                  _cellBox, _nameBox, _visibilityBox, _linkBox, _keepBox, _pageBox, _moreStyleBox ];
   for (NSView *box in _sections)
     [self addSubview:box];
@@ -751,6 +752,41 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
 
 #pragma mark - Fill (model → UI)
 
+// Which of the sections this tab is for. A thing's attributes are what it is
+// -- its name, where it sits, what it says, what data it reads, whether it
+// shows -- and its style is how it looks. One class serves both tabs, so the
+// list is filtered here rather than assembled twice.
+- (NSArray *)sectionsFor:(NSArray *)boxes ofItem:(RDLItem *)item {
+  if (_shows != RDLInspectorShowsStyle) {
+    NSMutableArray *attributes = [boxes mutableCopy];
+    for (NSView *styleOnly in [self styleSectionsOfItem:item])
+      [attributes removeObjectIdenticalTo:styleOnly];
+    return attributes;
+  }
+  NSMutableArray *style = [NSMutableArray array];
+  for (NSView *box in [self styleSectionsOfItem:item])
+    if ([boxes indexOfObjectIdenticalTo:box] != NSNotFound || box == _textStyleBox ||
+        box == _moreStyleBox)
+      [style addObject:box];
+  return style;
+}
+
+// The sections that are about how a thing looks. A line is drawn with its
+// border and nothing else, so its own section is style; a cell is styled
+// through what it holds, so that one is too.
+- (NSArray<NSView *> *)styleSectionsOfItem:(RDLItem *)item {
+  NSMutableArray<NSView *> *style = [NSMutableArray array];
+  if ([item isKindOfClass:[RDLTextbox class]])
+    [style addObject:_textStyleBox];
+  if ([item isKindOfClass:[RDLLine class]])
+    [style addObject:_lineBox];
+  if ([item isKindOfClass:[RDLRectangle class]])
+    [style addObject:_rectBox];
+  [style addObject:_cellBox];
+  [style addObject:_moreStyleBox];
+  return style;
+}
+
 - (void)stackBoxes:(NSArray *)boxes {
   for (NSView *v in _sections)
     [v setHidden:YES];
@@ -817,7 +853,7 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
   RDLBand *band = sel.scope == RDLSelectionScopeBand ? [report bandWithKey:sel.bandKey] : nil;
   // The Report tab shows the document's own fields whatever is selected, which
   // is the same branch the shared inspector falls to when nothing is.
-  if (_showsReportOnly) {
+  if (_shows == RDLInspectorShowsReport) {
     it = nil;
     band = nil;
   }
@@ -898,8 +934,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
       [self showCellBorders:!ownSectionHasBorders];
       [boxes addObject:_cellBox];
     }
-    [self stackBoxes:boxes];
-  } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && !_showsReportOnly) {
+    [self stackBoxes:[self sectionsFor:boxes ofItem:it]];
+  } else if (sel.scope == RDLSelectionScopeTablixCell && sel.tablix != nil && _shows != RDLInspectorShowsReport) {
     // An empty cell: nothing in it to describe, so what is shown is the column
     // it belongs to -- its width -- and the label says where in the table it is.
     [_kindLabel setStringValue:[NSString stringWithFormat:@"Empty cell · %@ · row %ld, column %ld",
@@ -939,8 +975,8 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // The report's own settings belong to the Report tab, and only to it:
     // showing them here as well meant the same fields were editable in two
     // places at once, with nothing to say which was which.
-    [self stackBoxes:_showsReportOnly ? @[ _docBox, _paperBox ] : @[]];
-    if (!_showsReportOnly)
+    [self stackBoxes:_shows == RDLInspectorShowsReport ? @[ _docBox, _paperBox ] : @[]];
+    if (_shows != RDLInspectorShowsReport)
       [_kindLabel setStringValue:@"The report's own settings are in the Report tab."];
   }
 

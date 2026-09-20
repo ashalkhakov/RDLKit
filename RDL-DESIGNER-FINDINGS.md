@@ -40,7 +40,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 |---|---|---|
 | PAG-02 | No margin fields | **fixed** — they were there, below the fold: the Report inspector had nowhere to scroll, so anything past the window's height could not be reached. It scrolls now, and so does the dataset-field inspector |
 | PAG-05 | No page background colour | **fixed** — same cause as PAG-02: the field was below the fold in a pane that would not scroll |
-| INSP-06 | No padding fields | **partly** — the four fields exist in the Attributes tab, which does scroll; they are hard to find among everything else, which is what the Style tab below would answer |
+| INSP-06 | No padding fields | **fixed** — they exist, and now live in a Style tab of their own rather than at the bottom of a pane full of everything else |
 | WIN-05 | No preferences, and Toggle Grid has no tick | open |
 | — | Lines are always drawn slanted, and are hard to select | open |
 | — | A tablix cannot be resized as a whole | open |
@@ -57,7 +57,7 @@ decision before it can be fixed) · **GS** (GNUstep only).
 |---|---|
 | GET-02 | A new report comes with a page header and footer. Should it? |
 | GET-03 | A `.docx` import makes two datasets on one data source, which is not a valid report |
-| INSP-06, INSP-09 | Should style move into an inspector of its own, as Xcode does with layout, instead of a More Style button and a panel? |
+| INSP-06, INSP-09 | *Answered: yes.* The right pane is Report · Attributes · Style · Properties. Attributes holds what a thing is; Style holds type, colour, alignment, padding, borders and the rest of its style |
 | PAG-03 | *Answered: yes.* The Attributes tab no longer shows the report's own settings; it says they are in the Report tab, which shows them whatever is selected |
 | CAN-07 | What should Make Same Size do to a tablix cell or an image? |
 | INS-01 | Should a chart or a subreport be insertable into a tablix cell at all? |
