@@ -28,6 +28,12 @@ static NSString * const kRDLPaletteHeader = @"header";
   if (!RDLLoadPaneNib(self, @"RDLInsertPalette"))
     return nil;
   RDLFillHost(self, _content);
+  // What a drag from here is: a copy, into this application. Without saying
+  // so the drag carries the "cannot drop" badge the whole way across the
+  // window, whatever the canvas answers when it arrives -- a table's drags are
+  // for nothing at all until its source mask says otherwise.
+  [_table setDraggingSourceOperationMask:NSDragOperationCopy forLocal:YES];
+  [_table setDraggingSourceOperationMask:NSDragOperationNone forLocal:NO];
   [self reload];
   return self;
 }

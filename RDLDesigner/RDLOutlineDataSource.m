@@ -78,6 +78,10 @@ static NSString *const RDLOutlineDragType = @"RDLOutlineRow";
   if (self) {
     _outlineView = outlineView;
     [outlineView registerForDraggedTypes:@[ RDLOutlineDragType ]];
+    // A row dragged here is moved, within this window and nowhere else. A
+    // table that does not say so drags under a "cannot drop" badge.
+    [outlineView setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
+    [outlineView setDraggingSourceOperationMask:NSDragOperationNone forLocal:NO];
     _ctx = context;
     _nodesByKey = [NSMutableDictionary dictionary];
     [outlineView setDataSource:self];

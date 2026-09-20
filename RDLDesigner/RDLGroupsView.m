@@ -61,6 +61,9 @@ static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
   // itself. The menu is built when it is asked for, because what it offers
   // depends on the row it was asked on.
   [_outline registerForDraggedTypes:@[ RDLGroupsDragType ]];
+  // Re-nesting is a move, within this window and nowhere else.
+  [_outline setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
+  [_outline setDraggingSourceOperationMask:NSDragOperationNone forLocal:NO];
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Group"];
   [menu setDelegate:self];
   [_outline setMenu:menu];
