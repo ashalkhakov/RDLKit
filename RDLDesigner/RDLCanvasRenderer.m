@@ -190,17 +190,22 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
   // Hovered cell highlight: shows which cell a click would select.
   if (_overlay.hoverTablix == it && _overlay.hoverRow >= 0 && _overlay.hoverColumn >= 0 &&
       _overlay.editingItem == nil) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it
-                                       itemRect:r
-                                            row:(NSUInteger)_overlay.hoverRow
-                                         column:(NSUInteger)_overlay.hoverColumn];
+    NSRect cell = [RDLTablixGeometry mergedCellRectOf:it
+                                             itemRect:r
+                                                  row:(NSUInteger)_overlay.hoverRow
+                                               column:(NSUInteger)_overlay.hoverColumn];
     [[NSColor colorWithCalibratedRed:0.55 green:0.62 blue:0.85 alpha:0.18] set];
     NSRectFillUsingOperation(cell, NSCompositeSourceOver);
   }
 
   for (NSUInteger row = 0; row < rows; row++) {
     for (NSUInteger col = 0; col < cols; col++) {
-      NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:col];
+      // A cell merged with its neighbours is drawn once, across all of them;
+      // the places it covers draw nothing, or the same item would be painted
+      // again in the space it already fills.
+      if ([RDLTablixGeometry tablix:it isCoveredAtRow:row column:col])
+        continue;
+      NSRect cell = [RDLTablixGeometry mergedCellRectOf:it itemRect:r row:row column:col];
       RDLItem *content = [RDLTablixGeometry itemOf:it inRow:row column:col];
       // An editor open over this cell leaves it blank, the way an item being
       // edited elsewhere on the canvas is left blank.
@@ -215,10 +220,10 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
   RDLSelection *selection = _ctx.selection;
   if (selection.scope == RDLSelectionScopeTablixCell && selection.tablix == it &&
       selection.cellRow >= 0 && selection.cellColumn >= 0) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it
-                                       itemRect:r
-                                            row:(NSUInteger)selection.cellRow
-                                         column:(NSUInteger)selection.cellColumn];
+    NSRect cell = [RDLTablixGeometry mergedCellRectOf:it
+                                             itemRect:r
+                                                  row:(NSUInteger)selection.cellRow
+                                               column:(NSUInteger)selection.cellColumn];
     [[NSColor colorWithCalibratedRed:0.1 green:0.1 blue:0.09 alpha:1] set];
     NSFrameRect(NSInsetRect(cell, 1, 1));
   }
@@ -226,18 +231,29 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
   // The grid last, over the contents, so the lines are not painted on by a
   // cell's own background.
   [[NSColor colorWithCalibratedWhite:0.72 alpha:1] set];
-  for (NSUInteger row = 0; row < rows; row++) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:0];
-    NSRectFill(NSMakeRect(NSMinX(r), NSMinY(cell), NSWidth(r), 1));
-  }
   CGFloat gridBottom = NSMinY(r);
   for (NSUInteger row = 0; row < rows; row++)
     gridBottom = NSMaxY([RDLTablixGeometry cellRectOf:it itemRect:r row:row column:0]);
-  NSRectFill(NSMakeRect(NSMinX(r), gridBottom, NSWidth(r), 1));
-  for (NSUInteger col = 0; col < cols; col++) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:0 column:col];
-    NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(r), 1, gridBottom - NSMinY(r)));
+  // Segment by segment, so a line does not run through a merged cell: two
+  // places that are one cell have nothing drawn between them.
+  for (NSUInteger row = 0; row < rows; row++) {
+    for (NSUInteger col = 0; col < cols; col++) {
+      NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:col];
+      if (row == 0 || ![RDLTablixGeometry tablix:it
+                                  isOneCellAtRow:row - 1
+                                          column:col
+                                          andRow:row
+                                          column:col])
+        NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(cell), NSWidth(cell), 1));
+      if (col == 0 || ![RDLTablixGeometry tablix:it
+                                  isOneCellAtRow:row
+                                          column:col - 1
+                                          andRow:row
+                                          column:col])
+        NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(cell), 1, NSHeight(cell)));
+    }
   }
+  NSRectFill(NSMakeRect(NSMinX(r), gridBottom, NSWidth(r), 1));
   NSRectFill(NSMakeRect(NSMaxX(r) - 1, NSMinY(r), 1, gridBottom - NSMinY(r)));
 }
 

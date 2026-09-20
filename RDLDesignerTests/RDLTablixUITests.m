@@ -763,6 +763,58 @@
 // first cell's contents -- or taking the neighbour's when the first had none --
 // and back again with a text box in each cell uncovered. A merge never
 // reaches into a group's own row.
+// TBL-06, reported as: merging removes the contents of the cell to the right
+// and the table is drawn exactly as before. The model was merging; the canvas
+// was not showing it, because every grid position was drawn as its own cell
+// and the lines ran straight through the merge.
+- (void)testAMergedCellIsDrawnAsOneCell {
+  RDLReport *report = [RDLSamples harborManifest];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = nil;
+  for (RDLItem *item in report.body.items)
+    if ([item isKindOfClass:[RDLTablix class]])
+      tablix = (RDLTablix *)item;
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 1200) context:ctx];
+  NSRect itemRect = NSZeroRect;
+  if (tablix == nil || ![[canvas geometry] findRectOfItem:tablix rect:&itemRect]) {
+    XCTFail(@"%@", @"the manifest's table should be on the page");
+    return;
+  }
+  NSUInteger cols = [RDLTablixGeometry columnCountOf:tablix];
+  if (cols < 2) {
+    XCTFail(@"%@", @"a merge needs two columns");
+    return;
+  }
+  NSRect before = [RDLTablixGeometry mergedCellRectOf:tablix itemRect:itemRect row:0 column:0];
+  NSRect neighbour = [RDLTablixGeometry cellRectOf:tablix itemRect:itemRect row:0 column:1];
+
+  [ctx.editor mergeTablixCellAtRow:0 column:0 along:RDLTablixAxisColumns ofTablix:tablix];
+
+  NSRect after = [RDLTablixGeometry mergedCellRectOf:tablix itemRect:itemRect row:0 column:0];
+  if (NSWidth(after) <= NSWidth(before) + 1)
+    XCTFail(@"the merged cell should be the width of both, it is %g where one is %g",
+            NSWidth(after), NSWidth(before));
+  if (fabs(NSWidth(after) - (NSWidth(before) + NSWidth(neighbour))) > 0.5)
+    XCTFail(@"%@", @"and exactly the width of the two it covers");
+  if (![RDLTablixGeometry tablix:tablix isCoveredAtRow:0 column:1])
+    XCTFail(@"%@", @"the place it now covers should draw nothing of its own");
+  if (![RDLTablixGeometry tablix:tablix isOneCellAtRow:0 column:0 andRow:0 column:1])
+    XCTFail(@"%@", @"and no line should be drawn between the two");
+  // Anything not merged is unchanged, which is what keeps the rest of the
+  // grid drawn as it was.
+  if ([RDLTablixGeometry tablix:tablix isCoveredAtRow:1 column:1] ||
+      [RDLTablixGeometry tablix:tablix isOneCellAtRow:1 column:0 andRow:1 column:1])
+    XCTFail(@"%@", @"a row nobody merged should still be cells of its own");
+
+  // Split puts it back, and the canvas with it.
+  [ctx.editor splitTablixCellAtRow:0 column:0 ofTablix:tablix];
+  if ([RDLTablixGeometry tablix:tablix isCoveredAtRow:0 column:1])
+    XCTFail(@"%@", @"a split cell covers nothing");
+  if (fabs(NSWidth([RDLTablixGeometry mergedCellRectOf:tablix itemRect:itemRect row:0 column:0]) -
+           NSWidth(before)) > 0.5)
+    XCTFail(@"%@", @"and is its own width again");
+}
+
 - (void)testCellsAreMergedAndSplit {
   RDLReport *report = [RDLSamples workshopByFinish];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];

@@ -174,10 +174,10 @@ static const CGFloat kRDLBracketGap = 3;
       RDLItem *item = [RDLTablixGeometry itemOf:tablix inRow:row column:col];
       if (item == nil)
         continue;
-      NSRect cell = [RDLTablixGeometry cellRectOf:tablix
-                                         itemRect:itemRect
-                                              row:row
-                                           column:col];
+      NSRect cell = [RDLTablixGeometry mergedCellRectOf:tablix
+                                               itemRect:itemRect
+                                                    row:row
+                                                 column:col];
       if (item == target) {
         if (outRect)
           *outRect = cell;
@@ -341,10 +341,10 @@ static NSString *RDLHandleAt(NSRect r, NSPoint p, BOOL hasHandles) {
   RDLItem *item = [RDLTablixGeometry itemOf:tablix inRow:row column:col];
   if (item == nil)
     return nil;
-  NSRect cell = [RDLTablixGeometry cellRectOf:tablix
-                                     itemRect:itemRect
-                                          row:row
-                                       column:col];
+  NSRect cell = [RDLTablixGeometry mergedCellRectOf:tablix
+                                           itemRect:itemRect
+                                                row:row
+                                             column:col];
   if ([item.childItems count]) {
     RDLItem *child = [self itemInItems:item.childItems
                                 origin:NSMakePoint(NSMinX(cell), NSMinY(cell))
@@ -536,6 +536,83 @@ static const CGFloat kUnbuiltColumnWidth = 60.0;
     y += [self heightOfRow:j of:tablix];
   return NSMakeRect(x, y, [self widthOfBodyColumn:column of:tablix],
                     [self heightOfRow:row of:tablix]);
+}
+
+// Where a grid position sits in the body, and what covers it there. Spans are
+// the body's -- the header rows and columns are not merged -- so a position
+// outside the body is never covered.
++ (RDLTablixCell *)coveringCellOf:(RDLTablix *)tablix
+                           gridRow:(NSUInteger)row
+                        gridColumn:(NSUInteger)column
+                         originRow:(NSUInteger *)outRow
+                      originColumn:(NSUInteger *)outColumn {
+  NSInteger bodyRow = [self bodyRowOf:tablix forGridRow:row];
+  NSInteger bodyColumn = [self bodyColumnOf:tablix forGridColumn:column];
+  if (bodyRow < 0 || bodyColumn < 0)
+    return nil;
+  NSUInteger originRow = 0, originColumn = 0;
+  RDLTablixCell *cell = [tablix cellCoveringRow:(NSUInteger)bodyRow
+                                         column:(NSUInteger)bodyColumn
+                                      originRow:&originRow
+                                   originColumn:&originColumn];
+  if (cell == nil)
+    return nil;
+  if (outRow)
+    *outRow = [self gridRowOf:tablix forBodyRow:originRow];
+  if (outColumn)
+    *outColumn = [self gridColumnOf:tablix forBodyColumn:originColumn];
+  return cell;
+}
+
++ (BOOL)tablix:(RDLTablix *)tablix isCoveredAtRow:(NSUInteger)row column:(NSUInteger)column {
+  NSUInteger originRow = 0, originColumn = 0;
+  RDLTablixCell *cell = [self coveringCellOf:tablix
+                                     gridRow:row
+                                  gridColumn:column
+                                   originRow:&originRow
+                                originColumn:&originColumn];
+  return cell != nil && (originRow != row || originColumn != column);
+}
+
++ (BOOL)tablix:(RDLTablix *)tablix
+     isOneCellAtRow:(NSUInteger)row
+             column:(NSUInteger)column
+              andRow:(NSUInteger)otherRow
+             column:(NSUInteger)otherColumn {
+  NSUInteger firstRow = 0, firstColumn = 0, secondRow = 0, secondColumn = 0;
+  RDLTablixCell *first = [self coveringCellOf:tablix
+                                      gridRow:row
+                                   gridColumn:column
+                                    originRow:&firstRow
+                                 originColumn:&firstColumn];
+  RDLTablixCell *second = [self coveringCellOf:tablix
+                                       gridRow:otherRow
+                                    gridColumn:otherColumn
+                                     originRow:&secondRow
+                                  originColumn:&secondColumn];
+  return first != nil && first == second;
+}
+
++ (NSRect)mergedCellRectOf:(RDLTablix *)tablix
+                  itemRect:(NSRect)itemRect
+                       row:(NSUInteger)row
+                    column:(NSUInteger)column {
+  NSRect rect = [self cellRectOf:tablix itemRect:itemRect row:row column:column];
+  NSUInteger originRow = 0, originColumn = 0;
+  RDLTablixCell *cell = [self coveringCellOf:tablix
+                                     gridRow:row
+                                  gridColumn:column
+                                   originRow:&originRow
+                                originColumn:&originColumn];
+  if (cell == nil || originRow != row || originColumn != column)
+    return rect;
+  NSUInteger down = cell.rowSpan > 1 ? (NSUInteger)cell.rowSpan : 1;
+  NSUInteger across = cell.colSpan > 1 ? (NSUInteger)cell.colSpan : 1;
+  for (NSUInteger i = 1; i < across; i++)
+    rect.size.width += [self widthOfBodyColumn:column + i of:tablix];
+  for (NSUInteger j = 1; j < down; j++)
+    rect.size.height += [self heightOfRow:row + j of:tablix];
+  return rect;
 }
 
 + (BOOL)tablix:(RDLTablix *)tablix

@@ -188,6 +188,25 @@ FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
             itemRect:(NSRect)itemRect
                  row:(NSUInteger)row
               column:(NSUInteger)column;
+// The same, across everything a merged cell covers: a cell merged with the one
+// to its right is one rect two columns wide. Cells that are not merged answer
+// as -cellRectOf: does, so this is what anything drawing or framing a cell
+// should ask for.
++ (NSRect)mergedCellRectOf:(RDLTablix *)tablix
+                  itemRect:(NSRect)itemRect
+                       row:(NSUInteger)row
+                    column:(NSUInteger)column;
+// Whether that grid position is inside a merge that starts somewhere else --
+// the right-hand half of a merged pair. Nothing is drawn there: what covers it
+// has already been drawn across it.
++ (BOOL)tablix:(RDLTablix *)tablix isCoveredAtRow:(NSUInteger)row column:(NSUInteger)column;
+// Whether two grid positions are the same cell -- which is how a grid line
+// knows not to draw between them.
++ (BOOL)tablix:(RDLTablix *)tablix
+     isOneCellAtRow:(NSUInteger)row
+             column:(NSUInteger)column
+              andRow:(NSUInteger)otherRow
+             column:(NSUInteger)otherColumn;
 // The cell under `point`, or NO outside the grid.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect

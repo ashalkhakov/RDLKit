@@ -54,10 +54,10 @@
       RDLItem *content = [RDLTablixGeometry itemOf:tablixHit inRow:row column:column];
       if ([content isKindOfClass:[RDLTextbox class]])
         [self beginEditingHit:content
-                         rect:[RDLTablixGeometry cellRectOf:tablixHit
-                                                   itemRect:itemRect
-                                                        row:row
-                                                     column:column]
+                         rect:[RDLTablixGeometry mergedCellRectOf:tablixHit
+                                                         itemRect:itemRect
+                                                              row:row
+                                                           column:column]
                         point:p];
     }
     return;
