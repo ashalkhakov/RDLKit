@@ -936,7 +936,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     NSUInteger variables = [report.variables count];
     [_reportVariablesButton
         setTitle:variables ? [NSString stringWithFormat:@"Variables (%lu)…", (unsigned long)variables] : @"Variables…"];
-    [self stackBoxes:@[ _docBox, _paperBox ]];
+    // The report's own settings belong to the Report tab, and only to it:
+    // showing them here as well meant the same fields were editable in two
+    // places at once, with nothing to say which was which.
+    [self stackBoxes:_showsReportOnly ? @[ _docBox, _paperBox ] : @[]];
+    if (!_showsReportOnly)
+      [_kindLabel setStringValue:@"The report's own settings are in the Report tab."];
   }
 
   [_bindings fillFromItem:it band:band report:report];

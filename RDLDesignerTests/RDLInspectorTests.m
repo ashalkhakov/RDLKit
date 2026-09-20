@@ -1101,11 +1101,25 @@
   report.page.leftMargin = report.page.rightMargin = 1;
   report.page.topMargin = report.page.bottomMargin = 1;
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  // The Report tab: the one place the document's own settings are edited. The
+  // Attributes tab used to show them as well, so the same fields were live in
+  // two panes at once.
   RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
                                                                 context:ctx];
+  inspector.showsReportOnly = YES;
   [ctx.selection selectReport];
+  [inspector reload];
   if ([[inspector valueForKey:@"paperBox"] isHidden] || [[inspector valueForKey:@"docBox"] isHidden])
     XCTFail(@"%@", @"the report should show its own section and the paper's");
+  RDLInspectorView *attributes = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 260, 900)
+                                                                 context:ctx];
+  [attributes reload];
+  if (![[attributes valueForKey:@"paperBox"] isHidden] || ![[attributes valueForKey:@"docBox"] isHidden])
+    XCTFail(@"%@", @"and the Attributes tab should leave them to it");
+  if ([[[attributes valueForKey:@"kindLabel"] stringValue] rangeOfString:@"Report tab"].location ==
+      NSNotFound)
+    XCTFail(@"it should say where they are, it says %@",
+            [[attributes valueForKey:@"kindLabel"] stringValue]);
   void (^type)(NSString *, NSString *) = ^(NSString *fieldName, NSString *text) {
     NSTextField *field = [inspector valueForKey:fieldName];
     [field setStringValue:text];

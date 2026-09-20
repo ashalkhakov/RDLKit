@@ -17,6 +17,13 @@ FOUNDATION_EXPORT void RDLFillHost(NSView *host, NSView *view);
 // handed with RDLFillHost.
 FOUNDATION_EXPORT BOOL RDLLoadPaneNib(NSView *pane, NSString *name);
 
+// The same, with somewhere to scroll: a pane taller than the space it is given
+// -- an inspector whose sections stack past the bottom of the window -- is
+// otherwise a pane whose last fields cannot be reached at all. The scroll view
+// fills the host and the pane is its document, so the pane goes on sizing
+// itself as it always did.
+FOUNDATION_EXPORT void RDLFillHostScrolling(NSView *host, NSView *view);
+
 // A window a controller owns must not release itself when it closes: the
 // controller's reference is what decides its lifetime, and a window that
 // releases itself as well is one release too many -- which is not an exception

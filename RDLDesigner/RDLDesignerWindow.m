@@ -889,7 +889,9 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   _reportInspector = [[RDLInspectorView alloc] initWithFrame:[_reportInspectorHost bounds]
                                                      context:_context];
   _reportInspector.showsReportOnly = YES;
-  RDLFillHost(_reportInspectorHost, _reportInspector);
+  // The report's own settings stack past the bottom of any pane -- the paper,
+  // its margins, its columns, the language, the code -- so this one scrolls.
+  RDLFillHostScrolling(_reportInspectorHost, _reportInspector);
 
   // How the tablix being worked in groups, under the canvas where the region
   // it is about is.
@@ -950,7 +952,7 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   // other selection's settings go.
   _fieldInspector = [[RDLFieldInspectorView alloc] initWithFrame:[_datasetInspectorHost bounds]
                                                          context:_context];
-  RDLFillHost(_datasetInspectorHost, _fieldInspector);
+  RDLFillHostScrolling(_datasetInspectorHost, _fieldInspector);
 
   _palette = [[RDLInsertPalette alloc] initWithFrame:[_paletteHost bounds] context:_context];
   RDLFillHost(_paletteHost, _palette);

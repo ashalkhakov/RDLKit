@@ -281,6 +281,53 @@ static NSArray<NSString *> *RDLHeadingsOf(RDLTablix *tablix);
     XCTFail(@"%@", @"the samples need a Samples.plist beside them");
 }
 
+// PAG-02 and PAG-05, reported as "where are the margins?" and "no UI for the
+// page background": both are in the Report inspector, below the fold. That
+// pane had nowhere to scroll, so whatever did not fit the window could not be
+// reached at all.
+- (void)testTheReportInspectorCanBeScrolledToItsLastField {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  if ([wc window] == nil) {
+    XCTFail(@"%@", @"the designer window did not load");
+    return;
+  }
+  // A window short enough that the report's settings do not all fit.
+  [[wc window] setFrame:NSMakeRect(0, 0, 1200, 600) display:YES];
+  RDLInspectorView *inspector = [wc valueForKey:@"reportInspector"];
+  NSScrollView *scroll = [inspector enclosingScrollView];
+  if (scroll == nil) {
+    XCTFail(@"%@", @"the Report inspector should have somewhere to scroll");
+    return;
+  }
+  if ([scroll documentView] != inspector)
+    XCTFail(@"%@", @"and the inspector itself should be what scrolls");
+
+  // Every field a person came looking for is inside what can be scrolled to.
+  for (NSString *name in @[ @"leftMarginField", @"rightMarginField", @"topMarginField",
+                            @"bottomMarginField", @"pageBGField", @"columnsField" ]) {
+    NSView *field = [inspector valueForKey:name];
+    if (field == nil || [field isHiddenOrHasHiddenAncestor]) {
+      XCTFail(@"%@ is not shown at all", name);
+      continue;
+    }
+    NSRect inDocument = [field convertRect:[field bounds] toView:inspector];
+    if (NSMaxY(inDocument) > NSHeight([inspector frame]) + 1)
+      XCTFail(@"%@ sits past the bottom of what scrolls (%g of %g)", name, NSMaxY(inDocument),
+              NSHeight([inspector frame]));
+  }
+
+  // And the bottom of it can actually be reached.
+  NSClipView *clip = [scroll contentView];
+  CGFloat furthest = NSHeight([inspector frame]) - NSHeight([clip bounds]);
+  if (furthest > 0) {
+    [inspector scrollPoint:NSMakePoint(0, furthest)];
+    [scroll reflectScrolledClipView:clip];
+    if (NSMaxY([clip documentVisibleRect]) < NSHeight([inspector frame]) - 1)
+      XCTFail(@"%@", @"scrolling to the end should show the last of the settings");
+  }
+}
+
 - (void)testTheInspectorsStayAtTheTopOfTheirPanes {
   RDLEditingContext *ctx =
       [[RDLEditingContext alloc] initWithReport:[RDLSamples atelierInvoice]];
