@@ -1111,8 +1111,6 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)showAttributesForSelection {
   if (_context.selection.scope == RDLSelectionScopeReport)
     return;
-  // The properties grid shows the selection too, so there is nothing to bring
-  // forward when it is the tab someone is working in.
   // The Style tab shows the selection too, so there is nothing to bring
   // forward when that is the tab being worked in.
   if ([_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]] == 2)
