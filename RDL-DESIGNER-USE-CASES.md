@@ -168,7 +168,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 | DAT-06 | Read the data | Generator window, or preview | Every source the report names is read, and what could not be read is said. *Guarded by `testTheGeneratorReadsEveryDataSource`, `testWhatReadingNotedIsSaid`, `testHarborManifestReadsItsOwnDocuments`* |
 | DAT-07 | Parameters | Parameters navigator: add, type, default, prompt, valid values, multi-value, hidden | Each is edited in its own inspector; a parameter reading a dataset is shown read-only. *Guarded by `testParametersAreDefinedInTheirOwnNavigator`, `testAParametersListsAndFlagsAreEdited`, `testAParameterReadingADatasetIsShownReadOnly`, `testAParameterCanBeAskedForWithNoWords`* |
 | DAT-08 | Reorder parameters | Move one up | The order is the order they are asked for; undo puts it back where it was. *Guarded by `testParametersAreReordered`* |
-| DAT-09 | Give values and render | The preview's parameter bar, or Centre > Dataset tab with no dataset selected: type values, then View Report | The value reaches the query and the render. *Guarded by `testThePreviewAsksForTheParametersBeforeItRenders`, `testAParameterGivenInTheDesignerReachesTheQuery`, `testAParameterAppliesToWhatTheGeneratorRenders`, `testSeveralValuesAreGivenInTheDataPane`* |
+| DAT-09 | Give values and render | The preview's Parameters and Data… panel, or Centre > Dataset tab with no dataset selected: type values, then OK | The value reaches the query and the render. *Guarded by `testThePreviewAsksForTheParametersBeforeItRenders`, `testCancellingTheInputsPanelChangesNothing`, `testAParameterGivenInTheDesignerReachesTheQuery`, `testAParameterAppliesToWhatTheGeneratorRenders`, `testSeveralValuesAreGivenInTheDataPane`* |
 | DAT-10 | Report variables and code | Report tab: variables, Code | Both are edited and kept. *Guarded by `testTheReportsVariablesAndCodeAreEdited`* |
 
 ## K. Expressions
@@ -211,7 +211,7 @@ a file on disk under `RDLDesigner/Samples/` that you can also open with
 
 | # | Case | Steps | Expected |
 |---|---|---|---|
-| PRE-01 | Preview | ⌘⇧P | The report as it comes out, with its data read and its subreports loaded first; what could not be read is said in the bar. *Guarded by `testThePreviewWalksThroughThePagesAndPrints`* |
+| PRE-01 | Preview | ⌘⇧P, then Parameters and Data… | The report as it comes out, with its data read and its subreports loaded first; what could not be read is said in the bar, which also says what this render is using and opens the panel that sets it. *Guarded by `testThePreviewWalksThroughThePagesAndPrints`, `testThePreviewAsksForTheParametersBeforeItRenders`* |
 | PRE-02 | Page navigation | First, previous, next, last, and the page count | "Page n of m" keeps up with the buttons and with scrolling; neither end is passed |
 | PRE-03 | Print | ⌘P, or Print in the preview | A print panel, paginated one printed page per report page |
 | PRE-04 | Export | File > Export PDF…; in the save panel choose `.pdf`, then try `.html` | The chosen extension picks the backend, so one command exports both. A file that opens, matching the preview. *Guarded by `testExport`* |

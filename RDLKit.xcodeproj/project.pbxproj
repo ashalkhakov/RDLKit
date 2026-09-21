@@ -327,6 +327,10 @@
 		554BCB3E24BC68478B2792A2 /* RDLParameterPrompts.m in Sources */ = {isa = PBXBuildFile; fileRef = 27982D059C03CCE6BCC64AED /* RDLParameterPrompts.m */; };
 		09D910329A1F4BCE8F9BF356 /* RDLOutlineView.m in Sources */ = {isa = PBXBuildFile; fileRef = 2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */; };
 		7FB887BB19BEE1424969CC2B /* RDLOutlineView.m in Sources */ = {isa = PBXBuildFile; fileRef = 2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */; };
+		074C762096481754DA5CD64D /* RDLRenderInputsEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */; };
+		FFF6FE2460AA0D34B88059D0 /* RDLRenderInputsEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */; };
+		69F15F7E46F913A6667B0B13 /* RDLRenderInputsEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */; };
+		A25C4C847727516F2B1F9BF6 /* RDLRenderInputsEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -680,6 +684,9 @@
 		DC24CEB7FFE16AF37B23FB6A /* RDLParameterPrompts.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLParameterPrompts.h; sourceTree = "<group>"; };
 		2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLOutlineView.m; sourceTree = "<group>"; };
 		10CA4CA664F2E21963944794 /* RDLOutlineView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLOutlineView.h; sourceTree = "<group>"; };
+		CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRenderInputsEditor.m; sourceTree = "<group>"; };
+		BC63E5189E3D60CBD64D2366 /* RDLRenderInputsEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLRenderInputsEditor.h; sourceTree = "<group>"; };
+		AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLRenderInputsEditor.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -917,6 +924,9 @@
 				DC24CEB7FFE16AF37B23FB6A /* RDLParameterPrompts.h */,
 				2788E5E7EC105EE6EACE453C /* RDLOutlineView.m */,
 				10CA4CA664F2E21963944794 /* RDLOutlineView.h */,
+				CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */,
+				BC63E5189E3D60CBD64D2366 /* RDLRenderInputsEditor.h */,
+				AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1318,6 +1328,7 @@
 				02F457AD0524CBD22B2B8C6A /* RDLSourceView.xib in Resources */,
 				2E28041BC0C83EC257065976 /* RDLPreviewWindow.xib in Resources */,
 				AA0C4EEB1968693BAE3F3180 /* RDLGroupsView.xib in Resources */,
+				A25C4C847727516F2B1F9BF6 /* RDLRenderInputsEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1362,6 +1373,7 @@
 				B6B7CD157690D1986C0E45A1 /* RDLProblemsView.xib in Resources */,
 				C33D0B314FB0CCBA794A4AF8 /* RDLSourceView.xib in Resources */,
 				CCAD574DF3ABF0DB57D729E7 /* RDLGroupsView.xib in Resources */,
+				FFF6FE2460AA0D34B88059D0 /* RDLRenderInputsEditor.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1464,6 +1476,7 @@
 				4025B2933AAEB9C04A8AB0D7 /* RDLGroupsView.m in Sources */,
 				C01C79BD576D3C75B35597A8 /* RDLParameterPrompts.m in Sources */,
 				09D910329A1F4BCE8F9BF356 /* RDLOutlineView.m in Sources */,
+				074C762096481754DA5CD64D /* RDLRenderInputsEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1549,6 +1562,7 @@
 				69D040638A6F5843ED38A8AA /* RDLRoundTripTests.m in Sources */,
 				554BCB3E24BC68478B2792A2 /* RDLParameterPrompts.m in Sources */,
 				7FB887BB19BEE1424969CC2B /* RDLOutlineView.m in Sources */,
+				69F15F7E46F913A6667B0B13 /* RDLRenderInputsEditor.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

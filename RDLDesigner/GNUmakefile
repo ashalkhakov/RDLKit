@@ -34,6 +34,7 @@ RDLDesigner_OBJC_FILES = \
   RDLRichTextEditor.m \
   RDLDataView.m \
   RDLParameterPrompts.m \
+  RDLRenderInputsEditor.m \
   RDLWelcomeWindow.m \
   RDLExpressionEditor.m \
   RDLInsertPalette.m \
@@ -123,6 +124,7 @@ RDLDesigner_RESOURCE_FILES += \
   RDLGroupPropertiesEditor.xib \
   RDLBordersEditor.xib \
   RDLSubreportParametersEditor.xib \
+  RDLRenderInputsEditor.xib \
   RDLDatasetNavigator.xib \
   RDLDataSourceNavigator.xib \
   RDLDataSourceView.xib \

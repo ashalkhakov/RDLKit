@@ -3,7 +3,7 @@
 #import "RDLDocument.h"
 #import "RDLEditingContext.h"
 #import "RDLPane.h"
-#import "RDLParameterPrompts.h"
+#import "RDLRenderInputsEditor.h"
 
 @interface RDLPreviewWindow () <NSWindowDelegate>
 @property (nonatomic, strong) IBOutlet NSWindow *window;
@@ -11,7 +11,6 @@
 @property (nonatomic, strong) IBOutlet NSScrollView *scroll;
 @property (nonatomic, strong) IBOutlet NSTextField *pageLabel;
 @property (nonatomic, strong) IBOutlet NSTextField *notesLabel;
-@property (nonatomic, strong) RDLParameterPrompts *prompts;
 @end
 
 @implementation RDLPreviewWindow {
@@ -28,8 +27,8 @@
   // rather than in the nib because how much of it there is depends on the
   // report: a report that asks for nothing shows no bar at all.
   NSView *_paramBar;
-  NSScrollView *_paramScroll;
-  NSButton *_viewReportButton;
+  NSButton *_inputsButton;
+  NSTextField *_inputsLabel;
   // Where the pages scroll when there is no bar above them.
   NSRect _scrollWhole;
 }
@@ -60,70 +59,92 @@
 
 #pragma mark - Asking for the parameters
 
-// How deep the bar may grow before the pages lose too much of the window.
-static const CGFloat kRDLParamBarMost = 132;
-static const CGFloat kRDLParamBarPad = 8;
+// How tall the bar is: one row, whatever the report asks for.
+static const CGFloat kRDLInputBarHeight = 38;
+static const CGFloat kRDLInputBarPad = 8;
 
 // A report server asks for a report's parameters before it renders it, and so
-// does this: the prompts sit above the pages, on the values the render is
-// using, and View Report renders again with what has been given. Values reach
-// the same place the data pane's do, so the two agree.
+// does this -- but in a panel, not along the top of the window. A real report
+// asks for seven or eight, and more than two or three is more than a bar can
+// hold without becoming the window. What the bar carries instead is the way
+// in, and a line saying what is set.
+//
+// The data sources are in the same panel, because in this kit they are the
+// same kind of thing: a report that names `invoices.json` is asking the reader
+// for a file on this machine, exactly as a parameter asks for a value.
 - (void)buildParameterBar {
   NSView *content = [_window contentView];
   _paramBar = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(_scrollWhole), 0)];
   [_paramBar setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  _paramScroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(_scrollWhole), 0)];
-  [_paramScroll setBorderType:NSNoBorder];
-  [_paramScroll setDrawsBackground:NO];
-  [_paramScroll setHasHorizontalScroller:YES];
-  [_paramScroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-  _prompts = [[RDLParameterPrompts alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(_scrollWhole), 0)
-                                               document:nil];
-  _prompts.columnHeight = kRDLParamBarMost - 2 * kRDLParamBarPad - 16;
-  __weak RDLPreviewWindow *weakSelf = self;
-  // A value given is a report to render again: the preview is the answer to
-  // the question the bar asks.
-  _prompts.whenValueGiven = ^{
-    [weakSelf refresh];
-  };
-  [_paramScroll setDocumentView:_prompts];
-  [_paramBar addSubview:_paramScroll];
-  _viewReportButton = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 96, 24)];
-  [_viewReportButton setTitle:@"View Report"];
-  [_viewReportButton setBezelStyle:NSRoundedBezelStyle];
-  [_viewReportButton setFont:[NSFont systemFontOfSize:11]];
-  [_viewReportButton setTarget:self];
-  [_viewReportButton setAction:@selector(viewReport:)];
-  [_viewReportButton setAutoresizingMask:NSViewMinXMargin | NSViewMinYMargin];
-  [_paramBar addSubview:_viewReportButton];
+  _inputsButton = [[NSButton alloc] initWithFrame:NSMakeRect(kRDLInputBarPad, kRDLInputBarPad, 168, 24)];
+  [_inputsButton setTitle:@"Parameters and Data…"];
+  [_inputsButton setBezelStyle:NSRoundedBezelStyle];
+  [_inputsButton setFont:[NSFont systemFontOfSize:11]];
+  [_inputsButton setTarget:self];
+  [_inputsButton setAction:@selector(editInputs:)];
+  [_inputsButton setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
+  [_paramBar addSubview:_inputsButton];
+  _inputsLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
+  [_inputsLabel setBezeled:NO];
+  [_inputsLabel setDrawsBackground:NO];
+  [_inputsLabel setEditable:NO];
+  [_inputsLabel setSelectable:YES];
+  [_inputsLabel setFont:[NSFont systemFontOfSize:10]];
+  [[_inputsLabel cell] setLineBreakMode:NSLineBreakByTruncatingTail];
+  [_inputsLabel setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
+  [_paramBar addSubview:_inputsLabel];
   [content addSubview:_paramBar];
 }
 
-// The bar as tall as what it has to ask for, and the pages below it. Nothing
-// asked for is no bar: a report with no parameters looks exactly as it did.
+// What the bar says: the values the render is using, in the order the report
+// asks for them, so the answer to "what is this showing?" is on the window
+// rather than behind a button.
+- (NSString *)inputsSummary {
+  RDLReport *report = _context.report;
+  RDLDocument *document = _context.document;
+  NSMutableArray<NSString *> *said = [NSMutableArray array];
+  for (RDLParameter *p in report.parameters) {
+    if (p.hidden || p.prompt == nil)
+      continue;
+    NSString *value = document.paramValues[p.name];
+    if (value == nil) {
+      NSArray<NSString *> *several = document.multiParamValues[p.name];
+      value = [several count] ? [several componentsJoinedByString:@", "] : nil;
+    }
+    if (value == nil) {
+      RDLParameterValue *worked = [[document parameterValues] valueNamed:p.name];
+      value = worked.value ? [RDLExpression formatValue:worked.value format:nil language:nil] : nil;
+    }
+    [said addObject:[NSString stringWithFormat:@"%@: %@", [p.prompt length] ? p.prompt : p.name,
+                                               [value length] ? value : @"—"]];
+  }
+  if ([said count] == 0)
+    return [report.dataSources count] ? @"Where this report reads its data." : @"";
+  return [said componentsJoinedByString:@"   ·   "];
+}
+
+// The bar, and the pages below it. A report that asks for nothing and reads
+// nothing shows no bar at all.
 - (void)layOutParameterBar {
-  _prompts.document = _context.document;
-  CGFloat asked = [_prompts reload];
-  BOOL any = [_prompts askedCount] > 0;
-  CGFloat height = any ? MIN(asked + 2 * kRDLParamBarPad, kRDLParamBarMost) : 0;
+  BOOL any = [_context.report.parameters count] > 0 || [_context.report.dataSources count] > 0;
+  CGFloat height = any ? kRDLInputBarHeight : 0;
   [_paramBar setHidden:!any];
+  [_inputsLabel setStringValue:[self inputsSummary]];
   [_paramBar setFrame:NSMakeRect(NSMinX(_scrollWhole), NSMaxY(_scrollWhole) - height,
                                  NSWidth(_scrollWhole), height)];
-  CGFloat button = NSWidth([_viewReportButton frame]);
-  [_viewReportButton setFrameOrigin:NSMakePoint(NSWidth(_scrollWhole) - button - kRDLParamBarPad,
-                                                MAX(height - 24 - kRDLParamBarPad, 0))];
-  [_paramScroll setFrame:NSMakeRect(kRDLParamBarPad, kRDLParamBarPad,
-                                    MAX(NSWidth(_scrollWhole) - button - 3 * kRDLParamBarPad, 1),
-                                    MAX(height - 2 * kRDLParamBarPad, 1))];
+  CGFloat afterButton = NSMaxX([_inputsButton frame]) + kRDLInputBarPad;
+  [_inputsLabel setFrame:NSMakeRect(afterButton, kRDLInputBarPad + 4,
+                                    MAX(NSWidth(_scrollWhole) - afterButton - kRDLInputBarPad, 1), 16)];
   [_scroll setFrame:NSMakeRect(NSMinX(_scrollWhole), NSMinY(_scrollWhole), NSWidth(_scrollWhole),
                                NSHeight(_scrollWhole) - height)];
 }
 
-// What the bar is for, and the button a report server puts beside it: the
-// report as it comes out with the values as they are now.
-- (void)viewReport:(id)sender {
+// The panel, and a render with what it was left holding. Cancel changes
+// nothing, so nothing is rendered again.
+- (void)editInputs:(id)sender {
   RDL_UNUSED(sender);
-  [self refresh];
+  if ([RDLRenderInputsEditor runForContext:_context])
+    [self refresh];
 }
 
 - (void)dealloc {

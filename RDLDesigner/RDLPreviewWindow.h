@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <AppKit/AppKit.h>
 
-@class RDLEditingContext, RDLView, RDLParameterPrompts;
+@class RDLEditingContext, RDLView;
 
 // The preview: the report as it will come out, page by page, with the way to
 // walk through it and the way to print it.
@@ -42,9 +42,13 @@
 - (void)goToNextPage:(id)sender;
 - (void)goToLastPage:(id)sender;
 - (void)printReport:(id)sender;
-// What the report is asked for through, above the pages: the prompts a report
-// server would show, and the button that renders again with what has been
-// given. The bar is there only when the report asks for something.
-@property (nonatomic, readonly, strong) RDLParameterPrompts *prompts;
-- (void)viewReport:(id)sender;
+// The bar above the pages: what this render is using, and the way to change
+// it. A report that asks for nothing and reads nothing shows no bar.
+// -editInputs: opens the panel where the parameter values are given and the
+// data sources are pointed at documents; the report is rendered again when the
+// panel is accepted, and not when it is cancelled.
+- (void)editInputs:(id)sender;
+// What the bar says: each parameter the report asks for and the value this
+// render is using, or a dash where there is none.
+@property (nonatomic, readonly, copy) NSString *inputsSummary;
 @end

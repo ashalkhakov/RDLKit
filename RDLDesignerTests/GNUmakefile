@@ -74,6 +74,7 @@ RDLDesignerTests_OBJC_FILES = \
   ../RDLDesigner/RDLInspectorView.m \
   ../RDLDesigner/RDLDataView.m \
   ../RDLDesigner/RDLParameterPrompts.m \
+  ../RDLDesigner/RDLRenderInputsEditor.m \
   ../RDLDesigner/RDLOutlineDataSource.m \
   ../RDLDesigner/RDLOutlineView.m \
   ../RDLDesigner/RDLTabBadge.m \
@@ -132,6 +133,7 @@ RDLDesignerTests_RESOURCE_FILES = \
   ../RDLDesigner/RDLParameterInspectorView.xib \
   ../RDLDesigner/RDLDataSourceView.xib \
   ../RDLDesigner/RDLSubreportParametersEditor.xib \
+  ../RDLDesigner/RDLRenderInputsEditor.xib \
   ../RDLDesigner/RDLGeneratorWindow.xib \
   ../RDLDesigner/RDLWelcomeWindow.xib \
   ../RDLDesigner/RDLAddElementPanel.xib \

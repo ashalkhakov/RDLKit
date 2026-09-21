@@ -19,6 +19,7 @@
 #import "RDLFieldInspectorView.h"
 #import "RDLParameterInspectorView.h"
 #import "RDLParameterPrompts.h"
+#import "RDLRenderInputsEditor.h"
 #import "RDLPreviewWindow.h"
 #import "RDLProblemsView.h"
 #import "RDLGroupsView.h"
@@ -1298,11 +1299,11 @@ static NSTabView *_centerTabViewOf(id wc) {
 // The preview: the report as it comes out, walked through page by page, with
 // what could not be read said rather than left to be puzzled over, and a print
 // operation that is paginated rather than one tall image.
-// A report server asks for a report's parameters before it renders it, and the
-// preview is where this designer renders: the prompts sit above the pages, on
-// the values the render is using, and what is given there is what comes out.
-// Values used to be given only in a pane of the designer window, which is why
-// a preview of a report that asks for a season rendered without asking.
+// A report server asks for a report's parameters before it renders, and the
+// preview is where this designer renders. The asking is a panel rather than a
+// bar: a real report asks for seven or eight parameters, and more than two or
+// three is more than a bar can hold without becoming the window. What the bar
+// carries is the way in and a line saying what this render is using.
 - (void)testThePreviewAsksForTheParametersBeforeItRenders {
   RDLReport *report = [RDLReport emptyReportNamed:@"Asked"];
   RDLTextbox *shown = [[RDLTextbox alloc] init];
@@ -1316,55 +1317,132 @@ static NSTabView *_centerTabViewOf(id wc) {
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLPreviewWindow *bare = [[RDLPreviewWindow alloc] initWithContext:ctx];
   [bare refresh];
-  // Nothing to ask for is no bar at all: a report with no parameters looks
-  // exactly as it did.
-  if ([[bare prompts] askedCount] != 0 || ![[bare prompts] isHiddenOrHasHiddenAncestor])
-    XCTFail(@"%@", @"a report that asks for nothing should show no bar");
+  // Nothing to ask for and nothing to read is no bar at all: such a report
+  // looks exactly as it did.
+  NSView *bareBar = [bare valueForKey:@"paramBar"];
+  if (![bareBar isHidden])
+    XCTFail(@"%@", @"a report that asks for nothing and reads nothing shows no bar");
   CGFloat wholeHeight = NSHeight([[bare valueForKey:@"scroll"] frame]);
 
+  // Seven parameters, which is what a real report asks for and what a bar
+  // cannot hold.
+  for (NSUInteger i = 0; i < 7; i++) {
+    RDLParameter *p = [[RDLParameter alloc] init];
+    p.name = [NSString stringWithFormat:@"P%lu", (unsigned long)i + 1];
+    p.prompt = [NSString stringWithFormat:@"Ask %lu", (unsigned long)i + 1];
+    p.dataType = RDLParameterDataTypeString;
+    p.defaultValue = [RDLValue literal:@"x"];
+    [report.parameters addObject:p];
+  }
   RDLParameter *season = [[RDLParameter alloc] init];
   season.name = @"Season";
   season.prompt = @"Which season?";
   season.dataType = RDLParameterDataTypeString;
   season.defaultValue = [RDLValue literal:@"Spring"];
   [report.parameters addObject:season];
+
   RDLPreviewWindow *preview = [[RDLPreviewWindow alloc] initWithContext:ctx];
   [preview refresh];
-  RDLParameterPrompts *prompts = [preview prompts];
-  if ([prompts askedCount] != 1 || [prompts isHiddenOrHasHiddenAncestor])
-    XCTFail(@"%@", @"the report asks for a season, so the bar should ask for it");
-  NSTextField *asked = nil, *typed = nil;
-  for (NSView *v in RDLEveryViewUnder(prompts)) {
-    if (![v isKindOfClass:[NSTextField class]])
-      continue;
-    if ([[(NSTextField *)v stringValue] isEqualToString:@"Which season?"])
-      asked = (NSTextField *)v;
-    else if ([(NSTextField *)v isEditable])
-      typed = (NSTextField *)v;
-  }
-  if (asked == nil || typed == nil) {
-    XCTFail(@"%@", @"it should be asked for by its prompt, with a box to give it in");
-    return;
-  }
-  // On the value the render is using, not empty.
-  if (![[typed stringValue] isEqualToString:@"Spring"])
-    XCTFail(@"the box should start on the value the report works out, starts on '%@'",
-            [typed stringValue]);
-  // The pages get what the bar does not take.
+  NSView *bar = [preview valueForKey:@"paramBar"];
+  if ([bar isHidden])
+    XCTFail(@"%@", @"the report asks for something, so the bar should be there");
+  if (NSHeight([bar frame]) > 48)
+    XCTFail(@"the bar is one row whatever is asked for, it is %g high", NSHeight([bar frame]));
+  // It says what this render is using, so the answer to "what am I looking
+  // at?" is on the window rather than behind a button.
+  if ([[preview inputsSummary] rangeOfString:@"Which season?: Spring"].location == NSNotFound)
+    XCTFail(@"the bar should say what is set, it says '%@'", [preview inputsSummary]);
   if (NSHeight([[preview valueForKey:@"scroll"] frame]) >= wholeHeight)
     XCTFail(@"%@", @"the bar should take its height from the pages below it");
 
-  // What is given there is what the render uses.
+  // The panel asks for every one of them, however many there are, and for the
+  // documents the data is read from.
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Invoices";
+  source.dataProvider = @"JSON";
+  source.connectString = @"jsondoc=invoices.json";
+  [report.dataSources addObject:source];
+  RDLRenderInputsEditor *panel = [RDLRenderInputsEditor editorForContext:ctx];
+  if (panel == nil) {
+    XCTFail(@"%@", @"the panel should load");
+    return;
+  }
+  if ([[panel prompts] askedCount] != 8)
+    XCTFail(@"the panel should ask for all eight, asks for %lu",
+            (unsigned long)[[panel prompts] askedCount]);
+  if ([[panel documentFields] count] != 1 ||
+      ![[[panel documentFields] firstObject] stringValue] ||
+      ![[[[panel documentFields] firstObject] stringValue] isEqualToString:@"invoices.json"])
+    XCTFail(@"%@", @"the panel should show the document each source reads");
+  // Every prompt is inside the panel's scrolling content, however many there
+  // are: the panel scrolls, so there is no number of them it cannot hold.
+  NSScrollView *scroll = [panel valueForKey:@"scroll"];
+  if (NSHeight([[scroll documentView] frame]) <= NSHeight([[scroll contentView] bounds]))
+    XCTFail(@"%@", @"eight parameters and a data source should be more than one screenful");
+
+  // What is given in the panel is what the render uses, once it is accepted.
+  NSTextField *typed = nil;
+  for (NSView *v in RDLEveryViewUnder([panel prompts]))
+    if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable] &&
+        [[(NSTextField *)v stringValue] isEqualToString:@"Spring"])
+      typed = (NSTextField *)v;
+  if (typed == nil) {
+    XCTFail(@"%@", @"the season should be asked for on the value the render is using");
+    return;
+  }
   [typed setStringValue:@"Autumn"];
-  [prompts paramChanged:typed];
+  [[panel prompts] paramChanged:typed];
+  [[[panel documentFields] firstObject] setStringValue:@"winter.json"];
+  [panel apply];
   if (![ctx.document.paramValues[@"Season"] isEqualToString:@"Autumn"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the value should reach the document: %@",
                                               ctx.document.paramValues]);
-  [preview viewReport:nil];
-  if ([[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Spring"] ||
-      ![[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Autumn"])
+  if ([source.connectString rangeOfString:@"winter.json"].location == NSNotFound)
+    XCTFail(@"the document should reach the data source: %@", source.connectString);
+  [preview refresh];
+  if (![[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Autumn"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the render should use what was given: %@",
                                               preview.view.paramValues]);
+  if ([[preview inputsSummary] rangeOfString:@"Which season?: Autumn"].location == NSNotFound)
+    XCTFail(@"and the bar should say so: '%@'", [preview inputsSummary]);
+}
+
+// Cancel leaves the render exactly as it was: the prompts write through to the
+// document as they are used, which is what makes them answer at once, so the
+// panel puts back every value it found.
+- (void)testCancellingTheInputsPanelChangesNothing {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Kept"];
+  RDLParameter *season = [[RDLParameter alloc] init];
+  season.name = @"Season";
+  season.prompt = @"Which season?";
+  season.dataType = RDLParameterDataTypeString;
+  season.defaultValue = [RDLValue literal:@"Spring"];
+  [report.parameters addObject:season];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Invoices";
+  source.dataProvider = @"JSON";
+  source.connectString = @"jsondoc=invoices.json";
+  [report.dataSources addObject:source];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.document setParamValue:@"Summer" forName:@"Season"];
+
+  RDLRenderInputsEditor *panel = [RDLRenderInputsEditor editorForContext:ctx];
+  NSTextField *typed = nil;
+  for (NSView *v in RDLEveryViewUnder([panel prompts]))
+    if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable])
+      typed = (NSTextField *)v;
+  [typed setStringValue:@"Autumn"];
+  [[panel prompts] paramChanged:typed];
+  [[[panel documentFields] firstObject] setStringValue:@"winter.json"];
+  // Cancelled: the value goes back to what it was, and nothing was ever
+  // written to the report.
+  [panel putValuesBack];
+  if (![ctx.document.paramValues[@"Season"] isEqualToString:@"Summer"])
+    XCTFail(@"the value should be as it was found: %@", ctx.document.paramValues);
+  if ([source.connectString rangeOfString:@"invoices.json"].location == NSNotFound)
+    XCTFail(@"the source should be untouched: %@", source.connectString);
+  if ([[ctx.document undoManager] canUndo])
+    XCTFail(@"%@", @"a cancelled panel leaves nothing to undo");
 }
 
 - (void)testThePreviewWalksThroughThePagesAndPrints {
