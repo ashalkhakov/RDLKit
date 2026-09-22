@@ -904,27 +904,13 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [self updateRulers];
   [self syncZoomControl];
 
-  // The report's own inspector: the same view the Attributes tab uses, told to
-  // stay on the report rather than follow the selection.
-  _reportInspector = [[RDLInspectorView alloc] initWithFrame:[_reportInspectorHost bounds]
-                                                     context:_context];
-  _reportInspector.shows = RDLInspectorShowsReport;
-  // The report's own settings stack past the bottom of any pane -- the paper,
-  // its margins, its columns, the language, the code -- so this one scrolls.
-  RDLFillHostScrolling(_reportInspectorHost, _reportInspector);
+  // The Report and Style inspectors are built when they are first looked at:
+  // see -reportInspector below.
 
   // How the tablix being worked in groups, under the canvas where the region
   // it is about is.
   _groupsView = [[RDLGroupsView alloc] initWithFrame:[_groupsHost bounds] context:_context];
   RDLFillHost(_groupsHost, _groupsView);
-
-  // How what is selected looks: the same sections, in the tab that is for
-  // them, so a font or a padding is not hunted for among what a thing is.
-  _styleInspector = [[RDLInspectorView alloc] initWithFrame:[_styleInspectorHost bounds]
-                                                    context:_context];
-  _styleInspector.shows = RDLInspectorShowsStyle;
-  RDLFillHostScrolling(_styleInspectorHost, _styleInspector);
-
 
   // What is wrong with the whole report, beside the ways into it.
   _problemsView = [[RDLProblemsView alloc] initWithFrame:[_problemsHost bounds] context:_context];
@@ -1114,6 +1100,48 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 
 - (void)rightTabChanged:(id)sender {
   RDLSelectTab(sender, _rightTabView);
+  [self buildRightTabPane];
+}
+
+// The right pane's three tabs are three inspectors, and the sections they are
+// built from are the largest XIB in this application. Building all three when
+// the window opens is three loads of it before anything is on screen -- on
+// GNUstep, where a XIB is read from its XML every time rather than compiled,
+// that is most of what made opening a report feel slow. Two of the three are
+// behind tabs nobody has asked for yet, so they wait until they are.
+- (void)buildRightTabPane {
+  NSInteger index = [_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]];
+  if (index == 0)
+    [self reportInspector];
+  else if (index == 2)
+    [self styleInspector];
+}
+
+- (RDLInspectorView *)reportInspector {
+  if (_reportInspector == nil && _reportInspectorHost != nil) {
+    _reportInspector = [[RDLInspectorView alloc] initWithFrame:[_reportInspectorHost bounds]
+                                                       context:_context];
+    _reportInspector.shows = RDLInspectorShowsReport;
+    // The report's own settings stack past the bottom of any pane -- the
+    // paper, its margins, its columns, the language, the code -- so this one
+    // scrolls.
+    RDLFillHostScrolling(_reportInspectorHost, _reportInspector);
+    [_reportInspector reload];
+  }
+  return _reportInspector;
+}
+
+// How what is selected looks: the same sections, in the tab that is for them,
+// so a font or a padding is not hunted for among what a thing is.
+- (RDLInspectorView *)styleInspector {
+  if (_styleInspector == nil && _styleInspectorHost != nil) {
+    _styleInspector = [[RDLInspectorView alloc] initWithFrame:[_styleInspectorHost bounds]
+                                                      context:_context];
+    _styleInspector.shows = RDLInspectorShowsStyle;
+    RDLFillHostScrolling(_styleInspectorHost, _styleInspector);
+    [_styleInspector reload];
+  }
+  return _styleInspector;
 }
 
 // The Attributes tab is the one that swaps. Which inspector it holds is a
