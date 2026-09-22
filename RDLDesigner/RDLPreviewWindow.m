@@ -11,6 +11,7 @@
 @property (nonatomic, strong) IBOutlet NSScrollView *scroll;
 @property (nonatomic, strong) IBOutlet NSTextField *pageLabel;
 @property (nonatomic, strong) IBOutlet NSTextField *notesLabel;
+@property (nonatomic, strong) IBOutlet NSButton *inputsButton;
 @end
 
 @implementation RDLPreviewWindow {
@@ -23,14 +24,6 @@
   // Set while scrolling to a page, so the scroll that follows is not read back
   // as the reader having scrolled somewhere else.
   BOOL _scrollingThere;
-  // The bar the report is asked for through, and what is in it. Built here
-  // rather than in the nib because how much of it there is depends on the
-  // report: a report that asks for nothing shows no bar at all.
-  NSView *_paramBar;
-  NSButton *_inputsButton;
-  NSTextField *_inputsLabel;
-  // Where the pages scroll when there is no bar above them.
-  NSRect _scrollWhole;
 }
 
 - (instancetype)initWithContext:(RDLEditingContext *)context {
@@ -51,54 +44,31 @@
                                            selector:@selector(scrolled:)
                                                name:NSViewBoundsDidChangeNotification
                                              object:clip];
-  _scrollWhole = [_scroll frame];
-  [self buildParameterBar];
   [self sayWhereWeAre];
   return self;
 }
 
 #pragma mark - Asking for the parameters
 
-// How tall the bar is: one row, whatever the report asks for.
-static const CGFloat kRDLInputBarHeight = 38;
-static const CGFloat kRDLInputBarPad = 8;
-
 // A report server asks for a report's parameters before it renders it, and so
-// does this -- but in a panel, not along the top of the window. A real report
-// asks for seven or eight, and more than two or three is more than a bar can
-// hold without becoming the window. What the bar carries instead is the way
-// in, and a line saying what is set.
+// does this -- in a panel, not along the top of the window. A real report asks
+// for seven or eight, and more than two or three is more than a bar can hold
+// without becoming the window; laying one out here by hand also put the button
+// somewhere GNUstep did not draw it. So the way in is a button in the bar the
+// nib already has, beside Print, and what this render is using is its tool
+// tip.
 //
 // The data sources are in the same panel, because in this kit they are the
 // same kind of thing: a report that names `invoices.json` is asking the reader
 // for a file on this machine, exactly as a parameter asks for a value.
-- (void)buildParameterBar {
-  NSView *content = [_window contentView];
-  _paramBar = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(_scrollWhole), 0)];
-  [_paramBar setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  _inputsButton = [[NSButton alloc] initWithFrame:NSMakeRect(kRDLInputBarPad, kRDLInputBarPad, 168, 24)];
-  [_inputsButton setTitle:@"Parameters and Data…"];
-  [_inputsButton setBezelStyle:NSRoundedBezelStyle];
-  [_inputsButton setFont:[NSFont systemFontOfSize:11]];
-  [_inputsButton setTarget:self];
-  [_inputsButton setAction:@selector(editInputs:)];
-  [_inputsButton setAutoresizingMask:NSViewMaxXMargin | NSViewMinYMargin];
-  [_paramBar addSubview:_inputsButton];
-  _inputsLabel = [[NSTextField alloc] initWithFrame:NSZeroRect];
-  [_inputsLabel setBezeled:NO];
-  [_inputsLabel setDrawsBackground:NO];
-  [_inputsLabel setEditable:NO];
-  [_inputsLabel setSelectable:YES];
-  [_inputsLabel setFont:[NSFont systemFontOfSize:10]];
-  [[_inputsLabel cell] setLineBreakMode:NSLineBreakByTruncatingTail];
-  [_inputsLabel setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-  [_paramBar addSubview:_inputsLabel];
-  [content addSubview:_paramBar];
+- (void)syncInputsButton {
+  BOOL any = [_context.report.parameters count] > 0 || [_context.report.dataSources count] > 0;
+  [_inputsButton setHidden:!any];
+  [_inputsButton setToolTip:[self inputsSummary]];
 }
 
-// What the bar says: the values the render is using, in the order the report
-// asks for them, so the answer to "what is this showing?" is on the window
-// rather than behind a button.
+// What this render is using, parameter by parameter: the tool tip, and what a
+// check reads to see that the panel's values reached the render.
 - (NSString *)inputsSummary {
   RDLReport *report = _context.report;
   RDLDocument *document = _context.document;
@@ -118,25 +88,10 @@ static const CGFloat kRDLInputBarPad = 8;
     [said addObject:[NSString stringWithFormat:@"%@: %@", [p.prompt length] ? p.prompt : p.name,
                                                [value length] ? value : @"—"]];
   }
-  if ([said count] == 0)
-    return [report.dataSources count] ? @"Where this report reads its data." : @"";
-  return [said componentsJoinedByString:@"   ·   "];
-}
-
-// The bar, and the pages below it. A report that asks for nothing and reads
-// nothing shows no bar at all.
-- (void)layOutParameterBar {
-  BOOL any = [_context.report.parameters count] > 0 || [_context.report.dataSources count] > 0;
-  CGFloat height = any ? kRDLInputBarHeight : 0;
-  [_paramBar setHidden:!any];
-  [_inputsLabel setStringValue:[self inputsSummary]];
-  [_paramBar setFrame:NSMakeRect(NSMinX(_scrollWhole), NSMaxY(_scrollWhole) - height,
-                                 NSWidth(_scrollWhole), height)];
-  CGFloat afterButton = NSMaxX([_inputsButton frame]) + kRDLInputBarPad;
-  [_inputsLabel setFrame:NSMakeRect(afterButton, kRDLInputBarPad + 4,
-                                    MAX(NSWidth(_scrollWhole) - afterButton - kRDLInputBarPad, 1), 16)];
-  [_scroll setFrame:NSMakeRect(NSMinX(_scrollWhole), NSMinY(_scrollWhole), NSWidth(_scrollWhole),
-                               NSHeight(_scrollWhole) - height)];
+  for (RDLDataSource *source in report.dataSources)
+    [said addObject:[NSString stringWithFormat:@"%@ reads %@", source.name ?: @"",
+                                               source.connectString ?: @"nothing"]];
+  return [said componentsJoinedByString:@"\n"];
 }
 
 // The panel, and a render with what it was left holding. Cancel changes
@@ -161,10 +116,8 @@ static const CGFloat kRDLInputBarPad = 8;
 - (void)refresh {
   NSUInteger was = [self pageIndex];
   RDLDocument *document = _context.document;
-  // Asked for before it is rendered, as a report server asks -- and the bar is
-  // laid out first, because how much of the window the pages get depends on
-  // how much there was to ask.
-  [self layOutParameterBar];
+  // What it is being rendered with, said on the button that changes it.
+  [self syncInputsButton];
   // A render reads data: the report's own sources, and the subreports it names
   // with theirs. Remote documents only if this document was already allowed to
   // fetch them -- a preview is not the place to start reaching out to the

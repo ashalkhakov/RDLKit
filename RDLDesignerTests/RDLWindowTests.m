@@ -11,6 +11,7 @@
 #import "RDLDesignerTestSupport.h"
 #import "RDLDataSourceNavigator.h"
 #import "RDLAppDelegate.h"
+#import "RDLUpgrader.h"
 #import "RDLOutlineView.h"
 #import "RDLDataView.h"
 #import "RDLInsertPalette.h"
@@ -693,6 +694,21 @@ static NSTabView *_centerTabViewOf(id wc) {
   if ([rightTabs indexOfTabViewItem:[rightTabs selectedTabViewItem]] != 1)
     XCTFail(@"%@", @"the Attributes tab is not reachable from its tab");
 
+  // The Report tab's inspector is built when the tab is first gone to, not
+  // when the window opens: its sections are the largest XIB in the
+  // application and the window would otherwise load three of them before
+  // anything is on screen.
+  if ([[[wc valueForKey:@"reportInspectorHost"] subviews] count] >= 2)
+    XCTFail(@"%@", @"the Report tab should not have been built before it was asked for");
+  rightBar.selectedIndex = 0;
+  [wc rightTabChanged:rightBar];
+  rightBar.selectedIndex = 2;
+  [wc rightTabChanged:rightBar];
+  if ([wc valueForKey:@"styleInspector"] == nil)
+    XCTFail(@"%@", @"the Style tab builds its inspector when it is gone to");
+  rightBar.selectedIndex = 1;
+  [wc rightTabChanged:rightBar];
+
   // Every host got a view: a pane that loads and shows nothing is the state
   // these were in before.
   for (NSString *host in @[ @"reportInspectorHost", @"datasetNavigatorHost",
@@ -1317,12 +1333,11 @@ static NSTabView *_centerTabViewOf(id wc) {
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
   RDLPreviewWindow *bare = [[RDLPreviewWindow alloc] initWithContext:ctx];
   [bare refresh];
-  // Nothing to ask for and nothing to read is no bar at all: such a report
+  // Nothing to ask for and nothing to read is nothing to press: such a report
   // looks exactly as it did.
-  NSView *bareBar = [bare valueForKey:@"paramBar"];
-  if (![bareBar isHidden])
-    XCTFail(@"%@", @"a report that asks for nothing and reads nothing shows no bar");
-  CGFloat wholeHeight = NSHeight([[bare valueForKey:@"scroll"] frame]);
+  NSButton *bareButton = [bare valueForKey:@"inputsButton"];
+  if (bareButton == nil || ![bareButton isHidden])
+    XCTFail(@"%@", @"a report that asks for nothing and reads nothing offers no button");
 
   // Seven parameters, which is what a real report asks for and what a bar
   // cannot hold.
@@ -1343,17 +1358,21 @@ static NSTabView *_centerTabViewOf(id wc) {
 
   RDLPreviewWindow *preview = [[RDLPreviewWindow alloc] initWithContext:ctx];
   [preview refresh];
-  NSView *bar = [preview valueForKey:@"paramBar"];
-  if ([bar isHidden])
-    XCTFail(@"%@", @"the report asks for something, so the bar should be there");
-  if (NSHeight([bar frame]) > 48)
-    XCTFail(@"the bar is one row whatever is asked for, it is %g high", NSHeight([bar frame]));
-  // It says what this render is using, so the answer to "what am I looking
-  // at?" is on the window rather than behind a button.
-  if ([[preview inputsSummary] rangeOfString:@"Which season?: Spring"].location == NSNotFound)
-    XCTFail(@"the bar should say what is set, it says '%@'", [preview inputsSummary]);
-  if (NSHeight([[preview valueForKey:@"scroll"] frame]) >= wholeHeight)
-    XCTFail(@"%@", @"the bar should take its height from the pages below it");
+  NSButton *button = [preview valueForKey:@"inputsButton"];
+  if ([button isHidden])
+    XCTFail(@"%@", @"the report asks for something, so the button should be there");
+  // It is in the bar the window already has, beside Print, where a hand-laid
+  // bar of our own put it somewhere GNUstep did not draw it.
+  if (![[button superview] isEqual:[[preview window] contentView]] ||
+      NSMinY([button frame]) < NSMaxY([[preview valueForKey:@"scroll"] frame]) - 1)
+    XCTFail(@"the button belongs in the bar above the pages: %@",
+            NSStringFromRect([button frame]));
+  if (![[button title] length] || ![button action])
+    XCTFail(@"%@", @"and it says what it is and does something");
+  // What this render is using is on it, however long the list: a tool tip does
+  // not have to fit in the window.
+  if ([[button toolTip] rangeOfString:@"Which season?: Spring"].location == NSNotFound)
+    XCTFail(@"the button should say what is set, it says '%@'", [button toolTip]);
 
   // The panel asks for every one of them, however many there are, and for the
   // documents the data is read from.
@@ -1403,8 +1422,10 @@ static NSTabView *_centerTabViewOf(id wc) {
   if (![[preview.view.paramValues objectForKey:@"Season"] isEqualToString:@"Autumn"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the render should use what was given: %@",
                                               preview.view.paramValues]);
-  if ([[preview inputsSummary] rangeOfString:@"Which season?: Autumn"].location == NSNotFound)
-    XCTFail(@"and the bar should say so: '%@'", [preview inputsSummary]);
+  if ([[button toolTip] rangeOfString:@"Which season?: Autumn"].location == NSNotFound)
+    XCTFail(@"and the button should say so: '%@'", [button toolTip]);
+  if ([[button toolTip] rangeOfString:@"Invoices reads"].location == NSNotFound)
+    XCTFail(@"as well as what the data is read from: '%@'", [button toolTip]);
 }
 
 // Cancel leaves the render exactly as it was: the prompts write through to the

@@ -13,6 +13,7 @@
                 <outlet property="scroll" destination="previewScroll" id="previewScrollOutlet"/>
                 <outlet property="pageLabel" destination="pageLabel" id="pageLabelOutlet"/>
                 <outlet property="notesLabel" destination="notesLabel" id="notesLabelOutlet"/>
+                <outlet property="inputsButton" destination="inputsButton" id="inputsButtonOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -111,8 +112,19 @@
                             <action selector="printReport:" target="-2" id="printButtonAction"/>
                         </connections>
                     </button>
+                    <button toolTip="The parameter values and the documents this report reads" id="inputsButton">
+                        <rect key="frame" x="354" y="830" width="120" height="24"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="square" title="Parameters…" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="inputsButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="system"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editInputs:" target="-2" id="inputsButtonAction"/>
+                        </connections>
+                    </button>
                     <textField focusRingType="none" verticalHuggingPriority="750" id="notesLabel">
-                        <rect key="frame" x="354" y="835" width="358" height="16"/>
+                        <rect key="frame" x="482" y="835" width="230" height="16"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
                         <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" title="" id="notesLabelCell">
                             <font key="font" metaFont="smallSystem"/>
