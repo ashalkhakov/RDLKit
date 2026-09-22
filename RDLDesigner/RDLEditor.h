@@ -39,6 +39,17 @@ FOUNDATION_EXPORT BOOL RDLGroupHasSettings(RDLTablixMember *member, RDLTablixMem
 // Re-entrant: nested begin/end pairs collapse into the outermost one.
 - (void)beginGroup:(NSString *)actionName;
 - (void)endGroup;
+// A burst of edits the panes need be told about only once: holding an arrow
+// key moves an item every repeat, and each move made every pane that listens
+// read the report again -- the inspector filling fifty controls among them.
+// On GNUstep that is slower than the key repeats, so nothing appeared to
+// happen until the key was let go and then the whole burst arrived at once.
+//
+// Between these, changes are made as usual and nobody is told; the last of
+// them is published when the last -endCoalescingChanges closes. Whatever has
+// to keep up meanwhile -- the canvas under a nudge -- redraws itself.
+- (void)beginCoalescingChanges;
+- (void)endCoalescingChanges;
 
 // --- Property edits -------------------------------------------------------
 // Key paths are relative to the object, so "left" and "style.fontFamily" both

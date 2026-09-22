@@ -39,6 +39,10 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
 
 @implementation RDLEditor {
   NSInteger _groupDepth;
+  // A burst of edits nobody is told about until it ends, and the last change
+  // made during it.
+  NSInteger _coalescingDepth;
+  RDLChange *_heldChange;
   // Property keys already inverted during the open group, so a drag records
   // one inverse instead of one per mouse-moved event.
   NSMutableSet *_groupRegistered;
@@ -114,7 +118,29 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
 }
 
 - (void)noteChange:(RDLChange *)change {
+  if (_coalescingDepth > 0) {
+    // The last one stands: a burst of nudges is one item moving, and what a
+    // pane wants to know is where it ended up.
+    _heldChange = change;
+    return;
+  }
   [_document noteChange:change];
+}
+
+- (void)beginCoalescingChanges {
+  _coalescingDepth += 1;
+}
+
+- (void)endCoalescingChanges {
+  if (_coalescingDepth == 0)
+    return;
+  _coalescingDepth -= 1;
+  if (_coalescingDepth > 0)
+    return;
+  RDLChange *held = _heldChange;
+  _heldChange = nil;
+  if (held != nil)
+    [_document noteChange:held];
 }
 
 #pragma mark - Property edits

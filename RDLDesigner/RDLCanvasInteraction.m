@@ -449,6 +449,12 @@ static BOOL RDLEventToggles(NSEvent *event) {
   if (!_nudging) {
     _nudging = YES;
     [_ctx.editor beginGroup:shift ? @"Resize" : @"Move"];
+    // The panes are told once, when the key is let go: a repeat that made
+    // every one of them read the report again was slower than the key
+    // repeated, so on GNUstep nothing moved until the key was released and
+    // then the whole burst arrived at once. The canvas keeps up on its own,
+    // below.
+    [_ctx.editor beginCoalescingChanges];
   }
   [NSObject cancelPreviousPerformRequestsWithTarget:self
                                            selector:@selector(endNudge)
@@ -461,12 +467,16 @@ static BOOL RDLEventToggles(NSEvent *event) {
     else
       [_ctx.editor moveItem:item toLeft:item.left + dx top:item.top + dy];
   }
+  // What the notification would have done for the one pane that has to keep up
+  // with every press.
+  [_host interactionNeedsRedraw];
   return YES;
 }
 
 - (void)endNudge {
   if (_nudging) {
     _nudging = NO;
+    [_ctx.editor endCoalescingChanges];
     [_ctx.editor endGroup];
   }
 }

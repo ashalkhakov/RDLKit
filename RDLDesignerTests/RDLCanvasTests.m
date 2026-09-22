@@ -1068,4 +1068,53 @@ static NSEvent *RDLKeyDownEvent(unichar c) {
     XCTFail(@"%@", @"typing x is not deleting");
 }
 
+// Holding an arrow key moves the item every repeat, and the panes are told
+// once, when it is let go. Telling them every time meant every pane read the
+// report again -- the inspector filling fifty controls among them -- which on
+// GNUstep is slower than the key repeats: nothing moved until the key was
+// released and then the whole burst arrived at once.
+- (void)testABurstOfNudgesTellsThePanesOnce {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Nudged"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Box";
+  box.left = 1;
+  box.top = 1;
+  box.width = 2;
+  box.height = 0.5;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900)
+                                                       context:ctx];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  __block NSUInteger told = 0;
+  id watcher = [[NSNotificationCenter defaultCenter]
+      addObserverForName:RDLDocumentDidChangeNotification
+                  object:ctx.document
+                   queue:nil
+              usingBlock:^(NSNotification *note) {
+                RDL_UNUSED(note);
+                told += 1;
+              }];
+
+  CGFloat was = box.left;
+  for (NSUInteger i = 0; i < 6; i++)
+    [canvas keyDown:RDLKeyDownEvent(NSRightArrowFunctionKey)];
+  // Every press moved it, whatever the panes have been told.
+  if (box.left <= was + 0.2)
+    XCTFail(@"six presses should have moved it, it went from %g to %g", was, box.left);
+  if (told != 0)
+    XCTFail(@"the panes should not have been told yet, they were told %lu times",
+            (unsigned long)told);
+
+  // Let go: told once, about where it ended up.
+  [[canvas valueForKey:@"interaction"] performSelector:@selector(endNudge)];
+  if (told != 1)
+    XCTFail(@"letting go should tell them once, it told them %lu times", (unsigned long)told);
+  // And the whole burst is one undo step.
+  [[ctx.document undoManager] undo];
+  if (fabs(box.left - was) > 0.001)
+    XCTFail(@"one undo should put it back where it started: %g against %g", box.left, was);
+  [[NSNotificationCenter defaultCenter] removeObserver:watcher];
+}
+
 @end
