@@ -246,6 +246,26 @@ static NSDictionary *RDLWithoutKey(NSDictionary *values, NSString *key) {
   [self parameterValuesDidChange];
 }
 
+// A value nobody has given, which is not the same as a value given as
+// nothing: the parameter goes back to whatever the report works out for
+// itself, and a blank -- which a parameter may refuse -- is a value like any
+// other. That is why this cannot be spelled -setParamValue:@"".
+- (void)clearParamValueForName:(NSString *)name {
+  if ([name length] == 0)
+    return;
+  _paramValues = RDLWithoutKey(_paramValues, name);
+  _multiParamValues = RDLWithoutKey(_multiParamValues, name);
+  [self parameterValuesDidChange];
+}
+
+- (void)clearGivenParameterValues {
+  if ([_paramValues count] == 0 && [_multiParamValues count] == 0)
+    return;
+  _paramValues = @{};
+  _multiParamValues = @{};
+  [self parameterValuesDidChange];
+}
+
 - (void)parameterValuesDidChange {
   // A query that reads the parameter reads the new value before anything is
   // shown with it.

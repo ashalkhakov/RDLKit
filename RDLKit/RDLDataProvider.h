@@ -59,6 +59,34 @@ FOUNDATION_EXPORT NSString *RDLConnectionString(NSDictionary<NSString *, NSStrin
 // than knowing the vocabulary.
 FOUNDATION_EXPORT NSString *RDLDocumentKeyForProviderKind(RDLDataProviderKind kind);
 FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind);
+
+// Which of the two a data source reads. A connect string may hold both -- data
+// kept in the report and a file beside it -- which is what makes a report
+// testable: it carries a few representative rows for checking the layout, and
+// a path to the real thing for when that is what is wanted. Without a say in
+// which it reads, keeping both would be pointless, since the kept data would
+// always win.
+typedef NS_ENUM(NSInteger, RDLDocumentSource) {
+  RDLDocumentSourceUnspecified = 0,
+  // The data written into the report itself: "jsondata=[…]".
+  RDLDocumentSourceEmbedded,
+  // A document beside the report, or anywhere else it names.
+  RDLDocumentSourceFile,
+};
+// "Use" in a connect string: `jsondata=[…];jsondoc=live.json;use=file`. A
+// string that does not say reads whichever it has, the kept data first --
+// which is what every connect string written before this meant.
+FOUNDATION_EXPORT NSString *const RDLConnectionUseKey;
+FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceFromString(NSString *name);
+FOUNDATION_EXPORT NSString *RDLStringFromDocumentSource(RDLDocumentSource source);
+// Which one these properties read, for a provider of that kind.
+FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceOfProperties(
+    NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind);
+// The same properties saying they read that one, with what they hold of the
+// other left where it is. Unspecified takes the say out again.
+FOUNDATION_EXPORT NSDictionary<NSString *, NSString *> *RDLPropertiesReading(
+    NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind,
+    RDLDocumentSource source);
 // A web document's URL with a dataset's QueryParameters added to its query
 // string, after any it already has -- how SSRS's XML data extension hands query
 // parameters to a web source.

@@ -66,6 +66,62 @@
     XCTFail(@"%@", @"unparseable JSON should fail rather than yield no rows");
 }
 
+// A data source may hold both: the rows the report keeps for checking a
+// layout, and the file the real thing lives in. Which it reads is what the
+// connect string says, so a report can carry its test data and still be run
+// against the real document without losing either.
+- (void)testASourceHoldingBothReadsTheOneItNames {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Both"];
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = @"Rows";
+  source.dataProvider = @"JSON";
+  [report.dataSources addObject:source];
+  RDLDataSet *rows = [[RDLDataSet alloc] init];
+  rows.name = @"Rows";
+  rows.dataSourceName = @"Rows";
+  rows.commandText = @"$[*]";
+  [report.dataSets addObject:rows];
+  NSString *kept = @"[{\"Name\":\"Kept\"}]";
+  NSString *file = [NSTemporaryDirectory() stringByAppendingPathComponent:@"RDLBoth.json"];
+  [@"[{\"Name\":\"Read\"},{\"Name\":\"Also\"}]" writeToFile:file
+                                                       atomically:YES
+                                                         encoding:NSUTF8StringEncoding
+                                                            error:NULL];
+  NSDictionary *both = @{ @"jsondata" : kept, @"jsondoc" : file };
+  NSString * (^bind)(RDLDocumentSource) = ^NSString *(RDLDocumentSource which) {
+    source.connectString = RDLConnectionString(RDLPropertiesReading(both, RDLDataProviderKindJSON, which));
+    RDLDataBinder *binder = [[RDLDataBinder alloc] initWithBaseURL:nil];
+    [binder bindReport:report error:NULL];
+    return [[rows.rows firstObject][@"Name"] description];
+  };
+  // Saying nothing reads the kept data, which is what every connect string
+  // written before this meant.
+  if (![bind(RDLDocumentSourceUnspecified) isEqualToString:@"Kept"])
+    XCTFail(@"%@", @"with nothing said, the data kept in the report is what is read");
+  if (![bind(RDLDocumentSourceEmbedded) isEqualToString:@"Kept"])
+    XCTFail(@"%@", @"asked for the kept data, it should read the kept data");
+  if (![bind(RDLDocumentSourceFile) isEqualToString:@"Read"] || [rows.rows count] != 2)
+    XCTFail(@"%@", [NSString stringWithFormat:@"asked for the file, it should read the file: %@",
+                                              rows.rows]);
+  // And the other is still there to go back to.
+  NSDictionary *back = RDLConnectionProperties(source.connectString);
+  if (![back[@"jsondata"] isEqualToString:kept])
+    XCTFail(@"%@", @"the kept data should survive reading the file");
+  if (RDLDocumentSourceOfProperties(back, RDLDataProviderKindJSON) != RDLDocumentSourceFile)
+    XCTFail(@"%@", @"and the string should still say which it reads");
+  // A source that holds only one has nothing to choose between: it reads that
+  // one, and says nothing about it -- a connect string written before any of
+  // this keeps the spelling it had.
+  NSDictionary *fileOnly = RDLPropertiesReading(@{ @"jsondoc" : file }, RDLDataProviderKindJSON,
+                                                RDLDocumentSourceEmbedded);
+  if (RDLDocumentSourceOfProperties(fileOnly, RDLDataProviderKindJSON) != RDLDocumentSourceFile)
+    XCTFail(@"%@", @"there is no kept data to read, so the file is what it reads");
+  if (fileOnly[RDLConnectionUseKey] != nil ||
+      ![RDLConnectionString(fileOnly) isEqualToString:[NSString stringWithFormat:@"jsondoc=%@", file]])
+    XCTFail(@"a string with one document should stay as it was: %@", RDLConnectionString(fileOnly));
+  [[NSFileManager defaultManager] removeItemAtPath:file error:NULL];
+}
+
 - (void)testXMLProviderReadsElementsAsRows {
   NSString *xml = @"<Orders>"
                    "<Order No=\"A-1\"><Customer>Vale</Customer>"

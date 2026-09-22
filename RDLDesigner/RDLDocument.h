@@ -71,6 +71,12 @@
 - (void)syncParamValuesFromReport;
 - (void)setParamValue:(NSString *)value forName:(NSString *)name;
 - (void)setParamValues:(NSArray<NSString *> *)values forName:(NSString *)name;
+// A value nobody has given, which is not a value given as nothing: the
+// parameter goes back to what the report works out for itself. What a panel
+// does for "use the report's defaults", and what its Cancel needs to put a
+// value back that was not there.
+- (void)clearParamValueForName:(NSString *)name;
+- (void)clearGivenParameterValues;
 // The report's parameters worked out from the values given so far: defaults
 // where none is given, the valid values to choose from, and what is wrong.
 - (RDLParameterValues *)parameterValues;

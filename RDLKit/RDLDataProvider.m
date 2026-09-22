@@ -195,6 +195,69 @@ NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind) {
   return @"data";
 }
 
+NSString *const RDLConnectionUseKey = @"use";
+
+RDLDocumentSource RDLDocumentSourceFromString(NSString *name) {
+  NSString *said = [[name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]
+      lowercaseString];
+  if ([said isEqualToString:@"data"] || [said isEqualToString:@"embedded"] ||
+      [said isEqualToString:@"report"])
+    return RDLDocumentSourceEmbedded;
+  if ([said isEqualToString:@"file"] || [said isEqualToString:@"document"] ||
+      [said isEqualToString:@"doc"])
+    return RDLDocumentSourceFile;
+  return RDLDocumentSourceUnspecified;
+}
+
+NSString *RDLStringFromDocumentSource(RDLDocumentSource source) {
+  switch (source) {
+  case RDLDocumentSourceEmbedded:
+    return @"data";
+  case RDLDocumentSourceFile:
+    return @"file";
+  case RDLDocumentSourceUnspecified:
+    break;
+  }
+  return nil;
+}
+
+RDLDocumentSource RDLDocumentSourceOfProperties(NSDictionary<NSString *, NSString *> *properties,
+                                                RDLDataProviderKind kind) {
+  NSString *inlineText = properties[RDLInlineKeyForProviderKind(kind)] ?: properties[@"data"];
+  NSString *file = properties[RDLDocumentKeyForProviderKind(kind)] ?: properties[@"file"]
+                       ?: properties[@"path"] ?: properties[@""];
+  RDLDocumentSource said = RDLDocumentSourceFromString(properties[RDLConnectionUseKey]);
+  // What it says, as long as it has that to read; otherwise whichever it has,
+  // the kept data first -- which is what a string that says nothing has always
+  // meant.
+  if (said == RDLDocumentSourceEmbedded && [inlineText length])
+    return RDLDocumentSourceEmbedded;
+  if (said == RDLDocumentSourceFile && [file length])
+    return RDLDocumentSourceFile;
+  if ([inlineText length])
+    return RDLDocumentSourceEmbedded;
+  if ([file length])
+    return RDLDocumentSourceFile;
+  return RDLDocumentSourceUnspecified;
+}
+
+NSDictionary<NSString *, NSString *> *RDLPropertiesReading(
+    NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind,
+    RDLDocumentSource source) {
+  NSMutableDictionary *said = [properties mutableCopy] ?: [NSMutableDictionary dictionary];
+  NSString *inlineText = said[RDLInlineKeyForProviderKind(kind)] ?: said[@"data"];
+  NSString *file = said[RDLDocumentKeyForProviderKind(kind)] ?: said[@"file"] ?: said[@"path"]
+                       ?: said[@""];
+  NSString *name = RDLStringFromDocumentSource(source);
+  // A source holding only one of the two has nothing to choose between, so it
+  // says nothing: a connect string does not carry an answer to a question
+  // nobody can ask, and one written before this keeps the spelling it had.
+  if (name == nil || [inlineText length] == 0 || [file length] == 0)
+    [said removeObjectForKey:RDLConnectionUseKey];
+  else
+    said[RDLConnectionUseKey] = name;
+  return said;
+}
 
 // What every provider hands back: an array of dictionaries. A selected value
 // that is an array is flattened, so "$.Movie" and "$.Movie[*]" agree; a scalar
@@ -346,7 +409,11 @@ NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems)
                             error:(NSError **)error {
   NSString *inlineKey = kind == RDLDataProviderKindXML ? @"xmldata" : @"jsondata";
   NSString *inlineText = properties[inlineKey] ?: properties[@"data"];
-  if ([inlineText length])
+  // A source may hold both: the data the report keeps for checking a layout,
+  // and the file the real thing lives in. Which it reads is what it says, and
+  // the kept data when it says nothing.
+  if ([inlineText length] &&
+      RDLDocumentSourceOfProperties(properties, kind) == RDLDocumentSourceEmbedded)
     return [inlineText dataUsingEncoding:NSUTF8StringEncoding];
 
   NSString *docKey = kind == RDLDataProviderKindXML ? @"xmldoc" : @"jsondoc";

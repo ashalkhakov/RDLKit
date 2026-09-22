@@ -1428,6 +1428,97 @@ static NSTabView *_centerTabViewOf(id wc) {
     XCTFail(@"as well as what the data is read from: '%@'", [button toolTip]);
 }
 
+// A report worth testing keeps a few representative rows for checking the
+// layout and names the real document as well. The panel is where a render is
+// pointed at one or the other, and choosing one keeps the other: the point of
+// the kept rows is that they are there next time.
+- (void)testTheInputsPanelChoosesBetweenTheKeptDataAndAFile {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Tested"];
+  RDLDataSource *both = [[RDLDataSource alloc] init];
+  both.name = @"Rows";
+  both.dataProvider = @"JSON";
+  both.connectString = RDLConnectionString(@{ @"jsondata" : @"[{\"N\":1}]",
+                                              @"jsondoc" : @"live.json" });
+  [report.dataSources addObject:both];
+  RDLDataSource *fileOnly = [[RDLDataSource alloc] init];
+  fileOnly.name = @"Ledger";
+  fileOnly.dataProvider = @"JSON";
+  fileOnly.connectString = @"jsondoc=ledger.json";
+  [report.dataSources addObject:fileOnly];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRenderInputsEditor *panel = [RDLRenderInputsEditor editorForContext:ctx];
+  if ([[panel readsPops] count] != 2) {
+    XCTFail(@"%@", @"each data source should say which of the two it reads");
+    return;
+  }
+  NSPopUpButton *choice = [panel readsPops][0];
+  if ([choice numberOfItems] != 2 || ![choice isEnabled])
+    XCTFail(@"%@", @"a source holding both should offer both");
+  // On what it reads now, which with nothing said is the data kept in it.
+  if ([[choice selectedItem] tag] != RDLDocumentSourceEmbedded)
+    XCTFail(@"%@", @"with nothing said it reads the data kept in the report");
+  // A source that keeps nothing has nothing to choose between.
+  if ([[panel readsPops][1] numberOfItems] != 1 || [[panel readsPops][1] isEnabled])
+    XCTFail(@"%@", @"a source with no kept data offers no choice");
+
+  // Choosing the file: read from the file, and the kept rows still there.
+  [choice selectItemAtIndex:[choice indexOfItemWithTag:RDLDocumentSourceFile]];
+  [panel apply];
+  NSDictionary *after = RDLConnectionProperties(both.connectString);
+  if (RDLDocumentSourceOfProperties(after, RDLDataProviderKindJSON) != RDLDocumentSourceFile)
+    XCTFail(@"it should read the file now: %@", both.connectString);
+  if ([after[@"jsondata"] length] == 0)
+    XCTFail(@"and the kept rows should still be there: %@", both.connectString);
+  // The one with nothing to choose is left exactly as it was.
+  if (![fileOnly.connectString isEqualToString:@"jsondoc=ledger.json"])
+    XCTFail(@"a source with one document should not be rewritten: %@", fileOnly.connectString);
+
+  // And back again, in the next panel.
+  RDLRenderInputsEditor *again = [RDLRenderInputsEditor editorForContext:ctx];
+  NSPopUpButton *back = [again readsPops][0];
+  if ([[back selectedItem] tag] != RDLDocumentSourceFile)
+    XCTFail(@"%@", @"the panel should open on what the source reads");
+  [back selectItemAtIndex:[back indexOfItemWithTag:RDLDocumentSourceEmbedded]];
+  [again apply];
+  if (RDLDocumentSourceOfProperties(RDLConnectionProperties(both.connectString),
+                                    RDLDataProviderKindJSON) != RDLDocumentSourceEmbedded)
+    XCTFail(@"back to the kept rows: %@", both.connectString);
+}
+
+// The values the report works out for itself are one button away, which is
+// what a layout is checked against: a value typed to try something is not a
+// value anyone wants to keep typing back.
+- (void)testTheInputsPanelGoesBackToTheReportsDefaults {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Defaulted"];
+  RDLParameter *season = [[RDLParameter alloc] init];
+  season.name = @"Season";
+  season.prompt = @"Which season?";
+  season.dataType = RDLParameterDataTypeString;
+  season.defaultValue = [RDLValue literal:@"Spring"];
+  [report.parameters addObject:season];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.document setParamValue:@"Autumn" forName:@"Season"];
+  RDLRenderInputsEditor *panel = [RDLRenderInputsEditor editorForContext:ctx];
+  NSTextField *typed = nil;
+  for (NSView *v in RDLEveryViewUnder([panel prompts]))
+    if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable])
+      typed = (NSTextField *)v;
+  if (![[typed stringValue] isEqualToString:@"Autumn"]) {
+    XCTFail(@"the panel should open on the value given: '%@'", [typed stringValue]);
+    return;
+  }
+  [panel useReportDefaults:nil];
+  if ([ctx.document.paramValues count] != 0)
+    XCTFail(@"nothing should be given any more: %@", ctx.document.paramValues);
+  // And the prompts show what the report itself says.
+  NSTextField *now = nil;
+  for (NSView *v in RDLEveryViewUnder([panel prompts]))
+    if ([v isKindOfClass:[NSTextField class]] && [(NSTextField *)v isEditable])
+      now = (NSTextField *)v;
+  if (![[now stringValue] isEqualToString:@"Spring"])
+    XCTFail(@"the prompt should show the report's own default: '%@'", [now stringValue]);
+}
+
 // Cancel leaves the render exactly as it was: the prompts write through to the
 // document as they are used, which is what makes them answer at once, so the
 // panel puts back every value it found.

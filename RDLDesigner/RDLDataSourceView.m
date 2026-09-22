@@ -92,7 +92,7 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   [_typePop selectItemAtIndex:kind - RDLDataProviderKindJSON];
 
   NSString *inlineText = properties[RDLInlineKeyForProviderKind(kind)];
-  BOOL embedded = [inlineText length] > 0;
+  BOOL embedded = RDLDocumentSourceOfProperties(properties, kind) == RDLDocumentSourceEmbedded;
   [_wherePop selectItemAtIndex:embedded ? 1 : 0];
   [_documentField setStringValue:properties[RDLDocumentKeyForProviderKind(kind)] ?: @""];
   [_contentView setString:inlineText ?: @""];
@@ -147,16 +147,32 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   if (_filling || _dataSource == nil || _unknownProvider)
     return;
   RDLDataProviderKind kind = [self chosenKind];
-  NSMutableDictionary *properties = [NSMutableDictionary dictionary];
-  if ([self chosenLocation] == RDLDocumentLocationEmbedded) {
+  // Both are kept, and the connect string says which is read: a report worth
+  // testing carries a few representative rows for checking the layout and
+  // names the real document as well, and choosing one used to throw the other
+  // away. What is not in the pane is what the source had, since only one of
+  // the two is on show at a time.
+  NSMutableDictionary *properties =
+      [RDLConnectionProperties(_dataSource.connectString) mutableCopy] ?: [NSMutableDictionary dictionary];
+  for (NSString *key in @[ @"hasheaders", @"headers", @"delimiter", @"widths" ])
+    [properties removeObjectForKey:key];
+  BOOL embedded = [self chosenLocation] == RDLDocumentLocationEmbedded;
+  if (embedded) {
     NSString *text = [_contentView string] ?: @"";
     if ([text length])
       properties[RDLInlineKeyForProviderKind(kind)] = text;
+    else
+      [properties removeObjectForKey:RDLInlineKeyForProviderKind(kind)];
   } else {
     NSString *file = [_documentField stringValue];
     if ([file length])
       properties[RDLDocumentKeyForProviderKind(kind)] = file;
+    else
+      [properties removeObjectForKey:RDLDocumentKeyForProviderKind(kind)];
   }
+  properties = [RDLPropertiesReading(properties, kind,
+                                     embedded ? RDLDocumentSourceEmbedded : RDLDocumentSourceFile)
+      mutableCopy];
   if (kind == RDLDataProviderKindCSV) {
     // Written both ways round, because "the default" is a header row and a
     // report that says nothing gets one.

@@ -30,6 +30,10 @@
 @property (nonatomic, readonly, strong) RDLParameterPrompts *prompts;
 // One row per data source: the file it reads, and the button that picks one.
 @property (nonatomic, readonly, copy) NSArray<NSTextField *> *documentFields;
+// Beside each of those: which of the two that source reads, the data kept in
+// the report or the file. A source that keeps no data of its own offers only
+// the file.
+@property (nonatomic, readonly, copy) NSArray<NSPopUpButton *> *readsPops;
 
 // What the buttons do. Declared because they are what the panel does, and so
 // a check can drive them without a modal session.
@@ -38,6 +42,9 @@
 // Picks a file for the row the sender belongs to; the panel's fields are read
 // on OK, so this only fills one in.
 - (void)chooseDocument:(id)sender;
+// Throws away every value given and shows what the report works out on its
+// own, which is what a reader with no say would see.
+- (void)useReportDefaults:(id)sender;
 // What Cancel does: every parameter value back as the panel found it. The
 // prompts write through to the document as they are used -- which is what lets
 // a preview answer at once -- so this is the undoing of that; the report

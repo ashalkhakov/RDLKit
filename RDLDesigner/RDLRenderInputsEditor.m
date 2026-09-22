@@ -38,6 +38,8 @@ static const CGFloat kRowGap = 8;
   NSArray<RDLDataSource *> *_sources;
   NSMutableArray<NSTextField *> *_documentFields;
   NSMutableArray<NSString *> *_documentsAsFound;
+  NSMutableArray<NSPopUpButton *> *_readsPops;
+  NSButton *_defaultsButton;
   // The values as they were when the panel opened. The prompts write straight
   // through to the document as they are used, which is what makes the preview
   // answer at once; Cancel is this going back.
@@ -100,12 +102,23 @@ static const CGFloat kRowGap = 8;
   _stack = [[RDLInputsStack alloc] initWithFrame:NSMakeRect(0, 0, kRowWidth + 2 * kRowLeft, 10)];
   _documentFields = [NSMutableArray array];
   _documentsAsFound = [NSMutableArray array];
+  _readsPops = [NSMutableArray array];
   CGFloat y = kRowGap;
 
   [_stack addSubview:[self label:@"Parameters"
-                              at:NSMakeRect(kRowLeft, y, kRowWidth, 16)
+                              at:NSMakeRect(kRowLeft, y, 180, 16)
                             bold:YES]];
-  y += 20;
+  // Back to what the report itself says: handy when a value was typed to try
+  // something and the question is now what the report does on its own.
+  _defaultsButton = [[NSButton alloc] initWithFrame:NSMakeRect(kRowLeft + kRowWidth - 190, y - 4,
+                                                               190, 22)];
+  [_defaultsButton setTitle:@"Use the report's defaults"];
+  [_defaultsButton setBezelStyle:NSRoundedBezelStyle];
+  [_defaultsButton setFont:[NSFont systemFontOfSize:11]];
+  [_defaultsButton setTarget:self];
+  [_defaultsButton setAction:@selector(useReportDefaults:)];
+  [_stack addSubview:_defaultsButton];
+  y += 22;
   _prompts = [[RDLParameterPrompts alloc] initWithFrame:NSMakeRect(kRowLeft, y, kRowWidth, 0)
                                                document:_context.document];
   // One column however long it grows: the panel scrolls, so a report that asks
@@ -175,6 +188,27 @@ static const CGFloat kRowGap = 8;
   [_stack addSubview:[self label:what at:NSMakeRect(kRowLeft, y, kRowWidth, 14) bold:NO]];
   y += 16;
 
+  // Which of the two it reads. A report worth testing keeps a few
+  // representative rows for checking the layout and names the real document as
+  // well; this is the say in which of them a render uses, and neither is lost
+  // by choosing the other.
+  NSPopUpButton *which = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(kRowLeft, y, 220, 22)
+                                                    pullsDown:NO];
+  if ([inlineText length]) {
+    [which addItemWithTitle:@"The data kept in the report"];
+    [[which lastItem] setTag:RDLDocumentSourceEmbedded];
+  }
+  [which addItemWithTitle:@"A file"];
+  [[which lastItem] setTag:RDLDocumentSourceFile];
+  RDLDocumentSource reads = RDLDocumentSourceOfProperties(properties, kind);
+  if ([which indexOfItemWithTag:reads] >= 0)
+    [which selectItemAtIndex:[which indexOfItemWithTag:reads]];
+  [which setEnabled:kind != RDLDataProviderKindUnspecified && [which numberOfItems] > 1];
+  [which setTag:(NSInteger)[_documentFields count]];
+  [_stack addSubview:which];
+  [_readsPops addObject:which];
+  y += 26;
+
   NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(kRowLeft, y, kRowWidth - 96, 22)];
   [field setStringValue:document ?: @""];
   [field setDelegate:self];
@@ -202,6 +236,19 @@ static const CGFloat kRowGap = 8;
   [_documentFields addObject:field];
   [_documentsAsFound addObject:document ?: @""];
   return y + 28;
+}
+
+// Which of the two the row says it reads: what was chosen, or the file when a
+// row offers no choice.
+- (RDLDocumentSource)sourceReadsAtIndex:(NSUInteger)index {
+  if (index >= [_readsPops count])
+    return RDLDocumentSourceUnspecified;
+  NSInteger tag = [[_readsPops[index] selectedItem] tag];
+  return tag == RDLDocumentSourceEmbedded ? RDLDocumentSourceEmbedded : RDLDocumentSourceFile;
+}
+
+- (NSArray<NSPopUpButton *> *)readsPops {
+  return [_readsPops copy] ?: @[];
 }
 
 - (NSArray<NSTextField *> *)documentFields {
@@ -243,6 +290,12 @@ static const CGFloat kRowGap = 8;
   if ([path length] == 0)
     return;
   [_documentFields[(NSUInteger)which] setStringValue:[self pathForField:path]];
+  // A file chosen is a file to read: choosing one and then finding the render
+  // still on the data kept in the report is the kind of thing nobody reports
+  // as a bug, they just stop trusting the panel.
+  NSPopUpButton *reads = which < (NSInteger)[_readsPops count] ? _readsPops[(NSUInteger)which] : nil;
+  if ([reads indexOfItemWithTag:RDLDocumentSourceFile] >= 0)
+    [reads selectItemAtIndex:[reads indexOfItemWithTag:RDLDocumentSourceFile]];
 }
 
 // A document beside the report is named as it is, so a report and its data
@@ -252,6 +305,14 @@ static const CGFloat kRowGap = 8;
   if ([beside length] && [path hasPrefix:[beside stringByAppendingString:@"/"]])
     return [path substringFromIndex:[beside length] + 1];
   return path;
+}
+
+// Every value given goes, so the report's own defaults are worked out again
+// and the prompts show what a reader with no say would see.
+- (void)useReportDefaults:(id)sender {
+  RDL_UNUSED(sender);
+  [_context.document clearGivenParameterValues];
+  [self rebuildPrompts];
 }
 
 #pragma mark - Leaving
@@ -271,14 +332,9 @@ static const CGFloat kRowGap = 8;
 // is to undo.
 - (void)putValuesBack {
   RDLDocument *document = _context.document;
-  for (NSString *name in [document.paramValues allKeys])
-    if (_paramsAsFound[name] == nil)
-      [document setParamValue:nil forName:name];
+  [document clearGivenParameterValues];
   for (NSString *name in _paramsAsFound)
     [document setParamValue:_paramsAsFound[name] forName:name];
-  for (NSString *name in [document.multiParamValues allKeys])
-    if (_multiParamsAsFound[name] == nil)
-      [document setParamValues:nil forName:name];
   for (NSString *name in _multiParamsAsFound)
     [document setParamValues:_multiParamsAsFound[name] forName:name];
 }
@@ -293,19 +349,23 @@ static const CGFloat kRowGap = 8;
       continue;
     NSString *document = [[_documentFields[i] stringValue]
         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if ([document isEqualToString:_documentsAsFound[i]])
+    NSDictionary *asFound = RDLConnectionProperties(source.connectString);
+    BOOL sameFile = [document isEqualToString:_documentsAsFound[i]];
+    BOOL sameSay = RDLDocumentSourceOfProperties(asFound, kind) == [self sourceReadsAtIndex:i];
+    if (sameFile && sameSay)
       continue;
-    // The document replaces whatever the source read before, content kept in
-    // the report included: a source reads one thing, and this is the one.
+    // The file and the data kept in the report both stay: what changes is
+    // which of them this source reads, so a report can carry its test rows and
+    // still be run against the real document.
     NSMutableDictionary *properties =
         [RDLConnectionProperties(source.connectString) mutableCopy] ?: [NSMutableDictionary dictionary];
-    [properties removeObjectForKey:RDLInlineKeyForProviderKind(kind)];
     if ([document length])
       properties[RDLDocumentKeyForProviderKind(kind)] = document;
     else
       [properties removeObjectForKey:RDLDocumentKeyForProviderKind(kind)];
+    NSDictionary *said = RDLPropertiesReading(properties, kind, [self sourceReadsAtIndex:i]);
     [_context.editor setProvider:source.dataProvider
-                   connectString:RDLConnectionString(properties)
+                   connectString:RDLConnectionString(said)
                     ofDataSource:source];
     any = YES;
   }
