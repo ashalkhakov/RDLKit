@@ -100,6 +100,86 @@ static NSString *RDLEnt(NSString *name) {
     XCTFail(@"%@", [NSString stringWithFormat:@"PDF magic %@", head]);
 }
 
+// The PDF backend renders through AppKit's printing machinery -- it lays the
+// pages into an RDLView and asks the view for its PDF -- which is the one
+// thing in this kit that behaves differently on the two platforms. It was
+// skipped in the GNUstep CI job for a year because that path was reported to
+// hang headless; it does not, and this is what says so on every run.
+- (void)testPDFBackendPaginatesOnBothPlatforms {
+  // A report of one page, and the same report with three pages' worth of body
+  // on the same paper.
+  RDLReport * (^invoice)(NSUInteger) = ^RDLReport *(NSUInteger pages) {
+    // Built here rather than from the shared fixture: what this is about is
+    // how many pages come out, so the report has nothing on it but the marks
+    // that make the pages.
+    RDLReport *r = [RDLReport emptyReportNamed:@"Paged"];
+    r.page.pageWidth = 8.5;
+    r.page.pageHeight = 4;
+    r.page.topMargin = 0.25;
+    r.page.bottomMargin = 0.25;
+    r.body.height = 3.4 * (CGFloat)pages;
+    for (NSUInteger i = 0; i < pages; i++) {
+      RDLTextbox *line = [[RDLTextbox alloc] init];
+      line.name = [NSString stringWithFormat:@"Mark%lu", (unsigned long)i + 1];
+      line.value = [NSString stringWithFormat:@"Page %lu", (unsigned long)i + 1];
+      line.left = 0.5;
+      line.top = 3.4 * (CGFloat)i + 0.2;
+      line.width = 3;
+      line.height = 0.3;
+      [r.body.items addObject:line];
+    }
+    return r;
+  };
+  NSUInteger (^pageObjectsIn)(NSData *) = ^NSUInteger(NSData *pdf) {
+    // Only the ones the writer left in plain sight: a backend that puts its
+    // page objects in compressed object streams -- cairo's does -- shows none
+    // here, and the caller treats that as "cannot tell" rather than as zero.
+    NSString *text = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    NSUInteger found = 0, at = 0;
+    while (at < [text length]) {
+      NSRange hit = [text rangeOfString:@"/Type /Page"
+                                options:0
+                                  range:NSMakeRange(at, [text length] - at)];
+      if (hit.location == NSNotFound)
+        break;
+      at = NSMaxRange(hit);
+      // "/Type /Pages" is the tree node, not a page.
+      if (at >= [text length] || [text characterAtIndex:at] != 's')
+        found++;
+    }
+    return found;
+  };
+
+  for (NSUInteger pages = 1; pages <= 3; pages += 2) {
+    RDLReport *r = invoice(pages);
+    NSArray *laidOut = [RDLGenerator pagesForReport:r parameters:@{}];
+    if ([laidOut count] != pages) {
+      XCTFail(@"the report should lay out as %lu pages, it is %lu",
+              (unsigned long)pages, (unsigned long)[laidOut count]);
+      continue;
+    }
+    NSData *pdf = [RDLGenerator PDFForReport:r parameters:@{}];
+    if ([pdf length] < 400) {
+      XCTFail(@"%lu pages came out as %lu bytes", (unsigned long)pages,
+              (unsigned long)[pdf length]);
+      continue;
+    }
+    NSString *head = [[NSString alloc] initWithBytes:[pdf bytes]
+                                              length:MIN((NSUInteger)5, [pdf length])
+                                            encoding:NSASCIIStringEncoding];
+    if (![head hasPrefix:@"%PDF"])
+      XCTFail(@"not a PDF: %@", head);
+    NSString *whole = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    if ([whole rangeOfString:@"%%EOF"].location == NSNotFound)
+      XCTFail(@"%@", @"the PDF should be finished off");
+    // One page object per page of the report, where they can be counted.
+    NSUInteger objects = pageObjectsIn(pdf);
+    if (objects != 0 && objects != pages)
+      XCTFail(@"%lu pages should make %lu page objects, made %lu", (unsigned long)pages,
+              (unsigned long)pages, (unsigned long)objects);
+  }
+}
+
 - (void)testRDLSubset {
   NSError *err = nil;
 

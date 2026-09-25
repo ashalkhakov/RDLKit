@@ -474,16 +474,43 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   return printView;
 }
 
+// A report of three pages is a PDF of three pages. It used to be one sheet as
+// tall as all of them: +PDFOperationWithView:insideRect:toData:printInfo: is
+// the single-image operation -- it draws the rect it is given and never asks
+// the view -knowsPageRange: -- so a paginating view arrived as a strip. What
+// paginates is an ordinary print operation whose job is saved rather than
+// spooled, which both platforms have; they differ only in how the destination
+// is named, and in nothing else.
 - (NSData *)PDFData {
+#if defined(GNUSTEP)
+  // GNUstep's print machinery does not return without an application object:
+  // -runOperation sits forever in a tool that never made one, which is what
+  // made rdlgen appear to hang on every PDF while HTML came out in
+  // milliseconds (Patches/gnustep-pdf-hangs-headless.md). Making the shared
+  // application first costs nothing -- it is idempotent, and anything drawing
+  // here has AppKit loaded already -- and the operation then returns in about
+  // a second. Cocoa needs none of this.
+  (void)[NSApplication sharedApplication];
+#endif
   NSPrintInfo *info = nil;
   RDLPrintView *printView = [self printViewWithInfo:&info fromInfo:nil];
-  NSMutableData *data = [NSMutableData data];
-  NSPrintOperation *op = [NSPrintOperation PDFOperationWithView:printView
-                                                     insideRect:printView.bounds
-                                                         toData:data
-                                                      printInfo:info];
+  NSString *path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"RDLKit-%@.pdf",
+                                                                [[NSUUID UUID] UUIDString]]];
+  [info setJobDisposition:NSPrintSaveJob];
+#if defined(GNUSTEP)
+  // GNUstep names the destination as a path, and has no NSPrintJobSavingURL.
+  [[info dictionary] setObject:path forKey:NSPrintSavePath];
+#else
+  [[info dictionary] setObject:[NSURL fileURLWithPath:path] forKey:NSPrintJobSavingURL];
+#endif
+  NSPrintOperation *op = [NSPrintOperation printOperationWithView:printView printInfo:info];
+  [op setShowsPrintPanel:NO];
+  [op setShowsProgressPanel:NO];
   [op runOperation];
-  return data;
+  NSData *data = [NSData dataWithContentsOfFile:path];
+  [[NSFileManager defaultManager] removeItemAtPath:path error:NULL];
+  return data ?: [NSData data];
 }
 
 - (NSPrintOperation *)printOperationWithPrintInfo:(NSPrintInfo *)info {

@@ -9,7 +9,7 @@ should say what was expected, what happened, and what the workaround costs.
 | --- | --- | --- |
 | `ibtool-silent-aborts.md` | Xcode 26 `ibtool` | Three pieces of slightly-wrong XIB markup abort the compiler with no diagnostics at all |
 | `nsxml-drops-whitespace-only-text.md` | Foundation `NSXMLDocument` | An element containing only whitespace reads back empty; `xml:space` does not help |
-| `gnustep-pdf-hangs-headless.md` | GNUstep gui / cairo | `-dataWithPDFInsideRect:` never returns under `xvfb-run` — **not reproducible on the current stack**; turn the CI step back on |
+| `gnustep-pdf-hangs-headless.md` | GNUstep gui | A print operation never returns in a process with no `NSApplication` — **cause found, worked around here**, and PDF is back in CI |
 | `gnustep-pdf-print-operation-upside-down.md` | GNUstep gui | A PDF print operation ignores pagination and mirrors the page |
 
 ## The GNUstep patches are not kept here any more
@@ -35,9 +35,12 @@ two GNUstep ones record what RDLDesigner actually hit.
 
 Each was walked through again on 2026-09-25 against a built GNUstep in that
 repository's container, to see whether any of them belongs in its fix list.
-None does: the NSXML whitespace bug and the `ibtool` aborts are Apple-side
-(GNUstep reads both correctly), and the headless PDF hang does not reproduce
-at all. What did come of it is recorded there: the reproduction for
+The NSXML whitespace bug and the `ibtool` aborts are Apple-side (GNUstep reads
+both correctly). The headless PDF hang is real, and its cause turned up when
+the audit's own conclusion was tested against `rdlgen` rather than against a
+hand-written program: a GNUstep print operation never returns in a process
+with no `NSApplication`, which every reproduction had made and no report
+generator has. What did come of it is recorded there: the reproduction for
 `libs-gui/pdf-print-operation` can assert after all — three pages with the
 patch against one without — once it inflates the compressed streams the cairo
 backend writes its page objects into.
