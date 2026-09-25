@@ -28,11 +28,28 @@ one through the LPR backend, and something in that path blocks rather than
 failing. macOS reaches `dataWithPDFInsideRect:` without involving a spooler at
 all, which is why this has never shown up there.
 
-**Not yet established.** Whether the block is in the LPR backend, in the print
-operation's run loop, or in waiting on a display the virtual server does not
-provide. Setting `GSLPRPrinters` to something real, or running against a
-configured CUPS queue, has not been tried and is the obvious next experiment.
+**Not reproducible on the current stack (checked 2026-09-25).** In the
+`gnustep-patches` container — gnustep-gui at `dacb45a56` with the project's
+patches applied, cairo backend, Ubuntu 24.04, `xvfb-run -a`, no printer
+configured — both paths return in about a second with a valid PDF:
 
-**Impact here.** The HTML backend is exercised on GNUstep and PDF is not; the
-macOS job covers PDF. `RDLGenerator PDFForReport:` is therefore untested on
-GNUstep and should be treated as unproven there, not as working.
+| What was run | Result |
+| --- | --- |
+| `-[NSView dataWithPDFInsideRect:]` on a plain view | 4,606 bytes, exit 0 |
+| `+[NSPrintOperation PDFOperationWithView:insideRect:toData:printInfo:]`, the path `RDLView -PDFData` takes, on a paginating view | 5,931 bytes, three PDF pages |
+
+The second run prints the same "Creating a default printer since no printer
+has been set" notice this report quotes, so the LPR default-printer path is
+being taken and is not where it blocked. Reverting our own
+`pdf-print-operation` patch and rebuilding changes the page count (three
+pages become one) but not the fact that it returns, so the hang was not that
+either.
+
+That leaves the older GNUstep this was first seen on, or something in the CI
+environment rather than in the library.
+
+**Impact here.** The HTML backend is exercised on GNUstep and PDF is not.
+Since PDF now renders headless in the container, the next move is to turn the
+PDF step back on in the GNUstep job and see whether it passes there too; if it
+does, this note is finished and `RDLGenerator PDFForReport:` is covered on
+both platforms.

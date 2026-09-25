@@ -51,6 +51,16 @@ ENV CC=clang CXX=clang++ \
     LIBRARY_COMBO=ng-gnu-gnu RUNTIME_VERSION=gnustep-2.0 \
     DEPS_PATH=/deps INSTALL_PATH=/gnustep
 
+# Only the script is copied, and that is now enough. It used to apply patches
+# named relative to the checkout, out of Patches/, which was never COPYed here
+# -- so `git apply` could not have found them and this image was quietly built
+# against a pristine gnustep-base and gui, unlike CI's. The script clones the
+# shared gnustep-patches repository instead, so the image gets the same patched
+# stack the workflow does. That needs git (installed above) and network access
+# during `docker build`, which this already required to clone GNUstep itself.
+#
+# Set GNUSTEP_PATCHES_REF to pin to a commit; the default follows the shared
+# repository's default branch, as a local reproduction box should.
 COPY .github/scripts/dependencies.sh /tmp/dependencies.sh
 RUN sh /tmp/dependencies.sh && rm -rf /deps
 

@@ -25,14 +25,45 @@
 # libs-corebase from that recipe are not built here; nothing in RDLKit uses
 # them.
 #
+# Fixes to GNUstep itself come from the shared gnustep-patches repository,
+# cloned below and applied per project; they are written for upstream and
+# held there until they can be sent. Everything else is built from master as
+# it stands.
+#
 # Expects: CC, CXX, LIBRARY_COMBO, RUNTIME_VERSION, DEPS_PATH, INSTALL_PATH.
 set -ex
 
-# Captured before anything cds away: the patches below are named relative to
-# the checkout.
-WORKSPACE_DIR=$(pwd)
-
 mkdir -p "$DEPS_PATH"
+
+# GNUstep's own fixes are not kept here any more: several projects on this
+# machine build the same stack and each used to carry its own copies, which
+# drifted and outlived the merges upstream. They live in one repository now,
+# and this fetches it.
+#
+# GNUSTEP_PATCHES_REF should name a commit, not a branch: it is what pins the
+# build, and the workflows fold it into the cache key so that changing a
+# patch invalidates the cached prefix. A branch name builds whatever is on it
+# that day and the cache will not notice.
+GNUSTEP_PATCHES_URL=${GNUSTEP_PATCHES_URL:-https://github.com/ashalkhakov/gnustep-patches.git}
+GNUSTEP_PATCHES_REF=${GNUSTEP_PATCHES_REF:-5b7cea43e828d053d72078f6dd1ebeb8785d770c}
+GNUSTEP_PATCHES_DIR="$DEPS_PATH/gnustep-patches"
+
+install_gnustep_patches() {
+    echo "::group::GNUstep patches"
+    if [ ! -d "$GNUSTEP_PATCHES_DIR" ]; then
+        git clone -q "$GNUSTEP_PATCHES_URL" "$GNUSTEP_PATCHES_DIR"
+        (cd "$GNUSTEP_PATCHES_DIR" && git checkout -q "$GNUSTEP_PATCHES_REF")
+    fi
+    (cd "$GNUSTEP_PATCHES_DIR" && git log --oneline -1)
+    echo "::endgroup::"
+}
+
+# Applies every patch that repository carries for one upstream project, with
+# no fuzz, and skips one that is already present -- which is what a fix looks
+# like between the day it is merged upstream and the day it is deleted there.
+apply_gnustep_patches() {
+    "$GNUSTEP_PATCHES_DIR/Scripts/apply-patches.sh" "$1" "$(pwd)"
+}
 
 # With --with-layout=gnustep this is where tools-make puts the makefiles.
 GNUSTEP_SH="$INSTALL_PATH/System/Library/Makefiles/GNUstep.sh"
@@ -106,12 +137,10 @@ install_libs_base() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_BASE_BRANCH:-master} https://github.com/gnustep/libs-base.git
     cd libs-base
-    # -[GSSAXHandler _initLibXML] hands libxml2 an xmlSAXHandler it never
-    # zeroed, and xmlSAX2InitDefaultSAXHandler does nothing when the handler's
-    # "initialized" field is not zero. See the patch and the repro beside it.
-    git apply "$WORKSPACE_DIR/Patches/gnustep-base-sax-handler-calloc.patch"
-    # Add a fix to the gnustep-base XML namespace added as attribute
-    git apply "$WORKSPACE_DIR/Patches/gnustep-patch-repros/gnustep-base-xmlns-attribute.patch"
+    # Among them: the SAX handler libxml2 is handed unzeroed, and the
+    # reserved-prefix namespace an "xmlns:foo" attribute manufactures, whose
+    # teardown corrupts the heap -- both of which RDLKit's XML writing hits.
+    apply_gnustep_patches libs-base
     # The reference recipe names $PREFIX/etc/GNUstep.conf here. This
     # gnustep-make writes it to $PREFIX/etc/GNUstep/GNUstep.conf instead, and
     # when the named file does not exist libs-base falls back to the built-in
@@ -137,12 +166,11 @@ install_libs_gui() {
     . "$GNUSTEP_SH"
     git clone -q -b ${LIBS_GUI_BRANCH:-master} https://github.com/gnustep/libs-gui.git
     cd libs-gui
-    # GSPDFPrintOperation overrides -_print with a single-sheet copy of
-    # GSEPSPrintOperation's, so PDF output ignores -knowsPageRange: and comes
-    # out upside down -- see Patches/gnustep-gui-pdf-print-operation.patch and
-    # the repro beside it. Applied here, not worked around in RDLKit: a
+    # Among them: GSPDFPrintOperation overriding -_print with a single-sheet
+    # copy of GSEPSPrintOperation's, so PDF output ignores -knowsPageRange:
+    # and comes out upside down. Patched here, not worked around in RDLKit: a
     # workaround and the patch together would correct it twice.
-    git apply "$WORKSPACE_DIR/Patches/gnustep-gui-pdf-print-operation.patch"
+    apply_gnustep_patches libs-gui
     ./configure --prefix="$INSTALL_PATH" || cat config.log
     make install
     echo "::endgroup::"
@@ -216,6 +244,7 @@ install_tools_xctest() {
 # tools-make with --with-runtime-abi=gnustep-2.0 probes for it, and libdispatch
 # needs BlocksRuntime from it. Everything after that needs GNUstep.sh, which
 # tools-make installs.
+install_gnustep_patches
 install_libobjc2
 install_libdispatch
 install_tools_make
