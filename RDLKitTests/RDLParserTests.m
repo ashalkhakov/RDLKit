@@ -2955,4 +2955,32 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
     XCTFail(@"%@", @"an edge that says None draws nothing, default or not");
 }
 
+// Nothing to read is an error, not an exception. A caller that has just
+// failed to read a file -- a sample that is not there, a name that turned out
+// to be a resource fork -- hands nil over without meaning to, and used to get
+// "NSInvalidArgumentException: nil argument" from inside NSXML, which says
+// neither which file nor why.
+- (void)testReadingNothingIsAnErrorRatherThanAnException {
+  for (NSString *nothing in @[ [NSNull null], @"" ]) {
+    NSString *xml = [nothing isKindOfClass:[NSString class]] ? (NSString *)nothing : nil;
+    NSError *error = nil;
+    RDLReport *report = nil;
+    @try {
+      report = [RDLParser reportFromXMLString:xml error:&error];
+    } @catch (NSException *raised) {
+      XCTFail(@"reading %@ raised %@", xml == nil ? @"nil" : @"an empty string", [raised name]);
+      continue;
+    }
+    if (report != nil)
+      XCTFail(@"%@", @"nothing should not read as a report");
+    if (error == nil || [[error localizedDescription] length] == 0)
+      XCTFail(@"%@", @"and it should say what was wrong");
+  }
+  // A string that is not a report is still an error, with the reader's own
+  // words for it.
+  NSError *error = nil;
+  if ([RDLParser reportFromXMLString:@"<NotAReport/>" error:&error] != nil || error == nil)
+    XCTFail(@"%@", @"a document that is not a report should be refused with a reason");
+}
+
 @end

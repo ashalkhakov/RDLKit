@@ -1677,6 +1677,22 @@ static void RDLPutBackPreserved(NSXMLElement *root, RDLReport *report) {
 }
 
 - (RDLReport *)reportFromXMLString:(NSString *)xml error:(NSError **)error {
+  // Nothing to read is an error to report, not an exception to raise:
+  // -initWithXMLString: raises on nil, and a caller that has just failed to
+  // read a file hands nil over without meaning to. What it got back was
+  // "NSInvalidArgumentException: nil argument", which says nothing about
+  // which file or why.
+  if ([xml length] == 0) {
+    if (error)
+      *error = [NSError errorWithDomain:@"RDLKit"
+                                   code:2
+                               userInfo:@{
+                                 NSLocalizedDescriptionKey : xml == nil
+                                     ? @"there is no XML to read"
+                                     : @"the XML to read is empty"
+                               }];
+    return nil;
+  }
   // PreserveWhitespace, or a TextRun holding a single space arrives empty --
   // see RDLElementText.
   NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml

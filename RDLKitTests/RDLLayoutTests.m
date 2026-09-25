@@ -1504,7 +1504,16 @@ static RDLTablixMember *RDLFirstGroupMember(NSArray<RDLTablixMember *> *members)
     NSString *xml = [NSString stringWithContentsOfFile:[samples stringByAppendingPathComponent:name]
                                               encoding:NSUTF8StringEncoding
                                                  error:NULL];
-    RDLReport *sample = [RDLParser reportFromXMLString:xml error:NULL];
+    NSError *error = nil;
+    RDLReport *sample = [RDLParser reportFromXMLString:xml error:&error];
+    if (sample == nil) {
+      // Named, because the alternative is an exception from inside NSXML that
+      // says neither which file nor why -- which is what a stray AppleDouble
+      // `._Something.rdl` beside the samples produced.
+      XCTFail(@"%@ could not be read as a report: %@", name,
+              [error localizedDescription] ?: @"no reason given");
+      continue;
+    }
     for (RDLItem *item in [sample allItemsIncludingNested]) {
       if (![item isKindOfClass:[RDLTablix class]])
         continue;
