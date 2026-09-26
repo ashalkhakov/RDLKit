@@ -2,8 +2,8 @@
 // looks like when it arrives.
 //
 // Three separable kinds of knowledge that used to sit together in the old
-// RDLController: insertion *policy* (a Rectangle may hold simple items but
-// not a data region), insertion *location* (derived from the selection), and
+// RDLController: insertion *policy* (what kinds may go where), insertion
+// *location* (derived from the selection), and
 // new-item *defaults* (a fresh Chart binds the first dataset's first two
 // fields). Naming lives here too, so there is one definition of "a name unused
 // anywhere in this report" — including inside nested Rectangles, which the
@@ -15,6 +15,24 @@
 @class RDLReport;
 @class RDLSelection;
 
+// What can be inserted. Mostly an RDL element each; List is a Tablix made the
+// way Report Builder makes a list -- one cell, holding a rectangle, repeated
+// for each row.
+typedef NS_ENUM(NSInteger, RDLItemKind) {
+  RDLItemKindUnspecified = 0,
+  RDLItemKindTextbox,
+  RDLItemKindLine,
+  RDLItemKindRectangle,
+  RDLItemKindImage,
+  RDLItemKindTablix,
+  RDLItemKindList,
+  RDLItemKindChart,
+  RDLItemKindSubreport,
+};
+
+// What the kind is called where a person picks it.
+FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
+
 // The resolved answer to "where would a new element land right now?"
 @interface RDLInsertionPoint : NSObject
 @property (nonatomic, readonly, copy) NSString *bandKey;
@@ -24,6 +42,10 @@
 // which is what Report Builder does when a second item is put in a cell.
 @property (nonatomic, readonly, strong) RDLTablixCell *cell;
 @property (nonatomic, readonly, strong) RDLTablix *cellTablix;
+// A corner position the file wrote no cell for, as a corner row and column, or
+// -1 -- in which case `cell` is nil and the cell is made when something goes in.
+@property (nonatomic, readonly, assign) NSInteger cornerRow;
+@property (nonatomic, readonly, assign) NSInteger cornerColumn;
 // The Rectangle that will hold the new item, or nil to insert at band level.
 @property (nonatomic, readonly, strong) RDLItem *container;
 // The selected item the new one should follow, when there is one.
@@ -39,12 +61,13 @@
 + (RDLInsertionPoint *)insertionPointInReport:(RDLReport *)report
                                     selection:(RDLSelection *)selection;
 
-// A Rectangle may only hold simple report items; data regions need band level.
-+ (NSArray<NSString *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point;
-+ (BOOL)kind:(NSString *)kind isAllowedAt:(RDLInsertionPoint *)point;
+// What may be inserted where, as RDLItemKinds: every kind, in a band, a
+// rectangle or a cell.
++ (NSArray<NSNumber *> *)elementKindsAllowedAt:(RDLInsertionPoint *)point;
++ (BOOL)kind:(RDLItemKind)kind isAllowedAt:(RDLInsertionPoint *)point;
 
 // A named, positioned, styled item of `kind`, ready to insert at `point`.
-+ (RDLItem *)itemOfKind:(NSString *)kind
++ (RDLItem *)itemOfKind:(RDLItemKind)kind
                  atPoint:(RDLInsertionPoint *)point
                 inReport:(RDLReport *)report;
 
@@ -56,6 +79,23 @@
 + (void)applyDefaultsTo:(RDLItem *)item report:(RDLReport *)report;
 
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report;
+// A name RDL accepts for a report item: a letter, then letters, digits and
+// underscores -- what an expression can write after ReportItems!.
++ (BOOL)isValidName:(NSString *)name;
+// Whether an item in the report, other than `item`, already has `name`.
++ (BOOL)name:(NSString *)name isTakenInReport:(RDLReport *)report besides:(RDLItem *)item;
+// Why a name cannot be given, in words to show the person who typed it, or nil
+// when it can. An RDL name starts with a letter and holds letters, digits and
+// underscores only -- which is why "Total price" is refused -- and no two items
+// in a report may share one.
++ (NSString *)whyName:(NSString *)name
+     isRefusedInReport:(RDLReport *)report
+               besides:(RDLItem *)item;
+// The same, kept apart from `item` and everything in it as well: an item being
+// edited away from the report, such as a dialog's working copy of a tablix.
++ (NSString *)uniqueNameWithPrefix:(NSString *)prefix
+                          inReport:(RDLReport *)report
+                           besides:(RDLItem *)item;
 + (void)renameTreeUniquely:(RDLItem *)item inReport:(RDLReport *)report;
 
 // Human-readable band name, for insertion descriptions and section headers.

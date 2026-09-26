@@ -1,4 +1,5 @@
 #import "RDLReport.h"
+#import "RDLCode.h"
 
 #pragma mark - Enum <-> RDL wire strings
 
@@ -116,6 +117,105 @@ NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v) {
   return RDLStringFromEnum(v, kRDLLayoutDirectionNames, kRDLLayoutDirectionNamesCount);
 }
 
+static const char *const kRDLGradientTypeNames[] = {
+    "",           "None",          "LeftRight",        "TopBottom",     "Center",
+    "DiagonalLeft", "DiagonalRight", "HorizontalCenter", "VerticalCenter"};
+static const NSInteger kRDLGradientTypeNamesCount =
+    (NSInteger)(sizeof(kRDLGradientTypeNames) / sizeof(*kRDLGradientTypeNames));
+RDLGradientType RDLGradientTypeFromString(NSString *s) {
+  return (RDLGradientType)RDLEnumFromString(s, kRDLGradientTypeNames, kRDLGradientTypeNamesCount);
+}
+NSString *RDLStringFromGradientType(RDLGradientType v) {
+  return RDLStringFromEnum(v, kRDLGradientTypeNames, kRDLGradientTypeNamesCount);
+}
+
+static const char *const kRDLMarkupTypeNames[] = {"", "None", "HTML"};
+static const NSInteger kRDLMarkupTypeNamesCount =
+    (NSInteger)(sizeof(kRDLMarkupTypeNames) / sizeof(*kRDLMarkupTypeNames));
+RDLMarkupType RDLMarkupTypeFromString(NSString *s) {
+  return (RDLMarkupType)RDLEnumFromString(s, kRDLMarkupTypeNames, kRDLMarkupTypeNamesCount);
+}
+NSString *RDLStringFromMarkupType(RDLMarkupType v) {
+  return RDLStringFromEnum(v, kRDLMarkupTypeNames, kRDLMarkupTypeNamesCount);
+}
+
+static const char *const kRDLListStyleNames[] = {"", "None", "Numbered", "Bulleted"};
+static const NSInteger kRDLListStyleNamesCount =
+    (NSInteger)(sizeof(kRDLListStyleNames) / sizeof(*kRDLListStyleNames));
+RDLListStyle RDLListStyleFromString(NSString *s) {
+  return (RDLListStyle)RDLEnumFromString(s, kRDLListStyleNames, kRDLListStyleNamesCount);
+}
+NSString *RDLStringFromListStyle(RDLListStyle v) {
+  return RDLStringFromEnum(v, kRDLListStyleNames, kRDLListStyleNamesCount);
+}
+
+static const char *const kRDLTextEffectNames[] = {"", "None", "Shadow", "Emboss", "Embed", "Frame"};
+static const NSInteger kRDLTextEffectNamesCount =
+    (NSInteger)(sizeof(kRDLTextEffectNames) / sizeof(*kRDLTextEffectNames));
+RDLTextEffect RDLTextEffectFromString(NSString *s) {
+  return (RDLTextEffect)RDLEnumFromString(s, kRDLTextEffectNames, kRDLTextEffectNamesCount);
+}
+NSString *RDLStringFromTextEffect(RDLTextEffect v) {
+  return RDLStringFromEnum(v, kRDLTextEffectNames, kRDLTextEffectNamesCount);
+}
+
+static const char *const kRDLUnicodeBiDiNames[] = {"", "Normal", "Embed", "BiDiOverride"};
+static const NSInteger kRDLUnicodeBiDiNamesCount =
+    (NSInteger)(sizeof(kRDLUnicodeBiDiNames) / sizeof(*kRDLUnicodeBiDiNames));
+RDLUnicodeBiDi RDLUnicodeBiDiFromString(NSString *s) {
+  return (RDLUnicodeBiDi)RDLEnumFromString(s, kRDLUnicodeBiDiNames, kRDLUnicodeBiDiNamesCount);
+}
+NSString *RDLStringFromUnicodeBiDi(RDLUnicodeBiDi v) {
+  return RDLStringFromEnum(v, kRDLUnicodeBiDiNames, kRDLUnicodeBiDiNamesCount);
+}
+
+static const char *const kRDLBackgroundRepeatNames[] = {"",       "Repeat", "RepeatX", "RepeatY",
+                                                        "NoRepeat", "Fit",    "Clip"};
+static const NSInteger kRDLBackgroundRepeatNamesCount =
+    (NSInteger)(sizeof(kRDLBackgroundRepeatNames) / sizeof(*kRDLBackgroundRepeatNames));
+RDLBackgroundRepeat RDLBackgroundRepeatFromString(NSString *s) {
+  return (RDLBackgroundRepeat)RDLEnumFromString(s, kRDLBackgroundRepeatNames,
+                                                kRDLBackgroundRepeatNamesCount);
+}
+NSString *RDLStringFromBackgroundRepeat(RDLBackgroundRepeat v) {
+  return RDLStringFromEnum(v, kRDLBackgroundRepeatNames, kRDLBackgroundRepeatNamesCount);
+}
+
+static const char *const kRDLBackgroundPositionNames[] = {
+    "",     "Default", "Top",         "TopLeft", "TopRight",  "Left",
+    "Center", "Right", "BottomRight", "Bottom",  "BottomLeft"};
+static const NSInteger kRDLBackgroundPositionNamesCount =
+    (NSInteger)(sizeof(kRDLBackgroundPositionNames) / sizeof(*kRDLBackgroundPositionNames));
+RDLBackgroundPosition RDLBackgroundPositionFromString(NSString *s) {
+  return (RDLBackgroundPosition)RDLEnumFromString(s, kRDLBackgroundPositionNames,
+                                                  kRDLBackgroundPositionNamesCount);
+}
+NSString *RDLStringFromBackgroundPosition(RDLBackgroundPosition v) {
+  return RDLStringFromEnum(v, kRDLBackgroundPositionNames, kRDLBackgroundPositionNamesCount);
+}
+
+static const char *const kRDLWritingModeNames[] = {"", "Horizontal", "Vertical", "Rotate270"};
+static const NSInteger kRDLWritingModeNamesCount =
+    (NSInteger)(sizeof(kRDLWritingModeNames) / sizeof(*kRDLWritingModeNames));
+RDLWritingMode RDLWritingModeFromString(NSString *s) {
+  return (RDLWritingMode)RDLEnumFromString(s, kRDLWritingModeNames, kRDLWritingModeNamesCount);
+}
+NSString *RDLStringFromWritingMode(RDLWritingMode v) {
+  return RDLStringFromEnum(v, kRDLWritingModeNames, kRDLWritingModeNamesCount);
+}
+
+static const char *const kRDLCalendarNames[] = {
+    "", "Default", "Gregorian", "GregorianArabic", "GregorianMiddleEastFrench", "GregorianTransliteratedEnglish",
+    "GregorianTransliteratedFrench", "GregorianUSEnglish", "Hebrew", "Hijri", "Japanese", "Korean", "Taiwan",
+    "ThaiBuddhist"};
+static const NSInteger kRDLCalendarNamesCount = (NSInteger)(sizeof(kRDLCalendarNames) / sizeof(*kRDLCalendarNames));
+RDLCalendar RDLCalendarFromString(NSString *s) {
+  return (RDLCalendar)RDLEnumFromString(s, kRDLCalendarNames, kRDLCalendarNamesCount);
+}
+NSString *RDLStringFromCalendar(RDLCalendar v) {
+  return RDLStringFromEnum(v, kRDLCalendarNames, kRDLCalendarNamesCount);
+}
+
 RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s) {
   return (RDLKeepWithGroup)RDLEnumFromString(s, kRDLKeepWithGroupNames, kRDLKeepWithGroupNamesCount);
 }
@@ -150,21 +250,47 @@ NSString *RDLStringFromParameterDataType(RDLParameterDataType v) {
   return RDLStringFromEnum(v, kRDLParameterDataTypeNames, kRDLParameterDataTypeNamesCount);
 }
 
+static const char *const kRDLUsedInQueryNames[] = {"", "False", "True", "Auto"};
+static const NSInteger kRDLUsedInQueryNamesCount = (NSInteger)(sizeof(kRDLUsedInQueryNames) / sizeof(*kRDLUsedInQueryNames));
+RDLUsedInQuery RDLUsedInQueryFromString(NSString *s) {
+  return (RDLUsedInQuery)RDLEnumFromString(s, kRDLUsedInQueryNames, kRDLUsedInQueryNamesCount);
+}
+NSString *RDLStringFromUsedInQuery(RDLUsedInQuery v) {
+  return RDLStringFromEnum(v, kRDLUsedInQueryNames, kRDLUsedInQueryNamesCount);
+}
+
+static const char *const kRDLAutoBooleanNames[] = {"", "Auto", "True", "False"};
+static const NSInteger kRDLAutoBooleanNamesCount = (NSInteger)(sizeof(kRDLAutoBooleanNames) / sizeof(*kRDLAutoBooleanNames));
+RDLAutoBoolean RDLAutoBooleanFromString(NSString *s) {
+  return (RDLAutoBoolean)RDLEnumFromString(s, kRDLAutoBooleanNames, kRDLAutoBooleanNamesCount);
+}
+NSString *RDLStringFromAutoBoolean(RDLAutoBoolean v) {
+  return RDLStringFromEnum(v, kRDLAutoBooleanNames, kRDLAutoBooleanNamesCount);
+}
+
+static const char *const kRDLCommandTypeNames[] = {"", "Text", "StoredProcedure", "TableDirect"};
+static const NSInteger kRDLCommandTypeNamesCount = (NSInteger)(sizeof(kRDLCommandTypeNames) / sizeof(*kRDLCommandTypeNames));
+RDLCommandType RDLCommandTypeFromString(NSString *s) {
+  return (RDLCommandType)RDLEnumFromString(s, kRDLCommandTypeNames, kRDLCommandTypeNamesCount);
+}
+NSString *RDLStringFromCommandType(RDLCommandType v) {
+  return RDLStringFromEnum(v, kRDLCommandTypeNames, kRDLCommandTypeNamesCount);
+}
+
 // RDL writes .NET type names, sometimes with the "System." prefix.
-static const char *const kRDLFieldDataTypeNames[] = {"",        "Boolean", "DateTime", "Integer",
-                                                     "Float",   "Decimal", "String"};
+static const char *const kRDLFieldDataTypeNames[] = {"",       "Boolean", "DateTime", "Short",  "Integer",
+                                                     "Long",   "Single",  "Float",    "Decimal", "String"};
 static const NSInteger kRDLFieldDataTypeNamesCount =
     (NSInteger)(sizeof(kRDLFieldDataTypeNames) / sizeof(*kRDLFieldDataTypeNames));
 RDLFieldDataType RDLFieldDataTypeFromString(NSString *s) {
   NSString *bare = [s hasPrefix:@"System."] ? [s substringFromIndex:7] : s;
-  // The names RDL uses are not all the names .NET uses.
-  if ([bare caseInsensitiveCompare:@"Int32"] == NSOrderedSame ||
-      [bare caseInsensitiveCompare:@"Int16"] == NSOrderedSame ||
-      [bare caseInsensitiveCompare:@"Int64"] == NSOrderedSame)
-    bare = @"Integer";
-  else if ([bare caseInsensitiveCompare:@"Double"] == NSOrderedSame ||
-           [bare caseInsensitiveCompare:@"Single"] == NSOrderedSame)
-    bare = @"Float";
+  // The names RDL uses are not all the names .NET uses. A whole-number type
+  // goes in the signed one that holds its range.
+  NSDictionary<NSString *, NSString *> *dotNet = @{
+    @"byte" : @"Short", @"sbyte" : @"Short", @"int16" : @"Short", @"uint16" : @"Integer", @"int32" : @"Integer",
+    @"uint32" : @"Long", @"int64" : @"Long", @"uint64" : @"Decimal", @"double" : @"Float"
+  };
+  bare = dotNet[[bare lowercaseString]] ?: bare;
   return (RDLFieldDataType)RDLEnumFromString(bare, kRDLFieldDataTypeNames,
                                               kRDLFieldDataTypeNamesCount);
 }
@@ -173,8 +299,15 @@ NSString *RDLStringFromFieldDataType(RDLFieldDataType v) {
 }
 
 static const char *const kRDLChartTypeNames[] = {"",     "Column",   "Bar",     "Line",  "Area",
-                                                 "Pie",  "Doughnut", "Scatter", "Bubble"};
+                                                 "Pie",  "Doughnut", "Scatter", "Bubble",
+                                                 "Range", "RangeColumn", "RangeBar", "Stock", "Candlestick",
+                                                 "Funnel", "Pyramid", "Polar", "Radar"};
 static const NSInteger kRDLChartTypeNamesCount = (NSInteger)(sizeof(kRDLChartTypeNames) / sizeof(*kRDLChartTypeNames));
+BOOL RDLChartTypeIsRange(RDLChartType type) {
+  return type == RDLChartTypeRange || type == RDLChartTypeRangeColumn || type == RDLChartTypeRangeBar ||
+         type == RDLChartTypeStock || type == RDLChartTypeCandlestick;
+}
+
 RDLChartType RDLChartTypeFromString(NSString *s) {
   return (RDLChartType)RDLEnumFromString(s, kRDLChartTypeNames, kRDLChartTypeNamesCount);
 }
@@ -183,7 +316,7 @@ NSString *RDLStringFromChartType(RDLChartType v) {
 }
 
 static const char *const kRDLChartSubtypeNames[] = {"",       "Plain",  "Stacked",
-                                                    "PercentStacked", "Smooth", "Exploded"};
+                                                    "PercentStacked", "Smooth", "Exploded", "Stepped"};
 static const NSInteger kRDLChartSubtypeNamesCount =
     (NSInteger)(sizeof(kRDLChartSubtypeNames) / sizeof(*kRDLChartSubtypeNames));
 RDLChartSubtype RDLChartSubtypeFromString(NSString *s) {
@@ -207,9 +340,10 @@ NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v) {
   return RDLStringFromEnum(v, kRDLChartLegendPositionNames, kRDLChartLegendPositionNamesCount);
 }
 
-static const char *const kRDLChartPaletteNames[] = {"",          "Default",   "EarthTones",
-                                                    "Excel",     "GrayScale", "Pastel",
-                                                    "Light",     "SemiTransparent"};
+static const char *const kRDLChartPaletteNames[] = {
+    "",       "Default", "EarthTones",   "Excel", "GrayScale", "Pastel",       "Light",
+    "SemiTransparent",   "Custom",       "Berry", "BrightPastel", "Chocolate", "Fire",
+    "Pacific", "PacificLight", "PacificSemiTransparent", "SeaGreen"};
 static const NSInteger kRDLChartPaletteNamesCount =
     (NSInteger)(sizeof(kRDLChartPaletteNames) / sizeof(*kRDLChartPaletteNames));
 RDLChartPalette RDLChartPaletteFromString(NSString *s) {
@@ -217,6 +351,16 @@ RDLChartPalette RDLChartPaletteFromString(NSString *s) {
 }
 NSString *RDLStringFromChartPalette(RDLChartPalette v) {
   return RDLStringFromEnum(v, kRDLChartPaletteNames, kRDLChartPaletteNamesCount);
+}
+
+static const char *const kRDLChartAxisMarginNames[] = {"", "Auto", "True", "False"};
+static const NSInteger kRDLChartAxisMarginNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisMarginNames) / sizeof(*kRDLChartAxisMarginNames));
+RDLChartAxisMargin RDLChartAxisMarginFromString(NSString *s) {
+  return (RDLChartAxisMargin)RDLEnumFromString(s, kRDLChartAxisMarginNames, kRDLChartAxisMarginNamesCount);
+}
+NSString *RDLStringFromChartAxisMargin(RDLChartAxisMargin v) {
+  return RDLStringFromEnum(v, kRDLChartAxisMarginNames, kRDLChartAxisMarginNamesCount);
 }
 
 static const char *const kRDLChartTickMarksNames[] = {"", "None", "Inside", "Outside", "Cross"};
@@ -229,24 +373,146 @@ NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v) {
   return RDLStringFromEnum(v, kRDLChartTickMarksNames, kRDLChartTickMarksNamesCount);
 }
 
-// Series colours. Deliberately muted rather than saturated, to sit with the
-// rest of what this kit draws; the named palettes keep RDL's names so a report
-// asking for one gets something recognisably like it.
+static const char *const kRDLChartDataLabelPositionNames[] = {
+    "",     "Auto",        "Top",    "TopLeft",    "TopRight", "Left",
+    "Center", "Right",     "BottomRight", "Bottom", "BottomLeft", "Outside"};
+static const NSInteger kRDLChartDataLabelPositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartDataLabelPositionNames) / sizeof(*kRDLChartDataLabelPositionNames));
+RDLChartDataLabelPosition RDLChartDataLabelPositionFromString(NSString *s) {
+  return (RDLChartDataLabelPosition)RDLEnumFromString(s, kRDLChartDataLabelPositionNames,
+                                                      kRDLChartDataLabelPositionNamesCount);
+}
+NSString *RDLStringFromChartDataLabelPosition(RDLChartDataLabelPosition v) {
+  return RDLStringFromEnum(v, kRDLChartDataLabelPositionNames, kRDLChartDataLabelPositionNamesCount);
+}
+
+@implementation RDLChartDataLabel
+@end
+
+static const char *const kRDLChartMarkerTypeNames[] = {
+    "",       "None",  "Square", "Circle", "Diamond", "Triangle",
+    "Cross",  "Star4", "Star5",  "Star6",  "Star10",  "Auto"};
+static const NSInteger kRDLChartMarkerTypeNamesCount =
+    (NSInteger)(sizeof(kRDLChartMarkerTypeNames) / sizeof(*kRDLChartMarkerTypeNames));
+RDLChartMarkerType RDLChartMarkerTypeFromString(NSString *s) {
+  return (RDLChartMarkerType)RDLEnumFromString(s, kRDLChartMarkerTypeNames, kRDLChartMarkerTypeNamesCount);
+}
+NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v) {
+  return RDLStringFromEnum(v, kRDLChartMarkerTypeNames, kRDLChartMarkerTypeNamesCount);
+}
+
+@implementation RDLChartMarker
+@end
+
+static const char *const kRDLChartAxisLocationNames[] = {"", "Default", "Opposite"};
+static const NSInteger kRDLChartAxisLocationNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisLocationNames) / sizeof(*kRDLChartAxisLocationNames));
+RDLChartAxisLocation RDLChartAxisLocationFromString(NSString *s) {
+  return (RDLChartAxisLocation)RDLEnumFromString(s, kRDLChartAxisLocationNames, kRDLChartAxisLocationNamesCount);
+}
+NSString *RDLStringFromChartAxisLocation(RDLChartAxisLocation v) {
+  return RDLStringFromEnum(v, kRDLChartAxisLocationNames, kRDLChartAxisLocationNamesCount);
+}
+
+static const char *const kRDLChartLegendLayoutNames[] = {"", "AutoTable", "Column", "Row", "WideTable", "TallTable"};
+static const NSInteger kRDLChartLegendLayoutNamesCount =
+    (NSInteger)(sizeof(kRDLChartLegendLayoutNames) / sizeof(*kRDLChartLegendLayoutNames));
+RDLChartLegendLayout RDLChartLegendLayoutFromString(NSString *s) {
+  return (RDLChartLegendLayout)RDLEnumFromString(s, kRDLChartLegendLayoutNames, kRDLChartLegendLayoutNamesCount);
+}
+NSString *RDLStringFromChartLegendLayout(RDLChartLegendLayout v) {
+  return RDLStringFromEnum(v, kRDLChartLegendLayoutNames, kRDLChartLegendLayoutNamesCount);
+}
+
+static const char *const kRDLChartTitlePositionNames[] = {
+    "",         "TopCenter",   "TopLeft",     "TopRight",    "LeftTop",      "LeftCenter", "LeftBottom",
+    "RightTop", "RightCenter", "RightBottom", "BottomRight", "BottomCenter", "BottomLeft"};
+static const NSInteger kRDLChartTitlePositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartTitlePositionNames) / sizeof(*kRDLChartTitlePositionNames));
+RDLChartTitlePosition RDLChartTitlePositionFromString(NSString *s) {
+  return (RDLChartTitlePosition)RDLEnumFromString(s, kRDLChartTitlePositionNames, kRDLChartTitlePositionNamesCount);
+}
+NSString *RDLStringFromChartTitlePosition(RDLChartTitlePosition v) {
+  return RDLStringFromEnum(v, kRDLChartTitlePositionNames, kRDLChartTitlePositionNamesCount);
+}
+
+static const char *const kRDLChartAxisTitlePositionNames[] = {"", "Center", "Near", "Far"};
+static const NSInteger kRDLChartAxisTitlePositionNamesCount =
+    (NSInteger)(sizeof(kRDLChartAxisTitlePositionNames) / sizeof(*kRDLChartAxisTitlePositionNames));
+RDLChartAxisTitlePosition RDLChartAxisTitlePositionFromString(NSString *s) {
+  return (RDLChartAxisTitlePosition)RDLEnumFromString(s, kRDLChartAxisTitlePositionNames,
+                                                      kRDLChartAxisTitlePositionNamesCount);
+}
+NSString *RDLStringFromChartAxisTitlePosition(RDLChartAxisTitlePosition v) {
+  return RDLStringFromEnum(v, kRDLChartAxisTitlePositionNames, kRDLChartAxisTitlePositionNamesCount);
+}
+
+@implementation RDLLaidOutChartAxis
+@end
+
+@implementation RDLChartTextStyle
+- (instancetype)init {
+  if ((self = [super init]))
+    _scale = 1;
+  return self;
+}
+@end
+
+// Series colours. The named palettes are Microsoft's own -- the colours the
+// .NET chart control SSRS draws with gives them, in its order -- so a chart
+// asking for one looks as it does there. Default and the Pacific palettes are
+// not published; they keep this kit's own muted colours, Pacific sharing
+// Default's, and PacificLight and PacificSemiTransparent this kit's light and
+// see-through ones. Custom has none of its own: they are the chart's.
 NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette) {
   switch (palette) {
-  case RDLChartPaletteEarthTones:
-    return @[ @"#7a5c3e", @"#a8814f", @"#5c6b4a", @"#8a6a4f", @"#3f4f3a", @"#c2a06a", @"#6b4f3a" ];
-  case RDLChartPaletteExcel:
-    return @[ @"#4572a7", @"#aa4643", @"#89a54e", @"#71588f", @"#4198af", @"#db843d", @"#93a9cf" ];
-  case RDLChartPaletteGrayScale:
-    return @[ @"#2b2b2b", @"#4f4f4f", @"#737373", @"#979797", @"#bbbbbb", @"#585858", @"#8c8c8c" ];
   case RDLChartPalettePastel:
-    return @[ @"#a8c8e0", @"#e0b8b0", @"#c2d6a8", @"#d0c0dc", @"#a8d6d0", @"#e6cfa8", @"#c8bfae" ];
-  case RDLChartPaletteLight:
-    return @[ @"#cfe0ec", @"#f0d5cf", @"#dbe8c8", @"#e4dcec", @"#cfe6e2", @"#f2e3c8", @"#ded7c9" ];
+    return @[ @"#87ceeb", @"#32cd32", @"#ba55d3", @"#f08080", @"#4682b4", @"#9acd32", @"#40e0d0",
+             @"#ff69b4", @"#f0e68c", @"#d2b48c", @"#8fbc8b", @"#6495ed", @"#dda0dd", @"#5f9ea0",
+             @"#ffdab9", @"#ffa07a" ];
+  case RDLChartPaletteEarthTones:
+    return @[ @"#ff8000", @"#b8860b", @"#c04000", @"#6b8e23", @"#cd853f", @"#c0c000", @"#228b22",
+             @"#d2691e", @"#808000", @"#20b2aa", @"#f4a460", @"#00c000", @"#8fbc8b", @"#b22222",
+             @"#8b4513", @"#c00000" ];
   case RDLChartPaletteSemiTransparent:
+    return @[ @"#96ff0000", @"#9600ff00", @"#960000ff", @"#96ffff00", @"#9600ffff", @"#96ff00ff",
+             @"#96aa7814", @"#50ff0000", @"#5000ff00", @"#500000ff", @"#50ffff00", @"#5000ffff",
+             @"#50ff00ff", @"#50aa7814", @"#96647832", @"#96285a96" ];
+  case RDLChartPaletteLight:
+    return @[ @"#e6e6fa", @"#fff0f5", @"#ffdab9", @"#fffacd", @"#ffe4e1", @"#f0fff0", @"#f0f8ff",
+             @"#f5f5f5", @"#faebd7", @"#e0ffff" ];
+  case RDLChartPaletteExcel:
+    return @[ @"#9999ff", @"#993366", @"#ffffcc", @"#ccffff", @"#660066", @"#ff8080", @"#0066cc",
+             @"#ccccff", @"#000080", @"#ff00ff", @"#ffff00", @"#00ffff", @"#800080", @"#800000",
+             @"#008080", @"#0000ff" ];
+  case RDLChartPaletteBerry:
+    return @[ @"#8a2be2", @"#ba55d3", @"#4169e1", @"#c71585", @"#0000ff", @"#8a2be2", @"#da70d6",
+             @"#7b68ee", @"#c000c0", @"#0000cd", @"#800080" ];
+  case RDLChartPaletteChocolate:
+    return @[ @"#a0522d", @"#d2691e", @"#8b0000", @"#cd853f", @"#a52a2a", @"#f4a460", @"#8b4513",
+             @"#c04000", @"#b22222", @"#b65c3a" ];
+  case RDLChartPaletteFire:
+    return @[ @"#ffd700", @"#ff0000", @"#ff1493", @"#dc143c", @"#ff8c00", @"#ff00ff", @"#ffff00",
+             @"#ff4500", @"#c71585", @"#dde221" ];
+  case RDLChartPaletteSeaGreen:
+    return @[ @"#2e8b57", @"#66cdaa", @"#4682b4", @"#008b8b", @"#5f9ea0", @"#3cb371", @"#48d1cc",
+             @"#b0c4de", @"#8fbc8b", @"#87ceeb" ];
+  case RDLChartPaletteBrightPastel:
+    return @[ @"#418cf0", @"#fcb441", @"#e0400a", @"#056492", @"#bfbfbf", @"#1a3b69", @"#ffe382",
+             @"#129cdd", @"#ca6b4b", @"#005cdb", @"#f3d288", @"#506381", @"#f1b9a8", @"#e0830a",
+             @"#7893be" ];
+  case RDLChartPaletteGrayScale:
+    return @[ @"#c8c8c8", @"#bdbdbd", @"#b2b2b2", @"#a7a7a7", @"#9c9c9c", @"#919191", @"#868686",
+             @"#7b7b7b", @"#707070", @"#656565", @"#5a5a5a", @"#4f4f4f", @"#444444", @"#393939",
+             @"#2e2e2e", @"#232323" ];
+  case RDLChartPalettePacificLight:
+    return @[ @"#cfe0ec", @"#f0d5cf", @"#dbe8c8", @"#e4dcec", @"#cfe6e2", @"#f2e3c8", @"#ded7c9" ];
+  case RDLChartPalettePacificSemiTransparent:
     return @[ @"#6f8fae", @"#ae7f78", @"#93a878", @"#9a8caa", @"#78a49e", @"#c0a173", @"#9c9384" ];
+  case RDLChartPaletteCustom:
+    return @[];
   case RDLChartPaletteDefault:
+  case RDLChartPalettePacific:
   case RDLChartPaletteUnspecified:
   default:
     return @[ @"#4a6b8a", @"#a8603f", @"#6b7f4a", @"#7a5f8a", @"#3f7f78", @"#b08a4a", @"#5c574e" ];
@@ -402,7 +668,11 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
          _color == nil && _backgroundColor == nil && _textAlign == nil && _verticalAlign == nil &&
          _textDecoration == nil && _format == nil && _language == nil &&
          _paddingLeft == nil && _paddingRight == nil &&
-         _paddingTop == nil && _paddingBottom == nil;
+         _paddingTop == nil && _paddingBottom == nil && _lineHeight == nil &&
+         _writingMode == nil && _direction == nil && _backgroundGradientType == nil &&
+         _backgroundGradientEndColor == nil && _textEffect == nil && _shadowColor == nil &&
+         _shadowOffset == nil && _unicodeBiDi == nil && _calendar == nil && _numeralLanguage == nil &&
+         _numeralVariant == nil;
 }
 @end
 
@@ -429,6 +699,9 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 }
 @end
 
+@implementation RDLBackgroundImage
+@end
+
 @implementation RDLStyle
 
 // Created on demand rather than left nil. Every reader already pairs its nil
@@ -442,27 +715,66 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   return _expressions;
 }
 
+// The defaults MS-RDL gives every style property. A report that omits a
+// property must render the way SSRS renders it, which is what this is for --
+// and nothing may write these back into a file, or a document that said
+// nothing acquires an opinion it never had.
 + (instancetype)defaultStyle {
   RDLStyle *s = [[RDLStyle alloc] init];
-  s.fontFamily = @"Georgia";
+  s.fontFamily = @"Arial";
   s.fontSize = [RDLLength points:10];
   s.fontWeight = RDLFontWeightNormal;
   s.fontStyle = RDLFontStyleNormal;
-  s.color = @"#1a1916";
+  s.color = @"#000000";
   s.backgroundColor = @"Transparent";
-  s.textAlign = RDLTextAlignLeft;
+  // General is not Left: numbers go right and everything else goes left, which
+  // the layout decides once it knows what the text is.
+  s.textAlign = RDLTextAlignGeneral;
   s.verticalAlign = RDLVerticalAlignTop;
   s.textDecoration = RDLTextDecorationNone;
-  s.paddingLeft = [RDLLength points:4];
-  s.paddingRight = [RDLLength points:4];
+  s.paddingLeft = [RDLLength points:2];
+  s.paddingRight = [RDLLength points:2];
   s.paddingTop = [RDLLength points:2];
   s.paddingBottom = [RDLLength points:2];
-  s.border = [RDLBorder none];
-  s.borderLeft = [RDLBorder none];
-  s.borderRight = [RDLBorder none];
-  s.borderTop = [RDLBorder none];
-  s.borderBottom = [RDLBorder none];
+  // No borders, said by saying nothing about them: an unstated border draws
+  // exactly as a None one does. Stating None here gave every item that never
+  // mentioned a border five of them, each carrying a width and a colour, and
+  // a save then wrote all of that into a file that had never said any of it.
   return s;
+}
+
+// A border with something to draw: one that is unspecified, or says None, is
+// not drawn and does not hide the default underneath it.
+- (RDLBorder *)borderForEdge:(RDLBoxEdge)edge {
+  RDLBorder *own = nil;
+  switch (edge) {
+  case RDLBoxEdgeTop:
+    own = _borderTop;
+    break;
+  case RDLBoxEdgeBottom:
+    own = _borderBottom;
+    break;
+  case RDLBoxEdgeLeft:
+    own = _borderLeft;
+    break;
+  case RDLBoxEdgeRight:
+    own = _borderRight;
+    break;
+  case RDLBoxEdgeUnspecified:
+    break;
+  }
+  // TopBorder and its siblings inherit from Border one property at a time, so
+  // an edge that gives only a width keeps the default's style and colour. An
+  // edge that says None draws nothing: that is a border of style None, not an
+  // edge with nothing to say, and the default does not show through it.
+  RDLBorderStyle style = own.style != RDLBorderStyleUnspecified ? own.style : _border.style;
+  if (style == RDLBorderStyleUnspecified || style == RDLBorderStyleNone)
+    return nil;
+  RDLBorder *resolved = [[RDLBorder alloc] init];
+  resolved.style = style;
+  resolved.width = own.width ?: _border.width;
+  resolved.color = [own.color length] ? own.color : _border.color;
+  return resolved;
 }
 
 + (RDLStyle *)styleByMerging:(RDLStyle *)run over:(RDLStyle *)base {
@@ -479,10 +791,23 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
       run.textDecoration != RDLTextDecorationUnspecified ? run.textDecoration : base.textDecoration;
   s.format = [run.format length] ? run.format : base.format;
   s.language = [run.language length] ? run.language : base.language;
+  s.calendar = run.calendar != RDLCalendarUnspecified ? run.calendar : base.calendar;
+  s.numeralLanguage = [run.numeralLanguage length] ? run.numeralLanguage : base.numeralLanguage;
+  s.numeralVariant = run.numeralVariant > 0 ? run.numeralVariant : base.numeralVariant;
   s.paddingLeft = base.paddingLeft;
   s.paddingRight = base.paddingRight;
   s.paddingTop = base.paddingTop;
   s.paddingBottom = base.paddingBottom;
+  s.lineHeight = run.lineHeight ?: base.lineHeight;
+  s.direction = base.direction;
+  s.writingMode = base.writingMode;
+  s.backgroundGradientType = base.backgroundGradientType;
+  s.backgroundGradientEndColor = base.backgroundGradientEndColor;
+  s.backgroundImage = base.backgroundImage;
+  s.textEffect = base.textEffect;
+  s.shadowColor = base.shadowColor;
+  s.shadowOffset = base.shadowOffset;
+  s.unicodeBiDi = base.unicodeBiDi;
   s.border = base.border;
   s.borderLeft = base.borderLeft;
   s.borderRight = base.borderRight;
@@ -493,6 +818,16 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 @end
 
 @implementation RDLTextRun
+- (BOOL)hasOwnProperties {
+  return self.label != nil || self.toolTip != nil || self.hyperlink != nil ||
+         self.markupType == RDLMarkupTypeHTML;
+}
+- (void)takeOwnPropertiesFrom:(RDLTextRun *)other {
+  self.label = other.label;
+  self.toolTip = other.toolTip;
+  self.hyperlink = other.hyperlink;
+  self.markupType = other.markupType;
+}
 @end
 
 @implementation RDLParagraph
@@ -500,6 +835,20 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   if ((self = [super init]))
     _runs = [NSMutableArray array];
   return self;
+}
+- (BOOL)hasOwnLayout {
+  return self.leftIndent || self.rightIndent || self.hangingIndent || self.spaceBefore ||
+         self.spaceAfter || self.listLevel > 0 ||
+         (self.listStyle != RDLListStyleUnspecified && self.listStyle != RDLListStyleNone);
+}
+- (void)takeLayoutFrom:(RDLParagraph *)other {
+  self.leftIndent = other.leftIndent;
+  self.rightIndent = other.rightIndent;
+  self.hangingIndent = other.hangingIndent;
+  self.spaceBefore = other.spaceBefore;
+  self.spaceAfter = other.spaceAfter;
+  self.listStyle = other.listStyle;
+  self.listLevel = other.listLevel;
 }
 @end
 
@@ -539,17 +888,32 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
 }
 @end
 
+@implementation RDLVariable
+@end
+
 @implementation RDLTablixMember
 - (instancetype)init {
   self = [super init];
   if (self) {
     _members = [NSMutableArray array];
+    _variables = [NSMutableArray array];
     _groupExpressions = [NSMutableArray array];
     _sortExpressions = [NSMutableArray array];
     _filters = [NSMutableArray array];
     _keepWithGroup = RDLKeepWithGroupNone;
   }
   return self;
+}
+
+- (NSArray<RDLTablixMember *> *)leafMembers {
+  return [self.members count] ? [RDLTablixMember leafMembersOf:self.members] : @[ self ];
+}
+
++ (NSArray<RDLTablixMember *> *)leafMembersOf:(NSArray<RDLTablixMember *> *)members {
+  NSMutableArray<RDLTablixMember *> *leaves = [NSMutableArray array];
+  for (RDLTablixMember *m in members)
+    [leaves addObjectsFromArray:[m leafMembers]];
+  return leaves;
 }
 @end
 
@@ -586,6 +950,109 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   }
   return self;
 }
+
+- (NSArray<RDLTablixMember *> *)leafMembers {
+  return [RDLTablixMember leafMembersOf:self.members];
+}
+
+// Where `target` sits among `members`: its leaves' range, counting on from
+// `*start`, and the path down to it. NO when it is not among them.
+static BOOL RDLFindMember(NSArray<RDLTablixMember *> *members, RDLTablixMember *target, NSUInteger *start,
+                          NSMutableArray<RDLTablixMember *> *path, NSRange *range) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger count = [[m leafMembers] count];
+    [path addObject:m];
+    if (m == target) {
+      *range = NSMakeRange(*start, count);
+      return YES;
+    }
+    NSUInteger inner = *start;
+    if (RDLFindMember(m.members, target, &inner, path, range))
+      return YES;
+    [path removeLastObject];
+    *start += count;
+  }
+  return NO;
+}
+
+- (NSRange)leafRangeOfMember:(RDLTablixMember *)member {
+  NSUInteger start = 0;
+  NSRange range = NSMakeRange(NSNotFound, 0);
+  RDLFindMember(self.members, member, &start, [NSMutableArray array], &range);
+  return range;
+}
+
+- (NSArray<RDLTablixMember *> *)pathToMember:(RDLTablixMember *)member {
+  NSUInteger start = 0;
+  NSRange range = NSMakeRange(NSNotFound, 0);
+  NSMutableArray<RDLTablixMember *> *path = [NSMutableArray array];
+  return RDLFindMember(self.members, member, &start, path, &range) ? path : nil;
+}
+
+// Down to the leaf `*remaining` leaves further on, counting it off as members
+// are passed.
+static BOOL RDLFindLeaf(NSArray<RDLTablixMember *> *members, NSUInteger *remaining,
+                        NSMutableArray<RDLTablixMember *> *path) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger count = [[m leafMembers] count];
+    if (*remaining >= count) {
+      *remaining -= count;
+      continue;
+    }
+    [path addObject:m];
+    return [m.members count] == 0 || RDLFindLeaf(m.members, remaining, path);
+  }
+  return NO;
+}
+
+- (NSArray<RDLTablixMember *> *)pathToLeaf:(NSUInteger)leaf {
+  NSUInteger remaining = leaf;
+  NSMutableArray<RDLTablixMember *> *path = [NSMutableArray array];
+  return RDLFindLeaf(self.members, &remaining, path) ? path : nil;
+}
+
+static void RDLCollectHeaderLevels(NSArray<RDLTablixMember *> *members, NSUInteger level,
+                                   NSMutableArray<NSNumber *> *sizes) {
+  for (RDLTablixMember *m in members) {
+    NSUInteger inner = level;
+    if (m.header != nil) {
+      while ([sizes count] <= level)
+        [sizes addObject:@0];
+      sizes[level] = @(MAX([sizes[level] doubleValue], m.header.size));
+      inner = level + 1;
+    }
+    RDLCollectHeaderLevels(m.members, inner, sizes);
+  }
+}
+
+- (NSArray<NSNumber *> *)headerLevelSizes {
+  NSMutableArray<NSNumber *> *sizes = [NSMutableArray array];
+  RDLCollectHeaderLevels(self.members, 0, sizes);
+  return sizes;
+}
+
+- (NSUInteger)headerLevelOfMember:(RDLTablixMember *)member {
+  NSArray<RDLTablixMember *> *path = [self pathToMember:member];
+  if (path == nil)
+    return NSNotFound;
+  NSUInteger level = 0;
+  for (NSUInteger i = 0; i + 1 < [path count]; i++)
+    if (path[i].header != nil)
+      level += 1;
+  return level;
+}
+
+- (RDLTablixMember *)memberWithHeaderAtLevel:(NSUInteger)level onPathToLeaf:(NSUInteger)leaf {
+  NSUInteger at = 0;
+  for (RDLTablixMember *m in [self pathToLeaf:leaf]) {
+    if (m.header == nil)
+      continue;
+    if (at == level)
+      return m;
+    at += 1;
+  }
+  return nil;
+}
 @end
 
 // One column of the designer table, resolved once per build.
@@ -605,7 +1072,15 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 @implementation RDLColSpec
 @end
 
+static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
+
 @implementation RDLItem
+
+- (NSArray<RDLItem *> *)itemsIncludingNested {
+  NSMutableArray *items = [NSMutableArray array];
+  RDLCollectNested(@[ self ], items);
+  return items;
+}
 
 - (instancetype)init {
   self = [super init];
@@ -634,7 +1109,8 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 - (instancetype)init {
   self = [super init];
   if (self)
-    _canGrow = YES;
+    // MS-RDL: a textbox that says nothing does not grow.
+    _canGrow = NO;
   return self;
 }
 
@@ -709,8 +1185,10 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
 @implementation RDLChartMember
 - (instancetype)init {
   self = [super init];
-  if (self)
+  if (self) {
     _groupExpressions = [NSMutableArray array];
+    _members = [NSMutableArray array];
+  }
   return self;
 }
 @end
@@ -721,6 +1199,7 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
   if (self) {
     _showMajorGridLines = YES;
     _majorTickMarks = RDLChartTickMarksOutside;
+    _minorTickMarks = RDLChartTickMarksNone;
   }
   return self;
 }
@@ -739,13 +1218,51 @@ static const CGFloat kRDLGroupHeaderWidth = 1.2;
     _series = [NSMutableArray array];
     _categoryAxis = [[RDLChartAxis alloc] init];
     _valueAxis = [[RDLChartAxis alloc] init];
-    _legendPosition = RDLChartLegendPositionRightCenter;
+    _secondaryValueAxes = [NSMutableArray array];
+    _customPaletteColors = [NSMutableArray array];
+    // No legend Position until one is named: the parser only sets what a file
+    // says, so a default here was what every chart without one got -- the
+    // middle of the right, where the spec puts it at the top right.
   }
   return self;
 }
 
 - (NSString *)rdlElementName {
   return @"Chart";
+}
+
+static NSArray<RDLChartMember *> *RDLChartGroupChain(NSArray<RDLChartMember *> *members) {
+  NSMutableArray<RDLChartMember *> *chain = [NSMutableArray array];
+  for (RDLChartMember *m = [members firstObject]; [m.groupExpressions count]; m = [m.members firstObject])
+    [chain addObject:m];
+  return chain;
+}
+
+- (NSArray<RDLChartMember *> *)categoryGroups {
+  return RDLChartGroupChain(self.categoryMembers);
+}
+
+- (NSArray<RDLChartMember *> *)seriesGroups {
+  return RDLChartGroupChain(self.seriesMembers);
+}
+
+- (NSUInteger)indexOfValueAxisNamed:(NSString *)name {
+  if ([name length] == 0 || [self.valueAxis.name isEqualToString:name])
+    return 0;
+  NSUInteger i = [self.secondaryValueAxes indexOfObjectPassingTest:^BOOL(RDLChartAxis *axis, NSUInteger idx, BOOL *stop) {
+    return [axis.name isEqualToString:name];
+  }];
+  return i == NSNotFound ? NSNotFound : i + 1;
+}
+
+// A series with a type of its own has its own subtype too, none being Plain;
+// only one that follows the chart takes the chart's.
+- (RDLChartType)typeOfSeries:(RDLChartSeries *)series {
+  return series.type != RDLChartTypeUnspecified ? series.type : self.chartType;
+}
+
+- (RDLChartSubtype)subtypeOfSeries:(RDLChartSeries *)series {
+  return series.type != RDLChartTypeUnspecified ? series.subtype : self.subtype;
 }
 
 #pragma mark - Designer conveniences
@@ -769,21 +1286,34 @@ static RDLValue *RDLChartFieldValue(NSString *field) {
   return [RDLValue valueWithSource:[NSString stringWithFormat:@"=Fields!%@.Value", field]];
 }
 
-static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString *field,
-                              NSString *chartName, NSString *suffix) {
+// What the outermost member of a hierarchy groups on. Only that: the groups
+// nested inside it, its name and a label of its own are the file's, and
+// rewriting the whole member is how editing one field used to drop them.
+static void RDLSetOutermostGroupField(NSMutableArray<RDLChartMember *> *members, NSString *field,
+                                      NSString *chartName, NSString *suffix) {
   if ([field length] == 0) {
     [members removeAllObjects];
     return;
   }
+  RDLValue *wanted = RDLChartFieldValue(field);
   RDLChartMember *m = [members firstObject];
   if (m == nil) {
     m = [[RDLChartMember alloc] init];
     [members addObject:m];
   }
-  m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
-  [m.groupExpressions removeAllObjects];
-  [m.groupExpressions addObject:RDLChartFieldValue(field)];
-  m.label = RDLChartFieldValue(field);
+  RDLValue *was = [m.groupExpressions firstObject];
+  if ([m.groupExpressions count])
+    m.groupExpressions[0] = wanted;
+  else
+    [m.groupExpressions addObject:wanted];
+  // A label follows the field while it shows it, and is left alone once it
+  // says something of its own.
+  if (m.label == nil || (was != nil && [[m.label source] isEqualToString:[was source]]))
+    m.label = wanted;
+  // A group already named keeps its name: an aggregate may name it as its
+  // scope, and renaming it would leave that expression pointing at nothing.
+  if ([m.groupName length] == 0)
+    m.groupName = [NSString stringWithFormat:@"%@_%@", chartName ?: @"Chart", suffix];
 }
 
 - (NSString *)categoryField {
@@ -792,7 +1322,7 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 }
 
 - (void)setCategoryField:(NSString *)field {
-  RDLSetSoleMember(_categoryMembers, field, self.name, @"Category");
+  RDLSetOutermostGroupField(_categoryMembers, field, self.name, @"Category");
 }
 
 - (NSString *)seriesField {
@@ -801,7 +1331,7 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 }
 
 - (void)setSeriesField:(NSString *)field {
-  RDLSetSoleMember(_seriesMembers, field, self.name, @"Series");
+  RDLSetOutermostGroupField(_seriesMembers, field, self.name, @"Series");
 }
 
 - (NSString *)valueField {
@@ -832,13 +1362,6 @@ static void RDLSetSoleMember(NSMutableArray<RDLChartMember *> *members, NSString
 }
 
 @end
-
-// CellContents may hold any report item; everything this file builds and reads
-// back puts a textbox there.
-static NSString *RDLCellValue(RDLTablixCell *cell) {
-  RDLItem *it = cell.item;
-  return [it isKindOfClass:[RDLTextbox class]] ? [(RDLTextbox *)it value] : nil;
-}
 
 @implementation RDLTablix {
   CGFloat _stashHeaderH;
@@ -902,92 +1425,6 @@ static NSString *RDLCellValue(RDLTablixCell *cell) {
   }
   if ([_tablixBody.rows count] > 1)
     _tablixBody.rows[1].height = h;
-}
-
-// "=Sum(Fields!Amount.Value)" → aggregate "Sum". Returns nil when the value
-// is not a plain aggregate call.
-static NSString *RDLAggregateOfValue(NSString *value) {
-  if (![value hasPrefix:@"="])
-    return nil;
-  NSRange paren = [value rangeOfString:@"("];
-  if (paren.location == NSNotFound || paren.location < 2)
-    return nil;
-  NSString *fn = [value substringWithRange:NSMakeRange(1, paren.location - 1)];
-  static NSSet *known = nil;
-  if (known == nil)
-    known = [NSSet setWithArray:@[ @"Sum", @"Avg", @"Count", @"CountDistinct", @"Min", @"Max" ]];
-  return [known containsObject:fn] ? fn : nil;
-}
-
-// Recover the designer column spec from a built tablixBody. Lossy: the
-// aggregate and (for a matrix) the header are read back out of the cell
-// expression text. Used by -inferColumnSpecsFromTablixBody and as the
-// fallback for items that never had a spec stored (e.g. an RDL 2005 List).
-- (NSArray *)rdlDerivedColumns {
-  if ([_tablixBody.columns count] == 0)
-    return @[];
-  if ([self rdlIsMatrix]) {
-    // Matrix: one measure column; recover the designer spec from the data cell.
-    RDLItem *cell = _tablixBody.rows.firstObject.cells.firstObject.item;
-    NSString *val = RDLCellValue(_tablixBody.rows.firstObject.cells.firstObject) ?: @"";
-    NSMutableDictionary *col = [NSMutableDictionary dictionary];
-    col[@"width"] = @(_tablixBody.columns[0].width);
-    col[@"header"] = @"";
-    col[@"value"] = val;
-    if (cell.style.textAlign != RDLTextAlignUnspecified)
-      col[@"align"] = RDLStringFromTextAlign(cell.style.textAlign);
-    NSString *agg = RDLAggregateOfValue(val);
-    if (agg) {
-      col[@"aggregate"] = agg;
-      NSRange bang = [val rangeOfString:@"Fields!"];
-      if (bang.location != NSNotFound) {
-        NSString *rest = [val substringFromIndex:bang.location + 7];
-        NSRange dot = [rest rangeOfString:@"."];
-        NSString *field = dot.location != NSNotFound ? [rest substringToIndex:dot.location] : rest;
-        col[@"header"] = field;
-        col[@"value"] = [NSString stringWithFormat:@"=Fields!%@.Value", field];
-      }
-    }
-    return @[ col ];
-  }
-  RDLTablixRow *header = _tablixBody.rows.firstObject;
-  RDLTablixRow *detail = [_tablixBody.rows count] > 1 ? _tablixBody.rows[1] : header;
-  // Aggregate metadata lives in the subtotal / grand total rows, if present.
-  RDLTablixRow *aggRow = [_tablixBody.rows count] > 2 ? _tablixBody.rows.lastObject : nil;
-  NSMutableArray *cols = [NSMutableArray array];
-  NSUInteger n = [_tablixBody.columns count];
-  for (NSUInteger i = 0; i < n; i++) {
-    CGFloat w = _tablixBody.columns[i].width;
-    NSMutableDictionary *col = [NSMutableDictionary dictionary];
-    col[@"width"] = @(w);
-    col[@"header"] = @"";
-    col[@"value"] = @"";
-    if (i < [header.cells count] && RDLCellValue(header.cells[i]))
-      col[@"header"] = RDLCellValue(header.cells[i]);
-    if (detail && i < [detail.cells count]) {
-      RDLItem *dItem = detail.cells[i].item;
-      if (RDLCellValue(detail.cells[i]))
-        col[@"value"] = RDLCellValue(detail.cells[i]);
-      if (dItem.style.textAlign != RDLTextAlignUnspecified)
-        col[@"align"] = RDLStringFromTextAlign(dItem.style.textAlign);
-      // What the cell holds, when it is not the text box a column spec
-      // describes. A subreport is the one this designer can also build, so it
-      // names the report as well; anything else is recorded by kind alone, so
-      // that a rebuild knows to leave it where it is.
-      if (![dItem isKindOfClass:[RDLTextbox class]] && dItem != nil) {
-        col[@"kind"] = [dItem rdlElementName] ?: @"";
-        if ([dItem isKindOfClass:[RDLSubreport class]])
-          col[@"report"] = [(RDLSubreport *)dItem reportName] ?: @"";
-      }
-    }
-    if (aggRow && i < [aggRow.cells count]) {
-      NSString *agg = RDLAggregateOfValue(RDLCellValue(aggRow.cells[i]) ?: @"");
-      if (agg)
-        col[@"aggregate"] = agg;
-    }
-    [cols addObject:col];
-  }
-  return cols;
 }
 
 // One header column per row group: a crosstab nested three deep needs three,
@@ -1078,66 +1515,124 @@ static NSString *RDLGroupPrefix(NSUInteger index) {
 }
 
 
-// The members that render a header of their own, outermost first: one per
-// level of a hierarchy that carries a TablixHeader with a size. This mirrors
-// the layout engine's RDLHeaderWidth, which sums exactly those -- a details
-// member has no header and takes up no room, and a static total member has
-// none either.
-static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *members) {
-  NSMutableArray *chain = [NSMutableArray array];
-  NSArray<RDLTablixMember *> *level = members;
-  while ([level count]) {
-    RDLTablixMember *widest = nil;
-    for (RDLTablixMember *m in level)
-      if (m.header.size > 0 && (widest == nil || m.header.size > widest.header.size))
-        widest = m;
-    if (widest != nil) {
-      [chain addObject:widest];
-      level = widest.members;
-      continue;
-    }
-    // Nothing at this level renders a header; the levels inside it may.
-    NSMutableArray *next = [NSMutableArray array];
-    for (RDLTablixMember *m in level)
-      [next addObjectsFromArray:m.members];
-    level = next;
-  }
-  return chain;
-}
-
 - (NSArray<NSNumber *> *)rowHeaderColumnWidths {
-  NSMutableArray *widths = [NSMutableArray array];
-  for (RDLTablixMember *m in RDLHeaderMembers(self.rowHierarchy.members))
-    [widths addObject:@(m.header.size)];
-  return widths;
-}
-
-- (RDLItem *)rowHeaderItemAtLevel:(NSUInteger)level {
-  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.rowHierarchy.members);
-  return level < [members count] ? members[level].header.item : nil;
+  return [self.rowHierarchy headerLevelSizes] ?: @[];
 }
 
 - (NSArray<NSNumber *> *)columnHeaderRowHeights {
-  NSMutableArray *heights = [NSMutableArray array];
-  for (RDLTablixMember *m in RDLHeaderMembers(self.columnHierarchy.members))
-    [heights addObject:@(m.header.size)];
-  return heights;
-}
-
-- (RDLItem *)columnHeaderItemAtLevel:(NSUInteger)level {
-  NSArray<RDLTablixMember *> *members = RDLHeaderMembers(self.columnHierarchy.members);
-  return level < [members count] ? members[level].header.item : nil;
+  return [self.columnHierarchy headerLevelSizes] ?: @[];
 }
 
 - (void)rebuildTablix {
-  NSArray *specs = _columnSpecs ?: [self rdlDerivedColumns];
+  NSArray *specs = _columnSpecs ?: @[];
   [self rdlBuildTable:[self rdlSpecsFittingWidth:specs]
           headerHeight:self.headerHeight
              rowHeight:self.rowHeight];
 }
 
-- (void)inferColumnSpecsFromTablixBody {
-  _columnSpecs = [[self rdlDerivedColumns] copy];
+// How many rows or columns a cell's span covers: a span of 0 or 1 is itself.
+static NSUInteger RDLSpanOf(NSInteger span) {
+  return span > 1 ? (NSUInteger)span : 1;
+}
+
+static BOOL RDLFindCellInRows(NSArray<NSArray<RDLTablixCell *> *> *rows, RDLTablixCell *cell,
+                              NSUInteger *row, NSUInteger *column) {
+  for (NSUInteger r = 0; cell != nil && r < [rows count]; r++) {
+    NSUInteger at = [rows[r] indexOfObjectIdenticalTo:cell];
+    if (at == NSNotFound)
+      continue;
+    if (row)
+      *row = r;
+    if (column)
+      *column = at;
+    return YES;
+  }
+  return NO;
+}
+
+- (BOOL)getRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
+  return RDLFindCellInRows([self.tablixBody.rows valueForKey:@"cells"], cell, row, column);
+}
+
+- (BOOL)getCornerRow:(NSUInteger *)row column:(NSUInteger *)column ofCell:(RDLTablixCell *)cell {
+  return RDLFindCellInRows(self.cornerRows, cell, row, column);
+}
+
+- (RDLTablixCell *)cellCoveringRow:(NSUInteger)row
+                            column:(NSUInteger)column
+                         originRow:(NSUInteger *)originRow
+                      originColumn:(NSUInteger *)originColumn {
+  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+  if (row >= [rows count] || column >= [rows[row].cells count])
+    return nil;
+  NSUInteger foundRow = row, foundColumn = column;
+  for (NSUInteger r = 0; r <= row; r++) {
+    NSArray<RDLTablixCell *> *cells = rows[r].cells;
+    for (NSUInteger c = 0; c <= column && c < [cells count]; c++) {
+      if (r == row && c == column)
+        continue;
+      RDLTablixCell *cell = cells[c];
+      NSUInteger down = RDLSpanOf(cell.rowSpan), across = RDLSpanOf(cell.colSpan);
+      if ((down > 1 || across > 1) && r + down > row && c + across > column) {
+        foundRow = r;
+        foundColumn = c;
+      }
+    }
+  }
+  if (originRow)
+    *originRow = foundRow;
+  if (originColumn)
+    *originColumn = foundColumn;
+  return rows[foundRow].cells[foundColumn];
+}
+
+- (NSArray<NSString *> *)structuralProblems {
+  NSMutableArray<NSString *> *problems = [NSMutableArray array];
+  NSArray<RDLTablixRow *> *rows = self.tablixBody.rows;
+  NSUInteger columns = [self.tablixBody.columns count];
+  if ([rows count] == 0)
+    [problems addObject:@"the body has no rows"];
+  if (columns == 0)
+    [problems addObject:@"the body has no columns"];
+  // A hierarchy with no members is one the writer and the layout make up, a
+  // static member per row or column, so it cannot disagree with the body.
+  NSUInteger rowLeaves = [[self.rowHierarchy leafMembers] count];
+  if ([self.rowHierarchy.members count] && rowLeaves != [rows count])
+    [problems addObject:[NSString stringWithFormat:@"the row hierarchy has %lu leaf members for %lu body rows",
+                                                   (unsigned long)rowLeaves, (unsigned long)[rows count]]];
+  NSUInteger columnLeaves = [[self.columnHierarchy leafMembers] count];
+  if ([self.columnHierarchy.members count] && columnLeaves != columns)
+    [problems addObject:[NSString stringWithFormat:@"the column hierarchy has %lu leaf members for %lu body columns",
+                                                   (unsigned long)columnLeaves, (unsigned long)columns]];
+  for (NSUInteger r = 0; r < [rows count]; r++) {
+    NSArray<RDLTablixCell *> *cells = rows[r].cells;
+    if ([cells count] != columns)
+      [problems addObject:[NSString stringWithFormat:@"body row %lu has %lu cells for %lu columns", (unsigned long)r,
+                                                     (unsigned long)[cells count], (unsigned long)columns]];
+    for (NSUInteger c = 0; c < [cells count]; c++) {
+      RDLTablixCell *cell = cells[c];
+      NSUInteger down = RDLSpanOf(cell.rowSpan), across = RDLSpanOf(cell.colSpan);
+      if (down == 1 && across == 1)
+        continue;
+      if (r + down > [rows count] || c + across > columns) {
+        [problems addObject:[NSString stringWithFormat:@"the cell at body row %lu, column %lu spans past the body",
+                                                       (unsigned long)r, (unsigned long)c]];
+        continue;
+      }
+      for (NSUInteger rr = r; rr < r + down; rr++)
+        for (NSUInteger cc = c; cc < c + across; cc++) {
+          if (rr == r && cc == c)
+            continue;
+          RDLTablixCell *covered = cc < [rows[rr].cells count] ? rows[rr].cells[cc] : nil;
+          if (covered.item != nil || RDLSpanOf(covered.rowSpan) > 1 || RDLSpanOf(covered.colSpan) > 1)
+            [problems addObject:[NSString stringWithFormat:@"body row %lu, column %lu is under the span of the cell at "
+                                                           @"row %lu, column %lu but is not empty",
+                                                           (unsigned long)rr, (unsigned long)cc, (unsigned long)r,
+                                                           (unsigned long)c]];
+        }
+    }
+  }
+  return problems;
 }
 
 
@@ -1562,15 +2057,35 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
   self = [super init];
   if (self) {
     _items = [NSMutableArray array];
-    _printOnFirstPage = YES;
-    _printOnLastPage = YES;
-    _height = 0.5;
+    // MS-RDL: a page section prints on neither the first page nor the last
+    // unless it says so.
+    _printOnFirstPage = NO;
+    _printOnLastPage = NO;
+    // And a band nobody has given a height to is not on the paper at all. Half
+    // an inch here is what made an absent PageHeader into half an inch of
+    // blank paper on every page; a report that wants a band says how tall.
+    _height = 0;
   }
   return self;
 }
 @end
 
 @implementation RDLField
+
+- (id)copyWithZone:(NSZone *)zone {
+  RDLField *copy = [[[self class] allocWithZone:zone] init];
+  copy.name = _name;
+  copy.dataField = _dataField;
+  copy.value = _value;
+  copy.dataType = _dataType;
+  return copy;
+}
+- (NSString *)rowKey {
+  if ([self isCalculated])
+    return nil;
+  return [_dataField length] ? _dataField : _name;
+}
+
 
 // The one rule for telling the kinds apart, so nothing has to remember that it
 // is written as "the value is not nil".
@@ -1583,6 +2098,20 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 @end
 
 @implementation RDLDataSet
+- (RDLField *)fieldNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLField *field in _fields)
+    if ([field.name caseInsensitiveCompare:name] == NSOrderedSame)
+      return field;
+  return nil;
+}
+
+- (NSString *)rowKeyForFieldNamed:(NSString *)name {
+  NSString *key = [[self fieldNamed:name] rowKey];
+  return [key length] ? key : name;
+}
+
 
 // The two halves of the link, kept honest: whichever is set, the other follows
 // or is dropped. Only the setters are written, so the ivars and getters are
@@ -1628,16 +2157,79 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
 @implementation RDLDataSource
 @end
 
+@implementation RDLPreservedNode
+
+// Written down from what was read, a piece at a time. The node itself is not
+// kept: what a report carries between a read and a write is data.
++ (instancetype)pieceOfNode:(NSXMLNode *)node {
+  if (node == nil)
+    return nil;
+  RDLPreservedNode *piece = [[self alloc] init];
+  piece.kind = node.kind;
+  piece.name = node.name ?: @"";
+  if (node.kind != NSXMLElementKind) {
+    piece.value = node.stringValue ?: @"";
+    return piece;
+  }
+  NSXMLElement *element = (NSXMLElement *)node;
+  NSMutableArray<RDLPreservedNode *> *attributes = [NSMutableArray array];
+  for (NSXMLNode *attribute in [element attributes])
+    // A namespace declaration is not a piece: the prefixes go on the root.
+    if (![attribute.name hasPrefix:@"xmlns"])
+      [attributes addObject:[self pieceOfNode:attribute]];
+  NSMutableArray<RDLPreservedNode *> *children = [NSMutableArray array];
+  for (NSXMLNode *child in [element children]) {
+    RDLPreservedNode *kid = [self pieceOfNode:child];
+    if (kid != nil)
+      [children addObject:kid];
+  }
+  piece.attributes = attributes;
+  piece.children = children;
+  return piece;
+}
+
+- (NSString *)attributeNamed:(NSString *)name {
+  for (RDLPreservedNode *attribute in _attributes)
+    if ([attribute.name isEqualToString:name])
+      return attribute.value;
+  return nil;
+}
+
+@end
+
+@implementation RDLQueryParameter
+@end
+
+@implementation RDLDataSetReference
+@end
+
 @implementation RDLParameter
 - (instancetype)init {
   self = [super init];
   if (self) {
     _defaultValues = [NSMutableArray array];
     _validValues = [NSMutableArray array];
+    _validValueLabels = [NSMutableDictionary dictionary];
   }
   return self;
 }
+
+- (RDLValue *)defaultValue {
+  return [_defaultValues firstObject];
+}
+
+- (void)setDefaultValue:(RDLValue *)value {
+  [_defaultValues removeAllObjects];
+  if (value != nil)
+    [_defaultValues addObject:value];
+}
+
+- (RDLValue *)labelForValidValue:(NSString *)value {
+  return value ? _validValueLabels[value] : nil;
+}
 @end
+
+const CGFloat RDLDefaultColumnSpacing = 0.5;
 
 @implementation RDLPage
 - (instancetype)init {
@@ -1646,6 +2238,8 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
     _pageWidth = 8.5;
     _pageHeight = 11.0;
     _leftMargin = _rightMargin = _topMargin = _bottomMargin = 0.5;
+    _columns = 1;
+    _columnSpacing = RDLDefaultColumnSpacing;
   }
   return self;
 }
@@ -1655,16 +2249,26 @@ static NSArray<RDLTablixMember *> *RDLHeaderMembers(NSArray<RDLTablixMember *> *
     sizes = @[
       @{ @"name" : @"Letter 8.5 × 11", @"width" : @8.5, @"height" : @11.0 },
       @{ @"name" : @"A4 210 × 297 mm", @"width" : @8.27, @"height" : @11.69 },
+      @{ @"name" : @"Legal 8.5 × 14", @"width" : @8.5, @"height" : @14.0 },
+      @{ @"name" : @"Tabloid 11 × 17", @"width" : @11.0, @"height" : @17.0 },
+      @{ @"name" : @"A3 297 × 420 mm", @"width" : @11.69, @"height" : @16.54 },
+      @{ @"name" : @"A5 148 × 210 mm", @"width" : @5.83, @"height" : @8.27 },
     ];
   }
   return sizes;
 }
 
+- (BOOL)isLandscape {
+  return self.pageWidth > self.pageHeight;
+}
+
 - (NSDictionary *)matchingStandardSize {
+  // The shorter side against the paper's width, so a sheet turned on its side
+  // is still that paper. Loose, because A4 in inches is not exact.
+  CGFloat shorter = MIN(self.pageWidth, self.pageHeight), longer = MAX(self.pageWidth, self.pageHeight);
   for (NSDictionary *size in [RDLPage standardSizes]) {
-    // Loose, because A4 in inches is not exact.
-    if (fabs(self.pageWidth - [size[@"width"] doubleValue]) < 0.05 &&
-        fabs(self.pageHeight - [size[@"height"] doubleValue]) < 0.05)
+    if (fabs(shorter - [size[@"width"] doubleValue]) < 0.05 &&
+        fabs(longer - [size[@"height"] doubleValue]) < 0.05)
       return size;
   }
   return nil;
@@ -1691,6 +2295,28 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   RDLAdoptItems(self.pageFooter.items, self);
 }
 
+@synthesize codeModule = _codeModule;
+
+- (void)setCode:(NSString *)code {
+  _code = [code copy];
+  _codeModule = nil;
+}
+
+- (RDLCodeModule *)codeModule {
+  if (_codeModule == nil &&
+      [[_code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length])
+    _codeModule = [RDLCodeModule moduleWithSource:_code];
+  return _codeModule;
+}
+
+- (NSArray<NSString *> *)codeProblems {
+  return [self codeModule].problems ?: @[];
+}
+
+- (NSArray<NSString *> *)codeFunctionNames {
+  return [self codeModule].functionNames ?: @[];
+}
+
 + (instancetype)emptyReportNamed:(NSString *)name {
   RDLReport *r = [[RDLReport alloc] init];
   r.name = name ?: @"Untitled";
@@ -1698,12 +2324,21 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.reportDescription = @"";
   r.width = 7.5;
   r.page = [[RDLPage alloc] init];
+  // A new report is a body and nothing else, which is what a blank report is
+  // in Report Builder: a header is something you add when you want one, and
+  // one nobody asked for is half an inch of blank paper on every page. The
+  // bands exist so that giving one a height is all it takes to add it; with no
+  // height and nothing in them they are not written to the file at all.
   r.pageHeader = [[RDLBand alloc] init];
-  r.pageHeader.height = 0.55;
+  // Said rather than assumed: MS-RDL's default is neither end, and a head
+  // someone adds wants to print on every page.
+  r.pageHeader.printOnFirstPage = YES;
+  r.pageHeader.printOnLastPage = YES;
   r.body = [[RDLBand alloc] init];
   r.body.height = 4.0;
   r.pageFooter = [[RDLBand alloc] init];
-  r.pageFooter.height = 0.4;
+  r.pageFooter.printOnFirstPage = YES;
+  r.pageFooter.printOnLastPage = YES;
   // No data sources and no datasets: a new report has no data, and a source
   // that names no document is one nobody asked for. A dataset is a query into
   // a source, so the source comes first -- which is the order Report Builder
@@ -1712,6 +2347,7 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   r.dataSets = [NSMutableArray array];
   r.parameters = [NSMutableArray array];
   r.embeddedImages = [NSMutableArray array];
+  r.variables = [NSMutableArray array];
   r.warnings = [NSMutableArray array];
   return r;
 }
@@ -1757,8 +2393,94 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
   return nil;
 }
 
+static void RDLCollectTablixGroupNames(NSArray<RDLTablixMember *> *members, NSMutableSet<NSString *> *names) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName length])
+      [names addObject:m.groupName];
+    RDLCollectTablixGroupNames(m.members, names);
+  }
+}
+
+static void RDLCollectChartGroupNames(NSArray<RDLChartMember *> *members, NSMutableSet<NSString *> *names) {
+  for (RDLChartMember *m in members) {
+    if ([m.groupName length])
+      [names addObject:m.groupName];
+    RDLCollectChartGroupNames(m.members, names);
+  }
+}
+
+- (RDLTablix *)tablixHoldingItem:(RDLItem *)item {
+  RDLTablix *holder = nil;
+  // Outer items come before what is inside them, so the last tablix holding
+  // the item is the innermost.
+  for (RDLItem *candidate in [self allItemsIncludingNested])
+    if (candidate != item && [candidate isKindOfClass:[RDLTablix class]] &&
+        [[candidate itemsIncludingNested] indexOfObjectIdenticalTo:item] != NSNotFound)
+      holder = (RDLTablix *)candidate;
+  return holder;
+}
+
+- (void)renameKeptPiecesOfElement:(NSString *)element from:(NSString *)was to:(NSString *)name {
+  if ([element length] == 0 || [was length] == 0 || [name length] == 0 || [was isEqualToString:name] ||
+      [_preservedNodes count] == 0)
+    return;
+  // A step is "LocalName[Name]#n": the element, the Name it carries, and which
+  // of the siblings alike it is. Only the Name changes.
+  NSString *from = [NSString stringWithFormat:@"%@[%@]#", element, was];
+  NSString *to = [NSString stringWithFormat:@"%@[%@]#", element, name];
+  NSMutableArray<RDLPreservedNode *> *renamed = [NSMutableArray array];
+  for (RDLPreservedNode *kept in _preservedNodes) {
+    NSMutableArray<NSString *> *path = [NSMutableArray array];
+    BOOL touched = NO;
+    for (NSString *step in kept.parentPath) {
+      if ([step hasPrefix:from]) {
+        [path addObject:[to stringByAppendingString:[step substringFromIndex:[from length]]]];
+        touched = YES;
+      } else {
+        [path addObject:step];
+      }
+    }
+    if (!touched) {
+      [renamed addObject:kept];
+      continue;
+    }
+    RDLPreservedNode *moved = [[RDLPreservedNode alloc] init];
+    moved.parentPath = path;
+    moved.kind = kept.kind;
+    moved.name = kept.name;
+    moved.value = kept.value;
+    moved.attributes = kept.attributes;
+    moved.children = kept.children;
+    [renamed addObject:moved];
+  }
+  _preservedNodes = renamed;
+}
+
+- (NSSet<NSString *> *)scopeNames {
+  NSMutableSet<NSString *> *names = [NSMutableSet set];
+  for (RDLDataSet *ds in self.dataSets)
+    if ([ds.name length])
+      [names addObject:ds.name];
+  for (RDLItem *item in [self allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLDataRegion class]])
+      continue;
+    if ([item.name length])
+      [names addObject:item.name];
+    if ([item isKindOfClass:[RDLTablix class]]) {
+      RDLTablix *tablix = (RDLTablix *)item;
+      RDLCollectTablixGroupNames(tablix.rowHierarchy.members, names);
+      RDLCollectTablixGroupNames(tablix.columnHierarchy.members, names);
+    } else if ([item isKindOfClass:[RDLChart class]]) {
+      RDLChart *chart = (RDLChart *)item;
+      RDLCollectChartGroupNames(chart.categoryMembers, names);
+      RDLCollectChartGroupNames(chart.seriesMembers, names);
+    }
+  }
+  return names;
+}
+
 + (BOOL)bandKeySupportsBackground:(NSString *)bandKey {
-  return [bandKey isEqualToString:@"body"];
+  return [[self bandKeys] containsObject:bandKey];
 }
 
 + (NSArray<NSString *> *)bandKeys {
@@ -1802,8 +2524,6 @@ static void RDLAdoptItems(NSArray<RDLItem *> *items, RDLReport *report) {
 // use -childItems (adoption, the designer outline) want the items a person can
 // see and move. So the tablix is opened here, once, rather than at every call
 // site that needs the whole tree.
-static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
-
 static void RDLCollectHeaderItems(NSArray<RDLTablixMember *> *members, NSMutableArray *into) {
   for (RDLTablixMember *m in members) {
     if (m.header.item)
@@ -1832,6 +2552,32 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
   }
 }
 
+static RDLTablixMember *RDLMemberNamedIn(NSArray<RDLTablixMember *> *members, NSString *name) {
+  for (RDLTablixMember *m in members) {
+    if ([m.groupName isEqualToString:name])
+      return m;
+    RDLTablixMember *inner = RDLMemberNamedIn(m.members, name);
+    if (inner)
+      return inner;
+  }
+  return nil;
+}
+
+- (RDLTablixMember *)tablixMemberNamed:(NSString *)name {
+  if ([name length] == 0)
+    return nil;
+  for (RDLItem *item in [self allItemsIncludingNested]) {
+    if (![item isKindOfClass:[RDLTablix class]])
+      continue;
+    RDLTablix *tablix = (RDLTablix *)item;
+    RDLTablixMember *hit = RDLMemberNamedIn(tablix.rowHierarchy.members, name)
+                               ?: RDLMemberNamedIn(tablix.columnHierarchy.members, name);
+    if (hit)
+      return hit;
+  }
+  return nil;
+}
+
 - (NSArray<RDLItem *> *)allItemsIncludingNested {
   NSMutableArray *a = [NSMutableArray array];
   RDLCollectNested([self allItems], a);
@@ -1845,8 +2591,11 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
     if (![candidate isKindOfClass:[RDLTablix class]])
       continue;
     RDLTablix *tablix = (RDLTablix *)candidate;
+    NSMutableArray<NSArray<RDLTablixCell *> *> *rows = [NSMutableArray arrayWithArray:tablix.cornerRows ?: @[]];
     for (RDLTablixRow *row in tablix.tablixBody.rows)
-      for (RDLTablixCell *cell in row.cells)
+      [rows addObject:row.cells ?: @[]];
+    for (NSArray<RDLTablixCell *> *row in rows)
+      for (RDLTablixCell *cell in row)
         if (cell.item == item) {
           if (outTablix)
             *outTablix = tablix;
@@ -1946,4 +2695,73 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into) {
   }
   return self;
 }
+@end
+
+RDLUnsupportedItemKind RDLUnsupportedItemKindFromString(NSString *s) {
+  if ([s isEqualToString:@"GaugePanel"])
+    return RDLUnsupportedItemKindGaugePanel;
+  if ([s isEqualToString:@"Map"])
+    return RDLUnsupportedItemKindMap;
+  if ([s isEqualToString:@"CustomReportItem"])
+    return RDLUnsupportedItemKindCustomReportItem;
+  return RDLUnsupportedItemKindUnspecified;
+}
+
+NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind) {
+  switch (kind) {
+  case RDLUnsupportedItemKindGaugePanel:
+    return @"GaugePanel";
+  case RDLUnsupportedItemKindMap:
+    return @"Map";
+  case RDLUnsupportedItemKindCustomReportItem:
+    return @"CustomReportItem";
+  case RDLUnsupportedItemKindUnspecified:
+    return nil;
+  }
+  return nil;
+}
+
+@implementation RDLUnsupportedItem
+- (NSString *)rdlElementName {
+  return RDLStringFromUnsupportedItemKind(_kind) ?: @"CustomReportItem";
+}
+@end
+
+NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *items) {
+  return [items sortedArrayWithOptions:NSSortStable
+                       usingComparator:^NSComparisonResult(RDLItem *a, RDLItem *b) {
+                         if (a.zIndex < b.zIndex)
+                           return NSOrderedAscending;
+                         if (a.zIndex > b.zIndex)
+                           return NSOrderedDescending;
+                         return NSOrderedSame;
+                       }];
+}
+
+static NSMutableArray<RDLItem *> *RDLListHolding(NSMutableArray<RDLItem *> *list, RDLItem *item) {
+  for (RDLItem *it in list) {
+    if (it == item)
+      return list;
+    if ([it isKindOfClass:[RDLRectangle class]]) {
+      NSMutableArray *inside = RDLListHolding([(RDLRectangle *)it items], item);
+      if (inside)
+        return inside;
+    }
+  }
+  return nil;
+}
+
+@implementation RDLReport (RDLItemLists)
+
+- (NSMutableArray<RDLItem *> *)itemListContainingItem:(RDLItem *)item {
+  if (item == nil)
+    return nil;
+  for (RDLBand *band in [self allBands]) {
+    NSMutableArray *list = RDLListHolding(band.items, item);
+    if (list)
+      return list;
+  }
+  return nil;
+}
+
 @end

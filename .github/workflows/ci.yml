@@ -125,6 +125,11 @@ jobs:
       CXX: clang++
       LIBRARY_COMBO: ng-gnu-gnu
       RUNTIME_VERSION: gnustep-2.0
+      # The shared repository the GNUstep fixes come from, and the pin that
+      # decides which of them this build gets. It is part of the cache key
+      # below, so moving it rebuilds the stack rather than reusing a prefix
+      # patched differently. Name a commit here to pin the build exactly.
+      GNUSTEP_PATCHES_REF: 44b9f3d8b750c0c2c128a14718a265b83a9a797c
       # libobjc2 and libdispatch land in the prefix's plain lib/, which the
       # gnustep layout does not treat as a library root. GNUstep.sh prepends
       # the roots it does know about to this.
@@ -190,7 +195,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.INSTALL_PATH }}
-          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}-${{ env.GNUSTEP_PATCHES_REF }}
 
       - name: Build GNUstep
         if: steps.gnustep-cache.outputs.cache-hit != 'true'
@@ -201,7 +206,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.INSTALL_PATH }}
-          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}
+          key: gnustep-v2-${{ runner.os }}-${{ hashFiles('source/.github/scripts/dependencies.sh') }}-${{ env.GNUSTEP_PATCHES_REF }}
 
       - name: Build RDLKit
         run: |
@@ -250,7 +255,8 @@ jobs:
           run() {
             # A stall here should report as one, not sit until the job's
             # timeout: GNUstep renders PDF through its print machinery, which
-            # invents a default printer when none is configured.
+            # invents a default printer when none is configured, and that path
+            # was once reported to hang headless.
             timeout 120 "$@" || {
               status=$?
               [ $status -eq 124 ] && echo "::error::timed out after 120s: $*"
@@ -260,10 +266,16 @@ jobs:
           run xvfb-run -a "$tool" "$sample" --check
           run xvfb-run -a "$tool" "$sample" -f html -o /tmp/out.html
           test -s /tmp/out.html
-          # PDF is not exercised here: -dataWithPDFInsideRect: goes through
-          # GNUstep's print machinery, which invents a default printer when
-          # none is configured and then never returns. See
-          # Patches/gnustep-pdf-hangs-headless.md. The macOS job covers PDF.
+          # PDF as well as HTML: the print machinery returns here, checked
+          # against a built GNUstep, and the kit's own testPDFBackend runs in
+          # this job too. It is left under the same timeout because a stall
+          # would otherwise sit until the job's.
+          run xvfb-run -a "$tool" "$sample" -o /tmp/out.pdf
+          test -s /tmp/out.pdf
+          head -c 4 /tmp/out.pdf | grep -q '%PDF' || {
+            echo "::error::rdlgen wrote something that is not a PDF"
+            exit 1
+          }
 
       # Packaged on every commit, unstable ones included, so there is always a
       # build to hand someone. Signed releases are release.yml's job; these are

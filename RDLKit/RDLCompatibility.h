@@ -89,24 +89,51 @@ static inline BOOL RDLColorIsTransparent(NSString *color) {
          [color caseInsensitiveCompare:@"Transparent"] == NSOrderedSame;
 }
 
-static inline NSColor *RDLColorFromHex(NSString *hex) {
-  if (hex == nil || [hex length] == 0) {
-    return RDL_COLOR(0.10, 0.10, 0.09, 1);
-  }
-  NSString *s = [hex stringByTrimmingCharactersInSet:
-                          [NSCharacterSet characterSetWithCharactersInString:@"#"]];
-  NSString *named = RDLHexForColorName(s);
+// The red, green, blue and alpha of an RDL colour, each 0...1. RDL writes a
+// colour as a name ("LightGrey"), as #rrggbb, as #rgb, or as #aarrggbb -- with
+// the alpha first, the .NET way round, not last as CSS has it. NO for anything
+// else, and for Transparent, which is no colour at all.
+//
+// Only #rrggbb used to be understood: #aarrggbb read its first six digits as
+// the colour, so #80ff0000 came out green, and #rgb fell back to the default
+// ink.
+static inline BOOL RDLColorComponents(NSString *color, CGFloat *r, CGFloat *g, CGFloat *b, CGFloat *a) {
+  if (RDLColorIsTransparent(color))
+    return NO;
+  NSString *s = [color stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  NSString *hex = [s hasPrefix:@"#"] ? [s substringFromIndex:1] : s;
+  NSString *named = [s hasPrefix:@"#"] ? nil : RDLHexForColorName(hex);
   if (named != nil)
-    s = named;
-  if ([s length] < 6) {
-    return RDL_COLOR(0.10, 0.10, 0.09, 1);
+    hex = named;
+  NSCharacterSet *notHex =
+      [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+  if ([hex rangeOfCharacterFromSet:notHex].location != NSNotFound)
+    return NO;
+  if ([hex length] == 3) {
+    unichar c[3] = {[hex characterAtIndex:0], [hex characterAtIndex:1], [hex characterAtIndex:2]};
+    hex = [NSString stringWithFormat:@"%C%C%C%C%C%C", c[0], c[0], c[1], c[1], c[2], c[2]];
   }
-  unsigned int rgb = 0;
-  [[NSScanner scannerWithString:[s substringToIndex:6]] scanHexInt:&rgb];
-  CGFloat r = ((rgb >> 16) & 0xFF) / 255.0;
-  CGFloat g = ((rgb >> 8) & 0xFF) / 255.0;
-  CGFloat b = (rgb & 0xFF) / 255.0;
-  return RDL_COLOR(r, g, b, 1);
+  if ([hex length] != 6 && [hex length] != 8)
+    return NO;
+  unsigned int value = 0;
+  [[NSScanner scannerWithString:hex] scanHexInt:&value];
+  CGFloat alpha = [hex length] == 8 ? ((value >> 24) & 0xFF) / 255.0 : 1;
+  if (r)
+    *r = ((value >> 16) & 0xFF) / 255.0;
+  if (g)
+    *g = ((value >> 8) & 0xFF) / 255.0;
+  if (b)
+    *b = (value & 0xFF) / 255.0;
+  if (a)
+    *a = alpha;
+  return YES;
+}
+
+static inline NSColor *RDLColorFromHex(NSString *hex) {
+  CGFloat r = 0, g = 0, b = 0, a = 1;
+  if (!RDLColorComponents(hex, &r, &g, &b, &a))
+    return RDL_COLOR(0.10, 0.10, 0.09, 1);
+  return RDL_COLOR(r, g, b, a);
 }
 
 // The inverse of RDLColorFromHex, for controls that hand back a colour. RDL
@@ -120,7 +147,12 @@ static inline NSString *RDLHexFromColor(NSColor *color) {
   CGFloat r = 0, g = 0, b = 0, a = 0;
   [rgb getRed:&r green:&g blue:&b alpha:&a];
   // Lower case, which is what the rich-text codec wrote when this lived there
-  // as a file-static; RDL does not care, but the fixtures do.
+  // as a file-static; RDL does not care, but the fixtures do. A colour that is
+  // not opaque keeps its alpha, first, as RDL writes it.
+  if (a < 0.999)
+    return [NSString stringWithFormat:@"#%02x%02x%02x%02x", (unsigned)round(a * 255),
+                                      (unsigned)round(r * 255), (unsigned)round(g * 255),
+                                      (unsigned)round(b * 255)];
   return [NSString stringWithFormat:@"#%02x%02x%02x", (unsigned)round(r * 255),
                                     (unsigned)round(g * 255), (unsigned)round(b * 255)];
 }

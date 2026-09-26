@@ -5,6 +5,7 @@
 #import "DMTabBarItem.h"
 #import "RDLToolbarIcons.h"
 #import "RDLDesignerWindow.h"
+#import "RDLSourceView.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 
@@ -82,6 +83,147 @@
   }
 }
 
+// A text view that says nothing about its colours takes the platform's, and
+// GNUstep's are not Cocoa's: the source pane came out black on black, which is
+// a pane that appears to be empty. Every text view in the designer says what
+// it draws in, and the two are not the same colour.
+- (void)testEveryTextViewSaysWhatItDrawsIn {
+  RDLEditingContext *ctx =
+      [[RDLEditingContext alloc] initWithReport:[RDLReport emptyReportNamed:@"Read"]];
+  RDLSourceView *source = [[RDLSourceView alloc] initWithFrame:NSMakeRect(0, 0, 600, 400)
+                                                       context:ctx];
+  NSTextView *text = [source valueForKey:@"text"];
+  if (text == nil) {
+    XCTFail(@"%@", @"the source pane should have its text view");
+    return;
+  }
+  if (![text drawsBackground])
+    XCTFail(@"%@", @"a pane that draws no background of its own takes whatever is behind it");
+  NSColor *ink = [[text textColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *paper = [[text backgroundColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (ink == nil || paper == nil) {
+    XCTFail(@"%@", @"the text view should say both its colours");
+    return;
+  }
+  // Not the same colour, which is what "black on black" was.
+  CGFloat difference = fabs([ink redComponent] - [paper redComponent]) +
+                       fabs([ink greenComponent] - [paper greenComponent]) +
+                       fabs([ink blueComponent] - [paper blueComponent]);
+  if (difference < 0.3)
+    XCTFail(@"the text and its ground are the same colour: %@ on %@", ink, paper);
+}
+
+// A column nobody can take an edit from must not be editable. On Cocoa a
+// click in a table selects the row and a second one starts editing, so an
+// editable column that goes nowhere is invisible; on GNUstep the first click
+// starts editing, and clicking a problem to be taken to its cause put the row
+// into a text field instead.
+- (void)testNoTableOffersAnEditNobodyTakes {
+  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
+                            stringByDeletingLastPathComponent]
+                           stringByAppendingPathComponent:@"RDLDesigner"];
+  NSArray<NSString *> *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer
+                                                                                   error:NULL];
+  if ([names count] == 0)
+    return;  // the source tree is not readable here; the other platform's run has it
+  NSUInteger looked = 0;
+  for (NSString *name in names) {
+    if (![[name pathExtension] isEqualToString:@"xib"])
+      continue;
+    NSString *xml = [NSString stringWithContentsOfFile:[designer stringByAppendingPathComponent:name]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    if (xml == nil)
+      continue;
+    // Only a column's data cell is typed into by clicking a row; a text field
+    // of its own is a different thing and is editable on purpose.
+    NSRange editable = [xml rangeOfString:@"key=\"dataCell\""];
+    BOOL offers = NO;
+    while (editable.location != NSNotFound) {
+      NSUInteger end = NSMaxRange(editable);
+      NSRange rest = NSMakeRange(end, MIN((NSUInteger)200, [xml length] - end));
+      NSRange stop = [xml rangeOfString:@">" options:0 range:rest];
+      NSRange cell = NSMakeRange(editable.location,
+                                 (stop.location == NSNotFound ? NSMaxRange(rest) : stop.location) -
+                                     editable.location);
+      if ([xml rangeOfString:@"editable=\"YES\"" options:0 range:cell].location != NSNotFound)
+        offers = YES;
+      NSRange after = NSMakeRange(end, [xml length] - end);
+      editable = [xml rangeOfString:@"key=\"dataCell\"" options:0 range:after];
+    }
+    if (!offers)
+      continue;
+    looked += 1;
+    // Whose table it is: the File's Owner, which is the pane or the panel.
+    NSRange ownerClass = [xml rangeOfString:@"userLabel=\"File's Owner\" customClass=\""];
+    if (ownerClass.location == NSNotFound)
+      continue;
+    NSUInteger from = NSMaxRange(ownerClass);
+    NSRange quote = [xml rangeOfString:@"\"" options:0 range:NSMakeRange(from, [xml length] - from)];
+    NSString *owner = [xml substringWithRange:NSMakeRange(from, quote.location - from)];
+    Class cls = NSClassFromString(owner);
+    if (cls == Nil)
+      continue;
+    if (![cls instancesRespondToSelector:@selector(tableView:setObjectValue:forTableColumn:row:)] &&
+        ![cls instancesRespondToSelector:@selector(outlineView:setObjectValue:forTableColumn:byItem:)])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ offers an editable column and %@ takes no "
+                                                @"edit from it", name, owner]);
+  }
+  if (looked == 0)
+    XCTFail(@"%@", @"nothing was looked at, so this checks nothing");
+}
+
+// API that only Cocoa has. The designer is one source tree for two platforms,
+// and the GNUstep job is the slowest way to find out that a file uses
+// something GNUstep never had -- it fails at the first such file and says
+// nothing about the rest. Each entry here is one that actually broke that
+// build, with what to write instead.
+- (void)testTheSourcesStayInTheAPIBothPlatformsHave {
+  NSString *root = [[@(__FILE__) stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+  NSArray<NSArray<NSString *> *> *banned = @[
+    @[ @"NSPrintInfoAttributeKey", @"spell the key type NSString *; GNUstep has no such typedef" ],
+    @[ @"layoutSubtreeIfNeeded", @"Auto Layout; this designer lays out with springs and struts" ],
+    @[ @"layoutIfNeeded", @"Auto Layout; ask the window to display instead" ],
+  ];
+  // Cocoa-only calls that are allowed behind a -respondsToSelector: check,
+  // because the feature simply does not exist on the other platform.
+  NSArray<NSString *> *guarded = @[ @"setAutomaticQuoteSubstitutionEnabled:" ];
+
+  NSFileManager *fm = [NSFileManager defaultManager];
+  for (NSString *folder in @[ @"RDLDesigner", @"RDLDesignerTests", @"RDLKit", @"RDLKit/MiniVB" ]) {
+    NSString *dir = [root stringByAppendingPathComponent:folder];
+    for (NSString *name in [fm contentsOfDirectoryAtPath:dir error:NULL]) {
+      if (![@[ @"m", @"h" ] containsObject:[name pathExtension]])
+        continue;
+      // This file names every one of them, which is not a use of any.
+      if ([name isEqualToString:[@(__FILE__) lastPathComponent]])
+        continue;
+      NSString *path = [dir stringByAppendingPathComponent:name];
+      NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:NULL];
+      if (text == nil)
+        continue;
+      NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
+      for (NSUInteger i = 0; i < [lines count]; i++) {
+        NSString *line = lines[i];
+        // What a comment says about the API is not a use of it.
+        NSString *code = [[line componentsSeparatedByString:@"//"] firstObject] ?: @"";
+        for (NSArray<NSString *> *entry in banned)
+          if ([code rangeOfString:entry[0]].location != NSNotFound)
+            XCTFail(@"%@:%lu uses %@ — %@", name, (unsigned long)i + 1, entry[0], entry[1]);
+        for (NSString *call in guarded) {
+          if ([code rangeOfString:call].location == NSNotFound)
+            continue;
+          NSString *before = i > 0 ? lines[i - 1] : @"";
+          if ([code rangeOfString:@"respondsToSelector"].location == NSNotFound &&
+              [before rangeOfString:@"respondsToSelector"].location == NSNotFound)
+            XCTFail(@"%@:%lu calls %@ without asking whether it is there", name,
+                    (unsigned long)i + 1, call);
+        }
+      }
+    }
+  }
+}
+
 // The reported sequence, in order and through the window: a dataset added with
 // the +, two fields added with its +, then a tablix inserted. On GNUstep this
 // aborts with "corrupted double-linked list" -- a heap that has already been
@@ -123,7 +265,7 @@
 
   // Insert into the body, which is where the panel would put it.
   [ctx.selection selectBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Tablix"];
+  [ctx addItemOfKind:RDLItemKindTablix];
   RDLTablix *tablix = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTablix class]])
@@ -148,7 +290,7 @@
   // same insert path, onto a report that now has a dataset nothing has ever
   // put a row in.
   [ctx.selection selectBandWithKey:@"body"];
-  [ctx addItemOfKind:@"Textbox"];
+  [ctx addItemOfKind:RDLItemKindTextbox];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]])
@@ -388,6 +530,54 @@
     if ([appRun rangeOfString:line].location == NSNotFound)
       XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should write: %@", line]);
   }
+}
+
+// The samples are the only RDL files this project ships, so they are the ones
+// someone will open in Report Builder. They used to declare the 2010 namespace
+// and carry the 2008 shape -- Body, Width and Page at the root -- which is
+// exactly the file that tool refuses.
+- (void)testTheSamplesAreInTheTwentyTenShape {
+  NSString *dir = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"RDLDesigner/Samples"];
+  NSArray<NSString *> *files =
+      [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:NULL];
+  NSUInteger checked = 0;
+  for (NSString *file in files) {
+    if (![[file pathExtension] isEqualToString:@"rdl"])
+      continue;
+    checked++;
+    NSString *xml = [NSString stringWithContentsOfFile:
+                                  [dir stringByAppendingPathComponent:file]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:NULL];
+    if (xml == nil) {
+      XCTFail(@"%@", [NSString stringWithFormat:@"could not read %@", file]);
+      continue;
+    }
+    if ([xml rangeOfString:@"<ReportSections>"].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ has no ReportSection", file]);
+    // Children the 2010 Report type does not have. Body, Width and Page are
+    // matched at the root only -- with four spaces of indent, which is where
+    // the writer puts a child of Report -- since they are legitimate inside
+    // the section.
+    for (NSString *stray in @[ @"\n    <Body>", @"\n    <Width>", @"\n    <Page>",
+                              @"\n    <PageHeader>", @"\n    <PageFooter>",
+                              @"\n    <Name>" ])
+      if ([xml rangeOfString:stray].location != NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ still has %@ under Report", file,
+                                                  [stray stringByTrimmingCharactersInSet:
+                                                      [NSCharacterSet whitespaceAndNewlineCharacterSet]]]);
+    if ([xml rangeOfString:@"<TypeName>"].location != NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@ writes TypeName unprefixed", file]);
+    // Chart names this kit once invented; the spec's are Interval and
+    // ChartMajorTickMarks.
+    for (NSString *invented in @[ @"<MajorTickMarks>", @"<MajorInterval>" ])
+      if ([xml rangeOfString:invented].location != NSNotFound)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ still says %@", file, invented]);
+  }
+  if (checked < 11)
+    XCTFail(@"%@", [NSString stringWithFormat:@"only %lu samples were checked",
+                                              (unsigned long)checked]);
 }
 
 @end

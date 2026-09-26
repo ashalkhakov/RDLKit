@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLExpressionEditor.h"
 #import "RDLExpressionField.h"
+#import "RDLExpressionHelper.h"
 #import "RDLExpressionTextStorage.h"
 #import "RDLPane.h"
 
@@ -18,6 +19,7 @@
 @implementation RDLExpressionEditor {
   RDLReport *_report;
   RDLExpressionContext _context;
+  NSString *_dataSetName;
   NSArray<RDLFunctionCategory *> *_categories;
   NSArray<RDLFunctionInfo *> *_items;
 }
@@ -37,6 +39,27 @@
                                                 containing:[self parameterEntries]]];
   [categories addObject:[RDLFunctionCategory categoryNamed:@"Globals"
                                                 containing:[self globalEntries]]];
+  // What else the report gives an expression to read, where it has any.
+  RDLExpressionScope *scope = [RDLExpressionScope scopeWithReport:_report dataSetName:_dataSetName];
+  NSArray<RDLFunctionInfo *> *items = [self entriesFor:scope.reportItemNames
+                                                format:@"ReportItems!%@.Value"
+                                               summary:@"What the %@ text box shows."];
+  NSArray<RDLFunctionInfo *> *variables = [self entriesFor:scope.variableNames
+                                                    format:@"Variables!%@.Value"
+                                                   summary:@"The %@ variable."];
+  NSMutableArray<RDLFunctionInfo *> *code = [NSMutableArray array];
+  for (NSString *name in scope.codeFunctionNames) {
+    RDLFunctionInfo *f = RDLEntry([NSString stringWithFormat:@"Code.%@", name],
+                                  [NSString stringWithFormat:@"The report's own %@ function.", name]);
+    f.insertion = [NSString stringWithFormat:@"Code.%@(", name];
+    [code addObject:f];
+  }
+  if ([items count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Report Items" containing:items]];
+  if ([variables count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Variables" containing:variables]];
+  if ([code count])
+    [categories addObject:[RDLFunctionCategory categoryNamed:@"Code" containing:code]];
   [categories addObjectsFromArray:[RDLExpressionCatalog categories]];
   _categories = [categories copy];
 }
@@ -50,6 +73,15 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
   f.signature = name;
   f.summary = summary;
   return f;
+}
+
+- (NSArray<RDLFunctionInfo *> *)entriesFor:(NSArray<NSString *> *)names
+                                    format:(NSString *)format
+                                   summary:(NSString *)summary {
+  NSMutableArray<RDLFunctionInfo *> *out = [NSMutableArray array];
+  for (NSString *name in names)
+    [out addObject:RDLEntry([NSString stringWithFormat:format, name], [NSString stringWithFormat:summary, name])];
+  return out;
 }
 
 - (NSArray<RDLFunctionInfo *> *)fieldEntries {
@@ -85,8 +117,13 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
     RDLEntry(@"Globals!TotalPages", @"How many pages there are."),
     RDLEntry(@"Globals!ReportName", @"The report's name."),
     RDLEntry(@"Globals!ExecutionTime", @"When the report was run."),
+    RDLEntry(@"Globals!OverallPageNumber", @"The page, counted across page-number resets."),
+    RDLEntry(@"Globals!OverallTotalPages", @"How many pages there are, across resets."),
     RDLEntry(@"Globals!PageName", @"The name of the page being printed."),
-    RDLEntry(@"Globals!UserID", @"Who is running the report."),
+    RDLEntry(@"Globals!RenderFormat.Name", @"What the report is being rendered as: PDF, HTML5, or RPL in the preview."),
+    RDLEntry(@"Globals!RenderFormat.IsInteractive", @"True when the report is read on screen."),
+    RDLEntry(@"User!UserID", @"Who is running the report."),
+    RDLEntry(@"User!Language", @"The culture of whoever is reading the report."),
   ];
 }
 
@@ -130,10 +167,33 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
     return;
   }
   RDLExpr *expr = [RDLExpr expressionWithSource:text];
-  if (expr != nil && expr.parsedCompletely)
-    [_statusLabel setStringValue:[NSString stringWithFormat:@"An expression. Expects %@.", expects]];
-  else
+  if (expr == nil || !expr.parsedCompletely) {
     [_statusLabel setStringValue:@"The expression ends before the text does; the rest is ignored."];
+    return;
+  }
+  // What the checker finds, the first thing first, and how many more.
+  RDLDiagnostic *first = [_diagnostics firstObject];
+  if (first == nil) {
+    [_statusLabel setStringValue:[NSString stringWithFormat:@"An expression. Expects %@.", expects]];
+    return;
+  }
+  NSString *message = [first.message length] ? first.message : @"something is wrong";
+  NSString *sentence = [[[message substringToIndex:1] uppercaseString]
+      stringByAppendingString:[message substringFromIndex:1]];
+  NSUInteger more = [_diagnostics count] - 1;
+  [_statusLabel setStringValue:more ? [NSString stringWithFormat:@"%@ (and %lu more).", sentence, (unsigned long)more]
+                                    : [NSString stringWithFormat:@"%@.", sentence]];
+  [_statusLabel setToolTip:[[_diagnostics valueForKey:@"message"] componentsJoinedByString:@"\n"]];
+}
+
+- (void)check {
+  _diagnostics = [RDLChecker checkExpression:[self source] inReport:_report dataSetName:_dataSetName] ?: @[];
+  [_statusLabel setToolTip:nil];
+  [self showStatus];
+}
+
+- (NSString *)status {
+  return [_statusLabel stringValue];
 }
 
 - (void)showSummary {
@@ -167,7 +227,7 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
   }
   [storage replaceCharactersInRange:at withString:text];
   [_sourceView setSelectedRange:NSMakeRange(at.location + [text length], 0)];
-  [self showStatus];
+  [self check];
 }
 
 - (void)ok:(id)sender {
@@ -208,7 +268,7 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
 
 - (void)textDidChange:(NSNotification *)note {
   (void)note;
-  [self showStatus];
+  [self check];
 }
 
 #pragma mark - Running
@@ -216,9 +276,17 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
 + (instancetype)editorForSource:(NSString *)source
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report {
+  return [self editorForSource:source context:context report:report dataSetName:nil];
+}
+
++ (instancetype)editorForSource:(NSString *)source
+                        context:(RDLExpressionContext)context
+                         report:(RDLReport *)report
+                    dataSetName:(NSString *)dataSetName {
   RDLExpressionEditor *ed = [[RDLExpressionEditor alloc] init];
   ed->_report = report;
   ed->_context = context;
+  ed->_dataSetName = [dataSetName copy];
   [ed buildCategories];
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"RDLExpressionEditor"
                                         bundle:[NSBundle bundleForClass:self]];
@@ -232,14 +300,21 @@ static RDLFunctionInfo *RDLEntry(NSString *name, NSString *summary) {
                                    [[NSAttributedString alloc] initWithString:source ?: @""]];
   [ed.sourceView setDelegate:ed];
   [ed selectCategoryNamed:[[ed categoryNames] firstObject]];
-  [ed showStatus];
+  [ed check];
   return ed;
 }
 
 + (NSString *)runForSource:(NSString *)source
                    context:(RDLExpressionContext)context
                     report:(RDLReport *)report {
-  RDLExpressionEditor *ed = [self editorForSource:source context:context report:report];
+  return [self runForSource:source context:context report:report dataSetName:nil];
+}
+
++ (NSString *)runForSource:(NSString *)source
+                   context:(RDLExpressionContext)context
+                    report:(RDLReport *)report
+               dataSetName:(NSString *)dataSetName {
+  RDLExpressionEditor *ed = [self editorForSource:source context:context report:report dataSetName:dataSetName];
   if (ed == nil)
     return nil;
   [ed.window center];

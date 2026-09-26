@@ -19,4 +19,8 @@
 - (void)reload;
 - (void)addParameter:(id)sender;
 - (void)removeParameter:(id)sender;
+// The order is the order they are asked in, and what a cascading parameter's
+// values may read, so it can be changed.
+- (void)moveParameterUp:(id)sender;
+- (void)moveParameterDown:(id)sender;
 @end

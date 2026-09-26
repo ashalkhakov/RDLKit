@@ -7,6 +7,22 @@ void RDLFillHost(NSView *host, NSView *view) {
   [host addSubview:view];
 }
 
+void RDLFillHostScrolling(NSView *host, NSView *view) {
+  if (host == nil || view == nil)
+    return;
+  NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:[host bounds]];
+  [scroll setHasVerticalScroller:YES];
+  [scroll setHasHorizontalScroller:NO];
+  [scroll setAutohidesScrollers:YES];
+  [scroll setBorderType:NSNoBorder];
+  [scroll setDrawsBackground:NO];
+  [scroll setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+  [view setFrame:NSMakeRect(0, 0, NSWidth([host bounds]), NSHeight([host bounds]))];
+  [view setAutoresizingMask:NSViewWidthSizable];
+  [scroll setDocumentView:view];
+  [host addSubview:scroll];
+}
+
 BOOL RDLLoadPaneNib(NSView *pane, NSString *name) {
   NSNib *nib = [[NSNib alloc] initWithNibNamed:name
                                         bundle:[NSBundle bundleForClass:[pane class]]];

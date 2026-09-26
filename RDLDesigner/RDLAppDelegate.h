@@ -32,6 +32,11 @@
 // Load one of the catalog's samples, by the menu item's tag. Declared so what
 // opening a sample does can be checked without a menu.
 - (void)openSample:(NSMenuItem *)sender;
+// Whether the grid is showing, turned on and off from the View menu. Declared
+// with the menu validation that ticks the item, so both can be checked without
+// a menu bar.
+- (void)toggleGrid:(id)sender;
+- (BOOL)validateMenuItem:(NSMenuItem *)item;
 - (void)showDesigner:(id)sender;
 - (void)showGenerator:(id)sender;
 - (void)showLibrary:(id)sender;

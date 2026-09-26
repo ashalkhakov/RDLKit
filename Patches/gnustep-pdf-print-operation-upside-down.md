@@ -43,17 +43,18 @@ backend compensates for a flip nobody applied, and the mirroring is of both the
 glyphs and the layout, which is what distinguishes it from a simple
 origin-at-the-wrong-corner bug.
 
-**Fix.** `gnustep-gui-pdf-print-operation.patch`, beside this file, deletes the
-override. `NSPrintOperation`'s own `-_print` needs nothing from the subclass:
+**Fix.** `libs-gui/pdf-print-operation` in the shared `gnustep-patches`
+repository deletes the override. `NSPrintOperation`'s own `-_print` needs nothing from the subclass:
 `-_runOperation` has already made `-createContext`'s context current, and
 `-_printPaginateWithInfo:knowsRange:` sets `NSPrintSheetBounds` itself. The
 inherited implementation paginates, honours `-knowsPageRange:`/`-rectForPage:`
 and applies the transform, so both the orientation and the page count come out
-right. `gnustep-patch-repros/pdf-print-operation-test.m` demonstrates it and
+right. `pdf-print-operation-test.m`, beside that patch, demonstrates it and
 decides PASS/FAIL on the page count.
 
-**Applied where.** `.github/scripts/dependencies.sh`, in the libs-gui step, the
-way `gnustep-build/Scripts/build-gnustep.sh` applies its own patches. RDLKit
+**Applied where.** `.github/scripts/dependencies.sh`, in the libs-gui step,
+which clones the shared repository and applies everything it carries for
+libs-gui. RDLKit
 briefly carried a `#ifdef GNUSTEP` workaround that supplied the missing matrix
 in `RDLPrintView -drawRect:`; it has been removed, because the patch and the
 workaround together would correct the orientation twice.

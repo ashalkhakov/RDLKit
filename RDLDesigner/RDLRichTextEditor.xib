@@ -16,6 +16,9 @@
                 <outlet property="cancelButton" destination="cancelButton" id="cancelButtonOutlet"/>
                 <outlet property="colorWell" destination="colorWell" id="colorWellOutlet"/>
                 <outlet property="exprButton" destination="exprButton" id="exprButtonOutlet"/>
+                <outlet property="listPop" destination="listPop" id="listPopOutlet"/>
+                <outlet property="outdentButton" destination="outdentButton" id="outdentButtonOutlet"/>
+                <outlet property="indentButton" destination="indentButton" id="indentButtonOutlet"/>
                 <outlet property="fontPopup" destination="fontPopup" id="fontPopupOutlet"/>
                 <outlet property="italicButton" destination="italicButton" id="italicButtonOutlet"/>
                 <outlet property="sizeCombo" destination="sizeCombo" id="sizeComboOutlet"/>
@@ -203,6 +206,40 @@ Gw
                         </buttonCell>
                         <connections>
                             <action selector="insertExpression:" target="-2" id="exprButtonAction"/>
+                        </connections>
+                    </button>
+                    <popUpButton toolTip="Whether the paragraphs are a list, and of which kind" verticalHuggingPriority="750" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="listPop">
+                        <rect key="frame" x="150" y="10" width="120" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="borderAndBezel" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" id="listPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="menu" size="12"/>
+                            <menu key="menu" id="listPopMenu"/>
+                        </popUpButtonCell>
+                        <connections>
+                            <action selector="listStyleChanged:" target="-2" id="listPopAction"/>
+                        </connections>
+                    </popUpButton>
+                    <button toolTip="Move the paragraphs out a step" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="outdentButton">
+                        <rect key="frame" x="276" y="10" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="outdentButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="outdent:" target="-2" id="outdentButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Move the paragraphs in a step" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="indentButton">
+                        <rect key="frame" x="308" y="10" width="30" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" title="" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="indentButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="cellTitle"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="indent:" target="-2" id="indentButtonAction"/>
                         </connections>
                     </button>
                     <button fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="okButton">

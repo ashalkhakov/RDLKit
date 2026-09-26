@@ -68,8 +68,7 @@ NSString * const RDLChangeKey = @"RDLChange";
   for (NSString *k in _keys) {
     if ([k isEqualToString:@"left"] || [k isEqualToString:@"top"] ||
         [k isEqualToString:@"width"] || [k isEqualToString:@"height"] ||
-        [k isEqualToString:@"columnSpecs"] || [k isEqualToString:@"headerHeight"] ||
-        [k isEqualToString:@"rowHeight"] || [k isEqualToString:@"hidden"])
+        [k isEqualToString:@"hidden"])
       return YES;
   }
   return NO;

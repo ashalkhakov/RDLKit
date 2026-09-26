@@ -100,6 +100,86 @@ static NSString *RDLEnt(NSString *name) {
     XCTFail(@"%@", [NSString stringWithFormat:@"PDF magic %@", head]);
 }
 
+// The PDF backend renders through AppKit's printing machinery -- it lays the
+// pages into an RDLView and asks the view for its PDF -- which is the one
+// thing in this kit that behaves differently on the two platforms. It was
+// skipped in the GNUstep CI job for a year because that path was reported to
+// hang headless; it does not, and this is what says so on every run.
+- (void)testPDFBackendPaginatesOnBothPlatforms {
+  // A report of one page, and the same report with three pages' worth of body
+  // on the same paper.
+  RDLReport * (^invoice)(NSUInteger) = ^RDLReport *(NSUInteger pages) {
+    // Built here rather than from the shared fixture: what this is about is
+    // how many pages come out, so the report has nothing on it but the marks
+    // that make the pages.
+    RDLReport *r = [RDLReport emptyReportNamed:@"Paged"];
+    r.page.pageWidth = 8.5;
+    r.page.pageHeight = 4;
+    r.page.topMargin = 0.25;
+    r.page.bottomMargin = 0.25;
+    r.body.height = 3.4 * (CGFloat)pages;
+    for (NSUInteger i = 0; i < pages; i++) {
+      RDLTextbox *line = [[RDLTextbox alloc] init];
+      line.name = [NSString stringWithFormat:@"Mark%lu", (unsigned long)i + 1];
+      line.value = [NSString stringWithFormat:@"Page %lu", (unsigned long)i + 1];
+      line.left = 0.5;
+      line.top = 3.4 * (CGFloat)i + 0.2;
+      line.width = 3;
+      line.height = 0.3;
+      [r.body.items addObject:line];
+    }
+    return r;
+  };
+  NSUInteger (^pageObjectsIn)(NSData *) = ^NSUInteger(NSData *pdf) {
+    // Only the ones the writer left in plain sight: a backend that puts its
+    // page objects in compressed object streams -- cairo's does -- shows none
+    // here, and the caller treats that as "cannot tell" rather than as zero.
+    NSString *text = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    NSUInteger found = 0, at = 0;
+    while (at < [text length]) {
+      NSRange hit = [text rangeOfString:@"/Type /Page"
+                                options:0
+                                  range:NSMakeRange(at, [text length] - at)];
+      if (hit.location == NSNotFound)
+        break;
+      at = NSMaxRange(hit);
+      // "/Type /Pages" is the tree node, not a page.
+      if (at >= [text length] || [text characterAtIndex:at] != 's')
+        found++;
+    }
+    return found;
+  };
+
+  for (NSUInteger pages = 1; pages <= 3; pages += 2) {
+    RDLReport *r = invoice(pages);
+    NSArray *laidOut = [RDLGenerator pagesForReport:r parameters:@{}];
+    if ([laidOut count] != pages) {
+      XCTFail(@"the report should lay out as %lu pages, it is %lu",
+              (unsigned long)pages, (unsigned long)[laidOut count]);
+      continue;
+    }
+    NSData *pdf = [RDLGenerator PDFForReport:r parameters:@{}];
+    if ([pdf length] < 400) {
+      XCTFail(@"%lu pages came out as %lu bytes", (unsigned long)pages,
+              (unsigned long)[pdf length]);
+      continue;
+    }
+    NSString *head = [[NSString alloc] initWithBytes:[pdf bytes]
+                                              length:MIN((NSUInteger)5, [pdf length])
+                                            encoding:NSASCIIStringEncoding];
+    if (![head hasPrefix:@"%PDF"])
+      XCTFail(@"not a PDF: %@", head);
+    NSString *whole = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    if ([whole rangeOfString:@"%%EOF"].location == NSNotFound)
+      XCTFail(@"%@", @"the PDF should be finished off");
+    // One page object per page of the report, where they can be counted.
+    NSUInteger objects = pageObjectsIn(pdf);
+    if (objects != 0 && objects != pages)
+      XCTFail(@"%lu pages should make %lu page objects, made %lu", (unsigned long)pages,
+              (unsigned long)pages, (unsigned long)objects);
+  }
+}
+
 - (void)testRDLSubset {
   NSError *err = nil;
 
@@ -460,22 +540,23 @@ static NSString *RDLEnt(NSString *name) {
   if (!note.nullable)
     XCTFail(@"%@", @"Nullable not parsed");
   // An element this kit does not model fails the parse rather than being
-  // skipped, so the report that comes back is always the report on disk.
-  // CustomReportItem is the example because it is real MS-RDL and genuinely
-  // not implemented -- Subreport used to stand here, and now renders.
-  NSString *withCRI = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
-                                                     withString:
-      @"<CustomReportItem Name=\"Cri1\"><Type>Barcode</Type><Top>1in</Top><Left>0in</Left>"
-      @"<Width>2in</Width><Height>1in</Height></CustomReportItem>"
+  // skipped, so the report that comes back is always the report on disk. The
+  // element is invented on purpose: Subreport stood here until it rendered,
+  // and CustomReportItem until it became a placeholder. A name from outside
+  // the schema keeps this about the rule rather than about a feature list.
+  NSString *withUnknown = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
+                                                         withString:
+      @"<NotAReportItem Name=\"Odd1\"><Top>1in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>1in</Height></NotAReportItem>"
       @"</ReportItems></Body>"];
   NSError *subErr = nil;
-  RDLReport *rejected = [RDLParser reportFromXMLString:withCRI error:&subErr];
+  RDLReport *rejected = [RDLParser reportFromXMLString:withUnknown error:&subErr];
   if (rejected != nil)
-    XCTFail(@"%@", @"a CustomReportItem should be rejected, not skipped");
-  else if ([subErr.localizedDescription rangeOfString:@"CustomReportItem"].location == NSNotFound ||
-           [subErr.localizedDescription rangeOfString:@"Cri1"].location == NSNotFound ||
+    XCTFail(@"%@", @"an element outside the schema should be rejected, not skipped");
+  else if ([subErr.localizedDescription rangeOfString:@"NotAReportItem"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"Odd1"].location == NSNotFound ||
            [subErr.localizedDescription rangeOfString:@"/Report"].location == NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for CustomReportItem: %@",
+    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for an unknown element: %@",
                                                subErr.localizedDescription]);
   if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
     XCTFail(@"%@", @"Body Style not parsed");
@@ -659,7 +740,11 @@ static NSString *RDLEnt(NSString *name) {
   kt.page.pageWidth = 8.5;
   kt.page.topMargin = 0.5;
   kt.page.bottomMargin = 0.5;
-  // bodyTop = 0.5 + default header 0.55; bodyBottom = 5 - 0.5 - default footer 0.4; avail ≈ 3.05
+  // A head and a foot of its own: a new report has neither, and what this is
+  // about is the room they leave. bodyTop = 0.5 + 0.55; bodyBottom = 5 - 0.5 -
+  // 0.4; avail ≈ 3.05.
+  kt.pageHeader.height = 0.55;
+  kt.pageFooter.height = 0.4;
   RDLTextbox *keep = [[RDLTextbox alloc] init];
   keep.name = @"KeepMe";
   keep.value = @"kept";
@@ -683,6 +768,59 @@ static NSString *RDLEnt(NSString *name) {
     if (onP1 || !onP2)
       XCTFail(@"%@", @"KeepTogether item should render only on page 2");
   }
+}
+
+
+#pragma mark - Colours and border styles
+
+// RDL writes a colour as a name, #rrggbb, #rgb or #aarrggbb -- alpha first.
+// Only #rrggbb used to be read: #80ff0000 came out green, #f80 as the default
+// ink.
+- (void)testEveryColourFormIsRead {
+  CGFloat r = -1, g = -1, b = -1, a = -1;
+  if (!RDLColorComponents(@"#80ff0000", &r, &g, &b, &a) || fabs(r - 1) > 0.001 || g > 0.001 ||
+      b > 0.001 || fabs(a - 128.0 / 255.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#80ff0000 is half-transparent red: %g %g %g %g", r, g,
+                                              b, a]);
+  if (!RDLColorComponents(@"#f80", &r, &g, &b, &a) || fabs(r - 1) > 0.001 ||
+      fabs(g - 136.0 / 255.0) > 0.001 || b > 0.001 || fabs(a - 1) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#f80 is #ff8800: %g %g %g %g", r, g, b, a]);
+  if (!RDLColorComponents(@"LightGrey", &r, &g, &b, &a) || fabs(r - 211.0 / 255.0) > 0.001)
+    XCTFail(@"%@", @"a colour name is its value");
+  if (RDLColorComponents(@"Transparent", &r, &g, &b, &a) || RDLColorComponents(@"#12345", &r, &g, &b, &a))
+    XCTFail(@"%@", @"Transparent and malformed text are not colours");
+  if (![RDLHexFromColor(RDLColorFromHex(@"#80ff0000")) isEqualToString:@"#80ff0000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a translucent colour keeps its alpha when written: %@",
+                                              RDLHexFromColor(RDLColorFromHex(@"#80ff0000"))]);
+}
+
+// The HTML page gets colours CSS reads the same way -- rgba() for alpha, since
+// CSS would take #aarrggbb's alpha from the wrong end -- and every border
+// style, not just solid, dashed, dotted and double.
+- (void)testHTMLWritesColoursAndBorderStylesCSSCanRead {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Swatches"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Swatch";
+  tb.value = @"Swatch";
+  tb.width = 2;
+  tb.height = 0.5;
+  RDLStyle *st = [[RDLStyle alloc] init];
+  st.color = @"#80ff0000";
+  st.backgroundColor = @"#0f0";
+  st.borderTop = [RDLBorder solidColor:@"#336699"];
+  st.borderTop.style = RDLBorderStyleGroove;
+  st.borderBottom = [RDLBorder solidColor:@"#336699"];
+  st.borderBottom.style = RDLBorderStyleInset;
+  tb.style = st;
+  [r.body.items addObject:tb];
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  for (NSString *needle in @[ @"color:rgba(255,0,0,0.502)", @"background:#00ff00",
+                              @"border-top:1pt groove #336699", @"border-bottom:1pt inset #336699" ])
+    if ([out rangeOfString:needle].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the HTML should say %@", needle]);
 }
 
 @end

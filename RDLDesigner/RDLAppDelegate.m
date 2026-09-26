@@ -62,8 +62,19 @@
 #pragma mark - Which report is in front
 
 - (RDLDocument *)currentDocument {
-  NSDocument *doc = [[NSDocumentController sharedDocumentController] currentDocument];
-  return [doc isKindOfClass:[RDLDocument class]] ? (RDLDocument *)doc : nil;
+  NSDocumentController *controller = [NSDocumentController sharedDocumentController];
+  NSDocument *doc = [controller currentDocument];
+  if ([doc isKindOfClass:[RDLDocument class]])
+    return (RDLDocument *)doc;
+  // Which report is in front is the main window's, and there are moments when
+  // nothing is in front -- a panel is up, or the window has not become key
+  // yet -- and a menu command would then do nothing at all. With one report
+  // open there is no doubt about which it is about; with several there is, and
+  // the command waits until one of them is in front.
+  NSArray<NSDocument *> *open = [controller documents];
+  if ([open count] == 1 && [open[0] isKindOfClass:[RDLDocument class]])
+    return (RDLDocument *)open[0];
+  return nil;
 }
 
 - (RDLEditingContext *)currentContext {
@@ -150,7 +161,7 @@
   (void)sender;
   RDLDocument *doc = [self currentDocument];
   if (doc == nil)
-    doc = [self openDocumentWithReport:[RDLSamples blankLetter]];
+    doc = [self openDocumentWithReport:[RDLSamples blankReport]];
   // The generator follows the report in front: opening it on a different one
   // means a different window, not a window that quietly swapped its report.
   if (_generator != nil && _generator.reportDocument != doc) {
@@ -212,6 +223,37 @@
       [(RDLDesignerWindow *)wc addElement:sender];
       return;
     }
+}
+
+// The groups pane belongs to a window, so this goes to the window the way Add
+// Element does rather than through the editing session.
+- (void)toggleGroupsPane:(id)sender {
+  for (NSWindowController *wc in [[self currentDocument] windowControllers])
+    if ([wc isKindOfClass:[RDLDesignerWindow class]]) {
+      [(RDLDesignerWindow *)wc toggleGroupsPane:sender];
+      return;
+    }
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if ([item action] == @selector(toggleGroupsPane:)) {
+    for (NSWindowController *wc in [[self currentDocument] windowControllers])
+      if ([wc isKindOfClass:[RDLDesignerWindow class]]) {
+        [item setState:[(RDLDesignerWindow *)wc groupsPaneIsShowing] ? NSOnState : NSOffState];
+        return YES;
+      }
+    [item setState:NSOffState];
+    return NO;
+  }
+  // The grid is a thing that is either on or off, so its item says which, the
+  // way a Mac menu does. Without the tick the only way to know was to look at
+  // the canvas and guess.
+  if ([item action] == @selector(toggleGrid:)) {
+    RDLEditingContext *ctx = [self currentContext];
+    [item setState:ctx.showsGrid ? NSOnState : NSOffState];
+    return ctx != nil;
+  }
+  return YES;
 }
 
 - (void)toggleGrid:(id)sender {

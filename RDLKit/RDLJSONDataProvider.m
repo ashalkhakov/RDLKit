@@ -11,10 +11,12 @@
 }
 
 - (NSArray *)rowsFromData:(NSData *)documentData
+                   query:(NSString *)query
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error {
   RDL_UNUSED(properties);
+  RDL_UNUSED(dataSet);
   if (documentData == nil) {
     if (error)
       *error = RDLDataError(25, @"there is no JSON to read");
@@ -29,14 +31,13 @@
   }
   // No query at all means the document itself is the rows, which is what a
   // plain array of objects is.
-  NSString *query = [dataSet.commandText
-      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  if ([query length] == 0)
+  NSString *path = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if ([path length] == 0)
     return RDLRowsFromSelection(@[ root ]);
-  RDLJSONPath *path = [RDLJSONPath pathWithString:query error:error];
-  if (path == nil)
+  RDLJSONPath *compiled = [RDLJSONPath pathWithString:path error:error];
+  if (compiled == nil)
     return nil;
-  return RDLRowsFromSelection([path selectFrom:root]);
+  return RDLRowsFromSelection([compiled selectFrom:root]);
 }
 
 @end

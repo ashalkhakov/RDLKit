@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="RDLChartAxisEditor">
+            <connections>
+                <outlet property="axisPop" destination="axisPop" id="axisPopOutlet"/>
+                <outlet property="titleField" destination="titleField" id="titleFieldOutlet"/>
+                <outlet property="titleExprButton" destination="titleExprButton" id="titleExprButtonOutlet"/>
+                <outlet property="titlePositionPop" destination="titlePositionPop" id="titlePositionPopOutlet"/>
+                <outlet property="showAxisCheck" destination="showAxisCheck" id="showAxisCheckOutlet"/>
+                <outlet property="minimumField" destination="minimumField" id="minimumFieldOutlet"/>
+                <outlet property="maximumField" destination="maximumField" id="maximumFieldOutlet"/>
+                <outlet property="intervalField" destination="intervalField" id="intervalFieldOutlet"/>
+                <outlet property="labelIntervalField" destination="labelIntervalField" id="labelIntervalFieldOutlet"/>
+                <outlet property="formatField" destination="formatField" id="formatFieldOutlet"/>
+                <outlet property="marginPop" destination="marginPop" id="marginPopOutlet"/>
+                <outlet property="scalarCheck" destination="scalarCheck" id="scalarCheckOutlet"/>
+                <outlet property="majorGridCheck" destination="majorGridCheck" id="majorGridCheckOutlet"/>
+                <outlet property="minorGridCheck" destination="minorGridCheck" id="minorGridCheckOutlet"/>
+                <outlet property="majorTicksPop" destination="majorTicksPop" id="majorTicksPopOutlet"/>
+                <outlet property="minorTicksPop" destination="minorTicksPop" id="minorTicksPopOutlet"/>
+                <outlet property="oppositeCheck" destination="oppositeCheck" id="oppositeCheckOutlet"/>
+                <outlet property="messageLabel" destination="messageLabel" id="messageLabelOutlet"/>
+                <outlet property="window" destination="axisPanel" id="windowOutlet"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <window title="Axis Properties" allowsToolTipsWhenApplicationIsInactive="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" animationBehavior="default" id="axisPanel">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES"/>
+            <rect key="contentRect" x="80" y="80" width="440" height="404"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
+            <view key="contentView" id="axisPanelContent">
+                <rect key="frame" x="0.0" y="0.0" width="440" height="404"/>
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                <subviews>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="axisLabel">
+                        <rect key="frame" x="12" y="368" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Axis" id="axisLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <popUpButton toolTip="Which of the chart's axes to set up" id="axisPop">
+                        <rect key="frame" x="116" y="364" width="200" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="axisPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="message"/>
+                            <menu key="menu" id="axisPopMenu"/>
+                        </popUpButtonCell>
+                        <connections>
+                            <action selector="selectAxis:" target="-2" id="axisPopAction"/>
+                        </connections>
+                    </popUpButton>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="titleLabel">
+                        <rect key="frame" x="12" y="338" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Title" id="titleLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="What the axis is labelled with" focusRingType="none" id="titleField" customClass="RDLExpressionField">
+                        <rect key="frame" x="116" y="334" width="280" height="22"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="titleFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <button toolTip="Edit this as an expression" id="titleExprButton">
+                        <rect key="frame" x="402" y="334" width="24" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="push" title="f(x)" bezelStyle="rounded" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="titleExprButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="editTitleExpression:" target="-2" id="titleExprButtonAction"/>
+                        </connections>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="titlePositionLabel">
+                        <rect key="frame" x="12" y="308" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Title position" id="titlePositionLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <popUpButton toolTip="Where along the axis its title sits" id="titlePositionPop">
+                        <rect key="frame" x="116" y="304" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="titlePositionPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="message"/>
+                            <menu key="menu" id="titlePositionPopMenu"/>
+                        </popUpButtonCell>
+                    </popUpButton>
+                    <button toolTip="Whether the axis, its labels and its title are drawn" id="showAxisCheck">
+                        <rect key="frame" x="226" y="305" width="180" height="20"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Show the axis" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" inset="2" id="showAxisCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="minimumLabel">
+                        <rect key="frame" x="12" y="278" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Minimum" id="minimumLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="Where the axis starts: a number or an expression" focusRingType="none" id="minimumField">
+                        <rect key="frame" x="116" y="274" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Auto" drawsBackground="YES" id="minimumFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="maximumLabel">
+                        <rect key="frame" x="226" y="278" width="70" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Maximum" id="maximumLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="Where the axis ends: a number or an expression" focusRingType="none" id="maximumField">
+                        <rect key="frame" x="300" y="274" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Auto" drawsBackground="YES" id="maximumFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="intervalLabel">
+                        <rect key="frame" x="12" y="248" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Interval" id="intervalLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="How far apart its grid lines and tick marks are" focusRingType="none" id="intervalField">
+                        <rect key="frame" x="116" y="244" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Auto" drawsBackground="YES" id="intervalFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="labelIntervalLabel">
+                        <rect key="frame" x="226" y="248" width="70" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Label step" id="labelIntervalLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="How far apart its labels are" focusRingType="none" id="labelIntervalField">
+                        <rect key="frame" x="300" y="244" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" placeholderString="Auto" drawsBackground="YES" id="labelIntervalFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="formatLabel">
+                        <rect key="frame" x="12" y="218" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Number format" id="formatLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField toolTip="How the axis writes its numbers, as a .NET format such as N0 or C2" focusRingType="none" id="formatField">
+                        <rect key="frame" x="116" y="214" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" selectable="YES" editable="YES" sendsActionOnEndEditing="YES" borderStyle="bezel" drawsBackground="YES" id="formatFieldCell">
+                            <font key="font" metaFont="system"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="marginLabel">
+                        <rect key="frame" x="12" y="188" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Margins" id="marginLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <popUpButton toolTip="Whether the axis leaves room past its first and last category" id="marginPop">
+                        <rect key="frame" x="116" y="184" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="marginPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="message"/>
+                            <menu key="menu" id="marginPopMenu"/>
+                        </popUpButtonCell>
+                    </popUpButton>
+                    <button toolTip="Whether the categories are numbers spaced by their values rather than evenly" id="scalarCheck">
+                        <rect key="frame" x="226" y="185" width="180" height="20"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Spaced by value" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" inset="2" id="scalarCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="gridLabel">
+                        <rect key="frame" x="12" y="158" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Grid lines" id="gridLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <button toolTip="Whether lines are drawn across the plot at each interval" id="majorGridCheck">
+                        <rect key="frame" x="116" y="155" width="100" height="20"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Major" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" inset="2" id="majorGridCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                    </button>
+                    <button toolTip="Whether lighter lines are drawn between them" id="minorGridCheck">
+                        <rect key="frame" x="226" y="155" width="100" height="20"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="Minor" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" inset="2" id="minorGridCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="majorTicksLabel">
+                        <rect key="frame" x="12" y="128" width="100" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Tick marks" id="majorTicksLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <popUpButton toolTip="The marks at each interval along the axis" id="majorTicksPop">
+                        <rect key="frame" x="116" y="124" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="majorTicksPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="message"/>
+                            <menu key="menu" id="majorTicksPopMenu"/>
+                        </popUpButtonCell>
+                    </popUpButton>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="minorTicksLabel">
+                        <rect key="frame" x="226" y="128" width="70" height="14"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" alignment="left" title="Minor" id="minorTicksLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <popUpButton toolTip="The marks between them" id="minorTicksPop">
+                        <rect key="frame" x="300" y="124" width="100" height="22"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <popUpButtonCell key="cell" type="push" bezelStyle="rounded" alignment="left" lineBreakMode="truncatingTail" borderStyle="border" imageScaling="proportionallyDown" inset="2" arrowPosition="arrowAtCenter" preferredEdge="maxY" id="minorTicksPopCell">
+                            <behavior key="behavior" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="message"/>
+                            <menu key="menu" id="minorTicksPopMenu"/>
+                        </popUpButtonCell>
+                    </popUpButton>
+                    <button toolTip="Whether the axis is drawn on the right, or the top, rather than the left or the bottom" id="oppositeCheck">
+                        <rect key="frame" x="116" y="95" width="240" height="20"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                        <buttonCell key="cell" type="check" title="On the opposite side" bezelStyle="regularSquare" imagePosition="left" alignment="left" controlSize="small" inset="2" id="oppositeCheckCell">
+                            <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                    </button>
+                    <textField focusRingType="none" verticalHuggingPriority="750" id="messageLabel">
+                        <rect key="frame" x="12" y="48" width="416" height="16"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMaxY="YES"/>
+                        <textFieldCell key="cell" controlSize="small" lineBreakMode="truncatingTail" selectable="YES" id="messageLabelCell">
+                            <font key="font" metaFont="smallSystem"/>
+                            <color key="textColor" name="systemRedColor" catalog="System" colorSpace="catalog"/>
+                            <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
+                        </textFieldCell>
+                    </textField>
+                    <button toolTip="Leave the axes as they were" id="cancelButton">
+                        <rect key="frame" x="242" y="12" width="84" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" bezelStyle="rounded" title="Cancel" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="cancelButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="cancel:" target="-2" id="cancelButtonAction"/>
+                        </connections>
+                    </button>
+                    <button toolTip="Apply these properties" id="okButton">
+                        <rect key="frame" x="334" y="12" width="92" height="26"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMinX="YES" flexibleMaxY="YES"/>
+                        <buttonCell key="cell" type="push" bezelStyle="rounded" title="OK" alignment="center" controlSize="small" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="okButtonCell">
+                            <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                            <font key="font" metaFont="smallSystem"/>
+                        </buttonCell>
+                        <connections>
+                            <action selector="accept:" target="-2" id="okButtonAction"/>
+                        </connections>
+                    </button>
+                </subviews>
+            </view>
+            <point key="canvasLocation" x="140" y="140"/>
+        </window>
+    </objects>
+</document>

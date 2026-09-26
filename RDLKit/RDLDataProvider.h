@@ -2,6 +2,7 @@
 #import <Foundation/Foundation.h>
 #import "RDLReport.h"
 #import "RDLJSONPath.h"
+@class RDLEvalScope;
 
 // Where a dataset's rows come from -- documents, always. This kit is a local
 // report viewer: the data is a file the host already has, content embedded in
@@ -41,6 +42,12 @@ FOUNDATION_EXPORT NSString *RDLStringFromDataProviderKind(RDLDataProviderKind ki
 // {"": "data.csv", "hasheaders": "true"} -- a bare first token is the document,
 // which is how the CSV provider's strings are written. Keys are lower-cased,
 // because RDL's own are written every which way.
+//
+// Quoting is .NET's DbConnectionStringBuilder's: a value that starts with " or
+// ' runs to its closing quote, the quote doubled inside it, and may hold ";";
+// "==" in a key is "="; any other value runs to the next ";" as written, quotes
+// and all. RDLConnectionString quotes what needs it, in ' when the value holds
+// a " and no ', otherwise in " with each " doubled.
 FOUNDATION_EXPORT NSDictionary<NSString *, NSString *> *RDLConnectionProperties(NSString *connectString);
 // The inverse: the properties written back as a connect string. The document
 // comes first and the options follow in a stable order, so editing a source in
@@ -52,6 +59,38 @@ FOUNDATION_EXPORT NSString *RDLConnectionString(NSDictionary<NSString *, NSStrin
 // than knowing the vocabulary.
 FOUNDATION_EXPORT NSString *RDLDocumentKeyForProviderKind(RDLDataProviderKind kind);
 FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind);
+
+// Which of the two a data source reads. A connect string may hold both -- data
+// kept in the report and a file beside it -- which is what makes a report
+// testable: it carries a few representative rows for checking the layout, and
+// a path to the real thing for when that is what is wanted. Without a say in
+// which it reads, keeping both would be pointless, since the kept data would
+// always win.
+typedef NS_ENUM(NSInteger, RDLDocumentSource) {
+  RDLDocumentSourceUnspecified = 0,
+  // The data written into the report itself: "jsondata=[…]".
+  RDLDocumentSourceEmbedded,
+  // A document beside the report, or anywhere else it names.
+  RDLDocumentSourceFile,
+};
+// "Use" in a connect string: `jsondata=[…];jsondoc=live.json;use=file`. A
+// string that does not say reads whichever it has, the kept data first --
+// which is what every connect string written before this meant.
+FOUNDATION_EXPORT NSString *const RDLConnectionUseKey;
+FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceFromString(NSString *name);
+FOUNDATION_EXPORT NSString *RDLStringFromDocumentSource(RDLDocumentSource source);
+// Which one these properties read, for a provider of that kind.
+FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceOfProperties(
+    NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind);
+// The same properties saying they read that one, with what they hold of the
+// other left where it is. Unspecified takes the say out again.
+FOUNDATION_EXPORT NSDictionary<NSString *, NSString *> *RDLPropertiesReading(
+    NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind,
+    RDLDocumentSource source);
+// A web document's URL with a dataset's QueryParameters added to its query
+// string, after any it already has -- how SSRS's XML data extension hands query
+// parameters to a web source.
+FOUNDATION_EXPORT NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems);
 
 #pragma mark - Providers
 //
@@ -69,7 +108,9 @@ FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind
 //
 // `documentData` is what the connect string pointed at, already loaded --
 // providers do no I/O of their own, so a caller decides what may be opened.
+// `query` is the dataset's CommandText as it was evaluated for this bind.
 - (NSArray *)rowsFromData:(NSData *)documentData
+                   query:(NSString *)query
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error;
@@ -112,4 +153,19 @@ FOUNDATION_EXPORT RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString 
 // Returns NO only when nothing could be bound at all.
 - (BOOL)bindReport:(RDLReport *)report error:(NSError **)error;
 - (BOOL)bindDataSet:(RDLDataSet *)dataSet inReport:(RDLReport *)report error:(NSError **)error;
+// Whether a dataset's data depends on the report's parameters: its source's
+// ConnectString or its CommandText is an expression, or it has QueryParameters.
+// RDLDataEvaluation binds such a dataset once the parameters have values, and
+// -bindReport:error: leaves it alone.
+- (BOOL)dataSetReadsParameters:(RDLDataSet *)dataSet inReport:(RDLReport *)report;
+// The bytes at a location a report names -- an external image, say: a path or
+// file URL, a relative one beside `baseURL`, or an http(s) URL when remote
+// documents are allowed. nil, with `error` set, when it cannot be read.
+- (NSData *)dataAtLocation:(NSString *)location error:(NSError **)error;
+// A dataset bound with its ConnectString, CommandText and QueryParameters
+// evaluated in `scope`, which holds the parameters worked out so far.
+- (BOOL)bindDataSet:(RDLDataSet *)dataSet
+           inReport:(RDLReport *)report
+              scope:(RDLEvalScope *)scope
+              error:(NSError **)error;
 @end

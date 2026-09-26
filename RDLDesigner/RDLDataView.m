@@ -1,8 +1,8 @@
 #import "RDLDataView.h"
 #import "RDLChange.h"
 #import "RDLDocument.h"
-#import "RDLDocument.h"
 #import "RDLKit.h"
+#import "RDLParameterPrompts.h"
 
 // The pane lays out downwards from the top, so the view it lays out into has
 // to agree about which way is down. Without this the stack is an ordinary
@@ -18,17 +18,15 @@
 }
 @end
 
-@interface RDLDataView () <NSTextFieldDelegate>
+@interface RDLDataView ()
 @property (nonatomic, strong) NSView *stack;
 @end
 
 @implementation RDLDataView {
   BOOL _reloading;
-  // Set while this pane is writing a parameter value. The document publishes
-  // that as a data change, and rebuilding the pane in response would tear down
-  // the control the person is still using -- which is why a popup's choice
-  // appeared not to take and a field needed Return to commit.
-  BOOL _applyingParameter;
+  // The prompts, which are a view of their own because the preview's bar asks
+  // the same question this pane does.
+  RDLParameterPrompts *_prompts;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame document:(RDLDocument *)document {
@@ -47,6 +45,16 @@
     _stack = [[RDLFlippedStack alloc] initWithFrame:NSMakeRect(0, 0, 240, 400)];
     [self addSubview:_stack];
   }
+  if (_prompts == nil) {
+    __weak RDLDataView *weakSelf = self;
+    _prompts = [[RDLParameterPrompts alloc] initWithFrame:NSMakeRect(0, 0, 240, 0) document:nil];
+    _prompts.whenValueGiven = ^{
+      // What a query read may have changed with the value, so the whole pane
+      // is built again and not only the prompts.
+      [weakSelf reload];
+    };
+  }
+  _prompts.document = document;
   if (document == nil)
     return;
   [[NSNotificationCenter defaultCenter] addObserver:self
@@ -62,7 +70,7 @@
 - (void)documentDidChange:(NSNotification *)note {
   // Our own edit: the controls already show what was just written, and the
   // one being used has to survive the writing.
-  if (_applyingParameter)
+  if (_prompts.applying)
     return;
   RDLChange *change = [note userInfo][RDLChangeKey];
   if (change.scope == RDLChangeScopeReport || change.scope == RDLChangeScopeData)
@@ -94,61 +102,24 @@
   if (_reloading)
     return;
   _reloading = YES;
-  NSArray *subs = [_stack.subviews copy];
-  for (NSView *v in subs)
+  for (NSView *v in [_stack.subviews copy])
     [v removeFromSuperview];
-  RDLDocument *doc = _document;
   RDLReport *report = _document.report;
   CGFloat y = 8;
   [_stack addSubview:[self label:@"Parameters" frame:NSMakeRect(10, y, 220, 16)]];
   y += 20;
-  if ([report.parameters count] == 0) {
-    NSTextField *empty = [self label:@"No parameters on this report." frame:NSMakeRect(10, y, 220, 16)];
+  CGFloat asked = [_prompts reload];
+  if ([_prompts askedCount] == 0) {
+    NSTextField *empty = [self label:[report.parameters count] ? @"This report asks for no parameters."
+                                                               : @"No parameters on this report."
+                               frame:NSMakeRect(10, y, 220, 16)];
     [empty setFont:[NSFont userFontOfSize:10]];
     [_stack addSubview:empty];
     y += 22;
-  }
-  NSInteger tag = 0;
-  for (RDLParameter *p in report.parameters) {
-    // Prompt is what a parameter is called when it is being asked for; the
-    // name is what expressions call it, and goes in the tooltip with the type.
-    NSString *asked = [p.prompt length] ? p.prompt : (p.name ?: @"");
-    NSTextField *l = [self label:asked frame:NSMakeRect(10, y, 220, 14)];
-    [l setFont:[NSFont userFontOfSize:10]];
-    [l setToolTip:[NSString stringWithFormat:@"Parameters!%@.Value — %@%@", p.name ?: @"",
-                                             RDLStringFromParameterDataType(p.dataType)
-                                                 ?: @"String",
-                                             p.multiValue ? @", one of several" : @""]];
-    [_stack addSubview:l];
-    y += 16;
-    NSString *current = doc.paramValues[p.name] ?: ([p.defaultValue source] ?: @"");
-    if ([p.validValues count]) {
-      // A parameter that lists what it accepts is chosen from, not typed into
-      // -- which is what ValidValues is for, and what stops a typo rendering
-      // an empty report.
-      NSPopUpButton *pop =
-          [[NSPopUpButton alloc] initWithFrame:NSMakeRect(10, y, 220, 22) pullsDown:NO];
-      for (RDLValue *v in p.validValues)
-        [pop addItemWithTitle:[v source] ?: @""];
-      if ([pop itemWithTitle:current])
-        [pop selectItemWithTitle:current];
-      [pop setTag:tag];
-      [pop setTarget:self];
-      [pop setAction:@selector(paramChanged:)];
-      [_stack addSubview:pop];
-    } else {
-      NSTextField *f = [[NSTextField alloc] initWithFrame:NSMakeRect(10, y, 220, 22)];
-      // The default as written: an expression shows its source, which is what
-      // the user would have to type to restore it.
-      [f setStringValue:current];
-      [f setTag:tag];
-      [f setDelegate:self];
-      [f setTarget:self];
-      [f setAction:@selector(paramChanged:)];
-      [_stack addSubview:f];
-    }
-    y += 28;
-    tag += 1;
+  } else {
+    [_prompts setFrameOrigin:NSMakePoint(0, y)];
+    [_stack addSubview:_prompts];
+    y += asked;
   }
   y += 8;
   // What the report will read, and what it has read: a summary, not an editor.
@@ -192,36 +163,18 @@
   _reloading = NO;
 }
 
-// A parameter's value, from whichever control was offered for it: a popup
-// when the report says what it accepts, a field when it does not.
+#pragma mark - The prompts, driven from outside
+
 - (void)paramChanged:(NSControl *)sender {
-  if (_reloading)
-    return;
-  NSArray *params = _document.report.parameters;
-  NSInteger i = [sender tag];
-  if (i < 0 || i >= (NSInteger)[params count])
-    return;
-  NSString *value = [sender isKindOfClass:[NSPopUpButton class]]
-                        ? [(NSPopUpButton *)sender titleOfSelectedItem]
-                        : [sender stringValue];
-  _applyingParameter = YES;
-  [_document setParamValue:value forName:[params[i] name]];
-  _applyingParameter = NO;
+  [_prompts paramChanged:sender];
 }
 
-// As it is typed, rather than only on Return: a parameter value is something
-// to try, and the preview beside it is the answer. Nothing is rebuilt while
-// this happens, so the field keeps the caret it had.
+- (void)severalValuesChanged:(id)sender {
+  [_prompts severalValuesChanged:sender];
+}
+
 - (void)controlTextDidChange:(NSNotification *)note {
-  id sender = [note object];
-  if ([sender isKindOfClass:[NSControl class]])
-    [self paramChanged:sender];
-}
-
-- (void)controlTextDidEndEditing:(NSNotification *)obj {
-  id sender = [obj object];
-  if ([sender isKindOfClass:[NSTextField class]])
-    [self paramChanged:sender];
+  [_prompts controlTextDidChange:note];
 }
 
 @end

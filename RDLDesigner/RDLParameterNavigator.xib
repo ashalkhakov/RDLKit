@@ -10,8 +10,10 @@
             <connections>
                 <outlet property="addButton" destination="addButton" id="addButtonOutlet"/>
                 <outlet property="content" destination="content" id="contentOutlet"/>
+                <outlet property="downButton" destination="downButton" id="downButtonOutlet"/>
                 <outlet property="removeButton" destination="removeButton" id="removeButtonOutlet"/>
                 <outlet property="table" destination="table" id="tableOutlet"/>
+                <outlet property="upButton" destination="upButton" id="upButtonOutlet"/>
             </connections>
         </customObject>
         <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
@@ -83,6 +85,28 @@
                     </buttonCell>
                     <connections>
                         <action selector="removeParameter:" target="-2" id="removeButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Ask for the selected parameter before the one above it" id="upButton">
+                    <rect key="frame" x="64" y="1" width="32" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="square" title="Up" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="upButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="moveParameterUp:" target="-2" id="upButtonAction"/>
+                    </connections>
+                </button>
+                <button toolTip="Ask for the selected parameter after the one below it" id="downButton">
+                    <rect key="frame" x="96" y="1" width="32" height="24"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                    <buttonCell key="cell" type="square" title="Down" bezelStyle="shadowlessSquare" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="downButtonCell">
+                        <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="moveParameterDown:" target="-2" id="downButtonAction"/>
                     </connections>
                 </button>
             </subviews>

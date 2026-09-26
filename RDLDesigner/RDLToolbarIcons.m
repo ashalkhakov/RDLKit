@@ -102,6 +102,19 @@ static void RDLDrawChevron(BOOL pointingLeft) {
   [path stroke];
 }
 
+// The same, turned to point up or down. The image is drawn with y upwards.
+static void RDLDrawVerticalChevron(BOOL pointingUp) {
+  NSBezierPath *path = [NSBezierPath bezierPath];
+  CGFloat near = pointingUp ? 5 : kRDLIconSide - 5;
+  CGFloat far = pointingUp ? kRDLIconSide - 5 : 5;
+  [path moveToPoint:NSMakePoint(3, near)];
+  [path lineToPoint:NSMakePoint(kRDLIconSide / 2, far)];
+  [path lineToPoint:NSMakePoint(kRDLIconSide - 3, near)];
+  [path setLineWidth:2];
+  [[NSColor blackColor] set];
+  [path stroke];
+}
+
 static void RDLDrawGlyph(RDLToolbarGlyph glyph) {
   switch (glyph) {
     case RDLToolbarGlyphBold:
@@ -141,6 +154,12 @@ static void RDLDrawGlyph(RDLToolbarGlyph glyph) {
       break;
     case RDLToolbarGlyphMoveRight:
       RDLDrawChevron(NO);
+      break;
+    case RDLToolbarGlyphMoveUp:
+      RDLDrawVerticalChevron(YES);
+      break;
+    case RDLToolbarGlyphMoveDown:
+      RDLDrawVerticalChevron(NO);
       break;
     case RDLToolbarGlyphUnspecified:
       break;
