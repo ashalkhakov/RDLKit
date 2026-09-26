@@ -129,7 +129,7 @@ jobs:
       # decides which of them this build gets. It is part of the cache key
       # below, so moving it rebuilds the stack rather than reusing a prefix
       # patched differently. Name a commit here to pin the build exactly.
-      GNUSTEP_PATCHES_REF: 5b7cea43e828d053d72078f6dd1ebeb8785d770c
+      GNUSTEP_PATCHES_REF: 44b9f3d8b750c0c2c128a14718a265b83a9a797c
       # libobjc2 and libdispatch land in the prefix's plain lib/, which the
       # gnustep layout does not treat as a library root. GNUstep.sh prepends
       # the roots it does know about to this.
