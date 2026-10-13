@@ -449,10 +449,23 @@
                    @"gnustep-make generates that file from RDLDesigner-Info.plist");
   // Xcode generates the bundle's plist from these, so a stamp that missed them
   // would ship a bundle still claiming whatever the project file says.
-  for (NSString *key in @[ @"MARKETING_VERSION", @"CURRENT_PROJECT_VERSION" ])
-    if ([project rangeOfString:[NSString stringWithFormat:@"%@ = %@;", key, numeric]].location ==
-        NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be %@", key, numeric]);
+  if ([project rangeOfString:[NSString stringWithFormat:@"MARKETING_VERSION = %@;", numeric]].location ==
+      NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"MARKETING_VERSION should be %@", numeric]);
+  // CURRENT_PROJECT_VERSION is the build, as CFBundleVersion is: what Sparkle
+  // compares, so the two agree, and a number, since it is compiled as one.
+  NSString *(^valueOf)(NSString *, NSString *) = ^NSString *(NSString *text, NSString *pattern) {
+    NSTextCheckingResult *found = [[NSRegularExpression regularExpressionWithPattern:pattern options:0 error:NULL]
+        firstMatchInString:text options:0 range:NSMakeRange(0, [text length])];
+    return found ? [text substringWithRange:[found rangeAtIndex:1]] : nil;
+  };
+  NSString *build = valueOf(project, @"CURRENT_PROJECT_VERSION = ([^;]*);");
+  NSString *bundleVersion = valueOf(plist, @"<key>CFBundleVersion</key>\\s*<string>([^<]*)</string>");
+  if ([build length] == 0 || [build rangeOfCharacterFromSet:[digitsAndDots invertedSet]].location != NSNotFound)
+    XCTFail(@"%@", [NSString stringWithFormat:@"CURRENT_PROJECT_VERSION should be a number, not %@", build]);
+  if (![build isEqualToString:bundleVersion])
+    XCTFail(@"%@", [NSString stringWithFormat:@"CURRENT_PROJECT_VERSION (%@) and CFBundleVersion (%@) should agree",
+                                              build, bundleVersion]);
 }
 
 // The AppImage's opener (GSUnknownFileTool, under both names GNUstep asks
