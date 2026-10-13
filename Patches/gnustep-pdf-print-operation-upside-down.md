@@ -52,9 +52,8 @@ and applies the transform, so both the orientation and the page count come out
 right. `pdf-print-operation-test.m`, beside that patch, demonstrates it and
 decides PASS/FAIL on the page count.
 
-**Applied where.** `.github/scripts/dependencies.sh`, in the libs-gui step,
-which clones the shared repository and applies everything it carries for
-libs-gui. RDLKit
+**Applied where.** In the shared gnustep-patches repository's libs-gui
+patches, so in every stack it publishes. RDLKit
 briefly carried a `#ifdef GNUSTEP` workaround that supplied the missing matrix
 in `RDLPrintView -drawRect:`; it has been removed, because the patch and the
 workaround together would correct the orientation twice.

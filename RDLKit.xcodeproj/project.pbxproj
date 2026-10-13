@@ -331,6 +331,10 @@
 		FFF6FE2460AA0D34B88059D0 /* RDLRenderInputsEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */; };
 		69F15F7E46F913A6667B0B13 /* RDLRenderInputsEditor.m in Sources */ = {isa = PBXBuildFile; fileRef = CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */; };
 		A25C4C847727516F2B1F9BF6 /* RDLRenderInputsEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */; };
+		521823B93E9DF5DFAA061AA8 /* RDLUpdater-Apple.m in Sources */ = {isa = PBXBuildFile; fileRef = D813D55D2EB9F49A59A6B8A8 /* RDLUpdater-Apple.m */; };
+		2713FE38ECE6CBA48AE45F46 /* Sparkle.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B86F16372CDA2866D3A432F /* Sparkle.xcframework */; };
+		B823283BCB218C08C73A6F07 /* Sparkle.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8B86F16372CDA2866D3A432F /* Sparkle.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BB61EFC9CB230D2E3898D34B /* RDLUpdater.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E3DC8C734C1DC8526327E0 /* RDLUpdater.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -364,6 +368,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				B823283BCB218C08C73A6F07 /* Sparkle.xcframework in Embed Frameworks */,
 				1724A67DAAA0BDBCB829D7FF /* RDLKit.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
@@ -687,6 +692,10 @@
 		CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLRenderInputsEditor.m; sourceTree = "<group>"; };
 		BC63E5189E3D60CBD64D2366 /* RDLRenderInputsEditor.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLRenderInputsEditor.h; sourceTree = "<group>"; };
 		AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLRenderInputsEditor.xib; sourceTree = "<group>"; };
+		5076688AAF40DB5DC75C165A /* RDLUpdater.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLUpdater.h; sourceTree = "<group>"; };
+		D813D55D2EB9F49A59A6B8A8 /* RDLUpdater-Apple.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpdater-Apple.m; sourceTree = "<group>"; };
+		F2E3DC8C734C1DC8526327E0 /* RDLUpdater.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpdater.m; sourceTree = "<group>"; };
+		8B86F16372CDA2866D3A432F /* Sparkle.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Sparkle.xcframework; path = .deps/Sparkle.xcframework; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -712,6 +721,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2713FE38ECE6CBA48AE45F46 /* Sparkle.xcframework in Frameworks */,
 				5CA2B37A0E355D5F2898D6C0 /* RDLKit.framework in Frameworks */,
 				9344C238D4AB0EB8FD9A6A05 /* Cocoa.framework in Frameworks */,
 				9103EFB536BAD208E47EBC10 /* AppKit.framework in Frameworks */,
@@ -927,6 +937,9 @@
 				CDE590341AB209EBE00E9F38 /* RDLRenderInputsEditor.m */,
 				BC63E5189E3D60CBD64D2366 /* RDLRenderInputsEditor.h */,
 				AC2BA9724CEF1659DD53CAF1 /* RDLRenderInputsEditor.xib */,
+				5076688AAF40DB5DC75C165A /* RDLUpdater.h */,
+				D813D55D2EB9F49A59A6B8A8 /* RDLUpdater-Apple.m */,
+				F2E3DC8C734C1DC8526327E0 /* RDLUpdater.m */,
 			);
 			path = RDLDesigner;
 			sourceTree = "<group>";
@@ -1083,6 +1096,7 @@
 		BDE88D77EBDC01774960BE71 = {
 			isa = PBXGroup;
 			children = (
+				8B86F16372CDA2866D3A432F /* Sparkle.xcframework */,
 				45316B45CB436116EC434408 /* RDLKit */,
 				367BDD79C0EB7824B717F2C6 /* RDLDesigner */,
 				2E717BE81530C7484312DD81 /* RDLGen */,
@@ -1477,6 +1491,7 @@
 				C01C79BD576D3C75B35597A8 /* RDLParameterPrompts.m in Sources */,
 				09D910329A1F4BCE8F9BF356 /* RDLOutlineView.m in Sources */,
 				074C762096481754DA5CD64D /* RDLRenderInputsEditor.m in Sources */,
+				521823B93E9DF5DFAA061AA8 /* RDLUpdater-Apple.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1563,6 +1578,7 @@
 				554BCB3E24BC68478B2792A2 /* RDLParameterPrompts.m in Sources */,
 				7FB887BB19BEE1424969CC2B /* RDLOutlineView.m in Sources */,
 				69F15F7E46F913A6667B0B13 /* RDLRenderInputsEditor.m in Sources */,
+				BB61EFC9CB230D2E3898D34B /* RDLUpdater.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -403,7 +403,7 @@
     XCTFail(@"%@", @"the Cocoa bundle should carry a copyright line too");
 
   // The version: one value, in the three places that are read, none of them
-  // still saying 1.0. Scripts/stamp-version.sh is what writes them.
+  // still saying 1.0. gnustep-release-actions' stamp-version.sh writes them.
   NSString *release = nil;
   NSTextCheckingResult *match = [[NSRegularExpression
       regularExpressionWithPattern:@"<key>ApplicationRelease</key>\\s*<string>([^<]+)</string>"
@@ -455,82 +455,10 @@
       XCTFail(@"%@", [NSString stringWithFormat:@"%@ should be %@", key, numeric]);
 }
 
-// The AppImage's opener. NSWorkspace hands a URL to whatever
-// [NSTask launchPathForTool:] finds, and that searches GNUstep's tool
-// directories before $PATH -- inside the image those are in the bundle, where
-// nothing opens anything, so the Website line in the About panel did nothing.
-// The wiring is three files that have to agree, and none of them is exercised
-// by building the app.
-- (void)testTheAppImageCarriesAnOpener {
-  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
-  NSString *(^read)(NSString *) = ^NSString *(NSString *relative) {
-    return [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:relative]
-                                     encoding:NSUTF8StringEncoding
-                                        error:NULL];
-  };
-  NSString *shim = read(@"Scripts/appimage/open");
-  NSString *assets = read(@"Scripts/appimage/install-assets.sh");
-  NSString *appRun = read(@"Scripts/appimage/AppRun");
-  if (shim == nil || assets == nil || appRun == nil) {
-    XCTFail(@"%@", @"could not read the AppImage scripts");
-    return;
-  }
-  if (![[NSFileManager defaultManager]
-          isExecutableFileAtPath:[dir stringByAppendingPathComponent:@"Scripts/appimage/open"]])
-    XCTFail(@"%@", @"the opener has to be executable in the tree, since it is installed as-is");
-
-  // Installed where the tool lookup looks first, under both names GNUstep
-  // asks for: the GSUnknownFileTool default, and NSWorkspace's own fallback.
-  if ([assets rangeOfString:@"usr/System/Tools"].location == NSNotFound)
-    XCTFail(@"%@", @"the opener belongs in the bundle's GNUstep tools directory");
-  for (NSString *name in @[ @"open", @"xdg-open" ])
-    if ([assets rangeOfString:name].location == NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should be installed as %@", name]);
-  if ([appRun rangeOfString:@"GSUnknownFileTool open"].location == NSNotFound)
-    XCTFail(@"%@", @"AppRun should point GSUnknownFileTool at it");
-
-  // And the host's environment has to survive the trip, or the browser it
-  // starts inherits the image's libraries and dies on a symbol.
-  for (NSString *saved in @[ @"RDL_HOST_LD_LIBRARY_PATH", @"RDL_HOST_PATH" ]) {
-    if ([appRun rangeOfString:saved].location == NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should save %@ before overriding it",
-                                                saved]);
-    if ([shim rangeOfString:saved].location == NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"the opener should restore %@", saved]);
-  }
-}
-
-// Ctrl, not Alt. GNUstep's default modifier map is NeXT's -- Alt_L is COMMAND
-// and both Control keys are CONTROL -- so on a Linux desktop the app answered
-// Alt+C where every other window answers Ctrl+C. AppRun writes the map with
-// the defaults tool at launch, beside the theme and the fonts.
-- (void)testAppRunPutsCommandOnTheControlKey {
-  NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
-  NSString *appRun =
-      [NSString stringWithContentsOfFile:[dir stringByAppendingPathComponent:
-                                                  @"Scripts/appimage/AppRun"]
-                                encoding:NSUTF8StringEncoding
-                                   error:NULL];
-  if (appRun == nil) {
-    XCTFail(@"%@", @"could not read AppRun");
-    return;
-  }
-  // The whole map, since half of it is worse than none: a key that is COMMAND
-  // and CONTROL at once fires a menu item and a text binding from one press,
-  // which gnustep-gui's KeyboardSetup warns about.
-  NSDictionary<NSString *, NSString *> *map = @{
-    @"GSFirstCommandKey" : @"Control_L",   // what menu key equivalents fire on
-    @"GSFirstControlKey" : @"NoSymbol",    // ... and no longer CONTROL as well
-    @"GSSecondControlKey" : @"Control_R",  // the right one stays a real CONTROL
-    @"GSFirstAlternateKey" : @"Alt_L",     // Alt, freed from COMMAND
-    @"GSSecondAlternateKey" : @"Alt_R",
-  };
-  for (NSString *key in map) {
-    NSString *line = [NSString stringWithFormat:@"write org.rdl.designer %@ %@", key, map[key]];
-    if ([appRun rangeOfString:line].location == NSNotFound)
-      XCTFail(@"%@", [NSString stringWithFormat:@"AppRun should write: %@", line]);
-  }
-}
+// The AppImage's opener (GSUnknownFileTool, under both names GNUstep asks
+// for, with the host's PATH restored) and its key map (Command on Ctrl, not
+// Alt) are gnustep-release-actions' AppRun and appimage.sh, the same for
+// every app's image: they are checked there, not here.
 
 // The samples are the only RDL files this project ships, so they are the ones
 // someone will open in Report Builder. They used to declare the 2010 namespace

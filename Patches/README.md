@@ -21,9 +21,8 @@ projects on this machine build the same stack and each carrying its own copies
 meant the same fix existed three times, drifted, and outlived its merge
 upstream.
 
-`.github/scripts/dependencies.sh` clones that repository and applies what it
-carries for libs-base and libs-gui, pinned by `GNUSTEP_PATCHES_REF` in the
-workflows.
+That repository publishes the patched stack as releases, and RDLKit builds on
+the one `.github/pins.env` names (`GNUSTEP_PATCHES_VERSION`).
 
 To add a fix, or to check whether one is still needed, go there: its `STATUS.md`
 lists every patch, its pull request and which repositories still carry a copy,

@@ -6,8 +6,23 @@
 #import "RDLEditingContext.h"
 #import "RDLNewReportPanel.h"
 #import "RDLSamples.h"
+#import "RDLUpdater.h"
 
-@implementation RDLAppDelegate
+// MainMenu.xib's RDLDesigner > Check for Updates…, removed where there is no
+// updater (RDLUpdater.h).
+static const NSInteger RDLCheckForUpdatesTag = 1001;
+
+@implementation RDLAppDelegate {
+  RDLUpdater *_updater;
+}
+
+// Updates, set up before the app finishes launching (as Sparkle asks), and
+// not started under XCTest, which reaches no network.
+- (void)applicationWillFinishLaunching:(NSNotification *)n {
+  (void)n;
+  BOOL testing = [[NSProcessInfo processInfo] environment][@"XCTestConfigurationFilePath"] != nil;
+  _updater = [[RDLUpdater alloc] initStarting:!testing];
+}
 
 - (void)applicationDidFinishLaunching:(NSNotification *)n {
   (void)n;
@@ -43,7 +58,16 @@
   NSNib *nib = [[NSNib alloc] initWithNibNamed:@"MainMenu" bundle:[NSBundle mainBundle]];
   [nib instantiateWithOwner:self topLevelObjects:NULL];
   [self populateSamplesMenu];
+  if (!_updater.available) {
+    NSMenu *appMenu = [[_mainMenu itemAtIndex:0] submenu];
+    NSMenuItem *check = [appMenu itemWithTag:RDLCheckForUpdatesTag];
+    if (check) [appMenu removeItem:check];
+  }
   [NSApp setMainMenu:_mainMenu];
+}
+
+- (IBAction)checkForUpdates:(id)sender {
+  [_updater checkForUpdates:sender];
 }
 
 - (void)populateSamplesMenu {
@@ -236,6 +260,7 @@
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
+  if ([item action] == @selector(checkForUpdates:)) return _updater.canCheckForUpdates;
   if ([item action] == @selector(toggleGroupsPane:)) {
     for (NSWindowController *wc in [[self currentDocument] windowControllers])
       if ([wc isKindOfClass:[RDLDesignerWindow class]]) {

@@ -23,6 +23,11 @@
                                     <action selector="orderFrontStandardAboutPanel:" target="-3" id="aboutAction"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Check for Updates…" tag="1001" id="checkForUpdatesItem">
+                                <connections>
+                                    <action selector="checkForUpdates:" target="-2" id="checkForUpdatesAction"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="appSep1"/>
                             <menuItem title="Quit RDLDesigner" keyEquivalent="q" id="quitItem">
                                 <connections>

@@ -627,69 +627,49 @@ server with different fonts can clip a box that fitted when it was made. Either
 render where you import, install the same fonts on both, or turn `CanGrow` back
 on for the boxes that matter.
 
-## Continuous integration
+## Building, continuous integration and releases
 
-`.github/workflows/ci.yml` builds and tests both platforms on every push.
+RDLKit is built the familiar way, on each platform with its own makefile:
 
-* **macOS** — `xcodebuild` for `RDLKit`, `RDLDesigner` and `RDLGen`, both test
-  suites, the RDL corpus score (which fails the build if any file parses to
-  nothing, or if fewer than 79 of the 86 still lay out), and a `rdlgen` smoke
-  test that checks a report and renders it to HTML and PDF.
-* **GNUstep** — the stack is built from source by
-  `.github/scripts/dependencies.sh` (tools-make, libobjc2, libs-base, libs-gui,
-  libs-back with the cairo graphics backend, and tools-xctest) and cached
-  against that script, since it changes far less often than RDLKit does. Then
-  the same three products, both XCTest bundles through `make run-tests`, and the
-  same smoke test — all under `xvfb`, because AppKit drawing needs a display.
+```sh
+# GNUstep (the stack .github/pins.env names; .tools/gnustep.sh runs these in a box with it)
+make && make check && make install
+# macOS (Sparkle's XCFramework in .deps/, by .github/pins.env)
+make -f Makefile.apple && make -f Makefile.apple check
+make -f Makefile.apple install DESTDIR=out
+```
 
-Actions is free for public repositories on the standard runners. On a private
-one the minutes count against the account's allowance and **macOS bills at
-10×**, so the macOS job runs on pull requests and on `master` rather than on
-every push; the Linux job, at 1×, runs on everything.
+`make check` is the same on both: no macOS-only imports
+(`Scripts/check-imports.sh`), both XCTest suites (under `xvfb` on GNUstep,
+because AppKit drawing needs a display), and `rdlgen` checking a sample report
+and rendering it to HTML and PDF (`Scripts/rdlgen-smoke.sh`). On macOS it also
+scores the parser against the RDL corpus, and fails if any file parses to
+nothing or if fewer than 79 of the 86 still lay out.
 
-## Builds and releases
+One workflow, `.github/workflows/build.yml`, runs on every push and `v*` tag.
+It calls gnustep-release-actions' `linux.yml` and `macos.yml`, the same as
+every repository's: they fetch what `.github/pins.env` names (the GNUstep
+stack gnustep-patches publishes, Sparkle), run the commands above, and
+package what was installed. Every push uploads artifacts kept two weeks,
+unsigned and named for the version: `RDLDesigner-macOS-<version>` and the
+AppImage, `RDLKit-<version>-x86_64.AppImage`. A tag (or the workflow run by
+hand with one) also releases them: RDLDesigner signed and notarized, with the
+Sparkle appcast its Check for Updates… reads, and the AppImage with its update
+information, attached to the release.
 
-Every push produces downloadable artifacts, from the run's own page in the
-Actions tab: an `RDLKit-Linux-<sha>` AppImage and an `RDLKit-macOS-<sha>` with
-an unsigned `RDLDesigner.app` and `rdlgen`. They are unsigned, named for the commit,
-and kept for 14 days — for trying a build, not for shipping.
-
-`.github/workflows/release.yml` is the shipping one. It runs on a `v*` tag, or
-by hand for the artifacts without publishing a release. Note that the "Run
-workflow" button only appears once the workflow is on the default branch;
-a tag triggers it from anywhere.
-
-* **Linux** — one AppImage carrying both programs. `Scripts/prepare-appdir.sh`
-  assembles an AppDir with the designer, the CLI and the GNUstep runtime, and
-  `Scripts/package-appimage.sh` hands it to `linuxdeploy`. The layout follows
-  GNUstep's: `AppRun` writes a config pointing `GNUSTEP_SYSTEM_ROOT` and its
-  siblings at wherever the image is mounted, because that path is not known
-  until it runs. Both scripts are ports of the ones in `UDQuakeTools`, which
-  package a GNUstep app the same way; the places they differ are marked in the
-  files. Run the designer by launching the image, and the CLI as
-  `./RDLKit-Linux-*.AppImage rdlgen report.rdl --check`.
-
-  The image carries the **Eau** theme, and `AppRun` selects it — along with the
-  bundled Liberation fonts — by writing them into the designer's own defaults
-  domain at launch, so it looks the way a GNUstep desktop is expected to look
-  rather than like stock GNUstep.
-
-  It also carries `Scripts/appimage/open`, installed into the bundle's GNUstep
-  tools directory as both `open` and `xdg-open` and named by the
-  `GSUnknownFileTool` default. `NSWorkspace` hands a URL to whatever
-  `+[NSTask launchPathForTool:]` finds, and that searches GNUstep's tool
-  directories before `$PATH` — inside the image those are in the bundle, where
-  no opener lives, so the About panel's website link did nothing. The shim
-  restores the host's `PATH` and `LD_LIBRARY_PATH` before handing the URL to
-  `xdg-open` or `gio open`, because a browser started with the image's
-  libraries on its path does not start.
-* **macOS** — `RDLDesigner.app`, and `rdlgen` beside the `RDLKit.framework` it
-  loads through `@rpath` (the tool alone will not start), signed with a
-  Developer ID and notarized. Signing needs `MACOS_CERTIFICATE` (a base64 `.p12`),
-  `MACOS_CERTIFICATE_PASSWORD` and `MACOS_SIGN_IDENTITY`; notarization
-  additionally needs `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID` and
-  `NOTARY_PASSWORD`. Without them the build still produces artifacts, marked
-  `-unsigned`, rather than failing.
+* **Linux** — one AppImage carrying both programs, made by
+  gnustep-release-actions' `appimage` from what `make install` put in
+  `/opt/gnustep` (`.github/release/appimage.conf`): the GNUstep runtime, the
+  Eau theme, DejaVu and Liberation fonts, and an opener installed as `open`
+  and `xdg-open` in the image's GNUstep tools directory (`NSWorkspace` looks
+  there before `$PATH`, so without it the About panel's website link did
+  nothing). Run the designer by launching the image (a report's path opens
+  it), and the CLI as `./RDLKit-*.AppImage rdlgen report.rdl --check`. On a
+  clean Ubuntu it is checked that way.
+* **macOS** — `RDLDesigner.app`, which updates itself with Sparkle
+  (RDLDesigner ▸ Check for Updates…; `RDLUpdater`). Signing and notarizing
+  take the repository's `production` environment's secrets; without them the
+  build still produces artifacts, marked `-unsigned`.
 
 The AppImage bundles DejaVu and Liberation, and the Microsoft core fonts if
 they are installed on the builder. That is the point of bundling any: it is

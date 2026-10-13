@@ -6,6 +6,8 @@
 include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = RDLKitTests
+# Built and run, never installed.
+RDLKitTests_STANDARD_INSTALL = no
 
 RDLKitTests_OBJC_FILES = \
   RDLTestSupport.m \

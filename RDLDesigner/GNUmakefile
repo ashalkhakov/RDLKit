@@ -4,6 +4,7 @@ APP_NAME = RDLDesigner
 RDLDesigner_NEEDS_GUI = yes
 RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -I../RDLKit/MiniVB -Werror=logical-not-parentheses
 RDLDesigner_OBJC_FILES = \
+  RDLUpdater.m \
   main.m \
   RDLEditingContext.m \
   RDLChange.m \

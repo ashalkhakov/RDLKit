@@ -6,12 +6,15 @@
 include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = RDLDesignerTests
+# Built and run, never installed.
+RDLDesignerTests_STANDARD_INSTALL = no
 
 # The app's objects are compiled in directly, so the checks can drive the same
 # classes the app runs. Only main.m is left out -- its main() would collide
 # with the test runner's -- so the window controllers and app delegate the
 # window checks exercise are all present.
 RDLDesignerTests_OBJC_FILES = \
+  ../RDLDesigner/RDLUpdater.m \
   RDLEditingCoreTests.m \
   RDLCanvasTests.m \
   RDLDesignerTestSupport.m \
