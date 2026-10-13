@@ -26,6 +26,10 @@ typedef NS_ENUM(NSInteger, RDLDiagnosticSeverity) {
 @property (nonatomic, copy) NSString *message;
 // Where in the report, in a form a person can find: "Body / Textbox 'Total' / Value".
 @property (nonatomic, copy) NSString *path;
+// The report item the complaint is about, by name, so what is looking at the
+// report can show it; nil when it is about the report itself, a dataset or a
+// parameter rather than something drawn.
+@property (nonatomic, copy) NSString *itemName;
 // The expression the complaint is about, as it was written.
 @property (nonatomic, copy) NSString *source;
 // "unknown-field", "unknown-function", "arity", "type", "scope", "syntax",
@@ -39,6 +43,13 @@ typedef NS_ENUM(NSInteger, RDLDiagnosticSeverity) {
 // Every problem found, in report order. An empty array means nothing was
 // found, which is not the same as the report being correct.
 + (NSArray<RDLDiagnostic *> *)checkReport:(RDLReport *)report;
+// One expression, as it would be checked in the body of `report` reading the
+// dataset named -- or, naming none, the report's only dataset if it has one.
+// What an editor asks while the expression is being written. A literal has
+// nothing to find.
++ (NSArray<RDLDiagnostic *> *)checkExpression:(NSString *)source
+                                     inReport:(RDLReport *)report
+                                  dataSetName:(NSString *)dataSetName;
 @end
 
 // The shape of the data a report needs, so a caller can check what it is about

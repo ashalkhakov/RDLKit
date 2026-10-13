@@ -1,13 +1,22 @@
 #import "RDLRichTextCodec.h"
+#import "RDLRichTextFormatter.h"
 
 NSString * const RDLExpressionRunAttributeName = @"RDLExpressionRun";
+// The expressions in a run's style, and in a paragraph's, ride on their text:
+// the editor shows what they cannot evaluate as the textbox's own style, so
+// reading the style back off the attributes alone would drop them.
+static NSString *const RDLRunStyleExpressionsAttributeName = @"RDLRunStyleExpressions";
+static NSString *const RDLParagraphStyleExpressionsAttributeName = @"RDLParagraphStyleExpressions";
+// A run's Label, ToolTip, link and MarkupType, which the editor has no way to
+// show: an RDLTextRun holding just those.
+static NSString *const RDLRunOwnPropertiesAttributeName = @"RDLRunOwnProperties";
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 
 static BOOL RDLStyleIsEmpty(RDLStyle *s) {
   return ![s.fontFamily length] && s.fontSize == nil && s.fontWeight == RDLFontWeightUnspecified &&
          s.fontStyle == RDLFontStyleUnspecified && ![s.color length] && s.textDecoration == RDLTextDecorationUnspecified &&
-         s.textAlign == RDLTextAlignUnspecified;
+         s.textAlign == RDLTextAlignUnspecified && [s.expressions isEmpty];
 }
 
 // A style holding only what differs from the textbox base style. Every font
@@ -66,7 +75,46 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
 @implementation RDLRichTextResult
 @end
 
+BOOL RDLTextboxHoldsRichText(RDLTextbox *box) {
+  if (![box isKindOfClass:[RDLTextbox class]])
+    return NO;
+  for (RDLParagraph *paragraph in box.paragraphs)
+    for (RDLTextRun *run in paragraph.runs)
+      // An expression is the one a plain field cannot show at all; a run with
+      // a style of its own is the one it cannot keep.
+      if ([RDLExpr isExpressionSource:run.value] || run.style != nil)
+        return YES;
+  return NO;
+}
+
 @implementation RDLRichTextCodec
+
++ (NSColor *)expressionTint {
+  return [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.18];
+}
+
++ (NSAttributedString *)oneLineForItem:(RDLTextbox *)item {
+  NSAttributedString *full = [self attributedStringForItem:item];
+  NSMutableAttributedString *line = [full mutableCopy];
+  // Paragraphs become one line with a mark between them: a field shows one
+  // line whatever it is given, and a silent join would read as one paragraph.
+  for (NSInteger at = (NSInteger)[line length] - 1; at >= 0; at--) {
+    unichar c = [[line string] characterAtIndex:(NSUInteger)at];
+    if (c == '\n' || c == '\r')
+      [line replaceCharactersInRange:NSMakeRange((NSUInteger)at, 1) withString:@" ¶ "];
+  }
+  NSRange all = NSMakeRange(0, [line length]);
+  if (all.length == 0)
+    return line;
+  // An expression reads as a pill here as it does in the editor.
+  [line removeAttribute:NSBackgroundColorAttributeName range:all];
+  RDLEnumerateAttribute(line, RDLExpressionRunAttributeName, all, ^(id value, NSRange range, BOOL *stop) {
+    (void)stop;
+    if (value)
+      [line addAttribute:NSBackgroundColorAttributeName value:[self expressionTint] range:range];
+  });
+  return line;
+}
 
 + (RDLRichTextResult *)resultForAttributedString:(NSAttributedString *)text
                                             item:(RDLTextbox *)item {
@@ -103,18 +151,41 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
   // walking the same paragraphs in the same order so the ranges line up.
   NSUInteger at = 0;
   BOOL first = YES;
+  NSArray<NSString *> *markers = [RDLTextAttributes listMarkersForParagraphs:item.paragraphs];
+  NSUInteger paraIndex = 0;
   for (RDLParagraph *para in item.paragraphs) {
     if (!first)
       at += 1;  // the newline the kit puts between paragraphs
     first = NO;
+    NSUInteger paraStart = at;
+    NSString *marker = markers[paraIndex++];
+    if ([marker length])
+      at += [marker length] + 1;  // the list marker and its tab
     for (RDLTextRun *run in para.runs) {
       NSUInteger length = [run.value length];
       if (length && [RDLExpr isExpressionSource:run.value] && at + length <= [out length])
         [out addAttribute:RDLExpressionRunAttributeName
                     value:run.value
                     range:NSMakeRange(at, length)];
+      if (length && [run hasOwnProperties] && at + length <= [out length]) {
+        RDLTextRun *extras = [[RDLTextRun alloc] init];
+        [extras takeOwnPropertiesFrom:run];
+        [out addAttribute:RDLRunOwnPropertiesAttributeName
+                    value:extras
+                    range:NSMakeRange(at, length)];
+      }
+      if (length && run.style && ![run.style.expressions isEmpty] && at + length <= [out length])
+        [out addAttribute:RDLRunStyleExpressionsAttributeName
+                    value:run.style.expressions
+                    range:NSMakeRange(at, length)];
       at += length;
     }
+    // The paragraph's, over its text and the newline ending it.
+    NSUInteger end = MIN(para == [item.paragraphs lastObject] ? at : at + 1, [out length]);
+    if (para.style && ![para.style.expressions isEmpty] && end > paraStart)
+      [out addAttribute:RDLParagraphStyleExpressionsAttributeName
+                  value:para.style.expressions
+                  range:NSMakeRange(paraStart, end - paraStart)];
   }
   return out;
 }
@@ -163,6 +234,27 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
     RDLParagraph *para = [[RDLParagraph alloc] init];
     NSMutableString *paraText = [NSMutableString string];
     RDLTextAlign paraAlign = RDLTextAlignUnspecified;
+    // The paragraph's indents, spacing and list style ride on its characters,
+    // the newline ending it included, so an empty paragraph keeps them too.
+    NSUInteger probe = paraRange.length ? paraRange.location : paraEnd;
+    RDLParagraph *layout = probe < len ? [text attribute:RDLParagraphLayoutAttributeName
+                                                 atIndex:probe
+                                          effectiveRange:NULL]
+                                       : nil;
+    if ([layout isKindOfClass:[RDLParagraph class]] && [layout hasOwnLayout]) {
+      [para takeLayoutFrom:layout];
+      rich = YES;
+    }
+    RDLStyleExpressions *paraExprs =
+        probe < len ? [text attribute:RDLParagraphStyleExpressionsAttributeName
+                              atIndex:probe
+                       effectiveRange:NULL]
+                    : nil;
+    if ([paraExprs isKindOfClass:[RDLStyleExpressions class]] && ![paraExprs isEmpty]) {
+      para.style = [[RDLStyle alloc] init];
+      para.style.expressions = paraExprs;
+      rich = YES;
+    }
     NSUInteger loc = paraRange.location;
     while (loc < NSMaxRange(paraRange)) {
       NSRange eff;
@@ -174,7 +266,27 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
       // that happens to begin with "=".
       NSString *expression = attrs[RDLExpressionRunAttributeName];
       run.value = [expression length] ? expression : [plain substringWithRange:runRange];
+      // A list marker is drawn, not typed: leave it out, and keep only what was
+      // typed after it if the editor carried the marker's attributes onward.
+      NSString *marker = attrs[RDLListMarkerAttributeName];
+      if ([marker length] && ![expression length]) {
+        NSString *typed = [run.value hasPrefix:marker] ? [run.value substringFromIndex:[marker length]]
+                          : [marker hasPrefix:run.value] ? @""
+                                                         : run.value;
+        loc = NSMaxRange(runRange);
+        if ([typed length] == 0)
+          continue;
+        run.value = typed;
+      }
       RDLStyle *sparse = RDLSparseRunStyle(attrs, base);
+      RDLTextRun *extras = attrs[RDLRunOwnPropertiesAttributeName];
+      if ([extras isKindOfClass:[RDLTextRun class]] && [extras hasOwnProperties]) {
+        [run takeOwnPropertiesFrom:extras];
+        rich = YES;
+      }
+      RDLStyleExpressions *runExprs = attrs[RDLRunStyleExpressionsAttributeName];
+      if ([runExprs isKindOfClass:[RDLStyleExpressions class]] && ![runExprs isEmpty])
+        sparse.expressions = runExprs;
       if (!RDLStyleIsEmpty(sparse)) {
         run.style = sparse;
         rich = YES;
@@ -190,10 +302,15 @@ static RDLTextAlign RDLAlignName(NSDictionary *attrs) {
       run.value = @"";
       [para.runs addObject:run];
     }
-    RDLTextAlign baseAlign =
-        base.textAlign != RDLTextAlignUnspecified ? base.textAlign : RDLTextAlignLeft;
+    // What the editor shows for text nobody has aligned. General -- the spec's
+    // default -- draws text left, and NSTextView reports Left for a paragraph
+    // with no alignment of its own, so a paragraph saying Left over a base of
+    // General is saying nothing and must not make the text rich.
+    RDLTextAlign baseAlign = base.textAlign;
+    if (baseAlign == RDLTextAlignUnspecified || baseAlign == RDLTextAlignGeneral)
+      baseAlign = RDLTextAlignLeft;
     if (paraAlign != RDLTextAlignUnspecified && paraAlign != baseAlign) {
-      RDLStyle *ps = [[RDLStyle alloc] init];
+      RDLStyle *ps = para.style ?: [[RDLStyle alloc] init];
       ps.textAlign = paraAlign;
       para.style = ps;
       rich = YES;

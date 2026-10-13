@@ -13,7 +13,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 - (instancetype)initWithDocument:(RDLDocument *)document {
   self = [super init];
   if (self) {
-    _document = document ?: [[RDLDocument alloc] initWithReport:[RDLSamples blankLetter]];
+    _document = document ?: [[RDLDocument alloc] initWithReport:[RDLSamples blankReport]];
     _selection = [[RDLSelection alloc] init];
     _editor = [[RDLEditor alloc] initWithDocument:_document];
     _zoom = 1.0;
@@ -22,13 +22,32 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
     // generator and "edit this subreport" all need. Weak on that side: the
     // window controller holding this context is what decides its lifetime.
     _document.context = self;
+    // A change to the report as a whole may have taken away what is selected:
+    // re-parsing an edited source builds a new object graph, so the items the
+    // selection holds are no longer in the report even though they look like
+    // the ones that are. The selection checks itself rather than each such
+    // edit remembering to tell it.
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(documentDidChange:)
+                                                 name:RDLDocumentDidChangeNotification
+                                               object:_document];
   }
   return self;
 }
 
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)documentDidChange:(NSNotification *)note {
+  RDLChange *change = [note userInfo][RDLChangeKey];
+  if (change.scope == RDLChangeScopeReport)
+    [_selection validateAgainstReport:_document.report];
+}
+
 - (instancetype)initWithReport:(RDLReport *)report {
   return [self initWithDocument:[[RDLDocument alloc]
-                                    initWithReport:report ?: [RDLSamples blankLetter]]];
+                                    initWithReport:report ?: [RDLSamples blankReport]]];
 }
 
 - (instancetype)init {
@@ -54,7 +73,7 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 }
 
 - (void)loadBlankReport {
-  [self loadReport:[RDLSamples blankLetter]];
+  [self loadReport:[RDLSamples blankReport]];
 }
 
 - (void)loadSampleWithId:(NSString *)sampleId {
@@ -74,9 +93,6 @@ NSString * const RDLViewStateDidChangeNotification = @"RDLViewStateDidChangeNoti
 // of zooming in far enough.
 const CGFloat RDLMinimumZoom = 0.4;
 const CGFloat RDLMaximumZoom = 4.0;
-static const CGFloat kRDLZoomFineStep = 0.1;
-static const CGFloat kRDLZoomCoarseStep = 0.25;
-static const CGFloat kRDLZoomCoarseAbove = 2.0;
 
 - (RDLTablix *)engagedTablix {
   RDLSelection *selection = self.selection;
@@ -125,19 +141,33 @@ static const CGFloat kRDLZoomCoarseAbove = 2.0;
   [self postViewStateChange];
 }
 
-// Above 200% a tenth of the paper is a small step and there is a lot of range
-// left, so the step grows with the zoom rather than making the keyboard press
-// the same key twenty times to cross it.
-static CGFloat RDLZoomStepFrom(CGFloat zoom) {
-  return zoom >= kRDLZoomCoarseAbove ? kRDLZoomCoarseStep : kRDLZoomFineStep;
+NSArray<NSNumber *> *RDLZoomStops(void) {
+  // The whole range, smallest first: what the zoom control lists is what the
+  // keyboard steps through, so a press always moves both.
+  return @[ @0.4, @0.5, @0.75, @1.0, @1.25, @1.5, @2.0, @3.0, @4.0 ];
 }
 
+// A zoom counts as being on a stop when it is within this of it, so a zoom
+// typed or arrived at by other means still steps to the next stop rather than
+// to itself.
+static const CGFloat kRDLZoomSame = 0.001;
+
 - (void)zoomIn {
-  self.zoom = _zoom + RDLZoomStepFrom(_zoom);
+  for (NSNumber *stop in RDLZoomStops())
+    if ([stop doubleValue] > _zoom + kRDLZoomSame) {
+      self.zoom = [stop doubleValue];
+      return;
+    }
+  self.zoom = RDLMaximumZoom;
 }
 
 - (void)zoomOut {
-  self.zoom = _zoom - RDLZoomStepFrom(_zoom - kRDLZoomFineStep / 2);
+  for (NSNumber *stop in [RDLZoomStops() reverseObjectEnumerator])
+    if ([stop doubleValue] < _zoom - kRDLZoomSame) {
+      self.zoom = [stop doubleValue];
+      return;
+    }
+  self.zoom = RDLMinimumZoom;
 }
 
 - (void)toggleGrid {
@@ -150,7 +180,7 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   return [RDLItemFactory insertionPointInReport:self.report selection:_selection];
 }
 
-- (NSArray<NSString *> *)allowedElementKinds {
+- (NSArray<NSNumber *> *)allowedElementKinds {
   return [RDLItemFactory elementKindsAllowedAt:[self insertionPoint]];
 }
 
@@ -158,15 +188,40 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   return [[self insertionPoint] localizedDescription];
 }
 
-- (void)addItemOfKind:(NSString *)kind {
+// A data region the factory could bind to nothing gets a dataset of its own,
+// empty, reading from the report's first source if it has one: a region
+// pointing at no dataset falls back to whichever is first when the report
+// gains one, which is some other region's. In the same step as the insertion.
+- (void)giveDataSetTo:(RDLItem *)item {
+  if (![item isKindOfClass:[RDLDataRegion class]])
+    return;
+  RDLDataRegion *region = (RDLDataRegion *)item;
+  if ([region.dataSetName length] && [self.report dataSetNamed:region.dataSetName])
+    return;
+  NSString *base = [NSString stringWithFormat:@"%@Data", item.name ?: @"Region"];
+  NSString *name = base;
+  for (NSUInteger i = 2; [self.report dataSetNamed:name] != nil; i++)
+    name = [NSString stringWithFormat:@"%@%lu", base, (unsigned long)i];
+  RDLDataSet *dataSet = [[RDLDataSet alloc] init];
+  dataSet.name = name;
+  dataSet.dataSourceName = [[self.report.dataSources firstObject] name];
+  dataSet.fields = @[];
+  [_editor addDataSet:dataSet];
+  region.dataSetName = name;
+}
+
+- (void)addItemOfKind:(RDLItemKind)kind {
   RDLInsertionPoint *point = [self insertionPoint];
   if (![RDLItemFactory kind:kind isAllowedAt:point])
     return;
   RDLItem *item = [RDLItemFactory itemOfKind:kind atPoint:point inReport:self.report];
   if (item == nil)
     return;
-  if (point.cell != nil) {
-    [self addItem:item toCell:point.cell ofTablix:point.cellTablix bandKey:point.bandKey];
+  [_editor beginGroup:[NSString stringWithFormat:@"Add %@", RDLTitleOfItemKind(kind)]];
+  [self giveDataSetTo:item];
+  if (point.cellTablix != nil) {
+    [self addItem:item toCell:[self cellAtPoint:point] ofTablix:point.cellTablix bandKey:point.bandKey];
+    [_editor endGroup];
     return;
   }
   // Insert directly after the selection when there is one, so the new element
@@ -178,7 +233,59 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
       index = at + 1;
   }
   [_editor insertItem:item into:point.items bandKey:point.bandKey atIndex:index];
+  [_editor endGroup];
   [_selection selectItem:item inBandWithKey:point.bandKey];
+}
+
+- (BOOL)moveSelectedItemInStacking:(RDLStackingMove)move {
+  return [_editor moveItem:[self selectedItem] inStacking:move];
+}
+
+- (BOOL)canMoveSelectedItemInStacking:(RDLStackingMove)move {
+  return [_editor canMoveItem:[self selectedItem] inStacking:move];
+}
+
+// The cell the selection points at, when that cell is empty. An item selected
+// in a cell also resolves to a cell, but that one is full.
+- (RDLInsertionPoint *)selectedEmptyCell {
+  RDLInsertionPoint *point = [self insertionPoint];
+  return point.cellTablix != nil && point.cell.item == nil ? point : nil;
+}
+
+// The cell a point is in -- made first, for a corner the file wrote no cell
+// for. Call inside the undo group of what goes in it.
+- (RDLTablixCell *)cellAtPoint:(RDLInsertionPoint *)point {
+  if (point.cell != nil || point.cornerRow < 0)
+    return point.cell;
+  return [_editor makeCornerCellAtRow:(NSUInteger)point.cornerRow
+                               column:(NSUInteger)point.cornerColumn
+                             ofTablix:point.cellTablix];
+}
+
+- (RDLTextbox *)blankTextboxForSelectedCell {
+  RDLInsertionPoint *point = [self selectedEmptyCell];
+  if (point == nil)
+    return nil;
+  RDLItem *item = [RDLItemFactory itemOfKind:RDLItemKindTextbox atPoint:point inReport:self.report];
+  if (![item isKindOfClass:[RDLTextbox class]])
+    return nil;
+  // Blank: the stand-in words a text box inserted from the menu gets would be
+  // text nobody asked for in a cell that was only being given a border. Empty
+  // rather than nil, which is how a blank cell reads from a file -- and a nil
+  // value is what the canvas labels with the element's name.
+  RDLTextbox *blank = (RDLTextbox *)item;
+  blank.value = @"";
+  return blank;
+}
+
+- (BOOL)addItemToSelectedEmptyCell:(RDLItem *)item {
+  RDLInsertionPoint *point = [self selectedEmptyCell];
+  if (point == nil || item == nil)
+    return NO;
+  [_editor beginGroup:nil];
+  [self addItem:item toCell:[self cellAtPoint:point] ofTablix:point.cellTablix bandKey:point.bandKey];
+  [_editor endGroup];
+  return YES;
 }
 
 // A cell holds one report item, so putting a second thing in one means the
@@ -222,7 +329,27 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
 }
 
 - (void)deleteSelectedItem {
-  RDLItem *item = [self selectedItem];
+  // A band selected is the band itself: deleting a page header or footer is
+  // the only way to be rid of one, and it is what Delete on its row in the
+  // outline means. The body is not one of these -- a report is its body.
+  if (_selection.scope == RDLSelectionScopeBand) {
+    [_editor removePageSectionWithKey:_selection.bandKey];
+    return;
+  }
+  // Everything selected goes, as one step: a box drawn round five things and
+  // Delete is one act, and one undo puts them all back.
+  NSArray<RDLItem *> *items = _selection.items;
+  if ([items count] > 1) {
+    [_editor beginGroup:@"Delete"];
+    for (RDLItem *each in items)
+      [self deleteItem:each];
+    [_editor endGroup];
+    return;
+  }
+  [self deleteItem:[self selectedItem]];
+}
+
+- (void)deleteItem:(RDLItem *)item {
   if (item == nil)
     return;
   // An item that is a cell's contents is not in any band's item list: deleting
@@ -231,16 +358,17 @@ static CGFloat RDLZoomStepFrom(CGFloat zoom) {
   RDLTablixCell *cell = [self.report cellContainingItem:item tablix:&tablix];
   if (cell != nil) {
     NSInteger row = -1, column = -1;
-    NSArray<RDLTablixRow *> *rows = tablix.tablixBody.rows;
-    for (NSUInteger r = 0; r < [rows count]; r++) {
-      NSUInteger at = [rows[r].cells indexOfObjectIdenticalTo:cell];
-      if (at != NSNotFound) {
-        // In grid terms, which is what a selection holds: a crosstab's
-        // column-heading rows and a grouped tablix's row-header columns come
-        // before the body's own.
-        row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:r];
-        column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:at];
-      }
+    NSUInteger bodyRow = 0, bodyColumn = 0;
+    if ([tablix getRow:&bodyRow column:&bodyColumn ofCell:cell]) {
+      // In grid terms, which is what a selection holds: a crosstab's
+      // column-heading rows and a grouped tablix's row-header columns come
+      // before the body's own.
+      row = (NSInteger)[RDLTablixGeometry gridRowOf:tablix forBodyRow:bodyRow];
+      column = (NSInteger)[RDLTablixGeometry gridColumnOf:tablix forBodyColumn:bodyColumn];
+    } else if ([tablix getCornerRow:&bodyRow column:&bodyColumn ofCell:cell]) {
+      // The corner is the grid's top left, row for row and column for column.
+      row = (NSInteger)bodyRow;
+      column = (NSInteger)bodyColumn;
     }
     [_editor setItem:nil inCell:cell ofTablix:tablix];
     [_selection selectCellOfTablix:tablix row:row column:column inBandWithKey:_selection.bandKey];
@@ -291,16 +419,19 @@ static NSString * const kRDLItemPboardType = @"com.rdlkit.item-xml";
 - (void)insertCopiedItem:(RDLItem *)item {
   if (item == nil)
     return;
+  // Whatever it is, it goes where the selection says: every kind is allowed
+  // everywhere.
   RDLInsertionPoint *point = [self insertionPoint];
-  // A data region cannot live inside a Rectangle, so a pasted one goes to the
-  // band instead of being silently dropped.
-  if (![RDLItemFactory kind:item.rdlElementName isAllowedAt:point]) {
-    [_selection selectBandWithKey:point.bandKey];
-    point = [self insertionPoint];
-    if (![RDLItemFactory kind:item.rdlElementName isAllowedAt:point])
-      return;
-  }
   [RDLItemFactory renameTreeUniquely:item inReport:self.report];
+  // Into the cell, when that is what is selected: a cell holds one item, and
+  // where it sits is the cell's business, so there is nothing to offset.
+  if (point.cellTablix != nil) {
+    [_editor beginGroup:@"Paste"];
+    [_editor setItem:item inCell:[self cellAtPoint:point] ofTablix:point.cellTablix];
+    [_editor endGroup];
+    [_selection selectItem:item inBandWithKey:point.bandKey];
+    return;
+  }
   // Offset the copy so it does not hide exactly behind the original.
   CGFloat step = [RDLEditor gridStep] * 2;
   item.left = [RDLEditor snap:item.left + step];

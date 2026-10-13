@@ -1,11 +1,10 @@
 #!/bin/sh
 # Run a command inside the GNUstep image, with this checkout mounted.
 #
-#   .tools/gnustep.sh make -C RDLKitTests run-tests
+#   .tools/gnustep.sh make check
 #
-# The image is not on any registry -- it is built locally from
-# gnustep.Dockerfile, which compiles the whole GNUstep stack from source and
-# takes the better part of an hour the first time. It is cached after that.
+# The image is built locally from gnustep.Dockerfile, on the released stack
+# CI builds on (a few minutes, once).
 set -e
 root=$(cd "$(dirname "$0")/.." && pwd)
 image=rdlkit-gnustep
@@ -16,12 +15,10 @@ $image has not been built yet. It is a local image, not one to pull:
 
     docker build -f .tools/gnustep.Dockerfile -t $image .
 
-That compiles libobjc2, libdispatch, gnustep-make, base, gui, back and
-tools-xctest from source, so expect it to take a while. Afterwards this
-script is fast.
+That unpacks the GNUstep stack .github/pins.env names, the one CI builds on.
 MSG
   exit 1
 fi
 
 exec docker run --rm -t -v "$root":/src -w /src "$image" \
-  sh -c '. /gnustep/System/Library/Makefiles/GNUstep.sh; xvfb-run -a "$@"' -- "$@"
+  sh -c '. /opt/gnustep/System/Library/Makefiles/GNUstep.sh; xvfb-run -a "$@"' -- "$@"

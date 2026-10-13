@@ -4,6 +4,32 @@
 #import "RDLKit.h"
 #import "RDLCompatibility.h"
 
+NSString *RDLWordsOfName(NSString *name) {
+  NSMutableString *words = [NSMutableString string];
+  NSCharacterSet *upper = [NSCharacterSet uppercaseLetterCharacterSet];
+  for (NSUInteger i = 0; i < [name length]; i++) {
+    NSString *letter = [name substringWithRange:NSMakeRange(i, 1)];
+    if (i > 0 && [upper characterIsMember:[name characterAtIndex:i]]) {
+      [words appendString:@" "];
+      letter = [letter lowercaseString];
+    }
+    [words appendString:letter];
+  }
+  return words;
+}
+
+void RDLShowColorInWell(NSColorWell *well, NSString *color) {
+  // A colour that is not one -- nothing stated, Transparent, or an expression
+  // worked out per row -- is not something a well can show, so it shows white
+  // and the field beside it says what is actually there.
+  BOOL showable = [color length] && ![color hasPrefix:@"="] && !RDLColorIsTransparent(color);
+  [well setColor:showable ? RDLColorFromHex(color) : [NSColor whiteColor]];
+}
+
+NSString *RDLColorChosenInWell(NSColorWell *well) {
+  return RDLHexFromColor([well color]);
+}
+
 @implementation RDLFieldBinding
 @end
 
@@ -94,13 +120,55 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
   return YES;
 }
 
+// The same question asked of an item's kind rather than of what it happens to
+// hold: every step of the path is a property the object in front of it
+// declares, whether or not anything has been put there yet. A line that states
+// no border still has a style that can hold one, so "style.border.width" is a
+// property of that line -- there is simply nothing at the end of it yet.
+//
+// Worth keeping the two apart. RDLCanReadKeyPath answers "can this be read
+// now", which is what filling a control needs; this answers "does this item
+// have such a property at all", which is what deciding to write one needs. A
+// control from a section that does not apply still fails both.
+static BOOL RDLKeyPathIsDeclared(id target, NSString *keyPath) {
+  id probe = target;
+  for (NSString *key in [keyPath componentsSeparatedByString:@"."]) {
+    if (probe == nil)
+      return YES;  // declared, but nothing there yet: the steps so far all hold
+    if (![probe respondsToSelector:NSSelectorFromString(key)])
+      return NO;
+    probe = [probe valueForKey:key];
+  }
+  return YES;
+}
+
+// What a path needs in place before it can be written through. Only the line
+// section reaches two steps down today, and this is deliberately a list rather
+// than a walk that makes an object of whatever class a property declares:
+// creating things on the way to a mistyped path would turn a typo into a model
+// change. Undo leaves the made object behind, which costs nothing -- a border
+// stating no style, width or colour is not written to the file at all.
+static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
+  if ([keyPath hasPrefix:@"style.border."] && item.style.border == nil)
+    item.style.border = [[RDLBorder alloc] init];
+}
+
 - (void)fillFromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
-  for (RDLFieldBinding *b in _bindings) {
+  for (RDLFieldBinding *b in _bindings)
+    [self fill:b fromItem:item band:band report:report];
+}
+
+// One control, from the model. Also used after a write, to bring the controls
+// that show the same property along with the one that was typed into: a
+// colour is a well beside a field, and a colour typed in has to reach the well
+// as surely as one picked reaches the field.
+- (void)fill:(RDLFieldBinding *)b fromItem:(RDLItem *)item band:(RDLBand *)band report:(RDLReport *)report {
+  {
     id target = [self targetForBinding:b item:item band:band report:report];
     if (target == nil)
-      continue;
+      return;
     if (!RDLCanReadKeyPath(target, b.keyPath))
-      continue;
+      return;
     id value = [target valueForKeyPath:b.keyPath];
     switch (b.kind) {
       case RDLFieldKindText: {
@@ -114,6 +182,9 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         [(NSTextField *)b.control
             setStringValue:[NSString stringWithFormat:@"%.3f",
                                      RDLUnitsFromInches([value doubleValue], report.unit)]];
+        break;
+      case RDLFieldKindInteger:
+        [(NSTextField *)b.control setStringValue:[NSString stringWithFormat:@"%ld", (long)[value integerValue]]];
         break;
       case RDLFieldKindLength: {
         RDLLength *len = [value isKindOfClass:[RDLLength class]] ? value : nil;
@@ -163,12 +234,14 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       }
       case RDLFieldKindColor: {
-        NSString *hex = [value isKindOfClass:[NSString class]] ? value : nil;
-        // A transparent background is not a colour the well can show, so it
-        // shows the paper it would let through.
-        [(NSColorWell *)b.control setColor:RDLColorIsTransparent(hex)
-                                               ? [NSColor whiteColor]
-                                               : RDLColorFromHex(hex)];
+        RDLShowColorInWell((NSColorWell *)b.control,
+                           [value isKindOfClass:[NSString class]] ? value : nil);
+        break;
+      }
+      case RDLFieldKindCheck: {
+        NSUInteger on = [b.values count] > 1 ? 1 : NSNotFound;
+        NSUInteger index = [b.values indexOfObject:(value ?: [NSNull null])];
+        [(NSButton *)b.control setState:index == on && on != NSNotFound ? NSOnState : NSOffState];
         break;
       }
       case RDLFieldKindPopUpIndex: {
@@ -185,17 +258,39 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
 
 #pragma mark - UI -> model
 
+// The other controls that show the property just written -- a colour well
+// beside the field that was typed into -- filled from the model, so the pair
+// agrees without waiting for a reload that a live edit deliberately skips.
+- (void)bringAlongControlsSharing:(RDLFieldBinding *)applied
+                             item:(RDLItem *)item
+                             band:(RDLBand *)band
+                           report:(RDLReport *)report {
+  for (RDLFieldBinding *other in _bindings) {
+    if (other == applied || other.control == applied.control || other.scope != applied.scope)
+      continue;
+    if (![other.keyPath isEqualToString:applied.keyPath])
+      continue;
+    [self fill:other fromItem:item band:band report:report];
+  }
+}
+
 - (BOOL)applyControl:(id)control
               editor:(RDLEditor *)editor
                 item:(RDLItem *)item
              bandKey:(NSString *)bandKey {
+  RDLBand *band = [bandKey length] ? [editor.document.report bandWithKey:bandKey] : nil;
   for (RDLFieldBinding *b in _bindings) {
     if (b.control != control)
       continue;
-    // Same reasoning as RDLCanReadKeyPath: a control belonging to a section
-    // that does not apply must not write into an item without that property.
-    if (b.scope == RDLFieldScopeItem && item != nil && !RDLCanReadKeyPath(item, b.keyPath))
+    // A control belonging to a section that does not apply must not write into
+    // an item without that property. Asked of the item's kind, not of what it
+    // holds: a line that states no border yet still has somewhere to put one,
+    // and the old question -- can this be read right now -- answered no, so
+    // the thickness and dash fields wrote nowhere and said nothing about it.
+    if (b.scope == RDLFieldScopeItem && item != nil && !RDLKeyPathIsDeclared(item, b.keyPath))
       continue;
+    if (b.scope == RDLFieldScopeItem && item != nil)
+      RDLEnsureKeyPathIsWritable(item, b.keyPath);
     id value = nil;
     switch (b.kind) {
       case RDLFieldKindText: {
@@ -209,6 +304,9 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         // the inches everything downstream measures in.
         value = @(RDLInchesFromUnits([[(NSTextField *)b.control stringValue] doubleValue],
                                      editor.document.report.unit));
+        break;
+      case RDLFieldKindInteger:
+        value = @(MAX([[(NSTextField *)b.control stringValue] integerValue], (NSInteger)0));
         break;
       case RDLFieldKindLength:
         // Clearing the field removes the measurement rather than storing zero.
@@ -248,6 +346,7 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
                         forKeyPath:b.keyPath];
             break;
         }
+        [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
         return YES;
       }
       case RDLFieldKindLengthOrExpression: {
@@ -276,6 +375,7 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
             [editor setReportValue:length forKeyPath:b.keyPath];
             break;
         }
+        [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
         return YES;
       }
       case RDLFieldKindValue: {
@@ -285,8 +385,17 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         break;
       }
       case RDLFieldKindColor:
-        value = RDLHexFromColor([(NSColorWell *)b.control color]);
+        value = RDLColorChosenInWell((NSColorWell *)b.control);
         break;
+      case RDLFieldKindCheck: {
+        NSUInteger i = [(NSButton *)b.control state] == NSOnState ? 1 : 0;
+        if (i >= [b.values count])
+          return YES; // bound, but nothing sensible to write
+        value = b.values[i];
+        if (value == [NSNull null])
+          value = nil;
+        break;
+      }
       case RDLFieldKindPopUpIndex: {
         NSInteger i = [(NSPopUpButton *)b.control indexOfSelectedItem];
         if (i < 0 || i >= (NSInteger)[b.values count])
@@ -310,6 +419,7 @@ static BOOL RDLCanReadKeyPath(id target, NSString *keyPath) {
         [editor setReportValue:value forKeyPath:b.keyPath];
         break;
     }
+    [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
     return YES;
   }
   return NO;

@@ -26,6 +26,8 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
 @end
 
 @implementation RDLDataSourceView {
+  // Whether the source names a provider this pane does not model.
+  BOOL _unknownProvider;
   RDLEditingContext *_context;
   BOOL _filling;
 }
@@ -78,6 +80,11 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   BOOL any = _dataSource != nil;
   NSDictionary *properties = RDLConnectionProperties(_dataSource.connectString);
   RDLDataProviderKind kind = RDLDataProviderKindFromString(_dataSource.dataProvider);
+  // A provider this kit does not read -- SQL, OLEDB, anything a server offers
+  // -- is shown as the file has it and left alone. Taking it for JSON, which
+  // is what an unrecognised one used to become, meant that touching any
+  // control here rewrote both the provider and the connect string.
+  _unknownProvider = any && kind == RDLDataProviderKindUnspecified;
   if (kind == RDLDataProviderKindUnspecified)
     kind = RDLDataProviderKindJSON;
 
@@ -85,7 +92,7 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   [_typePop selectItemAtIndex:kind - RDLDataProviderKindJSON];
 
   NSString *inlineText = properties[RDLInlineKeyForProviderKind(kind)];
-  BOOL embedded = [inlineText length] > 0;
+  BOOL embedded = RDLDocumentSourceOfProperties(properties, kind) == RDLDocumentSourceEmbedded;
   [_wherePop selectItemAtIndex:embedded ? 1 : 0];
   [_documentField setStringValue:properties[RDLDocumentKeyForProviderKind(kind)] ?: @""];
   [_contentView setString:inlineText ?: @""];
@@ -118,8 +125,15 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
   [_contentScroll setHidden:!any || !embedded];
   [_empty setHidden:any];
   [_documentLabel setStringValue:embedded ? @"Content" : @"File"];
-  [_summaryLabel setStringValue:any ? [NSString stringWithFormat:@"Connect string: %@",
-                                                                 _dataSource.connectString ?: @""]
+  for (NSView *v in @[ _typePop, _wherePop, _documentField, _headerCheck, _delimiterPop, _widthsField ])
+    [(NSControl *)v setEnabled:!_unknownProvider];
+  [_contentView setEditable:!_unknownProvider];
+  [_summaryLabel setStringValue:any ? (_unknownProvider
+                                           ? [NSString stringWithFormat:@"%@ source, shown as the file has it: %@",
+                                                                        _dataSource.dataProvider ?: @"Unknown",
+                                                                        _dataSource.connectString ?: @""]
+                                           : [NSString stringWithFormat:@"Connect string: %@",
+                                                                        _dataSource.connectString ?: @""])
                                     : @""];
 }
 
@@ -130,19 +144,35 @@ typedef NS_ENUM(NSInteger, RDLDocumentLocation) {
 // depend on it too.
 - (void)changed:(id)sender {
   (void)sender;
-  if (_filling || _dataSource == nil)
+  if (_filling || _dataSource == nil || _unknownProvider)
     return;
   RDLDataProviderKind kind = [self chosenKind];
-  NSMutableDictionary *properties = [NSMutableDictionary dictionary];
-  if ([self chosenLocation] == RDLDocumentLocationEmbedded) {
+  // Both are kept, and the connect string says which is read: a report worth
+  // testing carries a few representative rows for checking the layout and
+  // names the real document as well, and choosing one used to throw the other
+  // away. What is not in the pane is what the source had, since only one of
+  // the two is on show at a time.
+  NSMutableDictionary *properties =
+      [RDLConnectionProperties(_dataSource.connectString) mutableCopy] ?: [NSMutableDictionary dictionary];
+  for (NSString *key in @[ @"hasheaders", @"headers", @"delimiter", @"widths" ])
+    [properties removeObjectForKey:key];
+  BOOL embedded = [self chosenLocation] == RDLDocumentLocationEmbedded;
+  if (embedded) {
     NSString *text = [_contentView string] ?: @"";
     if ([text length])
       properties[RDLInlineKeyForProviderKind(kind)] = text;
+    else
+      [properties removeObjectForKey:RDLInlineKeyForProviderKind(kind)];
   } else {
     NSString *file = [_documentField stringValue];
     if ([file length])
       properties[RDLDocumentKeyForProviderKind(kind)] = file;
+    else
+      [properties removeObjectForKey:RDLDocumentKeyForProviderKind(kind)];
   }
+  properties = [RDLPropertiesReading(properties, kind,
+                                     embedded ? RDLDocumentSourceEmbedded : RDLDocumentSourceFile)
+      mutableCopy];
   if (kind == RDLDataProviderKindCSV) {
     // Written both ways round, because "the default" is a header row and a
     // report that says nothing gets one.

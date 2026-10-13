@@ -21,7 +21,6 @@
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLExpressionHelper.h"
-#import "RDLTablixEditor.h"
 #import "RDLDatasetNavigator.h"
 #import "RDLExpressionField.h"
 #import "RDLExpressionEditor.h"
@@ -35,6 +34,13 @@ NSString *RDLColorMismatch(NSColor *actual, NSColor *expected, NSString *what);
 NSButton *RDLFindButtonTitled(NSView *view, NSString *title);
 NSString *RDLSourceDirectory(void);
 NSString *RDLDesignerFixture(NSString *name);
+
+// A region of a view rendered to a bitmap for a pixel check. On Cocoa this is
+// -cacheDisplayInRect:toBitmapImageRep:. GNUstep does not fill a bitmap that
+// way for a windowless view -- it raises in -lockFocus, and a hand-made context
+// drawn into is left blank until it is flushed -- so there it sets up a bitmap
+// context itself, draws the view's rect into it, and flushes before returning.
+NSBitmapImageRep *RDLRenderViewRegion(NSView *view, NSRect rect);
 
 // The base every suite here inherits. It exists for one line, and that line is
 // load-bearing on GNUstep: nothing that touches a font may run before the

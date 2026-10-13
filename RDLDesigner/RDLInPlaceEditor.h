@@ -30,11 +30,10 @@
 // What the renderer needs to know so it does not draw under the field.
 @property (nonatomic, readonly) BOOL isEditing;
 @property (nonatomic, readonly, strong) RDLItem *editingItem;
-// nil = the item's own value; otherwise @{col, part} for a tablix cell.
-@property (nonatomic, readonly, copy) NSDictionary *editingCell;
 
-// Start editing whatever `point` names within `item`: its value, or the tablix
-// cell under the point. Does nothing for kinds with no editable text.
+// Start editing whatever `point` names within `item`: its value, or the value
+// of the textbox in the tablix cell under the point. Does nothing for kinds
+// with no editable text.
 - (void)beginEditingItem:(RDLItem *)item itemRect:(NSRect)itemRect point:(NSPoint)point;
 // Start editing an item's value without a specific point (the Return key).
 - (void)beginEditingItem:(RDLItem *)item;

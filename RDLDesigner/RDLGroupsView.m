@@ -1,0 +1,726 @@
+/* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
+#import "RDLGroupsView.h"
+#import "RDLChange.h"
+#import "RDLDocument.h"
+#import "RDLEditingContext.h"
+#import "RDLEditor.h"
+#import "RDLExpressionEditor.h"
+#import "RDLGroupPropertiesEditor.h"
+#import "RDLPane.h"
+#import "RDLTablixStructure.h"
+#import "RDLSelection.h"
+
+// What a group dragged in the pane carries. Nothing but the drag being this
+// pane's: which group it is comes from the row the drag started on, and that
+// is held here while it lasts.
+static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
+
+// The two roots of the tree. Objects rather than strings, so an outline item
+// is either one of these or a member, with nothing to confuse them.
+@interface RDLGroupsAxisNode : NSObject
+@property (nonatomic, assign) RDLTablixAxis axis;
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSArray<RDLTablixMember *> *groups;
+@end
+
+@implementation RDLGroupsAxisNode
+@end
+
+@interface RDLGroupsView () <NSOutlineViewDelegate, NSMenuDelegate>
+@property (nonatomic, strong) IBOutlet NSView *content;
+@property (nonatomic, strong) IBOutlet NSOutlineView *outline;
+@property (nonatomic, strong) IBOutlet NSTextField *headingLabel;
+@property (nonatomic, strong) IBOutlet NSButton *addGroupButton;
+@property (nonatomic, strong) IBOutlet NSButton *addAdjacentButton;
+@property (nonatomic, strong) IBOutlet NSButton *deleteGroupButton;
+@property (nonatomic, strong) IBOutlet NSButton *editGroupButton;
+@end
+
+@implementation RDLGroupsView {
+  NSArray<RDLGroupsAxisNode *> *_axes;
+  // The group being dragged, and the axis it groups along.
+  RDLTablixMember *_dragged;
+  RDLTablixAxis _draggedAxis;
+  // Guards the context-menu rebuild against re-entry: on GNUstep adding an item
+  // to a menu with a delegate calls -[NSMenu update], which calls the delegate
+  // again, so an unguarded rebuild recurses until the stack is gone. Cocoa does
+  // not re-enter, so this is simply never set there.
+  BOOL _rebuildingMenu;
+}
+
+- (instancetype)initWithFrame:(NSRect)frame context:(RDLEditingContext *)context {
+  self = [super initWithFrame:frame];
+  if (self == nil)
+    return nil;
+  if (!RDLLoadPaneNib(self, @"RDLGroupsView"))
+    return nil;
+  RDLFillHost(self, _content);
+  [_outline setTarget:self];
+  [_outline setDoubleAction:@selector(editGroup:)];
+  // The pane's commands are where Report Builder puts them: on the group
+  // itself. The menu is built when it is asked for, because what it offers
+  // depends on the row it was asked on.
+  [_outline registerForDraggedTypes:@[ RDLGroupsDragType ]];
+  // Re-nesting is a move, within this window and nowhere else.
+  [_outline setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
+  [_outline setDraggingSourceOperationMask:NSDragOperationNone forLocal:NO];
+  NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Group"];
+  [menu setDelegate:self];
+  [_outline setMenu:menu];
+  _axes = @[];
+  self.context = context;
+  return self;
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)setContext:(RDLEditingContext *)context {
+  if (_context == context)
+    return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  _context = context;
+  if (context != nil) {
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(reload)
+                                                 name:RDLDocumentDidChangeNotification
+                                               object:context.document];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(reload)
+                                                 name:RDLSelectionDidChangeNotification
+                                               object:context.selection];
+  }
+  [self reload];
+}
+
+#pragma mark - What is being shown
+
+// The region being worked in, else the one selected: clicking a tablix shows
+// its grouping, and working inside one keeps showing it.
+- (RDLTablix *)tablix {
+  RDLTablix *engaged = [_context engagedTablix];
+  if (engaged != nil)
+    return engaged;
+  RDLItem *selected = [_context selectedItem];
+  return [selected isKindOfClass:[RDLTablix class]] ? (RDLTablix *)selected : nil;
+}
+
+// A member is a group when it names one; the static members around it are the
+// header and total rows that belong to the groups, and are not grouping. So
+// the groups of a member list are the first ones found down each branch --
+// what is inside one of them is that group's own, which is what makes the
+// pane a tree rather than a list.
+static void RDLCollectGroups(NSArray<RDLTablixMember *> *members,
+                             NSMutableArray<RDLTablixMember *> *into) {
+  for (RDLTablixMember *member in members) {
+    if ([member.groupName length])
+      [into addObject:member];
+    else
+      RDLCollectGroups(member.members, into);
+  }
+}
+
+static NSArray<RDLTablixMember *> *RDLGroupsIn(NSArray<RDLTablixMember *> *members) {
+  NSMutableArray<RDLTablixMember *> *groups = [NSMutableArray array];
+  RDLCollectGroups(members, groups);
+  return groups;
+}
+
+// How many groups there are along an axis, however deeply they nest.
+static NSUInteger RDLCountGroups(NSArray<RDLTablixMember *> *groups) {
+  NSUInteger count = 0;
+  for (RDLTablixMember *group in groups)
+    count += 1 + RDLCountGroups(RDLGroupsIn(group.members));
+  return count;
+}
+
+// Where a group sits in the tree: which one of the outermost groups, then
+// which inside that, and so on. A structural edit builds new members, so this
+// is how the pane finds again the group the person was working in -- the one
+// in the same place is the same group to them, whatever object it is now.
+- (NSArray<NSNumber *> *)pathOfGroup:(RDLTablixMember *)group axis:(RDLTablixAxis)axis {
+  NSMutableArray<NSNumber *> *path = [NSMutableArray array];
+  NSArray<RDLTablixMember *> *level = [[self nodeForAxis:axis] groups] ?: @[];
+  while ([level count]) {
+    NSUInteger at = NSNotFound;
+    for (NSUInteger i = 0; i < [level count] && at == NSNotFound; i++)
+      if (level[i] == group || RDLGroupsHold(RDLGroupsIn(level[i].members), group))
+        at = i;
+    if (at == NSNotFound)
+      return nil;
+    [path addObject:@(at)];
+    if (level[at] == group)
+      return path;
+    level = RDLGroupsIn(level[at].members);
+  }
+  return nil;
+}
+
+- (RDLTablixMember *)groupAtPath:(NSArray<NSNumber *> *)path axis:(RDLTablixAxis)axis {
+  NSArray<RDLTablixMember *> *level = [[self nodeForAxis:axis] groups] ?: @[];
+  RDLTablixMember *group = nil;
+  for (NSNumber *index in path) {
+    NSUInteger at = [index unsignedIntegerValue];
+    if (at >= [level count])
+      return nil;
+    group = level[at];
+    level = RDLGroupsIn(group.members);
+  }
+  return group;
+}
+
+- (void)reload {
+  RDLTablix *tablix = [self tablix];
+  RDLTablixMember *wasGroup = _selectedGroup;
+  RDLTablixAxis wasAxis = _selectedAxis;
+  NSArray<NSNumber *> *wasPath = wasGroup ? [self pathOfGroup:wasGroup axis:wasAxis] : nil;
+  if (tablix == nil) {
+    _axes = @[];
+    _heading = @"Select a table, matrix or list to see how it groups.";
+  } else {
+    RDLGroupsAxisNode *rows = [[RDLGroupsAxisNode alloc] init];
+    rows.axis = RDLTablixAxisRows;
+    rows.title = @"Row Groups";
+    rows.groups = RDLGroupsIn(tablix.rowHierarchy.members);
+    RDLGroupsAxisNode *columns = [[RDLGroupsAxisNode alloc] init];
+    columns.axis = RDLTablixAxisColumns;
+    columns.title = @"Column Groups";
+    columns.groups = RDLGroupsIn(tablix.columnHierarchy.members);
+    _axes = @[ rows, columns ];
+    NSUInteger rowCount = RDLCountGroups(rows.groups);
+    NSUInteger columnCount = RDLCountGroups(columns.groups);
+    _heading = [NSString stringWithFormat:@"%@: %lu row group%@, %lu column group%@",
+                                          tablix.name ?: @"Tablix", (unsigned long)rowCount,
+                                          rowCount == 1 ? @"" : @"s", (unsigned long)columnCount,
+                                          columnCount == 1 ? @"" : @"s"];
+  }
+  [_headingLabel setStringValue:_heading];
+  [_outline reloadData];
+  for (RDLGroupsAxisNode *node in _axes)
+    [_outline expandItem:node expandChildren:YES];
+  // A structural edit builds new members, so what was picked out is gone; the
+  // axis is still meaningful, and keeping it is what leaves the pane where the
+  // person was working.
+  // A structural edit builds new members, so what was picked out is gone as an
+  // object; the group in the same place is the one to pick out again.
+  RDLTablixMember *again = wasGroup;
+  if (again != nil && [self pathOfGroup:again axis:wasAxis] == nil)
+    again = [self groupAtPath:wasPath axis:wasAxis];
+  if (wasGroup != nil && (again == nil || ![self selectGroup:again axis:wasAxis]))
+    [self selectAxis:wasAxis];
+  [self readSelection];
+}
+
+#pragma mark - What is picked out
+
+- (void)readSelection {
+  id item = [_outline itemAtRow:[_outline selectedRow]];
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]]) {
+    _selectedGroup = nil;
+    _selectedAxis = [(RDLGroupsAxisNode *)item axis];
+    [self syncButtons];
+    return;
+  }
+  if (![item isKindOfClass:[RDLTablixMember class]]) {
+    _selectedGroup = nil;
+    _selectedAxis = RDLTablixAxisUnspecified;
+    [self syncButtons];
+    return;
+  }
+  _selectedGroup = item;
+  _selectedAxis = [self axisOfGroup:item];
+  [self syncButtons];
+}
+
+// A button that cannot do anything is a button that says so: the commands
+// under the tree are offered exactly when they would work, which is how the
+// menu above them already behaves. A row picked out that a group cannot go
+// inside -- the details group -- greys Group Inside rather than taking the
+// click and doing nothing.
+- (void)syncButtons {
+  BOOL onATablix = [self tablix] != nil;
+  [_addGroupButton setEnabled:onATablix && [self canAddGroupWithPlacement:RDLGroupPlacementChild]];
+  [_addAdjacentButton setEnabled:onATablix &&
+                                 [self canAddGroupWithPlacement:RDLGroupPlacementAfter]];
+  [_deleteGroupButton setEnabled:onATablix && [self canDeleteSelectedGroup]];
+  [_editGroupButton setEnabled:onATablix && _selectedGroup != nil];
+}
+
+static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *group) {
+  for (RDLTablixMember *each in groups)
+    if (each == group || RDLGroupsHold(RDLGroupsIn(each.members), group))
+      return YES;
+  return NO;
+}
+
+- (RDLTablixAxis)axisOfGroup:(RDLTablixMember *)group {
+  for (RDLGroupsAxisNode *node in _axes)
+    if (RDLGroupsHold(node.groups, group))
+      return node.axis;
+  return RDLTablixAxisUnspecified;
+}
+
+- (RDLGroupsAxisNode *)nodeForAxis:(RDLTablixAxis)axis {
+  for (RDLGroupsAxisNode *node in _axes)
+    if (node.axis == axis)
+      return node;
+  return nil;
+}
+
+- (NSArray<RDLTablixMember *> *)groupsOnAxis:(RDLTablixAxis)axis {
+  return [[self nodeForAxis:axis] groups] ?: @[];
+}
+
+- (BOOL)selectGroup:(RDLTablixMember *)group axis:(RDLTablixAxis)axis {
+  RDLGroupsAxisNode *node = [self nodeForAxis:axis];
+  if (node == nil || !RDLGroupsHold(node.groups, group))
+    return NO;
+  NSInteger row = [_outline rowForItem:group];
+  if (row < 0)
+    return NO;
+  [_outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row] byExtendingSelection:NO];
+  [self readSelection];
+  return YES;
+}
+
+- (void)selectAxis:(RDLTablixAxis)axis {
+  RDLGroupsAxisNode *node = [self nodeForAxis:axis];
+  NSInteger row = node ? [_outline rowForItem:node] : -1;
+  if (row < 0)
+    return;
+  [_outline selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row] byExtendingSelection:NO];
+  [self readSelection];
+}
+
+- (void)outlineViewSelectionDidChange:(NSNotification *)note {
+  RDL_UNUSED(note);
+  [self readSelection];
+}
+
+#pragma mark - What can be done here
+
+// Whether a group can go where the buttons and the menu offer to put one. With
+// nothing picked out the new group goes round what the region already has, and
+// that is always something.
+- (BOOL)canAddGroupWithPlacement:(RDLGroupPlacement)placement {
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil)
+    return NO;
+  if (_selectedGroup == nil)
+    return [self memberToGroupRoundOnAxis:[self axisToActOn]] != nil;
+  return [RDLTablixStructure canAddGroupWithPlacement:placement
+                                             toMember:_selectedGroup
+                                                 axis:_selectedAxis
+                                             inTablix:tablix];
+}
+
+- (BOOL)canDeleteSelectedGroup {
+  return _selectedGroup != nil && [RDLTablixStructure canDeleteGroup:_selectedGroup
+                                                           withLines:NO
+                                                                axis:_selectedAxis
+                                                            inTablix:[self tablix]];
+}
+
+// Which axis a command acts on: the one picked out, or the rows when nothing
+// is.
+- (RDLTablixAxis)axisToActOn {
+  return _selectedAxis != RDLTablixAxisUnspecified ? _selectedAxis : RDLTablixAxisRows;
+}
+
+// What a first group goes round: the last member of that hierarchy, which is
+// the region's detail rows or its one column.
+- (RDLTablixMember *)memberToGroupRoundOnAxis:(RDLTablixAxis)axis {
+  RDLTablix *tablix = [self tablix];
+  RDLTablixHierarchy *hierarchy =
+      axis == RDLTablixAxisRows ? tablix.rowHierarchy : tablix.columnHierarchy;
+  return [hierarchy.members lastObject];
+}
+
+#pragma mark - The buttons
+
+- (RDLTablixMember *)addGroupWithExpression:(NSString *)expression placement:(RDLGroupPlacement)placement {
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil)
+    return nil;
+  RDLTablixAxis axis = [self axisToActOn];
+  // With no group picked out, the new one goes round what the region already
+  // has -- its detail rows, or its one column -- which is what a first group
+  // is: everything the tablix shows, grouped. There is nothing to go inside or
+  // beside yet, so the placement the buttons ask for does not apply.
+  RDLTablixMember *member = _selectedGroup;
+  RDLGroupPlacement where = placement;
+  if (member == nil) {
+    member = [self memberToGroupRoundOnAxis:axis];
+    where = RDLGroupPlacementParent;
+    if (member == nil)
+      return nil;
+  }
+  // Asked before it is tried, so the answer is the same one the menu and the
+  // buttons gave: a command that is offered works, and one that cannot is not
+  // offered.
+  if (_selectedGroup != nil &&
+      ![RDLTablixStructure canAddGroupWithPlacement:where toMember:member axis:axis inTablix:tablix]) {
+    [self sayWhyNot:[NSString stringWithFormat:@"A group cannot go there: %@ groups on nothing.",
+                                               [self nameOfGroup:member]]];
+    return nil;
+  }
+  NSString *on = expression;
+  if (on == nil)
+    on = [RDLExpressionEditor runForSource:@"" context:RDLExpressionContextText report:_context.report];
+  if ([on length] == 0)
+    return nil;
+  RDLTablixMember *made = [_context.editor addGroupWithExpression:on
+                                                        placement:where
+                                                         toMember:member
+                                                             axis:axis
+                                                         ofTablix:tablix];
+  [self reload];
+  if (made != nil)
+    [self selectGroup:made axis:axis];
+  return made;
+}
+
+- (void)addGroup:(id)sender {
+  RDL_UNUSED(sender);
+  [self addGroupWithExpression:nil placement:RDLGroupPlacementChild];
+}
+
+// What a group is called where a person reads it: a details group by what it
+// is, everything else by its name.
+- (NSString *)nameOfGroup:(RDLTablixMember *)group {
+  return [group.groupExpressions count] ? (group.groupName ?: @"that group") : @"the details group";
+}
+
+// Said above the tree, where the heading is, because a command that does
+// nothing and says nothing is the worst of the three.
+- (void)sayWhyNot:(NSString *)why {
+  _heading = [why copy];
+  [_headingLabel setStringValue:_heading ?: @""];
+}
+
+- (void)addAdjacentGroup:(id)sender {
+  RDL_UNUSED(sender);
+  [self addGroupWithExpression:nil placement:RDLGroupPlacementAfter];
+}
+
+- (void)deleteGroup:(id)sender {
+  RDL_UNUSED(sender);
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
+  // The grouping goes and what it held stays: deleting an outer group with its
+  // rows would take the detail rows inside it as well, which is not what
+  // "delete this group" should mean. Taking the rows too is the other command,
+  // as Report Builder offers both.
+  if (![self canDeleteSelectedGroup]) {
+    [self sayWhyNot:[NSString stringWithFormat:@"%@ cannot be deleted: it is what the region shows.",
+                                               [self nameOfGroup:_selectedGroup]]];
+    return;
+  }
+  [_context.editor deleteGroup:_selectedGroup withLines:NO axis:_selectedAxis ofTablix:tablix];
+  [self reload];
+}
+
+// The group and the rows or columns it owns. A group that is the only member
+// inside another cannot take its lines with it -- that would leave the group
+// around it owning nothing -- and nothing happens rather than something else.
+- (void)deleteGroupAndLines:(id)sender {
+  RDL_UNUSED(sender);
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
+  if (![_context.editor deleteGroup:_selectedGroup withLines:YES axis:_selectedAxis ofTablix:tablix])
+    NSBeep();
+  [self reload];
+}
+
+- (void)editGroup:(id)sender {
+  RDL_UNUSED(sender);
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
+  [RDLGroupPropertiesEditor runForGroup:_selectedGroup axis:_selectedAxis ofTablix:tablix context:_context];
+}
+
+#pragma mark - The commands, where Report Builder puts them
+
+// Right-clicking a row picks it out first: a command is about the group under
+// the pointer, not about whatever was picked out before.
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+  if (_rebuildingMenu)
+    return;
+  _rebuildingMenu = YES;
+  [self rebuildMenu:menu];
+  _rebuildingMenu = NO;
+}
+
+- (void)rebuildMenu:(NSMenu *)menu {
+  [menu removeAllItems];
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil)
+    return;
+  NSInteger row = [_outline clickedRow];
+  if (row >= 0) {
+    id item = [_outline itemAtRow:row];
+    if ([item isKindOfClass:[RDLTablixMember class]])
+      [self selectGroup:item axis:[self axisOfGroup:item]];
+    else if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+      [self selectAxis:[(RDLGroupsAxisNode *)item axis]];
+  }
+  BOOL onGroup = _selectedGroup != nil;
+  BOOL rows = _selectedAxis != RDLTablixAxisColumns;
+
+  // Adding: round what is there when nothing is picked out, and otherwise
+  // where the submenu says, each on a field of the dataset or on an expression.
+  NSMenu *add = [[NSMenu alloc] initWithTitle:@"Add Group"];
+  NSArray<NSArray *> *places = onGroup ? @[
+    @[ @(RDLGroupPlacementParent), @"Parent Group" ],
+    @[ @(RDLGroupPlacementChild), @"Child Group" ],
+    @[ @(RDLGroupPlacementBefore), rows ? @"Adjacent Above" : @"Adjacent Left" ],
+    @[ @(RDLGroupPlacementAfter), rows ? @"Adjacent Below" : @"Adjacent Right" ],
+  ] : @[ @[ @(RDLGroupPlacementParent), @"Group" ] ];
+  for (NSArray *place in places) {
+    RDLGroupPlacement placement = (RDLGroupPlacement)[place[0] integerValue];
+    if (![self canAddGroupWithPlacement:placement])
+      continue;  // nothing there to put a group around or inside
+    [add addItem:[self addItemTitled:place[1] placement:placement ofTablix:tablix]];
+  }
+  if ([add numberOfItems]) {
+    NSMenuItem *addItem = [[NSMenuItem alloc] initWithTitle:@"Add Group" action:NULL keyEquivalent:@""];
+    [addItem setSubmenu:add];
+    [menu addItem:addItem];
+  }
+
+  if (!onGroup)
+    return;
+  // A total beside the group, which is what a subtotal row is. Not beside a
+  // details group: there is nothing to total but the rows themselves.
+  NSMenu *totals = [RDLTablixStructure canAddTotalBesideGroup:_selectedGroup
+                                                         axis:_selectedAxis
+                                                     inTablix:tablix]
+                       ? [[NSMenu alloc] initWithTitle:@"Add Total"]
+                       : nil;
+  if (totals != nil) {
+    for (NSNumber *after in @[ @NO, @YES ]) {
+      NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:[after boolValue] ? @"After" : @"Before"
+                                                  action:@selector(addTotalFromMenu:)
+                                           keyEquivalent:@""];
+      [mi setTarget:self];
+      [mi setRepresentedObject:after];
+      [totals addItem:mi];
+    }
+    NSMenuItem *totalItem = [[NSMenuItem alloc] initWithTitle:@"Add Total" action:NULL keyEquivalent:@""];
+    [totalItem setSubmenu:totals];
+    [menu addItem:totalItem];
+  }
+
+  if (![RDLTablixStructure canDeleteGroup:_selectedGroup withLines:NO axis:_selectedAxis inTablix:tablix])
+    return;
+  [menu addItem:[NSMenuItem separatorItem]];
+  NSMenuItem *remove = [[NSMenuItem alloc] initWithTitle:@"Delete Group"
+                                                  action:@selector(deleteGroup:)
+                                           keyEquivalent:@""];
+  [remove setTarget:self];
+  [menu addItem:remove];
+  if ([RDLTablixStructure canDeleteGroup:_selectedGroup withLines:YES axis:_selectedAxis inTablix:tablix]) {
+    NSMenuItem *removeLines =
+        [[NSMenuItem alloc] initWithTitle:rows ? @"Delete Group and Rows" : @"Delete Group and Columns"
+                                   action:@selector(deleteGroupAndLines:)
+                            keyEquivalent:@""];
+    [removeLines setTarget:self];
+    [menu addItem:removeLines];
+  }
+  [menu addItem:[NSMenuItem separatorItem]];
+  NSMenuItem *properties = [[NSMenuItem alloc] initWithTitle:@"Group Properties…"
+                                                      action:@selector(editGroup:)
+                                               keyEquivalent:@""];
+  [properties setTarget:self];
+  [menu addItem:properties];
+}
+
+// One placement, with the dataset's fields under it and "Expression…" last --
+// the same offer the tablix's own menu makes on the canvas.
+- (NSMenuItem *)addItemTitled:(NSString *)title
+                    placement:(RDLGroupPlacement)placement
+                     ofTablix:(RDLTablix *)tablix {
+  NSMenu *on = [[NSMenu alloc] initWithTitle:title];
+  for (NSString *field in [[_context.report dataSetNamed:tablix.dataSetName] fieldNames] ?: @[]) {
+    NSMenuItem *mi = [[NSMenuItem alloc] initWithTitle:field
+                                                action:@selector(addGroupFromMenu:)
+                                         keyEquivalent:@""];
+    [mi setTarget:self];
+    [mi setRepresentedObject:@[ @(placement), [NSString stringWithFormat:@"=Fields!%@.Value", field] ]];
+    [on addItem:mi];
+  }
+  NSMenuItem *asked = [[NSMenuItem alloc] initWithTitle:@"Expression…"
+                                                 action:@selector(addGroupFromMenu:)
+                                          keyEquivalent:@""];
+  [asked setTarget:self];
+  [asked setRepresentedObject:@[ @(placement) ]];
+  [on addItem:asked];
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:NULL keyEquivalent:@""];
+  [item setSubmenu:on];
+  return item;
+}
+
+- (void)addGroupFromMenu:(NSMenuItem *)sender {
+  NSArray *what = [sender representedObject];
+  [self addGroupWithExpression:[what count] > 1 ? what[1] : nil
+                     placement:(RDLGroupPlacement)[what[0] integerValue]];
+}
+
+- (void)addTotalFromMenu:(NSMenuItem *)sender {
+  RDLTablix *tablix = [self tablix];
+  if (tablix == nil || _selectedGroup == nil)
+    return;
+  if (![RDLTablixStructure canAddTotalBesideGroup:_selectedGroup axis:_selectedAxis inTablix:tablix]) {
+    [self sayWhyNot:[NSString stringWithFormat:@"%@ has nothing to total: it is the rows themselves.",
+                                               [self nameOfGroup:_selectedGroup]]];
+    return;
+  }
+  [_context.editor addTotalBesideGroup:_selectedGroup
+                                 after:[[sender representedObject] boolValue]
+                                  axis:_selectedAxis
+                              ofTablix:tablix];
+  [self reload];
+}
+
+#pragma mark - Re-nesting by dragging
+
+- (NSArray<RDLTablixMember *> *)allGroupsOnAxis:(RDLTablixAxis)axis {
+  NSMutableArray<RDLTablixMember *> *flat = [NSMutableArray array];
+  NSArray<RDLTablixMember *> *level = [self groupsOnAxis:axis];
+  while ([level count]) {
+    [flat addObjectsFromArray:level];
+    NSMutableArray<RDLTablixMember *> *next = [NSMutableArray array];
+    for (RDLTablixMember *group in level)
+      [next addObjectsFromArray:RDLGroupsIn(group.members)];
+    level = next;
+  }
+  return flat;
+}
+
+// Where a drop between rows lands in that list: under an axis heading it is
+// the depth itself, and under a group it is one past that group.
+- (NSInteger)flatIndexOfDropOn:(id)item childIndex:(NSInteger)index axis:(RDLTablixAxis *)outAxis {
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]]) {
+    if (outAxis)
+      *outAxis = [(RDLGroupsAxisNode *)item axis];
+    return index;
+  }
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return -1;
+  RDLTablixAxis axis = [self axisOfGroup:item];
+  if (outAxis)
+    *outAxis = axis;
+  NSUInteger at = [[self allGroupsOnAxis:axis] indexOfObjectIdenticalTo:item];
+  return at == NSNotFound ? -1 : (NSInteger)at + 1 + index;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline writeItems:(NSArray *)items toPasteboard:(NSPasteboard *)pasteboard {
+  RDL_UNUSED(outline);
+  id item = [items firstObject];
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return NO;
+  _dragged = item;
+  _draggedAxis = [self axisOfGroup:item];
+  [pasteboard declareTypes:@[ RDLGroupsDragType ] owner:self];
+  [pasteboard setString:@"group" forType:RDLGroupsDragType];
+  return YES;
+}
+
+- (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outline pasteboardWriterForItem:(id)item {
+  RDL_UNUSED(outline);
+  if (![item isKindOfClass:[RDLTablixMember class]])
+    return nil;
+  _dragged = item;
+  _draggedAxis = [self axisOfGroup:item];
+  NSPasteboardItem *written = [[NSPasteboardItem alloc] init];
+  [written setString:@"group" forType:RDLGroupsDragType];
+  return written;
+}
+
+- (NSDragOperation)outlineView:(NSOutlineView *)outline
+                  validateDrop:(id<NSDraggingInfo>)info
+                  proposedItem:(id)item
+            proposedChildIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  // Between rows, not onto one: dropping a group onto another would read as
+  // putting it inside, and where a group nests is what the order already says.
+  if (index == NSOutlineViewDropOnItemIndex || _dragged == nil)
+    return NSDragOperationNone;
+  RDLTablixAxis axis = RDLTablixAxisUnspecified;
+  NSInteger to = [self flatIndexOfDropOn:item childIndex:index axis:&axis];
+  // Only among the groups it already nests with: a row group is not a column
+  // group, and moving it across would mean regrouping the region, not
+  // re-nesting.
+  return to >= 0 && axis == _draggedAxis ? NSDragOperationMove : NSDragOperationNone;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outline
+         acceptDrop:(id<NSDraggingInfo>)info
+               item:(id)item
+         childIndex:(NSInteger)index {
+  RDL_UNUSED(outline);
+  RDL_UNUSED(info);
+  RDLTablix *tablix = [self tablix];
+  RDLTablixAxis axis = RDLTablixAxisUnspecified;
+  NSInteger to = [self flatIndexOfDropOn:item childIndex:index axis:&axis];
+  RDLTablixMember *group = _dragged;
+  _dragged = nil;
+  if (tablix == nil || group == nil || to < 0 || axis != _draggedAxis)
+    return NO;
+  if (![_context.editor moveGroup:group toIndex:(NSUInteger)to axis:axis ofTablix:tablix])
+    return NO;
+  [self reload];
+  return YES;
+}
+
+#pragma mark - The tree
+
+- (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item {
+  RDL_UNUSED(outlineView);
+  if (item == nil)
+    return (NSInteger)[_axes count];
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+    return (NSInteger)[[(RDLGroupsAxisNode *)item groups] count];
+  return (NSInteger)[RDLGroupsIn([(RDLTablixMember *)item members]) count];
+}
+
+- (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item {
+  RDL_UNUSED(outlineView);
+  if (item == nil)
+    return _axes[(NSUInteger)index];
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+    return [(RDLGroupsAxisNode *)item groups][(NSUInteger)index];
+  return RDLGroupsIn([(RDLTablixMember *)item members])[(NSUInteger)index];
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item {
+  RDL_UNUSED(outlineView);
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+    return YES;
+  return [RDLGroupsIn([(RDLTablixMember *)item members]) count] > 0;
+}
+
+- (id)outlineView:(NSOutlineView *)outlineView
+    objectValueForTableColumn:(NSTableColumn *)column
+                       byItem:(id)item {
+  RDL_UNUSED(outlineView);
+  if ([item isKindOfClass:[RDLGroupsAxisNode class]])
+    return [[(RDLGroupsAxisNode *)item title] uppercaseString];
+  RDLTablixMember *member = item;
+  NSString *on = [[member.groupExpressions firstObject] source];
+  if ([[column identifier] isEqualToString:@"on"])
+    return on ?: @"";
+  // A details group groups on nothing: it is every row, one at a time, and
+  // naming it for what it is says why the commands that need a group are not
+  // offered on it.
+  if ([member.groupExpressions count] == 0)
+    return @"(Details)";
+  return member.groupName ?: @"";
+}
+
+@end

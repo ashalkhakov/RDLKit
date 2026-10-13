@@ -13,7 +13,6 @@
   NSView *_hostView;
   NSTextField *_editorField;
   RDLItem *_editItem;
-  NSDictionary *_editContext; // nil = item value; tablix: {col, part}
   BOOL _editorCancelled;
   BOOL _editorStarting; // ignore end-editing fired while the session begins
   BOOL _completing;     // Cocoa re-posts controlTextDidChange: during complete:
@@ -36,10 +35,6 @@
   return _editorField ? _editItem : nil;
 }
 
-- (NSDictionary *)editingCell {
-  return _editorField ? _editContext : nil;
-}
-
 - (void)beginEditingItem:(RDLItem *)item itemRect:(NSRect)itemRect point:(NSPoint)point {
   [self beginEditingHit:item rect:itemRect point:point];
 }
@@ -52,16 +47,19 @@
 
 - (void)beginEditingHit:(RDLItem *)hit rect:(NSRect)itemRect point:(NSPoint)p {
   if ([hit isKindOfClass:[RDLTablix class]]) {
+    // A cell of the grid: what is edited is the textbox in it, as itself.
     RDLTablix *tablixHit = (RDLTablix *)hit;
-    NSUInteger col = 0;
-    RDLTablixPart part = RDLTablixPartNone;
-    if ([RDLTablixGeometry tablix:tablixHit
-                         itemRect:itemRect
-                            point:p
-                           column:&col
-                             part:&part
-                             zoom:_ctx.zoom])
-      [self beginEditingTablix:tablixHit col:col part:part];
+    NSUInteger row = 0, column = 0;
+    if ([RDLTablixGeometry tablix:tablixHit itemRect:itemRect point:p row:&row column:&column]) {
+      RDLItem *content = [RDLTablixGeometry itemOf:tablixHit inRow:row column:column];
+      if ([content isKindOfClass:[RDLTextbox class]])
+        [self beginEditingHit:content
+                         rect:[RDLTablixGeometry mergedCellRectOf:tablixHit
+                                                         itemRect:itemRect
+                                                              row:row
+                                                           column:column]
+                        point:p];
+    }
     return;
   }
   if ([hit isKindOfClass:[RDLSubreport class]]) {
@@ -70,14 +68,15 @@
     [NSApp sendAction:@selector(editSubreport:) to:nil from:nil];
     return;
   }
-  if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]])
+  // Nothing here has text to edit. An unsupported item in particular must not
+  // reach the text field below, which asks the item for a textbox's value.
+  if ([hit isKindOfClass:[RDLLine class]] || [hit isKindOfClass:[RDLChart class]] ||
+      [hit isKindOfClass:[RDLUnsupportedItem class]])
     return;
   NSRect r = NSInsetRect(itemRect, -1, -1);
-  r.size.height = MAX(NSHeight(r), 19);
   // The editor mirrors the attributed preview: same font (family, size,
   // weight, italic — all zoom-scaled), alignment and text color.
   [self startFieldForItem:hit
-                  context:nil
                     rect:r
                  initial:[(RDLTextbox *)hit value] ?: @""
                     font:[RDLTextAttributes fontForStyle:hit.style scale:_ctx.zoom]
@@ -85,43 +84,23 @@
                    color:RDLColorFromHex(hit.style.color)];
 }
 
-- (void)beginEditingTablix:(RDLTablix *)tab col:(NSUInteger)col part:(RDLTablixPart)part {
-  NSArray *cols = tab.columnSpecs ?: @[];
-  if (col >= [cols count])
-    return;
-  NSRect itemRect;
-  if (![[_host editorGeometry] findRectOfItem:tab rect:&itemRect])
-    return;
-  NSRect cell = [RDLTablixGeometry cellRectOf:tab
-                                     itemRect:itemRect
-                                       column:col
-                                         part:part
-                                         zoom:_ctx.zoom];
-  cell.size.height = MAX(NSHeight(cell), 19);
-  BOOL editingHeader = part == RDLTablixPartHeader;
-  NSString *initial = editingHeader ? (cols[col][@"header"] ?: @"")
-                                    : (cols[col][@"value"] ?: @"");
-  NSFont *font = editingHeader ? [NSFont boldSystemFontOfSize:10]
-                               : [NSFont userFontOfSize:10];
-  [self startFieldForItem:tab
-                  context:@{ @"col" : @(col), @"part" : @(part) }
-                    rect:cell
-                 initial:initial
-                    font:font
-                   align:NSLeftTextAlignment
-                   color:nil];
-}
-
+// `rect` arrives in model space, like everything else the canvas works out.
+// The editor is not drawn by the canvas, though: it is a real NSTextField added
+// as a subview, and a subview's frame is in the view's own points. So this is
+// the one place that puts the zoom back, and the smallest usable height is
+// applied afterwards -- 19 points on screen, not 19 that grow with the zoom.
 - (void)startFieldForItem:(RDLItem *)it
-                  context:(NSDictionary *)ctx
-                    rect:(NSRect)rect
+                    rect:(NSRect)modelRect
                  initial:(NSString *)text
                     font:(NSFont *)font
                    align:(NSTextAlignment)align
                    color:(NSColor *)color {
   [self commit];
+  CGFloat zoom = _ctx.zoom > 0 ? _ctx.zoom : 1.0;
+  NSRect rect = NSMakeRect(NSMinX(modelRect) * zoom, NSMinY(modelRect) * zoom,
+                           NSWidth(modelRect) * zoom, NSHeight(modelRect) * zoom);
+  rect.size.height = MAX(NSHeight(rect), 19);
   _editItem = it;
-  _editContext = ctx;
   _editorCancelled = NO;
   _editorStarting = YES;
   NSTextField *f = [[NSTextField alloc] initWithFrame:rect];
@@ -153,7 +132,6 @@
     _editorField = nil;
   }
   _editItem = nil;
-  _editContext = nil;
   [_host editorSessionDidChange];
 }
 
@@ -162,33 +140,36 @@
     return;
   NSString *text = [_editorField stringValue];
   RDLItem *it = _editItem;
-  NSDictionary *ctx = _editContext;
   BOOL cancelled = _editorCancelled;
   [self tearDownEditor];
   if (cancelled || it == nil)
     return;
-  RDLEditor *editor = _ctx.editor;
-  if (ctx == nil) {
-    if ([text isEqualToString:[(RDLTextbox *)it value] ?: @""])
-      return;
-    [editor beginGroup:@"Edit Text"];
-    [editor setValue:text forKeyPath:@"value" ofItem:it];
-    [editor setValue:nil forKeyPath:@"paragraphs" ofItem:it]; // plain edit drops the runs
-    [editor endGroup];
-    return;
-  }
-  NSUInteger ci = [ctx[@"col"] unsignedIntegerValue];
-  NSString *key = [ctx[@"part"] integerValue] == RDLTablixPartHeader ? @"header" : @"value";
-  RDLTablix *tablix = (RDLTablix *)it;
-  NSMutableArray *specs = [tablix.columnSpecs mutableCopy];
-  if (specs == nil || ci >= [specs count])
-    return;
-  if ([text isEqualToString:specs[ci][key] ?: @""])
-    return;
-  NSMutableDictionary *col = [specs[ci] mutableCopy];
-  col[key] = text;
-  specs[ci] = col;
-  [editor setColumnSpecs:specs ofTablix:tablix];
+  // The same edit as the inspector's value field: the runs the text changed in
+  // change, and the rest of a rich text box stays as it was.
+  [_ctx.editor setPlainValue:text ofItem:it];
+}
+
+// The textbox after `item` among the cells of the tablix it is in -- the
+// corner's, then the body's, row by row -- or the one before it, coming round
+// at the ends; nil when `item` is not in a cell, or is the only textbox there.
+- (RDLTextbox *)textboxBeside:(RDLItem *)item forward:(BOOL)forward {
+  RDLTablix *tablix = nil;
+  if ([_ctx.report cellContainingItem:item tablix:&tablix] == nil)
+    return nil;
+  NSMutableArray<RDLItem *> *boxes = [NSMutableArray array];
+  // The corner first: it is the grid's top left.
+  for (NSArray<RDLTablixCell *> *row in tablix.cornerRows)
+    for (RDLTablixCell *cell in row)
+      if ([cell.item isKindOfClass:[RDLTextbox class]])
+        [boxes addObject:cell.item];
+  for (RDLTablixRow *row in tablix.tablixBody.rows)
+    for (RDLTablixCell *cell in row.cells)
+      if ([cell.item isKindOfClass:[RDLTextbox class]])
+        [boxes addObject:cell.item];
+  NSUInteger here = [boxes indexOfObjectIdenticalTo:item], count = [boxes count];
+  if (here == NSNotFound || count < 2)
+    return nil;
+  return (RDLTextbox *)boxes[forward ? (here + 1) % count : (here + count - 1) % count];
 }
 
 // --- Editor field delegate ---------------------------------------------------
@@ -245,37 +226,17 @@
   if (_editorStarting)
     return;
   RDLItem *it = _editItem;
-  NSDictionary *ctx = _editContext;
   NSInteger movement = [[[n userInfo] objectForKey:@"NSTextMovement"] integerValue];
   [self commit];
-  // Word-like Tab navigation between tablix cells: header row wraps into the
-  // value row (and back), so the whole grid tabs through.
-  if (ctx && (movement == NSTabTextMovement || movement == NSBacktabTextMovement)) {
-    NSArray *cols = [(RDLTablix *)it columnSpecs] ?: @[];
-    NSInteger n2 = (NSInteger)[cols count];
-    if (n2 == 0)
-      return;
-    NSInteger ci = (NSInteger)[ctx[@"col"] unsignedIntegerValue];
-    BOOL header = [ctx[@"part"] integerValue] == RDLTablixPartHeader;
-    if (movement == NSTabTextMovement) {
-      ci += 1;
-      if (ci >= n2) {
-        ci = 0;
-        header = !header;
-      }
-    } else {
-      ci -= 1;
-      if (ci < 0) {
-        ci = n2 - 1;
-        header = !header;
-      }
-    }
-    [self beginEditingTablix:(RDLTablix *)it
-                           col:(NSUInteger)ci
-                          part:header ? RDLTablixPartHeader : RDLTablixPartValue];
-  } else {
+  // Word-like Tab navigation between the cells of a tablix: on to the next
+  // textbox, row by row, or back to the one before.
+  RDLTextbox *next = movement == NSTabTextMovement || movement == NSBacktabTextMovement
+                         ? [self textboxBeside:it forward:movement == NSTabTextMovement]
+                         : nil;
+  if (next != nil)
+    [self beginEditingItem:next];
+  else
     [[_hostView window] makeFirstResponder:_hostView];
-  }
 }
 
 @end

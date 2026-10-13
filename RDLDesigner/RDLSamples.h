@@ -28,7 +28,7 @@
 // The blank letter every new report starts from. Built in code if the
 // resource is missing, because a designer that cannot make an empty report is
 // not a designer.
-+ (RDLReport *)blankLetter;
++ (RDLReport *)blankReport;
 // The samples the tests and the designer name directly.
 + (RDLReport *)atelierInvoice;
 + (RDLReport *)packingSlip;

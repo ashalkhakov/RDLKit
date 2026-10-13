@@ -77,9 +77,9 @@ Tablix follows the spec:
 - `NoRowsMessage`, `RepeatColumnHeaders` / `RepeatRowHeaders`, `TablixCorner`
 - group-scoped `Sum` / `Count` (current group rows, or a named dataset)
 
-Designer convenience: `columnSpecs` / `headerHeight` / `rowHeight` / `groupBy` describe a header + details table plainly, and `-rebuildTablix` projects them onto those structures (header + optional group header + details + subtotal footer). Assigning the spec has no side effect, so the order the properties are set in does not matter.
+A builder: `columnSpecs` / `headerHeight` / `rowHeight` / `rowGroups` / `columnGroups` / `showGrandTotal` describe a new header + details table plainly, and `-rebuildTablix` builds those structures from them (header + optional group header + details + subtotal footer). Assigning the spec has no side effect, so the order the properties are set in does not matter. They are inputs for making a tablix, not a view of one: the parser does not recover them from a file, and nothing rebuilds a tablix that already has a body.
 
-Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. Unsupported elements (Gauge, Map, CustomReportItem, …) are collected into `report.warnings` by the parser.
+Parameters support `Nullable`, `MultiValue` (array values, `Parameters!P.Count`), `ValidValues` and typed coercion (Integer/Float/Boolean/DateTime), with defaults that may be `=` expressions. `Body/Style` paints a page-wide background. `GaugePanel`, `Map` and `CustomReportItem` are read but not rendered: the report opens, each becomes an `RDLUnsupportedItem` that keeps its place on the page, and a warning in `report.warnings` (and from the checker) names it. A custom item draws its `AltReportItem`, as SSRS does when the extension is not installed; anything else draws a bordered placeholder that says what should be there. The element is kept verbatim and written back on save, so opening and saving a report does not lose a gauge, a map or a barcode.
 
 A `Subreport` renders another report inside this one. The element carries a `ReportName`, the `Parameters` handed over (each a `Value` expression, optionally `Omit`ted) and a `NoRowsMessage`; nothing in the model reads a file, so [RDLSubreportLoader](RDLSubreportLoader.h) is what finds the definition a name points at — beside the report that names it, as MS-RDL specifies — parses it, binds its data and hands it to the item. The parameter expressions are evaluated where the `Subreport` sits, so one in a tablix detail row reads that row's fields: that is master-detail. A subreport whose definition was never loaded renders as the spec's "Error: Subreport could not be shown", and the detail row grows to fit what the subreport shows.
 
@@ -104,12 +104,13 @@ A `Subreport` renders another report inside this one. The element carries a `Rep
 | Class | Role |
 | --- | --- |
 | `RDLParser` / `RDLWriter` | RDL 2010 XML ↔ `RDLReport` |
-| `RDLExpression` | VB-style expressions: tokenize → AST → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
+| `RDLExpression` (in `MiniVB/`) | VB-style expressions: tokenize → AST → bytecode → execute. Fields/Parameters/Globals/User, IIf/Switch, And/AndAlso/Or/OrElse/Not, Like, Lookup/LookupSet/Previous, Join/Split, aggregates incl. StDev/Var/RunningValue (group or named dataset), calculated fields, Format, string/math/date |
 | `RDLLayoutEngine` | Banded pages + tablix expansion → laid-out elements |
 | `RDLView` | Flipped `NSView`; stacked pages; PDF from pages |
 | `RDLPDFBackend` | PDF backend (`renderPages:`) |
 | `RDLHTMLBackend` | HTML backend (`renderPages:` / `HTMLStringForPages:`) |
-| `RDLUpgrader` | 2003 / 2005 / 2008 → the 2010 grammar, in place on read, the way SSRS upgrades an older report — so the model only knows one shape |
+| `RDLCode` (in `MiniVB/`) | The report's `Code`: VB functions parsed and compiled for the same VM as expressions. `MiniVB/` is the subset of Visual Basic that RDL needs, not a Visual Basic: lexer, parsers, compiler, VM, runtime library and `RDLNumber`. GNUstep builds it with `-IMiniVB` |
+| `RDLUpgrader` | 2003 → 2005 → 2008 → 2010 → 2016, one migration at a time (`RDLMigration<year>.m`), in place on read, the way SSRS upgrades an older report — so the model only knows one shape |
 | `RDLChecker` / `RDLDataContract` | Static checking with no data bound, and the data shape a report needs, described in Objective-C terms |
 | `RDLChartRenderer` | A chart as plain shapes, shared by both backends and the designer canvas |
 | `RDLDataProvider` | The provider protocol, connect strings read and written, column-type inference, and `RDLDataBinder`. The document is the source's (`jsondoc=` / `jsondata=` …) and the query is the dataset's (`CommandText`); rows are never written into a dataset |

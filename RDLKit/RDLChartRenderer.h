@@ -45,6 +45,9 @@ typedef NS_ENUM(NSInteger, RDLChartTextAnchor) {
 @property (nonatomic, assign) RDLChartTextAnchor anchor;
 @property (nonatomic, assign) CGFloat fontSize;
 @property (nonatomic, assign) BOOL bold;
+@property (nonatomic, assign) BOOL italic;
+// The family to write it in; nil for the backend's own chart font.
+@property (nonatomic, copy) NSString *fontFamily;
 // Degrees, anticlockwise, about the anchor point. Only axis titles use it.
 @property (nonatomic, assign) CGFloat rotation;
 @end

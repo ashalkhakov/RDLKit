@@ -63,3 +63,4 @@ obj/
 
 # Local Claude session tooling (per-machine, not project state)
 /.claude/
+.deps/

@@ -16,6 +16,14 @@
 @class RDLStyle;
 @class RDLParagraph;
 
+// On the text of attributedStringForParagraphs: a list item's marker and the
+// tab after it carry RDLListMarkerAttributeName, whose value is that text, so
+// an editor can tell the marker from what was typed. Every character of a
+// paragraph with its own layout, the newline ending it included, carries
+// RDLParagraphLayoutAttributeName: an RDLParagraph holding just that layout.
+FOUNDATION_EXPORT NSString *const RDLListMarkerAttributeName;
+FOUNDATION_EXPORT NSString *const RDLParagraphLayoutAttributeName;
+
 @interface RDLTextAttributes : NSObject
 
 // `scale` multiplies the point size — the canvas passes its zoom, everything
@@ -39,6 +47,18 @@
 + (NSAttributedString *)attributedStringForText:(NSString *)text
                                           style:(RDLStyle *)style
                                           scale:(CGFloat)scale;
+
+// A list item's marker for each paragraph -- "1.", "2.", "•" -- or @"" for one
+// that is not a list item. Numbering counts per level and starts again after
+// a paragraph that is not in the list.
++ (NSArray<NSString *> *)listMarkersForParagraphs:(NSArray<RDLParagraph *> *)paragraphs;
+
+// Where a paragraph's first line and its other lines start, in points from the
+// left of the text: its LeftIndent, moved by HangingIndent, and for a list item
+// its level's indent with room for the marker before the first line's text.
++ (void)indentsForParagraph:(RDLParagraph *)paragraph
+                  firstLine:(CGFloat *)firstLine
+                  otherLines:(CGFloat *)otherLines;
 
 // Paragraphs of styled runs, each run's sparse style merged over `baseStyle`
 // and paragraphs joined by a newline that carries the preceding paragraph's

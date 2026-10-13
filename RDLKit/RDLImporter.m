@@ -7,9 +7,6 @@
 // The dataset the placeholders become fields of. One dataset, because the
 // document says nothing about where its data comes from -- only what it needs.
 static NSString *const kRDLImportDataSetName = @"Data";
-// The one data source a scaffolded report gets. Every dataset the import
-// declares reads from it, because a dataset has to read from something.
-static NSString *const kRDLImportDataSourceName = @"Source";
 
 #pragma mark - Units and tuning
 
@@ -298,6 +295,7 @@ static NSArray<NSString *> *RDLFieldNamesForHeader(RDLImportRow *header, NSUInte
 @property (nonatomic, assign) CGFloat tabInterval;
 @property (nonatomic, strong) NSMutableArray<RDLEmbeddedImage *> *images;
 @property (nonatomic, strong) NSMutableArray<RDLDataSet *> *dataSets;
+@property (nonatomic, strong) NSMutableArray<RDLDataSource *> *dataSources;
 @property (nonatomic, strong) NSMutableArray<NSString *> *notes;
 @end
 @implementation RDLPlacement
@@ -410,11 +408,25 @@ static RDLTablix *RDLTablixForTable(RDLImportBlock *block, RDLNamer *namer, RDLS
 // pointing at nothing is a trap: the designer falls back to whatever dataset
 // happens to be first, which is some other table's. Binding it costs nothing
 // at render time, since a region with no rows still lays its body out once.
+// A dataset reads from a source of its own: one source shared by several
+// datasets is a report that says all of them read the same document, which is
+// not what a scaffold means -- each table came from somewhere different, and
+// the person points each at its own file. The source is an empty JSON
+// document, which reads as no rows until they do.
+static NSString *RDLFreshSourceFor(NSString *dataSetName, RDLPlacement *placement) {
+  RDLDataSource *source = [[RDLDataSource alloc] init];
+  source.name = [placement.namer nameFor:[NSString stringWithFormat:@"%@Source", dataSetName ?: @"Data"]];
+  source.dataProvider = RDLStringFromDataProviderKind(RDLDataProviderKindJSON);
+  source.connectString = @"jsondata=[]";
+  [placement.dataSources addObject:source];
+  return source.name;
+}
+
 static void RDLGiveTableADataSet(RDLTablix *tablix, RDLImportBlock *block,
                                   RDLPlacement *placement, CGFloat *outHeight) {
   RDLDataSet *dataSet = [[RDLDataSet alloc] init];
   dataSet.name = [NSString stringWithFormat:@"%@Data", tablix.name];
-  dataSet.dataSourceName = kRDLImportDataSourceName;
+  dataSet.dataSourceName = RDLFreshSourceFor(dataSet.name, placement);
   dataSet.commandText = @"$[*]";
   tablix.dataSetName = dataSet.name;
   [placement.dataSets addObject:dataSet];
@@ -781,30 +793,24 @@ static CGFloat RDLPlaceBlocks(NSArray<RDLImportBlock *> *blocks, NSMutableArray<
 
   RDLStyle *base = report.body.style ?: [RDLStyle defaultStyle];
 
-  // A dataset reads from a data source, so a scaffolded report gets one: an
-  // empty JSON document, which reads as no rows and is where the person then
-  // points at the file they actually have. A dataset naming no source is not a
-  // report anyone can run -- MS-RDL requires Query/DataSourceName, and Report
-  // Builder will not let you make one.
-  RDLDataSource *source = [[RDLDataSource alloc] init];
-  source.name = kRDLImportDataSourceName;
-  source.dataProvider = RDLStringFromDataProviderKind(RDLDataProviderKindJSON);
-  source.connectString = @"jsondata=[]";
-  [report.dataSources addObject:source];
-
+  // A dataset naming no source is not a report anyone can run -- MS-RDL
+  // requires Query/DataSourceName, and Report Builder will not let you make
+  // one -- so every dataset this scaffolds gets a source, and its own: see
+  // RDLFreshSourceFor.
   RDLPlacement *placement = [[RDLPlacement alloc] init];
   placement.namer = namer;
   placement.base = base;
   placement.tabInterval = document.defaultTabStop;
   placement.images = report.embeddedImages;
   placement.dataSets = report.dataSets;
+  placement.dataSources = report.dataSources;
   placement.notes = notes;
 
   // The placeholders become a dataset, so the report says what it needs.
   if ([document.fieldNames count]) {
     RDLDataSet *dataSet = [[RDLDataSet alloc] init];
     dataSet.name = kRDLImportDataSetName;
-    dataSet.dataSourceName = kRDLImportDataSourceName;
+    dataSet.dataSourceName = RDLFreshSourceFor(dataSet.name, placement);
     dataSet.commandText = @"$[*]";
     NSMutableArray *fields = [NSMutableArray array];
     for (NSString *name in document.fieldNames) {

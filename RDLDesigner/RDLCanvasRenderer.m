@@ -4,6 +4,8 @@
 #import "RDLPageGeometry.h"
 #import "RDLEditingContext.h"
 #import "RDLCompatibility.h"
+#import "RDLBorderPainter.h"
+#import "RDLLinePainter.h"
 
 @implementation RDLCanvasOverlay
 - (instancetype)init {
@@ -25,10 +27,23 @@ static const CGFloat kRDLHandleGripStep = 3.0;
 static const CGFloat kRDLBracketLabelSize = 8.0;
 static const CGFloat kRDLBracketLabelGap = 2.0;
 
+// A text box's text is drawn just inside its box, so a border does not sit on
+// top of the first glyph. This is the canvas's own breathing room, on top of
+// whatever Padding the style asks for.
+static const CGFloat kRDLTextInsetX = 2.0;
+static const CGFloat kRDLTextInsetY = 1.0;
+
+// One side of a style's Padding, in model points. The same conversion was
+// written out once per side, and the bottom one was missing.
+static CGFloat RDLCanvasPadding(RDLLength *length) {
+  return [length inches] * RDLPointsPerInch;
+}
+
 // The canvas is the one place that draws text at a scale other than 1: its
-// zoom. Everything else about the translation is shared (RDLTextAttributes).
-static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CGFloat zoom) {
-  return [RDLTextAttributes attributedStringForText:text style:style scale:zoom];
+// Everything about the translation is shared (RDLTextAttributes). Text is laid
+// out at its real size in model space; the view transform makes it bigger.
+static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
+  return [RDLTextAttributes attributedStringForText:text style:style scale:1.0];
 }
 
 @implementation RDLCanvasRenderer {
@@ -67,17 +82,15 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
                       inRect:(NSRect)r
                       active:(BOOL)active
                     selected:(BOOL)selected {
-  CGFloat z = _ctx.zoom > 0 ? _ctx.zoom : 1.0;
-  NSRect band = RDLTablixHandleRect(r, z);
-  CGFloat thickness = RDLTablixHandleBandForZoom(z);
-  // The marks inside a handle are written at 100% and scaled with everything
-  // else, so a band that is twice as thick gets brackets and grips twice as
-  // big rather than the same hairlines lost in more grey. `line` keeps a
-  // stroke at least a point wide, since a half-point line zoomed out is a
-  // line nobody can see.
-  CGFloat inset = kRDLHandleInset * z;
-  CGFloat tick = kRDLHandleTick * z;
-  CGFloat line = MAX(1.0, z);
+  NSRect band = RDLTablixHandleRect(r);
+  CGFloat thickness = RDLTablixHandleBand;
+  // The marks inside a handle are written at 100% in model space; the view
+  // transform scales them with everything else, so a band that is twice as
+  // thick gets brackets and grips twice as big rather than the same hairlines
+  // lost in more grey.
+  CGFloat inset = kRDLHandleInset;
+  CGFloat tick = kRDLHandleTick;
+  CGFloat line = 1.0;
   NSColor *fill = selected ? [NSColor colorWithCalibratedRed:0.55 green:0.66 blue:0.85 alpha:1.0]
                            : (active ? [NSColor colorWithCalibratedWhite:0.74 alpha:1.0]
                                      : [NSColor colorWithCalibratedWhite:0.84 alpha:1.0]);
@@ -120,7 +133,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   void (^grip)(NSRect) = ^(NSRect box) {
     [edge set];
     CGFloat mid = NSMidX(box);
-    CGFloat step = kRDLHandleGripStep * z;
+    CGFloat step = kRDLHandleGripStep;
     for (CGFloat g = -step; g <= step; g += step)
       NSRectFill(NSMakeRect(mid + g, NSMinY(box) + inset, line,
                             MAX(NSHeight(box) - 2 * inset, line)));
@@ -130,7 +143,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   NSUInteger columns = [RDLTablixGeometry columnCountOf:tablix];
   NSUInteger headerColumns = [RDLTablixGeometry headerColumnCountOf:tablix];
   for (NSUInteger c = 0; c < columns; c++) {
-    CGFloat w = [RDLTablixGeometry widthOfBodyColumn:c of:tablix zoom:z];
+    CGFloat w = [RDLTablixGeometry widthOfBodyColumn:c of:tablix];
     NSRect box = NSMakeRect(x, NSMinY(band), w, thickness);
     handle(box);
     if (c < headerColumns)
@@ -144,7 +157,7 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   NSUInteger rows = [RDLTablixGeometry rowCountOf:tablix];
   NSUInteger headerRows = [RDLTablixGeometry headerRowCountOf:tablix];
   for (NSUInteger i = 0; i < rows; i++) {
-    CGFloat h = [RDLTablixGeometry heightOfRow:i of:tablix zoom:z];
+    CGFloat h = [RDLTablixGeometry heightOfRow:i of:tablix];
     NSRect box = NSMakeRect(NSMinX(band), y, thickness, h);
     handle(box);
     if (i < headerRows)
@@ -156,40 +169,43 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   if (_overlay.dragTablix == tablix && _overlay.dragColumnTarget >= 0) {
     CGFloat marker = NSMinX(r);
     for (NSInteger c = 0; c < _overlay.dragColumnTarget; c++)
-      marker += [RDLTablixGeometry widthOfBodyColumn:(NSUInteger)c of:tablix zoom:z];
+      marker += [RDLTablixGeometry widthOfBodyColumn:(NSUInteger)c of:tablix];
     [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:1.0] set];
     NSRectFill(NSMakeRect(marker - line, NSMinY(band), 2 * line, NSHeight(band)));
   }
 }
 
 - (void)drawTablix:(RDLTablix *)it inRect:(NSRect)r {
-  CGFloat z = _ctx.zoom;
   NSUInteger rows = [RDLTablixGeometry rowCountOf:it];
   NSUInteger cols = [RDLTablixGeometry columnCountOf:it];
 
   // The header row keeps the background rdlBuildTable gives it, so the grid
   // reads as a table rather than as a stack of boxes.
   if (rows > 0) {
-    NSRect header = [RDLTablixGeometry cellRectOf:it itemRect:r row:0 column:0 zoom:z];
+    NSRect header = [RDLTablixGeometry cellRectOf:it itemRect:r row:0 column:0];
     [RDLColorFromHex(@"#ece6d8") set];
     NSRectFill(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), MIN(NSHeight(header), NSHeight(r))));
   }
 
   // Hovered cell highlight: shows which cell a click would select.
-  if (_overlay.hoverTablix == it && _overlay.hoverPart != RDLTablixPartNone &&
+  if (_overlay.hoverTablix == it && _overlay.hoverRow >= 0 && _overlay.hoverColumn >= 0 &&
       _overlay.editingItem == nil) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it
-                                       itemRect:r
-                                         column:_overlay.hoverColumn
-                                           part:_overlay.hoverPart
-                                           zoom:z];
+    NSRect cell = [RDLTablixGeometry mergedCellRectOf:it
+                                             itemRect:r
+                                                  row:(NSUInteger)_overlay.hoverRow
+                                               column:(NSUInteger)_overlay.hoverColumn];
     [[NSColor colorWithCalibratedRed:0.55 green:0.62 blue:0.85 alpha:0.18] set];
     NSRectFillUsingOperation(cell, NSCompositeSourceOver);
   }
 
   for (NSUInteger row = 0; row < rows; row++) {
     for (NSUInteger col = 0; col < cols; col++) {
-      NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:col zoom:z];
+      // A cell merged with its neighbours is drawn once, across all of them;
+      // the places it covers draw nothing, or the same item would be painted
+      // again in the space it already fills.
+      if ([RDLTablixGeometry tablix:it isCoveredAtRow:row column:col])
+        continue;
+      NSRect cell = [RDLTablixGeometry mergedCellRectOf:it itemRect:r row:row column:col];
       RDLItem *content = [RDLTablixGeometry itemOf:it inRow:row column:col];
       // An editor open over this cell leaves it blank, the way an item being
       // edited elsewhere on the canvas is left blank.
@@ -204,11 +220,10 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   RDLSelection *selection = _ctx.selection;
   if (selection.scope == RDLSelectionScopeTablixCell && selection.tablix == it &&
       selection.cellRow >= 0 && selection.cellColumn >= 0) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it
-                                       itemRect:r
-                                            row:(NSUInteger)selection.cellRow
-                                         column:(NSUInteger)selection.cellColumn
-                                           zoom:z];
+    NSRect cell = [RDLTablixGeometry mergedCellRectOf:it
+                                             itemRect:r
+                                                  row:(NSUInteger)selection.cellRow
+                                               column:(NSUInteger)selection.cellColumn];
     [[NSColor colorWithCalibratedRed:0.1 green:0.1 blue:0.09 alpha:1] set];
     NSFrameRect(NSInsetRect(cell, 1, 1));
   }
@@ -216,18 +231,29 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   // The grid last, over the contents, so the lines are not painted on by a
   // cell's own background.
   [[NSColor colorWithCalibratedWhite:0.72 alpha:1] set];
-  for (NSUInteger row = 0; row < rows; row++) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:0 zoom:z];
-    NSRectFill(NSMakeRect(NSMinX(r), NSMinY(cell), NSWidth(r), 1));
-  }
   CGFloat gridBottom = NSMinY(r);
   for (NSUInteger row = 0; row < rows; row++)
-    gridBottom = NSMaxY([RDLTablixGeometry cellRectOf:it itemRect:r row:row column:0 zoom:z]);
-  NSRectFill(NSMakeRect(NSMinX(r), gridBottom, NSWidth(r), 1));
-  for (NSUInteger col = 0; col < cols; col++) {
-    NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:0 column:col zoom:z];
-    NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(r), 1, gridBottom - NSMinY(r)));
+    gridBottom = NSMaxY([RDLTablixGeometry cellRectOf:it itemRect:r row:row column:0]);
+  // Segment by segment, so a line does not run through a merged cell: two
+  // places that are one cell have nothing drawn between them.
+  for (NSUInteger row = 0; row < rows; row++) {
+    for (NSUInteger col = 0; col < cols; col++) {
+      NSRect cell = [RDLTablixGeometry cellRectOf:it itemRect:r row:row column:col];
+      if (row == 0 || ![RDLTablixGeometry tablix:it
+                                  isOneCellAtRow:row - 1
+                                          column:col
+                                          andRow:row
+                                          column:col])
+        NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(cell), NSWidth(cell), 1));
+      if (col == 0 || ![RDLTablixGeometry tablix:it
+                                  isOneCellAtRow:row
+                                          column:col - 1
+                                          andRow:row
+                                          column:col])
+        NSRectFill(NSMakeRect(NSMinX(cell), NSMinY(cell), 1, NSHeight(cell)));
+    }
   }
+  NSRectFill(NSMakeRect(NSMinX(r), gridBottom, NSWidth(r), 1));
   NSRectFill(NSMakeRect(NSMaxX(r) - 1, NSMinY(r), 1, gridBottom - NSMinY(r)));
 }
 
@@ -237,10 +263,15 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
   _overlay = overlay;
   _geometry = geo;
   RDLReport *r = _ctx.report;
-  CGFloat z = _ctx.zoom;
-  CGFloat scale = RDLPointsPerInch * z;
+  CGFloat scale = RDLPointsPerInch;
+  // The backdrop is the view's own, so it is filled before the transform: it
+  // covers whatever part of the canvas is on screen, at any zoom.
   [[NSColor colorWithCalibratedWhite:0.11 alpha:1] set];
   NSRectFill(bounds);
+  // From here down everything is in model space -- points at 100% -- and the
+  // zoom is applied once, here, the way a scene is drawn and then viewed.
+  [[NSGraphicsContext currentContext] saveGraphicsState];
+  [RDLCanvasViewTransform(_ctx.zoom) concat];
   NSRect paper = geo.paperRect;
   [RDLColorFromHex(@"#f6f1e8") set];
   NSRectFill(paper);
@@ -284,41 +315,48 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style, CG
                                               withAttributes:labelAttr];
     [[NSGraphicsContext currentContext] restoreGraphicsState];
 
-    for (RDLItem *it in bf.band.items)
+    for (RDLItem *it in RDLItemsInPaintOrder(bf.band.items))
       [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
   }
+  // What the drag is lining itself up with, over the items it runs across.
+  for (NSValue *guide in overlay.guides) {
+    [[NSColor colorWithCalibratedRed:0.85 green:0.30 blue:0.45 alpha:0.9] set];
+    NSRect line = [guide rectValue];
+    NSRectFill(NSMakeRect(NSMinX(line), NSMinY(line), MAX(NSWidth(line), 1), MAX(NSHeight(line), 1)));
+  }
+  // The box being drawn to take hold of several items, over everything it is
+  // being drawn across.
+  if (!NSIsEmptyRect(overlay.marqueeRect)) {
+    [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:0.15] set];
+    NSRectFillUsingOperation(overlay.marqueeRect, NSCompositeSourceOver);
+    [[NSColor colorWithCalibratedRed:0.24 green:0.36 blue:0.60 alpha:0.9] set];
+    NSFrameRect(overlay.marqueeRect);
+  }
+  [[NSGraphicsContext currentContext] restoreGraphicsState];
 }
 
 // The group structure at a glance, the way Report Builder shows it: a bracket
 // outside the region per group, nested outwards, labelled with the field. Rows
 // bracket down the left, columns across the top, so a crosstab reads as the two
 // axes it is. Drawn only for the selected tablix -- it is orientation, not
-// decoration, and on every region at once it would be noise.
-// The group structure at a glance, the way Report Builder shows it: a bracket
-// outside the region per group, nested outwards, labelled with the field. Rows
-// bracket down the left, columns across the top, so a crosstab reads as the two
-// axes it is. Drawn only for the selected tablix -- it is orientation, not
 // decoration, and on every region at once it would be noise. Where each bracket
 // goes is RDLPageGeometry's, so it can be checked without drawing.
-static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
-  NSArray<NSString *> *rows = tablix.rowGroups ?: @[];
-  NSArray<NSString *> *cols = tablix.columnGroups ?: @[];
+static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
+  NSArray<NSString *> *rows = [RDLTablixGeometry groupBracketLabelsOf:tablix axis:RDLTablixAxisRows];
+  NSArray<NSString *> *cols = [RDLTablixGeometry groupBracketLabelsOf:tablix axis:RDLTablixAxisColumns];
   if ([rows count] == 0 && [cols count] == 0)
     return;
-
-  CGFloat z = zoom > 0 ? zoom : 1.0;
-  CGFloat line = MAX(1.0, z);
-  CGFloat gap = kRDLBracketLabelGap * z;
+  CGFloat line = 1.0;
+  CGFloat gap = kRDLBracketLabelGap;
   NSColor *ink = [NSColor colorWithCalibratedRed:0.36 green:0.49 blue:0.72 alpha:0.85];
   NSDictionary *attrs = @{
-    NSFontAttributeName : [NSFont boldSystemFontOfSize:kRDLBracketLabelSize * z],
+    NSFontAttributeName : [NSFont boldSystemFontOfSize:kRDLBracketLabelSize],
     NSForegroundColorAttributeName : ink,
   };
   [ink set];
 
   NSArray<NSValue *> *rowBrackets = [RDLPageGeometry rowGroupBracketsForCount:[rows count]
-                                                                       inRect:r
-                                                                         zoom:z];
+                                                                       inRect:r];
   for (NSUInteger i = 0; i < [rows count]; i++) {
     NSRect b = [rowBrackets[i] rectValue];
     NSBezierPath *path = [NSBezierPath bezierPath];
@@ -341,8 +379,7 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
   }
 
   NSArray<NSValue *> *colBrackets = [RDLPageGeometry columnGroupBracketsForCount:[cols count]
-                                                                          inRect:r
-                                                                            zoom:z];
+                                                                          inRect:r];
   for (NSUInteger i = 0; i < [cols count]; i++) {
     NSRect b = [colBrackets[i] rectValue];
     NSBezierPath *path = [NSBezierPath bezierPath];
@@ -366,6 +403,13 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
 // canvas has not got. Double-clicking it opens that report in a window of its
 // own, which is where its contents are edited.
 - (void)drawSubreport:(RDLSubreport *)sub inRect:(NSRect)r {
+  NSString *name = [sub.reportName length] ? sub.reportName : @"(no report)";
+  [self drawPlaceholder:[NSString stringWithFormat:@"Subreport: %@", name] inRect:r];
+}
+
+// A dashed box with one centred line in it: what the canvas draws for an item
+// whose contents it does not render itself.
+- (void)drawPlaceholder:(NSString *)label inRect:(NSRect)r {
   [[NSColor colorWithCalibratedWhite:0.94 alpha:1.0] set];
   NSRectFill(r);
   NSBezierPath *frame = [NSBezierPath bezierPathWithRect:NSInsetRect(r, 0.5, 0.5)];
@@ -382,8 +426,6 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     NSForegroundColorAttributeName : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0],
     NSParagraphStyleAttributeName : centred
   };
-  NSString *name = [sub.reportName length] ? sub.reportName : @"(no report)";
-  NSString *label = [NSString stringWithFormat:@"Subreport: %@", name];
   NSSize size = [label sizeWithAttributes:attrs];
   [label drawInRect:NSMakeRect(NSMinX(r) + 4, NSMidY(r) - size.height / 2,
                                MAX(NSWidth(r) - 8, 1), size.height)
@@ -397,17 +439,27 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
 // The same item, drawn where something else decides it goes: a tablix cell,
 // whose contents take the cell's rect because MS-RDL ignores an item's own box
 // inside CellContents.
++ (NSRect)textRectForStyle:(RDLStyle *)style inRect:(NSRect)rect {
+  CGFloat padL = RDLCanvasPadding(style.paddingLeft);
+  CGFloat padT = RDLCanvasPadding(style.paddingTop);
+  CGFloat padR = RDLCanvasPadding(style.paddingRight);
+  CGFloat padB = RDLCanvasPadding(style.paddingBottom);
+  return NSMakeRect(NSMinX(rect) + kRDLTextInsetX + padL, NSMinY(rect) + kRDLTextInsetY + padT,
+                    NSWidth(rect) - 2 * kRDLTextInsetX - padL - padR,
+                    NSHeight(rect) - 2 * kRDLTextInsetY - padT - padB);
+}
+
 - (void)drawItem:(RDLItem *)it inRect:(NSRect)r {
-  BOOL sel = it == [_ctx selectedItem];
+  BOOL sel = [_ctx.selection isSelectedItem:it];
   if ([it isKindOfClass:[RDLLine class]]) {
-    [RDLColorFromHex(it.style.color) set];
-    NSFrameRect(NSMakeRect(NSMinX(r), NSMinY(r), NSWidth(r), 1));
+    // The item's own width and height, not the rect: the rect is clamped to a
+    // point tall so a flat line can still be seen, which is the very thing the
+    // direction is read from.
+    [RDLLinePainter drawLineOfStyle:it.style inRect:r width:it.width height:it.height scale:1.0];
   } else if ([it isKindOfClass:[RDLRectangle class]]) {
-    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
-      [RDLColorFromHex(it.style.backgroundColor) set];
-      NSRectFill(r);
-    }
-    for (RDLItem *child in it.childItems)
+    [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
+    [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:1.0];
+    for (RDLItem *child in RDLItemsInPaintOrder(it.childItems))
       [self drawItem:child origin:NSMakePoint(NSMinX(r), NSMinY(r))];
   } else if ([it isKindOfClass:[RDLTablix class]]) {
     // A tablix nobody is working in is just its cells: no band, no brackets,
@@ -423,9 +475,17 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
       [self drawTablixHandleBand:(RDLTablix *)it inRect:r active:YES selected:sel];
     [self drawTablix:(RDLTablix *)it inRect:r];
     if (active)
-      RDLDrawGroupBrackets((RDLTablix *)it, r, _ctx.zoom);
+      RDLDrawGroupBrackets((RDLTablix *)it, r);
   } else if ([it isKindOfClass:[RDLSubreport class]]) {
     [self drawSubreport:(RDLSubreport *)it inRect:r];
+  } else if ([it isKindOfClass:[RDLUnsupportedItem class]]) {
+    // Kept in the file and on the page, but not something this canvas can
+    // draw: the box says what it is, so it can still be moved and sized.
+    RDLUnsupportedItem *u = (RDLUnsupportedItem *)it;
+    NSString *what = [u.customType length]
+                         ? [NSString stringWithFormat:@"%@ (%@)", u.rdlElementName, u.customType]
+                         : u.rdlElementName;
+    [self drawPlaceholder:[NSString stringWithFormat:@"%@: not supported", what] inRect:r];
   } else if ([it isKindOfClass:[RDLChart class]]) {
     // The canvas shows the real chart, not a stand-in: the model is laid out
     // against whatever data is bound and drawn by the same RDLChartRenderer
@@ -433,48 +493,38 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r, CGFloat zoom) {
     // gets exported.
     RDLLaidOutChart *preview = [RDLLayoutEngine laidOutChart:(RDLChart *)it
                                                     inReport:_ctx.report
-                                                 paramValues:_ctx.document.paramValues];
+                                                 paramValues:[_ctx.document suppliedParameters]];
     [RDLChartRenderer drawChart:preview inRect:r];
   } else {
     // Textbox (and unknown kinds): full WYSIWYG preview — background, border,
     // padding and the attributed value.
-    if (!RDLColorIsTransparent(it.style.backgroundColor)) {
-      [RDLColorFromHex(it.style.backgroundColor) set];
-      NSRectFill(r);
-    }
-    RDLBorder *b = it.style.border;
-    if (b && b.style != RDLBorderStyleUnspecified && b.style != RDLBorderStyleNone) {
-      [RDLColorFromHex(b.color) set];
-      NSFrameRect(r);
-    }
-    CGFloat padL = [it.style.paddingLeft inches] * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padT = [it.style.paddingTop inches] * RDLPointsPerInch * _ctx.zoom;
-    CGFloat padR = [it.style.paddingRight inches] * RDLPointsPerInch * _ctx.zoom;
-    NSRect textRect = NSMakeRect(NSMinX(r) + 2 + padL, NSMinY(r) + 1 + padT,
-                                 NSWidth(r) - 4 - padL - padR, NSHeight(r) - 2 - padT);
+    [RDLBorderPainter fillBackgroundOfStyle:it.style inRect:r];
+    [RDLBorderPainter drawBorderOfStyle:it.style inRect:r scale:1.0];
+    NSRect textRect = [RDLCanvasRenderer textRectForStyle:it.style inRect:r];
     BOOL editorCoversThisText =
-        _overlay.editingItem == it && _overlay.editingCell == nil;
+        _overlay.editingItem == it;
     if (!editorCoversThisText) {
       RDLTextbox *tb = [it isKindOfClass:[RDLTextbox class]] ? (RDLTextbox *)it : nil;
       if ([tb.paragraphs count])
         [[RDLTextAttributes attributedStringForParagraphs:tb.paragraphs
                                                baseStyle:it.style
-                                                   scale:_ctx.zoom]
+                                                   scale:1.0]
             drawInRect:textRect];
       else
-        [RDLAttributedText(tb.value ?: it.rdlElementName, it.style, _ctx.zoom)
+        [RDLAttributedText(tb.value ?: it.rdlElementName, it.style)
             drawInRect:textRect];
     }
   }
   if (sel) {
     [[NSColor colorWithCalibratedRed:0.1 green:0.1 blue:0.09 alpha:1] set];
     NSFrameRect(NSInsetRect(r, -1, -1));
-    NSRect handles[3] = {
-        NSMakeRect(NSMaxX(r) - 3, NSMaxY(r) - 3, 6, 6),
-        NSMakeRect(NSMaxX(r) - 3, NSMidY(r) - 3, 6, 6),
-        NSMakeRect(NSMidX(r) - 3, NSMaxY(r) - 3, 6, 6)};
-    for (int i = 0; i < 3; i++)
-      NSRectFill(handles[i]);
+    // The grips belong to the item a drag would resize, which is the one the
+    // inspector is showing: with several selected, the first of them.
+    if (it != [_ctx selectedItem])
+      return;
+    // The eight grips, where the hit test looks for them.
+    for (NSString *kind in RDLHandleKinds())
+      NSRectFill(NSInsetRect(RDLHandleRectOfKind(kind, r), 1, 1));
   }
 }
 

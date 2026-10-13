@@ -4,21 +4,13 @@
 NSArray<NSString *> *RDLExpressionFunctionNames(void) {
   static NSArray *names;
   if (names == nil) {
-    names = @[
-      @"Sum", @"Avg", @"Min", @"Max", @"Count", @"CountDistinct", @"CountRows",
-      @"First", @"Last", @"StDev", @"StDevP", @"Var", @"VarP", @"Aggregate",
-      @"RunningValue", @"Lookup", @"LookupSet", @"MultiLookup", @"IIf",
-      @"Switch", @"Choose", @"Format", @"FormatCurrency", @"FormatNumber",
-      @"FormatPercent", @"FormatDateTime", @"CStr", @"CInt", @"CDbl", @"CDate",
-      @"CBool", @"Len", @"Left", @"Right", @"Mid", @"Trim", @"LTrim", @"RTrim",
-      @"UCase", @"LCase", @"Replace", @"InStr", @"InStrRev", @"Join", @"Split",
-      @"Abs", @"Ceiling", @"Floor", @"Round", @"Sqrt", @"Pow", @"Exp", @"Log",
-      @"Int", @"Fix", @"Mod", @"Today", @"Now", @"Year", @"Month", @"Day",
-      @"Hour", @"Minute", @"Second", @"Weekday", @"MonthName", @"WeekdayName",
-      @"DateAdd", @"DateDiff", @"DatePart", @"DateSerial", @"DateValue",
-      @"IsNothing", @"IsNumeric", @"IsDate", @"Level", @"RowNumber", @"Previous",
-      @"True", @"False", @"Nothing", @"And", @"Or", @"Not", @"Like"
-    ];
+    NSMutableOrderedSet<NSString *> *all = [NSMutableOrderedSet orderedSet];
+    for (RDLFunctionInfo *function in [RDLExpressionCatalog functions])
+      if ([function.name length])
+        [all addObject:function.name];
+    [all addObjectsFromArray:@[ @"True", @"False", @"Nothing", @"And", @"AndAlso", @"Or", @"OrElse", @"Not",
+                                @"Xor", @"Like", @"Is", @"IsNot", @"Mod" ]];
+    names = [all array];
   }
   return names;
 }
@@ -34,6 +26,15 @@ static NSArray<NSString *> *RDLUserMembers(void) {
   return @[ @"UserID", @"Language" ];
 }
 
+static void RDLCollectGroupVariables(NSArray<RDLTablixMember *> *members, NSMutableOrderedSet<NSString *> *into) {
+  for (RDLTablixMember *member in members) {
+    for (RDLVariable *variable in member.variables)
+      if ([variable.name length])
+        [into addObject:variable.name];
+    RDLCollectGroupVariables(member.members, into);
+  }
+}
+
 @implementation RDLExpressionScope
 
 + (instancetype)scopeWithFieldNames:(NSArray<NSString *> *)fieldNames
@@ -41,6 +42,9 @@ static NSArray<NSString *> *RDLUserMembers(void) {
   RDLExpressionScope *s = [[RDLExpressionScope alloc] init];
   s->_fieldNames = [fieldNames copy] ?: @[];
   s->_parameterNames = [parameterNames copy] ?: @[];
+  s.reportItemNames = @[];
+  s.variableNames = @[];
+  s.codeFunctionNames = @[];
   return s;
 }
 
@@ -64,7 +68,28 @@ static NSArray<NSString *> *RDLUserMembers(void) {
     if ([p.name length])
       [params addObject:p.name];
   }
-  return [self scopeWithFieldNames:fields parameterNames:params];
+  RDLExpressionScope *scope = [self scopeWithFieldNames:fields parameterNames:params];
+  // Text boxes are what ReportItems! reads.
+  NSMutableOrderedSet<NSString *> *items = [NSMutableOrderedSet orderedSet];
+  for (RDLItem *item in [report allItemsIncludingNested])
+    if ([item isKindOfClass:[RDLTextbox class]] && [item.name length])
+      [items addObject:item.name];
+  scope.reportItemNames = [items array];
+  // The report's variables, and every group's, which the expressions within
+  // the group read.
+  NSMutableOrderedSet<NSString *> *variables = [NSMutableOrderedSet orderedSet];
+  for (RDLVariable *variable in report.variables)
+    if ([variable.name length])
+      [variables addObject:variable.name];
+  for (RDLItem *item in [report allItemsIncludingNested])
+    if ([item isKindOfClass:[RDLTablix class]])
+      for (RDLTablixHierarchy *hierarchy in @[ [(RDLTablix *)item rowHierarchy] ?: [NSNull null],
+                                                [(RDLTablix *)item columnHierarchy] ?: [NSNull null] ])
+        if ([hierarchy isKindOfClass:[RDLTablixHierarchy class]])
+          RDLCollectGroupVariables(hierarchy.members, variables);
+  scope.variableNames = [variables array];
+  scope.codeFunctionNames = [report codeFunctionNames];
+  return scope;
 }
 
 @end
@@ -101,10 +126,26 @@ NSArray<NSString *> *RDLExpressionCompletions(NSString *text, NSRange charRange,
     partial = [partial substringFromIndex:NSMaxRange(bang)];
     charRange = NSMakeRange(charRange.location + NSMaxRange(bang), [partial length]);
   }
+  // Code.Name: the report's own functions, called with their bracket open.
+  NSRange codeDot = [partial rangeOfString:@"Code." options:NSCaseInsensitiveSearch | NSAnchoredSearch];
+  if (codeDot.location == 0) {
+    NSString *member = [partial substringFromIndex:NSMaxRange(codeDot)];
+    NSMutableArray *calls = [NSMutableArray array];
+    for (NSString *function in scope.codeFunctionNames)
+      if ([member length] == 0 ||
+          [function rangeOfString:member options:NSCaseInsensitiveSearch | NSAnchoredSearch].location == 0)
+        [calls addObject:[NSString stringWithFormat:@"%@Code.%@(", replacePrefix, function]];
+    return calls;
+  }
   NSString *coll = RDLCollectionBefore(text, charRange.location);
   NSArray *pool;
   BOOL memberContext = YES;
-  if ([coll isEqualToString:@"Fields"]) {
+  if ([coll isEqualToString:@"ReportItems"] || [coll isEqualToString:@"Variables"]) {
+    NSMutableArray *m = [NSMutableArray array];
+    for (NSString *name in [coll isEqualToString:@"ReportItems"] ? scope.reportItemNames : scope.variableNames)
+      [m addObject:[name stringByAppendingString:@".Value"]];
+    pool = m;
+  } else if ([coll isEqualToString:@"Fields"]) {
     NSMutableArray *m = [NSMutableArray array];
     for (NSString *f in scope.fieldNames)
       [m addObject:[f stringByAppendingString:@".Value"]];
@@ -121,7 +162,10 @@ NSArray<NSString *> *RDLExpressionCompletions(NSString *text, NSRange charRange,
   } else {
     memberContext = NO;
     NSMutableArray *m =
-        [NSMutableArray arrayWithObjects:@"Fields!", @"Parameters!", @"Globals!", @"User!", nil];
+        [NSMutableArray arrayWithObjects:@"Fields!", @"Parameters!", @"Globals!", @"User!", @"ReportItems!",
+                                         @"Variables!", nil];
+    if ([scope.codeFunctionNames count])
+      [m addObject:@"Code."];
     [m addObjectsFromArray:RDLExpressionFunctionNames()];
     pool = m;
   }
@@ -152,6 +196,17 @@ BOOL RDLShouldAutoComplete(NSString *text, NSRange selectedRange) {
   if (loc == 0 || loc > [text length])
     return NO;
   if ([text characterAtIndex:loc - 1] == '!')
+    return YES;
+  // Right after Code. too, which is how the report's own functions are reached.
+  NSUInteger wordStart = loc;
+  while (wordStart > 0) {
+    unichar c = [text characterAtIndex:wordStart - 1];
+    if (!isalnum(c) && c != '_' && c != '.')
+      break;
+    wordStart--;
+  }
+  if ([[text substringWithRange:NSMakeRange(wordStart, loc - wordStart)]
+          rangeOfString:@"Code." options:NSCaseInsensitiveSearch | NSAnchoredSearch].location == 0)
     return YES;
   // Keep the list up while a member prefix is being typed (`Fields!Na`).
   NSInteger i = (NSInteger)loc - 1;

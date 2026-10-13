@@ -97,9 +97,19 @@
     [v setHidden:!any || calculated];
   for (NSView *v in @[ _valueField, _valueLabel, _valueExprButton ])
     [v setHidden:!any || !calculated];
-  [_kindHint setStringValue:
-      calculated ? @"An expression the report works out for every row."
-                 : @"A column of the query, read as it comes."];
+  [_kindHint setStringValue:calculated ? @"An expression the report works out for every row."
+                                       : [self columnHint]];
+}
+
+// What a column is depends on what the query reads: in XML it is an XPath from
+// the row's own element, and a field that says only "Total" is the short way
+// of writing a child of that name. Saying so here is the difference between a
+// pane that looks like it took the path and a report that comes out empty.
+- (NSString *)columnHint {
+  if (RDLDataProviderKindFromString(_dataSet.dataSource.dataProvider) == RDLDataProviderKindXML)
+    return @"A column of the query: a child or attribute of the row's element, "
+           @"or an XPath from it — @No, Customer/Name.";
+  return @"A column of the query, read as it comes.";
 }
 
 // Changing the kind rewrites the field as the other kind, because that is what
@@ -143,26 +153,33 @@
   NSUInteger index = [fields indexOfObject:_field];
   if (index == NSNotFound)
     return;
+  // What is edited is a copy, put in the list in the field's place: the field
+  // the report holds stays as it was until the editor is told, and that is
+  // what the editor keeps for undo.
+  RDLField *edited = [_field copy];
+  fields[index] = edited;
   NSString *name = [[_nameField stringValue]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   if ([name length])
-    _field.name = name;
+    edited.name = name;
   RDLFieldDataType type = RDLFieldDataTypeFromString([_typePop titleOfSelectedItem]);
   if (type != RDLFieldDataTypeUnknown)
-    _field.dataType = type;
+    edited.dataType = type;
   // Whichever kind it is, only that kind's box is written back: the other one
   // is not on screen, and a stale value left in it would change the field
   // behind the user.
   if ([_kindPop indexOfSelectedItem] == 1) {
     NSString *value = [_valueField stringValue];
-    _field.value = [RDLValue valueWithSource:[value length] ? value : @"=Nothing"];
-    _field.dataField = nil;
+    edited.value = [RDLValue valueWithSource:[value length] ? value : @"=Nothing"];
+    edited.dataField = nil;
   } else {
     NSString *dataField = [_dataFieldField stringValue];
-    _field.dataField = [dataField length] ? dataField : _field.name;
-    _field.value = nil;
+    edited.dataField = [dataField length] ? dataField : edited.name;
+    edited.value = nil;
   }
   [_context.editor setFields:fields ofDataSet:_dataSet];
+  // The pane goes on editing the field the dataset now holds.
+  _field = edited;
 }
 
 - (void)controlTextDidEndEditing:(NSNotification *)note {
