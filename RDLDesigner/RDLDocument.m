@@ -90,7 +90,13 @@ NSString *const RDLReportDocumentType = @"rdl";
   RDLReport *r = xml ? [RDLParser reportFromXMLString:xml error:error] : nil;
   if (r == nil)
     return NO;
-  [self loadReport:r];
+  // NSDocument names the file before it reads it -- File > Open, Edit
+  // Subreport, a second window on the same file, Revert -- and the document
+  // is that file. This used to go through -loadReport:, which is for a report
+  // that comes from nowhere and so forgets the file: an opened report was
+  // "Untitled", Save asked where, and nothing beside it (its data, its
+  // subreports) could be found.
+  [self installReport:r];
   return YES;
 }
 
@@ -128,9 +134,16 @@ NSString *const RDLReportDocumentType = @"rdl";
 - (void)loadReport:(RDLReport *)report originURL:(NSURL *)originURL {
   if (report == nil)
     return;
-  _report = report;
   [super setFileURL:nil];
   self.originURL = originURL;
+  [self installReport:report];
+}
+
+// The report this document now holds, as read: no undo before it, nothing
+// changed, and its parameters' values its own. Which file it is, is the
+// caller's to say.
+- (void)installReport:(RDLReport *)report {
+  _report = report;
   [[self undoManager] removeAllActions];
   self.dirty = NO;
   [self syncParamValuesFromReport];

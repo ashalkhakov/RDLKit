@@ -5230,6 +5230,39 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
     XCTFail(@"saving should leave a named report alone, not rename it to %@", report.name);
 }
 
+// A report opened from its file is that file: File > Open, Edit Subreport, a
+// second window and Revert all read it the way NSDocumentController does,
+// naming the file before reading it. Reading used to go through
+// -loadReport:, which is for a report that comes from nowhere and forgot the
+// file -- the window said "Untitled", Save asked where, and the data beside
+// it was not found, so Harbor Dispatch previewed with "could not read
+// harbor-dispatch.json" and no rows.
+- (void)testAnOpenedReportIsItsFile {
+  NSURL *url = [RDLSamples URLForSampleWithId:@"HarborDispatch"];
+  if (url == nil)
+    url = [NSURL fileURLWithPath:[[[RDLSourceDirectory() stringByDeletingLastPathComponent]
+        stringByAppendingPathComponent:@"RDLDesigner/Samples"]
+        stringByAppendingPathComponent:@"HarborDispatch.rdl"]];
+  NSError *error = nil;
+  RDLDocument *doc = [[RDLDocument alloc] initWithContentsOfURL:url ofType:@"rdl" error:&error];
+  XCTAssertNotNil(doc, @"%@", error);
+  XCTAssertEqualObjects([[doc.fileURL URLByStandardizingPath] path], [[url URLByStandardizingPath] path]);
+  // With or without the extension, as the Finder's setting has it.
+  XCTAssertTrue([[doc displayName] hasPrefix:@"HarborDispatch"], @"titled %@", [doc displayName]);
+  XCTAssertFalse([doc isDocumentEdited]);
+
+  NSArray<NSString *> *notes = nil;
+  [doc bindDataSourcesFetchingRemote:NO notes:&notes error:NULL];
+  for (NSString *note in notes)
+    XCTAssertTrue([note rangeOfString:@"could not"].location == NSNotFound, @"%@", note);
+  XCTAssertTrue([[doc.report dataSetNamed:@"Shipments"].rows count] > 0,
+                @"the data beside the report should have been read");
+
+  // Revert reads the file again, and is still that file.
+  XCTAssertTrue([doc revertToContentsOfURL:url ofType:@"rdl" error:&error], @"%@", error);
+  XCTAssertEqualObjects([[doc.fileURL URLByStandardizingPath] path], [[url URLByStandardizingPath] path]);
+}
+
 // A data source whose provider this kit does not read -- SQL, OLEDB -- is
 // shown as the file has it and written back unchanged. It used to read as
 // JSON, so touching any control rewrote both the provider and the connect
