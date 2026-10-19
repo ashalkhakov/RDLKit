@@ -278,6 +278,26 @@ BOOL RDLIsTypingEvent(void) {
   [_typingUndoManager removeAllActions];
 }
 
+// A completion list ended by typing -- a letter, a dot, a bracket, a space --
+// keeps what was typed. AppKit ends the list with the completion picked out
+// whenever a key it does not use arrives, and the completions here run on
+// past the dot ("Name.Value"): typing =Fields!Name.Value straight through, as
+// a person who knows the name does, came out as =Fields!Name.Value.Value.
+// Return, Tab, the right arrow and a click on the list still take it.
+- (void)insertCompletion:(NSString *)word
+     forPartialWordRange:(NSRange)charRange
+                movement:(NSInteger)movement
+                 isFinal:(BOOL)flag {
+  NSEvent *event = [NSApp currentEvent];
+  NSString *key = [event type] == NSKeyDown ? [event charactersIgnoringModifiers] : nil;
+  unichar c = [key length] ? [key characterAtIndex:0] : 0;
+  BOOL taking = movement == NSReturnTextMovement || movement == NSTabTextMovement || key == nil ||
+                c == '\r' || c == '\t' || c == 3 || c == NSRightArrowFunctionKey;
+  if (flag && !taking && NSMaxRange(charRange) <= [[self string] length])
+    word = [[self string] substringWithRange:charRange];
+  [super insertCompletion:word forPartialWordRange:charRange movement:movement isFinal:flag];
+}
+
 - (NSRange)rangeForUserCompletion {
   NSRange r = RDLExpressionCompletionRange([self string], [self selectedRange].location);
   if (r.location != NSNotFound)
