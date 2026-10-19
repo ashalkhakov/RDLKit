@@ -217,7 +217,11 @@
 - (void)setContext:(RDLEditingContext *)context {
   if (_context == context)
     return;
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  // Only what this pane observes: a blanket removal also takes the
+  // registrations its text views and fields made for it as their
+  // delegate, and their -textDidChange: and -controlText... never came.
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:RDLDocumentDidChangeNotification object:nil];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:RDLSelectionDidChangeNotification object:nil];
   _context = context;
   if (context == nil)
     return;
@@ -1445,6 +1449,12 @@ static NSArray<NSNumber *> *RDLFillPopUp(NSPopUpButton *pop, NSInteger first, NS
     // field goes back to the name the item has.
     NSString *name = [[_nameField stringValue]
         stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    // The name it already has: nothing to take, and nothing to say. Return
+    // applies the field and then ends its editing, which applies it again --
+    // by then holding the old name, put back by the refusal -- and saying
+    // "nothing wrong" here cleared the reason the moment it was given.
+    if ([name isEqualToString:it.name ?: @""])
+      return;
     // Refused in words, not in a beep: a name with a space in it is the
     // commonest thing to type, and being handed the old name back with no
     // reason reads as the field having eaten the edit.
