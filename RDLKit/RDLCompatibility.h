@@ -10,6 +10,23 @@
   [NSColor colorWithCalibratedRed:(r) green:(g) blue:(b) alpha:(a)]
 #endif
 
+// GNUstep sets its graphics backend up -- the fonts, and with them every
+// measurement of text -- when the shared application is made, and asserts if
+// a font is asked for before that ("Called with fontInfoClass unset ... The
+// shared NSApplication instance must be created"). A program that only
+// generates reports, rdlgen or a server, never makes one, and should not have
+// to know that it must: CanGrow text is measured during layout, long before
+// anything is drawn, so this is called wherever the kit first reaches for a
+// font, and making the application is idempotent. Cocoa's text system needs no
+// application object, and making one in a tool would connect it to the window
+// server for nothing, so there is nothing to do there.
+static inline void RDLPrepareTextSystem(void) {
+#if defined(GNUSTEP)
+  if (NSApp == nil)
+    (void)[NSApplication sharedApplication];
+#endif
+}
+
 #ifndef RDL_UNUSED
 #define RDL_UNUSED(x) (void)(x)
 #endif

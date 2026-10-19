@@ -83,7 +83,11 @@ XCTEST ?= xctest
 # as a backtrace naming the call that was waiting.
 TEST_TIMEOUT ?= 600
 
+# rdlgen too: one check runs the tool, which makes no application object of
+# its own, as the test runner does before any test (RDLGEN names it).
 run-tests: all
+	$(MAKE) -C ../RDLGen
 	$(SANITIZE_ENV) \
+	RDLGEN="$(CURDIR)/../RDLGen/$(GNUSTEP_OBJ_DIR)/rdlgen" \
 	LD_LIBRARY_PATH="$(CURDIR)/../RDLKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  timeout -s ABRT $(TEST_TIMEOUT) $(XCTEST) $(BUNDLE_NAME).bundle

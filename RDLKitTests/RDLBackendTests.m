@@ -823,4 +823,69 @@ static NSString *RDLEnt(NSString *name) {
       XCTFail(@"%@", [NSString stringWithFormat:@"the HTML should say %@", needle]);
 }
 
+
+// rdlgen, wherever this run built it: named by RDLGEN (GNUstep's run-tests
+// passes it), or beside this bundle, which is where Xcode puts the tool the
+// test target depends on.
+static NSString *RDLGenTool(void) {
+  NSString *named = [[[NSProcessInfo processInfo] environment] objectForKey:@"RDLGEN"];
+  if ([named length])
+    return named;
+  NSString *products = [[[NSBundle bundleForClass:[RDLBackendTests class]] bundlePath]
+      stringByDeletingLastPathComponent];
+  return [products stringByAppendingPathComponent:@"rdlgen"];
+}
+
+// Runs rdlgen, which makes no application object of its own, and answers its
+// exit status; what it printed comes back in *output.
+static int RDLRunGenerator(NSArray *arguments, NSString **output) {
+  NSTask *task = [[NSTask alloc] init];
+  [task setLaunchPath:RDLGenTool()];
+  [task setArguments:arguments];
+  NSMutableDictionary *env = [[[NSProcessInfo processInfo] environment] mutableCopy];
+  // Cocoa: rdlgen loads RDLKit.framework from beside it.
+  env[@"DYLD_FRAMEWORK_PATH"] = [RDLGenTool() stringByDeletingLastPathComponent];
+  [task setEnvironment:env];
+  NSPipe *pipe = [NSPipe pipe];
+  [task setStandardOutput:pipe];
+  [task setStandardError:pipe];
+  [task launch];
+  NSData *printed = [[pipe fileHandleForReading] readDataToEndOfFile];
+  [task waitUntilExit];
+  if (output)
+    *output = [[NSString alloc] initWithData:printed encoding:NSUTF8StringEncoding];
+  return [task terminationStatus];
+}
+
+// A tool that only generates reports never makes an NSApplication, and on
+// GNUstep the text system is not there until one is: CanGrow and CanShrink
+// text is measured during layout, before anything is drawn, and that used to
+// abort rdlgen on every report that has any ("fontInfoClass unset") -- 18 of
+// the corpus, HTML as well as PDF. This suite cannot see it in-process, since
+// the XCTest runner has made an application before any test runs, so it runs
+// the tool.
+- (void)testAToolWithNoApplicationMeasuresGrowingText {
+  NSString *tool = RDLGenTool();
+  XCTAssertTrue([[NSFileManager defaultManager] isExecutableFileAtPath:tool],
+                @"rdlgen was not built where this run looks for it: %@", tool);
+  NSString *report = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"Examples/majorsilence/ReportTests/Reports/CanGrowSplitTest.rdl"];
+  NSString *dir = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES
+                                             attributes:nil error:NULL];
+  for (NSString *format in @[ @"html", @"pdf" ]) {
+    NSString *out = [dir stringByAppendingPathComponent:[@"out." stringByAppendingString:format]];
+    NSString *printed = nil;
+    int status = RDLRunGenerator(@[ report, @"-f", format, @"-o", out ], &printed);
+    XCTAssertEqual(status, 0, @"rdlgen -f %@ failed:\n%@", format, printed);
+    NSData *data = [NSData dataWithContentsOfFile:out];
+    XCTAssertTrue([data length] > 0, @"rdlgen -f %@ wrote nothing", format);
+    if ([format isEqualToString:@"pdf"])
+      XCTAssertTrue([data length] > 4 && memcmp([data bytes], "%PDF", 4) == 0);
+  }
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
+}
+
+
 @end

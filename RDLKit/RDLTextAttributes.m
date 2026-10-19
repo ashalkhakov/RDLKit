@@ -5,6 +5,7 @@
 @implementation RDLTextAttributes
 
 + (NSFont *)fontForStyle:(RDLStyle *)style scale:(CGFloat)scale {
+  RDLPrepareTextSystem();
   CGFloat s = scale > 0 ? scale : 1.0;
   CGFloat pt = style.fontSize ? [style.fontSize points] : 0;
   if (pt <= 0)

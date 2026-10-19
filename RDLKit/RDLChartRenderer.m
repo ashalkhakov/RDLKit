@@ -1597,6 +1597,7 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
         break;
       // The family the text asks for, where this machine has it, in its weight
       // and slant; the system font otherwise.
+      RDLPrepareTextSystem();
       NSFontManager *fonts = [NSFontManager sharedFontManager];
       NSFontTraitMask traits = (sh.bold ? NSBoldFontMask : 0) | (sh.italic ? NSItalicFontMask : 0);
       NSFont *font = [sh.fontFamily length] ? [fonts fontWithFamily:sh.fontFamily traits:traits weight:5
