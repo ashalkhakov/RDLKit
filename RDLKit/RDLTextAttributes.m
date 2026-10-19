@@ -87,15 +87,15 @@
     CGFloat offset = (style.shadowOffset ? [style.shadowOffset points] : 2) * unit;
     shadow.shadowOffset = NSMakeSize(offset, -offset);
     shadow.shadowColor = RDLColorIsTransparent(style.shadowColor)
-                             ? [NSColor colorWithCalibratedWhite:0 alpha:0.5]
+                             ? RDL_COLOR(0, 0, 0, 0.5)
                              : RDLColorFromHex(style.shadowColor);
     attrs[NSShadowAttributeName] = shadow;
   } else if (style.textEffect == RDLTextEffectEmboss || style.textEffect == RDLTextEffectEmbed) {
     BOOL raised = style.textEffect == RDLTextEffectEmboss;
     NSShadow *shadow = [[NSShadow alloc] init];
     shadow.shadowOffset = NSMakeSize(unit, -unit);
-    shadow.shadowColor = raised ? [NSColor colorWithCalibratedWhite:0 alpha:0.35]
-                                : [NSColor colorWithCalibratedWhite:1 alpha:0.8];
+    shadow.shadowColor = raised ? RDL_COLOR(0, 0, 0, 0.35)
+                                : RDL_COLOR(1, 1, 1, 0.8);
     attrs[NSShadowAttributeName] = shadow;
   } else if (style.textEffect == RDLTextEffectFrame) {
     // A negative width strokes the outline and still fills the letters.

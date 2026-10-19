@@ -22,7 +22,8 @@ RDLKitTests_OBJC_FILES = \
 RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 RDLKitTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
-RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
+# zlib: the colour checks read the PDF's content streams.
+RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch -lz
 # The PDF backend and text measurement are AppKit.
 RDLKitTests_NEEDS_GUI = yes
 

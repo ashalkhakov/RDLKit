@@ -1843,6 +1843,7 @@
 					"-Werror=enum-conversion",
 					"-Werror=logical-not-parentheses",
 				);
+				OTHER_LDFLAGS = "-lz";
 				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.kit.tests;
 				PRODUCT_NAME = RDLKitTests;
 				USER_HEADER_SEARCH_PATHS = (
@@ -1901,6 +1902,7 @@
 					"-Werror=enum-conversion",
 					"-Werror=logical-not-parentheses",
 				);
+				OTHER_LDFLAGS = "-lz";
 				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.kit.tests;
 				PRODUCT_NAME = RDLKitTests;
 				USER_HEADER_SEARCH_PATHS = (

@@ -260,7 +260,7 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
   NSRect paper = NSMakeRect(0, originY, page.width * kRDLDPI, page.height * kRDLDPI);
   [RDLColorFromHex(@"#f6f1e8") set];
   NSRectFill(paper);
-  [[NSColor colorWithCalibratedWhite:0.7 alpha:1] set];
+  [RDL_COLOR(0.7, 0.7, 0.7, 1) set];
   NSFrameRect(paper);
   [self drawItemsOfPage:page atY:originY];
 }
@@ -412,7 +412,7 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
 
 - (void)drawRect:(NSRect)dirtyRect {
   RDL_UNUSED(dirtyRect);
-  [[NSColor colorWithCalibratedWhite:0.18 alpha:1] set];
+  [RDL_COLOR(0.18, 0.18, 0.18, 1) set];
   NSRectFill(self.bounds);
   if ([self.pages count] == 0)
     [self reloadLayout];

@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLTestSupport.h"
+#include <zlib.h>
 
 static NSString *RDLEnt(NSString *name) {
   return [@"&" stringByAppendingString:[name stringByAppendingString:@";"]];
@@ -887,5 +888,140 @@ static int RDLRunGenerator(NSArray *arguments, NSString **output) {
   [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
 }
 
+
+// The streams of a PDF, inflated where they are compressed, as Latin-1 text:
+// the page contents, and the ICC profiles a colour space names.
+static NSArray<NSData *> *RDLPDFStreams(NSData *pdf) {
+  NSMutableArray *streams = [NSMutableArray array];
+  const char *bytes = [pdf bytes];
+  NSUInteger length = [pdf length], at = 0;
+  while (at < length) {
+    NSRange open = [pdf rangeOfData:[@"stream" dataUsingEncoding:NSASCIIStringEncoding]
+                            options:0
+                              range:NSMakeRange(at, length - at)];
+    if (open.location == NSNotFound)
+      break;
+    NSUInteger start = NSMaxRange(open);
+    // "endstream" contains "stream": skip it, and anything not followed by EOL.
+    if ((open.location >= 3 && memcmp(bytes + open.location - 3, "end", 3) == 0) ||
+        start >= length || (bytes[start] != '\r' && bytes[start] != '\n')) {
+      at = start;
+      continue;
+    }
+    if (bytes[start] == '\r')
+      start++;
+    if (start < length && bytes[start] == '\n')
+      start++;
+    NSRange close = [pdf rangeOfData:[@"endstream" dataUsingEncoding:NSASCIIStringEncoding]
+                             options:0
+                               range:NSMakeRange(start, length - start)];
+    if (close.location == NSNotFound)
+      break;
+    NSData *raw = [pdf subdataWithRange:NSMakeRange(start, close.location - start)];
+    NSMutableData *inflated = [NSMutableData dataWithLength:[raw length] * 8 + 4096];
+    z_stream z;
+    memset(&z, 0, sizeof z);
+    z.next_in = (Bytef *)[raw bytes];
+    z.avail_in = (uInt)[raw length];
+    if (inflateInit(&z) == Z_OK) {
+      int status = Z_OK;
+      while (status == Z_OK) {
+        if (z.total_out >= [inflated length])
+          [inflated increaseLengthBy:[raw length] * 8 + 4096];
+        z.next_out = (Bytef *)[inflated mutableBytes] + z.total_out;
+        z.avail_out = (uInt)([inflated length] - z.total_out);
+        status = inflate(&z, Z_NO_FLUSH);
+      }
+      [inflated setLength:z.total_out];
+      inflateEnd(&z);
+      [streams addObject:status == Z_STREAM_END ? inflated : raw];
+    } else {
+      [streams addObject:raw];
+    }
+    at = NSMaxRange(close);
+  }
+  return streams;
+}
+
+// Every colour a PDF's pages set, as "r,g,b" in 0...255: the three operands
+// of each `sc`, `scn` or `rg`.
+static NSSet<NSString *> *RDLPDFColours(NSData *pdf) {
+  NSMutableSet *colours = [NSMutableSet set];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    NSString *text = [[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding];
+    NSArray *tokens = [text componentsSeparatedByCharactersInSet:
+                                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSMutableArray *numbers = [NSMutableArray array];
+    for (NSString *token in tokens) {
+      if ([token length] == 0)
+        continue;
+      if ([token isEqualToString:@"sc"] || [token isEqualToString:@"scn"] || [token isEqualToString:@"rg"]) {
+        NSUInteger n = [numbers count];
+        if (n >= 3)
+          [colours addObject:[NSString stringWithFormat:@"%ld,%ld,%ld",
+                                (long)lround([numbers[n - 3] doubleValue] * 255),
+                                (long)lround([numbers[n - 2] doubleValue] * 255),
+                                (long)lround([numbers[n - 1] doubleValue] * 255)]];
+      }
+      NSScanner *scan = [NSScanner scannerWithString:token];
+      double value = 0;
+      if ([scan scanDouble:&value] && [scan isAtEnd])
+        [numbers addObject:@(value)];
+      else
+        [numbers removeAllObjects];
+    }
+  }
+  return colours;
+}
+
+// The ICC profiles a PDF's colour spaces carry: an embedded profile has its
+// signature, "acsp", at byte 36, and says what it is in its description.
+static NSArray<NSString *> *RDLPDFProfiles(NSData *pdf) {
+  NSMutableArray *profiles = [NSMutableArray array];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    if ([stream length] < 128 || memcmp((const char *)[stream bytes] + 36, "acsp", 4) != 0)
+      continue;
+    // The colour space, at byte 16: only RGB ones say how a colour is read.
+    if (memcmp((const char *)[stream bytes] + 16, "RGB ", 4) != 0)
+      continue;
+    [profiles addObject:[[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding]];
+  }
+  return profiles;
+}
+
+// RDL's colours are sRGB, as CSS's and .NET's are: SSRS paints #006d6d as
+// (0, 109, 109). The PDF used to be drawn in Cocoa's calibrated (Generic) RGB,
+// so a viewer, converting for the screen, showed it as (0, 127, 128) and every
+// other colour shifted with it. The components and the space they are in are
+// what is checked: a colour set in DeviceRGB (cairo, on GNUstep) is sRGB as
+// every viewer reads it, and one set through an ICC profile has to be in an
+// sRGB one.
+- (void)testColoursArePaintedInSRGB {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+       "<Textbox Name=\"Teal\"><Top>0.5in</Top><Left>0.5in</Left><Height>1in</Height><Width>2in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>gy</Value>"
+       "<Style><FontSize>40pt</FontSize><Color>#ff8000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><BackgroundColor>#006d6d</BackgroundColor></Style></Textbox>"
+       "<Textbox Name=\"Grey\"><Top>0.5in</Top><Left>2.6in</Left><Height>1in</Height><Width>1in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>x</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><BackgroundColor>LightGrey</BackgroundColor></Style></Textbox>"
+       "</ReportItems></Body><Width>4in</Width>"
+       "<Page><PageHeight>3in</PageHeight><PageWidth>4in</PageWidth></Page>"
+       "</ReportSection></ReportSections></Report>";
+  NSError *error = nil;
+  NSData *pdf = [RDLGenerator PDFFromXML:xml parameters:@{} error:&error];
+  XCTAssertTrue([pdf length] > 0, @"%@", error);
+  NSSet *colours = RDLPDFColours(pdf);
+  for (NSString *want in @[ @"0,109,109", @"255,128,0", @"211,211,211" ])
+    XCTAssertTrue([colours containsObject:want], @"no %@ among the colours set: %@", want, colours);
+  for (NSString *profile in RDLPDFProfiles(pdf))
+    XCTAssertTrue([profile rangeOfString:@"sRGB"].location != NSNotFound,
+                  @"an RGB colour space that is not sRGB: %@",
+                  [profile substringToIndex:MIN((NSUInteger)200, [profile length])]);
+  // And back: a colour a control hands over is written as the colour it is.
+  XCTAssertEqualObjects(RDLHexFromColor(RDLColorFromHex(@"#006d6d")), @"#006d6d");
+}
 
 @end

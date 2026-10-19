@@ -5,9 +5,14 @@
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 
+// RDL's colours are CSS's and .NET's, which is to say sRGB: #006d6d is
+// (0, 109, 109) in sRGB, and SSRS renders it so. Calibrated RGB is Cocoa's
+// Generic RGB, a different space, and a PDF drawn in it came out with every
+// colour shifted (#006d6d as 0,127,128, LightGrey 211 as 219) once converted
+// for the screen. GNUstep has no colour management and treats both alike.
 #ifndef RDL_COLOR
 #define RDL_COLOR(r, g, b, a) \
-  [NSColor colorWithCalibratedRed:(r) green:(g) blue:(b) alpha:(a)]
+  [NSColor colorWithSRGBRed:(r) green:(g) blue:(b) alpha:(a)]
 #endif
 
 // GNUstep sets its graphics backend up -- the fonts, and with them every
@@ -157,8 +162,16 @@ static inline NSColor *RDLColorFromHex(NSString *hex) {
 // writes colours as #rrggbb, so the colour has to be resolved to RGB first: a
 // well can return one in any space, and a catalog colour has no components at
 // all until it is.
+//
+// In sRGB, the space RDL_COLOR makes them in, so that a colour read and
+// written back is the colour it was. gnustep-gui has no +sRGBColorSpace (and
+// no colour management to need one); the calibrated space is its RGB.
 static inline NSString *RDLHexFromColor(NSColor *color) {
-  NSColor *rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *rgb = nil;
+  if ([NSColorSpace respondsToSelector:@selector(sRGBColorSpace)])
+    rgb = [color colorUsingColorSpace:[NSColorSpace performSelector:@selector(sRGBColorSpace)]];
+  if (rgb == nil)
+    rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
   if (rgb == nil)
     return nil;
   CGFloat r = 0, g = 0, b = 0, a = 0;
