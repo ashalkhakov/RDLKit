@@ -66,4 +66,15 @@ FOUNDATION_EXPORT NSString *const RDLParagraphLayoutAttributeName;
 + (NSAttributedString *)attributedStringForParagraphs:(NSArray<RDLParagraph *> *)paragraphs
                                             baseStyle:(RDLStyle *)baseStyle
                                                 scale:(CGFloat)scale;
+
+// A text box's text, drawn as SSRS draws it: the first line's top at the top
+// of `textRect` (the box inside its padding) and its baseline the font's
+// ascent below that, the lines going on down from there, and anything that
+// does not fit cut at the edge of `box` -- the box itself, padding included,
+// not the padding's edge. -drawInRect: decides both differently on each
+// platform when the text is taller than the rect, so the rect it is handed is
+// always tall enough for the text: Cocoa clipped to it, cutting the
+// descenders off a line in a box as short as its text ("Exnression"), and
+// GNUstep lifted the line to fit it. The view is flipped.
++ (void)drawText:(NSAttributedString *)text inTextRect:(NSRect)textRect clippedTo:(NSRect)box;
 @end

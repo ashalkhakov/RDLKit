@@ -505,14 +505,14 @@ static void RDLDrawGroupBrackets(RDLTablix *tablix, NSRect r) {
         _overlay.editingItem == it;
     if (!editorCoversThisText) {
       RDLTextbox *tb = [it isKindOfClass:[RDLTextbox class]] ? (RDLTextbox *)it : nil;
-      if ([tb.paragraphs count])
-        [[RDLTextAttributes attributedStringForParagraphs:tb.paragraphs
-                                               baseStyle:it.style
-                                                   scale:1.0]
-            drawInRect:textRect];
-      else
-        [RDLAttributedText(tb.value ?: it.rdlElementName, it.style)
-            drawInRect:textRect];
+      NSAttributedString *text =
+          [tb.paragraphs count]
+              ? [RDLTextAttributes attributedStringForParagraphs:tb.paragraphs
+                                                       baseStyle:it.style
+                                                           scale:1.0]
+              : RDLAttributedText(tb.value ?: it.rdlElementName, it.style);
+      // Placed and cut as the preview and the export place and cut it.
+      [RDLTextAttributes drawText:text inTextRect:textRect clippedTo:r];
     }
   }
   if (sel) {

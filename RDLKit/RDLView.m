@@ -398,10 +398,9 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     if (dy > 0)
       textRect.origin.y += va == RDLVerticalAlignMiddle ? dy / 2 : dy;
   }
-  if (rich)
-    [rich drawInRect:textRect];
-  else
-    [text drawInRect:textRect withAttributes:attrs];
+  [RDLTextAttributes drawText:rich ?: [[NSAttributedString alloc] initWithString:text attributes:attrs]
+                   inTextRect:textRect
+                    clippedTo:r];
   if (it.style.textDecoration == RDLTextDecorationOverline)
     RDLDrawOverlines(rich ?: [[NSAttributedString alloc] initWithString:text attributes:attrs], textRect,
                      RDLColorFromHex(it.style.color));

@@ -867,8 +867,10 @@ static int RDLRunGenerator(NSArray *arguments, NSString **output) {
 // the tool.
 - (void)testAToolWithNoApplicationMeasuresGrowingText {
   NSString *tool = RDLGenTool();
-  XCTAssertTrue([[NSFileManager defaultManager] isExecutableFileAtPath:tool],
-                @"rdlgen was not built where this run looks for it: %@", tool);
+  if (![[NSFileManager defaultManager] isExecutableFileAtPath:tool]) {
+    XCTFail(@"rdlgen was not built where this run looks for it: %@", tool);
+    return;
+  }
   NSString *report = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
       stringByAppendingPathComponent:@"Examples/majorsilence/ReportTests/Reports/CanGrowSplitTest.rdl"];
   NSString *dir = [NSTemporaryDirectory()
@@ -1022,6 +1024,89 @@ static NSArray<NSString *> *RDLPDFProfiles(NSData *pdf) {
                   [profile substringToIndex:MIN((NSUInteger)200, [profile length])]);
   // And back: a colour a control hands over is written as the colour it is.
   XCTAssertEqualObjects(RDLHexFromColor(RDLColorFromHex(@"#006d6d")), @"#006d6d");
+}
+
+
+// `rect` of a view drawn into a bitmap by the view itself, in a window, the way
+// the screen gets it -- the same call on both platforms; a view outside a
+// window or drawn into a hand-made context has its text turned over on one or
+// the other. *scale says how many pixels the bitmap gives a point.
+static NSBitmapImageRep *RDLDrawnRegion(NSView *view, NSRect rect, CGFloat *scale) {
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:[view frame]
+                                                 styleMask:NSWindowStyleMaskBorderless
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:NO];
+  [window setReleasedWhenClosed:NO];
+  [window setContentView:view];
+  // On screen, if only for this: GNUstep caches nothing for a window that
+  // has never been shown.
+  [window orderFront:nil];
+  [view display];
+  NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:rect];
+  [view cacheDisplayInRect:rect toBitmapImageRep:rep];
+  if (scale)
+    *scale = [rep pixelsHigh] / NSHeight(rect);
+  [window orderOut:nil];
+  [window setContentView:nil];
+  return rep;
+}
+
+// The rows of `rep` (from the top) in which some pixel is dark.
+static NSIndexSet *RDLInkedRows(NSBitmapImageRep *rep) {
+  NSMutableIndexSet *rows = [NSMutableIndexSet indexSet];
+  for (NSInteger y = 0; y < [rep pixelsHigh]; y++)
+    for (NSInteger x = 0; x < [rep pixelsWide]; x++) {
+      NSColor *c = [[rep colorAtX:x y:y] colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+      if (c != nil && [c alphaComponent] > 0.5 &&
+          [c redComponent] + [c greenComponent] + [c blueComponent] < 1.2) {
+        [rows addIndex:(NSUInteger)y];
+        break;
+      }
+    }
+  return rows;
+}
+
+// A line of text in a box as short as it is sits where SSRS puts it: the top
+// of the line at the top of the box inside its padding, the baseline the
+// font's ascent below that, and what does not fit cut at the edge of the box.
+// Cocoa's -drawInRect: cut it at the padding instead, taking the descenders
+// off ("Exnression" in FinancialFunctions, whose header row is 12pt), and
+// GNUstep's lifted the line into the rect, so the same report set its text
+// about 2pt apart on the two platforms.
+- (void)testTextSitsAtTheTopOfItsBoxAndIsCutAtTheBox {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>1in</Height><ReportItems>"
+       "<Textbox Name=\"Short\"><Top>0.5in</Top><Left>0.5in</Left><Height>12pt</Height><Width>1in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>Hgjpqy</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "</Textbox></ReportItems></Body><Width>2in</Width>"
+       "<Page><PageHeight>2in</PageHeight><PageWidth>2in</PageWidth>"
+       "<LeftMargin>0in</LeftMargin><TopMargin>0in</TopMargin></Page>"
+       "</ReportSection></ReportSections></Report>";
+  NSError *error = nil;
+  RDLReport *report = [RDLParser reportFromXMLString:xml error:&error];
+  XCTAssertNotNil(report, @"%@", error);
+  RDLView *view = [[RDLView alloc] initWithFrame:NSMakeRect(0, 0, 144, 144)];
+  view.report = report;
+  [view reloadLayout];
+  CGFloat scale = 1;
+  // The box, 1in by 12pt at (36, 36), and 6pt of page below it.
+  NSBitmapImageRep *rep = RDLDrawnRegion(view, NSMakeRect(36, 36, 72, 18), &scale);
+  NSIndexSet *inked = RDLInkedRows(rep);
+  XCTAssertTrue([inked count] > 0, @"no text was drawn");
+  NSFont *font = [RDLTextAttributes fontForStyle:[RDLStyle defaultStyle] scale:1];
+  CGFloat padding = 2;
+  // The top of the capital: the ascent less the cap height below the padding.
+  CGFloat capTop = padding + [font ascender] - [font capHeight];
+  CGFloat firstInk = [inked firstIndex] / scale;
+  XCTAssertEqualWithAccuracy(firstInk, capTop, 1.0,
+                             @"the line's capitals start %.2fpt into the box, not %.2fpt (%@)",
+                             firstInk, capTop, [font fontName]);
+  // The descenders reach the bottom of the box, which cuts them, and nothing
+  // is drawn below it.
+  CGFloat lastInk = ([inked lastIndex] + 1) / scale;
+  XCTAssertTrue(lastInk > 11 && lastInk <= 12.01,
+                @"the descenders should run on to the box's bottom (12pt) and stop there, not at %.2fpt", lastInk);
 }
 
 @end

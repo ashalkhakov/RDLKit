@@ -291,4 +291,17 @@ static const CGFloat kRDLListIndentPoints = 18.0;
   return out;
 }
 
++ (void)drawText:(NSAttributedString *)text inTextRect:(NSRect)textRect clippedTo:(NSRect)box {
+  if ([text length] == 0 || NSWidth(textRect) <= 0)
+    return;
+  NSRect used = [text boundingRectWithSize:NSMakeSize(NSWidth(textRect), CGFLOAT_MAX)
+                                   options:NSStringDrawingUsesLineFragmentOrigin];
+  NSRect drawn = textRect;
+  drawn.size.height = MAX(NSHeight(textRect), ceil(NSHeight(used)) + 1);
+  [NSGraphicsContext saveGraphicsState];
+  NSRectClip(box);
+  [text drawInRect:drawn];
+  [NSGraphicsContext restoreGraphicsState];
+}
+
 @end
