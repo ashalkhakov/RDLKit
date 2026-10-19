@@ -76,6 +76,16 @@
                                     <action selector="saveDocumentAs:" target="-1" id="saveAsAction"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Revert to Saved" id="revertItem">
+                                <connections>
+                                    <action selector="revertDocumentToSaved:" target="-1" id="revertAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Close" keyEquivalent="w" id="closeItem">
+                                <connections>
+                                    <action selector="performClose:" target="-1" id="closeAction"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="fileSep2"/>
                             <menuItem title="Samples" id="samplesItem">
                                 <menu key="submenu" title="Samples" id="samplesMenu"/>
