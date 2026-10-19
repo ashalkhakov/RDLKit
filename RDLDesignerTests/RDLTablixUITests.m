@@ -1134,6 +1134,34 @@ static RDLTablix *RDLFirstTablixIn(RDLReport *report) {
 // A cell's contents changed after a structural edit, and both undone and
 // redone: the structural redo puts copies of the cells back, and the contents'
 // redo has to find its cell among them.
+// UND-05 the other way: an edit to a cell's contents made before a column
+// went in still undoes once the column is undone. Undoing the column restores
+// the tablix from a snapshot, whose cells held copies; the edit's own undo
+// then went into the item that had been in the cell, which the page no longer
+// showed, and nothing on it changed.
+- (void)testUndoingACellsEditAfterAStructuralUndoReachesTheCell {
+  RDLReport *report = [RDLSamples workshopByFinish];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLTablix *tablix = RDLFirstTablixIn(report);
+  NSUInteger last = [tablix.tablixBody.rows count] - 1;
+  RDLItem *cell = tablix.tablixBody.rows[last].cells[0].item;
+  NSString *was = cell.style.color;
+  NSUndoManager *undo = ctx.document.undoManager;
+  [undo setGroupsByEvent:NO];
+  [ctx.editor setValue:@"#ff0000" forKeyPath:@"style.color" ofItem:cell];
+  [ctx.editor insertTablixColumnAtIndex:0 ofTablix:tablix];
+  [undo undo];
+  XCTAssertEqualObjects(tablix.tablixBody.rows[last].cells[0].item.style.color, @"#ff0000",
+                        @"undoing the column leaves the colour");
+  [undo undo];
+  XCTAssertEqualObjects(tablix.tablixBody.rows[last].cells[0].item.style.color, was,
+                        @"and the next undo takes the colour off the cell on the page");
+  [undo redo];
+  [undo redo];
+  XCTAssertEqualObjects(tablix.tablixBody.rows[last].cells[1].item.style.color, @"#ff0000",
+                        @"redoing both puts it back, in its cell beside the new column");
+}
+
 - (void)testRedoingACellsContentsAfterAStructuralEditFindsTheCell {
   RDLReport *report = [RDLSamples workshopByFinish];
   RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];

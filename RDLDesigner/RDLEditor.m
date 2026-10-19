@@ -53,6 +53,9 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   // stack, and Command-Z would undo nothing.
   BOOL _groupOpened;
   NSString *_groupName;
+  // Report items a tablix restore took out of a tablix, by name, for a later
+  // restore to put back (see -restoreStructureOfTablix:fromXML:).
+  NSMutableDictionary<NSString *, RDLItem *> *_retiredItems;
 }
 
 - (instancetype)initWithDocument:(RDLDocument *)document {
@@ -1147,6 +1150,27 @@ static void RDLTransplantTablix(RDLTablix *into, RDLTablix *from) {
   into.filters = from.filters;
 }
 
+// The places a tablix holds a report item: its body's cells, its corner's,
+// and its members' headers -- each answering -item and -setItem:.
+static void RDLCollectHeaderSlots(NSArray<RDLTablixMember *> *members, NSMutableArray *slots) {
+  for (RDLTablixMember *member in members) {
+    if (member.header != nil)
+      [slots addObject:member.header];
+    RDLCollectHeaderSlots(member.members, slots);
+  }
+}
+
+static NSArray *RDLItemSlotsOfTablix(RDLTablix *tablix) {
+  NSMutableArray *slots = [NSMutableArray array];
+  for (RDLTablixRow *row in tablix.tablixBody.rows)
+    [slots addObjectsFromArray:row.cells];
+  for (NSArray *row in tablix.cornerRows)
+    [slots addObjectsFromArray:row];
+  RDLCollectHeaderSlots(tablix.rowHierarchy.members, slots);
+  RDLCollectHeaderSlots(tablix.columnHierarchy.members, slots);
+  return slots;
+}
+
 #pragma mark - Charts
 
 // What the chart panels edit, from one chart into another -- into the same
@@ -1215,7 +1239,31 @@ static void RDLTransplantChart(RDLChart *into, RDLChart *from) {
     return;
   [self beginGroup:nil];
   [[self undoProxy] restoreStructureOfTablix:tablix fromXML:[RDLEditor XMLStringForItem:tablix]];
+  // The items in its cells as they are now, and those an earlier restore took
+  // out, by name -- a name is the report's own key for an item.
+  if (_retiredItems == nil)
+    _retiredItems = [NSMutableDictionary dictionary];
+  NSMutableDictionary<NSString *, RDLItem *> *live = [_retiredItems mutableCopy];
+  for (id slot in RDLItemSlotsOfTablix(tablix)) {
+    RDLItem *item = [slot valueForKey:@"item"];
+    if ([item.name length])
+      live[item.name] = item;
+  }
   RDLTransplantTablix(tablix, saved);
+  // The snapshot's cells hold copies. Each is swapped for the item it is a
+  // copy of, which is in the state the copy describes (everything done to it
+  // since has been undone, or is about to be redone): the steps on the stack
+  // hold that object, and an edit to a cell made before a row went in used to
+  // undo into a copy the page no longer showed, changing nothing on it.
+  for (id slot in RDLItemSlotsOfTablix(tablix)) {
+    RDLItem *copy = [slot valueForKey:@"item"];
+    RDLItem *original = [copy.name length] ? live[copy.name] : nil;
+    if (original != nil && [original class] == [copy class]) {
+      [slot setValue:original forKey:@"item"];
+      [live removeObjectForKey:copy.name];
+    }
+  }
+  [_retiredItems setDictionary:live];
   [_document.report adoptItems];
   [self endGroup];
   [self noteChange:[RDLChange structureChange:tablix bandKey:nil]];
