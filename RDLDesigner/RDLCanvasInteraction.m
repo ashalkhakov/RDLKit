@@ -118,6 +118,23 @@ static BOOL RDLEventToggles(NSEvent *event) {
   NSString *kind = nil;
   NSString *bandKey = nil;
   NSRect itemRect = NSZeroRect;
+  // A column border of the table being worked in, before what is in its
+  // cells: the cells of a real table are full, and a press on the line
+  // between two of them hit the textbox on one side, so the border only
+  // answered over an empty cell or in the band above the grid (TBL-05).
+  RDLTablix *engaged = [_ctx engagedTablix];
+  NSRect engagedRect = NSZeroRect;
+  NSUInteger engagedBorder = 0;
+  if (engaged != nil && [[_host interactionGeometry] findRectOfItem:engaged rect:&engagedRect] &&
+      [RDLTablixGeometry tablix:engaged itemRect:engagedRect columnBorderAtPoint:p column:&engagedBorder]) {
+    _dragKind = @"tabcol";
+    _dragActive = NO;
+    _dragStart = p;
+    _dragColIndex = engagedBorder;
+    _origColW = engaged.tablixBody.columns[engagedBorder].width;
+    _pendingEditItem = nil;
+    return;
+  }
   RDLItem *hit = [[_host interactionGeometry] itemAtPoint:p kind:&kind bandKey:&bandKey rect:&itemRect];
   if (hit) {
     // In the tablix being worked in, a click in an empty cell selects that
