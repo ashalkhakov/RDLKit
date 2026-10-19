@@ -39,7 +39,10 @@
 - (void)setDocument:(RDLDocument *)document {
   if (_document == document)
     return;
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  // Only what this pane observes: a blanket removal also takes the
+  // registrations its text views and fields made for it as their
+  // delegate, and their -textDidChange: and -controlText... never came.
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:RDLDocumentDidChangeNotification object:nil];
   _document = document;
   if (_stack == nil) {
     _stack = [[RDLFlippedStack alloc] initWithFrame:NSMakeRect(0, 0, 240, 400)];

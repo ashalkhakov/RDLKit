@@ -2503,6 +2503,22 @@ static NSTabView *_centerTabViewOf(id wc) {
 
 // The source pane both ways: the report written out, and text read back as the
 // report -- one step that undoes, and nothing at all when it will not parse.
+// What is typed into the source pane marks it edited, which is what offers
+// Apply and Revert. Its -textDidChange: is the text view's delegate call, and
+// the pane's -setContext: used to remove every observation of the pane --
+// the one the text view had made for its delegate among them -- so typing
+// changed the text and nothing else, and neither button ever came on.
+- (void)testTypingInTheSourcePaneOffersApplyAndRevert {
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:[RDLReport emptyReportNamed:@"Typed"]];
+  RDLSourceView *pane = [[RDLSourceView alloc] initWithFrame:NSMakeRect(0, 0, 600, 400) context:ctx];
+  pane.live = YES;
+  NSTextView *text = [pane valueForKey:@"text"];
+  [text setSelectedRange:NSMakeRange(0, 0)];
+  [text insertText:@" " replacementRange:NSMakeRange(0, 0)];
+  XCTAssertTrue([[pane valueForKey:@"applyButton"] isEnabled], @"typing offers Apply");
+  XCTAssertTrue([[pane valueForKey:@"revertButton"] isEnabled], @"and Revert");
+}
+
 - (void)testTheSourcePaneReadsBackWhatIsTypedIntoIt {
   RDLReport *report = [RDLReport emptyReportNamed:@"Typed"];
   RDLTextbox *box = [[RDLTextbox alloc] init];

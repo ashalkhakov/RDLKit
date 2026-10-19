@@ -79,7 +79,11 @@ static NSString *const RDLGroupsDragType = @"org.rdl.designer.group-nesting";
 - (void)setContext:(RDLEditingContext *)context {
   if (_context == context)
     return;
-  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  // Only what this pane observes: a blanket removal also takes the
+  // registrations its text views and fields made for it as their
+  // delegate, and their -textDidChange: and -controlText... never came.
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:RDLDocumentDidChangeNotification object:nil];
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:RDLSelectionDidChangeNotification object:nil];
   _context = context;
   if (context != nil) {
     [[NSNotificationCenter defaultCenter] addObserver:self
