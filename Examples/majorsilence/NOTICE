@@ -1,6 +1,7 @@
-Report definitions in this directory come from the Majorsilence Reporting
-project (formerly My-FyiReporting), and remain under that project's Apache
-License 2.0 -- a copy is in LICENSE beside this file.
+Report definitions in this directory, and the three JSON documents some of
+them read, come from the Majorsilence Reporting project (formerly
+My-FyiReporting), and remain under that project's Apache License 2.0 -- a copy
+is in LICENSE beside this file.
 
     Copyright (C) 2004-2008  fyiReporting Software, LLC
     Copyright (C) 2011-2025  Peter Gill <peter@majorsilence.com>
@@ -24,3 +25,11 @@ no modifications have been made to any of them. They are here as reference
 report definitions, not as part of RDLKit itself: RDLKit's own source is under
 the GNU Lesser General Public License v2.1 (see ../../LICENSE), and these files
 are separate works distributed alongside it rather than combined with it.
+
+The JSON documents were added later, from upstream commit ff722c2 (main,
+2026-10), at the paths upstream keeps them:
+
+    Examples/JsonToPdf/employees.json            read by Examples/JsonToPdf/Employees.rdl
+    ReportTests/Reports/meeting-minutes-data.json read by ReportTests/Reports/meeting-minutes1-a4.rdl
+    RdlCreator.Tests/NestedJsonData.json         named by Examples/JsonExamples/JsonReport.rdl,
+                                                 by an absolute Windows path on its author's machine
