@@ -46,6 +46,13 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   // Property keys already inverted during the open group, so a drag records
   // one inverse instead of one per mouse-moved event.
   NSMutableSet *_groupRegistered;
+  // Whether the open group has reached the undo manager yet, and the name it
+  // will have when it does. It reaches it with its first inverse: a group in
+  // which nothing changed -- a field applied twice, the second time with what
+  // it already had -- would otherwise be an empty step at the top of the
+  // stack, and Command-Z would undo nothing.
+  BOOL _groupOpened;
+  NSString *_groupName;
 }
 
 - (instancetype)initWithDocument:(RDLDocument *)document {
@@ -75,6 +82,12 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
 // -prepareWithInvocationTarget: is typed id, which makes selectors that other
 // classes also declare (-removeItem:) ambiguous. Type the proxy.
 - (RDLEditor *)undoProxy {
+  if (_groupDepth > 0 && !_groupOpened) {
+    _groupOpened = YES;
+    [[self undo] beginUndoGrouping];
+    if ([_groupName length])
+      [[self undo] setActionName:_groupName];
+  }
   return (RDLEditor *)[[self undo] prepareWithInvocationTarget:self];
 }
 
@@ -82,10 +95,14 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
   _groupDepth += 1;
   if (_groupDepth == 1) {
     [_groupRegistered removeAllObjects];
-    [[self undo] beginUndoGrouping];
+    _groupOpened = NO;
+    _groupName = nil;
   }
-  if ([actionName length])
-    [[self undo] setActionName:actionName];
+  if ([actionName length]) {
+    _groupName = actionName;
+    if (_groupOpened)
+      [[self undo] setActionName:actionName];
+  }
 }
 
 - (void)endGroup {
@@ -93,7 +110,10 @@ static NSMutableArray *RDLContainerIn(NSMutableArray *items, RDLItem *target) {
     return;
   _groupDepth -= 1;
   if (_groupDepth == 0) {
-    [[self undo] endUndoGrouping];
+    if (_groupOpened)
+      [[self undo] endUndoGrouping];
+    _groupOpened = NO;
+    _groupName = nil;
     [_groupRegistered removeAllObjects];
   }
 }

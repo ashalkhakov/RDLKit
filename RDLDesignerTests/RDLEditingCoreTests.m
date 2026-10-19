@@ -2279,4 +2279,25 @@ static CGFloat RDLHeaderExtentOf(RDLTablixHierarchy *hierarchy) {
             (unsigned long)[ds.rows count]);
 }
 
+// A group in which nothing changes is no step at all. A field applied again
+// with what it already holds -- Return applies it, and the end of its editing
+// applies it once more -- used to leave an empty step on top of the stack,
+// and Command-Z then undid nothing.
+- (void)testAGroupInWhichNothingChangesIsNoUndoStep {
+  RDLDocument *doc = [[RDLDocument alloc] init];
+  [doc loadReport:RDLEditableReport()];
+  RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
+  RDLItem *item = [doc.report.body.items firstObject];
+  NSUndoManager *undo = [doc undoManager];
+  [undo setGroupsByEvent:NO];
+  [editor setValue:@"Moved" forKeyPath:@"name" ofItem:item];
+  XCTAssertTrue([undo canUndo]);
+  [editor beginGroup:@"Nothing"];
+  [editor setValue:@"Moved" forKeyPath:@"name" ofItem:item];
+  [editor endGroup];
+  XCTAssertNotEqualObjects([undo undoActionName], @"Nothing", @"an empty group is not a step");
+  [undo undo];
+  XCTAssertNotEqualObjects(item.name, @"Moved", @"one undo takes the rename back");
+}
+
 @end
