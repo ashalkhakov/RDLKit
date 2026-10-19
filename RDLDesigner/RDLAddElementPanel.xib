@@ -21,7 +21,7 @@
             <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
             <view key="contentView" id="palettePanelContent">
                 <rect key="frame" x="0.0" y="0.0" width="260" height="152"/>
-                <autoresizingMask key="autoresizingMask" flexibleMinY="YES" flexibleMaxY="YES"/>
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                 <subviews>
                     <textField verticalHuggingPriority="750" horizontalCompressionResistancePriority="250" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="paletteInfoLabel">
                         <rect key="frame" x="14" y="118" width="232" height="20"/>
