@@ -1596,13 +1596,17 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
       if (![sh.text length])
         break;
       // The family the text asks for, where this machine has it, in its weight
-      // and slant; the system font otherwise.
+      // and slant; the system font otherwise. Text whose style names no
+      // family is in RDL's own default, Arial, as every other piece of report
+      // text is: it was in the system font, which is a different font on
+      // every platform -- San Francisco on macOS, DejaVu Sans on Linux -- so
+      // the same chart measured and drew differently on each.
       RDLPrepareTextSystem();
       NSFontManager *fonts = [NSFontManager sharedFontManager];
       NSFontTraitMask traits = (sh.bold ? NSBoldFontMask : 0) | (sh.italic ? NSItalicFontMask : 0);
-      NSFont *font = [sh.fontFamily length] ? [fonts fontWithFamily:sh.fontFamily traits:traits weight:5
-                                                                size:sh.fontSize]
-                                            : nil;
+      NSString *family = [sh.fontFamily length] ? sh.fontFamily : [RDLStyle defaultStyle].fontFamily;
+      NSFont *font = [family length] ? [fonts fontWithFamily:family traits:traits weight:5 size:sh.fontSize]
+                                     : nil;
       if (font == nil) {
         font = [NSFont systemFontOfSize:sh.fontSize];
         if (sh.bold)
