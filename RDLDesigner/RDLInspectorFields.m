@@ -323,6 +323,14 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
         // an expression would resurrect it the moment the expression was
         // cleared, and the writer would have two answers to choose between.
         id expr = isExpression ? [RDLExpr expressionWithSource:text] : nil;
+        // The expression and the literal are written as one undo step: as
+        // two, the first Undo put the literal back and left the expression
+        // -- which is what shows -- where it was.
+        [editor beginGroup:nil];
+        // The expression and the literal are written as one undo step: as
+        // two, the first Undo put the literal back and left the expression
+        // -- which is what shows -- where it was.
+        [editor beginGroup:nil];
         switch (b.scope) {
           case RDLFieldScopeItem:
             if (item) {
@@ -346,6 +354,8 @@ static void RDLEnsureKeyPathIsWritable(RDLItem *item, NSString *keyPath) {
                         forKeyPath:b.keyPath];
             break;
         }
+        [editor endGroup];
+        [editor endGroup];
         [self bringAlongControlsSharing:b item:item band:band report:editor.document.report];
         return YES;
       }

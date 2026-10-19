@@ -488,6 +488,16 @@
   if (box.style.color != nil)
     XCTFail(@"%@", [NSString stringWithFormat:@"the literal survived as %@", box.style.color]);
 
+  // One undo puts the literal back and takes the expression away.
+  NSUndoManager *undo = [ctx.document undoManager];
+  if ([undo groupingLevel] > 0)
+    [undo endUndoGrouping];
+  [undo undo];
+  XCTAssertNil(box.style.expressions.color, @"undo leaves the expression behind");
+  XCTAssertEqualObjects(box.style.color, @"#336699", @"undo puts the literal back");
+  [undo redo];
+  XCTAssertNotNil(box.style.expressions.color, @"redo writes the expression again");
+
   // And it comes back as what was typed, byte for byte.
   [bindings fillFromItem:box band:nil report:report];
   if (![[field stringValue] hasPrefix:@"=IIf("])
