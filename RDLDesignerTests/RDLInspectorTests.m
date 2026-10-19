@@ -374,7 +374,9 @@
     XCTFail(@"%@", bad);
 
   // Well -> model, through the editor, so it is undoable like any other edit.
-  [well setColor:[NSColor colorWithCalibratedRed:1.0 green:0.5 blue:0.0 alpha:1.0]];
+  // In sRGB, the space RDL's colours are in: a colour in another space is
+  // written as the sRGB colour it is.
+  [well setColor:[NSColor colorWithSRGBRed:1.0 green:0.5 blue:0.0 alpha:1.0]];
   if (![bindings applyControl:well editor:ctx.editor item:box bandKey:nil])
     XCTFail(@"%@", @"the well is bound but the binding did not claim it");
   if (![box.style.color isEqualToString:@"#ff8000"])
