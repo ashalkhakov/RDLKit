@@ -9,8 +9,8 @@ BUNDLE_NAME = RDLDesignerTests
 # Built and run, never installed.
 RDLDesignerTests_STANDARD_INSTALL = no
 
-# The app's objects are compiled in directly, so the checks can drive the same
-# classes the app runs. Only main.m is left out -- its main() would collide
+# RDLKitUI's objects and the app's are compiled in directly, so the checks can
+# drive the same classes the app runs. Only main.m is left out -- its main() would collide
 # with the test runner's -- so the window controllers and app delegate the
 # window checks exercise are all present.
 RDLDesignerTests_OBJC_FILES = \
@@ -26,79 +26,84 @@ RDLDesignerTests_OBJC_FILES = \
   RDLRichTextTests.m \
   RDLTablixUITests.m \
   RDLNewReportTests.m \
-  ../RDLDesigner/RDLChange.m \
-  ../RDLDesigner/RDLDocument.m \
-  ../RDLDesigner/RDLEditingContext.m \
-  ../RDLDesigner/RDLEditor.m \
-  ../RDLDesigner/RDLTablixStructure.m \
-  ../RDLDesigner/RDLExpressionHelper.m \
-  ../RDLDesigner/RDLInspectorFields.m \
-  ../RDLDesigner/RDLItemFactory.m \
+  ../RDLKitUI/RDLChange.m \
+  ../RDLKitUI/RDLDocument.m \
+  ../RDLKitUI/RDLEditingContext.m \
+  ../RDLKitUI/RDLEditor.m \
+  ../RDLKitUI/RDLTablixStructure.m \
+  ../RDLKitUI/RDLExpressionHelper.m \
+  ../RDLKitUI/RDLInspectorFields.m \
+  ../RDLKitUI/RDLItemFactory.m \
   ../RDLDesigner/RDLNewReport.m \
   ../RDLDesigner/RDLNewReportPanel.m \
-  ../RDLDesigner/RDLPageGeometry.m \
-  ../RDLDesigner/RDLRichTextCodec.m \
-  ../RDLDesigner/RDLPlainTextEdit.m \
-  ../RDLDesigner/RDLRichTextFormatter.m \
-  ../RDLDesigner/RDLSamples.m \
-  ../RDLDesigner/RDLSelection.m \
-  ../RDLDesigner/RDLRichTextEditor.m \
-  ../RDLDesigner/RDLExpressionEditor.m \
-  ../RDLDesigner/RDLInsertPalette.m \
-  ../RDLDesigner/RDLExpressionCell.m \
-  ../RDLDesigner/RDLExpressionField.m \
-  ../RDLDesigner/RDLFilterEditor.m \
-  ../RDLDesigner/RDLSortEditor.m \
-  ../RDLDesigner/RDLValueListEditor.m \
-  ../RDLDesigner/RDLEmbeddedImages.m \
-  ../RDLDesigner/RDLEmbeddedImagesEditor.m \
-  ../RDLDesigner/RDLDatasetOptionsEditor.m \
-  ../RDLDesigner/RDLVariablesEditor.m \
-  ../RDLDesigner/RDLCodeEditor.m \
-  ../RDLDesigner/RDLStylePanel.m \
-  ../RDLDesigner/RDLPreviewWindow.m \
-  ../RDLDesigner/RDLGroupsView.m \
-  ../RDLDesigner/RDLProblemsView.m \
-  ../RDLDesigner/RDLSourceView.m \
-  ../RDLDesigner/RDLSnapGuides.m \
-  ../RDLDesigner/RDLChartAxisEditor.m \
-  ../RDLDesigner/RDLChartSeriesEditor.m \
-  ../RDLDesigner/RDLGroupPropertiesEditor.m \
-  ../RDLDesigner/RDLToolbarIcons.m \
-  ../RDLDesigner/RDLPane.m \
-  ../RDLDesigner/RDLExpressionTheme.m \
-  ../RDLDesigner/RDLExpressionTextStorage.m \
-  ../RDLDesigner/RDLDatasetNavigator.m \
-  ../RDLDesigner/RDLDesignerWindow.m \
-  ../RDLDesigner/RDLCanvasView.m \
-  ../RDLDesigner/RDLCanvasRenderer.m \
-  ../RDLDesigner/RDLCanvasInteraction.m \
-  ../RDLDesigner/RDLInPlaceEditor.m \
-  ../RDLDesigner/RDLInspectorView.m \
-  ../RDLDesigner/RDLDataView.m \
-  ../RDLDesigner/RDLParameterPrompts.m \
-  ../RDLDesigner/RDLRenderInputsEditor.m \
-  ../RDLDesigner/RDLOutlineDataSource.m \
-  ../RDLDesigner/RDLOutlineView.m \
-  ../RDLDesigner/RDLTabBadge.m \
-  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBar.m \
-  ../RDLDesigner/ThirdParty/DMTabBar/DMTabBarItem.m \
-  ../RDLDesigner/RDLFieldInspectorView.m \
-  ../RDLDesigner/RDLDatasetFieldsView.m \
+  ../RDLKitUI/RDLPageGeometry.m \
+  ../RDLKitUI/RDLRichTextCodec.m \
+  ../RDLKitUI/RDLPlainTextEdit.m \
+  ../RDLKitUI/RDLRichTextFormatter.m \
+  ../RDLKitUI/RDLSamples.m \
+  ../RDLKitUI/RDLSelection.m \
+  ../RDLKitUI/RDLRichTextEditor.m \
+  ../RDLKitUI/RDLExpressionEditor.m \
+  ../RDLKitUI/RDLInsertPalette.m \
+  ../RDLKitUI/RDLExpressionCell.m \
+  ../RDLKitUI/RDLExpressionField.m \
+  ../RDLKitUI/RDLFilterEditor.m \
+  ../RDLKitUI/RDLSortEditor.m \
+  ../RDLKitUI/RDLValueListEditor.m \
+  ../RDLKitUI/RDLEmbeddedImages.m \
+  ../RDLKitUI/RDLEmbeddedImagesEditor.m \
+  ../RDLKitUI/RDLDatasetOptionsEditor.m \
+  ../RDLKitUI/RDLVariablesEditor.m \
+  ../RDLKitUI/RDLCodeEditor.m \
+  ../RDLKitUI/RDLStylePanel.m \
+  ../RDLKitUI/RDLPreviewWindow.m \
+  ../RDLKitUI/RDLGroupsView.m \
+  ../RDLKitUI/RDLProblemsView.m \
+  ../RDLKitUI/RDLSourceView.m \
+  ../RDLKitUI/RDLSnapGuides.m \
+  ../RDLKitUI/RDLChartAxisEditor.m \
+  ../RDLKitUI/RDLChartSeriesEditor.m \
+  ../RDLKitUI/RDLGroupPropertiesEditor.m \
+  ../RDLKitUI/RDLToolbarIcons.m \
+  ../RDLKitUI/RDLPane.m \
+  ../RDLKitUI/RDLExpressionTheme.m \
+  ../RDLKitUI/RDLExpressionTextStorage.m \
+  ../RDLKitUI/RDLDatasetNavigator.m \
+  ../RDLKitUI/RDLReportDesigner.m \
+  ../RDLKitUI/RDLReportDesignerWindowController.m \
+  ../RDLKitUI/RDLReportViewController.m \
+  ../RDLKitUI/RDLReportViewerWindowController.m \
+  ../RDLKitUI/RDLKitUIBundle.m \
+  RDLEmbeddingTests.m \
+  ../RDLKitUI/RDLCanvasView.m \
+  ../RDLKitUI/RDLCanvasRenderer.m \
+  ../RDLKitUI/RDLCanvasInteraction.m \
+  ../RDLKitUI/RDLInPlaceEditor.m \
+  ../RDLKitUI/RDLInspectorView.m \
+  ../RDLKitUI/RDLDataView.m \
+  ../RDLKitUI/RDLParameterPrompts.m \
+  ../RDLKitUI/RDLRenderInputsEditor.m \
+  ../RDLKitUI/RDLOutlineDataSource.m \
+  ../RDLKitUI/RDLOutlineView.m \
+  ../RDLKitUI/RDLTabBadge.m \
+  ../RDLKitUI/ThirdParty/DMTabBar/DMTabBar.m \
+  ../RDLKitUI/ThirdParty/DMTabBar/DMTabBarItem.m \
+  ../RDLKitUI/RDLFieldInspectorView.m \
+  ../RDLKitUI/RDLDatasetFieldsView.m \
   ../RDLDesigner/RDLGeneratorWindow.m \
-  ../RDLDesigner/RDLParameterNavigator.m \
-  ../RDLDesigner/RDLDataSourceNavigator.m \
-  ../RDLDesigner/RDLDataSourceView.m \
-  ../RDLDesigner/RDLParameterInspectorView.m \
-  ../RDLDesigner/RDLBordersEditor.m \
-  ../RDLDesigner/RDLSubreportParametersEditor.m \
+  ../RDLKitUI/RDLParameterNavigator.m \
+  ../RDLKitUI/RDLDataSourceNavigator.m \
+  ../RDLKitUI/RDLDataSourceView.m \
+  ../RDLKitUI/RDLParameterInspectorView.m \
+  ../RDLKitUI/RDLBordersEditor.m \
+  ../RDLKitUI/RDLSubreportParametersEditor.m \
   ../RDLDesigner/RDLAppDelegate.m \
   ../RDLDesigner/RDLWelcomeWindow.m
 RDLDesignerTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # ThirdParty/DMTabBar as well: the tests import "DMTabBar.h" by name, which
 # Xcode resolves through its header map and gnustep-make has no equivalent for.
-RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB -I../RDLDesigner \
-                                -I../RDLDesigner/ThirdParty/DMTabBar
+RDLDesignerTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB -I../RDLKitUI -I../RDLDesigner \
+                                -I../RDLKitUI/ThirdParty/DMTabBar
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesignerTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
 RDLDesignerTests_NEEDS_GUI = yes
@@ -106,40 +111,43 @@ RDLDesignerTests_NEEDS_GUI = yes
 # The panels the checks open are looked up with -bundleForClass:,
 # which resolves to this bundle rather than to RDLDesigner.app.
 RDLDesignerTests_RESOURCE_FILES = \
-  ../RDLDesigner/RDLDesignerWindow.xib \
-  ../RDLDesigner/RDLInspectorSections.xib \
-  ../RDLDesigner/RDLFilterEditor.xib \
-  ../RDLDesigner/RDLSortEditor.xib \
-  ../RDLDesigner/RDLValueListEditor.xib \
-  ../RDLDesigner/RDLEmbeddedImagesEditor.xib \
-  ../RDLDesigner/RDLDatasetOptionsEditor.xib \
-  ../RDLDesigner/RDLVariablesEditor.xib \
-  ../RDLDesigner/RDLCodeEditor.xib \
-  ../RDLDesigner/RDLStylePanel.xib \
-  ../RDLDesigner/RDLPreviewWindow.xib \
-  ../RDLDesigner/RDLGroupsView.xib \
-  ../RDLDesigner/RDLProblemsView.xib \
-  ../RDLDesigner/RDLSourceView.xib \
-  ../RDLDesigner/RDLChartAxisEditor.xib \
-  ../RDLDesigner/RDLChartSeriesEditor.xib \
-  ../RDLDesigner/RDLGroupPropertiesEditor.xib \
-  ../RDLDesigner/RDLBordersEditor.xib \
-  ../RDLDesigner/RDLDatasetNavigator.xib \
-  ../RDLDesigner/RDLInsertPalette.xib \
-  ../RDLDesigner/RDLDatasetFieldsView.xib \
-  ../RDLDesigner/RDLFieldInspectorView.xib \
-  ../RDLDesigner/RDLExpressionEditor.xib \
-  ../RDLDesigner/RDLRichTextEditor.xib \
+  ../RDLKitUI/RDLReportDesigner.xib \
+  ../RDLKitUI/RDLReportDesignerWindow.xib \
+  ../RDLKitUI/RDLReportViewController.xib \
+  ../RDLKitUI/RDLReportViewerWindow.xib \
+  ../RDLKitUI/RDLInspectorSections.xib \
+  ../RDLKitUI/RDLFilterEditor.xib \
+  ../RDLKitUI/RDLSortEditor.xib \
+  ../RDLKitUI/RDLValueListEditor.xib \
+  ../RDLKitUI/RDLEmbeddedImagesEditor.xib \
+  ../RDLKitUI/RDLDatasetOptionsEditor.xib \
+  ../RDLKitUI/RDLVariablesEditor.xib \
+  ../RDLKitUI/RDLCodeEditor.xib \
+  ../RDLKitUI/RDLStylePanel.xib \
+  ../RDLKitUI/RDLPreviewWindow.xib \
+  ../RDLKitUI/RDLGroupsView.xib \
+  ../RDLKitUI/RDLProblemsView.xib \
+  ../RDLKitUI/RDLSourceView.xib \
+  ../RDLKitUI/RDLChartAxisEditor.xib \
+  ../RDLKitUI/RDLChartSeriesEditor.xib \
+  ../RDLKitUI/RDLGroupPropertiesEditor.xib \
+  ../RDLKitUI/RDLBordersEditor.xib \
+  ../RDLKitUI/RDLDatasetNavigator.xib \
+  ../RDLKitUI/RDLInsertPalette.xib \
+  ../RDLKitUI/RDLDatasetFieldsView.xib \
+  ../RDLKitUI/RDLFieldInspectorView.xib \
+  ../RDLKitUI/RDLExpressionEditor.xib \
+  ../RDLKitUI/RDLRichTextEditor.xib \
   ../RDLDesigner/RDLNewReportPanel.xib \
-  ../RDLDesigner/RDLDataSourceNavigator.xib \
-  ../RDLDesigner/RDLParameterNavigator.xib \
-  ../RDLDesigner/RDLParameterInspectorView.xib \
-  ../RDLDesigner/RDLDataSourceView.xib \
-  ../RDLDesigner/RDLSubreportParametersEditor.xib \
-  ../RDLDesigner/RDLRenderInputsEditor.xib \
+  ../RDLKitUI/RDLDataSourceNavigator.xib \
+  ../RDLKitUI/RDLParameterNavigator.xib \
+  ../RDLKitUI/RDLParameterInspectorView.xib \
+  ../RDLKitUI/RDLDataSourceView.xib \
+  ../RDLKitUI/RDLSubreportParametersEditor.xib \
+  ../RDLKitUI/RDLRenderInputsEditor.xib \
   ../RDLDesigner/RDLGeneratorWindow.xib \
   ../RDLDesigner/RDLWelcomeWindow.xib \
-  ../RDLDesigner/RDLAddElementPanel.xib \
+  ../RDLKitUI/RDLAddElementPanel.xib \
   ../RDLDesigner/MainMenu.xib \
   ../RDLDesigner/Samples
 

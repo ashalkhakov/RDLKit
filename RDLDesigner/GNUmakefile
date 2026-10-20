@@ -2,84 +2,25 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 APP_NAME = RDLDesigner
 RDLDesigner_NEEDS_GUI = yes
-RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -I../RDLKit/MiniVB -Werror=logical-not-parentheses
+RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -I../RDLKit/MiniVB -I../RDLKitUI \
+                         -I../RDLKitUI/ThirdParty/DMTabBar -Werror=logical-not-parentheses
+# The application around the designer: the library and the generator windows,
+# the new-report wizard, the menu bar, updates. The designer itself -- its
+# windows, panes and editing core -- is RDLKitUI's.
 RDLDesigner_OBJC_FILES = \
   RDLUpdater.m \
   main.m \
-  RDLEditingContext.m \
-  RDLChange.m \
-  RDLSelection.m \
-  RDLDocument.m \
-  RDLEditor.m \
-  RDLTablixStructure.m \
-  RDLItemFactory.m \
-  RDLPageGeometry.m \
-  RDLRichTextCodec.m \
-  RDLPlainTextEdit.m \
-  RDLRichTextFormatter.m \
-  RDLCanvasView.m \
-  RDLCanvasRenderer.m \
-  RDLInPlaceEditor.m \
-  RDLCanvasInteraction.m \
-  RDLDesignerWindow.m \
-  RDLOutlineDataSource.m \
-  RDLOutlineView.m \
-  RDLGeneratorWindow.m \
   RDLAppDelegate.m \
-  RDLSamples.m \
-  RDLInspectorView.m \
-  RDLInspectorFields.m \
-  RDLExpressionHelper.m \
-  RDLNewReport.m \
-  RDLNewReportPanel.m \
-  RDLRichTextEditor.m \
-  RDLDataView.m \
-  RDLParameterPrompts.m \
-  RDLRenderInputsEditor.m \
   RDLWelcomeWindow.m \
-  RDLExpressionEditor.m \
-  RDLInsertPalette.m \
-  RDLExpressionCell.m \
-  RDLExpressionField.m \
-  RDLFilterEditor.m \
-  RDLSortEditor.m \
-  RDLValueListEditor.m \
-  RDLEmbeddedImages.m \
-  RDLEmbeddedImagesEditor.m \
-  RDLDatasetOptionsEditor.m \
-  RDLVariablesEditor.m \
-  RDLCodeEditor.m \
-  RDLStylePanel.m \
-  RDLPreviewWindow.m \
-  RDLGroupsView.m \
-  RDLProblemsView.m \
-  RDLSourceView.m \
-  RDLSnapGuides.m \
-  RDLChartAxisEditor.m \
-  RDLChartSeriesEditor.m \
-  RDLGroupPropertiesEditor.m \
-  RDLBordersEditor.m \
-  RDLSubreportParametersEditor.m \
-  RDLToolbarIcons.m \
-  RDLPane.m \
-  RDLExpressionTheme.m \
-  RDLExpressionTextStorage.m \
-  RDLTabBadge.m \
-  RDLDatasetNavigator.m \
-  RDLDataSourceNavigator.m \
-  RDLDataSourceView.m \
-  RDLParameterNavigator.m \
-  RDLParameterInspectorView.m \
-  RDLFieldInspectorView.m \
-  RDLDatasetFieldsView.m \
-  ThirdParty/DMTabBar/DMTabBar.m \
-  ThirdParty/DMTabBar/DMTabBarItem.m
+  RDLGeneratorWindow.m \
+  RDLNewReport.m \
+  RDLNewReportPanel.m
 # RDLKit is built in the tree beside this one and not installed, so the
 # linker has to be told where it is. ADDITIONAL_LIB_DIRS rather than a
 # per-instance variable: it is the documented form and applies whatever the
 # instance type is.
-ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
-RDLDesigner_OBJC_LIBS += -lRDLKit -ldispatch
+ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR) -L../RDLKitUI/$(GNUSTEP_OBJ_DIR)
+RDLDesigner_OBJC_LIBS += -lRDLKitUI -lRDLKit -ldispatch
 # The bundle's icon: GNUstep puts it in the About panel, on the application's
 # window and miniwindow icons, and in the dock tile. The same PNG the AppImage
 # installs as the desktop icon.
@@ -101,43 +42,50 @@ RDLDesigner_APPLICATION_ICON = RDLDesigner.png
 RDLDesigner_RESOURCE_FILES = \
   Samples
 
+# The application's own windows, and RDLKitUI's as well: an installed
+# libRDLKitUI finds its XIBs in its own resources, and one run from the tree --
+# the checks, the UI suite, the AppImage -- finds them here
+# (RDLKitUIBundle()).
 RDLDesigner_RESOURCE_FILES += \
   RDLDesigner.png \
-  RDLExpressionEditor.xib \
   MainMenu.xib \
   RDLWelcomeWindow.xib \
-  RDLDesignerWindow.xib \
   RDLGeneratorWindow.xib \
-  RDLInspectorSections.xib \
-  RDLFilterEditor.xib \
-  RDLSortEditor.xib \
-  RDLValueListEditor.xib \
-  RDLEmbeddedImagesEditor.xib \
-  RDLDatasetOptionsEditor.xib \
-  RDLVariablesEditor.xib \
-  RDLCodeEditor.xib \
-  RDLStylePanel.xib \
-  RDLGroupsView.xib \
-  RDLProblemsView.xib \
-  RDLSourceView.xib \
-  RDLChartAxisEditor.xib \
-  RDLChartSeriesEditor.xib \
-  RDLGroupPropertiesEditor.xib \
-  RDLBordersEditor.xib \
-  RDLSubreportParametersEditor.xib \
-  RDLRenderInputsEditor.xib \
-  RDLDatasetNavigator.xib \
-  RDLDataSourceNavigator.xib \
-  RDLDataSourceView.xib \
-  RDLParameterNavigator.xib \
-  RDLParameterInspectorView.xib \
-  RDLInsertPalette.xib \
-  RDLDatasetFieldsView.xib \
-  RDLFieldInspectorView.xib \
-  RDLAddElementPanel.xib \
-  RDLPreviewWindow.xib \
-  RDLRichTextEditor.xib \
-  RDLNewReportPanel.xib
+  RDLNewReportPanel.xib \
+  ../RDLKitUI/RDLAddElementPanel.xib \
+  ../RDLKitUI/RDLBordersEditor.xib \
+  ../RDLKitUI/RDLChartAxisEditor.xib \
+  ../RDLKitUI/RDLChartSeriesEditor.xib \
+  ../RDLKitUI/RDLCodeEditor.xib \
+  ../RDLKitUI/RDLDataSourceNavigator.xib \
+  ../RDLKitUI/RDLDataSourceView.xib \
+  ../RDLKitUI/RDLDatasetFieldsView.xib \
+  ../RDLKitUI/RDLDatasetNavigator.xib \
+  ../RDLKitUI/RDLDatasetOptionsEditor.xib \
+  ../RDLKitUI/RDLEmbeddedImagesEditor.xib \
+  ../RDLKitUI/RDLExpressionEditor.xib \
+  ../RDLKitUI/RDLFieldInspectorView.xib \
+  ../RDLKitUI/RDLFilterEditor.xib \
+  ../RDLKitUI/RDLGroupPropertiesEditor.xib \
+  ../RDLKitUI/RDLGroupsView.xib \
+  ../RDLKitUI/RDLInsertPalette.xib \
+  ../RDLKitUI/RDLInspectorSections.xib \
+  ../RDLKitUI/RDLParameterInspectorView.xib \
+  ../RDLKitUI/RDLParameterNavigator.xib \
+  ../RDLKitUI/RDLPreviewWindow.xib \
+  ../RDLKitUI/RDLProblemsView.xib \
+  ../RDLKitUI/RDLRenderInputsEditor.xib \
+  ../RDLKitUI/RDLReportDesigner.xib \
+  ../RDLKitUI/RDLReportDesignerWindow.xib \
+  ../RDLKitUI/RDLReportViewController.xib \
+  ../RDLKitUI/RDLReportViewerWindow.xib \
+  ../RDLKitUI/RDLRichTextEditor.xib \
+  ../RDLKitUI/RDLSortEditor.xib \
+  ../RDLKitUI/RDLSourceView.xib \
+  ../RDLKitUI/RDLStylePanel.xib \
+  ../RDLKitUI/RDLSubreportParametersEditor.xib \
+  ../RDLKitUI/RDLValueListEditor.xib \
+  ../RDLKitUI/RDLVariablesEditor.xib
 
 # Left empty on purpose: the menu bar is loaded explicitly in
 # -[RDLAppDelegate loadMenuBar], so that the Samples submenu can be filled in

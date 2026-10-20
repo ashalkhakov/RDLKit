@@ -3,7 +3,8 @@
 Report Definition Language Kit for GNUstep and Cocoa.
 
 1. **Generator** (`RDLKit` + `RDLGen`) — takes an RDL file, data sources, and input parameters, and generates a **PDF** or **HTML** file.
-2. **Designer** (`RDLDesigner`) — creates and edits RDL definitions.
+2. **Viewer and designer, to embed** (`RDLKitUI`) — a report viewer and the report designer as components an application puts in its own windows, with its own rows (see **Embedding the viewer and the designer**).
+3. **Designer** (`RDLDesigner`) — creates and edits RDL definitions: a thin application over `RDLKitUI`.
 
 The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
@@ -35,8 +36,10 @@ Report generation is a pipeline:
 | --- | --- | --- |
 | `RDLKit` | Generator library | Parse RDL, bind data, evaluate expressions, lay out report elements, paginate, PDF and HTML backends |
 | `RDLKitTests` | XCTest (Mac and GNUstep) | Parser, expressions, layout, tablix pagination, both backends, the checker, data sources and JSONPath, the `.docx` importer. One XCTest per area |
+| `RDLKitUI` | Viewer and designer library | `RDLReportViewController` and `RDLReportDesigner` (and a window controller for each), the designer's editing core, canvas, panes and panels, and their XIBs |
 | `RDLGen` | Generator CLI | command-line tool to generate reports |
-| `RDLDesigner` | Designer app | WYSIWYG report designer |
+| `RDLDesigner` | Designer app | The application around `RDLKitUI`'s designer: the library and generator windows, the new-report wizard, the menu bar, updates, the samples |
+| `Examples/ReportHost` | Example host | The smallest application embedding the viewer and the designer; `--self-test` is part of `make check` |
 | `RDLDesignerTests` | XCTest (Mac and GNUstep) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
 | `RDLDesignerUITests` | XCTest, run inside `RDLDesigner` (Mac and GNUstep) | The designer driven as a person drives it -- clicks, drags, typing, menu commands -- checked in the model, the saved file, the preview and the window |
 
@@ -63,7 +66,7 @@ NSData *out = [RDLGenerator renderPages:pages title:report.name usingBackend:b];
   * Line (horizontal / vertical / sloped, dash styles)
   * Rectangle (a container: what grows inside it pushes down what is below, and it may hold a Tablix)
   * Image (`Source` Embedded, External -- beside the report, or by URL when remote documents are allowed -- or Database bytes with their `MIMEType`, such as `=Convert.FromBase64String(Fields!Logo.Value)`; `Sizing` Fit/FitProportional/Clip and AutoSize, which sizes the box to the image and moves what is below it; report-level `EmbeddedImages`)
-  * Chart (Column/Bar/Line/Pie: first series, category group, data point), read and written in the spec's vocabulary — `Shape`/`Pie`, `Scatter`/`Bubble`, axis `Visible`/`Interval`, `ChartMajorTickMarks`, grid lines `Enabled` — so Report Builder's charts draw as designed and this kit's charts validate; data labels on every chart type, on the data point or the whole series, saying their `Label` with the chart keywords (`#VALY`, `#VALX`, `#SERIESNAME`, `#AXISLABEL`, `#INDEX`, `#PERCENT`, `#TOTAL`, `#LEGENDTEXT`, `#AVG`, `#MIN`, `#MAX`, `#FIRST`, each with an optional `{format}`) or their value in their `Format`, placed by `Position` (a pie's `Outside` beyond the slice) in their font size, colour and weight; a legend at any of the 12 `Position`s (top right by default), its items in a `Layout` of rows or columns, in its `Style`'s font with its box's background and border; a title on any side by its `Position`, turned on the left and right, in its `Style`; axis labels in their axis' `Style` — a value axis' numbers in its `Format` — and axis titles in theirs, at the `Near`, `Center` or `Far` end of their axis; chart text in its font family and slant in both backends; colours from the chart's `Palette` — all 16 names, the named ones in Microsoft's own colours (Default and the Pacific palettes, whose colours are not published, in this kit's own), a pie's slices one each from it, `Custom` taking `ChartCustomPaletteColors` — with a series' `Style` `Color` over the palette and a data point's `Color`, worked out for each point, over that; each axis' major and minor grid lines (the category axis' too) and tick marks — `Inside`, `Outside` or `Cross`, at their `Length` — each at its own `Interval`, grid lines in their `Style`'s border colour, labels `LabelInterval` apart, and `Margin` (a line on an axis without one runs from end to end; bars always keep theirs); markers in their `Type`'s shape — `Auto` a different one for each series — at their `Size` in their `Color`; scatter points at their `X` on a scale of numbers, and bubbles as big as their `Size`; a series plotted against the value axis its `ValueAxisName` names, on that axis' own scale, drawn on the side its `Location` says; a chart with no rows saying its `ChartNoDataMessage` instead; stepped and smooth lines; and nested category and series groups, a category or series for each inner group within each outer one, the outer categories labelled in a row of their own; and range, range column and bar, stock and candlestick charts from each point's high, low, open and close; and funnels and pyramids, a band for each category as tall as its share; and polar and radar charts, the categories round a circle clockwise from twelve o'clock on rings of the value axis
+  * Chart (Column/Bar/Line/Pie: first series, category group, data point), read and written in the spec's vocabulary — `Shape`/`Pie`, `Scatter`/`Bubble`, axis `Visible`/`Interval`, `ChartMajorTickMarks`, grid lines `Enabled` — so Report Builder's charts draw as designed and this kit's charts validate; data labels on every chart type, on the data point or the whole series, saying their `Label` with the chart keywords (`#VALY`, `#VALX`, `#SERIESNAME`, `#AXISLABEL`, `#INDEX`, `#PERCENT`, `#TOTAL`, `#LEGENDTEXT`, `#AVG`, `#MIN`, `#MAX`, `#FIRST`, each with an optional `{format}`) or their value in their `Format`, placed by `Position` (a pie's `Outside` beyond the slice) in their font size, colour and weight; a legend at any of the 12 `Position`s (top right by default), its items in a `Layout` of rows or columns, in its `Style`'s font with its box's background and border; a title on any side by its `Position`, turned on the left and right, in its `Style`; axis labels in their axis' `Style` — a value axis' numbers in its `Format` — and axis titles in theirs, at the `Near`, `Center` or `Far` end of their axis; chart text in its font family and slant in both backends; colours from the chart's `Palette` — all 16 names, the named ones in Microsoft's own colours (Default and the Pacific palettes, whose colours are not published, in this kit's own), a pie's slices one each from it, `Custom` taking `ChartCustomPaletteColors` — with a series' `Style` `Color` over the palette and a data point's `Color`, worked out for each point, over that; each axis' major and minor grid lines (the category axis' too) and tick marks — `Inside`, `Outside` or `Cross`, at their `Length` — each at its own `Interval`, grid lines in their `Style`'s border colour, labels `LabelInterval` apart, and `Margin` (a line on an axis without one runs from end to end; bars always keep theirs); markers in their `Type`'s shape — `Auto` a different one for each series — at their `Size` in their `Color`; scatter points at their `X` on a scale of numbers, and bubbles as big as their `Size`; a series plotted against the value axis its `ValueAxisName` names, on that axis' own scale, drawn on the side its `Location` says; a chart with no rows saying its `ChartNoDataMessage` instead; stepped and smooth lines; and nested category and series groups, a category or series for each inner group within each outer one, the outer categories labelled in a row of their own, and each group's categories or series in the order its member's `SortExpressions` say; and range, range column and bar, stock and candlestick charts from each point's high, low, open and close; and funnels and pyramids, a band for each category as tall as its share; and polar and radar charts, the categories round a circle clockwise from twelve o'clock on rings of the value axis
   * Tablix — including `HideDuplicates` (per group or dataset, shown again on each page), `ColSpan` across dynamic column groups, `GroupsBeforeRowHeaders`, right-to-left `LayoutDirection`, the full `TablixCorner` grid (a cell over each row-header column, beside each column-header tier, with `RowSpan`/`ColSpan`), and the tablix's own `Style` background and border, boxed on each page it spans or left open along the break with `OmitBorderOnPageBreak`
   * List (mapped onto Tablix)
 * **Styles**
@@ -210,17 +213,18 @@ artifact.
 
 ## Cocoa (Xcode)
 
-Open `RDLKit.xcodeproj` (this folder). Five targets, all Objective-C ARC, macOS 12+:
+Open `RDLKit.xcodeproj` (this folder). Its targets, all Objective-C ARC, macOS 12+:
 
 | Scheme | Product | Role |
 | --- | --- | --- |
 | **RDLDesigner** | `RDLDesigner.app` | Designer (welcome screen also opens the generator window) |
 | **RDLGen** | `rdlgen` | Command-line generator |
 | **RDLKit** | `RDLKit.framework` | Generator library |
+| **RDLKitUI** | `RDLKitUI.framework` | The viewer and the designer, to embed |
 | **RDLKitTests** | `RDLKitTests.xctest` | XCTest for the library (parser, expressions, layout, backends, checker, `.docx` import) |
 | **RDLDesignerTests** | `RDLDesignerTests.xctest` | XCTest for the app (editing core, canvas, panels) |
 
-RDLDesigner and RDLGen link and embed `RDLKit.framework`. Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
+RDLDesigner links and embeds `RDLKitUI.framework` and `RDLKit.framework`, RDLGen `RDLKit.framework`; `make -f Makefile.apple` also makes the two frameworks into XCFrameworks (`build/`). Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
 
 Xcode 26: every scheme’s Run action expands macros from a real product (`RDLDesigner.app`, `rdlgen`, or `RDLKit.framework`) — never the `.xctest`. If a leftover user scheme still crashes the IDE, delete `RDLKit.xcodeproj/xcuserdata` (and `project.xcworkspace/xcuserdata`) and reopen.
 
@@ -234,6 +238,137 @@ There are two test schemes: `RDLKitTests` for the library and
 part of the build story, which has to work under GNUstep too.
 Both are ordinary XCTest; under GNUstep they build as bundles through their
 own GNUmakefiles and need `gnustep/tools-xctest`.
+
+## Using RDLKit in an application
+
+Every release publishes the libraries with what an application compiles
+against, as gnustep-release-actions' `scripts/deps.sh` fetches them for a
+repository whose `.github/pins.env` says `RDLKIT_VERSION=<version>`:
+
+| Platform | Archive | What is in it | Compile and link |
+| --- | --- | --- | --- |
+| macOS | `rdlkit-<version>-apple.zip`, unpacked into `.deps/` | `RDLKit.xcframework`, `RDLKitUI.xcframework` (arm64 and x86_64) | add them to the Xcode project, or `-F .deps/RDLKit.xcframework/macos-arm64_x86_64 -F .deps/RDLKitUI.xcframework/macos-arm64_x86_64 -framework RDLKitUI -framework RDLKit`; embed both |
+| GNUstep | `rdlkit-<version>-ubuntu22.04-<arch>.tar.xz` (x86_64, aarch64), unpacked at `/` | `libRDLKit`, `libRDLKitUI`, their headers in `Library/Headers/RDLKit` and `…/RDLKitUI`, `RDLKitUI`'s XIBs in `Library/Libraries/RDLKitUI/Versions/0/Resources`, and `rdlgen`, `RDLDesigner` | `-lRDLKitUI -lRDLKit` (gnustep-make: `xxx_GUI_LIBS += -lRDLKitUI -lRDLKit`; the headers are on GNUstep's header path) |
+
+On both, `#import <RDLKit/RDLKit.h>` and `#import <RDLKitUI/RDLKitUI.h>`.
+`make -f Makefile.apple installcheck` and `make check` on GNUstep compile
+`Scripts/installcheck/rdlkit-check.m` and `Examples/ReportHost` against what
+`make install` installed, and run them (`Scripts/installcheck.sh`).
+
+## Embedding the viewer and the designer
+
+`RDLKitUI` is the viewer and the designer as components: AppKit view
+controllers, the same code on macOS and GNUstep, that assume nothing about the
+application they are in -- not its delegate, its menu bar, its document
+controller or one report per window. Several can be open in one window.
+`Examples/ReportHost/ReportHost.m` embeds both.
+
+### Rows from the host
+
+Both ask a data source for each dataset's rows before every render -- the
+first, a Refresh, and each time a parameter's value changes -- with the
+parameters as that render works them out. A dataset it answers `nil` for is
+read as the report says.
+
+```objc
+@interface StockHost : NSObject <RDLReportDataSource>
+@end
+@implementation StockHost
+- (id)rowsForDataSet:(NSString *)dataSetName
+            inReport:(RDLReport *)report
+          parameters:(NSDictionary<NSString *, id> *)parameters {
+  if (![dataSetName isEqualToString:@"Items"])
+    return nil;                      // the report reads it itself
+  // An array of dictionaries (or any key-value-coding objects), keyed by the
+  // fields' DataField names -- or a JSON string holding one.
+  return [self.store itemsInRegion:parameters[@"Region"]];
+}
+@end
+```
+
+`+[RDLGenerator bindRows:toDataSet:inReport:error:]` and
+`bindJSONString:toDataSet:inReport:error:` do the same for a report rendered
+without a viewer.
+
+### The viewer
+
+```objc
+RDLReportViewController *viewer = [[RDLReportViewController alloc] init];
+viewer.dataSource = host;            // rows, asked again on every parameter change
+viewer.delegate = host;              // optional: parameters changed, rendered, export and print hooks
+[viewer loadURL:reportURL error:&error];         // or -loadData:baseURL:error:, or .report = ...
+viewer.parameterValues = @{ @"Region" : @"North" };
+[[viewer view] setFrame:[container bounds]];
+[container addSubview:[viewer view]];
+
+// Or a window of its own:
+RDLReportViewerWindowController *wc = [[RDLReportViewerWindowController alloc] initWithViewer:viewer];
+[wc showWindow:nil];
+```
+
+Its bar walks the pages, zooms, shows the report's parameters (the same
+prompts as the designer's preview, with their valid values and defaults),
+refreshes, exports PDF and HTML and prints. A host with its own toolbar hides
+the bar (`showsToolbar = NO`) and sends `goToNextPage:`, `zoomIn:`,
+`refresh:`, `exportPDF:`, `printReport:` and the rest to the first responder:
+the viewer answers them from inside its view, and validates them. Export and
+print go through the delegate first (`reportViewer:shouldExportUsingBackend:`,
+`reportViewerShouldPrint:`), so a host can take them over; it can also render
+directly: `-dataUsingBackendNamed:@"PDF"`, `-exportUsingBackendNamed:toURL:error:`,
+`-printOperation`.
+
+### The designer
+
+```objc
+RDLReportDesigner *designer = [[RDLReportDesigner alloc] initWithReport:nil
+                                                            undoManager:hostUndo]; // or -init
+designer.delegate = host;            // changed, dirty, open a subreport
+designer.dataSource = host;          // rows for its preview and export
+[designer loadData:fileData baseURL:fileURL error:&error];   // the host owns the file
+[[designer view] setFrame:[editorArea bounds]];
+[editorArea addSubview:[designer view]];
+
+// Saving is the host's:
+[[designer RDLData] writeToURL:fileURL options:NSDataWritingAtomic error:&error];
+[designer markSaved];
+```
+
+Its view is the whole designer in a split: the outline, datasets, insert
+palette and problems; the canvas (with its Source and dataset editors) and the
+row and column groups under it; the report, attributes and style inspectors.
+A host with sidebars of its own takes the parts instead:
+
+```objc
+designer.embedsSidePanes = NO;       // view is now the editor alone
+designer.embedsGroupsPane = NO;      // and the groups pane is the host's too
+[leftSidebar addSubview:designer.navigatorPane];
+[rightSidebar addSubview:designer.inspectorPane];
+[bottomPanel addSubview:designer.groupsPane];
+```
+
+The delegate hears `reportDesignerDidChange:` on every edit, undo and redo,
+and `reportDesigner:didChangeDirty:` when the dirty state flips;
+`reportDesigner:openSubreportAtURL:` lets the host open a subreport the way it
+opens files. The window it sits in gives it its undo and the field editor its
+expression fields complete with:
+
+```objc
+- (NSUndoManager *)windowWillReturnUndoManager:(NSWindow *)window {
+  return [self.focusedDesigner undoManager];
+}
+- (id)windowWillReturnFieldEditor:(NSWindow *)window toObject:(id)client {
+  return [self.focusedDesigner fieldEditorForClient:client];  // nil for fields not its own
+}
+```
+
+Commands travel the responder chain and are validated there
+(`-validateUserInterfaceItem:`): the designer installs no menu items.
+`+[RDLReportDesigner commands]` lists them -- title, action, key equivalent,
+and the menu (Edit, Arrange, View, Report) RDLDesigner puts them in -- for a
+host to build its menus or toolbar with a nil target; `-performCommand:` sends
+one as such an item would, and `-selectItemNamed:` takes the designer to an
+item. `RDLReportDesignerWindowController` is the designer in a window of its
+own, which is what RDLDesigner's documents open.
 
 ## Recursive hierarchies
 
@@ -675,7 +810,11 @@ make -f Makefile.apple install DESTDIR=out
 (`Scripts/check-imports.sh`), both XCTest suites (under `xvfb` on GNUstep,
 because AppKit drawing needs a display), the designer's UI tests run inside
 RDLDesigner, and `rdlgen` checking a sample report and rendering it to HTML
-and PDF (`Scripts/rdlgen-smoke.sh`). On macOS it also
+and PDF (`Scripts/rdlgen-smoke.sh`), and the example host's `--self-test`
+(`Examples/ReportHost`: the viewer and the designer embedded, with the host's
+rows). On GNUstep it also installs the libraries into a staging directory and
+builds against them (`Scripts/installcheck.sh`), which `make -f Makefile.apple
+installcheck` does on the Mac with the XCFrameworks. On macOS it also
 scores the parser against the RDL corpus, and fails if any file parses to
 nothing or if fewer than 79 of the 86 still lay out.
 
@@ -684,8 +823,11 @@ It calls gnustep-release-actions' `linux.yml` and `macos.yml`, the same as
 every repository's: they fetch what `.github/pins.env` names (the GNUstep
 stack gnustep-patches publishes, Sparkle), run the commands above, and
 package what was installed. Every push uploads artifacts kept two weeks,
-unsigned and named for the version: `RDLDesigner-macOS-<version>` and the
-AppImage, `RDLKit-<version>-x86_64.AppImage`. A tag (or the workflow run by
+unsigned and named for the version: `RDLDesigner-macOS-<version>`, the
+AppImage, `RDLKit-<version>-x86_64.AppImage`, and the library's archives
+(`library: true`), `rdlkit-<version>-apple.zip` and
+`rdlkit-<version>-ubuntu22.04-x86_64.tar.xz` / `-aarch64.tar.xz` (see **Using
+RDLKit in an application**). A tag (or the workflow run by
 hand with one) also releases them: RDLDesigner signed and notarized, with the
 Sparkle appcast its Check for Updates… reads, and the AppImage with its update
 information, attached to the release. Two more jobs, `xp-macos` and `xp`,

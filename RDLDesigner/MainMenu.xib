@@ -93,7 +93,7 @@
                             <menuItem isSeparatorItem="YES" id="fileSep3"/>
                             <menuItem title="Preview" keyEquivalent="P" id="previewItem">
                                 <connections>
-                                    <action selector="preview:" target="-2" id="previewAction"/>
+                                    <action selector="preview:" target="-1" id="previewAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Print…" keyEquivalent="p" id="printItem">
@@ -247,12 +247,12 @@
                             <menuItem isSeparatorItem="YES" id="editSep2"/>
                             <menuItem title="Add Element…" keyEquivalent="A" id="addElementItem">
                                 <connections>
-                                    <action selector="addElement:" target="-2" id="addElementAction"/>
+                                    <action selector="addElement:" target="-1" id="addElementAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Delete" keyEquivalent="" id="deleteItem">
                                 <connections>
-                                    <action selector="delete:" target="-2" id="deleteAction"/>
+                                    <action selector="delete:" target="-1" id="deleteAction"/>
                                 </connections>
                             </menuItem>
                         </items>
@@ -263,23 +263,23 @@
                         <items>
                             <menuItem title="Toggle Grid" keyEquivalent="g" id="toggleGridItem">
                                 <connections>
-                                    <action selector="toggleGrid:" target="-2" id="toggleGridAction"/>
+                                    <action selector="toggleGrid:" target="-1" id="toggleGridAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Zoom In" keyEquivalent="=" id="zoomInItem">
                                 <connections>
-                                    <action selector="zoomIn:" target="-2" id="zoomInAction"/>
+                                    <action selector="zoomIn:" target="-1" id="zoomInAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem title="Zoom Out" keyEquivalent="-" id="zoomOutItem">
                                 <connections>
-                                    <action selector="zoomOut:" target="-2" id="zoomOutAction"/>
+                                    <action selector="zoomOut:" target="-1" id="zoomOutAction"/>
                                 </connections>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="viewSep1"/>
                             <menuItem title="Row and Column Groups" keyEquivalent="G" id="groupsPaneItem">
                                 <connections>
-                                    <action selector="toggleGroupsPane:" target="-2" id="groupsPaneAction"/>
+                                    <action selector="toggleGroupsPane:" target="-1" id="groupsPaneAction"/>
                                 </connections>
                             </menuItem>
                         </items>

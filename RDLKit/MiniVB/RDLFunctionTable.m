@@ -314,10 +314,7 @@ static id RDLFnDateOrTimeValue(NSString *name, NSArray *vals, RDLEvalScope *scop
                                fromDate:date];
   if ([name isEqualToString:@"timevalue"])
     return RDLTimeOnFirstDay((long long)c.hour * kRDLMinutesPerHour * kRDLSecondsPerMinute + c.minute * kRDLSecondsPerMinute + c.second);
-  c.hour = 0;
-  c.minute = 0;
-  c.second = 0;
-  return [cal dateFromComponents:c];
+  return [cal startOfDayForDate:date];
 }
 
 static id RDLFnStr(NSString *name, NSArray *vals, RDLEvalScope *scope) {

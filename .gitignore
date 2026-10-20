@@ -64,3 +64,6 @@ obj/
 # Local Claude session tooling (per-machine, not project state)
 /.claude/
 .deps/
+# GNUstep: the test bundles, and RDLKitUI's resource bundle as built in the tree
+*.bundle/
+/RDLKitUI/RDLKitUI/

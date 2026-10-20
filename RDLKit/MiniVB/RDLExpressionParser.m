@@ -67,12 +67,17 @@ static RDLExprTokenKind RDLKindOfToken(RDLTok *t, RDLTok *next) {
     _memoClass = cls;
     _memoFor = [key copy];
   }
-  if (_memoKey == nil)
+  // An object's class says which keys it answers to; a dictionary's does not.
+  BOOL dictionary = [row isKindOfClass:[NSDictionary class]];
+  if (_memoKey == nil && !dictionary)
     return nil;
   id v = RDLFetchRowKey(row, _memoKey);
   // Dictionaries of the same class can still differ in their keys, so a miss
-  // means resolve again rather than report the field as absent.
-  if (v == nil && [row isKindOfClass:[NSDictionary class]]) {
+  // means resolve again rather than report the field as absent -- a miss
+  // remembered from an earlier row too: a JSON row that leaves out a value it
+  // has none of, the first fill-up's consumption, made the field Nothing in
+  // every row after it of the same class, and a chart's series empty.
+  if (v == nil && dictionary) {
     NSString *fresh = RDLResolveRowKey(row, key);
     if (fresh != nil && ![fresh isEqualToString:_memoKey]) {
       _memoKey = fresh;

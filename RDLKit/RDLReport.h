@@ -829,6 +829,11 @@ FOUNDATION_EXPORT NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemK
 @interface RDLChartMember : NSObject
 @property (nonatomic, copy) NSString *groupName;
 @property (nonatomic, strong) NSMutableArray<RDLValue *> *groupExpressions;
+// ChartMember/SortExpressions: the order of the group's instances -- the
+// categories along the axis, the series in the legend -- each key worked out
+// in its instance's scope, as a tablix group's are. In the order the rows bring
+// them when there are none.
+@property (nonatomic, strong) NSMutableArray<RDLSortExpression *> *sortExpressions;
 // What to write under the category, or beside the swatch in the legend.
 // Defaults to the group expression when absent.
 @property (nonatomic, strong) RDLValue *label;

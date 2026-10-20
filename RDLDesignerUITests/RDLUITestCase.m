@@ -130,7 +130,7 @@ static NSWindow *gKeepAlive;
 
 - (RDLDesignerWindow *)designerOf:(RDLDocument *)doc {
   for (NSWindowController *wc in [doc windowControllers])
-    if ([wc isKindOfClass:RDLUIClass(RDLDesignerWindow)])
+    if ([wc isKindOfClass:RDLUIClass(RDLReportDesignerWindowController)])
       return (RDLDesignerWindow *)wc;
   return nil;
 }

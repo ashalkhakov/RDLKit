@@ -32,6 +32,20 @@
       }];
     return NO;
   }
+  return [self bindRows:obj toDataSet:name inReport:report error:error];
+}
+
++ (BOOL)bindRows:(NSArray *)rows
+       toDataSet:(NSString *)name
+        inReport:(RDLReport *)report
+           error:(NSError **)error {
+  if (![rows isKindOfClass:[NSArray class]] || name == nil || report == nil) {
+    if (error)
+      *error = [NSError errorWithDomain:@"RDLKit" code:3 userInfo:@{
+        NSLocalizedDescriptionKey : @"Need rows, a dataset name and a report to bind"
+      }];
+    return NO;
+  }
   RDLDataSet *ds = [report dataSetNamed:name];
   if (ds == nil) {
     ds = [[RDLDataSet alloc] init];
@@ -39,10 +53,10 @@
     ds.dataSourceName = @"Demo";
     [report.dataSets addObject:ds];
   }
-  ds.rows = obj;
+  ds.rows = rows;
   // Only infer when nothing is declared: allKeys is unordered, so inferring
   // over an existing schema would silently reorder the report's columns.
-  NSDictionary *first = [obj firstObject];
+  NSDictionary *first = [rows firstObject];
   if ([ds.fields count] == 0 && [first isKindOfClass:[NSDictionary class]])
     [ds setFieldNames:[first allKeys]];
   return YES;

@@ -2703,6 +2703,17 @@ static void RDLGroupChartLevel(NSArray *rows, NSArray<RDLChartMember *> *members
     }
     [bucket addObject:row];
   }
+  // The member's SortExpressions put its instances in their order, each key
+  // worked out in the instance's scope, as a tablix group's are.
+  if ([member.sortExpressions count] && [order count] > 1) {
+    NSMutableArray *parts = [NSMutableArray array];
+    for (NSString *groupKey in order)
+      [parts addObject:groups[groupKey]];
+    NSMutableArray<NSString *> *sorted = [NSMutableArray array];
+    for (NSArray *part in RDLSortParts(parts, member.sortExpressions, member.groupName, scope))
+      [sorted addObject:order[[parts indexOfObjectIdenticalTo:part]]];
+    order = sorted;
+  }
   for (NSString *groupKey in order)
     RDLGroupChartLevel(groups[groupKey], members, level + 1, [NSString stringWithFormat:@"%@%@\x1e", key, groupKey],
                        [path arrayByAddingObject:labels[groupKey]], out, scope);

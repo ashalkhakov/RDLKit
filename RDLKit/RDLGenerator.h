@@ -14,6 +14,14 @@
              toDataSet:(NSString *)name
               inReport:(RDLReport *)report
                  error:(NSError **)error;
+// The same for rows the host has as objects: one NSDictionary per row, keyed
+// by the dataset's DataField names (or any object that answers to key-value
+// coding). A dataset the report does not declare is added; fields are
+// inferred from the first row only when it declares none.
++ (BOOL)bindRows:(NSArray *)rows
+       toDataSet:(NSString *)name
+        inReport:(RDLReport *)report
+           error:(NSError **)error;
 + (NSArray<RDLLaidOutPage *> *)pagesForReport:(RDLReport *)report
                                    parameters:(NSDictionary<NSString *, NSString *> *)params;
 // Rendered for a reader in `userLanguage` -- what User!Language answers, and

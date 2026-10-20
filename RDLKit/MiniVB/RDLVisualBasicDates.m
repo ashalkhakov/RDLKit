@@ -63,11 +63,7 @@ id RDLClockValue(NSString *name, NSDate *moment) {
     return [NSString stringWithFormat:@"%@-%@-%@", RDLPadded(p.month, 2), RDLPadded(p.day, 2), RDLPadded(p.year, 4)];
   if ([name isEqualToString:@"timestring"])
     return [NSString stringWithFormat:@"%@:%@:%@", RDLPadded(p.hour, 2), RDLPadded(p.minute, 2), RDLPadded(p.second, 2)];
-  NSDateComponents *day = [[NSDateComponents alloc] init];
-  day.year = p.year;
-  day.month = p.month;
-  day.day = p.day;
-  double since = [moment timeIntervalSinceDate:[calendar dateFromComponents:day]];
+  double since = [moment timeIntervalSinceDate:[calendar startOfDayForDate:moment]];
   if ([name isEqualToString:@"timer"])
     return RDLDouble(since);
   return RDLTimeOnFirstDay((long long)floor(since));
@@ -169,33 +165,15 @@ static double RDLWallClockSeconds(NSDate *date) {
   return [date timeIntervalSinceReferenceDate] + [[NSTimeZone defaultTimeZone] secondsFromGMTForDate:date];
 }
 
+// The 1-based day of the year, Jan 1 being 1.
+static NSInteger RDLDayOfYear(NSCalendar *calendar, NSDate *date) {
+  return (NSInteger)[calendar ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:date];
+}
+
 // The week of its year a date is in, as .NET's Calendar.GetWeekOfYear counts
 // it: from the week holding 1 January, or from the first week with four days,
 // or seven, in the year -- a date before that week being in the last week of
 // the year before.
-// The 1-based day of the year, Jan 1 being 1 (what -[NSCalendar
-// ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:]
-// returns on Cocoa). GNUstep's ordinalityOfUnit:inUnit: answers 0 for this
-// pair, which read day-of-year as -1 in RDLWeekOfYear and sent it recursing
-// a day at a time until the stack ran out (and made DatePart("y") 0). So it
-// is computed from the calendar directly: midnight of the date, less midnight
-// of its Jan 1, in days.
-static NSInteger RDLDayOfYear(NSCalendar *calendar, NSDate *date) {
-  NSDateComponents *c =
-      [calendar components:NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit fromDate:date];
-  NSDateComponents *jan1 = [[NSDateComponents alloc] init];
-  jan1.year = c.year;
-  jan1.month = 1;
-  jan1.day = 1;
-  NSDate *start = [calendar dateFromComponents:jan1];
-  NSDateComponents *midnight = [[NSDateComponents alloc] init];
-  midnight.year = c.year;
-  midnight.month = c.month;
-  midnight.day = c.day;
-  NSDate *today = [calendar dateFromComponents:midnight];
-  return (NSInteger)round([today timeIntervalSinceDate:start] / kRDLSecondsPerDay) + 1;
-}
-
 static NSInteger RDLWeekOfYear(NSDate *date, NSInteger firstDay, RDLFirstWeekOfYearName rule) {
   NSCalendar *calendar = [NSCalendar currentCalendar];
   NSInteger dayOfYear = RDLDayOfYear(calendar, date) - 1;
@@ -318,7 +296,7 @@ id RDLDatePart(NSArray *vals, NSString *language) {
     result = p.month;
     break;
   case RDLDateIntervalNameDayOfYear:
-    result = RDLDayOfYear(calendar, date);   // GNUstep's ordinalityOfUnit:inUnit: answers 0 here
+    result = RDLDayOfYear(calendar, date);
     break;
   case RDLDateIntervalNameDay:
     result = p.day;
