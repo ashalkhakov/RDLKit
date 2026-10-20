@@ -305,15 +305,20 @@ static NSAttributedString *RDLAttributedText(NSString *text, RDLStyle *style) {
     [[NSColor colorWithCalibratedWhite:0.55 alpha:1] set];
     NSFrameRect(br);
 
-    // The band name runs up the left edge, rotated.
-    [[NSGraphicsContext currentContext] saveGraphicsState];
-    NSAffineTransform *xf = [NSAffineTransform transform];
-    [xf translateXBy:NSMinX(br) - 12 yBy:NSMinY(br) + 8];
-    [xf rotateByDegrees:90];
-    [xf concat];
-    [[RDLItemFactory titleForBandKey:bf.bandKey] drawAtPoint:NSZeroPoint
-                                              withAttributes:labelAttr];
-    [[NSGraphicsContext currentContext] restoreGraphicsState];
+    // The band name runs up the left edge, rotated -- for a band with room
+    // for it. A page header or footer with no height is no band yet (a
+    // blank report has neither), and its name was drawn over the body's,
+    // where both start: "Bagy Header".
+    if (NSHeight(br) >= 1) {
+      [[NSGraphicsContext currentContext] saveGraphicsState];
+      NSAffineTransform *xf = [NSAffineTransform transform];
+      [xf translateXBy:NSMinX(br) - 12 yBy:NSMinY(br) + 8];
+      [xf rotateByDegrees:90];
+      [xf concat];
+      [[RDLItemFactory titleForBandKey:bf.bandKey] drawAtPoint:NSZeroPoint
+                                                withAttributes:labelAttr];
+      [[NSGraphicsContext currentContext] restoreGraphicsState];
+    }
 
     for (RDLItem *it in RDLItemsInPaintOrder(bf.band.items))
       [self drawItem:it origin:NSMakePoint(NSMinX(br), NSMinY(br))];
