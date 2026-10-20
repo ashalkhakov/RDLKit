@@ -121,10 +121,26 @@ static NSPoint RDLUIInWindow(NSView *view, NSPoint point) {
   return [view convertPoint:point toView:nil];
 }
 
+// Whether a click at `point` would reach `view` (or a view inside it).
+static BOOL RDLUIReachable(NSView *view, NSPoint point) {
+  if (!NSPointInRect(point, [view visibleRect]))
+    return NO;
+  NSView *frame = [[[view window] contentView] superview];
+  NSView *hit = [frame hitTest:[view convertPoint:point toView:nil]];
+  return hit != nil && [hit isDescendantOf:view];
+}
+
 void RDLUIClickAt(NSView *view, NSPoint point, NSUInteger clicks, NSEventModifierFlags flags) {
   // Where a person can click it: scrolled into sight first, as they would.
-  if (!NSPointInRect(point, [view visibleRect]))
+  if (!RDLUIReachable(view, point))
     [view scrollRectToVisible:NSMakeRect(point.x - 20, point.y - 20, 40, 40)];
+  if (!RDLUIReachable(view, point)) {
+    // Under a ruler or a floating header the visible rectangle still
+    // counts it seen: bring it to the middle instead.
+    NSRect seen = [view visibleRect];
+    [view scrollRectToVisible:NSMakeRect(point.x - NSWidth(seen) / 2, point.y - NSHeight(seen) / 2,
+                                         NSWidth(seen), NSHeight(seen))];
+  }
   NSWindow *window = [view window];
   NSPoint at = RDLUIInWindow(view, point);
   for (NSUInteger n = 1; n <= MAX(clicks, (NSUInteger)1); n++) {
@@ -140,6 +156,9 @@ void RDLUIClick(NSView *view) {
 }
 
 void RDLUIDrag(NSView *view, NSPoint from, NSPoint to, NSUInteger steps, NSEventModifierFlags flags) {
+  if (!RDLUIReachable(view, from) || !RDLUIReachable(view, to))
+    [view scrollRectToVisible:NSUnionRect(NSMakeRect(from.x - 20, from.y - 20, 40, 40),
+                                          NSMakeRect(to.x - 20, to.y - 20, 40, 40))];
   NSWindow *window = [view window];
   NSUInteger n = MAX(steps, (NSUInteger)1);
   RDLUIPost(RDLUIMouseEvent(NSEventTypeLeftMouseDown, window, RDLUIInWindow(view, from), 1, flags));

@@ -34,6 +34,17 @@ static NSWindow *gKeepAlive;
 
 @implementation RDLUITestCase
 
+// Every report window the size of the smallest screen the suite runs on --
+// a CI runner's 1024x768 -- so a run here is the run there, whatever the
+// screen: the canvas and its panes have the room they have on that one.
+- (void)sizeWindowOf:(RDLDocument *)doc {
+  NSWindow *w = [[self designerOf:doc] window];
+  NSRect visible = [[w screen] ?: [NSScreen mainScreen] visibleFrame];
+  NSRect frame = NSMakeRect(NSMinX(visible), NSMaxY(visible) - 684, MIN(1024, NSWidth(visible)), MIN(684, NSHeight(visible)));
+  [w setFrame:frame display:YES];
+  RDLUIPump(0.2);
+}
+
 - (void)setUp {
   [super setUp];
   RDLUIInstall();
@@ -162,6 +173,7 @@ static NSWindow *gKeepAlive;
   RDLDocument *doc = [[NSDocumentController sharedDocumentController] currentDocument]
                          ?: [[self documents] lastObject];
   XCTAssertNotNil(doc, @"no report came of New Report");
+  [self sizeWindowOf:doc];
   [[[self designerOf:doc] window] makeKeyAndOrderFront:nil];
   RDLUIPump(0.2);
   return doc;
@@ -197,6 +209,8 @@ static NSWindow *gKeepAlive;
     return opened != nil;
   });
   XCTAssertNotNil(opened, @"File > Open did not open %@ as itself", [url lastPathComponent]);
+  if ([[self documents] count] == 1)
+    [self sizeWindowOf:opened];
   [[[self designerOf:opened] window] makeKeyAndOrderFront:nil];
   RDLUIPump(0.3);
   return opened;
