@@ -32,6 +32,8 @@ TARGETS = {
     # bundle as well: -bundleForClass: resolves there, not to RDLDesigner.app.
     'RDLDesignerTests': ('9D4444B8635515926096826D', 'A38464B071A1A354E92781FB',
                           None, '0C7A1FD3B4E5A6C7D8E9F001'),
+    # Hosted in RDLDesigner.app (TEST_HOST), so it has no resources of its own.
+    'RDLDesignerUITests': ('4E06CF1EB7168622901D7CCD', 'CF4048A249C714AA33CF3320', None, None),
 }
 
 FILETYPE = {

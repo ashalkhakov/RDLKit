@@ -4,7 +4,9 @@
 #   make -f Makefile.apple            RDLKit.framework, rdlgen and RDLDesigner.app,
 #                                     universal (Release)
 #   make -f Makefile.apple check      no macOS-only imports; the Debug builds;
-#                                     the two suites; the parser over the
+#                                     the two suites and the designer's UI
+#                                     tests (hosted in RDLDesigner.app, so a
+#                                     session that can show windows); the parser over the
 #                                     Majorsilence corpus (at least 79 of its 86
 #                                     reports, and none silently empty); rdlgen
 #                                     on a sample report
@@ -36,7 +38,7 @@ check:
 	@for scheme in RDLKit RDLDesigner RDLGen; do \
 	  $(XCODEBUILD) -scheme $$scheme -configuration Debug -destination 'platform=macOS' build || exit 1; \
 	done
-	@for suite in RDLKitTests RDLDesignerTests; do \
+	@for suite in RDLKitTests RDLDesignerTests RDLDesignerUITests; do \
 	  rm -rf $(RESULTS)/$$suite.xcresult; \
 	  $(XCODEBUILD) -scheme $$suite -destination 'platform=macOS' -resultBundlePath $(RESULTS)/$$suite.xcresult test || exit 1; \
 	done

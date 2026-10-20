@@ -335,6 +335,15 @@
 		2713FE38ECE6CBA48AE45F46 /* Sparkle.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8B86F16372CDA2866D3A432F /* Sparkle.xcframework */; };
 		B823283BCB218C08C73A6F07 /* Sparkle.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8B86F16372CDA2866D3A432F /* Sparkle.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		BB61EFC9CB230D2E3898D34B /* RDLUpdater.m in Sources */ = {isa = PBXBuildFile; fileRef = F2E3DC8C734C1DC8526327E0 /* RDLUpdater.m */; };
+		03F8A5BFF03C2AC7033FEC77 /* RDLUIDocumentTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D72D09320C40C21A94C918C2 /* RDLUIDocumentTests.m */; };
+		8A1137921D565BE5E1120D9D /* RDLUIDriver.m in Sources */ = {isa = PBXBuildFile; fileRef = 930174576B8BD0D4648C7641 /* RDLUIDriver.m */; };
+		80267349CFFE5D44F1FB0744 /* RDLUIHost.m in Sources */ = {isa = PBXBuildFile; fileRef = 7DF949EFC49EA1293E54B7E3 /* RDLUIHost.m */; };
+		83E98C203141AD0B3822CDC2 /* RDLUITestCase.m in Sources */ = {isa = PBXBuildFile; fileRef = AB5ACA6F202F68CE372D2989 /* RDLUITestCase.m */; };
+		0F626DBAC70A01710220ED43 /* RDLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; };
+		CD960704617B9BCB7906EC25 /* RDLUICanvasTests.m in Sources */ = {isa = PBXBuildFile; fileRef = B58D2BE688F8204338CBA11D /* RDLUICanvasTests.m */; };
+		D66EB600EFFB27475E2CE931 /* RDLUITablixTests.m in Sources */ = {isa = PBXBuildFile; fileRef = ECAD13801C52C948FCBFF714 /* RDLUITablixTests.m */; };
+		55FF09F86CEC45051556E5C3 /* RDLUIDataTests.m in Sources */ = {isa = PBXBuildFile; fileRef = C248192DCEF128E96787BC09 /* RDLUIDataTests.m */; };
+		54E13FF0812EF6D72D6098D8 /* RDLUIWindowTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 7A03F4BFEC08BC6590A5FA23 /* RDLUIWindowTests.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -365,6 +374,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = D125E61DED1C7934C31DB9B9;
 			remoteInfo = RDLGen;
+		};
+		29DAA90D1EB3C867B9A502BC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2FE3FBD7A51C361D063370C7;
+			remoteInfo = RDLDesigner;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -703,6 +719,17 @@
 		D813D55D2EB9F49A59A6B8A8 /* RDLUpdater-Apple.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpdater-Apple.m; sourceTree = "<group>"; };
 		F2E3DC8C734C1DC8526327E0 /* RDLUpdater.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUpdater.m; sourceTree = "<group>"; };
 		8B86F16372CDA2866D3A432F /* Sparkle.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Sparkle.xcframework; path = .deps/Sparkle.xcframework; sourceTree = SOURCE_ROOT; };
+		D72D09320C40C21A94C918C2 /* RDLUIDocumentTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUIDocumentTests.m; sourceTree = "<group>"; };
+		548DD377A32A794A8CB0D4C3 /* RDLUIDriver.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLUIDriver.h; sourceTree = "<group>"; };
+		930174576B8BD0D4648C7641 /* RDLUIDriver.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUIDriver.m; sourceTree = "<group>"; };
+		7DF949EFC49EA1293E54B7E3 /* RDLUIHost.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUIHost.m; sourceTree = "<group>"; };
+		BF19788A2B46A852C432490F /* RDLUITestCase.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLUITestCase.h; sourceTree = "<group>"; };
+		AB5ACA6F202F68CE372D2989 /* RDLUITestCase.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUITestCase.m; sourceTree = "<group>"; };
+		B5657A8507A3AC852FA79CDE /* RDLDesignerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RDLDesignerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B58D2BE688F8204338CBA11D /* RDLUICanvasTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUICanvasTests.m; sourceTree = "<group>"; };
+		ECAD13801C52C948FCBFF714 /* RDLUITablixTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUITablixTests.m; sourceTree = "<group>"; };
+		C248192DCEF128E96787BC09 /* RDLUIDataTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUIDataTests.m; sourceTree = "<group>"; };
+		7A03F4BFEC08BC6590A5FA23 /* RDLUIWindowTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLUIWindowTests.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -750,6 +777,14 @@
 			files = (
 				8D92EA1642AFC3256F660C88 /* AppKit.framework in Frameworks */,
 				0FEF055A10144BEB0846DD94 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		19E5E30571FCA6CA3BB57DD5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F626DBAC70A01710220ED43 /* RDLKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1065,6 +1100,7 @@
 				9FDB08F274A9264C500CEE4F /* rdlgen */,
 				3ACD4FCE2926083C83034463 /* RDLKitTests.xctest */,
 				6790076B2E553AE0FAFF4A94 /* RDLDesignerTests.xctest */,
+				B5657A8507A3AC852FA79CDE /* RDLDesignerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1109,6 +1145,7 @@
 				2E717BE81530C7484312DD81 /* RDLGen */,
 				E1F97BA8A1EBCC74BB0E0AFC /* RDLKitTests */,
 				9D4444B8635515926096826D /* RDLDesignerTests */,
+				4E06CF1EB7168622901D7CCD /* RDLDesignerUITests */,
 				5B525B480D23A981A0DB1611 /* README.md */,
 				79B75F223E5D7AEAEC1468B4 /* Frameworks */,
 				4FDE57E4B72FFCEE306CEB0F /* Products */,
@@ -1132,6 +1169,23 @@
 				8CBC030D3A8D2EF4DCBED36A /* README.md */,
 			);
 			path = RDLKitTests;
+			sourceTree = "<group>";
+		};
+		4E06CF1EB7168622901D7CCD /* RDLDesignerUITests */ = {
+			isa = PBXGroup;
+			children = (
+				D72D09320C40C21A94C918C2 /* RDLUIDocumentTests.m */,
+				548DD377A32A794A8CB0D4C3 /* RDLUIDriver.h */,
+				930174576B8BD0D4648C7641 /* RDLUIDriver.m */,
+				7DF949EFC49EA1293E54B7E3 /* RDLUIHost.m */,
+				BF19788A2B46A852C432490F /* RDLUITestCase.h */,
+				AB5ACA6F202F68CE372D2989 /* RDLUITestCase.m */,
+				B58D2BE688F8204338CBA11D /* RDLUICanvasTests.m */,
+				ECAD13801C52C948FCBFF714 /* RDLUITablixTests.m */,
+				C248192DCEF128E96787BC09 /* RDLUIDataTests.m */,
+				7A03F4BFEC08BC6590A5FA23 /* RDLUIWindowTests.m */,
+			);
+			path = RDLDesignerUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1266,6 +1320,23 @@
 			productReference = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		2C3AEFCA369A90A3492E75E3 /* RDLDesignerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C9CA9D39DCD11D0C796ACC70 /* Build configuration list for PBXNativeTarget "RDLDesignerUITests" */;
+			buildPhases = (
+				CF4048A249C714AA33CF3320 /* Sources */,
+				19E5E30571FCA6CA3BB57DD5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9788D58AA316C6D0D885E71F /* PBXTargetDependency */,
+			);
+			name = RDLDesignerUITests;
+			productName = RDLDesignerUITests;
+			productReference = B5657A8507A3AC852FA79CDE /* RDLDesignerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1303,6 +1374,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				2C3AEFCA369A90A3492E75E3 /* RDLDesignerUITests */,
 				DD1BD88978FB5AC6C4DA2266 /* RDLDesignerTests */,
 				F14379BD3391DC97D94E4AC2 /* RDLKit */,
 				2FE3FBD7A51C361D063370C7 /* RDLDesigner */,
@@ -1648,6 +1720,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CF4048A249C714AA33CF3320 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				03F8A5BFF03C2AC7033FEC77 /* RDLUIDocumentTests.m in Sources */,
+				8A1137921D565BE5E1120D9D /* RDLUIDriver.m in Sources */,
+				80267349CFFE5D44F1FB0744 /* RDLUIHost.m in Sources */,
+				83E98C203141AD0B3822CDC2 /* RDLUITestCase.m in Sources */,
+				CD960704617B9BCB7906EC25 /* RDLUICanvasTests.m in Sources */,
+				D66EB600EFFB27475E2CE931 /* RDLUITablixTests.m in Sources */,
+				55FF09F86CEC45051556E5C3 /* RDLUIDataTests.m in Sources */,
+				54E13FF0812EF6D72D6098D8 /* RDLUIWindowTests.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1670,6 +1757,11 @@
 			isa = PBXTargetDependency;
 			target = D125E61DED1C7934C31DB9B9 /* RDLGen */;
 			targetProxy = 15962C938BF66D308CBA29D9 /* PBXContainerItemProxy */;
+		};
+		9788D58AA316C6D0D885E71F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2FE3FBD7A51C361D063370C7 /* RDLDesigner */;
+			targetProxy = 29DAA90D1EB3C867B9A502BC /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2059,6 +2151,70 @@
 			};
 			name = Debug;
 		};
+		6A9F481C516B8C3FE1F348DE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0.0.0;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.0.0;
+				OTHER_CFLAGS = (
+					"-Werror=int-conversion",
+					"-Werror=incompatible-pointer-types",
+					"-Werror=enum-conversion",
+					"-Werror=logical-not-parentheses",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.designer.uitests;
+				PRODUCT_NAME = RDLDesignerUITests;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RDLDesigner.app/Contents/MacOS/RDLDesigner";
+				USER_HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/RDLKit",
+					"$(SRCROOT)/RDLKit/MiniVB",
+					"$(SRCROOT)/RDLDesigner",
+					"$(SRCROOT)/RDLDesigner/ThirdParty/DMTabBar",
+					"$(SRCROOT)/RDLDesignerUITests",
+				);
+			};
+			name = Debug;
+		};
+		297D4D28F9418D24FBC46356 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0.0.0;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.0.0;
+				OTHER_CFLAGS = (
+					"-Werror=int-conversion",
+					"-Werror=incompatible-pointer-types",
+					"-Werror=enum-conversion",
+					"-Werror=logical-not-parentheses",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.designer.uitests;
+				PRODUCT_NAME = RDLDesignerUITests;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RDLDesigner.app/Contents/MacOS/RDLDesigner";
+				USER_HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/RDLKit",
+					"$(SRCROOT)/RDLKit/MiniVB",
+					"$(SRCROOT)/RDLDesigner",
+					"$(SRCROOT)/RDLDesigner/ThirdParty/DMTabBar",
+					"$(SRCROOT)/RDLDesignerUITests",
+				);
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -2115,6 +2271,15 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+		C9CA9D39DCD11D0C796ACC70 /* Build configuration list for PBXNativeTarget "RDLDesignerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A9F481C516B8C3FE1F348DE /* Debug */,
+				297D4D28F9418D24FBC46356 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};

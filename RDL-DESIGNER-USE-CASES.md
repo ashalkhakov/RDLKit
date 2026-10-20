@@ -12,6 +12,14 @@ test pays best.
 Cases are numbered by area so they can be referred to in a bug report: `TBL-07`
 rather than "the group thing".
 
+Many are also driven end to end, in the running app, by `RDLDesignerUITests`
+-- clicks, drags, typing and menu commands, on macOS and on GNUstep -- and
+each of its tests says which cases it covers (GET-01/02/04/05/06/07/08,
+WIN-01/03/04/06, INS-01/04, CAN-01/02/03/05/07/09/10/11, INSP-02/05/06/10,
+TBL-01/02/03/04/05/07/13, DAT-01/02/03/06/07/08, EXP-01/02/04, SRC-01/03/04,
+PRE-01, SUB-03, UND-01 to UND-05; and the Generator). `make check` runs it on
+both platforms.
+
 ## How to use this
 
 1. Build and run: `xcodebuild -scheme RDLDesigner -destination 'platform=macOS' build`,
