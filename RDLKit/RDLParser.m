@@ -583,7 +583,8 @@ static void RDLChartKindToRDL(RDLChartType kind, RDLChartSubtype variant, NSStri
                  : RDLStringFromChartSubtype(variant);
 }
 
-// One ChartMember: the grouping and the label to write under it.
+// One ChartMember: the grouping, the order of its instances, and the label to
+// write under it.
 - (RDLChartMember *)parseChartMember:(NSXMLElement *)el {
   RDLChartMember *m = [[RDLChartMember alloc] init];
   NSXMLElement *group = RDLChild(el, @"Group");
@@ -593,6 +594,7 @@ static void RDLChartKindToRDL(RDLChartType kind, RDLChartSubtype variant, NSStri
       [m.groupExpressions addObject:[RDLValue valueWithSource:RDLText((NSXMLElement *)n)]
                                         ?: [RDLValue literal:@""]];
   }
+  [m.sortExpressions addObjectsFromArray:[self parseSorts:RDLChild(el, @"SortExpressions")]];
   m.label = RDLValueFromElement(RDLChild(el, @"Label"));
   [self parseChartMembers:el into:m.members];
   return m;
@@ -2427,9 +2429,11 @@ static NSXMLElement *RDLChartMembersElement(NSArray<RDLChartMember *> *members) 
       [group addChild:exprs];
       [member addChild:group];
     }
-    RDLAddValue(member, @"Label", m.label);
+    // In the schema's order: Group, SortExpressions, ChartMembers, Label.
+    RDLAddSorts(member, m.sortExpressions);
     if ([m.members count])
       [member addChild:RDLChartMembersElement(m.members)];
+    RDLAddValue(member, @"Label", m.label);
     [list addChild:member];
   }
   return list;

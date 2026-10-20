@@ -1090,6 +1090,8 @@ static void RDLCheckChartMembers(NSArray<RDLChartMember *> *members, NSString *w
   for (RDLChartMember *m in members) {
     for (RDLValue *g in m.groupExpressions)
       RDLCheckValue(g, RDLSubScope(scope, what, nil), run);
+    for (RDLSortExpression *s in m.sortExpressions)
+      RDLCheckValue(s.expression, RDLSubScope(scope, [what stringByAppendingString:@" sort"], nil), run);
     RDLCheckValue(m.label, RDLSubScope(scope, [what stringByAppendingString:@" label"], nil), run);
     RDLCheckChartMembers(m.members, what, scope, run);
   }

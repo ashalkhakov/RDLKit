@@ -5915,4 +5915,126 @@ static RDLChart *RDLSalesLineChart(RDLReport *r) {
     XCTFail(@"%@", @"a footer that is not on the page should not paint there");
 }
 
+// A 2010 chart over the Readings dataset: a category for each day, and one
+// series of each day's Consumption, of the given type. `member` goes inside the
+// category ChartMember after its Group: SortExpressions, as Report Builder
+// writes them there.
+static NSString *RDLReadingsChartRDL(NSString *type, NSString *member) {
+  return [NSString
+      stringWithFormat:
+          @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition\" "
+          @"xmlns:rd=\"http://schemas.microsoft.com/SQLServer/reporting/reportdesigner\">"
+          @"<DataSets><DataSet Name=\"Readings\"><Fields>"
+          @"<Field Name=\"When\"><DataField>When</DataField><rd:TypeName>System.String</rd:TypeName></Field>"
+          @"<Field Name=\"Consumption\"><DataField>Consumption</DataField>"
+          @"<rd:TypeName>System.Decimal</rd:TypeName></Field></Fields></DataSet></DataSets>"
+          @"<ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+          @"<Chart Name=\"C\"><Top>0in</Top><Left>0in</Left><Width>4in</Width><Height>3in</Height>"
+          @"<DataSetName>Readings</DataSetName>"
+          @"<ChartCategoryHierarchy><ChartMembers><ChartMember><Group Name=\"Days\"><GroupExpressions>"
+          @"<GroupExpression>=Fields!When.Value</GroupExpression></GroupExpressions></Group>%@"
+          @"<Label>=Fields!When.Value</Label></ChartMember></ChartMembers></ChartCategoryHierarchy>"
+          @"<ChartSeriesHierarchy><ChartMembers><ChartMember><Label>Consumption</Label></ChartMember>"
+          @"</ChartMembers></ChartSeriesHierarchy>"
+          @"<ChartData><ChartSeriesCollection><ChartSeries Name=\"S\"><ChartDataPoints><ChartDataPoint>"
+          @"<ChartDataPointValues><Y>=Sum(Fields!Consumption.Value)</Y></ChartDataPointValues>"
+          @"</ChartDataPoint></ChartDataPoints><Type>%@</Type></ChartSeries></ChartSeriesCollection></ChartData>"
+          @"<ChartAreas><ChartArea Name=\"Default\"><ChartCategoryAxes><ChartAxis Name=\"Primary\"/>"
+          @"</ChartCategoryAxes><ChartValueAxes><ChartAxis Name=\"Primary\"/></ChartValueAxes></ChartArea>"
+          @"</ChartAreas></Chart></ReportItems></Body><Width>6in</Width><Page/></ReportSection>"
+          @"</ReportSections></Report>",
+          member, type];
+}
+
+static RDLLaidOutChart *RDLFirstLaidOutChart(NSArray<RDLLaidOutPage *> *pages) {
+  for (RDLLaidOutPage *page in pages)
+    for (RDLLaidOutItem *item in page.items)
+      if ([item isKindOfClass:[RDLLaidOutChart class]])
+        return (RDLLaidOutChart *)item;
+  return nil;
+}
+
+// A series that is Nothing in its first category -- the first fill-up, which has
+// no consumption yet -- is an empty point there and plotted everywhere else, on
+// a value axis that reaches its values, as SSRS does: a line leaves a gap, a
+// column chart no bar. The whole series used to be lost and the axis left at 0..1.
+- (void)testAChartSeriesEmptyInItsFirstCategoryIsPlottedElsewhere {
+  // Rows alike but for the missing key -- the same class of dictionary, which
+  // is what let a field's first miss stand for every row after it.
+  NSArray *datas = @[
+    @"[{\"When\":\"2026-08-02\",\"Station\":\"Shell\",\"Cost\":70},"
+    @"{\"When\":\"2026-08-20\",\"Station\":\"Aral\",\"Consumption\":6.17},"
+    @"{\"When\":\"2026-09-09\",\"Station\":\"Shell\",\"Consumption\":6.28}]",
+    @"[{\"When\":\"2026-08-02\",\"Consumption\":null},{\"When\":\"2026-08-20\",\"Consumption\":6.17},"
+    @"{\"When\":\"2026-09-09\",\"Consumption\":6.28}]",
+  ];
+  for (NSString *type in @[ @"Line", @"Column" ])
+    for (NSString *json in datas) {
+      RDLReport *r = [RDLParser reportFromXMLString:RDLReadingsChartRDL(type, @"") error:NULL];
+      NSError *err = nil;
+      if (![RDLGenerator bindJSONString:json toDataSet:@"Readings" inReport:r error:&err]) {
+        XCTFail(@"%@", [NSString stringWithFormat:@"binding failed: %@", err.localizedDescription]);
+        return;
+      }
+      RDLLaidOutChart *laid = RDLFirstLaidOutChart([RDLGenerator pagesForReport:r parameters:@{}]);
+      RDLLaidOutChartSeries *series = [laid.chartSeries firstObject];
+      NSArray *values = series.values;
+      if ([laid.categories count] != 3 || [values count] != 3 || values[0] != [NSNull null] ||
+          ![values[1] isKindOfClass:[NSNumber class]] || fabs([values[1] doubleValue] - 6.17) > 1e-9 ||
+          ![values[2] isKindOfClass:[NSNumber class]] || fabs([values[2] doubleValue] - 6.28) > 1e-9) {
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ %@: an empty point, then 6.17 and 6.28: %@ %@", type, json,
+                                                  laid.categories, values]);
+        continue;
+      }
+      if (laid.axisMaximum < 6.28 || laid.axisMaximum > 10)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@: the value axis reaches the values: %g..%g", type,
+                                                  laid.axisMinimum, laid.axisMaximum]);
+      // Drawn: a line through the two points, or a column at each.
+      NSUInteger marks = 0;
+      for (RDLChartShape *shape in [RDLChartRenderer shapesForChart:laid inRect:NSMakeRect(0, 0, 320, 200)]) {
+        if (![shape.fill isEqualToString:series.color] && ![shape.stroke isEqualToString:series.color])
+          continue;
+        if ([type isEqualToString:@"Line"] && shape.kind == RDLChartShapePolyline)
+          marks += [shape.points count];
+        else if ([type isEqualToString:@"Column"] && shape.kind == RDLChartShapeRect && NSHeight(shape.rect) > 1)
+          marks++;
+      }
+      // A column chart's legend swatch is a rect in the series' colour too.
+      NSUInteger want = [type isEqualToString:@"Line"] ? 2 : 3;
+      if (marks != want)
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@ %@: %lu marks drawn, wanted %lu", type, json,
+                                                  (unsigned long)marks, (unsigned long)want]);
+    }
+}
+
+// A category ChartMember's SortExpressions put its categories in their order:
+// by the group's value either way, or by an aggregate over each category's rows.
+- (void)testAChartCategoryMembersSortExpressionsOrderItsCategories {
+  NSString *json = @"[{\"When\":\"b\",\"Consumption\":1},{\"When\":\"c\",\"Consumption\":5},"
+                   @"{\"When\":\"a\",\"Consumption\":2},{\"When\":\"b\",\"Consumption\":2}]";
+  NSArray *cases = @[
+    @[ @"", @[ @"b", @"c", @"a" ], @[ @3, @5, @2 ] ],
+    @[ @"<SortExpressions><SortExpression><Value>=Fields!When.Value</Value></SortExpression></SortExpressions>",
+       @[ @"a", @"b", @"c" ], @[ @2, @3, @5 ] ],
+    @[ @"<SortExpressions><SortExpression><Value>=Fields!When.Value</Value><Direction>Descending</Direction>"
+       @"</SortExpression></SortExpressions>",
+       @[ @"c", @"b", @"a" ], @[ @5, @3, @2 ] ],
+    @[ @"<SortExpressions><SortExpression><Value>=Sum(Fields!Consumption.Value)</Value>"
+       @"<Direction>Descending</Direction></SortExpression></SortExpressions>",
+       @[ @"c", @"b", @"a" ], @[ @5, @3, @2 ] ],
+    @[ @"<SortExpressions><SortExpression><Value>=Sum(Fields!Consumption.Value)</Value>"
+       @"</SortExpression></SortExpressions>",
+       @[ @"a", @"b", @"c" ], @[ @2, @3, @5 ] ],
+  ];
+  for (NSArray *c in cases) {
+    RDLReport *r = [RDLParser reportFromXMLString:RDLReadingsChartRDL(@"Column", c[0]) error:NULL];
+    [RDLGenerator bindJSONString:json toDataSet:@"Readings" inReport:r error:NULL];
+    RDLLaidOutChart *laid = RDLFirstLaidOutChart([RDLGenerator pagesForReport:r parameters:@{}]);
+    NSArray *values = [[laid.chartSeries firstObject] values];
+    if (![laid.categories isEqualToArray:c[1]] || ![values isEqualToArray:c[2]])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: categories %@ with %@, wanted %@ with %@", c[0], laid.categories,
+                                                values, c[1], c[2]]);
+  }
+}
+
 @end

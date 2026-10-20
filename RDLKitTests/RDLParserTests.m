@@ -2253,6 +2253,76 @@ static RDLChart *RDLFirstChart(RDLReport *r) {
 }
 
 
+// A ChartMember's SortExpressions, as Report Builder writes them between its
+// Group and its Label, are read, and written back in the schema's order:
+// Group, SortExpressions, ChartMembers, Label. They used to be dropped.
+- (void)testChartMemberSortExpressionsAreReadAndWritten {
+  NSString *categories =
+      @"<ChartMember><Group Name=\"Year\"><GroupExpressions><GroupExpression>=Fields!Year.Value"
+      @"</GroupExpression></GroupExpressions></Group><SortExpressions><SortExpression><Value>=Fields!Year.Value"
+      @"</Value><Direction>Descending</Direction></SortExpression><SortExpression><Value>=Sum(Fields!V.Value)"
+      @"</Value></SortExpression></SortExpressions><ChartMembers><ChartMember><Group Name=\"Quarter\">"
+      @"<GroupExpressions><GroupExpression>=Fields!Quarter.Value</GroupExpression></GroupExpressions></Group>"
+      @"<SortExpressions><SortExpression><Value>=Fields!Quarter.Value</Value></SortExpression></SortExpressions>"
+      @"<Label>=Fields!Quarter.Value</Label></ChartMember></ChartMembers><Label>=Fields!Year.Value</Label>"
+      @"</ChartMember>";
+  NSString *series = @"<ChartMember><Group Name=\"Kind\"><GroupExpressions><GroupExpression>=Fields!Kind.Value"
+                     @"</GroupExpression></GroupExpressions></Group><SortExpressions><SortExpression>"
+                     @"<Value>=Fields!Kind.Value</Value><Direction>Descending</Direction></SortExpression>"
+                     @"</SortExpressions><Label>=Fields!Kind.Value</Label></ChartMember>";
+  NSString *xml = [RDLChartDocument(@"2016", @"<Type>Column</Type>", @"", @"", @"")
+      stringByReplacingOccurrencesOfString:@"<ChartData>"
+                                withString:[NSString stringWithFormat:
+                                                         @"<ChartCategoryHierarchy><ChartMembers>%@</ChartMembers>"
+                                                         @"</ChartCategoryHierarchy><ChartSeriesHierarchy><ChartMembers>"
+                                                         @"%@</ChartMembers></ChartSeriesHierarchy><ChartData>",
+                                                         categories, series]];
+  for (NSUInteger pass = 0; pass < 2; pass++) {
+    NSString *when = pass == 0 ? @"read" : @"read back";
+    RDLReport *r = [RDLParser reportFromXMLString:xml error:NULL];
+    RDLChart *chart = RDLFirstChart(r);
+    RDLChartMember *year = [chart.categoryMembers firstObject];
+    RDLChartMember *quarter = [year.members firstObject];
+    RDLChartMember *kind = [chart.seriesMembers firstObject];
+    NSArray<RDLSortExpression *> *ys = year.sortExpressions;
+    if ([ys count] != 2 || ![[ys[0].expression source] isEqualToString:@"=Fields!Year.Value"] ||
+        ys[0].direction != RDLSortDirectionDescending ||
+        ![[ys[1].expression source] isEqualToString:@"=Sum(Fields!V.Value)"] ||
+        ys[1].direction == RDLSortDirectionDescending)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the year's sorts %@", when, ys]);
+    if ([quarter.sortExpressions count] != 1 ||
+        ![[[quarter.sortExpressions firstObject].expression source] isEqualToString:@"=Fields!Quarter.Value"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the quarter's sort %@", when, quarter.sortExpressions]);
+    if ([kind.sortExpressions count] != 1 ||
+        [kind.sortExpressions firstObject].direction != RDLSortDirectionDescending)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: the kind's sort %@", when, kind.sortExpressions]);
+    if ([chart.sortExpressions count] != 0)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: a member's sorts are not the chart's", when]);
+    for (NSString *w in r.warnings)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: %@", when, w]);
+    xml = [RDLWriter XMLStringFromReport:r];
+    // The schema's order within each member written.
+    NSXMLDocument *doc = [[NSXMLDocument alloc] initWithXMLString:xml options:0 error:NULL];
+    NSArray *members = [doc nodesForXPath:@"//*[local-name()='ChartMember']" error:NULL];
+    if ([members count] != 3)
+      XCTFail(@"%@", [NSString stringWithFormat:@"%@: three members written, not %lu", when,
+                                                (unsigned long)[members count]]);
+    NSArray *schema = @[ @"Group", @"SortExpressions", @"ChartMembers", @"Label" ];
+    for (NSXMLElement *m in members) {
+      NSMutableArray *names = [NSMutableArray array];
+      for (NSXMLNode *n in [m children])
+        if (n.kind == NSXMLElementKind)
+          [names addObject:[n localName]];
+      NSMutableArray *want = [NSMutableArray array];
+      for (NSString *name in schema)
+        if ([names containsObject:name])
+          [want addObject:name];
+      if (![names isEqualToArray:want] || ![names containsObject:@"SortExpressions"])
+        XCTFail(@"%@", [NSString stringWithFormat:@"%@: a member written as %@", when, names]);
+    }
+  }
+}
+
 // A range chart's High and Low, and a stock chart's and a candlestick's Start
 // and End, are read and written back, and a range, a range column or bar, a
 // stock chart and a candlestick are each read as such. None of those values was

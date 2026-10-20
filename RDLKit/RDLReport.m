@@ -1191,6 +1191,7 @@ static void RDLCollectNested(NSArray<RDLItem *> *items, NSMutableArray *into);
   self = [super init];
   if (self) {
     _groupExpressions = [NSMutableArray array];
+    _sortExpressions = [NSMutableArray array];
     _members = [NSMutableArray array];
   }
   return self;
