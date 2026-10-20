@@ -169,6 +169,9 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
     // Set before -window forces the nib in: -windowDidLoad hands the context
     // to the three custom views the XIB placed.
     _context = context;
+    // Placed by -stepClearOfOtherReports, not cascaded: Cocoa cascades after
+    // -windowDidLoad and would undo it.
+    [self setShouldCascadeWindows:NO];
     [self window];
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
     [nc addObserver:self
@@ -423,10 +426,12 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 }
 
 // GET-07: a second report's window does not land exactly on the first. The
-// window controller cascades new windows, but its cascade wraps back to the
-// top left of the screen once enough have opened, and there it can fall
+// window controller's cascade wraps back to the top left of the screen once
+// enough have opened (at once on a small screen), and there it can fall
 // squarely on a report that is still open -- every one of them then looks
-// like one window. Stepped down and across from any it would cover.
+// like one window. So each report window opens where the XIB puts it and is
+// stepped down and across from any it would cover: a cascade that never
+// wraps onto an open report.
 - (void)stepClearOfOtherReports {
   NSWindow *mine = [self window];
   // Fitted to the screen first, where the window server would put it on
