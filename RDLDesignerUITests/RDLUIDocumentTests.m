@@ -206,7 +206,8 @@
     return;
   NSWindow *a = [[self designerOf:docs[0]] window], *b = [[self designerOf:docs[1]] window];
   XCTAssertTrue([a isVisible] && [b isVisible]);
-  XCTAssertFalse(NSEqualPoints([a frame].origin, [b frame].origin), @"the second does not land exactly on the first: %@ and %@", NSStringFromRect([a frame]), NSStringFromRect([b frame]));
+  XCTAssertFalse(NSEqualPoints(NSMakePoint(NSMinX([a frame]), NSMaxY([a frame])), NSMakePoint(NSMinX([b frame]), NSMaxY([b frame]))),
+                 @"the second's title bar does not land exactly on the first's: %@ and %@", NSStringFromRect([a frame]), NSStringFromRect([b frame]));
   [b makeKeyAndOrderFront:nil];
   RDLDocument *front = [self designerOf:docs[1]] ? docs[1] : docs[0];
   [self rename:front to:@"Edited"];
