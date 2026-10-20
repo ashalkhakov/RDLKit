@@ -4,6 +4,8 @@
 // the formatting bar, and the editor -- including expressions, which are runs
 // of their own and read as pills.
 #import "RDLDesignerTestSupport.h"
+#import "RDLInspectorView.h"
+#import "RDLPlainTextEdit.h"
 
 // Finds a button by title anywhere under a view. Used instead of running a
 // modal session: what these panels owe us is that they are built and wired,
@@ -33,9 +35,151 @@ static NSMutableAttributedString *RDLSampleRichText(void) {
   return s;
 }
 
+
+static RDLTextRun *RDLRun(NSString *value, RDLStyle *style) {
+  RDLTextRun *run = [[RDLTextRun alloc] init];
+  run.value = value;
+  run.style = style;
+  return run;
+}
+
+static RDLParagraph *RDLParagraphOf(NSArray<RDLTextRun *> *runs) {
+  RDLParagraph *paragraph = [[RDLParagraph alloc] init];
+  paragraph.runs = [runs mutableCopy];
+  return paragraph;
+}
+
+// Each run's text, with a bar between runs and a slash between paragraphs.
+static NSString *RDLRunsOf(NSArray<RDLParagraph *> *paragraphs) {
+  NSMutableArray *out = [NSMutableArray array];
+  for (RDLParagraph *paragraph in paragraphs) {
+    NSMutableArray *runs = [NSMutableArray array];
+    for (RDLTextRun *run in paragraph.runs)
+      [runs addObject:run.value ?: @""];
+    [out addObject:[runs componentsJoinedByString:@"|"]];
+  }
+  return [out componentsJoinedByString:@"/"];
+}
+
 @interface RDLRichTextTests : RDLDesignerTestCase
 @end
 @implementation RDLRichTextTests
+
+// UND-05, reported as: rich text changed, nothing in undo. What the panel
+// does on OK, and what one undo does to it.
+- (void)testARichTextEditUndoesAsOneStep {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Undoing rich text"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Note";
+  box.value = @"Plain words";
+  box.width = 2.5;
+  box.height = 0.4;
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+
+  RDLRichTextEditor *editor = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  if (editor == nil) {
+    XCTFail(@"%@", @"the rich-text panel should build for a text box");
+    return;
+  }
+  // Bold the first word, the way the formatting bar does, then apply as OK
+  // does -- through the editor, which is what makes it one undoable step.
+  NSTextView *view = [editor valueForKey:@"textView"];
+  NSMutableAttributedString *storage = [view textStorage];
+  [RDLRichTextFormatter setTrait:RDLRichTextTraitBold
+                              on:YES
+                          inText:storage
+                           range:NSMakeRange(0, 5)
+                typingAttributes:nil];
+  [ctx.editor setAttributedString:storage ofItem:box];
+
+  if ([box.paragraphs count] == 0)
+    XCTFail(@"%@", @"the formatted text should have reached the box as runs");
+  if (![ctx.document.undoManager canUndo]) {
+    XCTFail(@"%@", @"a rich-text edit should be on the undo stack");
+    return;
+  }
+  NSString *wrote = [RDLEditor XMLStringForItem:box];
+
+  [ctx.document.undoManager undo];
+  if ([box.paragraphs count])
+    XCTFail(@"one undo should take the runs back off, %lu paragraphs remain",
+            (unsigned long)[box.paragraphs count]);
+  if (![[box.value description] isEqualToString:@"Plain words"])
+    XCTFail(@"and the words should be as they were, they read %@", box.value);
+
+  [ctx.document.undoManager redo];
+  if (![[RDLEditor XMLStringForItem:box] isEqualToString:wrote])
+    XCTFail(@"%@", @"redo should put the formatted text back exactly");
+}
+
+// The value row in the inspector: what the text box says, on one line, with
+// each expression tinted as the rich-text editor tints it -- and f(x) beside
+// it opening that editor. Typing into the field would have written the runs
+// away, and the expression editor alone could not describe text that carries
+// formatting and expressions at once.
+- (void)testTheValueRowShowsTheRunsAndOpensTheRichEditor {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rich"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Total";
+  box.value = @"Total: ";
+  box.width = 2;
+  box.height = 0.3;
+  RDLParagraph *paragraph = [[RDLParagraph alloc] init];
+  RDLTextRun *words = [[RDLTextRun alloc] init];
+  words.value = @"Total: ";
+  RDLTextRun *sum = [[RDLTextRun alloc] init];
+  sum.value = @"=Sum(Fields!Amount.Value)";
+  paragraph.runs = [@[ words, sum ] mutableCopy];
+  box.paragraphs = [@[ paragraph ] mutableCopy];
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  [ctx.selection selectItem:box inBandWithKey:@"body"];
+  RDLInspectorView *inspector = [[RDLInspectorView alloc] initWithFrame:NSMakeRect(0, 0, 263, 900)
+                                                                context:ctx];
+  [inspector reload];
+
+  NSTextField *value = [inspector valueForKey:@"valueField"];
+  NSAttributedString *shown = [value attributedStringValue];
+  if ([[shown string] rangeOfString:@"Total: "].location == NSNotFound ||
+      [[shown string] rangeOfString:@"=Sum(Fields!Amount.Value)"].location == NSNotFound)
+    XCTFail(@"the field should show what the box says, it shows %@", [shown string]);
+  if ([[shown string] rangeOfString:@"\n"].location != NSNotFound)
+    XCTFail(@"%@", @"and show it on one line");
+  // The expression is a pill there, as it is in the editor.
+  NSRange expression = [[shown string] rangeOfString:@"=Sum"];
+  id tint = [shown attribute:NSBackgroundColorAttributeName atIndex:expression.location
+              effectiveRange:NULL];
+  if (tint == nil)
+    XCTFail(@"%@", @"an expression should read as a pill in the field");
+  id wordsTint = [shown attribute:NSBackgroundColorAttributeName atIndex:0 effectiveRange:NULL];
+  if (wordsTint != nil)
+    XCTFail(@"%@", @"and the words around it should not");
+
+  // Nothing is typed there: the runs are edited in the editor f(x) opens.
+  if ([value isEditable])
+    XCTFail(@"%@", @"the value field is for reading, not for typing over the runs");
+  NSButton *fx = [inspector valueForKey:@"valueExprButton"];
+  if (![fx isEnabled])
+    XCTFail(@"%@", @"f(x) should be the way in, whatever the text holds");
+  if ([fx action] != @selector(editRichText:))
+    XCTFail(@"f(x) should open the rich-text editor, it sends %@",
+            NSStringFromSelector([fx action]));
+
+  // A plain box reads as plainly, and is edited the same way.
+  RDLTextbox *plain = [[RDLTextbox alloc] init];
+  plain.name = @"Plain";
+  plain.value = @"Just words";
+  plain.top = 1;
+  plain.width = 2;
+  plain.height = 0.3;
+  [report.body.items addObject:plain];
+  [ctx.selection selectItem:plain inBandWithKey:@"body"];
+  if (![[[value attributedStringValue] string] isEqualToString:@"Just words"])
+    XCTFail(@"a plain box should read as its words, it reads %@",
+            [[value attributedStringValue] string]);
+}
 
 - (void)testRichTextCodec {
 
@@ -162,6 +306,113 @@ static NSMutableAttributedString *RDLSampleRichText(void) {
     XCTFail(@"%@", @"attributedStringIsRich: should agree that styled text is rich");
   if ([RDLRichTextCodec attributedStringIsRich:multi forItem:item])
     XCTFail(@"%@", @"attributedStringIsRich: should call plain multi-line text plain");
+}
+
+// Typing over part of a rich text box, in the value field or on the canvas,
+// changes the runs the edit falls in and no others. It used to replace the
+// paragraphs with nothing, so correcting one word lost every run's styling.
+- (void)testAPlainEditChangesOnlyTheRunsItTouches {
+  RDLStyle *bold = [[RDLStyle alloc] init];
+  bold.fontWeight = RDLFontWeightBold;
+  RDLStyle *italic = [[RDLStyle alloc] init];
+  italic.fontStyle = RDLFontStyleItalic;
+  RDLTextRun *label = RDLRun(@"Total: ", bold);
+  label.toolTip = [RDLValue literal:@"what this is"];
+  NSArray *paragraphs = @[ RDLParagraphOf(@[ label, RDLRun(@"=Sum(Fields!A.Value)", nil), RDLRun(@" items", italic) ]) ];
+  NSString *text = @"Total: =Sum(Fields!A.Value) items";
+  if (![RDLTextOfParagraphs(paragraphs) isEqualToString:text])
+    XCTFail(@"the paragraphs read %@", RDLTextOfParagraphs(paragraphs));
+
+  NSArray<NSArray<NSString *> *> *cases = @[
+    // A word changed in one run: that run's text, and its style and tooltip kept.
+    @[ @"Sum: =Sum(Fields!A.Value) items", @"Sum: |=Sum(Fields!A.Value)| items" ],
+    // Typed at the end goes on the end of the last run.
+    @[ @"Total: =Sum(Fields!A.Value) items now", @"Total: |=Sum(Fields!A.Value)| items now" ],
+    // Typed right after an expression is not part of it: it goes into the
+    // literal run after.
+    @[ @"Total: =Sum(Fields!A.Value)! items", @"Total: |=Sum(Fields!A.Value)|! items" ],
+    // Typed right before an expression continues the text before it.
+    @[ @"Total: x=Sum(Fields!A.Value) items", @"Total: x|=Sum(Fields!A.Value)| items" ],
+    // Inside an expression, the expression is what is being edited.
+    @[ @"Total: =Sum(Fields!B.Value) items", @"Total: |=Sum(Fields!B.Value)| items" ],
+    // Across runs: the first keeps what came before, the last what came after,
+    // and the one between goes.
+    @[ @"Totems", @"Tot|ems" ],
+    // Everything replaced: one run, looking like the first.
+    @[ @"Hi", @"Hi" ],
+  ];
+  for (NSArray<NSString *> *c in cases) {
+    NSMutableArray<RDLParagraph *> *edited = RDLParagraphsEditedAsText(paragraphs, text, c[0]);
+    if (![RDLRunsOf(edited) isEqualToString:c[1]]) {
+      XCTFail(@"typing %@ gave runs %@, not %@", c[0], RDLRunsOf(edited), c[1]);
+      continue;
+    }
+    if (![RDLTextOfParagraphs(edited) isEqualToString:c[0]])
+      XCTFail(@"typing %@ gave the text %@", c[0], RDLTextOfParagraphs(edited));
+    // The first run is still the bold one with the tooltip, whatever its text.
+    RDLTextRun *first = edited[0].runs[0];
+    if (first.style != bold || ![[first.toolTip source] isEqualToString:@"what this is"])
+      XCTFail(@"typing %@ lost the first run's style or tooltip", c[0]);
+  }
+  // The paragraphs given are left as they were, for undo to put back.
+  if (![RDLTextOfParagraphs(paragraphs) isEqualToString:text] || ![label.value isEqualToString:@"Total: "])
+    XCTFail(@"%@", @"the edit should not change the paragraphs it was given");
+
+  // Between two expressions, typed text is a literal run of its own.
+  NSArray *pair = @[ RDLParagraphOf(@[ RDLRun(@"=Fields!A.Value", italic), RDLRun(@"=Fields!B.Value", nil) ]) ];
+  NSMutableArray *between = RDLParagraphsEditedAsText(pair, @"=Fields!A.Value=Fields!B.Value",
+                                                      @"=Fields!A.Value - =Fields!B.Value");
+  if (![RDLRunsOf(between) isEqualToString:@"=Fields!A.Value| - |=Fields!B.Value"])
+    XCTFail(@"between expressions the runs are %@", RDLRunsOf(between));
+  else if (((RDLParagraph *)between[0]).runs[1].style != italic)
+    XCTFail(@"%@", @"the new run should look like the text before it");
+
+  // Paragraphs: an edit in the second leaves the first alone and keeps the
+  // second's list style; deleting the line break joins them.
+  RDLParagraph *listed = RDLParagraphOf(@[ RDLRun(@"Body", italic) ]);
+  listed.listStyle = RDLListStyleBulleted;
+  listed.listLevel = 1;
+  NSArray *two = @[ RDLParagraphOf(@[ RDLRun(@"Head", bold) ]), listed ];
+  NSMutableArray<RDLParagraph *> *second = RDLParagraphsEditedAsText(two, @"Head\nBody", @"Head\nBody text");
+  if (![RDLRunsOf(second) isEqualToString:@"Head/Body text"] || second[1].listStyle != RDLListStyleBulleted)
+    XCTFail(@"editing the second paragraph gave %@", RDLRunsOf(second));
+  NSMutableArray<RDLParagraph *> *joined = RDLParagraphsEditedAsText(two, @"Head\nBody", @"HeadBody");
+  if (![RDLRunsOf(joined) isEqualToString:@"Head|Body"] || joined[0].listStyle != RDLListStyleUnspecified)
+    XCTFail(@"deleting the line break gave %@", RDLRunsOf(joined));
+
+  // What cannot be carried into the runs says so: a new line break, and text
+  // that is not what the paragraphs say.
+  if (RDLParagraphsEditedAsText(two, @"Head\nBody", @"Head\nBo\ndy") != nil)
+    XCTFail(@"%@", @"a new line break should not be carried into the runs");
+  if (RDLParagraphsEditedAsText(two, @"Something else", @"Head") != nil)
+    XCTFail(@"%@", @"an edit of other text should not be carried into these runs");
+}
+
+// The same through the editor, the way the value field and the canvas write:
+// one undoable step that keeps the runs, and undo puts the old ones back.
+- (void)testEditingARichTextBoxAsTextKeepsItRich {
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rich"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Rich";
+  RDLStyle *bold = [[RDLStyle alloc] init];
+  bold.fontWeight = RDLFontWeightBold;
+  NSArray *before = @[ RDLParagraphOf(@[ RDLRun(@"Dear ", nil), RDLRun(@"=Fields!Name.Value", bold) ]) ];
+  box.paragraphs = [before mutableCopy];
+  box.value = @"Dear =Fields!Name.Value";
+  [report.body.items addObject:box];
+  RDLDocument *doc = [[RDLDocument alloc] initWithReport:report];
+  RDLEditor *editor = [[RDLEditor alloc] initWithDocument:doc];
+
+  [editor setPlainValue:@"Hello =Fields!Name.Value" ofItem:box];
+  if (![box.value isEqualToString:@"Hello =Fields!Name.Value"])
+    XCTFail(@"the value reads %@", box.value);
+  if (![RDLRunsOf(box.paragraphs) isEqualToString:@"Hello |=Fields!Name.Value"] ||
+      box.paragraphs[0].runs[1].style != bold)
+    XCTFail(@"the runs are %@", RDLRunsOf(box.paragraphs));
+
+  [doc.undoManager undo];
+  if (![box.value isEqualToString:@"Dear =Fields!Name.Value"] || box.paragraphs[0] != before[0])
+    XCTFail(@"one undo should put the text and the very same runs back: %@", RDLRunsOf(box.paragraphs));
 }
 
 - (void)testRichTextFormatter {
@@ -338,12 +589,17 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
                                        range:NSMakeRange(0, [back length])
                             typingAttributes:@{}].bold != RDLTriStateOn)
         XCTFail(@"%@", @"bold should still be there after the field loses focus");
-      // Actually typing something else does replace the runs.
+      // Typing something else stores it, and the text stays bold: the edit
+      // goes into the run rather than replacing it.
       [editor setPlainValue:@"Hello there," ofItem:item];
-      if ([item.paragraphs count] != 0)
-        XCTFail(@"%@", @"typing a new value should replace the rich-text runs");
       if (![item.value isEqualToString:@"Hello there,"])
         XCTFail(@"%@", @"typing a new value should store it");
+      NSAttributedString *typed = [RDLRichTextCodec attributedStringForItem:item];
+      if (![[typed string] isEqualToString:@"Hello there,"] ||
+          [RDLRichTextFormatter stateOfText:typed
+                                      range:NSMakeRange(0, [typed length])
+                           typingAttributes:@{}].bold != RDLTriStateOn)
+        XCTFail(@"%@", @"typing a new value should keep the runs it was typed into");
     }
   }
 
@@ -476,7 +732,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // A pill is one thing: the caret does not rest inside it and a selection that
 // crosses an edge takes the whole of it.
 - (void)testRichTextPillsAreAtomic {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -523,7 +779,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 // The rich-text editor has its own way into the expression editor, because an
 // expression nests inside a run and the run is what is being edited.
 - (void)testRichTextEditorTakesExpressions {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -546,7 +802,7 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
 }
 
 - (void)testRichTextEditorPaper {
-  RDLReport *report = [RDLSamples blankLetter];
+  RDLReport *report = [RDLSamples reportWithId:@"letter"];
   RDLTextbox *box = nil;
   for (RDLItem *it in report.body.items)
     if ([it isKindOfClass:[RDLTextbox class]]) {
@@ -677,6 +933,200 @@ typingAttributes:@{NSFontAttributeName : [NSFont fontWithName:@"Helvetica" size:
   if (![[para.runs[0] value] isEqualToString:@"Due "] ||
       ![[para.runs[2] value] isEqualToString:@" today"])
     XCTFail(@"%@", @"the literals around it should come back unchanged");
+}
+
+
+// A list's markers are drawn in the editor but are not text anyone typed, so
+// they must not end up in the runs; and the indents, spacing and list style
+// of each paragraph must come back out of the editor, expressions included.
+- (void)testParagraphLayoutAndListsSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Steps";
+  NSMutableArray *paras = [NSMutableArray array];
+  for (NSString *value in @[ @"Mix", @"=Fields!Step.Value", @"Notes" ]) {
+    RDLParagraph *para = [[RDLParagraph alloc] init];
+    RDLTextRun *run = [[RDLTextRun alloc] init];
+    run.value = value;
+    [para.runs addObject:run];
+    [paras addObject:para];
+  }
+  ((RDLParagraph *)paras[0]).listStyle = RDLListStyleNumbered;
+  ((RDLParagraph *)paras[0]).listLevel = 1;
+  ((RDLParagraph *)paras[1]).listStyle = RDLListStyleNumbered;
+  ((RDLParagraph *)paras[1]).listLevel = 1;
+  ((RDLParagraph *)paras[2]).leftIndent = [RDLLength points:12];
+  ((RDLParagraph *)paras[2]).spaceAfter = [RDLLength points:4];
+  item.paragraphs = paras;
+
+  NSAttributedString *shown = [RDLRichTextCodec attributedStringForItem:item];
+  if (![[shown string] isEqualToString:@"1.\tMix\n2.\t=Fields!Step.Value\nNotes"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the editor should show the markers: %@", [shown string]]);
+  NSRange expr = [[shown string] rangeOfString:@"=Fields!Step.Value"];
+  if (![[shown attribute:RDLExpressionRunAttributeName atIndex:expr.location effectiveRange:NULL]
+          isEqualToString:@"=Fields!Step.Value"])
+    XCTFail(@"%@", @"the expression run after a marker should still be marked");
+
+  [RDLRichTextCodec applyAttributedString:shown toItem:item];
+  NSArray<RDLParagraph *> *back = item.paragraphs;
+  if ([back count] != 3) {
+    XCTFail(@"%@", [NSString stringWithFormat:@"three paragraphs should come back, not %lu",
+                                              (unsigned long)[back count]]);
+    return;
+  }
+  NSString *first = [back[0].runs.firstObject value], *second = [back[1].runs.firstObject value];
+  if (![first isEqualToString:@"Mix"] || ![second isEqualToString:@"=Fields!Step.Value"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the markers should stay out of the runs: %@, %@",
+                                              first, second]);
+  if (back[0].listStyle != RDLListStyleNumbered || back[1].listLevel != 1 ||
+      [back[2].leftIndent points] != 12 || [back[2].spaceAfter points] != 4)
+    XCTFail(@"%@", @"the paragraphs' layout should come back from the editor");
+}
+
+
+// The editor makes the selected paragraphs a list, moves them in and out, and
+// ends the list -- the markers shown again each time -- and a plain paragraph
+// moves in and out by a quarter inch. The panel does it through its controls.
+- (void)testParagraphsAreListedAndIndentedInTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Steps";
+  item.value = @"Mix\nFire\nGlaze";
+  NSAttributedString *text = [RDLRichTextCodec attributedStringForItem:item];
+  NSRange selection = NSMakeRange(5, 6);  // "ire\nGl": the second and third
+  NSAttributedString *listed = [RDLRichTextEditor text:text
+                                                forItem:item
+                              changingParagraphsInRange:selection
+                                                   with:^(RDLParagraph *layout) {
+                                                     layout.listStyle = RDLListStyleNumbered;
+                                                     layout.listLevel = 1;
+                                                   }
+                                              selection:&selection];
+  if (![[listed string] isEqualToString:@"Mix\n1.\tFire\n2.\tGlaze"])
+    XCTFail(@"the second and third should be numbered, read %@", [listed string]);
+  if (![[[listed string] substringWithRange:selection] isEqualToString:@"1.\tFire\n2.\tGlaze"])
+    XCTFail(@"the numbered paragraphs should stay selected, select %@", [[listed string] substringWithRange:selection]);
+  // In a level: the marker restarts under the level above.
+  NSAttributedString *nested = [RDLRichTextEditor text:listed
+                                                 forItem:item
+                               changingParagraphsInRange:NSMakeRange([[listed string] length] - 1, 0)
+                                                    with:^(RDLParagraph *layout) {
+                                                      layout.listLevel += 1;
+                                                    }
+                                               selection:NULL];
+  if (![[nested string] isEqualToString:@"Mix\n1.\tFire\n1.\tGlaze"])
+    XCTFail(@"the third should be numbered afresh a level in, reads %@", [nested string]);
+  // Ended, and the first moved in: plain text again, with an indent.
+  NSAttributedString *ended = [RDLRichTextEditor text:nested
+                                                forItem:item
+                              changingParagraphsInRange:NSMakeRange(0, [[nested string] length])
+                                                   with:^(RDLParagraph *layout) {
+                                                     layout.listStyle = RDLListStyleUnspecified;
+                                                     layout.listLevel = 0;
+                                                   }
+                                              selection:NULL];
+  if (![[ended string] isEqualToString:@"Mix\nFire\nGlaze"])
+    XCTFail(@"ending the list should take the markers away, reads %@", [ended string]);
+  [RDLRichTextCodec applyAttributedString:ended toItem:item];
+  if (item.paragraphs != nil && [item.paragraphs[1] listStyle] != RDLListStyleUnspecified)
+    XCTFail(@"%@", @"the paragraphs should not be a list any more");
+
+  // Through the panel's controls.
+  RDLReport *report = [RDLReport emptyReportNamed:@"Rich"];
+  RDLTextbox *box = [[RDLTextbox alloc] init];
+  box.name = @"Box";
+  box.value = @"One\nTwo";
+  [report.body.items addObject:box];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLRichTextEditor *ed = [RDLRichTextEditor editorForTextbox:box context:ctx];
+  NSTextView *view = [ed valueForKey:@"textView"];
+  [view setSelectedRange:NSMakeRange(0, [[view string] length])];
+  NSPopUpButton *lists = [ed valueForKey:@"listPop"];
+  [lists selectItemWithTitle:@"Bulleted list"];
+  [ed listStyleChanged:lists];
+  [ed indent:nil];
+  if (![[view string] isEqualToString:@"\u25E6\tOne\n\u25E6\tTwo"])
+    XCTFail(@"the panel should bullet both a level in, reads %@", [view string]);
+  [view setSelectedRange:NSMakeRange(1, 0)];
+  if (![[lists titleOfSelectedItem] isEqualToString:@"Bulleted list"])
+    XCTFail(@"the popup should say the caret is in a bulleted list, says %@", [lists titleOfSelectedItem]);
+  // Chosen with the paragraphs selected, as it is used: a change of selection
+  // shows the list the caret is in.
+  [view setSelectedRange:NSMakeRange(0, [[view string] length])];
+  [lists selectItemWithTitle:@"Not a list"];
+  [ed listStyleChanged:lists];
+  [ed indent:nil];
+  [ed indent:nil];
+  [ed outdent:nil];
+  [RDLRichTextCodec applyAttributedString:[view textStorage] toItem:box];
+  if (![[box.paragraphs[0] leftIndent] isKindOfClass:[RDLLength class]] ||
+      fabs([box.paragraphs[0].leftIndent inches] - 0.25) > 0.001 || box.paragraphs[1].listStyle != RDLListStyleUnspecified)
+    XCTFail(@"%@", @"two steps in and one out should leave a quarter inch, and no list");
+  [[ed valueForKey:@"window"] close];
+}
+
+// Expressions in a run's style and a paragraph's cannot be shown as what they
+// evaluate to, so the editor shows the textbox's style -- and must still hand
+// them back rather than reading the style off what it showed.
+- (void)testStyleExpressionsSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Signed";
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  para.style = [[RDLStyle alloc] init];
+  para.style.expressions.textAlign = [RDLExpr expressionWithSource:@"=\"Center\""];
+  RDLTextRun *label = [[RDLTextRun alloc] init];
+  label.value = @"Net ";
+  RDLTextRun *amount = [[RDLTextRun alloc] init];
+  amount.value = @"=Fields!Net.Value";
+  amount.style = [[RDLStyle alloc] init];
+  amount.style.expressions.color =
+      [RDLExpr expressionWithSource:@"=IIf(Fields!Net.Value < 0, \"Red\", \"Black\")"];
+  [para.runs addObjectsFromArray:@[ label, amount ]];
+  item.paragraphs = [NSMutableArray arrayWithObject:para];
+
+  [RDLRichTextCodec applyAttributedString:[RDLRichTextCodec attributedStringForItem:item]
+                                   toItem:item];
+  RDLParagraph *back = [item.paragraphs firstObject];
+  RDLTextRun *net = [back.runs lastObject];
+  if (![[net.style.expressions.color source] hasPrefix:@"=IIf(Fields!Net.Value < 0"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the run's Color expression should come back: %@",
+                                              [net.style.expressions.color source]]);
+  if ([[back.runs firstObject] style] != nil && ![[[back.runs firstObject] style].expressions isEmpty])
+    XCTFail(@"%@", @"the label next to it should not take its expression");
+  if (![[back.style.expressions.textAlign source] isEqualToString:@"=\"Center\""])
+    XCTFail(@"%@", @"the paragraph's TextAlign expression should come back");
+}
+
+
+// A run's Label, ToolTip and link are not visible in the editor, and must come
+// back out of it on the run they belong to.
+- (void)testRunLabelsToolTipsLinksAndMarkupSurviveTheEditor {
+  RDLTextbox *item = [[RDLTextbox alloc] init];
+  item.name = @"Docs";
+  RDLParagraph *para = [[RDLParagraph alloc] init];
+  RDLTextRun *plain = [[RDLTextRun alloc] init];
+  plain.value = @"See ";
+  RDLTextRun *linked = [[RDLTextRun alloc] init];
+  linked.value = @"the guide";
+  linked.label = [RDLValue valueWithSource:@"Guide"];
+  linked.toolTip = [RDLValue valueWithSource:@"=\"Opens the guide\""];
+  linked.hyperlink = [RDLValue valueWithSource:@"https://example.com/docs"];
+  linked.markupType = RDLMarkupTypeHTML;
+  [para.runs addObjectsFromArray:@[ plain, linked ]];
+  item.paragraphs = [NSMutableArray arrayWithObject:para];
+
+  [RDLRichTextCodec applyAttributedString:[RDLRichTextCodec attributedStringForItem:item]
+                                   toItem:item];
+  NSArray<RDLTextRun *> *runs = [item.paragraphs.firstObject runs];
+  RDLTextRun *back = [runs lastObject];
+  if ([runs count] != 2 || ![back.value isEqualToString:@"the guide"] ||
+      ![back.hyperlink.source isEqualToString:@"https://example.com/docs"] ||
+      ![back.toolTip.source isEqualToString:@"=\"Opens the guide\""] ||
+      ![back.label.source isEqualToString:@"Guide"] || back.markupType != RDLMarkupTypeHTML)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the run should keep its link, tooltip and label: "
+                                              @"%lu runs, %@ %@ %@",
+                                              (unsigned long)[runs count], back.hyperlink.source,
+                                              back.toolTip.source, back.label.source]);
+  if ([[runs firstObject] hasOwnProperties])
+    XCTFail(@"%@", @"the plain run beside it should not take them");
 }
 
 @end

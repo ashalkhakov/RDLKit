@@ -1,0 +1,64 @@
+# RDLKit on macOS, the familiar way (gnustep-release-actions' macos.yml runs
+# the same):
+#
+#   make -f Makefile.apple            RDLKit.framework, rdlgen and RDLDesigner.app,
+#                                     universal (Release)
+#   make -f Makefile.apple check      no macOS-only imports; the Debug builds;
+#                                     the two suites and the designer's UI
+#                                     tests (hosted in RDLDesigner.app, so a
+#                                     session that can show windows); the parser over the
+#                                     Majorsilence corpus (at least 79 of its 86
+#                                     reports, and none silently empty); rdlgen
+#                                     on a sample report
+#   make -f Makefile.apple install DESTDIR=<dir>       RDLDesigner.app
+#   make -f Makefile.apple installcheck DESTDIR=<dir>  its signature holds
+#
+# Sparkle's XCFramework is in .deps/, by the version .github/pins.env names
+# (gnustep-release-actions' scripts/deps.sh apple). GNUstep: GNUmakefile.
+
+BUILD = build
+DERIVED = $(BUILD)/DerivedData
+RELEASE = $(DERIVED)/Build/Products/Release
+DEBUG = $(DERIVED)/Build/Products/Debug
+# Where a failed test's result bundle is kept (CI uploads it from there).
+RESULTS ?= $(or $(RUNNER_TEMP),$(BUILD))
+XCODEBUILD = xcodebuild -project RDLKit.xcodeproj -derivedDataPath $(DERIVED)
+# The corpus: how many of its 86 reports parse (it was 79).
+CORPUS_OK = 79
+
+all:
+	@test -d .deps/Sparkle.xcframework \
+	  || { echo "no Sparkle in .deps: gnustep-release-actions' scripts/deps.sh apple fetches what .github/pins.env names"; exit 1; }
+	@for scheme in RDLKit RDLGen RDLDesigner; do \
+	  $(XCODEBUILD) -scheme $$scheme -configuration Release -destination 'generic/platform=macOS' build || exit 1; \
+	done
+
+check:
+	Scripts/check-imports.sh
+	@for scheme in RDLKit RDLDesigner RDLGen; do \
+	  $(XCODEBUILD) -scheme $$scheme -configuration Debug -destination 'platform=macOS' build || exit 1; \
+	done
+	@for suite in RDLKitTests RDLDesignerTests RDLDesignerUITests; do \
+	  rm -rf $(RESULTS)/$$suite.xcresult; \
+	  $(XCODEBUILD) -scheme $$suite -destination 'platform=macOS' -resultBundlePath $(RESULTS)/$$suite.xcresult test || exit 1; \
+	done
+	@RDL_BUILT=$(abspath $(DEBUG)) .tools/rdl-coverage.sh > $(BUILD)/coverage.txt 2> $(BUILD)/coverage-tally.txt || true; \
+	  cat $(BUILD)/coverage-tally.txt; \
+	  grep -q "0 silently empty" $(BUILD)/coverage-tally.txt || { echo "check: a report parsed to nothing without complaining"; exit 1; }; \
+	  ok=$$(sed -n 's/.*: \([0-9]*\) ok.*/\1/p' $(BUILD)/coverage-tally.txt); \
+	  [ "$${ok:-0}" -ge $(CORPUS_OK) ] || { echo "check: corpus coverage fell to $$ok of 86 (was $(CORPUS_OK))"; exit 1; }
+	DYLD_FRAMEWORK_PATH=$(abspath $(DEBUG)) Scripts/rdlgen-smoke.sh $(DEBUG)/rdlgen
+
+install: all
+	@test -n "$(DESTDIR)" || { echo "install: give DESTDIR"; exit 1; }
+	mkdir -p $(DESTDIR)
+	rm -rf $(DESTDIR)/RDLDesigner.app
+	ditto $(RELEASE)/RDLDesigner.app $(DESTDIR)/RDLDesigner.app
+
+installcheck:
+	codesign --verify --deep --strict $(DESTDIR)/RDLDesigner.app
+
+clean:
+	rm -rf $(BUILD)
+
+.PHONY: all check install installcheck clean

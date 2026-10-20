@@ -1,7 +1,7 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <AppKit/AppKit.h>
 
-@class RDLEditingContext, RDLParameter;
+@class RDLEditingContext, RDLParameter, RDLValue;
 
 // One report parameter's settings, in the inspector -- the same place an
 // element's settings and a dataset field's appear, because it is the same
@@ -15,4 +15,9 @@
 // they can be driven without a click.
 - (void)changed:(id)sender;
 - (void)rename:(id)sender;
+- (void)editDefaultValues:(id)sender;
+- (void)editValidValues:(id)sender;
+// What the available values panel hands back: values, and labels in step with
+// them (NSNull for none), set as one step.
+- (void)setValidValues:(NSArray<RDLValue *> *)values labels:(NSArray *)labels;
 @end

@@ -15,6 +15,10 @@
 // it called for. Declared because it is what the pane does, and so that it can
 // be driven without a click.
 - (void)paramChanged:(NSControl *)sender;
+// The values of a parameter of several values, from its checkboxes -- one for
+// each value it accepts -- or its list, one value a line: the sender is a
+// checkbox or the list's text view.
+- (void)severalValuesChanged:(id)sender;
 // Typing applies as it goes; declared so a check can type without a keyboard.
 - (void)controlTextDidChange:(NSNotification *)note;
 - (void)reload;

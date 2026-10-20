@@ -16,6 +16,14 @@
 @class RDLStyle;
 @class RDLParagraph;
 
+// On the text of attributedStringForParagraphs: a list item's marker and the
+// tab after it carry RDLListMarkerAttributeName, whose value is that text, so
+// an editor can tell the marker from what was typed. Every character of a
+// paragraph with its own layout, the newline ending it included, carries
+// RDLParagraphLayoutAttributeName: an RDLParagraph holding just that layout.
+FOUNDATION_EXPORT NSString *const RDLListMarkerAttributeName;
+FOUNDATION_EXPORT NSString *const RDLParagraphLayoutAttributeName;
+
 @interface RDLTextAttributes : NSObject
 
 // `scale` multiplies the point size — the canvas passes its zoom, everything
@@ -40,10 +48,36 @@
                                           style:(RDLStyle *)style
                                           scale:(CGFloat)scale;
 
+// A list item's marker for each paragraph -- "1.", "2.", "•" -- or @"" for one
+// that is not a list item. Numbering counts per level and starts again after
+// a paragraph that is not in the list.
++ (NSArray<NSString *> *)listMarkersForParagraphs:(NSArray<RDLParagraph *> *)paragraphs;
+
+// Where a paragraph's first line and its other lines start, in points from the
+// left of the text: its LeftIndent, moved by HangingIndent, and for a list item
+// its level's indent with room for the marker before the first line's text.
++ (void)indentsForParagraph:(RDLParagraph *)paragraph
+                  firstLine:(CGFloat *)firstLine
+                  otherLines:(CGFloat *)otherLines;
+
 // Paragraphs of styled runs, each run's sparse style merged over `baseStyle`
 // and paragraphs joined by a newline that carries the preceding paragraph's
 // alignment (so the break itself does not re-align the line above it).
 + (NSAttributedString *)attributedStringForParagraphs:(NSArray<RDLParagraph *> *)paragraphs
                                             baseStyle:(RDLStyle *)baseStyle
                                                 scale:(CGFloat)scale;
+
+// A text box's text, drawn as SSRS draws it: the first line's top at the top
+// of `textRect` (the box inside its padding) and its baseline the font's
+// ascent below that, the lines going on down from there, and anything that
+// does not fit cut at the edge of `box` -- the box itself, padding included,
+// not the padding's edge. -drawInRect: decides both differently on each
+// platform when the text is taller than the rect, so the rect it is handed is
+// always tall enough for the text: Cocoa clipped to it, cutting the
+// descenders off a line in a box as short as its text ("Exnression"), and
+// GNUstep lifted the line to fit it. Lines wholly outside `box` are not drawn
+// at all: drawn and clipped away they were still in a PDF's text, found by a
+// search and copied with the rest, on a page that does not show them -- and
+// only on the Mac, since cairo leaves out what it clips. The view is flipped.
++ (void)drawText:(NSAttributedString *)text inTextRect:(NSRect)textRect clippedTo:(NSRect)box;
 @end

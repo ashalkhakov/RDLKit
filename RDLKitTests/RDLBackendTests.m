@@ -1,5 +1,6 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import "RDLTestSupport.h"
+#include <zlib.h>
 
 static NSString *RDLEnt(NSString *name) {
   return [@"&" stringByAppendingString:[name stringByAppendingString:@";"]];
@@ -98,6 +99,86 @@ static NSString *RDLEnt(NSString *name) {
   NSString *head = [[NSString alloc] initWithBytes:data.bytes length:n encoding:NSASCIIStringEncoding];
   if (![head hasPrefix:@"%PDF"])
     XCTFail(@"%@", [NSString stringWithFormat:@"PDF magic %@", head]);
+}
+
+// The PDF backend renders through AppKit's printing machinery -- it lays the
+// pages into an RDLView and asks the view for its PDF -- which is the one
+// thing in this kit that behaves differently on the two platforms. It was
+// skipped in the GNUstep CI job for a year because that path was reported to
+// hang headless; it does not, and this is what says so on every run.
+- (void)testPDFBackendPaginatesOnBothPlatforms {
+  // A report of one page, and the same report with three pages' worth of body
+  // on the same paper.
+  RDLReport * (^invoice)(NSUInteger) = ^RDLReport *(NSUInteger pages) {
+    // Built here rather than from the shared fixture: what this is about is
+    // how many pages come out, so the report has nothing on it but the marks
+    // that make the pages.
+    RDLReport *r = [RDLReport emptyReportNamed:@"Paged"];
+    r.page.pageWidth = 8.5;
+    r.page.pageHeight = 4;
+    r.page.topMargin = 0.25;
+    r.page.bottomMargin = 0.25;
+    r.body.height = 3.4 * (CGFloat)pages;
+    for (NSUInteger i = 0; i < pages; i++) {
+      RDLTextbox *line = [[RDLTextbox alloc] init];
+      line.name = [NSString stringWithFormat:@"Mark%lu", (unsigned long)i + 1];
+      line.value = [NSString stringWithFormat:@"Page %lu", (unsigned long)i + 1];
+      line.left = 0.5;
+      line.top = 3.4 * (CGFloat)i + 0.2;
+      line.width = 3;
+      line.height = 0.3;
+      [r.body.items addObject:line];
+    }
+    return r;
+  };
+  NSUInteger (^pageObjectsIn)(NSData *) = ^NSUInteger(NSData *pdf) {
+    // Only the ones the writer left in plain sight: a backend that puts its
+    // page objects in compressed object streams -- cairo's does -- shows none
+    // here, and the caller treats that as "cannot tell" rather than as zero.
+    NSString *text = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    NSUInteger found = 0, at = 0;
+    while (at < [text length]) {
+      NSRange hit = [text rangeOfString:@"/Type /Page"
+                                options:0
+                                  range:NSMakeRange(at, [text length] - at)];
+      if (hit.location == NSNotFound)
+        break;
+      at = NSMaxRange(hit);
+      // "/Type /Pages" is the tree node, not a page.
+      if (at >= [text length] || [text characterAtIndex:at] != 's')
+        found++;
+    }
+    return found;
+  };
+
+  for (NSUInteger pages = 1; pages <= 3; pages += 2) {
+    RDLReport *r = invoice(pages);
+    NSArray *laidOut = [RDLGenerator pagesForReport:r parameters:@{}];
+    if ([laidOut count] != pages) {
+      XCTFail(@"the report should lay out as %lu pages, it is %lu",
+              (unsigned long)pages, (unsigned long)[laidOut count]);
+      continue;
+    }
+    NSData *pdf = [RDLGenerator PDFForReport:r parameters:@{}];
+    if ([pdf length] < 400) {
+      XCTFail(@"%lu pages came out as %lu bytes", (unsigned long)pages,
+              (unsigned long)[pdf length]);
+      continue;
+    }
+    NSString *head = [[NSString alloc] initWithBytes:[pdf bytes]
+                                              length:MIN((NSUInteger)5, [pdf length])
+                                            encoding:NSASCIIStringEncoding];
+    if (![head hasPrefix:@"%PDF"])
+      XCTFail(@"not a PDF: %@", head);
+    NSString *whole = [[NSString alloc] initWithData:pdf encoding:NSISOLatin1StringEncoding];
+    if ([whole rangeOfString:@"%%EOF"].location == NSNotFound)
+      XCTFail(@"%@", @"the PDF should be finished off");
+    // One page object per page of the report, where they can be counted.
+    NSUInteger objects = pageObjectsIn(pdf);
+    if (objects != 0 && objects != pages)
+      XCTFail(@"%lu pages should make %lu page objects, made %lu", (unsigned long)pages,
+              (unsigned long)pages, (unsigned long)objects);
+  }
 }
 
 - (void)testRDLSubset {
@@ -460,22 +541,23 @@ static NSString *RDLEnt(NSString *name) {
   if (!note.nullable)
     XCTFail(@"%@", @"Nullable not parsed");
   // An element this kit does not model fails the parse rather than being
-  // skipped, so the report that comes back is always the report on disk.
-  // CustomReportItem is the example because it is real MS-RDL and genuinely
-  // not implemented -- Subreport used to stand here, and now renders.
-  NSString *withCRI = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
-                                                     withString:
-      @"<CustomReportItem Name=\"Cri1\"><Type>Barcode</Type><Top>1in</Top><Left>0in</Left>"
-      @"<Width>2in</Width><Height>1in</Height></CustomReportItem>"
+  // skipped, so the report that comes back is always the report on disk. The
+  // element is invented on purpose: Subreport stood here until it rendered,
+  // and CustomReportItem until it became a placeholder. A name from outside
+  // the schema keeps this about the rule rather than about a feature list.
+  NSString *withUnknown = [xml stringByReplacingOccurrencesOfString:@"</ReportItems></Body>"
+                                                         withString:
+      @"<NotAReportItem Name=\"Odd1\"><Top>1in</Top><Left>0in</Left>"
+      @"<Width>2in</Width><Height>1in</Height></NotAReportItem>"
       @"</ReportItems></Body>"];
   NSError *subErr = nil;
-  RDLReport *rejected = [RDLParser reportFromXMLString:withCRI error:&subErr];
+  RDLReport *rejected = [RDLParser reportFromXMLString:withUnknown error:&subErr];
   if (rejected != nil)
-    XCTFail(@"%@", @"a CustomReportItem should be rejected, not skipped");
-  else if ([subErr.localizedDescription rangeOfString:@"CustomReportItem"].location == NSNotFound ||
-           [subErr.localizedDescription rangeOfString:@"Cri1"].location == NSNotFound ||
+    XCTFail(@"%@", @"an element outside the schema should be rejected, not skipped");
+  else if ([subErr.localizedDescription rangeOfString:@"NotAReportItem"].location == NSNotFound ||
+           [subErr.localizedDescription rangeOfString:@"Odd1"].location == NSNotFound ||
            [subErr.localizedDescription rangeOfString:@"/Report"].location == NSNotFound)
-    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for CustomReportItem: %@",
+    XCTFail(@"%@", [NSString stringWithFormat:@"unhelpful error for an unknown element: %@",
                                                subErr.localizedDescription]);
   if (![r.body.style.backgroundColor isEqualToString:@"#eeeeff"])
     XCTFail(@"%@", @"Body Style not parsed");
@@ -659,7 +741,11 @@ static NSString *RDLEnt(NSString *name) {
   kt.page.pageWidth = 8.5;
   kt.page.topMargin = 0.5;
   kt.page.bottomMargin = 0.5;
-  // bodyTop = 0.5 + default header 0.55; bodyBottom = 5 - 0.5 - default footer 0.4; avail ≈ 3.05
+  // A head and a foot of its own: a new report has neither, and what this is
+  // about is the room they leave. bodyTop = 0.5 + 0.55; bodyBottom = 5 - 0.5 -
+  // 0.4; avail ≈ 3.05.
+  kt.pageHeader.height = 0.55;
+  kt.pageFooter.height = 0.4;
   RDLTextbox *keep = [[RDLTextbox alloc] init];
   keep.name = @"KeepMe";
   keep.value = @"kept";
@@ -683,6 +769,394 @@ static NSString *RDLEnt(NSString *name) {
     if (onP1 || !onP2)
       XCTFail(@"%@", @"KeepTogether item should render only on page 2");
   }
+}
+
+
+#pragma mark - Colours and border styles
+
+// RDL writes a colour as a name, #rrggbb, #rgb or #aarrggbb -- alpha first.
+// Only #rrggbb used to be read: #80ff0000 came out green, #f80 as the default
+// ink.
+- (void)testEveryColourFormIsRead {
+  CGFloat r = -1, g = -1, b = -1, a = -1;
+  if (!RDLColorComponents(@"#80ff0000", &r, &g, &b, &a) || fabs(r - 1) > 0.001 || g > 0.001 ||
+      b > 0.001 || fabs(a - 128.0 / 255.0) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#80ff0000 is half-transparent red: %g %g %g %g", r, g,
+                                              b, a]);
+  if (!RDLColorComponents(@"#f80", &r, &g, &b, &a) || fabs(r - 1) > 0.001 ||
+      fabs(g - 136.0 / 255.0) > 0.001 || b > 0.001 || fabs(a - 1) > 0.001)
+    XCTFail(@"%@", [NSString stringWithFormat:@"#f80 is #ff8800: %g %g %g %g", r, g, b, a]);
+  if (!RDLColorComponents(@"LightGrey", &r, &g, &b, &a) || fabs(r - 211.0 / 255.0) > 0.001)
+    XCTFail(@"%@", @"a colour name is its value");
+  if (RDLColorComponents(@"Transparent", &r, &g, &b, &a) || RDLColorComponents(@"#12345", &r, &g, &b, &a))
+    XCTFail(@"%@", @"Transparent and malformed text are not colours");
+  if (![RDLHexFromColor(RDLColorFromHex(@"#80ff0000")) isEqualToString:@"#80ff0000"])
+    XCTFail(@"%@", [NSString stringWithFormat:@"a translucent colour keeps its alpha when written: %@",
+                                              RDLHexFromColor(RDLColorFromHex(@"#80ff0000"))]);
+}
+
+// The HTML page gets colours CSS reads the same way -- rgba() for alpha, since
+// CSS would take #aarrggbb's alpha from the wrong end -- and every border
+// style, not just solid, dashed, dotted and double.
+- (void)testHTMLWritesColoursAndBorderStylesCSSCanRead {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Swatches"];
+  RDLTextbox *tb = [[RDLTextbox alloc] init];
+  tb.name = @"Swatch";
+  tb.value = @"Swatch";
+  tb.width = 2;
+  tb.height = 0.5;
+  RDLStyle *st = [[RDLStyle alloc] init];
+  st.color = @"#80ff0000";
+  st.backgroundColor = @"#0f0";
+  st.borderTop = [RDLBorder solidColor:@"#336699"];
+  st.borderTop.style = RDLBorderStyleGroove;
+  st.borderBottom = [RDLBorder solidColor:@"#336699"];
+  st.borderBottom.style = RDLBorderStyleInset;
+  tb.style = st;
+  [r.body.items addObject:tb];
+  NSArray *pages = [RDLGenerator pagesForReport:r parameters:@{}];
+  id<RDLBackend> html = [RDLGenerator backendNamed:@"HTML"];
+  NSString *out = [[NSString alloc] initWithData:[html renderPages:pages title:r.name]
+                                        encoding:NSUTF8StringEncoding];
+  for (NSString *needle in @[ @"color:rgba(255,0,0,0.502)", @"background:#00ff00",
+                              @"border-top:1pt groove #336699", @"border-bottom:1pt inset #336699" ])
+    if ([out rangeOfString:needle].location == NSNotFound)
+      XCTFail(@"%@", [NSString stringWithFormat:@"the HTML should say %@", needle]);
+}
+
+
+// rdlgen, wherever this run built it: named by RDLGEN (GNUstep's run-tests
+// passes it), or beside this bundle, which is where Xcode puts the tool the
+// test target depends on.
+static NSString *RDLGenTool(void) {
+  NSString *named = [[[NSProcessInfo processInfo] environment] objectForKey:@"RDLGEN"];
+  if ([named length])
+    return named;
+  NSString *products = [[[NSBundle bundleForClass:[RDLBackendTests class]] bundlePath]
+      stringByDeletingLastPathComponent];
+  return [products stringByAppendingPathComponent:@"rdlgen"];
+}
+
+// Runs rdlgen, which makes no application object of its own, and answers its
+// exit status; what it printed comes back in *output.
+static int RDLRunGenerator(NSArray *arguments, NSString **output) {
+  NSTask *task = [[NSTask alloc] init];
+  [task setLaunchPath:RDLGenTool()];
+  [task setArguments:arguments];
+  NSMutableDictionary *env = [[[NSProcessInfo processInfo] environment] mutableCopy];
+  // Cocoa: rdlgen loads RDLKit.framework from beside it.
+  env[@"DYLD_FRAMEWORK_PATH"] = [RDLGenTool() stringByDeletingLastPathComponent];
+  [task setEnvironment:env];
+  NSPipe *pipe = [NSPipe pipe];
+  [task setStandardOutput:pipe];
+  [task setStandardError:pipe];
+  [task launch];
+  NSData *printed = [[pipe fileHandleForReading] readDataToEndOfFile];
+  [task waitUntilExit];
+  if (output)
+    *output = [[NSString alloc] initWithData:printed encoding:NSUTF8StringEncoding];
+  return [task terminationStatus];
+}
+
+// A tool that only generates reports never makes an NSApplication, and on
+// GNUstep the text system is not there until one is: CanGrow and CanShrink
+// text is measured during layout, before anything is drawn, and that used to
+// abort rdlgen on every report that has any ("fontInfoClass unset") -- 18 of
+// the corpus, HTML as well as PDF. This suite cannot see it in-process, since
+// the XCTest runner has made an application before any test runs, so it runs
+// the tool.
+- (void)testAToolWithNoApplicationMeasuresGrowingText {
+  NSString *tool = RDLGenTool();
+  if (![[NSFileManager defaultManager] isExecutableFileAtPath:tool]) {
+    XCTFail(@"rdlgen was not built where this run looks for it: %@", tool);
+    return;
+  }
+  NSString *report = [[RDLSourceDirectory() stringByDeletingLastPathComponent]
+      stringByAppendingPathComponent:@"Examples/majorsilence/ReportTests/Reports/CanGrowSplitTest.rdl"];
+  NSString *dir = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[[NSUUID UUID] UUIDString]];
+  [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES
+                                             attributes:nil error:NULL];
+  for (NSString *format in @[ @"html", @"pdf" ]) {
+    NSString *out = [dir stringByAppendingPathComponent:[@"out." stringByAppendingString:format]];
+    NSString *printed = nil;
+    int status = RDLRunGenerator(@[ report, @"-f", format, @"-o", out ], &printed);
+    XCTAssertEqual(status, 0, @"rdlgen -f %@ failed:\n%@", format, printed);
+    NSData *data = [NSData dataWithContentsOfFile:out];
+    XCTAssertTrue([data length] > 0, @"rdlgen -f %@ wrote nothing", format);
+    if ([format isEqualToString:@"pdf"])
+      XCTAssertTrue([data length] > 4 && memcmp([data bytes], "%PDF", 4) == 0);
+  }
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
+}
+
+
+// The streams of a PDF, inflated where they are compressed, as Latin-1 text:
+// the page contents, and the ICC profiles a colour space names.
+static NSArray<NSData *> *RDLPDFStreams(NSData *pdf) {
+  NSMutableArray *streams = [NSMutableArray array];
+  const char *bytes = [pdf bytes];
+  NSUInteger length = [pdf length], at = 0;
+  while (at < length) {
+    NSRange open = [pdf rangeOfData:[@"stream" dataUsingEncoding:NSASCIIStringEncoding]
+                            options:0
+                              range:NSMakeRange(at, length - at)];
+    if (open.location == NSNotFound)
+      break;
+    NSUInteger start = NSMaxRange(open);
+    // "endstream" contains "stream": skip it, and anything not followed by EOL.
+    if ((open.location >= 3 && memcmp(bytes + open.location - 3, "end", 3) == 0) ||
+        start >= length || (bytes[start] != '\r' && bytes[start] != '\n')) {
+      at = start;
+      continue;
+    }
+    if (bytes[start] == '\r')
+      start++;
+    if (start < length && bytes[start] == '\n')
+      start++;
+    NSRange close = [pdf rangeOfData:[@"endstream" dataUsingEncoding:NSASCIIStringEncoding]
+                             options:0
+                               range:NSMakeRange(start, length - start)];
+    if (close.location == NSNotFound)
+      break;
+    NSData *raw = [pdf subdataWithRange:NSMakeRange(start, close.location - start)];
+    NSMutableData *inflated = [NSMutableData dataWithLength:[raw length] * 8 + 4096];
+    z_stream z;
+    memset(&z, 0, sizeof z);
+    z.next_in = (Bytef *)[raw bytes];
+    z.avail_in = (uInt)[raw length];
+    if (inflateInit(&z) == Z_OK) {
+      int status = Z_OK;
+      while (status == Z_OK) {
+        if (z.total_out >= [inflated length])
+          [inflated increaseLengthBy:[raw length] * 8 + 4096];
+        z.next_out = (Bytef *)[inflated mutableBytes] + z.total_out;
+        z.avail_out = (uInt)([inflated length] - z.total_out);
+        status = inflate(&z, Z_NO_FLUSH);
+      }
+      [inflated setLength:z.total_out];
+      inflateEnd(&z);
+      [streams addObject:status == Z_STREAM_END ? inflated : raw];
+    } else {
+      [streams addObject:raw];
+    }
+    at = NSMaxRange(close);
+  }
+  return streams;
+}
+
+// Every colour a PDF's pages set, as "r,g,b" in 0...255: the three operands
+// of each `sc`, `scn` or `rg`.
+static NSSet<NSString *> *RDLPDFColours(NSData *pdf) {
+  NSMutableSet *colours = [NSMutableSet set];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    NSString *text = [[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding];
+    NSArray *tokens = [text componentsSeparatedByCharactersInSet:
+                                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSMutableArray *numbers = [NSMutableArray array];
+    for (NSString *token in tokens) {
+      if ([token length] == 0)
+        continue;
+      if ([token isEqualToString:@"sc"] || [token isEqualToString:@"scn"] || [token isEqualToString:@"rg"]) {
+        NSUInteger n = [numbers count];
+        if (n >= 3)
+          [colours addObject:[NSString stringWithFormat:@"%ld,%ld,%ld",
+                                (long)lround([numbers[n - 3] doubleValue] * 255),
+                                (long)lround([numbers[n - 2] doubleValue] * 255),
+                                (long)lround([numbers[n - 1] doubleValue] * 255)]];
+      }
+      NSScanner *scan = [NSScanner scannerWithString:token];
+      double value = 0;
+      if ([scan scanDouble:&value] && [scan isAtEnd])
+        [numbers addObject:@(value)];
+      else
+        [numbers removeAllObjects];
+    }
+  }
+  return colours;
+}
+
+// The ICC profiles a PDF's colour spaces carry: an embedded profile has its
+// signature, "acsp", at byte 36, and says what it is in its description.
+static NSArray<NSString *> *RDLPDFProfiles(NSData *pdf) {
+  NSMutableArray *profiles = [NSMutableArray array];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    if ([stream length] < 128 || memcmp((const char *)[stream bytes] + 36, "acsp", 4) != 0)
+      continue;
+    // The colour space, at byte 16: only RGB ones say how a colour is read.
+    if (memcmp((const char *)[stream bytes] + 16, "RGB ", 4) != 0)
+      continue;
+    [profiles addObject:[[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding]];
+  }
+  return profiles;
+}
+
+// RDL's colours are sRGB, as CSS's and .NET's are: SSRS paints #006d6d as
+// (0, 109, 109). The PDF used to be drawn in Cocoa's calibrated (Generic) RGB,
+// so a viewer, converting for the screen, showed it as (0, 127, 128) and every
+// other colour shifted with it. The components and the space they are in are
+// what is checked: a colour set in DeviceRGB (cairo, on GNUstep) is sRGB as
+// every viewer reads it, and one set through an ICC profile has to be in an
+// sRGB one.
+- (void)testColoursArePaintedInSRGB {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>2in</Height><ReportItems>"
+       "<Textbox Name=\"Teal\"><Top>0.5in</Top><Left>0.5in</Left><Height>1in</Height><Width>2in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>gy</Value>"
+       "<Style><FontSize>40pt</FontSize><Color>#ff8000</Color></Style></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><BackgroundColor>#006d6d</BackgroundColor></Style></Textbox>"
+       "<Textbox Name=\"Grey\"><Top>0.5in</Top><Left>2.6in</Left><Height>1in</Height><Width>1in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>x</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><BackgroundColor>LightGrey</BackgroundColor></Style></Textbox>"
+       "</ReportItems></Body><Width>4in</Width>"
+       "<Page><PageHeight>3in</PageHeight><PageWidth>4in</PageWidth></Page>"
+       "</ReportSection></ReportSections></Report>";
+  NSError *error = nil;
+  NSData *pdf = [RDLGenerator PDFFromXML:xml parameters:@{} error:&error];
+  XCTAssertTrue([pdf length] > 0, @"%@", error);
+  NSSet *colours = RDLPDFColours(pdf);
+  for (NSString *want in @[ @"0,109,109", @"255,128,0", @"211,211,211" ])
+    XCTAssertTrue([colours containsObject:want], @"no %@ among the colours set: %@", want, colours);
+  for (NSString *profile in RDLPDFProfiles(pdf))
+    XCTAssertTrue([profile rangeOfString:@"sRGB"].location != NSNotFound,
+                  @"an RGB colour space that is not sRGB: %@",
+                  [profile substringToIndex:MIN((NSUInteger)200, [profile length])]);
+  // And back: a colour a control hands over is written as the colour it is.
+  XCTAssertEqualObjects(RDLHexFromColor(RDLColorFromHex(@"#006d6d")), @"#006d6d");
+}
+
+
+// How many times a PDF's pages show text (Tj, TJ, ' and "): how often depends
+// on the platform and how the text was drawn, but the same text drawn the same
+// way is shown as often.
+static NSUInteger RDLPDFTextShows(NSData *pdf) {
+  NSUInteger shows = 0;
+  NSRegularExpression *op = [NSRegularExpression regularExpressionWithPattern:@"(\\)|\\]|>)\\s*(Tj|TJ|'|\")"
+                                                                      options:0
+                                                                        error:NULL];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    NSString *text = [[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding];
+    if (text != nil)
+      shows += [op numberOfMatchesInString:text options:0 range:NSMakeRange(0, [text length])];
+  }
+  return shows;
+}
+
+// A report of one box 26pt tall -- two lines of it in sight -- holding
+// `count` one-line paragraphs.
+static NSString *RDLLinesInAShortBox(int count) {
+  NSMutableString *lines = [NSMutableString string];
+  for (int i = 1; i <= count; i++)
+    [lines appendFormat:@"<Paragraph><TextRuns><TextRun><Value>LINE%d</Value></TextRun></TextRuns></Paragraph>", i];
+  return [NSString stringWithFormat:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+       "<Textbox Name=\"Lines\"><Top>0.5in</Top><Left>0.5in</Left><Height>26pt</Height><Width>2in</Width>"
+       "<CanGrow>false</CanGrow><Paragraphs>%@</Paragraphs></Textbox>"
+       "</ReportItems></Body><Width>4in</Width>"
+       "<Page><PageHeight>4in</PageHeight><PageWidth>4in</PageWidth></Page>"
+       "</ReportSection></ReportSections></Report>", lines];
+}
+
+// Nine lines in a box two lines tall: what the box cuts off is not in the
+// PDF, drawn and hidden, where a search would find it and a copy take it. So
+// the PDF shows no more text than for three lines in the same box.
+- (void)testTextCutOffByItsBoxIsNotInThePDF {
+  NSError *error = nil;
+  NSData *nine = [RDLGenerator PDFFromXML:RDLLinesInAShortBox(9) parameters:@{} error:&error];
+  XCTAssertTrue([nine length] > 0, @"%@", error);
+  NSData *three = [RDLGenerator PDFFromXML:RDLLinesInAShortBox(3) parameters:@{} error:&error];
+  XCTAssertTrue([three length] > 0, @"%@", error);
+  NSUInteger shownNine = RDLPDFTextShows(nine), shownThree = RDLPDFTextShows(three);
+  XCTAssertTrue(shownThree > 0, @"no text shown");
+  XCTAssertEqual(shownNine, shownThree, @"nine lines in the box show text %lu times, three lines %lu",
+                 (unsigned long)shownNine, (unsigned long)shownThree);
+}
+
+
+// `rect` of a view drawn into a bitmap by the view itself, in a window, the way
+// the screen gets it -- the same call on both platforms; a view outside a
+// window or drawn into a hand-made context has its text turned over on one or
+// the other. *scale says how many pixels the bitmap gives a point.
+static NSBitmapImageRep *RDLDrawnRegion(NSView *view, NSRect rect, CGFloat *scale) {
+  NSWindow *window = [[NSWindow alloc] initWithContentRect:[view frame]
+                                                 styleMask:NSWindowStyleMaskBorderless
+                                                   backing:NSBackingStoreBuffered
+                                                     defer:NO];
+  [window setReleasedWhenClosed:NO];
+  [window setContentView:view];
+  // On screen, if only for this: GNUstep caches nothing for a window that
+  // has never been shown.
+  [window orderFront:nil];
+  [view display];
+  NSBitmapImageRep *rep = [view bitmapImageRepForCachingDisplayInRect:rect];
+  [view cacheDisplayInRect:rect toBitmapImageRep:rep];
+  if (scale)
+    *scale = [rep pixelsHigh] / NSHeight(rect);
+  [window orderOut:nil];
+  [window setContentView:nil];
+  return rep;
+}
+
+// The rows of `rep` (from the top) in which some pixel is dark.
+static NSIndexSet *RDLInkedRows(NSBitmapImageRep *rep) {
+  NSMutableIndexSet *rows = [NSMutableIndexSet indexSet];
+  for (NSInteger y = 0; y < [rep pixelsHigh]; y++)
+    for (NSInteger x = 0; x < [rep pixelsWide]; x++) {
+      NSColor *c = [[rep colorAtX:x y:y] colorUsingColorSpaceName:NSDeviceRGBColorSpace];
+      if (c != nil && [c alphaComponent] > 0.5 &&
+          [c redComponent] + [c greenComponent] + [c blueComponent] < 1.2) {
+        [rows addIndex:(NSUInteger)y];
+        break;
+      }
+    }
+  return rows;
+}
+
+// A line of text in a box as short as it is sits where SSRS puts it: the top
+// of the line at the top of the box inside its padding, the baseline the
+// font's ascent below that, and what does not fit cut at the edge of the box.
+// Cocoa's -drawInRect: cut it at the padding instead, taking the descenders
+// off ("Exnression" in FinancialFunctions, whose header row is 12pt), and
+// GNUstep's lifted the line into the rect, so the same report set its text
+// about 2pt apart on the two platforms.
+- (void)testTextSitsAtTheTopOfItsBoxAndIsCutAtTheBox {
+  NSString *xml =
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>1in</Height><ReportItems>"
+       "<Textbox Name=\"Short\"><Top>0.5in</Top><Left>0.5in</Left><Height>12pt</Height><Width>1in</Width>"
+       "<Paragraphs><Paragraph><TextRuns><TextRun><Value>Hgjpqy</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><PaddingLeft>2pt</PaddingLeft><PaddingTop>2pt</PaddingTop></Style>"
+       "</Textbox></ReportItems></Body><Width>2in</Width>"
+       "<Page><PageHeight>2in</PageHeight><PageWidth>2in</PageWidth>"
+       "<LeftMargin>0in</LeftMargin><TopMargin>0in</TopMargin></Page>"
+       "</ReportSection></ReportSections></Report>";
+  NSError *error = nil;
+  RDLReport *report = [RDLParser reportFromXMLString:xml error:&error];
+  XCTAssertNotNil(report, @"%@", error);
+  RDLView *view = [[RDLView alloc] initWithFrame:NSMakeRect(0, 0, 144, 144)];
+  view.report = report;
+  [view reloadLayout];
+  CGFloat scale = 1;
+  // The box, 1in by 12pt at (36, 36), and 6pt of page below it.
+  NSBitmapImageRep *rep = RDLDrawnRegion(view, NSMakeRect(36, 36, 72, 18), &scale);
+  NSIndexSet *inked = RDLInkedRows(rep);
+  XCTAssertTrue([inked count] > 0, @"no text was drawn");
+  NSFont *font = [RDLTextAttributes fontForStyle:[RDLStyle defaultStyle] scale:1];
+  // Report Builder's 2pt, which pushes the descenders past the bottom.
+  CGFloat padding = 2;
+  // The top of the capital: the ascent less the cap height below the padding.
+  CGFloat capTop = padding + [font ascender] - [font capHeight];
+  CGFloat firstInk = [inked firstIndex] / scale;
+  XCTAssertEqualWithAccuracy(firstInk, capTop, 1.0,
+                             @"the line's capitals start %.2fpt into the box, not %.2fpt (%@)",
+                             firstInk, capTop, [font fontName]);
+  // The descenders reach the bottom of the box, which cuts them, and nothing
+  // is drawn below it.
+  CGFloat lastInk = ([inked lastIndex] + 1) / scale;
+  XCTAssertTrue(lastInk > 11 && lastInk <= 12.01,
+                @"the descenders should run on to the box's bottom (12pt) and stop there, not at %.2fpt", lastInk);
 }
 
 @end

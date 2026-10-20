@@ -6,6 +6,8 @@
 include $(GNUSTEP_MAKEFILES)/common.make
 
 BUNDLE_NAME = RDLKitTests
+# Built and run, never installed.
+RDLKitTests_STANDARD_INSTALL = no
 
 RDLKitTests_OBJC_FILES = \
   RDLTestSupport.m \
@@ -18,9 +20,10 @@ RDLKitTests_OBJC_FILES = \
   RDLJSONPathTests.m \
   RDLSubreportTests.m
 RDLKitTests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
-RDLKitTests_INCLUDE_DIRS = -I../RDLKit
+RDLKitTests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
-RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
+# zlib: the colour checks read the PDF's content streams.
+RDLKitTests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch -lz
 # The PDF backend and text measurement are AppKit.
 RDLKitTests_NEEDS_GUI = yes
 
@@ -81,7 +84,11 @@ XCTEST ?= xctest
 # as a backtrace naming the call that was waiting.
 TEST_TIMEOUT ?= 600
 
+# rdlgen too: one check runs the tool, which makes no application object of
+# its own, as the test runner does before any test (RDLGEN names it).
 run-tests: all
+	$(MAKE) -C ../RDLGen
 	$(SANITIZE_ENV) \
+	RDLGEN="$(CURDIR)/../RDLGen/$(GNUSTEP_OBJ_DIR)/rdlgen" \
 	LD_LIBRARY_PATH="$(CURDIR)/../RDLKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  timeout -s ABRT $(TEST_TIMEOUT) $(XCTEST) $(BUNDLE_NAME).bundle

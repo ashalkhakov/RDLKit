@@ -75,17 +75,15 @@ static NSString *const kRDLSamplesDirectory = @"Samples";
   return report;
 }
 
-// The one sample that has to exist: it is what File > New Report starts from,
-// and what an editing session opens with. A missing resource is a broken
-// build, so this says so and carries on with an empty report rather than
-// handing back nil to code that has no answer for it.
-+ (RDLReport *)blankLetter {
-  RDLReport *letter = [self reportWithId:@"letter"];
-  if (letter != nil)
-    return letter;
-  RDLReport *fallback = [RDLReport emptyReportNamed:@"Letter"];
-  fallback.reportDescription = @"Blank letter.";
-  return fallback;
+// What File > New Report starts from, and what an editing session opens with:
+// a body and nothing else, which is what a blank report is in Report Builder.
+// It used to be the Letter sample -- a branded head, a rule, a folio and a
+// salutation -- which is a template, not a blank page, and left every new
+// report with a page header nobody had asked for.
++ (RDLReport *)blankReport {
+  RDLReport *blank = [RDLReport emptyReportNamed:@"Untitled"];
+  blank.reportDescription = @"";
+  return blank;
 }
 
 + (RDLReport *)atelierInvoice {

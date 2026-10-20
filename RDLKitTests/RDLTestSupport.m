@@ -64,6 +64,12 @@ RDLReport *RDLMiniInvoice(void) {
   title.height = 0.35;
   title.style.fontSize = [RDLLength points:16];
   title.style.fontWeight = RDLFontWeightBold;
+  // A page section prints on neither the first page nor the last unless it
+  // says so -- MS-RDL's default, and this fixture wants both.
+  r.pageHeader.printOnFirstPage = YES;
+  r.pageHeader.printOnLastPage = YES;
+  r.pageFooter.printOnFirstPage = YES;
+  r.pageFooter.printOnLastPage = YES;
   [r.pageHeader.items addObject:title];
 
   RDLTextbox *note = [[RDLTextbox alloc] init];
@@ -120,6 +126,8 @@ RDLReport *RDLMiniInvoice(void) {
 }
 
 double RDLAsNum(id v) {
+  if ([v isKindOfClass:[RDLNumber class]])
+    return [(RDLNumber *)v doubleValue];
   if ([v isKindOfClass:[NSNumber class]])
     return [v doubleValue];
   if ([v isKindOfClass:[NSString class]])
@@ -152,6 +160,32 @@ void RDLAttachInlineSource(RDLReport *report, RDLDataSet *dataSet, NSString *sou
   source.connectString = [@"jsondata=" stringByAppendingString:document];
   dataSet.dataSourceName = name;
   dataSet.commandText = @"$[*]";
+}
+
+RDLReport *RDLSalesWithRenamedColumns(void) {
+  RDLReport *r = [RDLReport emptyReportNamed:@"Renamed Columns"];
+  RDLDataSet *ds = [[RDLDataSet alloc] init];
+  ds.name = @"Sales";
+  ds.rows = @[
+    @{@"TERRITORY" : @"North", @"AMT" : @120, @"Rep" : @"Ann"},
+    @{@"TERRITORY" : @"North", @"AMT" : @30, @"Rep" : @"Bo"},
+    @{@"TERRITORY" : @"South", @"AMT" : @55, @"Rep" : @"Cy"},
+  ];
+  [r.dataSets addObject:ds];
+  RDLAttachInlineSource(r, ds, @"Document");
+  RDLField *region = [[RDLField alloc] init];
+  region.name = @"Region";
+  region.dataField = @"TERRITORY";
+  RDLField *amount = [[RDLField alloc] init];
+  amount.name = @"Amount";
+  amount.dataField = @"AMT";
+  ds.fields = @[ region, amount ];
+  // The rows come back from the document, through the binder, as they would
+  // for a report opened from a file.
+  ds.rows = nil;
+  [r resolveDataSources];
+  [[[RDLDataBinder alloc] init] bindReport:r error:NULL];
+  return r;
 }
 
 RDLReport *RDLGroupedJobs(void) {

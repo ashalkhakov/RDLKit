@@ -3,7 +3,8 @@
 86 `.rdl` files from [Majorsilence Reporting](https://github.com/majorsilence/Reporting)
 — its `Examples/` gallery and the report definitions its `ReportTests/` suite runs
 against. They are Apache 2.0; see `LICENSE` and `NOTICE`. Nothing here has been
-modified.
+modified. Beside them are the three JSON documents three of them read
+(`NOTICE` lists them), copied the same way.
 
 They are kept because they are the closest thing to a conformance corpus that
 exists for RDL: real reports, written against a real implementation, exercising
@@ -21,3 +22,12 @@ grammar RDLKit was built against:
 Which is why most of them do not work yet. `../../RDL-COVERAGE.md` has the
 gap analysis and the running score; regenerate it with
 `.tools/rdl-coverage.sh`.
+
+The three reports that read those documents render without rows, and are
+meant to. They query them in Majorsilence's own JSON dialect --
+`file=…;table=root_Attendees` in the connect string, `columns=Name,Title` with
+`_` joining nested members as the command -- rather than with a JSONPath,
+which is what RDLKit reads. That dialect is one tool's, not RDL's, and RDLKit
+will not read it (out of scope: `../../RDL-SPEC-GAPS.md`, section 5).
+`JsonReport.rdl` also names its document by a path on its author's Windows
+machine. The documents are here so that the reports have what they name.

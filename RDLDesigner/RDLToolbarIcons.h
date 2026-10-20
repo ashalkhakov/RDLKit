@@ -25,6 +25,8 @@ typedef NS_ENUM(NSInteger, RDLToolbarGlyph) {
   RDLToolbarGlyphRemove,
   RDLToolbarGlyphMoveLeft,
   RDLToolbarGlyphMoveRight,
+  RDLToolbarGlyphMoveUp,
+  RDLToolbarGlyphMoveDown,
 };
 
 // Drawn here rather than shipped as files: an image in the bundle is one more

@@ -15,4 +15,18 @@
 - (void)reload;
 // Move the outline's highlight to match the selection, without rebuilding.
 - (void)syncSelection;
+// The drag that reorders: a row taken hold of, where a drop would land, and
+// the drop itself. Declared because they are what the outline does, and so a
+// check can drive a drag without a mouse.
+- (BOOL)outlineView:(NSOutlineView *)outline
+         writeItems:(NSArray *)items
+       toPasteboard:(NSPasteboard *)pasteboard;
+- (NSDragOperation)outlineView:(NSOutlineView *)outline
+                  validateDrop:(id<NSDraggingInfo>)info
+                  proposedItem:(id)item
+            proposedChildIndex:(NSInteger)index;
+- (BOOL)outlineView:(NSOutlineView *)outline
+         acceptDrop:(id<NSDraggingInfo>)info
+               item:(id)item
+         childIndex:(NSInteger)index;
 @end

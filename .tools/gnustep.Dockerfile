@@ -1,58 +1,46 @@
 # A GNUstep box to reproduce the Linux build locally, so a portability bug can
 # be found in a minute here instead of a round trip through CI.
 #
-# Build it once -- this compiles libobjc2, libdispatch, gnustep-make, base, gui,
-# back and tools-xctest from source, so it takes the better part of an hour:
-#
 #   docker build -f .tools/gnustep.Dockerfile -t rdlkit-gnustep .
+#   .tools/gnustep.sh make check
 #
-# After that the image is cached and running the suites is quick:
+# The stack is the one CI builds on: the gnustep-patches release
+# .github/pins.env names, an archive unpacked at /, on the Ubuntu it is built
+# for, with the packages it lists beside it.
 #
-#   .tools/gnustep.sh make -C RDLKitTests run-tests
-#   .tools/gnustep.sh make -C RDLDesignerTests run-tests
-#
-# The stack is the same one the workflow builds, from the same script, so what
-# fails here fails there.
-FROM ubuntu:24.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Retry, and stop apt pipelining requests, which is what proxies mangle. The
-# install is split in two so a failure does not re-download the lot.
-#
-# Not built successfully on this machine: its network path corrupts plain HTTP
-# from ports.ubuntu.com -- a 178 kB package arriving as 42 MB, reported as
-# "File has unexpected size" -- and drops HTTPS to the same host entirely, so
-# apt sees "Ign:" for every InRelease and ends up with no package lists. On a
-# network that does neither, this builds as written. If yours does, point apt
-# at a mirror you trust by editing /etc/apt/sources.list.d/ubuntu.sources here.
-RUN printf '%s\n' \
-      'Acquire::Retries "5";' \
-      'Acquire::http::Pipeline-Depth "0";' \
-      'Acquire::http::No-Cache "true";' \
-      'Acquire::BrokenProxy "true";' \
-    > /etc/apt/apt.conf.d/99-retries
-
-RUN apt-get -q -y update && apt-get -q -y install \
-      clang lld cmake make git pkg-config xvfb
-
-RUN apt-get -q -y install \
-      libgnutls28-dev libffi-dev libicu-dev libxml2-dev libxslt1-dev libssl-dev \
-      libavahi-client-dev zlib1g-dev gnutls-bin libcurl4-gnutls-dev libgmp-dev \
-      libcairo2-dev libjpeg-dev libtiff-dev libpng-dev libicns-dev \
-      libpthread-workqueue-dev \
-      libxt-dev libxmu-dev libxft-dev libxrandr-dev libxfixes-dev libxcursor-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# The gnustep-2.0 runtime wants ld.gold or lld; 24.04 ships lld.
-RUN update-alternatives --install /usr/bin/ld ld /usr/bin/ld.lld 10
-
-ENV CC=clang CXX=clang++ \
-    LIBRARY_COMBO=ng-gnu-gnu RUNTIME_VERSION=gnustep-2.0 \
-    DEPS_PATH=/deps INSTALL_PATH=/gnustep
-
-COPY .github/scripts/dependencies.sh /tmp/dependencies.sh
-RUN sh /tmp/dependencies.sh && rm -rf /deps
-
-ENV LD_LIBRARY_PATH=/gnustep/lib
+# And the fonts the cross-platform comparison renders with (.tools/xp): the
+# Microsoft core fonts, which Ubuntu's installer fetches from Microsoft's own
+# archives as their licence asks, beside the stack's DejaVu and Liberation.
+# The installer fetches them over plain HTTP, which some networks mangle; when
+# it comes back with none, the same archives are fetched over HTTPS and
+# checked against the installer's own checksums.
+FROM ubuntu:22.04
+ARG DEBIAN_FRONTEND=noninteractive
+# Through caching proxies that answer with stale indexes: no pipelining, no
+# proxy caches, retries; and over HTTPS once it can be, because some networks
+# rewrite plain HTTP from Ubuntu's mirrors ("File has unexpected size").
+RUN printf 'Acquire::http::No-Cache "true";\nAcquire::BrokenProxy "true";\nAcquire::http::Pipeline-Depth "0";\nAcquire::Retries "5";\n' \
+      > /etc/apt/apt.conf.d/99-retries
+COPY .github/pins.env /tmp/pins.env
+RUN set -e; \
+    apt-get update; apt-get install -y --no-install-recommends ca-certificates curl xz-utils; \
+    sed -i 's|http://\([a-z.]*\)ubuntu.com|https://\1ubuntu.com|' /etc/apt/sources.list; apt-get update; \
+    v=$(sed -n 's/^GNUSTEP_PATCHES_VERSION=//p' /tmp/pins.env); \
+    curl -fsSL "https://github.com/ashalkhakov/gnustep-patches/releases/download/v$v/gnustep-patches-$v-ubuntu22.04-$(uname -m).tar.xz" \
+      | tar -C / -xJ; \
+    grep -v '^#' /opt/gnustep/share/gnustep-patches/packages-ubuntu.txt | xargs apt-get install -y --no-install-recommends; \
+    update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10; \
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections; \
+    apt-get install -y --no-install-recommends fontconfig cabextract ttf-mscorefonts-installer; \
+    d=/usr/share/fonts/truetype/msttcorefonts; mkdir -p $d; \
+    if ! ls $d | grep -qi georgia; then \
+      sed -n 's/^Url: http:/https:/p; s/^Sha256: //p' /usr/share/package-data-downloads/ttf-mscorefonts-installer \
+        | paste - - | while read u sum; do \
+            curl -fsSL "$u" -o /tmp/font.exe && echo "$sum  /tmp/font.exe" | sha256sum -c --quiet && \
+            cabextract -q -L -F '*.ttf' -d $d /tmp/font.exe; rm -f /tmp/font.exe; done; \
+    fi; \
+    fc-cache -f; \
+    rm -rf /var/lib/apt/lists/*
+ENV CC=clang CXX=clang++ LIBRARY_COMBO=ng-gnu-gnu RUNTIME_VERSION=gnustep-2.0 \
+    LD_LIBRARY_PATH=/opt/gnustep/lib
 WORKDIR /src

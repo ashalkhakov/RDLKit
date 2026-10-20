@@ -8,11 +8,16 @@
 // top-level band items, so a tablix nested in a Rectangle got no highlight and
 // no resize cursor.
 //
-// A geometry is a snapshot: it is built for one report at one zoom and one view
-// origin, and is thrown away when any of those change. Nothing here mutates the
-// model, so it is safe to build one per draw.
+// A geometry is a snapshot in model space: points at 100%, which is inches
+// times RDLPointsPerInch. The zoom is not in it. Everything drawn, measured and
+// hit-tested is worked out in these coordinates, and the canvas applies the
+// zoom once as a view transform -- the way a scene is drawn in model space and
+// then viewed. It is built for one report at one paper origin and thrown away
+// when either changes; a zoom change no longer invalidates it. Nothing here
+// mutates the model, so it is safe to build one per draw.
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
+#import "RDLTablixStructure.h"
 
 @class RDLBand;
 @class RDLItem;
@@ -23,24 +28,35 @@ extern const CGFloat RDLPointsPerInch;
 
 // Drag handle kinds, as returned by -itemAtPoint:.
 extern NSString * const RDLHandleMove;
+// Not a handle: the box drawn across bare paper to take hold of what it
+// touches. A drag kind like the others, so the state machine has one list.
+extern NSString * const RDLDragMarquee;
+// The rect two corners make, whichever way round they were given.
+FOUNDATION_EXPORT NSRect RDLRectBetween(NSPoint a, NSPoint b);
 // An item that lives in a tablix cell: selectable, but not draggable and not
 // resizable. MS-RDL ignores Top/Left/Height/Width inside CellContents -- the
 // cell decides where it is and how big it is -- so the canvas must not offer
 // to change them.
 extern NSString * const RDLHandleCell;
-extern NSString * const RDLHandleSouthEast;
+// The eight grips round an item's box, named by the side or corner they are
+// on: a corner moves two edges, a side one, and the ones on the top and the
+// left move the item as they resize it.
+extern NSString * const RDLHandleNorthWest;
+extern NSString * const RDLHandleNorth;
+extern NSString * const RDLHandleNorthEast;
+extern NSString * const RDLHandleWest;
 extern NSString * const RDLHandleEast;
+extern NSString * const RDLHandleSouthWest;
 extern NSString * const RDLHandleSouth;
-
-// Which row of a tablix's preview a point fell in, as returned by
-// +tablix:itemRect:point:column:part:. An enumeration rather than the two
-// strings this was: the vocabulary is fixed, and a mistyped comparison against
-// a string is a branch that never runs and that nothing diagnoses.
-typedef NS_ENUM(NSInteger, RDLTablixPart) {
-  RDLTablixPartNone = 0,
-  RDLTablixPartHeader,
-  RDLTablixPartValue
-};
+extern NSString * const RDLHandleSouthEast;
+// Where each grip sits on `rect`, in the order they are drawn and hit-tested:
+// the four corners first, so a corner wins over the sides it touches.
+FOUNDATION_EXPORT NSArray<NSString *> *RDLHandleKinds(void);
+FOUNDATION_EXPORT NSRect RDLHandleRectOfKind(NSString *kind, NSRect rect);
+// The box a drag from `kind` makes of `rect` when the pointer has moved by
+// `delta`, never smaller than `least` -- which is in the rect's own units,
+// since the canvas resizes in inches and draws in points.
+FOUNDATION_EXPORT NSRect RDLRectResizedByHandle(NSRect rect, NSString *kind, NSSize delta, CGFloat least);
 
 // One band's placement, paired with its key so callers never have to index two
 // parallel arrays (a previous source of drift).
@@ -53,17 +69,17 @@ typedef NS_ENUM(NSInteger, RDLTablixPart) {
 
 @interface RDLPageGeometry : NSObject
 // `origin` is where the paper's top-left sits in the view.
-+ (instancetype)geometryForReport:(RDLReport *)report
-                             zoom:(CGFloat)zoom
-                      paperOrigin:(NSPoint)origin;
-
-@property (nonatomic, readonly, assign) CGFloat zoom;
++ (instancetype)geometryForReport:(RDLReport *)report paperOrigin:(NSPoint)origin;
 // The tablix being worked in, from the editing session. Every other tablix is
 // a single object to this geometry: a click anywhere on it is a click on the
 // region, not on one of its cells, and its handle band takes nothing -- it is
 // not drawn, and an invisible target over a neighbouring item is exactly what
 // this avoids.
 @property (nonatomic, strong) RDLTablix *engagedTablix;
+// The item whose grips are drawn, and so the only item whose grips can be
+// taken hold of: a grip straddles its edge, and one on an item nobody can see
+// grips would steal clicks from whatever lies beside it.
+@property (nonatomic, strong) RDLItem *itemWithHandles;
 @property (nonatomic, readonly, assign) NSRect paperRect;
 // Paper plus the surrounding margin the canvas leaves around it.
 @property (nonatomic, readonly, assign) NSSize canvasSize;
@@ -83,14 +99,21 @@ typedef NS_ENUM(NSInteger, RDLTablixPart) {
 // the grid, so without this there is nowhere on the canvas to point at the
 // tablix itself. Outside the item's own rect, the way Report Builder's row and
 // column handles are, and the same place the group brackets are drawn.
-// The band is part of the drawing, not chrome laid over it: it scales with the
-// zoom, so that a tablix whose group brackets are unreadable at 100% can be
-// read by zooming in, and so that the handles stay over the rows and columns
-// they belong to. RDLTablixHandleBand is the thickness at 100%; every other
-// caller wants RDLTablixHandleBandForZoom.
+// The band is part of the drawing, not chrome laid over it, so it is measured
+// in model space like everything else and the view transform thickens it along
+// with the page: a tablix whose group brackets are unreadable at 100% can be
+// read by zooming in, and the handles stay over the rows and columns they
+// belong to.
 FOUNDATION_EXPORT const CGFloat RDLTablixHandleBand;
-FOUNDATION_EXPORT CGFloat RDLTablixHandleBandForZoom(CGFloat zoom);
-FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
+FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect);
+
+// The canvas's view transform: model space to view points. A pure scale, since
+// panning is the scroll view's. Everything drawn goes through it, and every
+// point arriving from an event comes back the other way through
+// RDLModelPointFromView -- one definition, rather than each caller dividing by
+// the zoom and one of them getting it wrong.
+FOUNDATION_EXPORT NSAffineTransform *RDLCanvasViewTransform(CGFloat zoom);
+FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
 
 // The item's rect anywhere in the report, including inside nested Rectangles.
 // NO when the item is not in this report.
@@ -110,14 +133,23 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
 // turned-in ends. Geometry rather than drawing, so where they land can be
 // checked without rendering anything.
 + (NSArray<NSValue *> *)rowGroupBracketsForCount:(NSUInteger)count
-                                          inRect:(NSRect)rect
-                                            zoom:(CGFloat)zoom;
+                                          inRect:(NSRect)rect;
 + (NSArray<NSValue *> *)columnGroupBracketsForCount:(NSUInteger)count
-                                             inRect:(NSRect)rect
-                                               zoom:(CGFloat)zoom;
+                                             inRect:(NSRect)rect;
 
 // The band whose frame contains `point`, or nil.
 - (NSString *)bandKeyAtPoint:(NSPoint)point;
+
+// The items of one band that `rect` touches, in the order the band lists them.
+// What a marquee drawn across the canvas takes hold of: the items a band draws,
+// not what is inside a Rectangle -- dragging a box around a rectangle means
+// the rectangle.
+- (NSArray<RDLItem *> *)itemsIntersectingRect:(NSRect)rect inBandWithKey:(NSString *)bandKey;
+
+// The boxes of a band's items, less those given, as NSValues: what a drag
+// lines itself up against, and the band's own frame, which is a line to meet
+// as much as any item's edge is.
+- (NSArray<NSValue *> *)rectsInBandWithKey:(NSString *)bandKey besides:(NSArray<RDLItem *> *)items;
 
 // Every tablix in the report, paired with its rect — including ones nested in
 // a Rectangle, which the old per-band scan missed.
@@ -148,27 +180,66 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
 + (NSUInteger)columnCountOf:(RDLTablix *)tablix;
 // How many of those are row-header columns -- one per level of row grouping.
 + (NSUInteger)headerColumnCountOf:(RDLTablix *)tablix;
-// One grid column's width, and one grid row's height, in view points.
-+ (CGFloat)widthOfBodyColumn:(NSUInteger)column of:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-+ (CGFloat)heightOfRow:(NSUInteger)row of:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-// The rect of one cell of that grid, in view points.
+// One grid column's width, and one grid row's height, in model points.
++ (CGFloat)widthOfBodyColumn:(NSUInteger)column of:(RDLTablix *)tablix;
++ (CGFloat)heightOfRow:(NSUInteger)row of:(RDLTablix *)tablix;
+// The rect of one cell of that grid, in model points.
 + (NSRect)cellRectOf:(RDLTablix *)tablix
             itemRect:(NSRect)itemRect
                  row:(NSUInteger)row
-              column:(NSUInteger)column
-                zoom:(CGFloat)zoom;
+              column:(NSUInteger)column;
+// The same, across everything a merged cell covers: a cell merged with the one
+// to its right is one rect two columns wide. Cells that are not merged answer
+// as -cellRectOf: does, so this is what anything drawing or framing a cell
+// should ask for.
++ (NSRect)mergedCellRectOf:(RDLTablix *)tablix
+                  itemRect:(NSRect)itemRect
+                       row:(NSUInteger)row
+                    column:(NSUInteger)column;
+// Whether that grid position is inside a merge that starts somewhere else --
+// the right-hand half of a merged pair. Nothing is drawn there: what covers it
+// has already been drawn across it.
++ (BOOL)tablix:(RDLTablix *)tablix isCoveredAtRow:(NSUInteger)row column:(NSUInteger)column;
+// Whether two grid positions are the same cell -- which is how a grid line
+// knows not to draw between them.
++ (BOOL)tablix:(RDLTablix *)tablix
+     isOneCellAtRow:(NSUInteger)row
+             column:(NSUInteger)column
+              andRow:(NSUInteger)otherRow
+             column:(NSUInteger)otherColumn;
 // The cell under `point`, or NO outside the grid.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
          point:(NSPoint)point
            row:(NSUInteger *)outRow
-        column:(NSUInteger *)outColumn
-          zoom:(CGFloat)zoom;
-// The item in that cell, or nil for an empty one.
+        column:(NSUInteger *)outColumn;
+// The item in that cell, or nil for an empty one. In a header column or
+// heading row, the header of the member at that level, beside the first body
+// row or column the member spans.
 + (RDLItem *)itemOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
+// The member along `axis` a grid cell belongs to, for the commands that add,
+// delete and edit groups: in a header cell, the member whose header it is;
+// elsewhere on a body row (or column), the innermost group around it, or its
+// own member when no group is. nil for a cell on no row (or column) of the
+// body -- a heading row has no row member.
+// What each group bracket along `axis` says, outermost first: at each depth of
+// nesting, what its groups group on -- a field by name, anything else as it is
+// written. A details group, which groups on nothing, has no bracket.
++ (NSArray<NSString *> *)groupBracketLabelsOf:(RDLTablix *)tablix axis:(RDLTablixAxis)axis;
++ (RDLTablixMember *)groupMemberOf:(RDLTablix *)tablix
+                           gridRow:(NSUInteger)row
+                        gridColumn:(NSUInteger)column
+                              axis:(RDLTablixAxis)axis;
 // The TablixCell at that place in the grid, or nil when the column is a
 // row-header column -- those belong to the row hierarchy, not to the body.
 + (RDLTablixCell *)cellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
+// Whether a grid position is the corner's -- over the row-header columns, in a
+// column-heading row, or in a table's heading row where no row member has a
+// header -- and which corner row it is. The corner column is the grid column.
++ (BOOL)tablix:(RDLTablix *)tablix isCornerAtRow:(NSUInteger)row column:(NSUInteger)column cornerRow:(NSUInteger *)outRow;
+// The corner cell there, or nil when the position is not the corner's or the
+// file wrote no cell for it.
++ (RDLTablixCell *)cornerCellOf:(RDLTablix *)tablix inRow:(NSUInteger)row column:(NSUInteger)column;
 // Which body column a grid column is, or -1 for a row-header column. The grid
 // counts the header columns first, and everything that edits a column spec
 // counts only the body's.
@@ -182,41 +253,24 @@ FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect, CGFloat zoom);
 // Builder says the same thing with the shape of the handle: a group handle is
 // drawn as a bracket, a movable column's as a grip.
 + (BOOL)tablix:(RDLTablix *)tablix columnIsMovable:(NSUInteger)column;
-+ (CGFloat)headerHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-+ (CGFloat)rowHeightOf:(RDLTablix *)tablix zoom:(CGFloat)zoom;
-+ (NSRect)cellRectOf:(RDLTablix *)tablix
-            itemRect:(NSRect)itemRect
-              column:(NSUInteger)column
-                part:(RDLTablixPart)part
-                zoom:(CGFloat)zoom;
-// The column and part under `point`, or NO outside the editable grid.
-+ (BOOL)tablix:(RDLTablix *)tablix
-      itemRect:(NSRect)itemRect
-         point:(NSPoint)point
-        column:(NSUInteger *)outColumn
-          part:(RDLTablixPart *)outPart
-          zoom:(CGFloat)zoom;
 // The column whose handle in the band above the grid is under `point`, for
 // picking a column up. NO anywhere else -- the band down the left and the
 // corner move the whole region.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     handleColumnAtPoint:(NSPoint)point
-                 column:(NSUInteger *)outColumn
-                   zoom:(CGFloat)zoom;
+                 column:(NSUInteger *)outColumn;
 // Where a dragged column would land: the grid column whose left half the point
 // is in, so dropping between two columns is unambiguous.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     dropColumnAtPoint:(NSPoint)point
-               column:(NSUInteger *)outColumn
-                 zoom:(CGFloat)zoom;
+               column:(NSUInteger *)outColumn;
 // An INTERNAL column border under `point`, for width dragging. The last
 // column's right edge is deliberately excluded: that is the item's own east
 // resize handle. Returns the index of the column whose right border was hit.
 + (BOOL)tablix:(RDLTablix *)tablix
       itemRect:(NSRect)itemRect
     columnBorderAtPoint:(NSPoint)point
-                 column:(NSUInteger *)outColumn
-                   zoom:(CGFloat)zoom;
+                 column:(NSUInteger *)outColumn;
 @end

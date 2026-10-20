@@ -4,8 +4,10 @@
 static void RDLUsage(void) {
   fprintf(stderr,
           "RDLDesigner generator — RDL + data + parameters → PDF or HTML\n"
-          "usage: rdlgen report.rdl [-o out.pdf|out.html] [-f pdf|html]\n"
+          "usage: rdlgen report.rdl [-o out.pdf|out.html|out.rdl] [-f pdf|html|rdl]\n"
           "                [-p Name=Value] [-d DataSet=file.json] [--language en-US]\n"
+          "                -p again with the same Name for a MultiValue parameter's next value;\n"
+          "                -p Name:isnull=true for Nothing\n"
           "                [--allow-remote]   fetch http(s) documents a report points at\n"
           "       rdlgen report.rdl --check      static check, no data needed\n"
           "       rdlgen report.rdl --contract   the data shape the report needs\n");
@@ -39,8 +41,25 @@ int main(int argc, const char *argv[]) {
       } else if ([a isEqualToString:@"-p"] && i + 1 < argc) {
         NSString *kv = [NSString stringWithUTF8String:argv[++i]];
         NSRange eq = [kv rangeOfString:@"="];
-        if (eq.location != NSNotFound)
-          params[[kv substringToIndex:eq.location]] = [kv substringFromIndex:eq.location + 1];
+        if (eq.location != NSNotFound) {
+          NSString *name = [kv substringToIndex:eq.location];
+          id value = [kv substringFromIndex:eq.location + 1];
+          // Name:isnull=true is Nothing, as a report server's URL writes it.
+          NSString *isNull = @":isnull";
+          if ([name length] > [isNull length] &&
+              [[name substringFromIndex:[name length] - [isNull length]] caseInsensitiveCompare:isNull] == NSOrderedSame) {
+            name = [name substringToIndex:[name length] - [isNull length]];
+            if ([value caseInsensitiveCompare:@"true"] != NSOrderedSame)
+              continue;
+            value = [NSNull null];
+          }
+          // A name given again is a MultiValue parameter's next value.
+          id before = params[name];
+          if (before != nil && before != [NSNull null] && value != [NSNull null])
+            params[name] = [([before isKindOfClass:[NSArray class]] ? before : @[ before ]) arrayByAddingObject:value];
+          else
+            params[name] = value;
+        }
       } else if ([a isEqualToString:@"-d"] && i + 1 < argc) {
         [binds addObject:[NSString stringWithUTF8String:argv[++i]]];
       } else if ([a isEqualToString:@"--language"] && i + 1 < argc) {
@@ -102,11 +121,13 @@ int main(int argc, const char *argv[]) {
     if (format == nil) {
       if ([[outPath pathExtension] caseInsensitiveCompare:@"html"] == NSOrderedSame)
         format = @"html";
+      else if ([[outPath pathExtension] caseInsensitiveCompare:@"rdl"] == NSOrderedSame)
+        format = @"rdl";
       else
         format = @"pdf";
     }
     if (outPath == nil)
-      outPath = [format isEqualToString:@"html"] ? @"report.html" : @"report.pdf";
+      outPath = [NSString stringWithFormat:@"report.%@", format];
     NSError *err = nil;
     NSString *xml = [NSString stringWithContentsOfFile:rdlPath
                                               encoding:NSUTF8StringEncoding
@@ -119,6 +140,22 @@ int main(int argc, const char *argv[]) {
     if (report == nil) {
       fprintf(stderr, "parse: %s\n", err.localizedDescription.UTF8String);
       return 1;
+    }
+    // RDL out: the report as this kit writes it -- in the 2010 grammar, with what
+    // it does not read put back as it was written. No data is needed for that.
+    if ([format isEqualToString:@"rdl"]) {
+      for (NSString *note in report.warnings)
+        fprintf(stderr, "note: %s\n", note.UTF8String);
+      NSError *writeError = nil;
+      if (![[RDLWriter XMLStringFromReport:report] writeToFile:outPath
+                                                    atomically:YES
+                                                      encoding:NSUTF8StringEncoding
+                                                         error:&writeError]) {
+        fprintf(stderr, "write: %s\n", writeError.localizedDescription.UTF8String);
+        return 1;
+      }
+      fprintf(stdout, "wrote %s (RDL)\n", outPath.UTF8String);
+      return 0;
     }
     // The report's own JSON, XML and CSV sources first; -d then overrides any
     // dataset the caller wants to supply itself.
@@ -156,14 +193,31 @@ int main(int argc, const char *argv[]) {
       fprintf(stderr, "unknown backend: %s (pdf or html)\n", format.UTF8String);
       return 2;
     }
+    RDLRenderEnvironment *environment = [[RDLRenderEnvironment alloc] init];
+    environment.userLanguage = userLanguage;
+    environment.documentBinder = binder;
+    environment.renderFormat = [RDLGenerator renderFormatForBackend:backend];
+    // As a report server does, nothing is rendered with a parameter it would
+    // refuse: missing, of the wrong type, not a valid value, or not asked for.
+    // The data sources that read the parameters, evaluated with them before
+    // anything is laid out.
+    RDLDataEvaluation *evaluation = [[RDLDataEvaluation alloc] initWithReport:report binder:binder];
+    RDLParameterValues *parameterValues = [evaluation evaluateWithParameters:params environment:environment];
+    for (NSString *note in evaluation.notes)
+      fprintf(stderr, "data source: %s\n", note.UTF8String);
+    if ([parameterValues.problems count]) {
+      for (RDLParameterValue *value in parameterValues.problems)
+        fprintf(stderr, "parameter: %s\n", value.problemDescription.UTF8String);
+      return 1;
+    }
     NSData *out = [RDLGenerator renderReport:report
                                   parameters:params
                                  usingBackend:backend
-                                userLanguage:userLanguage];
+                                 environment:environment];
     [out writeToFile:outPath atomically:YES];
     NSArray *pages = [RDLGenerator pagesForReport:report
                                        parameters:params
-                                     userLanguage:userLanguage];
+                                      environment:environment];
     fprintf(stdout, "wrote %s (%lu bytes) pages=%lu backend=%s\n", outPath.UTF8String,
             (unsigned long)[out length], (unsigned long)[pages count], backend.name.UTF8String);
   }

@@ -74,11 +74,18 @@
     [content addSubview:button];
     x -= 90;
   }
+  // The data status runs up to the export buttons, not under them: the XIB
+  // cannot know how many there are, and its label ran 64pt beneath the
+  // first, hiding the end of what it said.
+  NSRect status = [_dataStatus frame];
+  status.size.width = MAX(80, x + 90 - 10 - NSMinX(status));
+  [_dataStatus setFrame:status];
 }
 
 - (void)reloadPreview {
   _preview.report = _reportDocument.report;
-  _preview.paramValues = _reportDocument.paramValues;
+  _preview.paramValues = [_reportDocument suppliedParameters];
+  _preview.documentBinder = [_reportDocument dataBinder];
   [_preview reloadLayout];
 }
 

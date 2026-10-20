@@ -3,7 +3,7 @@
 **Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. One source tree for **Cocoa** (macOS) and **GNUstep** — both are CI jobs, and
 the Linux build ships as an AppImage. No Swift, no UIKit. Every window, panel and the menu bar is a plain **XIB**; only the parts that depend on the open report stay in code.
 
-`../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. Tablix on the canvas is a convenience (`columnSpecs` + `-rebuildTablix`, with `rowGroups` / `columnGroups` / `showGrandTotal`) that rebuilds MS-RDL `TablixBody` + hierarchies, including a grouped header + details + subtotal footer and an optional grand-total row; per-column `aggregate` (Sum/Avg/Count/CountDistinct/Min/Max) picks what subtotal and total rows show. A column group alongside a row group builds a crosstab (matrix): a dynamic `TablixColumnHierarchy` group with the first column as the aggregated measure. The spec is stored plainly and projected onto the MS-RDL structures on demand, so the order in which the properties are set no longer matters. Grouping prepends a 1.2in row-header column that no column spec budgeted for, so `-rebuildTablix` takes that width back out of the columns in proportion rather than growing the tablix past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. The "Edit Tablix…" inspector button opens the modal editor.
+`../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. A tablix on the canvas is edited where it stands: columns, groups and totals change the MS-RDL `TablixBody` and hierarchies in place (`RDLTablixStructure`), each as one undoable step, so what a loaded file has that the designer does not show is kept. A new tablix is built from `columnSpecs` + `-rebuildTablix` (with `rowGroups` / `columnGroups` / `showGrandTotal`), which takes the row headers' width out of the columns rather than growing past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. Grouping is the Row Groups / Column Groups pane under the canvas, and a group's own settings are the Group Properties panel it opens.
 
 RDLDesigner.app’s welcome screen opens either this designer or the generator window.
 Choosing the designer asks first where the report comes from — a blank page, or
@@ -37,14 +37,14 @@ the same wizard.
 | `RDLOutlineDataSource` | The report outline: node tree, data source, delegate, and selection mirroring both ways. A tablix opens into its grid — a node per row, a node per cell under it, named by what the cell holds or "empty" — so an item inside a cell is somewhere the outline can reach |
 | `RDLInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
 | `RDLInspectorFields` | One binding declaration per field — control, key path, scope, kind — driving both the fill and the write-back |
-| `RDLTablixEditor` | Modal Report-Builder-style tablix editor: column grid (header/value/width/align/total, and whether a column shows text or a subreport), the row and column group lists — **+**/**−**, editable in place, and re-nested by dragging one group above another, which is what makes a crosstab — subtotals, and the grand-total row. Applies as one undo step |
+| `RDLGroupsView` | The Row Groups / Column Groups pane under the canvas, as Report Builder has it: how the region being worked in groups, with a group added inside, beside or around the one picked out, re-nested by dragging it past another, given a total, deleted, or opened in Group Properties. A tablix's structure is edited on the canvas itself, not in a dialog |
 | `RDLRichTextEditor` | Modal rich-text editor (right-click → Edit Rich Text…): a formatting bar over an NSTextView. Wiring only |
 | `RDLRichTextFormatter` | What the formatting bar does — read the state of a selection (on / off / mixed) and change font, size, colour, bold, italic, underline, strikethrough and paragraph alignment. No window, so checks drive it directly |
 | `RDLRichTextCodec` | Attributed string ⇄ RDL `Paragraphs`/`TextRuns` with sparse per-run styles. Plain text — multi-line included — stays a plain `value` |
 | `RDLDataView` | What a render needs from a person: the report's parameter values, asked for by prompt and offered as a list when the report says what it accepts, plus a summary of the data it will read. Applies as it is typed |
 | `RDLDataSourceNavigator` / `RDLDataSourceView` | A new report has no data source, and nothing invents one: this is where the first is added. The report's data sources, and the one selected: what kind of document, whether it is a file beside the report or content carried in it, and the questions that kind has (a header row, a delimiter). The connect string is written from the answers, never typed |
 | `RDLDatasetNavigator` / `RDLDatasetFieldsView` | The report's datasets, and the one selected: which source it reads, the query into it, **Load**, and its fields — Query or Calculated, with what each is read from. Adding a dataset needs a data source to read from, and offers to make one when the report has none — the order Report Builder works in, and what `Query/DataSourceName` means |
-| `RDLParameterNavigator` / `RDLParameterInspectorView` | The report's parameters, and the settings of the one selected: prompt, type, blank and multi-value, default, and what it accepts |
+| `RDLParameterNavigator` / `RDLParameterInspectorView` | The report's parameters, and the settings of the one selected: whether it is asked for and the prompt it is asked by (an empty prompt is still a prompt), type, blank and multi-value, default, and what it accepts — with a default or a list a `DataSetReference` supplies shown as what it reads rather than typed over |
 | `RDLFieldInspectorView` | A dataset field's settings: its kind, the column it reads or the expression it computes, and its type |
 | `RDLFilterEditor` | Filters at any level — dataset, data region or group: the field, the operator, and the value as an expression |
 | `RDLSubreportParametersEditor` | What a report hands to the report inside it: one row per parameter of the subreport, named from its own definition when that has been loaded, with the value as an expression in the master's scope |
@@ -170,12 +170,10 @@ Deleting a cell's contents empties the cell rather than removing anything from
 a band, and the empty cell stays selected — it is drawn framed, and it is where
 the next element goes.
 
-The column scaffolding (`columnSpecs` + `-rebuildTablix`) still exists for
-laying out a header + details + subtotal table quickly, and it no longer
-destroys what it cannot describe: a cell holding a subreport, an image or a
-rectangle of items is carried across a rebuild rather than replaced by an empty
-text box. A column can also say it *shows* a subreport (`kind` / `report` in
-the spec, **Shows** and **Report** in the tablix editor), which is how a
+The column scaffolding (`columnSpecs` + `-rebuildTablix`) builds a new
+header + details + subtotal table quickly; a tablix that has a body is never
+rebuilt. A column can say it *shows* a subreport (**Shows** and **Report** in
+the tablix dialog), which puts a subreport in its value cell -- how a
 master-detail column is made without touching the cell by hand.
 
 ## Subreports
@@ -205,11 +203,12 @@ shows up in the master's next preview.
 | --- | --- | --- |
 | `MainMenu.xib` | The whole menu bar. Items this app implements target File's Owner; the editing ones (Undo, Cut, Open…, Export PDF…) target First Responder, so the front window answers first | The Samples submenu, one item per sample in the catalogue |
 | `RDLWelcomeWindow.xib` | Everything | — |
-| `RDLDesignerWindow.xib` | The splits, both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
+| `RDLDesignerWindow.xib` | The splits — the three panes, and the centre's own canvas-over-groups split — both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
 | `RDLGeneratorWindow.xib` | The window, the toolbar row, the split and both panes | The sample list, and one export button per backend the kit offers |
 | `RDLInspectorSections.xib` | All ten sections as top-level views: every label, field, popup and frame | Which sections are shown and where they stack (`-stackBoxes:`), and the dataset/page popup contents |
 | `RDLSubreportParametersEditor.xib` | The panel, its three columns and the buttons | The parameter names the subreport declares, and the expression cell in the Value column |
-| `RDLTablixEditor.xib` | The panel, the five columns with their widths and their Align/Total combo lists, the buttons | The dataset and field lists, and the tablix's own values |
+| `RDLGroupsView.xib` | The pane: the group tree with its two columns, and the four buttons | The groups of the region being worked in, and the menu on a row |
+| `RDLSourceView.xib` | The pane: the text view, the status line, Apply and Revert | The report written out as RDL |
 | `RDLRichTextEditor.xib` | The window, the formatting bar and its controls, the text view and the buttons | The installed font families, and the text being edited |
 | `RDLAddElementPanel.xib` | The panel, its caption and Cancel | One button per allowed element kind, and the height to hold them |
 | `RDLPreviewWindow.xib` | Everything | — |

@@ -29,6 +29,11 @@ RDLReport *RDLMiniInvoice(void);
 double RDLAsNum(id v);
 NSString *RDLLaidText(RDLLaidOutItem *it);
 RDLReport *RDLGroupedJobs(void);
+// A dataset whose fields are named differently from the columns they read --
+// Region over TERRITORY, Amount over AMT -- bound through a real data source, the
+// way a report from Report Builder over someone else's data is. Plus an
+// undeclared column, Rep, that a report can still name directly.
+RDLReport *RDLSalesWithRenamedColumns(void);
 // Give a dataset built in code the data source a report on disk would have:
 // its rows as an inline JSON document on the source, and the query that
 // selects them. Fixtures used to rely on rows surviving a write inside

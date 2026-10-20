@@ -82,10 +82,28 @@ static NSArray<NSString *> *RDLFixedWidthSplit(NSString *line, NSArray<NSNumber 
 }
 
 - (NSArray *)rowsFromData:(NSData *)documentData
+                   query:(NSString *)query
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error {
   RDL_UNUSED(dataSet);
+  RDL_UNUSED(query);
+  return [self rowsFromData:documentData properties:properties columns:NULL error:error];
+}
+
+// The file's columns, in the file's order: the header row's names, or
+// Column1, Column2 ... A row is a dictionary, which keeps no order of its own.
+- (NSArray<NSString *> *)columnsFromData:(NSData *)documentData
+                              properties:(NSDictionary<NSString *, NSString *> *)properties {
+  NSArray<NSString *> *columns = nil;
+  [self rowsFromData:documentData properties:properties columns:&columns error:NULL];
+  return columns;
+}
+
+- (NSArray *)rowsFromData:(NSData *)documentData
+               properties:(NSDictionary<NSString *, NSString *> *)properties
+                  columns:(NSArray<NSString *> **)outColumns
+                    error:(NSError **)error {
   if (documentData == nil) {
     if (error)
       *error = RDLDataError(30, @"there is no text to read");
@@ -143,17 +161,22 @@ static NSArray<NSString *> *RDLFixedWidthSplit(NSString *line, NSArray<NSNumber 
     headers = made;
   }
 
+  NSMutableArray<NSString *> *names = [NSMutableArray array];
+  for (NSUInteger c = 0; c < [headers count]; c++) {
+    NSString *name = [headers[c] stringByTrimmingCharactersInSet:
+                                     [NSCharacterSet whitespaceCharacterSet]];
+    if ([name length] == 0)
+      name = [NSString stringWithFormat:@"Column%lu", (unsigned long)c + 1];
+    [names addObject:name];
+  }
+  if (outColumns)
+    *outColumns = names;
   NSMutableArray *rows = [NSMutableArray array];
   for (NSUInteger i = firstRow; i < [lines count]; i++) {
     NSArray<NSString *> *values = split(lines[i]);
     NSMutableDictionary *row = [NSMutableDictionary dictionary];
-    for (NSUInteger c = 0; c < [headers count]; c++) {
-      NSString *name = [headers[c] stringByTrimmingCharactersInSet:
-                                       [NSCharacterSet whitespaceCharacterSet]];
-      if ([name length] == 0)
-        name = [NSString stringWithFormat:@"Column%lu", (unsigned long)c + 1];
-      row[name] = c < [values count] ? values[c] : @"";
-    }
+    for (NSUInteger c = 0; c < [names count]; c++)
+      row[names[c]] = c < [values count] ? values[c] : @"";
     [rows addObject:row];
   }
   return rows;

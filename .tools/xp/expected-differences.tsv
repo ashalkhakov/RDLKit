@@ -1,0 +1,22 @@
+# What still differs between macOS and GNUstep in the corpus comparison
+# (.tools/xp/compare.py, the xp job in build.yml), and why: one line per
+# report and check -- id<TAB>check<TAB>reason; an id may be a glob.
+#
+# Checks: status, pages, text, pixels, html (compare.py says what each is).
+# A difference listed here is reported and passed; one that is not fails the
+# job. When a fix lands -- a gnustep-patches release moved in .github/pins.env
+# -- the comparison says which lines no longer differ ("FIXED?" in
+# verdict.txt), and they come out of this file.
+Designer_Samples_AtelierInvoice	pixels	Helvetica: GNUstep sets it in DejaVu Sans, where fontconfig names the metric-compatible Arial (fc-match Helvetica: Arial.ttf), so the sample's Helvetica captions are wider on Linux; its Georgia text matches (waiting on gnustep-patches)
+Designer_Samples_HarborDispatch	pixels	Helvetica: GNUstep sets it in DejaVu Sans, where fontconfig names the metric-compatible Arial (fc-match Helvetica: Arial.ttf), so the sample's Helvetica captions are wider on Linux; its Georgia text matches (waiting on gnustep-patches)
+Designer_Samples_HarborManifest	pixels	Helvetica: GNUstep sets it in DejaVu Sans, where fontconfig names the metric-compatible Arial (fc-match Helvetica: Arial.ttf), so the sample's Helvetica captions are wider on Linux; its Georgia text matches (waiting on gnustep-patches)
+Designer_Samples_HarborPackingSlip	pixels	Helvetica: GNUstep sets it in DejaVu Sans, where fontconfig names the metric-compatible Arial (fc-match Helvetica: Arial.ttf), so the sample's Helvetica captions are wider on Linux; its Georgia text matches (waiting on gnustep-patches)
+Designer_Samples_Letter	pixels	Helvetica: GNUstep sets it in DejaVu Sans, where fontconfig names the metric-compatible Arial (fc-match Helvetica: Arial.ttf), so the sample's Helvetica captions are wider on Linux; its Georgia text matches (waiting on gnustep-patches)
+Examples_Examples.416_STAMPA_TABELLONE_RADIO_CON_DATI	pixels	a page of fractional height (8.3in = 597.6pt) is drawn by whole points on GNUstep: the page rect is cut to 842 x 597 and everything on it sits 0.6pt higher than on the Mac (waiting on gnustep-patches)
+ReportTests_Reports_meeting-minutes1-a4	pixels	a page of fractional height (841.68pt) is drawn by whole points on GNUstep: the page rect is cut to 595 x 841 and everything on it sits 0.68pt higher than on the Mac (waiting on gnustep-patches)
+ReportTests_Reports_meeting-minutes1-a4	pages	not a fault on either side: the report asks for 8.27in x 11.69in = 595.44 x 841.68pt, which GNUstep writes; macOS snaps the sheet to its A4 (595 x 842) and centres the page on it
+ReportTests_Reports_CanGrowSplitTest	pixels	glyph rasterization: the same text in the same lines, but its pages are 2in tall and nothing but 10pt text, where poppler's anti-aliasing of the two PDFs' embedded fonts, and glyph positions a fraction of a point apart, come to more than 0.5% of the pixels at 60 dpi
+*_ChartTypes	text	a line cut by the edge of its box or of the page (the turned "Matrix" label, of which the page shows the "M"; the second line of a "Grand Total" header): Quartz writes the whole line into the PDF's text and lets the clip hide what is outside, cairo writes only the glyphs the clip leaves in sight, so the words read out differ where the pages look alike
+Examples_Examples_FinancialFunctions	text	a line cut by the edge of its box or of the page (the second line of an NPer() caption, below its box): Quartz writes the whole line into the PDF's text and lets the clip hide what is outside, cairo writes only the glyphs the clip leaves in sight, so the words read out differ where the pages look alike
+Examples_Examples_SuppliersStyled	text	a line cut by the edge of its box or of the page ("CompanyName" wrapping its "e" below the header box): Quartz writes the whole line into the PDF's text and lets the clip hide what is outside, cairo writes only the glyphs the clip leaves in sight, so the words read out differ where the pages look alike
+ReportTests_Reports_CanGrow*Test	text	a line cut by the edge of its box or of the page (the line a CanGrow box is split at between pages, on both of them): Quartz writes the whole line into the PDF's text and lets the clip hide what is outside, cairo writes only the glyphs the clip leaves in sight, so the words read out differ where the pages look alike

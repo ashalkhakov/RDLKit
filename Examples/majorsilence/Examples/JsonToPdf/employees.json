@@ -1,0 +1,119 @@
+[
+  {
+    "EmployeeID": 1,
+    "FirstName": "Nancy",
+    "LastName": "Davolio",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1992-05-01",
+    "Salary": 52000,
+    "Contact": {
+      "Email": "nancy.davolio@example.com",
+      "Phone": "(206) 555-9857"
+    }
+  },
+  {
+    "EmployeeID": 2,
+    "FirstName": "Andrew",
+    "LastName": "Fuller",
+    "Department": "Management",
+    "Title": "Vice President, Sales",
+    "HireDate": "1992-08-14",
+    "Salary": 90000,
+    "Contact": {
+      "Email": "andrew.fuller@example.com",
+      "Phone": "(206) 555-9482"
+    }
+  },
+  {
+    "EmployeeID": 3,
+    "FirstName": "Janet",
+    "LastName": "Leverling",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1992-04-01",
+    "Salary": 54000,
+    "Contact": {
+      "Email": "janet.leverling@example.com",
+      "Phone": "(206) 555-3412"
+    }
+  },
+  {
+    "EmployeeID": 4,
+    "FirstName": "Margaret",
+    "LastName": "Peacock",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1993-05-03",
+    "Salary": 56000,
+    "Contact": {
+      "Email": "margaret.peacock@example.com",
+      "Phone": "(206) 555-8122"
+    }
+  },
+  {
+    "EmployeeID": 5,
+    "FirstName": "Steven",
+    "LastName": "Buchanan",
+    "Department": "Sales",
+    "Title": "Sales Manager",
+    "HireDate": "1993-10-17",
+    "Salary": 72000,
+    "Contact": {
+      "Email": "steven.buchanan@example.com",
+      "Phone": "(71) 555-4848"
+    }
+  },
+  {
+    "EmployeeID": 6,
+    "FirstName": "Michael",
+    "LastName": "Suyama",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1993-10-17",
+    "Salary": 50000,
+    "Contact": {
+      "Email": "michael.suyama@example.com",
+      "Phone": "(71) 555-7773"
+    }
+  },
+  {
+    "EmployeeID": 7,
+    "FirstName": "Robert",
+    "LastName": "King",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1994-01-02",
+    "Salary": 51000,
+    "Contact": {
+      "Email": "robert.king@example.com",
+      "Phone": "(71) 555-5598"
+    }
+  },
+  {
+    "EmployeeID": 8,
+    "FirstName": "Laura",
+    "LastName": "Callahan",
+    "Department": "Support",
+    "Title": "Inside Sales Coordinator",
+    "HireDate": "1994-03-05",
+    "Salary": 48000,
+    "Contact": {
+      "Email": "laura.callahan@example.com",
+      "Phone": "(206) 555-1189"
+    }
+  },
+  {
+    "EmployeeID": 9,
+    "FirstName": "Anne",
+    "LastName": "Dodsworth",
+    "Department": "Sales",
+    "Title": "Sales Representative",
+    "HireDate": "1994-11-15",
+    "Salary": 49000,
+    "Contact": {
+      "Email": "anne.dodsworth@example.com",
+      "Phone": "(71) 555-4444"
+    }
+  }
+]

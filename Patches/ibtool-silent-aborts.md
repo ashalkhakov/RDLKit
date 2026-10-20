@@ -17,7 +17,10 @@ The same input also aborts `ibtool --upgrade`, and opening the file in Xcode
 crashes the IDE.
 
 Each case is markup that Interface Builder itself would never write, but none of
-them is rejected as an error — they abort the process instead. A diagnostic
+them is rejected as an error — they abort the process instead. **Xcode's
+`ibtool` only:** GNUstep's `GSXib5KeyedUnarchiver` loads all three repro files
+and instantiates their top-level object, checked on 2026-09-25 in the
+`gnustep-patches` container, so this is nothing to take upstream there. A diagnostic
 naming the element would have turned each of these from an afternoon into a
 minute.
 

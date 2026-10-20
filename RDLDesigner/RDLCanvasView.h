@@ -13,5 +13,19 @@
 // A binding dropped from the palette, as a textbox at that point. Separated
 // from the drag so it can be driven directly.
 - (BOOL)dropBinding:(NSDictionary *)binding atPoint:(NSPoint)point;
+// Arranging what is selected, from the Edit menu: lined up on the first of
+// them, given its size, or spread evenly between the two furthest apart.
+// Declared because the menu names them and a check drives them.
+- (void)alignLeftEdges:(id)sender;
+- (void)alignHorizontalCenters:(id)sender;
+- (void)alignRightEdges:(id)sender;
+- (void)alignTopEdges:(id)sender;
+- (void)alignVerticalCenters:(id)sender;
+- (void)alignBottomEdges:(id)sender;
+- (void)makeSameWidth:(id)sender;
+- (void)makeSameHeight:(id)sender;
+- (void)makeSameSize:(id)sender;
+- (void)distributeHorizontally:(id)sender;
+- (void)distributeVertically:(id)sender;
 - (RDLPageGeometry *)geometry;
 @end

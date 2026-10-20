@@ -1,7 +1,12 @@
 # NSXML discards a text node that is only whitespace (worked around)
 
 **Framework.** Foundation's `NSXMLDocument` on macOS 15 (Darwin 24.6.0),
-Xcode 26.0 toolchain.
+Xcode 26.0 toolchain. **Apple's Foundation only:** GNUstep reads every one of
+the cases below correctly — checked on 2026-09-25 by building
+`repro-nsxml-whitespace.m` against gnustep-base in the `gnustep-patches`
+container, where all five lines report the whitespace they were given. So
+there is nothing to fix upstream in GNUstep, and the workaround costs nothing
+there.
 
 **Symptom.** An element whose content is entirely whitespace comes back empty.
 The text is written correctly — it is the *reader* that drops it — so a value

@@ -12,10 +12,26 @@
                    context:(RDLExpressionContext)context
                     report:(RDLReport *)report;
 
+// The same, for an expression that reads the dataset named: what it is
+// checked against as it is written. nil for the report's only dataset.
++ (NSString *)runForSource:(NSString *)source
+                   context:(RDLExpressionContext)context
+                    report:(RDLReport *)report
+               dataSetName:(NSString *)dataSetName;
+
 // Built but not shown, for checking what it does without a modal session.
 + (instancetype)editorForSource:(NSString *)source
                         context:(RDLExpressionContext)context
                          report:(RDLReport *)report;
++ (instancetype)editorForSource:(NSString *)source
+                        context:(RDLExpressionContext)context
+                         report:(RDLReport *)report
+                    dataSetName:(NSString *)dataSetName;
+// What RDLChecker finds in the source as it stands -- a field the dataset does
+// not have, a function that does not exist, the wrong number of arguments.
+@property (nonatomic, readonly, copy) NSArray<RDLDiagnostic *> *diagnostics;
+// The status line, as it reads.
+@property (nonatomic, readonly, copy) NSString *status;
 @property (nonatomic, readonly, copy) NSString *source;
 // The text behind the source, which is what colours it -- see
 // RDLExpressionTextStorage. Published so a test can change the text the way
