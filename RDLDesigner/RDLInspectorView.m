@@ -654,16 +654,16 @@ static void RDLFillStyleChoices(NSPopUpButton *pop, NSInteger first, NSInteger l
   [_bindings bind:_textBGField keyPath:@"style.backgroundColor" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression];
   // Padding, which the engine has always drawn and the inspector never showed:
-  // 2pt a side is what a style that says nothing gets, so that is what the
-  // empty field means rather than none.
+  // a style that says nothing has none (RDL's default), so that is what the
+  // empty field means.
   [_bindings bind:_padLeftField keyPath:@"style.paddingLeft" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"0pt"];
   [_bindings bind:_padRightField keyPath:@"style.paddingRight" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"0pt"];
   [_bindings bind:_padTopField keyPath:@"style.paddingTop" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"0pt"];
   [_bindings bind:_padBottomField keyPath:@"style.paddingBottom" scope:RDLFieldScopeItem
-             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"2pt"];
+             kind:RDLFieldKindLengthOrExpression values:nil placeholder:@"0pt"];
   [_bindings bind:_colorField keyPath:@"style.color" scope:RDLFieldScopeItem
              kind:RDLFieldKindTextOrExpression values:nil placeholder:@"#1a1916"];
   [_bindings bind:_colorWell keyPath:@"style.color" scope:RDLFieldScopeItem

@@ -709,8 +709,8 @@ static NSString *RDLLegacyMatrixRDL(void) {
     XCTFail(@"%@", @"TextAlign defaults to General");
   for (RDLLength *padding in @[ box.style.paddingLeft, box.style.paddingRight,
                                 box.style.paddingTop, box.style.paddingBottom ])
-    if (![[padding stringValue] isEqualToString:@"2pt"])
-      XCTFail(@"%@", [NSString stringWithFormat:@"padding defaults to 2pt, not %@",
+    if (![[padding stringValue] isEqualToString:@"0pt"])
+      XCTFail(@"%@", [NSString stringWithFormat:@"padding defaults to 0pt, not %@",
                                                 [padding stringValue]]);
   // Each side on its own: a file that states one padding keeps the default on
   // the other three. Assigning every side from the parse overwrote the ones
@@ -726,8 +726,8 @@ static NSString *RDLLegacyMatrixRDL(void) {
   RDLStyle *style = [[partly.body.items firstObject] style];
   if (![[style.paddingLeft stringValue] isEqualToString:@"6pt"])
     XCTFail(@"%@", @"a stated padding should be read");
-  if (![[style.paddingTop stringValue] isEqualToString:@"2pt"] ||
-      ![[style.paddingRight stringValue] isEqualToString:@"2pt"])
+  if (![[style.paddingTop stringValue] isEqualToString:@"0pt"] ||
+      ![[style.paddingRight stringValue] isEqualToString:@"0pt"])
     XCTFail(@"%@", [NSString stringWithFormat:@"the other sides keep the default, not %@/%@",
                                               [style.paddingTop stringValue],
                                               [style.paddingRight stringValue]]);

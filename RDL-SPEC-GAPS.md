@@ -212,7 +212,7 @@ The audit's findings here are fixed (P0.2, P0.11):
 ### 3.4 Defaults — fixed (P0.3)
 
 The kit's defaults are the spec's: `FontFamily` Arial, `FontSize` 10pt,
-`Color` Black, padding 2pt on all sides, `TextAlign` General (numbers
+`Color` Black, no padding (0pt on all sides; see below), `TextAlign` General (numbers
 right-aligned, everything else left), textbox `CanGrow` false,
 `PrintOnFirstPage`/`PrintOnLastPage` false, image `Sizing` `AutoSize`, a
 visible legend when `ChartLegends` is absent, and no page header or footer
@@ -224,6 +224,17 @@ into items that omitted it. Remaining differences:
 |---|---|---|---|
 | `TextAlign` General on a date | left | right | `RDLLayoutEngine.m`, `RDLStyleResolvingGeneralAlign` |
 | Body height when absent | 4in | — | `:1101` |
+
+Padding: [MS-RDL] 2.293.25–2.293.28 (`Style.PaddingBottom`, `PaddingLeft`,
+`PaddingRight`, `PaddingTop`) make each element optional and give no value
+for its absence, where 2.293.16 does for `FontSize` ("interpreted as 10pt").
+The RDL reference gives 0pt (*PaddingLeft Element (RDL)*, SQL Server 2005,
+ms154617: "Default value: 0pt"), and SSRS reads an absent padding as none.
+The 2pt in most reports is Report Builder's, which writes it into every text
+box it makes; RDLKit's designer does the same, so a box it makes states 2pt
+and renders the same anywhere. *Until 2026-10* the kit read an absent padding
+as 2pt, which put text 2pt further in than SSRS does in files from tools that
+leave it out.
 
 *As audited:* Georgia, `#1a1916`, padding 4/4/2/2 and `TextAlign` Left,
 materialised into every item on a round trip; `PrintOn*` and `CanGrow`
@@ -313,6 +324,13 @@ URL, or content carried inline in the connect string), and the dataset's
 is the local-mode ReportViewer model — the host supplies rows — expressed
 in RDL's own elements. Database providers, shared data sources and shared
 datasets remain server-side (§12).
+
+Other tools' query dialects are out of scope too. Majorsilence Reporting
+queries a JSON document with `table=root_Attendees` in the connect string and
+`columns=Name,Title` as the command, `_` joining nested members; RDLKit reads
+JSONPath only, so the three Majorsilence examples written that way
+(`Employees.rdl`, `JsonReport.rdl`, `meeting-minutes1-a4.rdl`) bind no rows
+and render empty, as they would in any reader of RDL that is not Majorsilence.
 
 | Element | Status | Detail |
 |---|---|---|
@@ -560,7 +578,7 @@ included since P1.3 (§7.2).
 | `TextDecoration` | FULL | `Overline` drawn in PDF too (P1.2). |
 | `TextAlign` | PART | `General` right-aligns numbers and left-aligns everything else; the spec right-aligns dates too. Written only when set. |
 | `VerticalAlign` | FULL | |
-| `PaddingLeft/Right/Top/Bottom` | FULL | Default 2pt on every side, as the spec says. |
+| `PaddingLeft/Right/Top/Bottom` | FULL | 0pt when absent, as the RDL reference and SSRS have it ([MS-RDL] 2.293.25–28 state no default; §3.4). The designer writes 2pt into the text boxes it makes, as Report Builder does. |
 | `Format` | PART | §10.4. |
 | `Language` | FULL | Per item (and per run); switches the formatting culture for the item's contents. |
 | `Direction`, `WritingMode` | FULL | Right-to-left text, and `Vertical` and `Rotate270` text turned in its box; the 2005 `lr-tb`/`tb-rl`/`rl-tb` values are upgraded (P1.2). |
@@ -1239,7 +1257,7 @@ All twelve are fixed; the sections they point to say what changed.
    engine cannot open, or produce, a current Report Builder file.
 2. **Done.** Stop the upgrader from stripping 2008 chart series; lift 2005
    `Action`; read 2005 `List/Sorting` (§3.3).
-3. **Done.** Spec defaults and no materialisation: Arial 10pt black, 2pt padding,
+3. **Done.** Spec defaults and no materialisation: Arial 10pt black, no padding,
    `TextAlign` General with numeric right-align, `CanGrow` false,
    `PrintOnFirst/LastPage` false, no phantom bands, `Sizing` AutoSize
    (§3.4, §11.2).

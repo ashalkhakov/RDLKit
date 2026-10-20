@@ -1127,6 +1127,7 @@ static NSIndexSet *RDLInkedRows(NSBitmapImageRep *rep) {
        "<ReportSections><ReportSection><Body><Height>1in</Height><ReportItems>"
        "<Textbox Name=\"Short\"><Top>0.5in</Top><Left>0.5in</Left><Height>12pt</Height><Width>1in</Width>"
        "<Paragraphs><Paragraph><TextRuns><TextRun><Value>Hgjpqy</Value></TextRun></TextRuns></Paragraph></Paragraphs>"
+       "<Style><PaddingLeft>2pt</PaddingLeft><PaddingTop>2pt</PaddingTop></Style>"
        "</Textbox></ReportItems></Body><Width>2in</Width>"
        "<Page><PageHeight>2in</PageHeight><PageWidth>2in</PageWidth>"
        "<LeftMargin>0in</LeftMargin><TopMargin>0in</TopMargin></Page>"
@@ -1143,6 +1144,7 @@ static NSIndexSet *RDLInkedRows(NSBitmapImageRep *rep) {
   NSIndexSet *inked = RDLInkedRows(rep);
   XCTAssertTrue([inked count] > 0, @"no text was drawn");
   NSFont *font = [RDLTextAttributes fontForStyle:[RDLStyle defaultStyle] scale:1];
+  // Report Builder's 2pt, which pushes the descenders past the bottom.
   CGFloat padding = 2;
   // The top of the capital: the ascent less the cap height below the padding.
   CGFloat capTop = padding + [font ascender] - [font capHeight];

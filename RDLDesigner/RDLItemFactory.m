@@ -345,12 +345,20 @@ static NSMutableSet *RDLUsedNames(RDLReport *report) {
   list.height = kListHeight;
 }
 
++ (void)applyTextboxPaddingTo:(RDLItem *)it {
+  it.style.paddingLeft = [RDLLength points:2];
+  it.style.paddingRight = [RDLLength points:2];
+  it.style.paddingTop = [RDLLength points:2];
+  it.style.paddingBottom = [RDLLength points:2];
+}
+
 + (void)applyDefaultsTo:(RDLItem *)it report:(RDLReport *)report {
   it.width = 2.0;
   it.height = 0.32;
   if ([it isKindOfClass:[RDLTextbox class]]) {
     [(RDLTextbox *)it setValue:@"Text"];
     it.style.fontSize = [RDLLength points:11];
+    [self applyTextboxPaddingTo:it];
   } else if ([it isKindOfClass:[RDLLine class]]) {
     // Flat. A line runs from one corner of its box to the other, so any height
     // at all is a slope -- and a line inserted from the menu is meant to be a

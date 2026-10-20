@@ -77,6 +77,10 @@ FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
 // palette, say -- starts it the same as one inserted from the menu, rather
 // than inventing a second set of defaults that drift apart.
 + (void)applyDefaultsTo:(RDLItem *)item report:(RDLReport *)report;
+// 2pt of padding on every side, written into the file, as Report Builder
+// writes it into each text box it makes: RDL itself gives padding no default
+// and SSRS reads an absent one as none, so a box made here says what it wants.
++ (void)applyTextboxPaddingTo:(RDLItem *)item;
 
 + (NSString *)uniqueNameWithPrefix:(NSString *)prefix inReport:(RDLReport *)report;
 // A name RDL accepts for a report item: a letter, then letters, digits and

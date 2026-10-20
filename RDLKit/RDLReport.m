@@ -732,10 +732,14 @@ static const char *RDLLengthUnitSuffix(RDLLengthUnit unit) {
   s.textAlign = RDLTextAlignGeneral;
   s.verticalAlign = RDLVerticalAlignTop;
   s.textDecoration = RDLTextDecorationNone;
-  s.paddingLeft = [RDLLength points:2];
-  s.paddingRight = [RDLLength points:2];
-  s.paddingTop = [RDLLength points:2];
-  s.paddingBottom = [RDLLength points:2];
+  // MS-RDL 2.293.25-28 give padding no default; the RDL reference gives 0pt
+  // (PaddingLeft Element (RDL), SQL Server 2005), and SSRS reads an absent one
+  // as none. The 2pt in most reports is Report Builder's, written into each
+  // text box it makes.
+  s.paddingLeft = [RDLLength points:0];
+  s.paddingRight = [RDLLength points:0];
+  s.paddingTop = [RDLLength points:0];
+  s.paddingBottom = [RDLLength points:0];
   // No borders, said by saying nothing about them: an unstated border draws
   // exactly as a None one does. Stating None here gave every item that never
   // mentioned a border five of them, each carrying a width and a colour, and

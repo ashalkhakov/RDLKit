@@ -744,12 +744,12 @@
   NSTextField *left = [inspector valueForKey:@"padLeftField"];
   if (![[left stringValue] isEqualToString:@"6pt"])
     XCTFail(@"the left padding shows %@", [left stringValue]);
-  // A side nobody set still holds the 2pt MS-RDL gives every style, so that is
-  // what the field shows: the box says what the item has, not what is left
-  // over once the defaults are taken away.
+  // A side nobody set still holds the default every style has -- none -- so
+  // that is what the field shows: the box says what the item has, not what is
+  // left over once the defaults are taken away.
   NSTextField *top = [inspector valueForKey:@"padTopField"];
-  if (![[top stringValue] isEqualToString:@"2pt"])
-    XCTFail(@"an unset padding should show the 2pt default, shows %@", [top stringValue]);
+  if (![[top stringValue] isEqualToString:@"0pt"])
+    XCTFail(@"an unset padding should show the 0pt default, shows %@", [top stringValue]);
 
   // Field -> model, as a length rather than the string that was typed.
   [top setStringValue:@"3pt"];
@@ -759,7 +759,7 @@
   if (![[box.style.paddingTop stringValue] isEqualToString:@"3pt"])
     XCTFail(@"the top padding reads %@", [box.style.paddingTop stringValue]);
   // And the other sides were left where they were.
-  if (![[box.style.paddingRight stringValue] isEqualToString:@"2pt"])
+  if (![[box.style.paddingRight stringValue] isEqualToString:@"0pt"])
     XCTFail(@"the right padding moved to %@", [box.style.paddingRight stringValue]);
   if (![[box.style.paddingLeft stringValue] isEqualToString:@"6pt"])
     XCTFail(@"the left padding moved to %@", [box.style.paddingLeft stringValue]);

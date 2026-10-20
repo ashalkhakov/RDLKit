@@ -115,6 +115,10 @@
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#6b6357</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -148,6 +152,10 @@
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#6b6357</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -181,6 +189,10 @@
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#6b6357</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -214,6 +226,10 @@
                                                         <FontWeight>Bold</FontWeight>
                                                         <Color>#6b6357</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -251,6 +267,10 @@
                                                         <FontSize>9pt</FontSize>
                                                         <Color>#1a1916</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -282,6 +302,10 @@
                                                         <FontSize>9pt</FontSize>
                                                         <Color>#1a1916</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -313,6 +337,10 @@
                                                         <FontSize>9pt</FontSize>
                                                         <Color>#1a1916</Color>
                                                         <VerticalAlign>Middle</VerticalAlign>
+                                                        <PaddingLeft>2pt</PaddingLeft>
+                                                        <PaddingRight>2pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -400,6 +428,10 @@
                                 <FontWeight>Bold</FontWeight>
                                 <Color>#1a1916</Color>
                                 <VerticalAlign>Middle</VerticalAlign>
+                                <PaddingLeft>2pt</PaddingLeft>
+                                <PaddingRight>2pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -429,6 +461,10 @@
                                 <Color>#6b6357</Color>
                                 <TextAlign>Right</TextAlign>
                                 <VerticalAlign>Middle</VerticalAlign>
+                                <PaddingLeft>2pt</PaddingLeft>
+                                <PaddingRight>2pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -457,6 +493,10 @@
                                 <FontSize>8pt</FontSize>
                                 <Color>#6b6357</Color>
                                 <VerticalAlign>Middle</VerticalAlign>
+                                <PaddingLeft>2pt</PaddingLeft>
+                                <PaddingRight>2pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -492,6 +532,10 @@
                                 <Color>#6b6357</Color>
                                 <TextAlign>Center</TextAlign>
                                 <VerticalAlign>Middle</VerticalAlign>
+                                <PaddingLeft>2pt</PaddingLeft>
+                                <PaddingRight>2pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>

@@ -36,6 +36,7 @@ static RDLTextbox *RDLNewTextbox(NSString *prefix, NSString *value, RDLTablix *t
   RDLTextbox *box = [[RDLTextbox alloc] init];
   box.name = [RDLItemFactory uniqueNameWithPrefix:prefix inReport:report besides:tablix];
   box.value = value;
+  [RDLItemFactory applyTextboxPaddingTo:box];
   return box;
 }
 

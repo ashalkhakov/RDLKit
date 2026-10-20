@@ -4271,7 +4271,7 @@ static RDLTextRun *RDLRunNamed(NSArray<RDLParagraph *> *paragraphs, NSString *va
                                               (unsigned long)[pieces count]]);
     return;
   }
-  const CGFloat padTop = 2.0 / 72.0;
+  const CGFloat padTop = [[RDLStyle defaultStyle].paddingTop points] / 72.0;
   for (NSUInteger k = 0; k < [pieces count]; k++) {
     RDLLaidOutItem *it = pieces[k];
     RDLLaidOutPage *page = piecePages[k];

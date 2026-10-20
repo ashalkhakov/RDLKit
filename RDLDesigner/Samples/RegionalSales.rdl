@@ -87,6 +87,8 @@
                                                     <VerticalAlign>Top</VerticalAlign>
                                                     <PaddingLeft>4pt</PaddingLeft>
                                                     <PaddingRight>4pt</PaddingRight>
+                                                    <PaddingTop>2pt</PaddingTop>
+                                                    <PaddingBottom>2pt</PaddingBottom>
                                                 </Style>
                                                 <Paragraphs>
                                                     <Paragraph>
@@ -137,6 +139,8 @@
                                                         <VerticalAlign>Top</VerticalAlign>
                                                         <PaddingLeft>4pt</PaddingLeft>
                                                         <PaddingRight>4pt</PaddingRight>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -184,6 +188,8 @@
                                                             <Width>0.5pt</Width>
                                                             <Color>#1a1916</Color>
                                                         </TopBorder>
+                                                        <PaddingTop>2pt</PaddingTop>
+                                                        <PaddingBottom>2pt</PaddingBottom>
                                                     </Style>
                                                     <Paragraphs>
                                                         <Paragraph>
@@ -241,6 +247,8 @@
                                                     <BackgroundColor>#ece6d8</BackgroundColor>
                                                     <PaddingLeft>4pt</PaddingLeft>
                                                     <PaddingRight>4pt</PaddingRight>
+                                                    <PaddingTop>2pt</PaddingTop>
+                                                    <PaddingBottom>2pt</PaddingBottom>
                                                 </Style>
                                                 <Paragraphs>
                                                     <Paragraph>
@@ -289,6 +297,8 @@
                                                             <BackgroundColor>#ece6d8</BackgroundColor>
                                                             <PaddingLeft>4pt</PaddingLeft>
                                                             <PaddingRight>4pt</PaddingRight>
+                                                            <PaddingTop>2pt</PaddingTop>
+                                                            <PaddingBottom>2pt</PaddingBottom>
                                                         </Style>
                                                         <Paragraphs>
                                                             <Paragraph>
@@ -341,6 +351,8 @@
                                                     <VerticalAlign>Top</VerticalAlign>
                                                     <PaddingLeft>4pt</PaddingLeft>
                                                     <PaddingRight>4pt</PaddingRight>
+                                                    <PaddingTop>2pt</PaddingTop>
+                                                    <PaddingBottom>2pt</PaddingBottom>
                                                 </Style>
                                                 <Paragraphs>
                                                     <Paragraph>
@@ -386,6 +398,8 @@
                                                             <VerticalAlign>Top</VerticalAlign>
                                                             <PaddingLeft>4pt</PaddingLeft>
                                                             <PaddingRight>4pt</PaddingRight>
+                                                            <PaddingTop>2pt</PaddingTop>
+                                                            <PaddingBottom>2pt</PaddingBottom>
                                                         </Style>
                                                         <Paragraphs>
                                                             <Paragraph>
@@ -444,6 +458,8 @@
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -478,6 +494,8 @@
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -511,6 +529,8 @@
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
@@ -577,6 +597,8 @@
                                 <VerticalAlign>Top</VerticalAlign>
                                 <PaddingLeft>4pt</PaddingLeft>
                                 <PaddingRight>4pt</PaddingRight>
+                                <PaddingTop>2pt</PaddingTop>
+                                <PaddingBottom>2pt</PaddingBottom>
                             </Style>
                             <Paragraphs>
                                 <Paragraph>
