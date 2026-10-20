@@ -6,7 +6,7 @@
 # repository's root.
 set -euo pipefail
 if grep -rn "CoreGraphics\|<Cocoa/Cocoa.h>\|QuartzCore" \
-     --include="*.h" --include="*.m" RDLKit RDLDesigner RDLGen RDLKitTests RDLDesignerTests RDLDesignerUITests; then
+     --include="*.h" --include="*.m" RDLKit RDLKitUI RDLDesigner RDLGen Examples/ReportHost Scripts/installcheck RDLKitTests RDLDesignerTests RDLDesignerUITests; then
   echo "check-imports: a macOS-only framework is imported; GNUstep has no such header"
   exit 1
 fi

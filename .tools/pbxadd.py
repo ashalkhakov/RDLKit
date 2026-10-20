@@ -26,6 +26,12 @@ TARGETS = {
     # name: (group, sources phase, headers phase or None, resources phase or None)
     'RDLKit': ('45316B45CB436116EC434408', 'BBD96B25C463E4F2194995B6',
                 '7904DBFDD0ABC4FECE1D6E19', None),
+    # The viewer and the designer, as a framework (RDLKitUI/). A header
+    # registered here is made Public, which only the API is (RDLKitUI.h and
+    # what it imports): register an internal one's .m alone, and add the .h
+    # to the group by hand or with --shared-ref from a target without headers.
+    'RDLKitUI': ('582420A36E459B31121B1DC9', 'D309EC81756F887B0B713410',
+                 '24E8D77759D7E3A7B34C0124', 'BE7101C06E442BCFE7F3C587'),
     'RDLDesigner':    ('367BDD79C0EB7824B717F2C6', '9A62AC01A2B00BE761FA3E90',
                 None, 'F0BE7C60351F60A2424990B8'),
     # The checks drive the tablix panel, so its XIB has to be in the test

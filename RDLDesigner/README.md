@@ -3,6 +3,17 @@
 **Component 2.** Native Objective-C (ARC) designer for creating and editing Microsoft RDL files. One source tree for **Cocoa** (macOS) and **GNUstep** — both are CI jobs, and
 the Linux build ships as an AppImage. No Swift, no UIKit. Every window, panel and the menu bar is a plain **XIB**; only the parts that depend on the open report stay in code.
 
+**Where the code is.** The designer itself -- its editing core, canvas, panes,
+panels and their XIBs -- is `../RDLKitUI`, a library any application embeds
+(`RDLReportDesigner`, and the viewer, `RDLReportViewController`; see the
+top-level README's **Embedding the viewer and the designer**). This directory
+is the application around it: `main.m`, `RDLAppDelegate` (the menu bar, from
+`MainMenu.xib`, whose designer commands go to the first responder), the
+library and generator windows, the new-report wizard, updates, the samples.
+Its documents are `RDLDocument`s, each opening an
+`RDLReportDesignerWindowController` -- the name the classes below go by is
+`RDLDesignerWindow`, an alias the checks still use.
+
 `../RDLKit` is the **generator**: RDL + data + parameters → laid-out pages, then a **PDF** or **HTML** backend. The designer writes `.rdl`; preview and export call the generator. A tablix on the canvas is edited where it stands: columns, groups and totals change the MS-RDL `TablixBody` and hierarchies in place (`RDLTablixStructure`), each as one undoable step, so what a loaded file has that the designer does not show is kept. A new tablix is built from `columnSpecs` + `-rebuildTablix` (with `rowGroups` / `columnGroups` / `showGrandTotal`), which takes the row headers' width out of the columns rather than growing past the page; the bound is the tablix's own width, clamped by what is left of the body to its right, which it finds through the weak `RDLItem.report` back-pointer that `-[RDLReport adoptItems]` stamps on load and after every structural edit. Grouping is the Row Groups / Column Groups pane under the canvas, and a group's own settings are the Group Properties panel it opens.
 
 RDLDesigner.app’s welcome screen opens either this designer or the generator window.
@@ -32,7 +43,7 @@ the same wizard.
 | `RDLWelcomeWindow` | Chooser: Generator or Designer |
 | `RDLNewReport` | What a new report is made of — blank, or scaffolded from a `.docx` — plus the import's notes and the checker's verdict. No window, so checks drive all of it |
 | `RDLNewReportPanel` | The wizard itself: the choice, the file, and what the import found. Wiring only |
-| `RDLDesignerWindow` | Split: navigators (outline, or data sources · datasets · parameters) · centre (canvas, source, or whichever of a dataset and a data source is selected) · inspector. Every pane derives what it shows from `RDLSelection`; nothing coordinates with anything else. Selecting anything but the report brings the inspector's Attributes tab forward, in one place rather than at each navigator |
+| `RDLReportDesigner` (in a window: `RDLReportDesignerWindowController`, alias `RDLDesignerWindow`) | Split: navigators (outline, or data sources · datasets · parameters) · centre (canvas, source, or whichever of a dataset and a data source is selected) · inspector. Every pane derives what it shows from `RDLSelection`; nothing coordinates with anything else. Selecting anything but the report brings the inspector's Attributes tab forward, in one place rather than at each navigator |
 | `RDLGeneratorWindow` | Give a report its parameter values and read its data — every source it names, fetching `http(s)` only if asked and offering to find a document that has moved — then read the pages and export. Shares the designer's document |
 | `RDLOutlineDataSource` | The report outline: node tree, data source, delegate, and selection mirroring both ways. A tablix opens into its grid — a node per row, a node per cell under it, named by what the cell holds or "empty" — so an item inside a cell is somewhere the outline can reach |
 | `RDLInspectorView` | Per-selection sections: report, band, item geometry + type-specific (text, line, rect, image, chart, tablix) |
@@ -203,7 +214,7 @@ shows up in the master's next preview.
 | --- | --- | --- |
 | `MainMenu.xib` | The whole menu bar. Items this app implements target File's Owner; the editing ones (Undo, Cut, Open…, Export PDF…) target First Responder, so the front window answers first | The Samples submenu, one item per sample in the catalogue |
 | `RDLWelcomeWindow.xib` | Everything | — |
-| `RDLDesignerWindow.xib` | The splits — the three panes, and the centre's own canvas-over-groups split — both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
+| `RDLReportDesigner.xib` (the window: `RDLReportDesignerWindow.xib`) | The splits — the three panes, and the centre's own canvas-over-groups split — both scroll views, the outline column, the +/− bar, the Preview and PDF buttons | — |
 | `RDLGeneratorWindow.xib` | The window, the toolbar row, the split and both panes | The sample list, and one export button per backend the kit offers |
 | `RDLInspectorSections.xib` | All ten sections as top-level views: every label, field, popup and frame | Which sections are shown and where they stack (`-stackBoxes:`), and the dataset/page popup contents |
 | `RDLSubreportParametersEditor.xib` | The panel, its three columns and the buttons | The parameter names the subreport declares, and the expression cell in the Value column |

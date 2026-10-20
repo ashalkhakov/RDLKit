@@ -1,6 +1,5 @@
 #import <AppKit/AppKit.h>
 @class RDLReport;
-@class RDLDesignerWindow;
 @class RDLWelcomeWindow;
 @class RDLGeneratorWindow;
 @class RDLEditingContext;

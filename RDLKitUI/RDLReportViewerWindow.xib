@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <!-- A viewer in a window of its own: the window, and the view the
+             viewer's view fills. Everything else is RDLReportViewController.xib. -->
+        <customObject id="-2" userLabel="File's Owner" customClass="RDLReportViewerWindowController">
+            <connections>
+                <outlet property="viewerHost" destination="viewerHost" id="viewerHostOutlet"/>
+                <outlet property="window" destination="viewerWindow" id="viewerWindowOutlet"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <window title="Report" allowsToolTipsWhenApplicationIsInactive="NO" releasedWhenClosed="NO" visibleAtLaunch="NO" animationBehavior="default" id="viewerWindow">
+            <windowStyleMask key="styleMask" titled="YES" closable="YES" miniaturizable="YES" resizable="YES"/>
+            <rect key="contentRect" x="60" y="40" width="900" height="700"/>
+            <rect key="screenRect" x="0.0" y="0.0" width="1920" height="1055"/>
+            <view key="contentView" id="viewerHost">
+                <rect key="frame" x="0.0" y="0.0" width="900" height="700"/>
+                <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            </view>
+            <connections>
+                <outlet property="delegate" destination="-2" id="viewerWindowDelegate"/>
+            </connections>
+            <point key="canvasLocation" x="140" y="144"/>
+        </window>
+    </objects>
+</document>

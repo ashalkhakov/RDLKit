@@ -400,7 +400,7 @@
   NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
   NSString *xib = [NSString
       stringWithContentsOfFile:[dir stringByAppendingPathComponent:
-                                        @"RDLDesigner/RDLInspectorSections.xib"]
+                                        @"RDLKitUI/RDLInspectorSections.xib"]
                       encoding:NSUTF8StringEncoding
                          error:NULL];
   if (xib == nil) {

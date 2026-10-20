@@ -1,17 +1,27 @@
 # RDLKit on macOS, the familiar way (gnustep-release-actions' macos.yml runs
 # the same):
 #
-#   make -f Makefile.apple            RDLKit.framework, rdlgen and RDLDesigner.app,
-#                                     universal (Release)
+#   make -f Makefile.apple            RDLKit.framework, RDLKitUI.framework, rdlgen and
+#                                     RDLDesigner.app, universal (Release), and the two
+#                                     frameworks as XCFrameworks (build/*.xcframework)
 #   make -f Makefile.apple check      no macOS-only imports; the Debug builds;
 #                                     the two suites and the designer's UI
 #                                     tests (hosted in RDLDesigner.app, so a
 #                                     session that can show windows); the parser over the
 #                                     Majorsilence corpus (at least 79 of its 86
 #                                     reports, and none silently empty); rdlgen
-#                                     on a sample report
-#   make -f Makefile.apple install DESTDIR=<dir>       RDLDesigner.app
-#   make -f Makefile.apple installcheck DESTDIR=<dir>  its signature holds
+#                                     on a sample report; the example host
+#                                     (Examples/ReportHost) embedding the viewer and
+#                                     the designer, --self-test
+#   make -f Makefile.apple install DESTDIR=<dir>       RDLDesigner.app, RDLKit.xcframework and
+#                                                      RDLKitUI.xcframework (what an app pins:
+#                                                      the release's rdlkit-<v>-apple.zip)
+#   make -f Makefile.apple installcheck DESTDIR=<dir>  the app's signature holds; a program and
+#                                                      the example host compiled against the
+#                                                      installed XCFrameworks, and run
+#
+# An app links them as -F <the XCFramework's macos-arm64_x86_64 slice> -framework
+# RDLKitUI -framework RDLKit (or adds the XCFrameworks to its Xcode project).
 #
 # Sparkle's XCFramework is in .deps/, by the version .github/pins.env names
 # (gnustep-release-actions' scripts/deps.sh apple). GNUstep: GNUmakefile.
@@ -26,16 +36,25 @@ XCODEBUILD = xcodebuild -project RDLKit.xcodeproj -derivedDataPath $(DERIVED)
 # The corpus: how many of its 86 reports parse (it was 79).
 CORPUS_OK = 79
 
+# The libraries an application builds on, as XCFrameworks: macOS, arm64 and
+# x86_64, made from the Release frameworks.
+FRAMEWORKS = RDLKit RDLKitUI
+
 all:
 	@test -d .deps/Sparkle.xcframework \
 	  || { echo "no Sparkle in .deps: gnustep-release-actions' scripts/deps.sh apple fetches what .github/pins.env names"; exit 1; }
-	@for scheme in RDLKit RDLGen RDLDesigner; do \
+	@for scheme in RDLKit RDLKitUI RDLGen RDLDesigner; do \
 	  $(XCODEBUILD) -scheme $$scheme -configuration Release -destination 'generic/platform=macOS' build || exit 1; \
+	done
+	@for fw in $(FRAMEWORKS); do \
+	  rm -rf $(BUILD)/$$fw.xcframework; \
+	  xcodebuild -create-xcframework -framework $(abspath $(RELEASE))/$$fw.framework \
+	    -output $(BUILD)/$$fw.xcframework || exit 1; \
 	done
 
 check:
 	Scripts/check-imports.sh
-	@for scheme in RDLKit RDLDesigner RDLGen; do \
+	@for scheme in RDLKit RDLKitUI RDLDesigner RDLGen; do \
 	  $(XCODEBUILD) -scheme $$scheme -configuration Debug -destination 'platform=macOS' build || exit 1; \
 	done
 	@for suite in RDLKitTests RDLDesignerTests RDLDesignerUITests; do \
@@ -48,15 +67,23 @@ check:
 	  ok=$$(sed -n 's/.*: \([0-9]*\) ok.*/\1/p' $(BUILD)/coverage-tally.txt); \
 	  [ "$${ok:-0}" -ge $(CORPUS_OK) ] || { echo "check: corpus coverage fell to $$ok of 86 (was $(CORPUS_OK))"; exit 1; }
 	DYLD_FRAMEWORK_PATH=$(abspath $(DEBUG)) Scripts/rdlgen-smoke.sh $(DEBUG)/rdlgen
+	clang -fobjc-arc -F$(abspath $(DEBUG)) -Wl,-rpath,$(abspath $(DEBUG)) \
+	  -framework RDLKitUI -framework RDLKit -framework AppKit \
+	  Examples/ReportHost/ReportHost.m -o $(BUILD)/ReportHost
+	$(BUILD)/ReportHost --self-test Examples/ReportHost/Stock.rdl
 
 install: all
 	@test -n "$(DESTDIR)" || { echo "install: give DESTDIR"; exit 1; }
 	mkdir -p $(DESTDIR)
 	rm -rf $(DESTDIR)/RDLDesigner.app
 	ditto $(RELEASE)/RDLDesigner.app $(DESTDIR)/RDLDesigner.app
+	@for fw in $(FRAMEWORKS); do \
+	  rm -rf $(DESTDIR)/$$fw.xcframework && ditto $(BUILD)/$$fw.xcframework $(DESTDIR)/$$fw.xcframework || exit 1; \
+	done
 
 installcheck:
 	codesign --verify --deep --strict $(DESTDIR)/RDLDesigner.app
+	Scripts/installcheck.sh apple $(DESTDIR)
 
 clean:
 	rm -rf $(BUILD)

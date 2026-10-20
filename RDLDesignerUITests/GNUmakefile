@@ -25,8 +25,8 @@ RDLDesignerUITests_OBJC_FILES = \
   RDLUIDataTests.m \
   RDLUIWindowTests.m
 RDLDesignerUITests_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
-RDLDesignerUITests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB -I../RDLDesigner \
-                                  -I../RDLDesigner/ThirdParty/DMTabBar
+RDLDesignerUITests_INCLUDE_DIRS = -I../RDLKit -I../RDLKit/MiniVB -I../RDLKitUI -I../RDLDesigner \
+                                  -I../RDLKitUI/ThirdParty/DMTabBar
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLDesignerUITests_BUNDLE_LIBS += -lRDLKit -lXCTest -ldispatch
 RDLDesignerUITests_NEEDS_GUI = yes
@@ -45,6 +45,6 @@ run-tests: all
 	mkdir -p "$(RDL_UI_ARTIFACTS)" "$(CURDIR)/$(GNUSTEP_OBJ_DIR)/home"
 	HOME="$(CURDIR)/$(GNUSTEP_OBJ_DIR)/home" \
 	RDL_UI_ARTIFACTS="$(RDL_UI_ARTIFACTS)" \
-	LD_LIBRARY_PATH="$(CURDIR)/../RDLKit/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
+	LD_LIBRARY_PATH="$(CURDIR)/../RDLKit/$(GNUSTEP_OBJ_DIR):$(CURDIR)/../RDLKitUI/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
 	  timeout -s ABRT $(TEST_TIMEOUT) $(XVFB) ../RDLDesigner/RDLDesigner.app/RDLDesigner \
 	    -GSAppKitUserBundles '("$(CURDIR)/$(BUNDLE_NAME).bundle")'

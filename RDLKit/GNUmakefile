@@ -8,12 +8,20 @@ RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
 # need -- not a Visual Basic -- with the runtime library both call, is a
 # directory of its own.
 RDLKit_INCLUDE_DIRS += -IMiniVB
+# Every header RDLKit.h imports, so that <RDLKit/RDLKit.h> compiles against an
+# installed library -- the same set the Xcode framework makes public.
 RDLKit_HEADER_FILES = \
   RDLKit.h \
   RDLCompatibility.h \
   RDLReport.h \
   RDLReferenceSites.h \
   RDLParser.h \
+  RDLUpgrader.h \
+  RDLChartRenderer.h \
+  RDLChecker.h \
+  RDLZipArchive.h \
+  RDLDocxReader.h \
+  RDLImporter.h \
   RDLLayoutEngine.h \
   RDLView.h \
   RDLBackend.h \

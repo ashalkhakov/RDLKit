@@ -575,13 +575,13 @@ static NSArray<NSView *> *RDLEveryViewUnder(NSView *view) {
 
 - (void)testDesignerWindowShell {
   NSString *dir = [RDLSourceDirectory() stringByDeletingLastPathComponent];
-  NSString *xibPath = [dir stringByAppendingPathComponent:@"RDLDesigner/RDLDesignerWindow.xib"];
+  NSString *xibPath = [dir stringByAppendingPathComponent:@"RDLKitUI/RDLReportDesigner.xib"];
   NSString *xib = [NSString stringWithContentsOfFile:xibPath
                                             encoding:NSUTF8StringEncoding
                                                error:NULL];
   NSString *source = [NSString stringWithContentsOfFile:
                                    [dir stringByAppendingPathComponent:
-                                            @"RDLDesigner/RDLDesignerWindow.m"]
+                                            @"RDLKitUI/RDLReportDesigner.m"]
                                                encoding:NSUTF8StringEncoding
                                                   error:NULL];
   if (xib == nil || source == nil) {
@@ -601,7 +601,8 @@ static NSArray<NSView *> *RDLEveryViewUnder(NSView *view) {
        [outlets matchesInString:xib options:0 range:NSMakeRange(0, [xib length])]) {
     NSString *name = [xib substringWithRange:[m rangeAtIndex:1]];
     found++;
-    if ([name isEqualToString:@"delegate"] || [name isEqualToString:@"window"])
+    if ([name isEqualToString:@"delegate"] || [name isEqualToString:@"window"] ||
+        [name isEqualToString:@"view"])
       continue;
     if ([source rangeOfString:[NSString stringWithFormat:@"*%@;", name]].location == NSNotFound &&
         [source rangeOfString:[NSString stringWithFormat:@"*%@,", name]].location == NSNotFound)

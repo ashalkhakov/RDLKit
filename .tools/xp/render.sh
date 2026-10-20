@@ -16,7 +16,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$out"; out=$(cd "$out" && pwd)
 export TZ=UTC
 printf 'id\tpath\tformat\tstatus\tseconds\n' > "$out/results.tsv"
-(cd "$src" && find Examples RDLDesigner/Samples \( -iname '*.rdl' -o -iname '*.rdlc' \) | LC_ALL=C sort) > "$out/corpus.txt"
+(cd "$src" && find Examples/majorsilence RDLDesigner/Samples \( -iname '*.rdl' -o -iname '*.rdlc' \) | LC_ALL=C sort) > "$out/corpus.txt"
 while IFS= read -r rel; do
   id=$(printf '%s' "$rel" | sed 's|^Examples/majorsilence/||; s|^RDLDesigner/|Designer/|; s|[/ ]|_|g; s|\.[Rr][Dd][Ll][Cc]*$||')
   for fmt in pdf html; do

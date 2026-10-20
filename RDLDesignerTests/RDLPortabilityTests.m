@@ -15,6 +15,20 @@
 @interface RDLPortabilityTests : RDLDesignerTestCase
 @end
 
+// Every XIB in the source tree: the application's, and the components' in
+// RDLKitUI. Empty when the tree is not readable here.
+static NSArray<NSString *> *RDLSourceXIBPaths(void) {
+  NSString *root = [[@(__FILE__) stringByDeletingLastPathComponent] stringByDeletingLastPathComponent];
+  NSMutableArray<NSString *> *paths = [NSMutableArray array];
+  for (NSString *folder in @[ @"RDLDesigner", @"RDLKitUI" ]) {
+    NSString *dir = [root stringByAppendingPathComponent:folder];
+    for (NSString *name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir error:NULL])
+      if ([[name pathExtension] isEqualToString:@"xib"])
+        [paths addObject:[dir stringByAppendingPathComponent:name]];
+  }
+  return paths;
+}
+
 @implementation RDLPortabilityTests
 
 // An NSButton with no title has none on Cocoa and is called "Button" on
@@ -54,13 +68,7 @@
   // From the source tree where it can be found -- on macOS the XIBs are
   // compiled into the bundle and there is nothing there to read -- and from
   // the bundle otherwise, which is where GNUstep keeps them as they are.
-  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
-                            stringByDeletingLastPathComponent]
-                           stringByAppendingPathComponent:@"RDLDesigner"];
-  for (NSString *name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer
-                                                                            error:NULL])
-    if ([[name pathExtension] isEqualToString:@"xib"])
-      [paths addObject:[designer stringByAppendingPathComponent:name]];
+  [paths addObjectsFromArray:RDLSourceXIBPaths()];
   [paths addObjectsFromArray:[[NSBundle bundleForClass:[self class]] pathsForResourcesOfType:@"xib"
                                                                                 inDirectory:nil]];
   if ([paths count] == 0)
@@ -119,18 +127,13 @@
 // starts editing, and clicking a problem to be taken to its cause put the row
 // into a text field instead.
 - (void)testNoTableOffersAnEditNobodyTakes {
-  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
-                            stringByDeletingLastPathComponent]
-                           stringByAppendingPathComponent:@"RDLDesigner"];
-  NSArray<NSString *> *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer
-                                                                                   error:NULL];
-  if ([names count] == 0)
+  NSArray<NSString *> *xibs = RDLSourceXIBPaths();
+  if ([xibs count] == 0)
     return;  // the source tree is not readable here; the other platform's run has it
   NSUInteger looked = 0;
-  for (NSString *name in names) {
-    if (![[name pathExtension] isEqualToString:@"xib"])
-      continue;
-    NSString *xml = [NSString stringWithContentsOfFile:[designer stringByAppendingPathComponent:name]
+  for (NSString *path in xibs) {
+    NSString *name = [path lastPathComponent];
+    NSString *xml = [NSString stringWithContentsOfFile:path
                                               encoding:NSUTF8StringEncoding
                                                  error:NULL];
     if (xml == nil)
@@ -190,7 +193,7 @@
   NSArray<NSString *> *guarded = @[ @"setAutomaticQuoteSubstitutionEnabled:" ];
 
   NSFileManager *fm = [NSFileManager defaultManager];
-  for (NSString *folder in @[ @"RDLDesigner", @"RDLDesignerTests", @"RDLKit", @"RDLKit/MiniVB" ]) {
+  for (NSString *folder in @[ @"RDLDesigner", @"RDLKitUI", @"RDLDesignerTests", @"RDLKit", @"RDLKit/MiniVB" ]) {
     NSString *dir = [root stringByAppendingPathComponent:folder];
     for (NSString *name in [fm contentsOfDirectoryAtPath:dir error:NULL]) {
       if (![@[ @"m", @"h" ] containsObject:[name pathExtension]])
@@ -314,15 +317,10 @@
 // itself when closed. Cocoa forgives the extra release for long enough that
 // nothing shows; GNUstep aborts in the allocator, somewhere else entirely.
 - (void)testXIBWindowsDoNotReleaseThemselves {
-  NSString *designer = [[[@(__FILE__) stringByDeletingLastPathComponent]
-                            stringByDeletingLastPathComponent]
-                           stringByAppendingPathComponent:@"RDLDesigner"];
-  NSArray *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:designer error:NULL];
   NSUInteger windows = 0;
-  for (NSString *name in names) {
-    if (![[name pathExtension] isEqualToString:@"xib"])
-      continue;
-    NSString *xml = [NSString stringWithContentsOfFile:[designer stringByAppendingPathComponent:name]
+  for (NSString *path in RDLSourceXIBPaths()) {
+    NSString *name = [path lastPathComponent];
+    NSString *xml = [NSString stringWithContentsOfFile:path
                                               encoding:NSUTF8StringEncoding
                                                  error:NULL];
     NSRange at = [xml rangeOfString:@"<window "];
@@ -340,7 +338,7 @@
       at = [xml rangeOfString:@"<window " options:0 range:rest];
     }
   }
-  if (windows == 0 && [names count])
+  if (windows == 0 && [RDLSourceXIBPaths() count])
     XCTFail(@"%@", @"no windows were found to check");
 }
 
