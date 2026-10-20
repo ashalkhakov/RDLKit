@@ -101,10 +101,8 @@ id RDLMemberOfValue(id target, NSString *member, NSArray *vals, RDLEvalScope *sc
       return RDLDouble((double)(c.weekday - 1));
     if ([m isEqualToString:@"dayofyear"])
       return RDLDouble((double)[cal ordinalityOfUnit:NSDayCalendarUnit inUnit:NSYearCalendarUnit forDate:d]);
-    if ([m isEqualToString:@"date"]) {
-      NSDateComponents *day = [cal components:NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit fromDate:d];
-      return [cal dateFromComponents:day];
-    }
+    if ([m isEqualToString:@"date"])
+      return [cal startOfDayForDate:d];
     // A .NET date is a time on the clock, not an instant, so adding a day moves
     // it to the same time the next day even across a change of offset -- which
     // adding 86400 seconds does not: midnight on 28 February 2024 in a zone that

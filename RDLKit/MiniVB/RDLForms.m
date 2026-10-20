@@ -76,9 +76,7 @@ id RDLCallForm(RDLForm form, NSString *lowercaseName, NSArray *vals, RDLEvalScop
     return scope.executionTime ?: [NSDate date];
   case RDLFormToday: {
     NSDate *d = scope.executionTime ?: [NSDate date];
-    NSCalendar *cal = [NSCalendar currentCalendar];
-    NSDateComponents *c = [cal components:NSYearCalendarUnit | NSMonthCalendarUnit | NSDayCalendarUnit fromDate:d];
-    return [cal dateFromComponents:c];
+    return [[NSCalendar currentCalendar] startOfDayForDate:d];
   }
   case RDLFormClock:
     return RDLClockValue(lowercaseName, scope.executionTime ?: [NSDate date]);
