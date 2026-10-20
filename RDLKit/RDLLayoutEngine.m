@@ -8,16 +8,6 @@
 #import "RDLParameterValues.h"
 #import "RDLDataProvider.h"
 
-#if !defined(__APPLE__)
-// gnustep-gui's NSLayoutManager has no -setUsesFontLeading: (the typesetter
-// never adds leading), and ARC refuses to send a selector nothing declares.
-// The call below is guarded by respondsToSelector:, so declaring it is all
-// that is needed for the build; if gnustep-gui gains it, it will be used.
-@interface NSLayoutManager (RDLFontLeading)
-- (void)setUsesFontLeading:(BOOL)flag;
-@end
-#endif
-
 @interface RDLTablixCellInst : NSObject
 @property (nonatomic, assign) CGFloat xRel;
 @property (nonatomic, assign) CGFloat width;
@@ -842,8 +832,7 @@ static void RDLTextboxLines(RDLTextbox *item, CGFloat width, CGFloat height, RDL
   // Drawn and measured text leaves the font's leading out -- neither asks for
   // it -- and a layout manager puts it in unless told not to, which set every
   // line a third of a point lower than it is drawn and cut pages mid-line.
-  if ([layout respondsToSelector:@selector(setUsesFontLeading:)])
-    [layout setUsesFontLeading:NO];
+  [layout setUsesFontLeading:NO];
   [layout addTextContainer:container];
   [storage addLayoutManager:layout];
   NSRange glyphs = [layout glyphRangeForTextContainer:container];

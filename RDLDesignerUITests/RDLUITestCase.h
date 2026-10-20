@@ -16,25 +16,6 @@
 #import "RDLPageGeometry.h"
 #import "RDLSelection.h"
 
-// A check that holds on macOS and is waiting on a fix to GNUstep in
-// gnustep-patches (`gap` names it): on GNUstep it is logged, as waiting or as
-// apparently fixed, and does not fail the test -- the fix belongs to GNUstep,
-// and the designer's code stays as it is. Everywhere else it is an ordinary
-// assertion.
-#if defined(GNUSTEP)
-#define RDLUIWaitingOnGNUstep(gap, expr, ...)                                              \
-  do {                                                                                   \
-    if (expr)                                                                            \
-      NSLog(@"RDLDesignerUITests: %@ holds now -- has gnustep-patches' %@ landed? (%s)", \
-            NSStringFromSelector(_cmd), gap, #expr);                                     \
-    else                                                                                 \
-      NSLog(@"RDLDesignerUITests: %@ is waiting on gnustep-patches: %@ (%s)",            \
-            NSStringFromSelector(_cmd), gap, #expr);                                     \
-  } while (0)
-#else
-#define RDLUIWaitingOnGNUstep(gap, expr, ...) XCTAssertTrue(expr, __VA_ARGS__)
-#endif
-
 @interface RDLUITestCase : XCTestCase
 
 // The open designer documents, the frontmost first.

@@ -164,14 +164,9 @@ static inline NSColor *RDLColorFromHex(NSString *hex) {
 // all until it is.
 //
 // In sRGB, the space RDL_COLOR makes them in, so that a colour read and
-// written back is the colour it was. gnustep-gui has no +sRGBColorSpace (and
-// no colour management to need one); the calibrated space is its RGB.
+// written back is the colour it was.
 static inline NSString *RDLHexFromColor(NSColor *color) {
-  NSColor *rgb = nil;
-  if ([NSColorSpace respondsToSelector:@selector(sRGBColorSpace)])
-    rgb = [color colorUsingColorSpace:[NSColorSpace performSelector:@selector(sRGBColorSpace)]];
-  if (rgb == nil)
-    rgb = [color colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  NSColor *rgb = [color colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
   if (rgb == nil)
     return nil;
   CGFloat r = 0, g = 0, b = 0, a = 0;

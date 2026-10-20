@@ -213,9 +213,8 @@ static const CGFloat kRowGap = 8;
   [field setStringValue:document ?: @""];
   [field setDelegate:self];
   [field setTag:(NSInteger)[_documentFields count]];
-  if ([[field cell] respondsToSelector:@selector(setPlaceholderString:)])
-    [[field cell] setPlaceholderString:[inlineText length] ? @"kept in the report"
-                                                           : @"no document yet"];
+  [[field cell] setPlaceholderString:[inlineText length] ? @"kept in the report"
+                                                         : @"no document yet"];
   [field setToolTip:source.connectString ?: @""];
   NSButton *choose = [[NSButton alloc] initWithFrame:NSMakeRect(kRowLeft + kRowWidth - 88, y, 88, 22)];
   [choose setTitle:@"Choose…"];

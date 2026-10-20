@@ -189,8 +189,8 @@ A failing check leaves a picture of every window beside it, in
 temporary directory on the Mac), and so do the cases that photograph the
 panes on purpose (`WIN-01-*`), which is how the layout on GNUstep is looked
 at. `RDL_UI_TESTS=Class[.method],…` runs some on GNUstep; Xcode's
-`-only-testing:` does on the Mac. A check that holds on macOS and waits on
-a fix to GNUstep is marked `RDLUIWaitingOnGNUstep` with the fix it waits on.
+`-only-testing:` does on the Mac. Every check holds on both: none waits on
+a fix to GNUstep.
 
 The cases are numbered as `RDL-DESIGNER-USE-CASES.md` numbers them.
 

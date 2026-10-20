@@ -285,7 +285,7 @@
 // moving the image, is not something posted events can run.)
 - (BOOL)drag:(NSInteger)row of:(NSTableView *)table to:(NSPoint)point in:(NSView *)view {
   NSPasteboard *pb = [NSPasteboard pasteboardWithName:@"RDLDesignerUITestsDrag"];
-  [pb declareTypes:@[] owner:nil];
+  [pb clearContents];
   if (![[table dataSource] tableView:table writeRowsWithIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
                         toPasteboard:pb])
     return NO;

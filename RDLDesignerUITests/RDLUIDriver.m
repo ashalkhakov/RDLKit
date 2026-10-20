@@ -558,7 +558,7 @@ static void RDLUIWake(void) {
       if ([NSApp modalWindow] == panel)
         [NSApp abortModal];
       else
-        [NSApp endSheet:panel];
+        [[panel sheetParent] endSheet:panel];
       [panel orderOut:nil];
       RDLUIWake();
     }
@@ -595,7 +595,7 @@ static void RDLUIWake(void) {
     if ([NSApp modalWindow] == panel)
       [NSApp abortModal];
     else
-      [NSApp endSheet:panel];
+      [[panel sheetParent] endSheet:panel];
   }
   RDLUIWake();
 }
