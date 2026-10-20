@@ -23,8 +23,11 @@ Which is why most of them do not work yet. `../../RDL-COVERAGE.md` has the
 gap analysis and the running score; regenerate it with
 `.tools/rdl-coverage.sh`.
 
-Those three still render without rows. They query their documents in
-Majorsilence's own JSON dialect -- `file=…;table=root_Attendees` in the connect
-string, `columns=Name,Title` with `_` joining nested members as the command --
-rather than with a JSONPath, which is what RDLKit reads; and `JsonReport.rdl`
-names its document by a path on its author's Windows machine.
+The three reports that read those documents render without rows, and are
+meant to. They query them in Majorsilence's own JSON dialect --
+`file=…;table=root_Attendees` in the connect string, `columns=Name,Title` with
+`_` joining nested members as the command -- rather than with a JSONPath,
+which is what RDLKit reads. That dialect is one tool's, not RDL's, and RDLKit
+will not read it (out of scope: `../../RDL-SPEC-GAPS.md`, section 5).
+`JsonReport.rdl` also names its document by a path on its author's Windows
+machine. The documents are here so that the reports have what they name.
