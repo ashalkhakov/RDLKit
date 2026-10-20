@@ -550,6 +550,14 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
 // a rect at a time, gives each its own PDF page, and applies whatever
 // coordinate transform that page needs. It is also why nothing here has to
 // know which way up the destination is.
+// The page is the sheet: each one goes at the sheet's corner. Left to AppKit
+// it went where the printer can reach and was centred there, so it moved with
+// the printer -- 11pt up on a Mac with none installed, as CI's are.
+- (NSPoint)locationOfPrintRect:(NSRect)rect {
+  RDL_UNUSED(rect);
+  return NSZeroPoint;
+}
+
 - (BOOL)knowsPageRange:(NSRange *)range {
   range->location = 1;
   range->length = MAX((NSUInteger)[self.pages count], (NSUInteger)1);
