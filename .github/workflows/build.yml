@@ -41,3 +41,94 @@ jobs:
       tag: ${{ inputs.tag }}
       apps: RDLDesigner=RDLDesigner
     secrets: inherit
+
+  # The cross-platform comparison (.tools/xp): every report of the corpus
+  # rendered by rdlgen on macOS and on GNUstep, with the same fonts on both
+  # -- Microsoft's core fonts (macOS has them; Ubuntu's installer fetches
+  # them from Microsoft's archives) and Liberation Sans, from the same Ubuntu
+  # package on both, as the fallback -- then compared: page counts, the words
+  # of each PDF and HTML, and each page's pixels. A difference not listed in
+  # .tools/xp/expected-differences.tsv fails the job; the side-by-side report
+  # is kept as an artifact either way.
+  xp-macos:
+    name: Corpus rendered on macOS
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: rdlgen
+        run: |
+          xcodebuild -project RDLKit.xcodeproj -scheme RDLGen -configuration Debug \
+            -destination 'platform=macOS' -derivedDataPath build/xp build > build-xp.log \
+            || { tail -40 build-xp.log; exit 1; }
+      - name: Render
+        env:
+          XP_INSTALL_FONTS: '1'
+        run: |
+          .tools/xp/liberation.sh "$HOME/Library/Fonts"
+          defaults write rdlgen NSFont LiberationSans
+          products="$PWD/build/xp/Build/Products/Debug"
+          DYLD_FRAMEWORK_PATH="$products" sh .tools/xp/render.sh "$products/rdlgen" "$PWD" "$PWD/xp-macos"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xp-macos
+          path: xp-macos
+          retention-days: 7
+
+  xp:
+    name: Corpus, macOS against GNUstep
+    needs: xp-macos
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      CC: clang
+      CXX: clang++
+      LIBRARY_COMBO: ng-gnu-gnu
+      RUNTIME_VERSION: gnustep-2.0
+      LD_LIBRARY_PATH: /opt/gnustep/lib
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ashalkhakov/gnustep-release-actions
+          ref: v1
+          path: .release-actions
+      # The stack .github/pins.env names, as the Linux build gets it, the
+      # packages it lists, the core fonts, and what compares the renders.
+      - name: GNUstep and the fonts
+        run: |
+          .release-actions/scripts/deps.sh linux
+          sudo rm -f /etc/apt/sources.list.d/google-chrome* /etc/apt/sources.list.d/*google* \
+                     /etc/apt/sources.list.d/microsoft* || true
+          packages=$(grep -v '^#' /opt/gnustep/share/gnustep-patches/packages-ubuntu.txt | tr '\n' ' ')
+          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
+          sudo apt-get -q -o Acquire::Retries=3 update
+          sudo apt-get -q -y -o Acquire::Retries=3 install $packages \
+            ttf-mscorefonts-installer fontconfig poppler-utils imagemagick python3-lxml
+          sudo update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
+          fc-cache -f
+      - name: rdlgen
+        run: |
+          . /opt/gnustep/System/Library/Makefiles/GNUstep.sh
+          make -C RDLKit -j"$(nproc)" > build-xp.log 2>&1 && make -C RDLGen >> build-xp.log 2>&1 \
+            || { tail -40 build-xp.log; exit 1; }
+      - name: Render
+        run: |
+          . /opt/gnustep/System/Library/Makefiles/GNUstep.sh
+          defaults write rdlgen NSFont LiberationSans
+          export LD_LIBRARY_PATH="$PWD/RDLKit/obj:$LD_LIBRARY_PATH"
+          xvfb-run -a sh .tools/xp/render.sh "$PWD/RDLGen/obj/rdlgen" "$PWD" "$PWD/xp-linux"
+      - uses: actions/download-artifact@v4
+        with:
+          name: xp-macos
+          path: xp-macos
+      - name: Compare
+        run: |
+          python3 .tools/xp/compare.py xp-macos xp-linux xp-report \
+            --labels macOS GNUstep --expected .tools/xp/expected-differences.tsv
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xp-report
+          path: xp-report
+          retention-days: 14

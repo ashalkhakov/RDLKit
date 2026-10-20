@@ -1,0 +1,84 @@
+# What still differs between macOS and GNUstep in the corpus comparison
+# (.tools/xp/compare.py, the xp job in build.yml), and why: one line per
+# report and check -- id<TAB>check<TAB>reason; an id may be a glob.
+#
+# Checks: status, pages, text, pixels, html (compare.py says what each is).
+# A difference listed here is reported and passed; one that is not fails the
+# job. When a fix lands -- a gnustep-patches release moved in .github/pins.env
+# -- the comparison says which lines no longer differ ("FIXED?" in
+# verdict.txt), and they come out of this file.
+Designer_Samples_AtelierInvoice	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_HarborDispatch	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_HarborManifest	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_HarborPackingSlip	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_KilnLog	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_Letter	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_QuarterlyLedger	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_RegionalSales	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_StudioRoster	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Designer_Samples_WorkshopByFinish	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_BarcodeShowcase_BarcodeShowcase	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_DynamicBarcodeType_BarcodeDemo	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples.416_STAMPA_TABELLONE_RADIO_CON_DATI	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_ChartExampleArea	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleAreaPercentStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleAreaStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleBar	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_ChartExampleBar	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleBarPercentStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleBarStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleColumn	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleColumnPercentStacked	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_ChartExampleColumnPercentStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleColumnPercentStacked	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleColumnStacked	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleDoughnut	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExampleLine	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExamplePie	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartExamplePie	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartTypes	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_ChartTypes	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ChartTypes	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_FileDirectoryTest	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_FinancialFunctions	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_FinancialFunctions	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_MatrixExample	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_MatrixExample	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_MatrixStaticTest	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_MatrixTest	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_MatrixTest	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_RssShort	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_Suppliers	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_Suppliers	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_Suppliers	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_SuppliersStyled	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_SuppliersStyled	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_SuppliersStyled	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_ThreeColumns	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_WebLogHitCount	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_Examples_WorldFacts	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_WorldFactsQueryArgs	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_WorldFactsQueryArgs	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_Examples_iTunes	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_SqliteExamples_SimpleTest1	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_SqliteExamples_SimpleTest2	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+Examples_SqliteExamples_barcode	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_SqliteExamples_chart	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+Examples_SqliteExamples_functions	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+ReportTests_Reports_BaseTestReport	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_CanGrowPageTest	pixels	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_CanGrowPageTest	text	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_CanGrowSplitTest	html	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_CanGrowSplitTest	pages	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_CanGrowSplitTest	pixels	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_CanGrowSplitTest	text	gnustep-patches #60: NSLayoutManager line height, so long CanGrow text breaks pages elsewhere
+ReportTests_Reports_ChartTypes	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+ReportTests_Reports_ChartTypes	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_ChartTypes	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_FunctionTest	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_LineObjects	pixels	gnustep-patches #60: dashes drawn 1.4x long, and fonts by family name
+ReportTests_Reports_MatrixExample	pages	gnustep-patches #60: landscape PDF pages (GNUstep writes a portrait sheet with the page turned)
+ReportTests_Reports_MatrixExample	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_WorldFacts	text	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)
+ReportTests_Reports_meeting-minutes1-a4	pages	GNUstep writes A4 as 595.44 x 841.68pt (not fixed in gnustep-patches yet)
+ReportTests_Reports_meeting-minutes1-a4	pixels	gnustep-patches #60: fonts by family name, unhinted metrics, line height (Linux sets the report's Arial/Georgia/... in the fallback)

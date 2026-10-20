@@ -37,7 +37,8 @@ Report generation is a pipeline:
 | `RDLKitTests` | XCTest (Mac and GNUstep) | Parser, expressions, layout, tablix pagination, both backends, the checker, data sources and JSONPath, the `.docx` importer. One XCTest per area |
 | `RDLGen` | Generator CLI | command-line tool to generate reports |
 | `RDLDesigner` | Designer app | WYSIWYG report designer |
-| `RDLDesignerTests` | XCTest (Mac) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
+| `RDLDesignerTests` | XCTest (Mac and GNUstep) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
+| `RDLDesignerUITests` | XCTest, run inside `RDLDesigner` (Mac and GNUstep) | The designer driven as a person drives it -- clicks, drags, typing, menu commands -- checked in the model, the saved file, the preview and the window |
 
 Written in Objective-C with ARC. UI is built via XIBs.
 
@@ -153,28 +154,59 @@ one.
 
 ## Testing
 
-* On MacOS:
-  * `xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests -destination 'platform=macOS' test`
-  * `xcodebuild -project RDLKit.xcodeproj -scheme RDLDesignerTests -destination 'platform=macOS' test`
-  * Or in Xcode: open `RDLKit.xcodeproj`, scheme **RDLKitTests**, Product → Test.
-* on GNUstep:
+`make check` on GNUstep and `make -f Makefile.apple check` on the Mac run
+everything below; GNUstep's runs in docker (`.tools/gnustep.sh make check`,
+from `.tools/gnustep.Dockerfile`, on the stack `.github/pins.env` names).
 
-  ```
-  . /usr/share/GNUstep/Makefiles/GNUstep.sh
-  cd RDLKit && make
-  cd ../RDLDesigner && make
-  openapp ./RDLDesigner.app
-  cd ../RDLGen && make
-  LD_LIBRARY_PATH=../RDLKit/obj ./obj/rdlgen \
-    ../Examples/majorsilence/ReportTests/Reports/MatrixExample.rdl -f html -o out.html
-  ```
+| Suite | macOS | GNUstep |
+| --- | --- | --- |
+| RDLKitTests | `xcodebuild -project RDLKit.xcodeproj -scheme RDLKitTests -destination 'platform=macOS' test` | `make -C RDLKitTests run-tests` |
+| RDLDesignerTests | `... -scheme RDLDesignerTests ... test` | `make -C RDLDesignerTests run-tests` |
+| RDLDesignerUITests | `... -scheme RDLDesignerUITests ... test` | `make -C RDLDesignerUITests run-tests` |
+| corpus, macOS against GNUstep | `.tools/xp/xp.sh OUTDIR` (both, with Docker) | |
 
-  `RDLKit` is linked out of the tree rather than installed, so the dependent
-  makefiles add `-L../RDLKit/$(GNUSTEP_OBJ_DIR)` and running anything built
-  against it needs that directory on `LD_LIBRARY_PATH`. `make install` in
-  `RDLKit` avoids both.
+Anything that draws on GNUstep needs a display: `xvfb-run -a` (the
+makefiles use it when there is no `DISPLAY`).
 
-Requires `gnustep-base`, `gnustep-gui`, clang `-fobjc-arc`.
+### The designer, driven as a person drives it
+
+`RDLDesignerUITests` runs inside the real application: on macOS as Xcode's
+hosted tests (`TEST_HOST` is `RDLDesigner.app`), and on GNUstep as a bundle
+the app loads at launch (`RDLDesigner -GSAppKitUserBundles
+'("…/RDLDesignerUITests.bundle")'`, which `run-tests` does) and runs once it
+has finished launching, exiting with the verdict. The tests post NSEvents to
+the application's own queue -- clicks, drags on the canvas, keys typed at a
+keyboard's pace, Command keys -- and choose menu items as a click on them
+does; they check the report, the file written, the preview's pages and the
+windows. What posted events cannot reach is done as near to a person as the
+platform allows, and said where it is (`RDLDesignerUITests/RDLUIDriver.h`):
+pop-up and context menus are chosen by item, a drop is the drag source's own
+pasteboard and the canvas's own `-performDragOperation:`, and the system's
+file panels answer the URL the test gives them.
+
+A failing check leaves a picture of every window beside it, in
+`RDL_UI_ARTIFACTS` (`RDLDesignerUITests/obj/artifacts` on GNUstep, the
+temporary directory on the Mac), and so do the cases that photograph the
+panes on purpose (`WIN-01-*`), which is how the layout on GNUstep is looked
+at. `RDL_UI_TESTS=Class[.method],…` runs some on GNUstep; Xcode's
+`-only-testing:` does on the Mac. A check that holds on macOS and waits on
+a fix to GNUstep is marked `RDLUIWaitingOnGNUstep` with the fix it waits on.
+
+The cases are numbered as `RDL-DESIGNER-USE-CASES.md` numbers them.
+
+### The corpus on both platforms
+
+`.tools/xp/` renders every report of the corpus (the Majorsilence examples
+and the samples) with `rdlgen` on macOS and on GNUstep and compares them --
+the same rasterizer and text extractor for both: page counts and sizes, the
+words of each PDF and HTML, and each page's pixels (under 0.5% different).
+Both sides have the same fonts: Microsoft's core fonts, which macOS ships and
+Ubuntu's installer fetches from Microsoft, and Liberation Sans, from the same
+Ubuntu package on both, as the fallback (`NSFont`). What still differs, and
+the GNUstep fix each difference waits on, is listed in
+`.tools/xp/expected-differences.tsv`; anything else fails. CI runs it on every
+push (the `xp` jobs) and keeps the side-by-side report as the `xp-report`
+artifact.
 
 ## Cocoa (Xcode)
 
@@ -641,8 +673,9 @@ make -f Makefile.apple install DESTDIR=out
 
 `make check` is the same on both: no macOS-only imports
 (`Scripts/check-imports.sh`), both XCTest suites (under `xvfb` on GNUstep,
-because AppKit drawing needs a display), and `rdlgen` checking a sample report
-and rendering it to HTML and PDF (`Scripts/rdlgen-smoke.sh`). On macOS it also
+because AppKit drawing needs a display), the designer's UI tests run inside
+RDLDesigner, and `rdlgen` checking a sample report and rendering it to HTML
+and PDF (`Scripts/rdlgen-smoke.sh`). On macOS it also
 scores the parser against the RDL corpus, and fails if any file parses to
 nothing or if fewer than 79 of the 86 still lay out.
 
@@ -655,7 +688,9 @@ unsigned and named for the version: `RDLDesigner-macOS-<version>` and the
 AppImage, `RDLKit-<version>-x86_64.AppImage`. A tag (or the workflow run by
 hand with one) also releases them: RDLDesigner signed and notarized, with the
 Sparkle appcast its Check for Updates… reads, and the AppImage with its update
-information, attached to the release.
+information, attached to the release. Two more jobs, `xp-macos` and `xp`,
+render the corpus on both platforms and compare them (see **Testing**); the
+side-by-side report is their `xp-report` artifact.
 
 * **Linux** — one AppImage carrying both programs, made by
   gnustep-release-actions' `appimage` from what `make install` put in

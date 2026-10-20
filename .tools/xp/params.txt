@@ -1,0 +1,12 @@
+# Parameters the harness supplies (same on both platforms) to reports that
+# declare one with no usable default:  path<TAB>Name=Value[<TAB>Name=Value...]
+Examples/majorsilence/Examples/Examples.416/HIDERIGA_ON_COMMAND.rdl	RIGAPRESENTE=1
+Examples/majorsilence/Examples/Examples.416/TESTRIG.rdl	RIGAPRESENTE=1
+Examples/majorsilence/Examples/Examples.416/STAMPA_TABELLONE_RADIO_CON_DATI.RDL	PICTURE=none	REPARTO=1
+Examples/majorsilence/Examples/SqliteExamples/SimpleTestConnectionString.rdl	ConnectionString=Data Source=northwindEF.db
+Examples/majorsilence/ReportTests/Reports/BaseTestReport.rdl	ConnectionString=Data Source=northwindEF.db
+Examples/majorsilence/ReportTests/Reports/FunctionTest.rdl	ConnectionString=Data Source=northwindEF.db
+Examples/majorsilence/Examples/SqliteExamples/barcode.rdl	BarcodeType=AztecCode
+# Not SimpleTest3WithParameters: its TestParam1 has no Prompt, which makes it
+# internal (read-only) in SSRS, and no default -- SSRS refuses that report
+# whether or not a value is given, and so does RDLKit, on both platforms.
