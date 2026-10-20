@@ -195,6 +195,10 @@
   NSMenu *samples = [RDLUIMenuItem(@"File > Samples") submenu];
   XCTAssertTrue([samples numberOfItems] >= 10, @"the samples are listed: %ld", (long)[samples numberOfItems]);
   XCTAssertTrue(RDLUIChooseInMenu(samples, @"Regional Sales"));
+  // The first fills the screen, as on a small one: the second still has
+  // to come out from under it.
+  NSWindow *first = [[self designerOf:[[self documents] firstObject]] window];
+  [first setFrame:[[first screen] ?: [NSScreen mainScreen] visibleFrame] display:YES];
   XCTAssertTrue(RDLUIChooseInMenu(samples, @"Atelier Invoice"));
   NSArray *docs = [self documents];
   XCTAssertEqual([docs count], (NSUInteger)2, @"two samples, two documents");

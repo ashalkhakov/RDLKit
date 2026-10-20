@@ -429,6 +429,18 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 // like one window. Stepped down and across from any it would cover.
 - (void)stepClearOfOtherReports {
   NSWindow *mine = [self window];
+  // Fitted to the screen first, where the window server would put it on
+  // showing it: on a screen smaller than the XIB's window that is the top
+  // left, and only there does it cover another.
+  NSRect screen = [[mine screen] ?: [NSScreen mainScreen] visibleFrame];
+  if (!NSIsEmptyRect(screen) && !NSContainsRect(screen, [mine frame])) {
+    NSRect fitted = [mine frame];
+    fitted.size.width = MIN(NSWidth(fitted), NSWidth(screen));
+    fitted.size.height = MIN(NSHeight(fitted), NSHeight(screen));
+    fitted.origin.x = MAX(NSMinX(screen), MIN(NSMinX(fitted), NSMaxX(screen) - NSWidth(fitted)));
+    fitted.origin.y = MAX(NSMinY(screen), MIN(NSMinY(fitted), NSMaxY(screen) - NSHeight(fitted)));
+    [mine setFrame:fitted display:NO];
+  }
   for (NSUInteger tries = 0; tries < 20; tries++) {
     BOOL covers = NO;
     for (NSWindow *other in [NSApp windows]) {
