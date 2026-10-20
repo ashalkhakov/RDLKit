@@ -445,15 +445,23 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
     NSRect visible = [[mine screen] ?: [NSScreen mainScreen] visibleFrame];
     NSRect frame = [mine frame];
     NSPoint steps[] = { {24, -24}, {-24, -24}, {24, 24}, {-24, 24} };
-    NSRect moved = NSOffsetRect(frame, steps[0].x, steps[0].y);
-    for (size_t i = 0; i < sizeof steps / sizeof steps[0]; i++) {
+    // On a screen the window fills, no step keeps all of it on the screen,
+    // and the screen would put it straight back: then it steps with its
+    // title bar and gives up what would hang off the screen.
+    NSRect moved = NSZeroRect;
+    for (size_t i = 0; i < sizeof steps / sizeof steps[0] && NSIsEmptyRect(moved); i++) {
       NSRect candidate = NSOffsetRect(frame, steps[i].x, steps[i].y);
-      if (NSContainsRect(visible, candidate)) {
+      if (NSContainsRect(visible, candidate))
         moved = candidate;
-        break;
-      }
     }
-    [mine setFrameOrigin:moved.origin];
+    for (size_t i = 0; i < sizeof steps / sizeof steps[0] && NSIsEmptyRect(moved); i++) {
+      NSRect candidate = NSOffsetRect(frame, steps[i].x, steps[i].y);
+      if (NSPointInRect(NSMakePoint(NSMinX(candidate) + 1, NSMaxY(candidate) - 1), visible))
+        moved = NSIntersectionRect(candidate, visible);
+    }
+    if (NSIsEmptyRect(moved))
+      return;
+    [mine setFrame:moved display:NO];
   }
 }
 
