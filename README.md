@@ -203,8 +203,8 @@ words of each PDF and HTML, and each page's pixels (under 0.5% different).
 Both sides have the same fonts: Microsoft's core fonts, which macOS ships and
 Ubuntu's installer fetches from Microsoft, and Liberation Sans, from the same
 Ubuntu package on both, as the fallback (`NSFont`). What still differs, and
-the GNUstep fix each difference waits on, is listed in
-`.tools/xp/expected-differences.tsv`; anything else fails. CI runs it on every
+why -- the GNUstep fix it waits on, or what neither side does wrong -- is
+listed in `.tools/xp/expected-differences.tsv`; anything else fails. CI runs it on every
 push (the `xp` jobs) and keeps the side-by-side report as the `xp-report`
 artifact.
 
