@@ -532,8 +532,21 @@ NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems)
   // names.
   NSDictionary *first = [rows firstObject];
   if ([dataSet.fields count] == 0 && [first isKindOfClass:[NSDictionary class]]) {
+    // In the document's order where it has one -- a CSV header row -- and in
+    // the names' otherwise. A row is a dictionary, whose keys come in no
+    // order and in a different one on each platform: a table made from the
+    // fields put the columns of the same file in different places on macOS
+    // and on GNUstep.
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    if ([provider respondsToSelector:@selector(columnsFromData:properties:)])
+      for (NSString *column in [provider columnsFromData:document properties:properties])
+        if (first[column] != nil && ![names containsObject:column])
+          [names addObject:column];
+    for (NSString *name in [[first allKeys] sortedArrayUsingSelector:@selector(compare:)])
+      if (![names containsObject:name])
+        [names addObject:name];
     NSMutableArray<RDLField *> *fields = [NSMutableArray array];
-    for (NSString *name in [first allKeys]) {
+    for (NSString *name in names) {
       RDLField *field = [[RDLField alloc] init];
       field.name = name;
       field.dataField = name;

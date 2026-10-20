@@ -114,6 +114,11 @@ FOUNDATION_EXPORT NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryIt
                  dataSet:(RDLDataSet *)dataSet
               properties:(NSDictionary<NSString *, NSString *> *)properties
                    error:(NSError **)error;
+@optional
+// The document's columns in its own order, for a provider whose documents
+// have one (a header row): the fields a dataset discovers come in that order.
+- (NSArray<NSString *> *)columnsFromData:(NSData *)documentData
+                              properties:(NSDictionary<NSString *, NSString *> *)properties;
 @end
 
 // The type a column holds, read off the values themselves. JSON says what its

@@ -263,8 +263,8 @@
   // A file beside the report, named relatively -- the ordinary case.
   NSString *dir = NSTemporaryDirectory();
   NSString *file = [dir stringByAppendingPathComponent:@"rdlkit-rows.csv"];
-  [@"Item,Qty\nBowl,2\nCup,1\n" writeToFile:file atomically:YES encoding:NSUTF8StringEncoding
-                                      error:NULL];
+  [@"Qty,Item,Colour\n2,Bowl,Blue\n1,Cup,Green\n" writeToFile:file atomically:YES encoding:NSUTF8StringEncoding
+                                                      error:NULL];
   RDLReport *csv = [self reportWithProvider:@"CSV" connect:@"rdlkit-rows.csv" query:@""];
   RDLDataBinder *relative =
       [[RDLDataBinder alloc] initWithBaseURL:[NSURL fileURLWithPath:dir isDirectory:YES]];
@@ -272,6 +272,10 @@
     XCTFail(@"%@", [NSString stringWithFormat:@"csv did not bind: %@", err]);
   if ([[csv dataSetNamed:@"Rows"].rows count] != 2)
     XCTFail(@"%@", @"the csv file should have supplied two rows");
+  // Its fields in the file's order, the header row's, on every platform: a
+  // row is a dictionary, and a table made from fields in its key order put
+  // the columns in different places on macOS and on GNUstep.
+  XCTAssertEqualObjects([[csv dataSetNamed:@"Rows"] fieldNames], (@[ @"Qty", @"Item", @"Colour" ]));
   [[NSFileManager defaultManager] removeItemAtPath:file error:NULL];
 
   // A remote document is not fetched unless the host says so: a report is a
