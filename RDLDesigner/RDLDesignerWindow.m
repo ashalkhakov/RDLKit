@@ -417,8 +417,44 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   [[self window] setMinSize:RDLDesignerWindowMinimumSize()];
   [self setDefaultPaneWidths];
   [self syncInspectorToSelection];
+  [self stepClearOfOtherReports];
   // Once the window is on screen, not while it is being put there.
   [self performSelector:@selector(presentOpeningNotes) withObject:nil afterDelay:0];
+}
+
+// GET-07: a second report's window does not land exactly on the first. The
+// window controller cascades new windows, but its cascade wraps back to the
+// top left of the screen once enough have opened, and there it can fall
+// squarely on a report that is still open -- every one of them then looks
+// like one window. Stepped down and across from any it would cover.
+- (void)stepClearOfOtherReports {
+  NSWindow *mine = [self window];
+  for (NSUInteger tries = 0; tries < 20; tries++) {
+    BOOL covers = NO;
+    for (NSWindow *other in [NSApp windows]) {
+      if (other == mine || ![other isVisible] || ![[other windowController] isKindOfClass:[RDLDesignerWindow class]])
+        continue;
+      if (fabs(NSMinX([other frame]) - NSMinX([mine frame])) < 4 &&
+          fabs(NSMaxY([other frame]) - NSMaxY([mine frame])) < 4)
+        covers = YES;
+    }
+    if (!covers)
+      return;
+    // Down and across if the screen has room there, otherwise whichever
+    // diagonal it has room for: a step off the screen is put straight back.
+    NSRect visible = [[mine screen] ?: [NSScreen mainScreen] visibleFrame];
+    NSRect frame = [mine frame];
+    NSPoint steps[] = { {24, -24}, {-24, -24}, {24, 24}, {-24, 24} };
+    NSRect moved = NSOffsetRect(frame, steps[0].x, steps[0].y);
+    for (size_t i = 0; i < sizeof steps / sizeof steps[0]; i++) {
+      NSRect candidate = NSOffsetRect(frame, steps[i].x, steps[i].y);
+      if (NSContainsRect(visible, candidate)) {
+        moved = candidate;
+        break;
+      }
+    }
+    [mine setFrameOrigin:moved.origin];
+  }
 }
 
 + (NSString *)openingNotesForReport:(RDLReport *)report {

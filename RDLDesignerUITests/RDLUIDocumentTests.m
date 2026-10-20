@@ -202,7 +202,7 @@
     return;
   NSWindow *a = [[self designerOf:docs[0]] window], *b = [[self designerOf:docs[1]] window];
   XCTAssertTrue([a isVisible] && [b isVisible]);
-  XCTAssertFalse(NSEqualPoints([a frame].origin, [b frame].origin), @"the second does not land exactly on the first");
+  XCTAssertFalse(NSEqualPoints([a frame].origin, [b frame].origin), @"the second does not land exactly on the first: %@ and %@", NSStringFromRect([a frame]), NSStringFromRect([b frame]));
   [b makeKeyAndOrderFront:nil];
   RDLDocument *front = [self designerOf:docs[1]] ? docs[1] : docs[0];
   [self rename:front to:@"Edited"];
