@@ -52,6 +52,9 @@ typedef NS_ENUM(NSInteger, RDLChartTextAnchor) {
 @property (nonatomic, assign) CGFloat rotation;
 @end
 
+// Where `rect` lands once `t` has turned it: the rectangle around its corners.
+NSRect RDLTurnedRect(NSAffineTransform *t, NSRect rect);
+
 @interface RDLChartRenderer : NSObject
 // The shapes that draw `chart` inside `rect`, back to front: paint them in
 // order and the result is the chart. An empty array means there was nothing
@@ -65,4 +68,8 @@ typedef NS_ENUM(NSInteger, RDLChartTextAnchor) {
 // flipped -- origin top left, y downwards -- which is what RDLView and the
 // designer canvas both use.
 + (void)drawChart:(RDLLaidOutChart *)chart inRect:(NSRect)rect;
+// The same, on a page that cuts the chart to `cut` (an empty rect: no cut). A
+// label wholly outside it is left out rather than drawn hidden, so that it is
+// not in a PDF's text either.
++ (void)drawChart:(RDLLaidOutChart *)chart inRect:(NSRect)rect cutTo:(NSRect)cut;
 @end

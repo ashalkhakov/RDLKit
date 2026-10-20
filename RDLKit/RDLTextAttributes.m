@@ -300,7 +300,29 @@ static const CGFloat kRDLListIndentPoints = 18.0;
   drawn.size.height = MAX(NSHeight(textRect), ceil(NSHeight(used)) + 1);
   [NSGraphicsContext saveGraphicsState];
   NSRectClip(box);
-  [text drawInRect:drawn];
+  if (NSMinY(drawn) >= NSMinY(box) && NSMaxY(drawn) <= NSMaxY(box)) {
+    [text drawInRect:drawn];
+  } else {
+    // Laid out as -drawInRect: lays it out (no leading, no padding at the
+    // line ends), and only the lines that reach into the box drawn.
+    NSTextStorage *storage = [[NSTextStorage alloc] initWithAttributedString:text];
+    NSLayoutManager *layout = [[NSLayoutManager alloc] init];
+    [layout setUsesFontLeading:NO];
+    NSTextContainer *container =
+        [[NSTextContainer alloc] initWithContainerSize:NSMakeSize(NSWidth(drawn), CGFLOAT_MAX)];
+    [container setLineFragmentPadding:0];
+    [layout addTextContainer:container];
+    [storage addLayoutManager:layout];
+    NSRect seen = NSIntersectionRect(box, drawn);
+    NSRange glyphs = NSIsEmptyRect(seen)
+                         ? NSMakeRange(0, 0)
+                         : [layout glyphRangeForBoundingRect:NSOffsetRect(seen, -NSMinX(drawn), -NSMinY(drawn))
+                                             inTextContainer:container];
+    if (glyphs.length > 0) {
+      [layout drawBackgroundForGlyphRange:glyphs atPoint:drawn.origin];
+      [layout drawGlyphsForGlyphRange:glyphs atPoint:drawn.origin];
+    }
+  }
   [NSGraphicsContext restoreGraphicsState];
 }
 

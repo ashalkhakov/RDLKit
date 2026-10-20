@@ -1481,6 +1481,21 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
 // designer canvas -- are flipped the same way, so the coordinates only need
 // shifting into place.
 + (void)drawChart:(RDLLaidOutChart *)chart inRect:(NSRect)frame {
+  [self drawChart:chart inRect:frame cutTo:NSZeroRect];
+}
+
+NSRect RDLTurnedRect(NSAffineTransform *t, NSRect rect) {
+  NSPoint corners[4] = { rect.origin, NSMakePoint(NSMaxX(rect), NSMinY(rect)),
+                         NSMakePoint(NSMinX(rect), NSMaxY(rect)), NSMakePoint(NSMaxX(rect), NSMaxY(rect)) };
+  CGFloat minX = CGFLOAT_MAX, minY = CGFLOAT_MAX, maxX = -CGFLOAT_MAX, maxY = -CGFLOAT_MAX;
+  for (int i = 0; i < 4; i++) {
+    NSPoint p = [t transformPoint:corners[i]];
+    minX = MIN(minX, p.x), minY = MIN(minY, p.y), maxX = MAX(maxX, p.x), maxY = MAX(maxY, p.y);
+  }
+  return NSMakeRect(minX, minY, maxX - minX, maxY - minY);
+}
+
++ (void)drawChart:(RDLLaidOutChart *)chart inRect:(NSRect)frame cutTo:(NSRect)cut {
   NSArray<RDLChartShape *> *shapes =
       [RDLChartRenderer shapesForChart:chart
                                 inRect:NSMakeRect(0, 0, NSWidth(frame), NSHeight(frame))];
@@ -1634,10 +1649,13 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
         [t translateXBy:pivot.x yBy:pivot.y];
         [t rotateByDegrees:-sh.rotation];
         [t translateXBy:-pivot.x yBy:-pivot.y];
-        [t concat];
-        [sh.text drawAtPoint:at withAttributes:attrs];
+        NSRect seen = RDLTurnedRect(t, NSMakeRect(at.x, at.y, size.width, size.height));
+        if (NSIsEmptyRect(cut) || NSIntersectsRect(seen, cut)) {
+          [t concat];
+          [sh.text drawAtPoint:at withAttributes:attrs];
+        }
         [NSGraphicsContext restoreGraphicsState];
-      } else {
+      } else if (NSIsEmptyRect(cut) || NSIntersectsRect(NSMakeRect(at.x, at.y, size.width, size.height), cut)) {
         [sh.text drawAtPoint:at withAttributes:attrs];
       }
       break;

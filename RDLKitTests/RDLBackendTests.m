@@ -1027,6 +1027,54 @@ static NSArray<NSString *> *RDLPDFProfiles(NSData *pdf) {
 }
 
 
+// How many times a PDF's pages show text (Tj, TJ, ' and "): how often depends
+// on the platform and how the text was drawn, but the same text drawn the same
+// way is shown as often.
+static NSUInteger RDLPDFTextShows(NSData *pdf) {
+  NSUInteger shows = 0;
+  NSRegularExpression *op = [NSRegularExpression regularExpressionWithPattern:@"(\\)|\\]|>)\\s*(Tj|TJ|'|\")"
+                                                                      options:0
+                                                                        error:NULL];
+  for (NSData *stream in RDLPDFStreams(pdf)) {
+    NSString *text = [[NSString alloc] initWithData:stream encoding:NSISOLatin1StringEncoding];
+    if (text != nil)
+      shows += [op numberOfMatchesInString:text options:0 range:NSMakeRange(0, [text length])];
+  }
+  return shows;
+}
+
+// A report of one box 26pt tall -- two lines of it in sight -- holding
+// `count` one-line paragraphs.
+static NSString *RDLLinesInAShortBox(int count) {
+  NSMutableString *lines = [NSMutableString string];
+  for (int i = 1; i <= count; i++)
+    [lines appendFormat:@"<Paragraph><TextRuns><TextRun><Value>LINE%d</Value></TextRun></TextRuns></Paragraph>", i];
+  return [NSString stringWithFormat:
+      @"<Report xmlns=\"http://schemas.microsoft.com/sqlserver/reporting/2010/01/reportdefinition\">"
+       "<ReportSections><ReportSection><Body><Height>3in</Height><ReportItems>"
+       "<Textbox Name=\"Lines\"><Top>0.5in</Top><Left>0.5in</Left><Height>26pt</Height><Width>2in</Width>"
+       "<CanGrow>false</CanGrow><Paragraphs>%@</Paragraphs></Textbox>"
+       "</ReportItems></Body><Width>4in</Width>"
+       "<Page><PageHeight>4in</PageHeight><PageWidth>4in</PageWidth></Page>"
+       "</ReportSection></ReportSections></Report>", lines];
+}
+
+// Nine lines in a box two lines tall: what the box cuts off is not in the
+// PDF, drawn and hidden, where a search would find it and a copy take it. So
+// the PDF shows no more text than for three lines in the same box.
+- (void)testTextCutOffByItsBoxIsNotInThePDF {
+  NSError *error = nil;
+  NSData *nine = [RDLGenerator PDFFromXML:RDLLinesInAShortBox(9) parameters:@{} error:&error];
+  XCTAssertTrue([nine length] > 0, @"%@", error);
+  NSData *three = [RDLGenerator PDFFromXML:RDLLinesInAShortBox(3) parameters:@{} error:&error];
+  XCTAssertTrue([three length] > 0, @"%@", error);
+  NSUInteger shownNine = RDLPDFTextShows(nine), shownThree = RDLPDFTextShows(three);
+  XCTAssertTrue(shownThree > 0, @"no text shown");
+  XCTAssertEqual(shownNine, shownThree, @"nine lines in the box show text %lu times, three lines %lu",
+                 (unsigned long)shownNine, (unsigned long)shownThree);
+}
+
+
 // `rect` of a view drawn into a bitmap by the view itself, in a window, the way
 // the screen gets it -- the same call on both platforms; a view outside a
 // window or drawn into a hand-made context has its text turned over on one or

@@ -288,13 +288,15 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
       [NSGraphicsContext saveGraphicsState];
       NSRectClip(clipRect);
     }
-    [self drawItem:it inRect:r];
+    [self drawItem:it inRect:r cutTo:clip ? clipRect : NSZeroRect];
     if (clip)
       [NSGraphicsContext restoreGraphicsState];
   }
 }
 
-- (void)drawItem:(RDLLaidOutItem *)it inRect:(NSRect)r {
+// `cut`, when not empty, is what the page cuts the item to as well: a text
+// box leaves out the lines outside it rather than drawing them hidden.
+- (void)drawItem:(RDLLaidOutItem *)it inRect:(NSRect)r cutTo:(NSRect)cut {
   if ([it isKindOfClass:[RDLLaidOutLine class]]) {
     // Drawn by RDLLinePainter, which the designer canvas draws with too; this
     // file used to hold the only copy that read the width, the dash and which
@@ -351,7 +353,7 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     RDLDrawBackgroundImage(r, it);
     // The picture is worked out by RDLChartRenderer, the same geometry the
     // HTML backend and the designer canvas draw, so all three agree.
-    [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r];
+    [RDLChartRenderer drawChart:(RDLLaidOutChart *)it inRect:r cutTo:cut];
     RDLDrawBorders(r, it.style);
     return;
   }
@@ -398,9 +400,23 @@ static void RDLFillBackground(NSRect r, RDLStyle *s) {
     if (dy > 0)
       textRect.origin.y += va == RDLVerticalAlignMiddle ? dy / 2 : dy;
   }
+  // Turned text is drawn in its own coordinates: the page's cut is turned
+  // back into them.
+  NSRect seen = r;
+  if (!NSIsEmptyRect(cut)) {
+    NSRect pageCut = cut;
+    if (turned) {
+      NSAffineTransform *back = [NSAffineTransform transform];
+      [back translateXBy:NSMidX(box) yBy:NSMidY(box)];
+      [back rotateByDegrees:it.style.writingMode == RDLWritingModeVertical ? 90 : -90];
+      [back invert];
+      pageCut = RDLTurnedRect(back, cut);
+    }
+    seen = NSIntersectionRect(r, pageCut);
+  }
   [RDLTextAttributes drawText:rich ?: [[NSAttributedString alloc] initWithString:text attributes:attrs]
                    inTextRect:textRect
-                    clippedTo:r];
+                    clippedTo:seen];
   if (it.style.textDecoration == RDLTextDecorationOverline)
     RDLDrawOverlines(rich ?: [[NSAttributedString alloc] initWithString:text attributes:attrs], textRect,
                      RDLColorFromHex(it.style.color));

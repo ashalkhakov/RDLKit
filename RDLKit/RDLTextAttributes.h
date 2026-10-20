@@ -75,6 +75,9 @@ FOUNDATION_EXPORT NSString *const RDLParagraphLayoutAttributeName;
 // platform when the text is taller than the rect, so the rect it is handed is
 // always tall enough for the text: Cocoa clipped to it, cutting the
 // descenders off a line in a box as short as its text ("Exnression"), and
-// GNUstep lifted the line to fit it. The view is flipped.
+// GNUstep lifted the line to fit it. Lines wholly outside `box` are not drawn
+// at all: drawn and clipped away they were still in a PDF's text, found by a
+// search and copied with the rest, on a page that does not show them -- and
+// only on the Mac, since cairo leaves out what it clips. The view is flipped.
 + (void)drawText:(NSAttributedString *)text inTextRect:(NSRect)textRect clippedTo:(NSRect)box;
 @end
