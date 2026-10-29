@@ -57,8 +57,10 @@ gnustep)
   [ ! -d "$destdir/opt/gnustep" ] || prefix="$destdir/opt/gnustep"
   rdlkit_h=$(find "$prefix" -path '*/RDLKit/RDLKit.h' | head -1)
   kitui_h=$(find "$prefix" -path '*/RDLKitUI/RDLKitUI.h' | head -1)
-  lib=$(find "$prefix" -name 'libRDLKit.so*' | head -1)
-  uilib=$(find "$prefix" -name 'libRDLKitUI.so*' | head -1)
+  # The library to link: libRDLKit.so on Linux, its import library
+  # libRDLKit.dll.a on Windows (the DLL itself is beside the tools).
+  lib=$(find "$prefix" \( -name 'libRDLKit.so*' -o -name 'libRDLKit.dll.a' \) | head -1)
+  uilib=$(find "$prefix" \( -name 'libRDLKitUI.so*' -o -name 'libRDLKitUI.dll.a' \) | head -1)
   [ -n "$rdlkit_h" ] || fail "no RDLKit/RDLKit.h under $destdir"
   [ -n "$kitui_h" ] || fail "no RDLKitUI/RDLKitUI.h under $destdir"
   [ -n "$lib" ] || fail "no libRDLKit under $destdir"
@@ -84,6 +86,9 @@ gnustep)
   clang $cflags -fobjc-arc -I"$headers" "$root/Examples/ReportHost/ReportHost.m" \
     -L"$libdir" -lRDLKitUI -lRDLKit $libs -ldispatch -o "$out/ReportHost"
   export LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  # Windows finds a DLL on PATH: RDLKit's are where make install puts DLLs.
+  dll=$(find "$prefix" -name 'RDLKit-*.dll' | head -1)
+  [ -z "$dll" ] || PATH="$(dirname "$dll"):$PATH"
   # Installed at /, the library finds its XIBs itself; a staged install is not
   # where GNUstep looks, so it is told.
   if [ "$destdir" != "/" ]; then
