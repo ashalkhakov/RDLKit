@@ -501,13 +501,6 @@ BOOL RDLUIClickButtonIn(NSWindow *panel, NSArray<NSString *> *titles) {
         NSLog(@"RDLUI click %@ frame %@ at %@ hits %@ key=%d", title, NSStringFromRect([b frame]),
               NSStringFromPoint(mid), [[[panel contentView] superview] hitTest:mid], [panel isKeyWindow]);
       }
-      // A person's click brings a panel that has just come up to the front
-      // before its button sees it; one posted at once may reach a panel the
-      // system has not made key yet (Windows), and be lost.
-      if (![panel isKeyWindow]) {
-        [panel makeKeyWindow];
-        RDLUIDrain();
-      }
       RDLUIClick(b);
       return YES;
     }
