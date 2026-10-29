@@ -4,13 +4,15 @@ name: Build
 # make install; Makefile.apple on macOS) by gnustep-release-actions'
 # workflows, the same as every repository's: every push is built, tested and
 # uploaded as artifacts (RDLDesigner for macOS; the AppImage, RDLDesigner and
-# rdlgen; and, a library, what an app builds on: the libraries with their
-# headers as rdlkit-<version>-ubuntu22.04-<arch>.tar.xz, and RDLKit.xcframework
-# and RDLKitUI.xcframework as rdlkit-<version>-apple.zip); a v* tag (or a run
+# rdlgen; RDLDesigner-<version>-win64.msi, rdlgen in its runtime; and, a
+# library, what an app builds on: the libraries with their headers as
+# rdlkit-<version>-ubuntu22.04-<arch>.tar.xz and
+# rdlkit-<version>-windows-clang64-x86_64.tar.xz, and RDLKit.xcframework and
+# RDLKitUI.xcframework as rdlkit-<version>-apple.zip); a v* tag (or a run
 # started by hand with one) is also released: RDLDesigner signed and notarized
-# with its Sparkle appcast, the AppImage with its update information, and the
-# library's archives, attached to the tag's release (a pre-release when the
-# tag has a '-'). What it builds on is in .github/pins.env; what builds on
+# with its Sparkle appcast, the AppImage with its update information, the
+# installer with its WinSparkle appcast, and the library's archives, attached
+# to the tag's release (a pre-release when the tag has a '-'). What it builds on is in .github/pins.env; what builds on
 # RDLKit names it there by RDLKIT_VERSION.
 on:
   push:
@@ -39,6 +41,14 @@ jobs:
     with:
       tag: ${{ inputs.tag }}
       library: true
+
+  windows:
+    uses: ashalkhakov/gnustep-release-actions/.github/workflows/windows.yml@v1
+    with:
+      tag: ${{ inputs.tag }}
+      library: true
+      extra-packages: zlib
+    secrets: inherit
 
   macos:
     uses: ashalkhakov/gnustep-release-actions/.github/workflows/macos.yml@v1
