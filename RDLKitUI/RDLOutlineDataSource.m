@@ -272,7 +272,10 @@ static NSString *const RDLOutlineDragType = @"RDLOutlineRow";
   if ([nodes count] == 0)
     return NO;
   _draggedNodes = nodes;
-  [pasteboard declareTypes:@[ RDLOutlineDragType ] owner:self];
+  // No owner: the data is all here, and an owner is one the pasteboard
+  // server calls back as the pasteboard changes hands (on GNUstep, a
+  // message to this process, which a Windows client could miss).
+  [pasteboard declareTypes:@[ RDLOutlineDragType ] owner:nil];
   [pasteboard setString:@"row" forType:RDLOutlineDragType];
   return YES;
 }
