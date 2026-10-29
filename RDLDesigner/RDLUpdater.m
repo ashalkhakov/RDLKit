@@ -1,5 +1,6 @@
-// RDLUpdater on GNUstep: the AppImage is updated from outside it
-// (RDLUpdater.h).
+// RDLUpdater in the test bundles: nothing, so that a test reaches no network
+// (RDLUpdater.h). The applications have RDLUpdater-Apple.m (Sparkle) and
+// RDLUpdater-GNUstep.m (the stack's GSUpdater).
 #import "RDLUpdater.h"
 
 @implementation RDLUpdater

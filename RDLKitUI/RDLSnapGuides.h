@@ -1,6 +1,12 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <AppKit/AppKit.h>
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // Smart guides: while something is being dragged or sized, the edges and
 // middles it nearly lines up with, and the size it nearly matches.
 //
@@ -21,11 +27,11 @@
 // The box moved into line with `others`: its left, middle and right against
 // theirs, and its top, middle and bottom likewise, taking the nearest within
 // `tolerance` on each axis. The box keeps its size.
-FOUNDATION_EXPORT RDLSnapResult *RDLSnapMovedRect(NSRect rect, NSArray<NSValue *> *others,
+RDLKITUI_EXPORT RDLSnapResult *RDLSnapMovedRect(NSRect rect, NSArray<NSValue *> *others,
                                                   CGFloat tolerance);
 
 // The box sized into line, the edges `kind` moves being the ones that may
 // snap: to another box's edges, and to another box's width or height, so
 // things end up the same size as their neighbours without being nudged there.
-FOUNDATION_EXPORT RDLSnapResult *RDLSnapSizedRect(NSRect rect, NSString *kind,
+RDLKITUI_EXPORT RDLSnapResult *RDLSnapSizedRect(NSRect rect, NSString *kind,
                                                   NSArray<NSValue *> *others, CGFloat tolerance);

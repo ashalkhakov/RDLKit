@@ -1,13 +1,19 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <AppKit/AppKit.h>
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLEditingContext;
 
 // What a drag from the palette carries: the expression to bind and the label to
 // name the textbox after.
-extern NSString * const RDLPaletteDragType;
-extern NSString * const RDLPaletteExpressionKey;
-extern NSString * const RDLPaletteLabelKey;
+RDLKITUI_EXPORT NSString * const RDLPaletteDragType;
+RDLKITUI_EXPORT NSString * const RDLPaletteExpressionKey;
+RDLKITUI_EXPORT NSString * const RDLPaletteLabelKey;
 
 // The quick-insert palette: the report's parameters, each dataset's fields and
 // the built-in globals, dragged onto the canvas to make a textbox already bound

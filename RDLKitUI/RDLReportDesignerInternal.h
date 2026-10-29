@@ -9,12 +9,18 @@
 #import "RDLDatasetNavigator.h"
 #import "RDLDatasetFieldsView.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLEditingContext;
 @class RDLSubreport;
 
 // The smallest the designer can be with all three panes showing: below it the
 // split has nothing left to take the difference from.
-FOUNDATION_EXPORT NSSize RDLReportDesignerMinimumSize(void);
+RDLKITUI_EXPORT NSSize RDLReportDesignerMinimumSize(void);
 
 @interface RDLReportDesignerCommand ()
 - (instancetype)initWithGroup:(NSString *)group

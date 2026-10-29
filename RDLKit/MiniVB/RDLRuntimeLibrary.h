@@ -16,6 +16,12 @@
 #import "RDLLayoutEngine.h"
 #import "RDLParameterValues.h"
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 #pragma mark - Vocabularies
 
 // Whose rules a conversion follows. Visual Basic's conversion functions take
@@ -137,43 +143,43 @@ static const NSInteger kRDLTwoDigitYearMax = 2029;
 
 #pragma mark - Between the parts
 
-FOUNDATION_EXPORT RDLConversionTarget RDLConversionTargetNamed(NSString *name, RDLConversionStyle *style);
-FOUNDATION_EXPORT id RDLConvertToBoolean(id value, RDLConversionStyle style);
-FOUNDATION_EXPORT id RDLConvert(id value, RDLConversionTarget target, RDLConversionStyle style);
-FOUNDATION_EXPORT NSDate *RDLDateFromText(NSString *text);
-FOUNDATION_EXPORT id RDLConvertToDate(id v);
-FOUNDATION_EXPORT id RDLWholePart(id v, BOOL towardZero);
-FOUNDATION_EXPORT id RDLAbsolute(id v);
-FOUNDATION_EXPORT id RDLDoubleOperand(id v);
-FOUNDATION_EXPORT double RDLLogarithm(double a, double base);
-FOUNDATION_EXPORT id RDLRound(id value, id second, id third);
-FOUNDATION_EXPORT id RDLMathWhole(id value, RDLWholeRounding rounding);
-FOUNDATION_EXPORT id RDLSign(id value);
-FOUNDATION_EXPORT id RDLExtreme(id left, id right, BOOL largest);
-FOUNDATION_EXPORT id RDLOfTwoDoubles(id left, id right, double (*function)(double, double));
-FOUNDATION_EXPORT RDLConversionTarget RDLConversionTargetOfFieldType(RDLFieldDataType type, RDLNumericType *carried);
-FOUNDATION_EXPORT NSString *RDLPadded(long long value, NSUInteger digits);
-FOUNDATION_EXPORT id RDLFormattedInCalendar(id value, NSString *format, NSString *language, RDLCalendar calendar);
-FOUNDATION_EXPORT id RDLFormatted(id value, NSString *format, NSString *language);
-FOUNDATION_EXPORT NSString *RDLDigitsOfNumeralVariant(NSInteger variant, NSString *numeralLanguage);
-FOUNDATION_EXPORT NSString *RDLWithDigits(NSString *text, NSString *digits);
-FOUNDATION_EXPORT id RDLVisualBasicNumberText(id value, RDLVisualBasicNumberStyle style, NSArray *options, NSString *language);
-FOUNDATION_EXPORT id RDLFormatDateTime(id value, id name, NSString *language);
-FOUNDATION_EXPORT id RDLVisualBasicFormat(id value, id style, NSString *language);
-FOUNDATION_EXPORT id RDLCompareMethodOfValue(id value, RDLCompareMethod *method);
-FOUNDATION_EXPORT NSStringCompareOptions RDLSearchOptions(RDLCompareMethod method);
-FOUNDATION_EXPORT id RDLIntegerArgument(id value, NSInteger fallback, NSInteger *out);
-FOUNDATION_EXPORT id RDLInStr(NSArray *vals);
-FOUNDATION_EXPORT id RDLInStrRev(NSArray *vals);
-FOUNDATION_EXPORT id RDLReplace(NSArray *vals);
-FOUNDATION_EXPORT NSDate *RDLTimeOnFirstDay(long long seconds);
-FOUNDATION_EXPORT id RDLClockValue(NSString *name, NSDate *moment);
-FOUNDATION_EXPORT RDLExprError *RDLInvalidArgument(NSString *name);
-FOUNDATION_EXPORT id RDLDateDiff(NSArray *vals, NSString *language);
-FOUNDATION_EXPORT id RDLDatePart(NSArray *vals, NSString *language);
-FOUNDATION_EXPORT id RDLDateAddition(NSArray *vals);
-FOUNDATION_EXPORT id RDLDayOrMonthName(BOOL month, NSArray *vals, NSString *language);
-FOUNDATION_EXPORT id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLCall(NSString *name, NSArray *vals, RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLArgumentAt(NSArray *vals, NSUInteger i);
-FOUNDATION_EXPORT id RDLMemberOfValue(id target, NSString *member, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT RDLConversionTarget RDLConversionTargetNamed(NSString *name, RDLConversionStyle *style);
+RDLKIT_EXPORT id RDLConvertToBoolean(id value, RDLConversionStyle style);
+RDLKIT_EXPORT id RDLConvert(id value, RDLConversionTarget target, RDLConversionStyle style);
+RDLKIT_EXPORT NSDate *RDLDateFromText(NSString *text);
+RDLKIT_EXPORT id RDLConvertToDate(id v);
+RDLKIT_EXPORT id RDLWholePart(id v, BOOL towardZero);
+RDLKIT_EXPORT id RDLAbsolute(id v);
+RDLKIT_EXPORT id RDLDoubleOperand(id v);
+RDLKIT_EXPORT double RDLLogarithm(double a, double base);
+RDLKIT_EXPORT id RDLRound(id value, id second, id third);
+RDLKIT_EXPORT id RDLMathWhole(id value, RDLWholeRounding rounding);
+RDLKIT_EXPORT id RDLSign(id value);
+RDLKIT_EXPORT id RDLExtreme(id left, id right, BOOL largest);
+RDLKIT_EXPORT id RDLOfTwoDoubles(id left, id right, double (*function)(double, double));
+RDLKIT_EXPORT RDLConversionTarget RDLConversionTargetOfFieldType(RDLFieldDataType type, RDLNumericType *carried);
+RDLKIT_EXPORT NSString *RDLPadded(long long value, NSUInteger digits);
+RDLKIT_EXPORT id RDLFormattedInCalendar(id value, NSString *format, NSString *language, RDLCalendar calendar);
+RDLKIT_EXPORT id RDLFormatted(id value, NSString *format, NSString *language);
+RDLKIT_EXPORT NSString *RDLDigitsOfNumeralVariant(NSInteger variant, NSString *numeralLanguage);
+RDLKIT_EXPORT NSString *RDLWithDigits(NSString *text, NSString *digits);
+RDLKIT_EXPORT id RDLVisualBasicNumberText(id value, RDLVisualBasicNumberStyle style, NSArray *options, NSString *language);
+RDLKIT_EXPORT id RDLFormatDateTime(id value, id name, NSString *language);
+RDLKIT_EXPORT id RDLVisualBasicFormat(id value, id style, NSString *language);
+RDLKIT_EXPORT id RDLCompareMethodOfValue(id value, RDLCompareMethod *method);
+RDLKIT_EXPORT NSStringCompareOptions RDLSearchOptions(RDLCompareMethod method);
+RDLKIT_EXPORT id RDLIntegerArgument(id value, NSInteger fallback, NSInteger *out);
+RDLKIT_EXPORT id RDLInStr(NSArray *vals);
+RDLKIT_EXPORT id RDLInStrRev(NSArray *vals);
+RDLKIT_EXPORT id RDLReplace(NSArray *vals);
+RDLKIT_EXPORT NSDate *RDLTimeOnFirstDay(long long seconds);
+RDLKIT_EXPORT id RDLClockValue(NSString *name, NSDate *moment);
+RDLKIT_EXPORT RDLExprError *RDLInvalidArgument(NSString *name);
+RDLKIT_EXPORT id RDLDateDiff(NSArray *vals, NSString *language);
+RDLKIT_EXPORT id RDLDatePart(NSArray *vals, NSString *language);
+RDLKIT_EXPORT id RDLDateAddition(NSArray *vals);
+RDLKIT_EXPORT id RDLDayOrMonthName(BOOL month, NSArray *vals, NSString *language);
+RDLKIT_EXPORT id RDLStaticMember(NSString *dotted, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLCall(NSString *name, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLArgumentAt(NSArray *vals, NSUInteger i);
+RDLKIT_EXPORT id RDLMemberOfValue(id target, NSString *member, NSArray *vals, RDLEvalScope *scope);

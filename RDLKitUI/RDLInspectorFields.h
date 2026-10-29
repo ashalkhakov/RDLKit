@@ -9,6 +9,12 @@
 // same declaration drives both directions.
 #import <AppKit/AppKit.h>
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLBand;
 @class RDLEditor;
 @class RDLItem;
@@ -16,7 +22,7 @@
 
 // A name as the model spells it, as words for a popup: "PercentStacked" is
 // "Percent stacked".
-FOUNDATION_EXPORT NSString *RDLWordsOfName(NSString *name);
+RDLKITUI_EXPORT NSString *RDLWordsOfName(NSString *name);
 
 // A colour well beside the field that holds the colour as RDL writes it. The
 // inspector pairs the two for every colour it edits, and the panels do the
@@ -28,10 +34,10 @@ FOUNDATION_EXPORT NSString *RDLWordsOfName(NSString *name);
 // Shows `color` in `well`: a hex colour or a colour name as it is, and white
 // for nothing at all, for Transparent and for an expression -- none of which
 // is a colour a well can show, and all of which the field beside it says.
-FOUNDATION_EXPORT void RDLShowColorInWell(NSColorWell *well, NSString *color);
+RDLKITUI_EXPORT void RDLShowColorInWell(NSColorWell *well, NSString *color);
 // What a well that has just been used puts in the field beside it: the colour
 // as RDL writes it.
-FOUNDATION_EXPORT NSString *RDLColorChosenInWell(NSColorWell *well);
+RDLKITUI_EXPORT NSString *RDLColorChosenInWell(NSColorWell *well);
 
 typedef NS_ENUM(NSInteger, RDLFieldScope) {
   RDLFieldScopeItem = 0,

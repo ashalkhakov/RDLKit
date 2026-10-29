@@ -18,6 +18,12 @@ RDLKitUI_INTERFACE_VERSION = 0
 # RDLKitUI/Versions/0/Resources).
 RDLKitUI_HAS_RESOURCE_BUNDLE = yes
 RDLKitUI_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
+# Windows: a DLL exports what it marks, and once the runtime marks its
+# classes, its C constants and functions must be marked too: RDLKITUI_EXPORT
+# (in its headers) is "export" while it is built, an import elsewhere.
+ifeq ($(OS),Windows_NT)
+RDLKitUI_CPPFLAGS += "-DRDLKITUI_EXPORT=__declspec(dllexport) extern"
+endif
 RDLKitUI_INCLUDE_DIRS += -I../RDLKit -I../RDLKit/MiniVB -IThirdParty/DMTabBar
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR)
 RDLKitUI_LIBRARIES_DEPEND_UPON += -lRDLKit -ldispatch $(GUI_LIBS) $(FND_LIBS) $(OBJC_LIBS)

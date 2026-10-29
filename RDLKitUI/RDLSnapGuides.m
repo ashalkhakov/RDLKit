@@ -80,16 +80,16 @@ RDLSnapResult *RDLSnapMovedRect(NSRect rect, NSArray<NSValue *> *others, CGFloat
   CGFloat mine[3] = {NSMinX(rect), NSMidX(rect), NSMaxX(rect)};
   RDLNearest bestX = {0, 0, NO};
   for (int i = 0; i < 3; i++) {
-    RDLNearest near = RDLNearestTo(mine[i], vertical, tolerance);
-    if (near.found && (!bestX.found || fabs(near.distance) < fabs(bestX.distance)))
-      bestX = near;
+    RDLNearest nearest = RDLNearestTo(mine[i], vertical, tolerance);
+    if (nearest.found && (!bestX.found || fabs(nearest.distance) < fabs(bestX.distance)))
+      bestX = nearest;
   }
   CGFloat mineY[3] = {NSMinY(rect), NSMidY(rect), NSMaxY(rect)};
   RDLNearest bestY = {0, 0, NO};
   for (int i = 0; i < 3; i++) {
-    RDLNearest near = RDLNearestTo(mineY[i], horizontal, tolerance);
-    if (near.found && (!bestY.found || fabs(near.distance) < fabs(bestY.distance)))
-      bestY = near;
+    RDLNearest nearest = RDLNearestTo(mineY[i], horizontal, tolerance);
+    if (nearest.found && (!bestY.found || fabs(nearest.distance) < fabs(bestY.distance)))
+      bestY = nearest;
   }
   if (bestX.found)
     rect.origin.x += bestX.distance;

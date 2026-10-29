@@ -1,5 +1,11 @@
 #import "RDLCompatibility.h"
 #import "RDLExpression.h"
+
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
 @class RDLCodeModule;
 
 // RDL 2010/01 object model (MS-RDL subset).
@@ -49,7 +55,7 @@ typedef NS_ENUM(NSInteger, RDLFontWeight) {
   RDLFontWeightSemiBold, RDLFontWeightHeavy, RDLFontWeightExtraBold,
 };
 // YES for Bold, Bolder and 600 and up -- the one question the renderers ask.
-FOUNDATION_EXPORT BOOL RDLFontWeightIsBold(RDLFontWeight weight);
+RDLKIT_EXPORT BOOL RDLFontWeightIsBold(RDLFontWeight weight);
 
 typedef NS_ENUM(NSInteger, RDLFontStyle) {
   RDLFontStyleUnspecified = 0,
@@ -231,7 +237,7 @@ typedef NS_ENUM(NSInteger, RDLFilterOperator) {
   RDLFilterOperatorContains,
 };
 // In and Between read every value; the rest compare against the first.
-FOUNDATION_EXPORT BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op);
+RDLKIT_EXPORT BOOL RDLFilterOperatorTakesMultipleValues(RDLFilterOperator op);
 
 typedef NS_ENUM(NSInteger, RDLSortDirection) {
   RDLSortDirectionUnspecified = 0,
@@ -320,7 +326,7 @@ typedef NS_ENUM(NSInteger, RDLChartType) {
   RDLChartTypeRadar,
 };
 // Whether a kind of chart plots each point's High and Low rather than one value.
-FOUNDATION_EXPORT BOOL RDLChartTypeIsRange(RDLChartType type);
+RDLKIT_EXPORT BOOL RDLChartTypeIsRange(RDLChartType type);
 
 // How the series of a chart are combined. Plain draws them side by side;
 // Stacked piles them up; PercentStacked piles them up and scales each category
@@ -382,72 +388,72 @@ typedef NS_ENUM(NSInteger, RDLChartTickMarks) {
 };
 
 
-FOUNDATION_EXPORT RDLBorderStyle RDLBorderStyleFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromBorderStyle(RDLBorderStyle v);
-FOUNDATION_EXPORT RDLFontWeight RDLFontWeightFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromFontWeight(RDLFontWeight v);
-FOUNDATION_EXPORT RDLFontStyle RDLFontStyleFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromFontStyle(RDLFontStyle v);
-FOUNDATION_EXPORT RDLTextAlign RDLTextAlignFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromTextAlign(RDLTextAlign v);
-FOUNDATION_EXPORT RDLVerticalAlign RDLVerticalAlignFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromVerticalAlign(RDLVerticalAlign v);
-FOUNDATION_EXPORT RDLTextDecoration RDLTextDecorationFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromTextDecoration(RDLTextDecoration v);
-FOUNDATION_EXPORT RDLImageSource RDLImageSourceFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromImageSource(RDLImageSource v);
-FOUNDATION_EXPORT RDLImageSizing RDLImageSizingFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromImageSizing(RDLImageSizing v);
-FOUNDATION_EXPORT RDLPageBreakLocation RDLPageBreakLocationFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v);
-FOUNDATION_EXPORT RDLLayoutDirection RDLLayoutDirectionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v);
-FOUNDATION_EXPORT RDLWritingMode RDLWritingModeFromString(NSString *s);
-FOUNDATION_EXPORT RDLCalendar RDLCalendarFromString(NSString *s);
-FOUNDATION_EXPORT RDLGradientType RDLGradientTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromGradientType(RDLGradientType v);
-FOUNDATION_EXPORT RDLBackgroundRepeat RDLBackgroundRepeatFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromBackgroundRepeat(RDLBackgroundRepeat v);
-FOUNDATION_EXPORT RDLBackgroundPosition RDLBackgroundPositionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromBackgroundPosition(RDLBackgroundPosition v);
-FOUNDATION_EXPORT RDLTextEffect RDLTextEffectFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromTextEffect(RDLTextEffect v);
-FOUNDATION_EXPORT RDLUnicodeBiDi RDLUnicodeBiDiFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromUnicodeBiDi(RDLUnicodeBiDi v);
-FOUNDATION_EXPORT RDLListStyle RDLListStyleFromString(NSString *s);
-FOUNDATION_EXPORT RDLMarkupType RDLMarkupTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromMarkupType(RDLMarkupType v);
-FOUNDATION_EXPORT NSString *RDLStringFromListStyle(RDLListStyle v);
-FOUNDATION_EXPORT NSString *RDLStringFromWritingMode(RDLWritingMode v);
-FOUNDATION_EXPORT NSString *RDLStringFromCalendar(RDLCalendar v);
-FOUNDATION_EXPORT RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromKeepWithGroup(RDLKeepWithGroup v);
-FOUNDATION_EXPORT RDLFilterOperator RDLFilterOperatorFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromFilterOperator(RDLFilterOperator v);
-FOUNDATION_EXPORT RDLSortDirection RDLSortDirectionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromSortDirection(RDLSortDirection v);
-FOUNDATION_EXPORT RDLParameterDataType RDLParameterDataTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromParameterDataType(RDLParameterDataType v);
-FOUNDATION_EXPORT RDLUsedInQuery RDLUsedInQueryFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromUsedInQuery(RDLUsedInQuery v);
-FOUNDATION_EXPORT RDLAutoBoolean RDLAutoBooleanFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromAutoBoolean(RDLAutoBoolean v);
-FOUNDATION_EXPORT RDLCommandType RDLCommandTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromCommandType(RDLCommandType v);
-FOUNDATION_EXPORT RDLFieldDataType RDLFieldDataTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromFieldDataType(RDLFieldDataType v);
-FOUNDATION_EXPORT RDLChartType RDLChartTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartType(RDLChartType v);
-FOUNDATION_EXPORT RDLChartSubtype RDLChartSubtypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartSubtype(RDLChartSubtype v);
-FOUNDATION_EXPORT RDLChartLegendPosition RDLChartLegendPositionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v);
-FOUNDATION_EXPORT RDLChartPalette RDLChartPaletteFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartPalette(RDLChartPalette v);
-FOUNDATION_EXPORT RDLChartTickMarks RDLChartTickMarksFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v);
+RDLKIT_EXPORT RDLBorderStyle RDLBorderStyleFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromBorderStyle(RDLBorderStyle v);
+RDLKIT_EXPORT RDLFontWeight RDLFontWeightFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromFontWeight(RDLFontWeight v);
+RDLKIT_EXPORT RDLFontStyle RDLFontStyleFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromFontStyle(RDLFontStyle v);
+RDLKIT_EXPORT RDLTextAlign RDLTextAlignFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromTextAlign(RDLTextAlign v);
+RDLKIT_EXPORT RDLVerticalAlign RDLVerticalAlignFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromVerticalAlign(RDLVerticalAlign v);
+RDLKIT_EXPORT RDLTextDecoration RDLTextDecorationFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromTextDecoration(RDLTextDecoration v);
+RDLKIT_EXPORT RDLImageSource RDLImageSourceFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromImageSource(RDLImageSource v);
+RDLKIT_EXPORT RDLImageSizing RDLImageSizingFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromImageSizing(RDLImageSizing v);
+RDLKIT_EXPORT RDLPageBreakLocation RDLPageBreakLocationFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromPageBreakLocation(RDLPageBreakLocation v);
+RDLKIT_EXPORT RDLLayoutDirection RDLLayoutDirectionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromLayoutDirection(RDLLayoutDirection v);
+RDLKIT_EXPORT RDLWritingMode RDLWritingModeFromString(NSString *s);
+RDLKIT_EXPORT RDLCalendar RDLCalendarFromString(NSString *s);
+RDLKIT_EXPORT RDLGradientType RDLGradientTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromGradientType(RDLGradientType v);
+RDLKIT_EXPORT RDLBackgroundRepeat RDLBackgroundRepeatFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromBackgroundRepeat(RDLBackgroundRepeat v);
+RDLKIT_EXPORT RDLBackgroundPosition RDLBackgroundPositionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromBackgroundPosition(RDLBackgroundPosition v);
+RDLKIT_EXPORT RDLTextEffect RDLTextEffectFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromTextEffect(RDLTextEffect v);
+RDLKIT_EXPORT RDLUnicodeBiDi RDLUnicodeBiDiFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromUnicodeBiDi(RDLUnicodeBiDi v);
+RDLKIT_EXPORT RDLListStyle RDLListStyleFromString(NSString *s);
+RDLKIT_EXPORT RDLMarkupType RDLMarkupTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromMarkupType(RDLMarkupType v);
+RDLKIT_EXPORT NSString *RDLStringFromListStyle(RDLListStyle v);
+RDLKIT_EXPORT NSString *RDLStringFromWritingMode(RDLWritingMode v);
+RDLKIT_EXPORT NSString *RDLStringFromCalendar(RDLCalendar v);
+RDLKIT_EXPORT RDLKeepWithGroup RDLKeepWithGroupFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromKeepWithGroup(RDLKeepWithGroup v);
+RDLKIT_EXPORT RDLFilterOperator RDLFilterOperatorFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromFilterOperator(RDLFilterOperator v);
+RDLKIT_EXPORT RDLSortDirection RDLSortDirectionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromSortDirection(RDLSortDirection v);
+RDLKIT_EXPORT RDLParameterDataType RDLParameterDataTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromParameterDataType(RDLParameterDataType v);
+RDLKIT_EXPORT RDLUsedInQuery RDLUsedInQueryFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromUsedInQuery(RDLUsedInQuery v);
+RDLKIT_EXPORT RDLAutoBoolean RDLAutoBooleanFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromAutoBoolean(RDLAutoBoolean v);
+RDLKIT_EXPORT RDLCommandType RDLCommandTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromCommandType(RDLCommandType v);
+RDLKIT_EXPORT RDLFieldDataType RDLFieldDataTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromFieldDataType(RDLFieldDataType v);
+RDLKIT_EXPORT RDLChartType RDLChartTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartType(RDLChartType v);
+RDLKIT_EXPORT RDLChartSubtype RDLChartSubtypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartSubtype(RDLChartSubtype v);
+RDLKIT_EXPORT RDLChartLegendPosition RDLChartLegendPositionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartLegendPosition(RDLChartLegendPosition v);
+RDLKIT_EXPORT RDLChartPalette RDLChartPaletteFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartPalette(RDLChartPalette v);
+RDLKIT_EXPORT RDLChartTickMarks RDLChartTickMarksFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartTickMarks(RDLChartTickMarks v);
 // The colours a palette cycles through, as "#rrggbb".
-FOUNDATION_EXPORT NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette);
+RDLKIT_EXPORT NSArray<NSString *> *RDLColorsForChartPalette(RDLChartPalette palette);
 
 // An RDL measurement: a number and the unit it was written in. RDL writes
 // these as "10pt", "0.5in", "3mm"; keeping the unit rather than normalising to
@@ -464,16 +470,16 @@ typedef NS_ENUM(NSInteger, RDLReportUnit) {
   RDLReportUnitCentimeter,
 };
 
-FOUNDATION_EXPORT RDLReportUnit RDLReportUnitFromString(NSString *name);
+RDLKIT_EXPORT RDLReportUnit RDLReportUnitFromString(NSString *name);
 // "Inch" / "Cm", as rd:ReportUnitType writes them.
-FOUNDATION_EXPORT NSString *RDLStringFromReportUnit(RDLReportUnit unit);
+RDLKIT_EXPORT NSString *RDLStringFromReportUnit(RDLReportUnit unit);
 // "in" / "cm", for a label or a ruler.
-FOUNDATION_EXPORT NSString *RDLAbbreviationForReportUnit(RDLReportUnit unit);
+RDLKIT_EXPORT NSString *RDLAbbreviationForReportUnit(RDLReportUnit unit);
 // Geometry is held in inches throughout the kit, which is RDL's own default
 // and what every laid-out coordinate is in. These two are the only places a
 // document unit touches a number: on the way to a person, and back.
-FOUNDATION_EXPORT double RDLUnitsFromInches(double inches, RDLReportUnit unit);
-FOUNDATION_EXPORT double RDLInchesFromUnits(double value, RDLReportUnit unit);
+RDLKIT_EXPORT double RDLUnitsFromInches(double inches, RDLReportUnit unit);
+RDLKIT_EXPORT double RDLInchesFromUnits(double value, RDLReportUnit unit);
 
 typedef NS_ENUM(NSInteger, RDLLengthUnit) {
   RDLLengthUnitUnspecified = 0,
@@ -796,8 +802,8 @@ typedef NS_ENUM(NSInteger, RDLUnsupportedItemKind) {
   RDLUnsupportedItemKindMap,
   RDLUnsupportedItemKindCustomReportItem,
 };
-FOUNDATION_EXPORT RDLUnsupportedItemKind RDLUnsupportedItemKindFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind);
+RDLKIT_EXPORT RDLUnsupportedItemKind RDLUnsupportedItemKindFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromUnsupportedItemKind(RDLUnsupportedItemKind kind);
 
 // One of those, kept rather than refused. Refusing stopped the whole file from
 // opening over a single gauge; now the file opens, the item keeps its place on
@@ -858,8 +864,8 @@ typedef NS_ENUM(NSInteger, RDLChartDataLabelPosition) {
   RDLChartDataLabelPositionBottomLeft,
   RDLChartDataLabelPositionOutside,
 };
-FOUNDATION_EXPORT RDLChartDataLabelPosition RDLChartDataLabelPositionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartDataLabelPosition(RDLChartDataLabelPosition v);
+RDLKIT_EXPORT RDLChartDataLabelPosition RDLChartDataLabelPositionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartDataLabelPosition(RDLChartDataLabelPosition v);
 
 // ChartDataLabel: the label a data point shows beside it.
 @interface RDLChartDataLabel : NSObject
@@ -886,8 +892,8 @@ typedef NS_ENUM(NSInteger, RDLChartLegendLayout) {
   RDLChartLegendLayoutWideTable,
   RDLChartLegendLayoutTallTable,
 };
-FOUNDATION_EXPORT RDLChartLegendLayout RDLChartLegendLayoutFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartLegendLayout(RDLChartLegendLayout v);
+RDLKIT_EXPORT RDLChartLegendLayout RDLChartLegendLayoutFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartLegendLayout(RDLChartLegendLayout v);
 
 // ChartTitle/Position: the side of the chart a title is on, and where along it.
 typedef NS_ENUM(NSInteger, RDLChartTitlePosition) {
@@ -905,8 +911,8 @@ typedef NS_ENUM(NSInteger, RDLChartTitlePosition) {
   RDLChartTitlePositionBottomCenter,
   RDLChartTitlePositionBottomLeft,
 };
-FOUNDATION_EXPORT RDLChartTitlePosition RDLChartTitlePositionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartTitlePosition(RDLChartTitlePosition v);
+RDLKIT_EXPORT RDLChartTitlePosition RDLChartTitlePositionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartTitlePosition(RDLChartTitlePosition v);
 
 // ChartAxisTitle/Position: where along its axis a title sits. Near is the end
 // the axis starts from.
@@ -916,8 +922,8 @@ typedef NS_ENUM(NSInteger, RDLChartAxisTitlePosition) {
   RDLChartAxisTitlePositionNear,
   RDLChartAxisTitlePositionFar,
 };
-FOUNDATION_EXPORT RDLChartAxisTitlePosition RDLChartAxisTitlePositionFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartAxisTitlePosition(RDLChartAxisTitlePosition v);
+RDLKIT_EXPORT RDLChartAxisTitlePosition RDLChartAxisTitlePositionFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartAxisTitlePosition(RDLChartAxisTitlePosition v);
 
 // ChartAxis/Margin: whether an axis leaves room past its first and last
 // category. Auto leaves it to the kind of chart.
@@ -927,8 +933,8 @@ typedef NS_ENUM(NSInteger, RDLChartAxisMargin) {
   RDLChartAxisMarginTrue,
   RDLChartAxisMarginFalse,
 };
-FOUNDATION_EXPORT RDLChartAxisMargin RDLChartAxisMarginFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartAxisMargin(RDLChartAxisMargin v);
+RDLKIT_EXPORT RDLChartAxisMargin RDLChartAxisMarginFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartAxisMargin(RDLChartAxisMargin v);
 
 // ChartAxis/Location: which side of the plot an axis is drawn on -- the left,
 // or under the bars, by default, and the right or the top when Opposite.
@@ -937,8 +943,8 @@ typedef NS_ENUM(NSInteger, RDLChartAxisLocation) {
   RDLChartAxisLocationDefault,
   RDLChartAxisLocationOpposite,
 };
-FOUNDATION_EXPORT RDLChartAxisLocation RDLChartAxisLocationFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartAxisLocation(RDLChartAxisLocation v);
+RDLKIT_EXPORT RDLChartAxisLocation RDLChartAxisLocationFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartAxisLocation(RDLChartAxisLocation v);
 
 // ChartMarker/Type: the shape drawn at a data point. Auto gives each series
 // the next shape in turn.
@@ -956,8 +962,8 @@ typedef NS_ENUM(NSInteger, RDLChartMarkerType) {
   RDLChartMarkerTypeStar10,
   RDLChartMarkerTypeAuto,
 };
-FOUNDATION_EXPORT RDLChartMarkerType RDLChartMarkerTypeFromString(NSString *s);
-FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
+RDLKIT_EXPORT RDLChartMarkerType RDLChartMarkerTypeFromString(NSString *s);
+RDLKIT_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 
 // ChartMarker: the marker at each data point -- its shape, its Size (an
 // RdlSize or an expression; nil for 3.75pt) and its Style, whose Color fills it.
@@ -1457,12 +1463,12 @@ FOUNDATION_EXPORT NSString *RDLStringFromChartMarkerType(RDLChartMarkerType v);
 @end
 
 // ColumnSpacing when a report says nothing, as MS-RDL gives it.
-FOUNDATION_EXPORT const CGFloat RDLDefaultColumnSpacing;
+RDLKIT_EXPORT const CGFloat RDLDefaultColumnSpacing;
 
 // Items in the order they are painted: by ZIndex, lowest first, and in the
 // order they are listed where two share one. The last is on top.
 @class RDLItem;
-FOUNDATION_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *items);
+RDLKIT_EXPORT NSArray<RDLItem *> *RDLItemsInPaintOrder(NSArray<RDLItem *> *items);
 
 @interface RDLPage : NSObject
 @property (nonatomic, assign) CGFloat pageWidth, pageHeight;

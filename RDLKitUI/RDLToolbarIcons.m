@@ -92,11 +92,11 @@ static void RDLDrawAddCalculated(void) {
 
 static void RDLDrawChevron(BOOL pointingLeft) {
   NSBezierPath *path = [NSBezierPath bezierPath];
-  CGFloat near = pointingLeft ? kRDLIconSide - 5 : 5;
-  CGFloat far = pointingLeft ? 5 : kRDLIconSide - 5;
-  [path moveToPoint:NSMakePoint(near, 3)];
-  [path lineToPoint:NSMakePoint(far, kRDLIconSide / 2)];
-  [path lineToPoint:NSMakePoint(near, kRDLIconSide - 3)];
+  CGFloat nearEdge = pointingLeft ? kRDLIconSide - 5 : 5;
+  CGFloat farEdge = pointingLeft ? 5 : kRDLIconSide - 5;
+  [path moveToPoint:NSMakePoint(nearEdge, 3)];
+  [path lineToPoint:NSMakePoint(farEdge, kRDLIconSide / 2)];
+  [path lineToPoint:NSMakePoint(nearEdge, kRDLIconSide - 3)];
   [path setLineWidth:2];
   [[NSColor blackColor] set];
   [path stroke];
@@ -105,11 +105,11 @@ static void RDLDrawChevron(BOOL pointingLeft) {
 // The same, turned to point up or down. The image is drawn with y upwards.
 static void RDLDrawVerticalChevron(BOOL pointingUp) {
   NSBezierPath *path = [NSBezierPath bezierPath];
-  CGFloat near = pointingUp ? 5 : kRDLIconSide - 5;
-  CGFloat far = pointingUp ? kRDLIconSide - 5 : 5;
-  [path moveToPoint:NSMakePoint(3, near)];
-  [path lineToPoint:NSMakePoint(kRDLIconSide / 2, far)];
-  [path lineToPoint:NSMakePoint(kRDLIconSide - 3, near)];
+  CGFloat nearEdge = pointingUp ? 5 : kRDLIconSide - 5;
+  CGFloat farEdge = pointingUp ? kRDLIconSide - 5 : 5;
+  [path moveToPoint:NSMakePoint(3, nearEdge)];
+  [path lineToPoint:NSMakePoint(kRDLIconSide / 2, farEdge)];
+  [path lineToPoint:NSMakePoint(kRDLIconSide - 3, nearEdge)];
   [path setLineWidth:2];
   [[NSColor blackColor] set];
   [path stroke];

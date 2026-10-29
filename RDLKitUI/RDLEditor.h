@@ -13,6 +13,12 @@
 #import "RDLKit.h"
 #import "RDLTablixStructure.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLDocument;
 @class RDLItem;
 @class RDLDataSet;
@@ -20,9 +26,9 @@
 
 // The group settings the Group Properties panel edits beyond its name,
 // expressions and filters.
-FOUNDATION_EXPORT NSArray<NSString *> *RDLGroupSettingKeys(void);
+RDLKITUI_EXPORT NSArray<NSString *> *RDLGroupSettingKeys(void);
 // Whether `member` already has every one of those settings as `settings` does.
-FOUNDATION_EXPORT BOOL RDLGroupHasSettings(RDLTablixMember *member, RDLTablixMember *settings);
+RDLKITUI_EXPORT BOOL RDLGroupHasSettings(RDLTablixMember *member, RDLTablixMember *settings);
 
 @interface RDLEditor : NSObject
 - (instancetype)initWithDocument:(RDLDocument *)document;

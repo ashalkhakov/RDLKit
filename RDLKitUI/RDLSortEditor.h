@@ -2,6 +2,12 @@
 #import <AppKit/AppKit.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // How something is sorted: an expression and a direction, one row each, the
 // first row deciding first.
 //
@@ -38,4 +44,4 @@
 
 // Two sorts the same, row for row: the same expressions in the same
 // directions. What a caller asks before recording an edit that changes nothing.
-FOUNDATION_EXPORT BOOL RDLSortExpressionsEqual(NSArray<RDLSortExpression *> *a, NSArray<RDLSortExpression *> *b);
+RDLKITUI_EXPORT BOOL RDLSortExpressionsEqual(NSArray<RDLSortExpression *> *a, NSArray<RDLSortExpression *> *b);

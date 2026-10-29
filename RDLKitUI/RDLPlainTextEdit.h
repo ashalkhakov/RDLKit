@@ -13,8 +13,14 @@
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // A text box's paragraphs as its `value` has them.
-FOUNDATION_EXPORT NSString *RDLTextOfParagraphs(NSArray<RDLParagraph *> *paragraphs);
+RDLKITUI_EXPORT NSString *RDLTextOfParagraphs(NSArray<RDLParagraph *> *paragraphs);
 
 // The paragraphs `paragraphs` become when their text is edited from `oldText`
 // to `newText`, as new objects: the ones given are left as they were, which is
@@ -28,6 +34,6 @@ FOUNDATION_EXPORT NSString *RDLTextOfParagraphs(NSArray<RDLParagraph *> *paragra
 //
 // nil when the edit cannot be carried into the runs: `oldText` is not the
 // paragraphs' text, or `newText` breaks a line where it did not break before.
-FOUNDATION_EXPORT NSMutableArray<RDLParagraph *> *RDLParagraphsEditedAsText(NSArray<RDLParagraph *> *paragraphs,
+RDLKITUI_EXPORT NSMutableArray<RDLParagraph *> *RDLParagraphsEditedAsText(NSArray<RDLParagraph *> *paragraphs,
                                                                            NSString *oldText,
                                                                            NSString *newText);

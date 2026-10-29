@@ -7,6 +7,12 @@
 #import <Foundation/Foundation.h>
 #import "RDLExpression.h"
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 // What an As names, as far as it changes a value.
 typedef NS_ENUM(NSInteger, RDLCodeType) {
   RDLCodeTypeUnspecified = 0,  // Object, or no As at all: the value as it is
@@ -107,12 +113,12 @@ NSString *RDLCodeWithoutComment(NSString *line);
 
 // Shared between the phases: the pieces the parser makes, and the value
 // handling the interpreter does with them.
-FOUNDATION_EXPORT RDLCodeType RDLCodeTypeNamed(NSString *name);
-FOUNDATION_EXPORT RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStatement *> *body);
+RDLKIT_EXPORT RDLCodeType RDLCodeTypeNamed(NSString *name);
+RDLKIT_EXPORT RDLCodeBranch *RDLCodeBranchOf(RDLExpr *condition, NSArray<RDLCodeStatement *> *body);
 // A value as a variable declared with that type holds it, and what one holds
 // before anything is put in it.
-FOUNDATION_EXPORT id RDLCodeConverted(id value, RDLCodeType type);
-FOUNDATION_EXPORT id RDLCodeStartingValue(RDLCodeType type);
+RDLKIT_EXPORT id RDLCodeConverted(id value, RDLCodeType type);
+RDLKIT_EXPORT id RDLCodeStartingValue(RDLCodeType type);
 
 // The parser. The interpreter makes one to read a module's source.
 @interface RDLCodeReader : NSObject

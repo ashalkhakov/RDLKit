@@ -2,6 +2,12 @@
 #import <AppKit/AppKit.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // A list of variables -- the report's, or a group's -- each a name and the
 // expression it is worked out from, in the order they are worked out. A
 // report's variable may also be writable, which a group's may not.
@@ -42,4 +48,4 @@
 
 // Two lists of variables the same: names, values as written, and writability,
 // in order.
-FOUNDATION_EXPORT BOOL RDLVariablesEqual(NSArray<RDLVariable *> *a, NSArray<RDLVariable *> *b);
+RDLKITUI_EXPORT BOOL RDLVariablesEqual(NSArray<RDLVariable *> *a, NSArray<RDLVariable *> *b);

@@ -629,7 +629,10 @@ static BOOL RDLGroupsHold(NSArray<RDLTablixMember *> *groups, RDLTablixMember *g
     return NO;
   _dragged = item;
   _draggedAxis = [self axisOfGroup:item];
-  [pasteboard declareTypes:@[ RDLGroupsDragType ] owner:self];
+  // No owner: the data is all here, and an owner is one the pasteboard
+  // server calls back as the pasteboard changes hands (on GNUstep, a
+  // message to this process, which a Windows client could miss).
+  [pasteboard declareTypes:@[ RDLGroupsDragType ] owner:nil];
   [pasteboard setString:@"group" forType:RDLGroupsDragType];
   return YES;
 }

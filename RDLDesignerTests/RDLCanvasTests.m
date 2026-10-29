@@ -116,11 +116,11 @@
     if (hit != rule)
       XCTFail(@"a click %g points from the rule should select it, it found %@", dy, hit.name);
   }
-  RDLItem *far = [[canvas geometry] itemAtPoint:NSMakePoint(NSMidX(lineRect), NSMidY(lineRect) - 30)
+  RDLItem *farAway = [[canvas geometry] itemAtPoint:NSMakePoint(NSMidX(lineRect), NSMidY(lineRect) - 30)
                                            kind:&kind
                                         bandKey:NULL
                                            rect:NULL];
-  if (far == rule)
+  if (farAway == rule)
     XCTFail(@"%@", @"but not half an inch away from it");
 }
 
@@ -940,9 +940,9 @@ paperOrigin:NSMakePoint(0, 0)];
   RDLSnapResult *middle = RDLSnapMovedRect(NSMakeRect(113, 250, 50, 20), others, 5);
   if (fabs(NSMidX(middle.rect) - 140) > 0.001)
     XCTFail(@"the middles should meet, sits at %g", NSMidX(middle.rect));
-  // Too far off, and nothing moves.
-  RDLSnapResult *far = RDLSnapMovedRect(NSMakeRect(200, 250, 50, 20), others, 5);
-  if (far.snapped || fabs(NSMinX(far.rect) - 200) > 0.001 || [far.guides count])
+  // Too farAway off, and nothing moves.
+  RDLSnapResult *farAway = RDLSnapMovedRect(NSMakeRect(200, 250, 50, 20), others, 5);
+  if (farAway.snapped || fabs(NSMinX(farAway.rect) - 200) > 0.001 || [farAway.guides count])
     XCTFail(@"%@", @"a box away from everything should be left where it is");
   // Both axes at once.
   RDLSnapResult *both = RDLSnapMovedRect(NSMakeRect(102, 98, 50, 20), others, 5);

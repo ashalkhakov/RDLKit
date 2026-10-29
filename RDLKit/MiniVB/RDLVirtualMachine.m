@@ -156,9 +156,9 @@ id RDLRunChunk(RDLChunk *chunk, RDLEvalScope *scope) {
   const RDLFunctionHandler *handlers = chunk.handlers;
   RDLCodeFrame *frame = scope.codeFrame;
   NSUInteger depth = chunk.maxStack;
-  __strong id small[kRDLSmallStack];
+  __strong id onStack[kRDLSmallStack];
   __strong id *heap = NULL;
-  __strong id *s = small;
+  __strong id *s = onStack;
   if (depth > kRDLSmallStack) {
     heap = (__strong id *)calloc(depth, sizeof(id));
     s = heap;

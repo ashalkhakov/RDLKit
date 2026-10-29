@@ -11,6 +11,12 @@
 #import "RDLPageGeometry.h"
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLItem;
 @class RDLReport;
 @class RDLDataSet;
@@ -37,7 +43,7 @@ typedef NS_ENUM(NSInteger, RDLSelectionScope) {
   RDLSelectionScopeTablixCell
 };
 
-extern NSString * const RDLSelectionDidChangeNotification;
+RDLKITUI_EXPORT NSString * const RDLSelectionDidChangeNotification;
 
 @interface RDLSelection : NSObject
 @property (nonatomic, readonly, assign) RDLSelectionScope scope;

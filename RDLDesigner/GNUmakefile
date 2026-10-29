@@ -8,7 +8,7 @@ RDLDesigner_OBJCFLAGS += -fobjc-arc -Wall -I../RDLKit -I../RDLKit/MiniVB -I../RD
 # the new-report wizard, the menu bar, updates. The designer itself -- its
 # windows, panes and editing core -- is RDLKitUI's.
 RDLDesigner_OBJC_FILES = \
-  RDLUpdater.m \
+  RDLUpdater-GNUstep.m \
   main.m \
   RDLAppDelegate.m \
   RDLWelcomeWindow.m \
@@ -20,7 +20,8 @@ RDLDesigner_OBJC_FILES = \
 # per-instance variable: it is the documented form and applies whatever the
 # instance type is.
 ADDITIONAL_LIB_DIRS += -L../RDLKit/$(GNUSTEP_OBJ_DIR) -L../RDLKitUI/$(GNUSTEP_OBJ_DIR)
-RDLDesigner_OBJC_LIBS += -lRDLKitUI -lRDLKit -ldispatch
+# GSUpdater, the stack's: the designer's updates (RDLUpdater-GNUstep.m).
+RDLDesigner_OBJC_LIBS += -lRDLKitUI -lRDLKit -lGSUpdater -ldispatch
 # The bundle's icon: GNUstep puts it in the About panel, on the application's
 # window and miniwindow icons, and in the dock tile. The same PNG the AppImage
 # installs as the desktop icon.

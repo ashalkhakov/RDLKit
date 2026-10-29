@@ -1,5 +1,11 @@
 #import <Foundation/Foundation.h>
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 // A number as an expression carries one: a value of one of Visual Basic's
 // numeric types, held the way .NET holds it, and doing what VB does with it.
 //
@@ -83,7 +89,7 @@ typedef NS_ENUM(NSInteger, RDLNumberFailure) {
 };
 
 // .NET's message for a failure, as an expression's #Error carries it.
-FOUNDATION_EXPORT NSString *RDLNumberFailureMessage(RDLNumberFailure failure);
+RDLKIT_EXPORT NSString *RDLNumberFailureMessage(RDLNumberFailure failure);
 
 // VB's TriState, as FormatNumber, FormatCurrency and FormatPercent take their
 // last three arguments: True, False, or UseDefault, the culture's own.

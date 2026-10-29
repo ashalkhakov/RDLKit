@@ -9,16 +9,22 @@
 #import "RDLExpression.h"
 #import "RDLValueBoxing.h"
 
-FOUNDATION_EXPORT NSString *RDLResolveRowKey(id row, NSString *key);
-FOUNDATION_EXPORT id RDLFetchRowKey(id row, NSString *resolved);
-FOUNDATION_EXPORT BOOL RDLAsBoolObj(id v, BOOL *out);
-FOUNDATION_EXPORT NSString *RDLStr(id v);
-FOUNDATION_EXPORT RDLNumber *RDLSingle(float v);
-FOUNDATION_EXPORT NSLocale *RDLPOSIXLocale(void);
-FOUNDATION_EXPORT NSDate *RDLDateLiteral(NSString *text);
-FOUNDATION_EXPORT RDLExprNode *RDLParse(NSString *src);
-FOUNDATION_EXPORT NSString *RDLPrint(RDLExprNode *a);
-FOUNDATION_EXPORT id RDLExec(RDLExprNode *ast, RDLEvalScope *scope);
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
+RDLKIT_EXPORT NSString *RDLResolveRowKey(id row, NSString *key);
+RDLKIT_EXPORT id RDLFetchRowKey(id row, NSString *resolved);
+RDLKIT_EXPORT BOOL RDLAsBoolObj(id v, BOOL *out);
+RDLKIT_EXPORT NSString *RDLStr(id v);
+RDLKIT_EXPORT RDLNumber *RDLSingle(float v);
+RDLKIT_EXPORT NSLocale *RDLPOSIXLocale(void);
+RDLKIT_EXPORT NSDate *RDLDateLiteral(NSString *text);
+RDLKIT_EXPORT RDLExprNode *RDLParse(NSString *src);
+RDLKIT_EXPORT NSString *RDLPrint(RDLExprNode *a);
+RDLKIT_EXPORT id RDLExec(RDLExprNode *ast, RDLEvalScope *scope);
 
 // The Code element lexes with the same lexer, keeping the line breaks Visual
 // Basic is written in. The tokens are RDLTok, whose `line` says where each was
@@ -42,7 +48,7 @@ FOUNDATION_EXPORT id RDLExec(RDLExprNode *ast, RDLEvalScope *scope);
 // element reports a problem against; an expression has only the one line.
 @property (nonatomic, assign) NSUInteger line;
 @end
-FOUNDATION_EXPORT NSArray *RDLLexCode(NSString *src);
+RDLKIT_EXPORT NSArray *RDLLexCode(NSString *src);
 
 // Parsing part of a stream the Code element lexed, rather than a string of its
 // own: the expression inside a statement is a range of the module's tokens.
@@ -53,29 +59,29 @@ FOUNDATION_EXPORT NSArray *RDLLexCode(NSString *src);
 // A token the Code parser makes for itself, standing for something Visual Basic
 // writes without writing it: a Select's subject, and the comparison a Case
 // clause means.
-FOUNDATION_EXPORT RDLTok *RDLCodeMakeToken(RDLExprTokenKind kind, NSString *text);
+RDLKIT_EXPORT RDLTok *RDLCodeMakeToken(RDLExprTokenKind kind, NSString *text);
 
 // Between the evaluator and the runtime library it calls. The library is every
 // function the language offers -- the conversions, the formatting, the text and
 // date work, and .NET's members -- and the evaluator needs only to hand a call
 // to it; these few go the other way, because a function of the library asks the
 // same questions of a value that an operator does.
-FOUNDATION_EXPORT NSString *RDLStrInLocale(id v, NSLocale *locale);
-FOUNDATION_EXPORT BOOL RDLKeyEq(id a, id b);
-FOUNDATION_EXPORT NSDate *RDLAsDate(id v, NSDate *fallback);
-FOUNDATION_EXPORT NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName);
-FOUNDATION_EXPORT BOOL RDLLike(NSString *value, NSString *pattern, BOOL ignoringCase, BOOL *valid);
-FOUNDATION_EXPORT NSComparisonResult RDLOrder(id a, id b);
-FOUNDATION_EXPORT RDLExprError *RDLNumberError(RDLNumberFailure failure);
-FOUNDATION_EXPORT BOOL RDLIsError(id v);
-FOUNDATION_EXPORT BOOL RDLIsIntegralType(RDLNumericType t);
-FOUNDATION_EXPORT BOOL RDLIsNumberValue(id v);
-FOUNDATION_EXPORT id RDLNumericOperand(id v);
-FOUNDATION_EXPORT id RDLArithmetic(RDLExprOperator op, id left, id right);
-FOUNDATION_EXPORT id RDLBooleanOperand(id v);
-FOUNDATION_EXPORT id RDLOperate(RDLExprOperator op, id a, id b);
-FOUNDATION_EXPORT id RDLDateInFormat(NSDate *date, NSString *format, NSLocale *locale);
-FOUNDATION_EXPORT NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *locale);
+RDLKIT_EXPORT NSString *RDLStrInLocale(id v, NSLocale *locale);
+RDLKIT_EXPORT BOOL RDLKeyEq(id a, id b);
+RDLKIT_EXPORT NSDate *RDLAsDate(id v, NSDate *fallback);
+RDLKIT_EXPORT NSArray *RDLRows(RDLEvalScope *scope, NSString *dsName);
+RDLKIT_EXPORT BOOL RDLLike(NSString *value, NSString *pattern, BOOL ignoringCase, BOOL *valid);
+RDLKIT_EXPORT NSComparisonResult RDLOrder(id a, id b);
+RDLKIT_EXPORT RDLExprError *RDLNumberError(RDLNumberFailure failure);
+RDLKIT_EXPORT BOOL RDLIsError(id v);
+RDLKIT_EXPORT BOOL RDLIsIntegralType(RDLNumericType t);
+RDLKIT_EXPORT BOOL RDLIsNumberValue(id v);
+RDLKIT_EXPORT id RDLNumericOperand(id v);
+RDLKIT_EXPORT id RDLArithmetic(RDLExprOperator op, id left, id right);
+RDLKIT_EXPORT id RDLBooleanOperand(id v);
+RDLKIT_EXPORT id RDLOperate(RDLExprOperator op, id a, id b);
+RDLKIT_EXPORT id RDLDateInFormat(NSDate *date, NSString *format, NSLocale *locale);
+RDLKIT_EXPORT NSString *RDLVisualBasicDateText(NSDate *date, NSLocale *locale);
 
 // Reading a row by a field's key. A row may be a dictionary or an object
 // answering to the key, and finding out which is worth remembering: callers in

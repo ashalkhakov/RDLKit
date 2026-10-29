@@ -4,6 +4,12 @@ LIBRARY_NAME = RDLKit
 RDLKit_NEEDS_GUI = yes
 RDLKit_LIBRARIES_DEPEND_UPON += -lz -ldispatch
 RDLKit_OBJCFLAGS += -fobjc-arc -Wall -Werror=logical-not-parentheses
+# Windows: a DLL exports what it marks, and once the runtime marks its
+# classes, its C constants and functions must be marked too: RDLKIT_EXPORT
+# (in its headers) is "export" while it is built, an import elsewhere.
+ifeq ($(OS),Windows_NT)
+RDLKit_CPPFLAGS += "-DRDLKIT_EXPORT=__declspec(dllexport) extern"
+endif
 # MiniVB, the subset of Visual Basic that RDL expressions and a report's Code
 # need -- not a Visual Basic -- with the runtime library both call, is a
 # directory of its own.

@@ -13,6 +13,12 @@
 #import "RDLReport.h"
 #import "RDLReport.h"
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLStyle;
 @class RDLParagraph;
 
@@ -21,8 +27,8 @@
 // an editor can tell the marker from what was typed. Every character of a
 // paragraph with its own layout, the newline ending it included, carries
 // RDLParagraphLayoutAttributeName: an RDLParagraph holding just that layout.
-FOUNDATION_EXPORT NSString *const RDLListMarkerAttributeName;
-FOUNDATION_EXPORT NSString *const RDLParagraphLayoutAttributeName;
+RDLKIT_EXPORT NSString *const RDLListMarkerAttributeName;
+RDLKIT_EXPORT NSString *const RDLParagraphLayoutAttributeName;
 
 @interface RDLTextAttributes : NSObject
 

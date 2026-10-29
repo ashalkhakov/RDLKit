@@ -2,6 +2,12 @@
 #import <Foundation/Foundation.h>
 #import "RDLReport.h"
 #import "RDLJSONPath.h"
+
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
 @class RDLEvalScope;
 
 // Where a dataset's rows come from -- documents, always. This kit is a local
@@ -33,9 +39,9 @@ typedef NS_ENUM(NSInteger, RDLDataProviderKind) {
   RDLDataProviderKindCSV,
 };
 
-FOUNDATION_EXPORT RDLDataProviderKind RDLDataProviderKindFromString(NSString *name);
+RDLKIT_EXPORT RDLDataProviderKind RDLDataProviderKindFromString(NSString *name);
 // "JSON" / "XML" / "CSV", as a DataProvider element is written.
-FOUNDATION_EXPORT NSString *RDLStringFromDataProviderKind(RDLDataProviderKind kind);
+RDLKIT_EXPORT NSString *RDLStringFromDataProviderKind(RDLDataProviderKind kind);
 
 // A connection string, read into its parts: "jsondoc=films.json" is
 // {"jsondoc": "films.json"}, and "data.csv;HasHeaders=true" is
@@ -48,17 +54,17 @@ FOUNDATION_EXPORT NSString *RDLStringFromDataProviderKind(RDLDataProviderKind ki
 // "==" in a key is "="; any other value runs to the next ";" as written, quotes
 // and all. RDLConnectionString quotes what needs it, in ' when the value holds
 // a " and no ', otherwise in " with each " doubled.
-FOUNDATION_EXPORT NSDictionary<NSString *, NSString *> *RDLConnectionProperties(NSString *connectString);
+RDLKIT_EXPORT NSDictionary<NSString *, NSString *> *RDLConnectionProperties(NSString *connectString);
 // The inverse: the properties written back as a connect string. The document
 // comes first and the options follow in a stable order, so editing a source in
 // the designer does not rewrite the whole line every time.
-FOUNDATION_EXPORT NSString *RDLConnectionString(NSDictionary<NSString *, NSString *> *properties);
+RDLKIT_EXPORT NSString *RDLConnectionString(NSDictionary<NSString *, NSString *> *properties);
 // Which key names the document for a kind of provider: a file to read
 // ("jsondoc", "xmldoc", or the bare document for CSV), or content carried in
 // the report ("jsondata", "xmldata", "data"). An editor asks for these rather
 // than knowing the vocabulary.
-FOUNDATION_EXPORT NSString *RDLDocumentKeyForProviderKind(RDLDataProviderKind kind);
-FOUNDATION_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind);
+RDLKIT_EXPORT NSString *RDLDocumentKeyForProviderKind(RDLDataProviderKind kind);
+RDLKIT_EXPORT NSString *RDLInlineKeyForProviderKind(RDLDataProviderKind kind);
 
 // Which of the two a data source reads. A connect string may hold both -- data
 // kept in the report and a file beside it -- which is what makes a report
@@ -76,21 +82,21 @@ typedef NS_ENUM(NSInteger, RDLDocumentSource) {
 // "Use" in a connect string: `jsondata=[…];jsondoc=live.json;use=file`. A
 // string that does not say reads whichever it has, the kept data first --
 // which is what every connect string written before this meant.
-FOUNDATION_EXPORT NSString *const RDLConnectionUseKey;
-FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceFromString(NSString *name);
-FOUNDATION_EXPORT NSString *RDLStringFromDocumentSource(RDLDocumentSource source);
+RDLKIT_EXPORT NSString *const RDLConnectionUseKey;
+RDLKIT_EXPORT RDLDocumentSource RDLDocumentSourceFromString(NSString *name);
+RDLKIT_EXPORT NSString *RDLStringFromDocumentSource(RDLDocumentSource source);
 // Which one these properties read, for a provider of that kind.
-FOUNDATION_EXPORT RDLDocumentSource RDLDocumentSourceOfProperties(
+RDLKIT_EXPORT RDLDocumentSource RDLDocumentSourceOfProperties(
     NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind);
 // The same properties saying they read that one, with what they hold of the
 // other left where it is. Unspecified takes the say out again.
-FOUNDATION_EXPORT NSDictionary<NSString *, NSString *> *RDLPropertiesReading(
+RDLKIT_EXPORT NSDictionary<NSString *, NSString *> *RDLPropertiesReading(
     NSDictionary<NSString *, NSString *> *properties, RDLDataProviderKind kind,
     RDLDocumentSource source);
 // A web document's URL with a dataset's QueryParameters added to its query
 // string, after any it already has -- how SSRS's XML data extension hands query
 // parameters to a web source.
-FOUNDATION_EXPORT NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems);
+RDLKIT_EXPORT NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryItem *> *queryItems);
 
 #pragma mark - Providers
 //
@@ -129,7 +135,7 @@ FOUNDATION_EXPORT NSURL *RDLURLAddingQueryItems(NSURL *url, NSArray<NSURLQueryIt
 //
 // Mixed columns come back as String, and a column of nothing but nulls as
 // Unknown, which is what "the report did not say" already means.
-FOUNDATION_EXPORT RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field);
+RDLKIT_EXPORT RDLFieldDataType RDLInferredFieldType(NSArray *rows, NSString *field);
 
 #pragma mark - Binding
 
