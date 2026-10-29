@@ -8,6 +8,12 @@
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLItem;
 
 typedef NS_ENUM(NSInteger, RDLChangeScope) {
@@ -25,8 +31,8 @@ typedef NS_ENUM(NSInteger, RDLChangeScope) {
 };
 
 // Posted by RDLDocument. userInfo[RDLChangeKey] is the RDLChange.
-extern NSString * const RDLDocumentDidChangeNotification;
-extern NSString * const RDLChangeKey;
+RDLKITUI_EXPORT NSString * const RDLDocumentDidChangeNotification;
+RDLKITUI_EXPORT NSString * const RDLChangeKey;
 
 @interface RDLChange : NSObject
 @property (nonatomic, readonly, assign) RDLChangeScope scope;

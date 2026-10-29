@@ -135,10 +135,17 @@ static NSArray<NSView *> *RDLEveryViewUnder(NSView *view) {
   CGFloat splitGrew = NSWidth([split frame]) - splitWas;
 
   // The content view fills the window it is in -- no offset, no band of unused
-  // window under it.
-  if (fabs(NSMinX([content frame])) > 0.01 || fabs(NSMinY([content frame])) > 0.01)
-    XCTFail(@"%@", [NSString stringWithFormat:@"the content view floats at %@",
-                                              NSStringFromPoint([content frame].origin)]);
+  // window under it. It sits where the window's content is within its frame:
+  // at the frame's corner on macOS, inside the frame's borders where the
+  // frame has them (Windows draws them, and GNUstep's frame includes them).
+  NSRect contentRect = [window contentRectForFrameRect:[window frame]];
+  NSPoint contentOrigin = NSMakePoint(NSMinX(contentRect) - NSMinX([window frame]),
+                                      NSMinY(contentRect) - NSMinY([window frame]));
+  if (fabs(NSMinX([content frame]) - contentOrigin.x) > 0.01 ||
+      fabs(NSMinY([content frame]) - contentOrigin.y) > 0.01)
+    XCTFail(@"%@", [NSString stringWithFormat:@"the content view floats at %@, not at %@",
+                                              NSStringFromPoint([content frame].origin),
+                                              NSStringFromPoint(contentOrigin)]);
   if (fabs(NSWidth([content frame]) - NSWidth([content bounds])) > 0.01)
     XCTFail(@"%@", @"the content view should be as wide as the window");
   if (fabs(NSWidth([split frame]) - NSWidth([content frame])) > 0.01)

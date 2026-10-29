@@ -19,44 +19,50 @@
 #import "RDLKit.h"
 #import "RDLTablixStructure.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLBand;
 @class RDLItem;
 @class RDLReport;
 
 // Points per inch. RDL positions are in inches; views work in points.
-extern const CGFloat RDLPointsPerInch;
+RDLKITUI_EXPORT const CGFloat RDLPointsPerInch;
 
 // Drag handle kinds, as returned by -itemAtPoint:.
-extern NSString * const RDLHandleMove;
+RDLKITUI_EXPORT NSString * const RDLHandleMove;
 // Not a handle: the box drawn across bare paper to take hold of what it
 // touches. A drag kind like the others, so the state machine has one list.
-extern NSString * const RDLDragMarquee;
+RDLKITUI_EXPORT NSString * const RDLDragMarquee;
 // The rect two corners make, whichever way round they were given.
-FOUNDATION_EXPORT NSRect RDLRectBetween(NSPoint a, NSPoint b);
+RDLKITUI_EXPORT NSRect RDLRectBetween(NSPoint a, NSPoint b);
 // An item that lives in a tablix cell: selectable, but not draggable and not
 // resizable. MS-RDL ignores Top/Left/Height/Width inside CellContents -- the
 // cell decides where it is and how big it is -- so the canvas must not offer
 // to change them.
-extern NSString * const RDLHandleCell;
+RDLKITUI_EXPORT NSString * const RDLHandleCell;
 // The eight grips round an item's box, named by the side or corner they are
 // on: a corner moves two edges, a side one, and the ones on the top and the
 // left move the item as they resize it.
-extern NSString * const RDLHandleNorthWest;
-extern NSString * const RDLHandleNorth;
-extern NSString * const RDLHandleNorthEast;
-extern NSString * const RDLHandleWest;
-extern NSString * const RDLHandleEast;
-extern NSString * const RDLHandleSouthWest;
-extern NSString * const RDLHandleSouth;
-extern NSString * const RDLHandleSouthEast;
+RDLKITUI_EXPORT NSString * const RDLHandleNorthWest;
+RDLKITUI_EXPORT NSString * const RDLHandleNorth;
+RDLKITUI_EXPORT NSString * const RDLHandleNorthEast;
+RDLKITUI_EXPORT NSString * const RDLHandleWest;
+RDLKITUI_EXPORT NSString * const RDLHandleEast;
+RDLKITUI_EXPORT NSString * const RDLHandleSouthWest;
+RDLKITUI_EXPORT NSString * const RDLHandleSouth;
+RDLKITUI_EXPORT NSString * const RDLHandleSouthEast;
 // Where each grip sits on `rect`, in the order they are drawn and hit-tested:
 // the four corners first, so a corner wins over the sides it touches.
-FOUNDATION_EXPORT NSArray<NSString *> *RDLHandleKinds(void);
-FOUNDATION_EXPORT NSRect RDLHandleRectOfKind(NSString *kind, NSRect rect);
+RDLKITUI_EXPORT NSArray<NSString *> *RDLHandleKinds(void);
+RDLKITUI_EXPORT NSRect RDLHandleRectOfKind(NSString *kind, NSRect rect);
 // The box a drag from `kind` makes of `rect` when the pointer has moved by
 // `delta`, never smaller than `least` -- which is in the rect's own units,
 // since the canvas resizes in inches and draws in points.
-FOUNDATION_EXPORT NSRect RDLRectResizedByHandle(NSRect rect, NSString *kind, NSSize delta, CGFloat least);
+RDLKITUI_EXPORT NSRect RDLRectResizedByHandle(NSRect rect, NSString *kind, NSSize delta, CGFloat least);
 
 // One band's placement, paired with its key so callers never have to index two
 // parallel arrays (a previous source of drift).
@@ -104,16 +110,16 @@ FOUNDATION_EXPORT NSRect RDLRectResizedByHandle(NSRect rect, NSString *kind, NSS
 // with the page: a tablix whose group brackets are unreadable at 100% can be
 // read by zooming in, and the handles stay over the rows and columns they
 // belong to.
-FOUNDATION_EXPORT const CGFloat RDLTablixHandleBand;
-FOUNDATION_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect);
+RDLKITUI_EXPORT const CGFloat RDLTablixHandleBand;
+RDLKITUI_EXPORT NSRect RDLTablixHandleRect(NSRect itemRect);
 
 // The canvas's view transform: model space to view points. A pure scale, since
 // panning is the scroll view's. Everything drawn goes through it, and every
 // point arriving from an event comes back the other way through
 // RDLModelPointFromView -- one definition, rather than each caller dividing by
 // the zoom and one of them getting it wrong.
-FOUNDATION_EXPORT NSAffineTransform *RDLCanvasViewTransform(CGFloat zoom);
-FOUNDATION_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
+RDLKITUI_EXPORT NSAffineTransform *RDLCanvasViewTransform(CGFloat zoom);
+RDLKITUI_EXPORT NSPoint RDLModelPointFromView(NSPoint point, CGFloat zoom);
 
 // The item's rect anywhere in the report, including inside nested Rectangles.
 // NO when the item is not in this report.

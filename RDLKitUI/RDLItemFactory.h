@@ -11,6 +11,12 @@
 #import <Foundation/Foundation.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLItem;
 @class RDLReport;
 @class RDLSelection;
@@ -31,7 +37,7 @@ typedef NS_ENUM(NSInteger, RDLItemKind) {
 };
 
 // What the kind is called where a person picks it.
-FOUNDATION_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
+RDLKITUI_EXPORT NSString *RDLTitleOfItemKind(RDLItemKind kind);
 
 // The resolved answer to "where would a new element land right now?"
 @interface RDLInsertionPoint : NSObject

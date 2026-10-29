@@ -11,13 +11,19 @@
 #import <Foundation/Foundation.h>
 #import "RDLNumber.h"
 
-FOUNDATION_EXPORT BOOL RDLIsNothing(id v);
-FOUNDATION_EXPORT id RDLOutOfCollection(id v);
-FOUNDATION_EXPORT double RDLNum(id v);
-FOUNDATION_EXPORT BOOL RDLNumericLikeValue(id v);
-FOUNDATION_EXPORT BOOL RDLNumericLike(id v);
-FOUNDATION_EXPORT id RDLYes(BOOL b);
-FOUNDATION_EXPORT RDLNumber *RDLShort(int16_t v);
-FOUNDATION_EXPORT RDLNumber *RDLInt(int32_t v);
-FOUNDATION_EXPORT RDLNumber *RDLLong(int64_t v);
-FOUNDATION_EXPORT RDLNumber *RDLDouble(double v);
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
+RDLKIT_EXPORT BOOL RDLIsNothing(id v);
+RDLKIT_EXPORT id RDLOutOfCollection(id v);
+RDLKIT_EXPORT double RDLNum(id v);
+RDLKIT_EXPORT BOOL RDLNumericLikeValue(id v);
+RDLKIT_EXPORT BOOL RDLNumericLike(id v);
+RDLKIT_EXPORT id RDLYes(BOOL b);
+RDLKIT_EXPORT RDLNumber *RDLShort(int16_t v);
+RDLKIT_EXPORT RDLNumber *RDLInt(int32_t v);
+RDLKIT_EXPORT RDLNumber *RDLLong(int64_t v);
+RDLKIT_EXPORT RDLNumber *RDLDouble(double v);

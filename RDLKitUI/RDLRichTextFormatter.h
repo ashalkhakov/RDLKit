@@ -1,5 +1,11 @@
 #import <AppKit/AppKit.h>
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // The formatting half of the rich-text editor, with no window in sight.
 //
 // Everything the toolbar can do to the text is here, expressed over an
@@ -41,7 +47,7 @@ typedef NS_ENUM(NSInteger, RDLTriState) {
 // GNUstep's Foundation does not declare; -attribute:atIndex:
 // longestEffectiveRange:inRange: exists on both and is what the block form is
 // built on. Exported so nothing has to write this walk a second time.
-FOUNDATION_EXPORT void RDLEnumerateAttribute(NSAttributedString *text, NSString *name,
+RDLKITUI_EXPORT void RDLEnumerateAttribute(NSAttributedString *text, NSString *name,
                                              NSRange range,
                                              void (^block)(id value, NSRange r, BOOL *stop));
 

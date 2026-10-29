@@ -27,5 +27,6 @@ XVFB = $(if $(DISPLAY),,$(shell command -v xvfb-run >/dev/null 2>&1 && echo xvfb
 .PHONY: self-test
 self-test: all
 	LD_LIBRARY_PATH="$(CURDIR)/../../RDLKit/$(GNUSTEP_OBJ_DIR):$(CURDIR)/../../RDLKitUI/$(GNUSTEP_OBJ_DIR):$$LD_LIBRARY_PATH" \
+	PATH="$(CURDIR)/../../RDLKit/$(GNUSTEP_OBJ_DIR):$(CURDIR)/../../RDLKitUI/$(GNUSTEP_OBJ_DIR):$$PATH" \
 	RDLKITUI_RESOURCES="$(CURDIR)/../../RDLKitUI" \
 	  timeout -s ABRT 300 $(XVFB) ./$(GNUSTEP_OBJ_DIR)/ReportHost --self-test Stock.rdl

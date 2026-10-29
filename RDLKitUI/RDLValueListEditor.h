@@ -2,6 +2,12 @@
 #import <AppKit/AppKit.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 // An ordered list of values, one a row, each a constant or an expression --
 // a custom palette's colours, say -- added, removed and reordered.
 //
@@ -63,4 +69,4 @@
 @end
 
 // Two lists the same, value for value, as written.
-FOUNDATION_EXPORT BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b);
+RDLKITUI_EXPORT BOOL RDLValueListsEqual(NSArray<RDLValue *> *a, NSArray<RDLValue *> *b);

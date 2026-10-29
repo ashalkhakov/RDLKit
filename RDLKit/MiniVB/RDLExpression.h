@@ -1,5 +1,11 @@
 #import <Foundation/Foundation.h>
 #import "RDLNumber.h"
+
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
 @class RDLReport;
 @class RDLDataSet;
 @class RDLParameterValues;
@@ -14,7 +20,7 @@
 // matched case-insensitively, the way RDL matches field names; a KVC object is
 // asked only for keys it actually has, so a field it lacks reads as nil rather
 // than raising.
-FOUNDATION_EXPORT id RDLRowValue(id row, NSString *key);
+RDLKIT_EXPORT id RDLRowValue(id row, NSString *key);
 
 // Style.Calendar: the calendar a date is written in. Default, and a style that
 // names none, is the culture's own.
@@ -136,19 +142,19 @@ typedef NS_ENUM(NSInteger, RDLRenderFormat) {
 
 // A value's VB numeric type: an RDLNumber's own, and for a Foundation number
 // handed in from outside, the type RDLNumber would read it as.
-FOUNDATION_EXPORT RDLNumericType RDLNumericTypeOfValue(id value);
+RDLKIT_EXPORT RDLNumericType RDLNumericTypeOfValue(id value);
 
 // A value as VB's conversion function to that type converts it, or an
 // RDLExprError where that function would throw.
-FOUNDATION_EXPORT id RDLValueConvertedTo(id value, RDLConversionTarget target);
+RDLKIT_EXPORT id RDLValueConvertedTo(id value, RDLConversionTarget target);
 // A value as VB's CBool reads it -- Nothing False, a number True unless zero,
 // text True or False or a number -- or an RDLExprError where CBool would throw.
 // What a condition is taken as, in an expression and in the report's code.
-FOUNDATION_EXPORT id RDLValueConvertedToBoolean(id value);
+RDLKIT_EXPORT id RDLValueConvertedToBoolean(id value);
 // VB's Like: ? * # [list] [!list] and ranges, case-sensitive as expressions
 // compare, or ignoring case as a dataset's filters do by default. NO for a
 // pattern VB refuses.
-FOUNDATION_EXPORT BOOL RDLTextMatchesLikePattern(NSString *text, NSString *pattern, BOOL ignoringCase);
+RDLKIT_EXPORT BOOL RDLTextMatchesLikePattern(NSString *text, NSString *pattern, BOOL ignoringCase);
 
 // What an expression comes to when evaluating it fails the way VB throws -- an
 // overflow, a division by zero, text used as a number that is not one. It
@@ -162,9 +168,9 @@ FOUNDATION_EXPORT BOOL RDLTextMatchesLikePattern(NSString *text, NSString *patte
 // A value as the expression language reads one: as a number (text such as
 // "1,000" counts; anything that is not a number is 0), as text, and as True or
 // False. What the report's code converts its As types with.
-FOUNDATION_EXPORT double RDLValueAsNumber(id value);
-FOUNDATION_EXPORT NSString *RDLValueAsText(id value);
-FOUNDATION_EXPORT BOOL RDLValueAsBoolean(id value);
+RDLKIT_EXPORT double RDLValueAsNumber(id value);
+RDLKIT_EXPORT NSString *RDLValueAsText(id value);
+RDLKIT_EXPORT BOOL RDLValueAsBoolean(id value);
 
 // What a node of a parsed expression is. An enum rather than a string,
 // because a mistyped comparison against a string is a branch that silently
@@ -224,7 +230,7 @@ typedef NS_ENUM(NSInteger, RDLExprOperator) {
 };
 
 // As it is written in an expression, for diagnostics.
-FOUNDATION_EXPORT NSString *RDLStringFromExprOperator(RDLExprOperator op);
+RDLKIT_EXPORT NSString *RDLStringFromExprOperator(RDLExprOperator op);
 
 // One node of a parsed expression. Published so tools can walk a report's
 // expressions without running them -- RDLChecker resolves names and infers
@@ -283,7 +289,7 @@ typedef NS_ENUM(NSInteger, RDLExprTokenKind) {
 // Accepted: yyyy-MM-dd, yyyy-MM-dd'T'HH:mm:ss, yyyy-MM-dd HH:mm:ss,
 // MM/dd/yyyy, d MMM yyyy, MMM d, yyyy. ISO first, so an unambiguous form wins
 // before the American one is tried.
-FOUNDATION_EXPORT NSDate *RDLDateFromValue(id value);
+RDLKIT_EXPORT NSDate *RDLDateFromValue(id value);
 
 // One parsed RDL expression, kept losslessly.
 //
@@ -377,16 +383,16 @@ typedef NS_ENUM(NSInteger, RDLExprCompleteness) {
 // boolean is, so this asks the object instead of the runtime. Published
 // because anything reading typed data -- a JSON document, an expression --
 // needs the same answer.
-FOUNDATION_EXPORT BOOL RDLNumberIsBoolean(id value);
+RDLKIT_EXPORT BOOL RDLNumberIsBoolean(id value);
 
-FOUNDATION_EXPORT NSLocale *RDLLocaleForLanguage(NSString *language);
+RDLKIT_EXPORT NSLocale *RDLLocaleForLanguage(NSString *language);
 // This machine's own culture, as RDL writes one: "en-US". The fallback for a
 // report that names no Language, and the default for User!Language.
-FOUNDATION_EXPORT NSString *RDLHostLanguage(void);
+RDLKIT_EXPORT NSString *RDLHostLanguage(void);
 // NO for a code no locale on this machine answers to, so a report can be told
 // that its Language is a typo rather than silently formatting as if it were
 // English. An empty code is known: it means "the machine's own".
-FOUNDATION_EXPORT BOOL RDLLanguageIsKnown(NSString *language);
+RDLKIT_EXPORT BOOL RDLLanguageIsKnown(NSString *language);
 
 // VB-style RDL expressions: tokens, a tree, bytecode, and a stack machine that runs it.
 // How a value is written as text: its Format, and the culture, calendar and

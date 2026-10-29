@@ -16,6 +16,12 @@
 #import "RDLCodeInternal.h"
 #import "RDLCode.h"
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 typedef NS_ENUM(int32_t, RDLOpcode) {
   RDLOpcodeUnspecified = 0,
   // --- values
@@ -150,7 +156,7 @@ typedef id (*RDLFunctionHandler)(NSString *name, NSArray *vals, RDLEvalScope *sc
 
 // A slot nobody has put anything in yet -- which is not Nothing: an unset local
 // lets its name mean the module's variable or function instead.
-FOUNDATION_EXPORT id RDLUnsetSlot(void);
+RDLKIT_EXPORT id RDLUnsetSlot(void);
 
 // One call of one of the report's functions: its locals and their declared
 // types, its loops' state, and what it returns.
@@ -170,34 +176,34 @@ FOUNDATION_EXPORT id RDLUnsetSlot(void);
 @end
 
 // --- the compiler
-FOUNDATION_EXPORT RDLChunk *RDLCompileExpression(RDLExprNode *node);
+RDLKIT_EXPORT RDLChunk *RDLCompileExpression(RDLExprNode *node);
 // The node's chunk, compiled the first time it is asked for.
-FOUNDATION_EXPORT RDLChunk *RDLChunkForNode(RDLExprNode *node);
+RDLKIT_EXPORT RDLChunk *RDLChunkForNode(RDLExprNode *node);
 // An expression inside the report's code, its names meaning what the context says.
-FOUNDATION_EXPORT RDLChunk *RDLCompileCodeExpression(RDLExprNode *node, RDLCodeContext *context);
+RDLKIT_EXPORT RDLChunk *RDLCompileCodeExpression(RDLExprNode *node, RDLCodeContext *context);
 // A function's statements. The context's locals are the function's slots; its
 // register count is filled in.
-FOUNDATION_EXPORT RDLChunk *RDLCompileCodeBody(NSArray<RDLCodeStatement *> *body, RDLCodeContext *context);
+RDLKIT_EXPORT RDLChunk *RDLCompileCodeBody(NSArray<RDLCodeStatement *> *body, RDLCodeContext *context);
 // The locals a function has, by lower-cased name: its parameters first, then its
 // own name for a Function, then everything its statements declare or assign.
-FOUNDATION_EXPORT NSDictionary<NSString *, NSNumber *> *RDLCodeLocalSlots(RDLCodeFunction *function);
+RDLKIT_EXPORT NSDictionary<NSString *, NSNumber *> *RDLCodeLocalSlots(RDLCodeFunction *function);
 
 // --- the machine
-FOUNDATION_EXPORT id RDLRunChunk(RDLChunk *chunk, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLRunChunk(RDLChunk *chunk, RDLEvalScope *scope);
 
 // --- what the machine calls in the runtime library
-FOUNDATION_EXPORT RDLFunctionHandler RDLFunctionHandlerNamed(NSString *lowercaseName);
-FOUNDATION_EXPORT RDLForm RDLFormNamed(NSString *lowercaseName);
-FOUNDATION_EXPORT id RDLLoadReference(RDLOpcode opcode, RDLExprNode *node, RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLCallLibrary(NSString *name, NSArray *vals, RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLCallForm(RDLForm form, NSString *lowercaseName, NSArray *vals, RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLCallLazyForm(RDLForm form, NSString *lowercaseName, NSArray<RDLExprNode *> *args,
+RDLKIT_EXPORT RDLFunctionHandler RDLFunctionHandlerNamed(NSString *lowercaseName);
+RDLKIT_EXPORT RDLForm RDLFormNamed(NSString *lowercaseName);
+RDLKIT_EXPORT id RDLLoadReference(RDLOpcode opcode, RDLExprNode *node, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLCallLibrary(NSString *name, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLCallForm(RDLForm form, NSString *lowercaseName, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLCallLazyForm(RDLForm form, NSString *lowercaseName, NSArray<RDLExprNode *> *args,
                                      RDLEvalScope *scope);
 // A shared member; `head`, when it is given and the name before the first dot
 // holds a value, makes it that value's member instead.
-FOUNDATION_EXPORT id RDLCallMember(NSString *dottedName, NSArray *vals, id head, BOOL headFound,
+RDLKIT_EXPORT id RDLCallMember(NSString *dottedName, NSArray *vals, id head, BOOL headFound,
                                    RDLEvalScope *scope);
-FOUNDATION_EXPORT id RDLCallMethod(NSString *name, NSArray *vals, RDLEvalScope *scope);
+RDLKIT_EXPORT id RDLCallMethod(NSString *name, NSArray *vals, RDLEvalScope *scope);
 
 // --- what the machine asks of the module
 @interface RDLCodeModule (RDLMachine)

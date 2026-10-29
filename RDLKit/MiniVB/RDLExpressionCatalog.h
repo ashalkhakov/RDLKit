@@ -1,6 +1,12 @@
 /* Copyright (c) 2026 the RDLKit contributors. LGPL 2.1. */
 #import <Foundation/Foundation.h>
 
+/* RDLKit's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKIT_EXPORT
+#define RDLKIT_EXPORT FOUNDATION_EXPORT
+#endif
+
 // What an attribute will accept once its expression has been evaluated. An
 // expression is still an expression whatever it sits in; this says what its
 // result has to be coercible to, so the editor can say what is expected and a
@@ -22,7 +28,7 @@ typedef NS_ENUM(NSInteger, RDLExpressionContext) {
 };
 
 // A sentence naming what the context expects, for the editor to show.
-FOUNDATION_EXPORT NSString *RDLExpressionContextDescription(RDLExpressionContext context);
+RDLKIT_EXPORT NSString *RDLExpressionContextDescription(RDLExpressionContext context);
 
 @class RDLFunctionCategory;
 

@@ -11,6 +11,12 @@
 #import <AppKit/AppKit.h>
 #import "RDLKit.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 @class RDLItem;
 
 // What an attributed string implies for an item, computed without touching it.
@@ -35,7 +41,7 @@
 // TextRun whose Value is that expression -- which is what RDL means by an
 // expression inside rich text. Not a kit attribute: the renderer never sees
 // one, because the layout engine evaluates every run before anything is drawn.
-extern NSString * const RDLExpressionRunAttributeName;
+RDLKITUI_EXPORT NSString * const RDLExpressionRunAttributeName;
 
 + (NSAttributedString *)attributedStringForItem:(RDLTextbox *)item;
 // The same text on one line, for showing a text box's contents in a field:
@@ -67,5 +73,5 @@ extern NSString * const RDLExpressionRunAttributeName;
 // inspector's Value field would read the words with the expressions missing,
 // and writing that back would be the loss -- so it is edited as rich text and
 // the field says so.
-FOUNDATION_EXPORT BOOL RDLTextboxHoldsRichText(RDLTextbox *box);
+RDLKITUI_EXPORT BOOL RDLTextboxHoldsRichText(RDLTextbox *box);
 

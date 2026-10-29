@@ -16,23 +16,29 @@
 #import "RDLSelection.h"
 #import "RDLItemFactory.h"
 
+/* RDLKitUI's own: exported where it is built for Windows (its GNUmakefile),
+   imported everywhere else, as FOUNDATION_EXPORT. */
+#ifndef RDLKITUI_EXPORT
+#define RDLKITUI_EXPORT FOUNDATION_EXPORT
+#endif
+
 
 // Zoom and grid are not document content. They used to be published through
 // the document-changed notification, which meant every zoom marked the report
 // dirty and pushed an undo entry -- the old code worked around that by
 // resetting `dirty` immediately afterwards. They now have their own channel.
-extern NSString * const RDLViewStateDidChangeNotification;
+RDLKITUI_EXPORT NSString * const RDLViewStateDidChangeNotification;
 
 // What the canvas will zoom to. Everything the canvas draws scales with it,
 // the tablix handle band and group brackets included, so zooming in is how a
 // nested group structure is read rather than squinted at.
-FOUNDATION_EXPORT const CGFloat RDLMinimumZoom;
-FOUNDATION_EXPORT const CGFloat RDLMaximumZoom;
+RDLKITUI_EXPORT const CGFloat RDLMinimumZoom;
+RDLKITUI_EXPORT const CGFloat RDLMaximumZoom;
 // The zooms the zoom control lists, smallest first -- and the steps Zoom In
 // and Zoom Out take, so the two agree. Stepping by a fixed tenth meant the
 // control only moved on every second press, because it shows the nearest zoom
 // it knows about.
-FOUNDATION_EXPORT NSArray<NSNumber *> *RDLZoomStops(void);
+RDLKITUI_EXPORT NSArray<NSNumber *> *RDLZoomStops(void);
 
 @interface RDLEditingContext : NSObject
 @property (nonatomic, readonly, strong) RDLDocument *document;

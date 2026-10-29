@@ -81,7 +81,7 @@ static NSString *RDLAxisNumber(double v, double interval, NSString *language) {
 @property (nonatomic, strong) RDLLaidOutChartAxis *marks;
 @property (nonatomic, assign) double minimum, maximum, interval;
 @property (nonatomic, copy) NSArray<NSString *> *labels;
-@property (nonatomic, assign) BOOL hidden, far;
+@property (nonatomic, assign) BOOL hidden, opposite;
 @property (nonatomic, copy) NSString *title;
 @property (nonatomic, strong) RDLChartTextStyle *text, *titleText;
 @property (nonatomic, assign) RDLChartAxisTitlePosition titlePosition;
@@ -423,12 +423,12 @@ static NSArray<NSNumber *> *RDLSteps(double from, double to, double step) {
 // A tick mark on an axis line at `at` along it: outside the plot, inside it, or
 // across the line, `length` long. A vertical axis runs up the plot's left edge,
 // its outside to the left; any other runs along the bottom, its outside below.
-static void RDLAddTick(NSMutableArray *out, RDLChartTickMarks type, BOOL vertical, CGFloat line, BOOL far, CGFloat at,
+static void RDLAddTick(NSMutableArray *out, RDLChartTickMarks type, BOOL vertical, CGFloat line, BOOL opposite, CGFloat at,
                        CGFloat length) {
   if (type == RDLChartTickMarksNone || type == RDLChartTickMarksUnspecified || length <= 0)
     return;
   // On the far side -- the plot's right edge or its top -- outside is the other way.
-  CGFloat outward = far ? -1 : 1;
+  CGFloat outward = opposite ? -1 : 1;
   CGFloat outer = (type == RDLChartTickMarksInside ? 0 : length) * outward;
   CGFloat inner = (type == RDLChartTickMarksOutside ? 0 : length) * outward;
   if (vertical)
@@ -440,13 +440,13 @@ static void RDLAddTick(NSMutableArray *out, RDLChartTickMarks type, BOOL vertica
 // An axis' tick marks along its line: the minor ones, where no major one is,
 // then the major ones. `position` turns a place on the axis into a point along it.
 static void RDLAddTicks(NSMutableArray *out, RDLLaidOutChartAxis *marks, double from, double to, BOOL vertical,
-                        CGFloat line, BOOL far, CGFloat unit, CGFloat (^position)(double)) {
+                        CGFloat line, BOOL opposite, CGFloat unit, CGFloat (^position)(double)) {
   BOOL majors = marks.majorTickMarks != RDLChartTickMarksNone && marks.majorTickMarks != RDLChartTickMarksUnspecified;
   for (NSNumber *v in RDLSteps(from, to, marks.minorTickInterval))
     if (!(majors && RDLOnStep([v doubleValue], from, marks.majorTickInterval)))
-      RDLAddTick(out, marks.minorTickMarks, vertical, line, far, position([v doubleValue]), marks.minorTickLength * unit);
+      RDLAddTick(out, marks.minorTickMarks, vertical, line, opposite, position([v doubleValue]), marks.minorTickLength * unit);
   for (NSNumber *v in RDLSteps(from, to, marks.majorTickInterval))
-    RDLAddTick(out, marks.majorTickMarks, vertical, line, far, position([v doubleValue]), marks.majorTickLength * unit);
+    RDLAddTick(out, marks.majorTickMarks, vertical, line, opposite, position([v doubleValue]), marks.majorTickLength * unit);
 }
 
 // The chart's first value axis, from the chart's own fields.
@@ -458,7 +458,7 @@ static RDLChartValueScale *RDLPrimaryValueScale(RDLLaidOutChart *chart) {
   scale.interval = chart.axisInterval;
   scale.labels = chart.valueAxisLabels;
   scale.hidden = chart.valueAxisHidden;
-  scale.far = chart.valueAxis.opposite;
+  scale.opposite = chart.valueAxis.opposite;
   scale.title = chart.valueAxisTitle;
   scale.text = chart.valueAxisText;
   scale.titleText = chart.valueAxisTitleText;
@@ -475,7 +475,7 @@ static RDLChartValueScale *RDLSecondaryValueScale(RDLLaidOutChartAxis *axis) {
   scale.interval = axis.interval;
   scale.labels = axis.labels;
   scale.hidden = axis.hidden;
-  scale.far = axis.opposite;
+  scale.opposite = axis.opposite;
   scale.title = axis.title;
   scale.text = axis.text;
   scale.titleText = axis.titleText;
@@ -990,8 +990,8 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
       scale.labelBand = widest + 6;
     }
     scale.titleBand = [scale.title length] ? fontSize * RDLTextScale(scale.titleText) * 1.4f : 0;
-    scale.offset = scale.far ? farGutter : nearGutter;
-    if (scale.far)
+    scale.offset = scale.opposite ? farGutter : nearGutter;
+    if (scale.opposite)
       farGutter += scale.labelBand + scale.titleBand;
     else
       nearGutter += scale.labelBand + scale.titleBand;
@@ -1066,7 +1066,7 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
   BOOL nearValueAxis = NO, farValueAxis = NO;
   for (RDLChartValueScale *scale in valueScales) {
     RDLLaidOutChartAxis *marks = scale.marks;
-    if (scale.far)
+    if (scale.opposite)
       farValueAxis = YES;
     else
       nearValueAxis = YES;
@@ -1086,10 +1086,10 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
       CGFloat p = valuePosition(scale, v);
       if (horizontal)
         [out addObject:RDLStyledText(label,
-                                     NSMakePoint(p, scale.far ? plot.origin.y - scale.offset - 4
+                                     NSMakePoint(p, scale.opposite ? plot.origin.y - scale.offset - 4
                                                               : NSMaxY(plot) + scale.offset + labelSize + 2),
                                      fontSize, RDLChartTextAnchorMiddle, kRDLChartMuted, NO, scale.text)];
-      else if (scale.far)
+      else if (scale.opposite)
         [out addObject:RDLStyledText(label, NSMakePoint(NSMaxX(plot) + scale.offset + 4, p + labelSize * 0.35f),
                                      fontSize, RDLChartTextAnchorStart, kRDLChartMuted, NO, scale.text)];
       else
@@ -1117,9 +1117,9 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
   for (RDLChartValueScale *scale in valueScales)
     if (!scale.hidden)
       RDLAddTicks(out, scale.marks, scale.minimum, scale.maximum, !horizontal,
-                  horizontal ? (scale.far ? plot.origin.y : NSMaxY(plot))
-                             : (scale.far ? NSMaxX(plot) : plot.origin.x),
-                  scale.far, tickUnit, ^CGFloat(double v) {
+                  horizontal ? (scale.opposite ? plot.origin.y : NSMaxY(plot))
+                             : (scale.opposite ? NSMaxX(plot) : plot.origin.x),
+                  scale.opposite, tickUnit, ^CGFloat(double v) {
                     return valuePosition(scale, v);
                   });
 
@@ -1250,11 +1250,11 @@ static void RDLDrawFunnel(RDLLaidOutChart *chart, NSRect plot, CGFloat fontSize,
     CGFloat outside = scale.offset + scale.labelBand + scale.titleBand;
     if (horizontal)
       [out addObject:RDLAxisTitle(scale.title, scale.titlePosition, scale.titleText, fontSize, NO,
-                                  scale.far ? plot.origin.y - outside + titleSize : NSMaxY(plot) + outside - 1,
+                                  scale.opposite ? plot.origin.y - outside + titleSize : NSMaxY(plot) + outside - 1,
                                   plot.origin.x, NSMaxX(plot))];
     else
       [out addObject:RDLAxisTitle(scale.title, scale.titlePosition, scale.titleText, fontSize, YES,
-                                  scale.far ? NSMaxX(plot) + outside - scale.titleBand + titleSize
+                                  scale.opposite ? NSMaxX(plot) + outside - scale.titleBand + titleSize
                                             : plot.origin.x - outside + titleSize,
                                   plot.origin.y, NSMaxY(plot))];
   }

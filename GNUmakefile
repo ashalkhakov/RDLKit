@@ -30,14 +30,18 @@ SUBPROJECTS = RDLKit RDLKitUI RDLGen RDLDesigner
 include $(GNUSTEP_MAKEFILES)/aggregate.make
 
 XVFB = $(if $(DISPLAY),,$(shell command -v xvfb-run >/dev/null 2>&1 && echo xvfb-run -a))
-RDL_RUN = LD_LIBRARY_PATH="$(CURDIR)/RDLKit/$(GNUSTEP_OBJ_DIR_NAME):$(CURDIR)/RDLKitUI/$(GNUSTEP_OBJ_DIR_NAME)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"
+RDL_RUN = LD_LIBRARY_PATH="$(CURDIR)/RDLKit/$(GNUSTEP_OBJ_DIR_NAME):$(CURDIR)/RDLKitUI/$(GNUSTEP_OBJ_DIR_NAME)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+  PATH="$(CURDIR)/RDLKit/$(GNUSTEP_OBJ_DIR_NAME):$(CURDIR)/RDLKitUI/$(GNUSTEP_OBJ_DIR_NAME):$$PATH"
 
 # The suites are built here, not with the rest: under AddressSanitizer
-# (SANITIZE=1), which names a bad write where it happens.
+# (SANITIZE=1), which names a bad write where it happens. Not on Windows:
+# MSYS2's cannot link a bundle (its runtime's import library and libc++'s
+# collide), and LD_PRELOAD, which loads it for a run, is not Windows'.
+RDL_SANITIZE = $(if $(filter Windows_NT,$(OS)),,SANITIZE=1)
 check::
 	Scripts/check-imports.sh
-	$(XVFB) $(MAKE) -C RDLKitTests run-tests SANITIZE=1
-	$(XVFB) $(MAKE) -C RDLDesignerTests run-tests SANITIZE=1
+	$(XVFB) $(MAKE) -C RDLKitTests run-tests $(RDL_SANITIZE)
+	$(XVFB) $(MAKE) -C RDLDesignerTests run-tests $(RDL_SANITIZE)
 	$(XVFB) $(MAKE) -C RDLDesignerUITests run-tests
 	$(RDL_RUN) XVFB="$(XVFB)" Scripts/rdlgen-smoke.sh RDLGen/$(GNUSTEP_OBJ_DIR_NAME)/rdlgen
 	$(MAKE) -C Examples/ReportHost self-test
