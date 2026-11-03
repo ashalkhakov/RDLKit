@@ -346,6 +346,25 @@ designer.embedsGroupsPane = NO;      // and the groups pane is the host's too
 [bottomPanel addSubview:designer.groupsPane];
 ```
 
+A host that spreads the designer over a window of its own, as an IDE spreads
+an editor's parts over its panes (UDCode's RDL extension), makes it *hosted*:
+
+```objc
+designer.hosted = YES;               // before its view is shown; once
+[outlineArea addSubview:designer.navigatorPane];  // Outline and Datasets alone
+for (NSViewController *inspector in designer.inspectorControllers)
+  [self addInspectorTab:inspector];  // Report, Attributes, Style
+[self setLibrary:designer.insertController];      // the insert palette
+[self addBottomPane:designer.groupsController];   // the row and column groups
+```
+
+Hosted, the side panes and the groups pane are the host's, the problems are
+the host's to list (`+[RDLChecker checkReport:]`), and the editor has no
+Preview/Source switch, since the host has the text. The delegate's
+`reportDesigner:showPart:` asks the host to bring a part forward: the
+Attributes inspector when something is selected, the groups for Row and
+Column Groups.
+
 The delegate hears `reportDesignerDidChange:` on every edit, undo and redo,
 and `reportDesigner:didChangeDirty:` when the dirty state flips;
 `reportDesigner:openSubreportAtURL:` lets the host open a subreport the way it
