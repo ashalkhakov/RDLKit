@@ -138,6 +138,10 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
   RDLExpressionFieldEditor *_fieldEditor;
   BOOL _embedsSidePanes, _embedsGroupsPane;
   BOOL _wasDirty;
+  // Spread over a host's window (-setHosted:), and the parts handed to it.
+  BOOL _hosted;
+  NSArray<NSViewController *> *_inspectorControllers;
+  NSViewController *_insertController, *_groupsController;
 }
 
 // Text fields get an expression-aware field editor so `complete:` uses the
@@ -330,6 +334,8 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 
 // Whether the groups pane is showing, and the two ways it changes.
 - (BOOL)groupsPaneIsShowing {
+  if (_hosted)
+    return [_groupsHost window] != nil;
   return _centerSplit != nil && ![_centerSplit isSubviewCollapsed:_groupsHost];
 }
 
@@ -394,6 +400,14 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 
 - (void)toggleGroupsPane:(id)sender {
   RDL_UNUSED(sender);
+  // Hosted, the groups are the host's pane: asked for, they are brought
+  // forward there, and the host's own control puts them away.
+  if (_hosted) {
+    id<RDLReportDesignerDelegate> delegate = self.delegate;
+    if ([delegate respondsToSelector:@selector(reportDesigner:showPart:)])
+      [delegate reportDesigner:self showPart:_groupsController];
+    return;
+  }
   [self showGroupsPane:![self groupsPaneIsShowing]];
 }
 
@@ -1029,16 +1043,22 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_context.selection selectDatasetField:field inDataSet:view.dataSet];
 }
 
-- (void)buildTabBars {
-  // Both side panes are choosers. The centre is not: Preview or Source is a
-  // segmented control, and the dataset pane arrives because a dataset was
-  // selected rather than because a tab was clicked.
-  RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, @[
+// The left pane's pages, in the order of its tab view's items: hosted, the
+// first two alone (the host has a library and a list of problems).
+static NSArray<NSArray *> *RDLLeftPages(void) {
+  return @[
     @[ @"O", @"Outline", @0.47, @0.53, @0.64 ],
     @[ @"D", @"Datasets", @0.70, @0.48, @0.32 ],
     @[ @"I", @"Insert", @0.32, @0.60, @0.53 ],
     @[ @"P", @"Problems", @0.72, @0.42, @0.40 ],
-  ]);
+  ];
+}
+
+- (void)buildTabBars {
+  // Both side panes are choosers. The centre is not: Preview or Source is a
+  // segmented control, and the dataset pane arrives because a dataset was
+  // selected rather than because a tab was clicked.
+  RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0, RDLLeftPages());
   // Report first -- page size and margins, which belong to the document rather
   // than to anything in it -- then the attributes of whatever is selected.
   RDLFillTabBar(_rightTabBar, self, @selector(rightTabChanged:), 1, @[
@@ -1129,6 +1149,14 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
 - (void)showAttributesForSelection {
   if (_context.selection.scope == RDLSelectionScopeReport)
     return;
+  // Hosted, the inspectors are the host's tabs, and it is asked; it leaves the
+  // Style tab in front, which shows the selection too.
+  if (_hosted) {
+    id<RDLReportDesignerDelegate> delegate = self.delegate;
+    if ([_inspectorControllers count] > 1 && [delegate respondsToSelector:@selector(reportDesigner:showPart:)])
+      [delegate reportDesigner:self showPart:_inspectorControllers[1]];
+    return;
+  }
   // The Style tab shows the selection too, so there is nothing to bring
   // forward when that is the tab being worked in.
   if ([_rightTabView indexOfTabViewItem:[_rightTabView selectedTabViewItem]] == 2)
@@ -1351,6 +1379,72 @@ static CGFloat RDLZoomFromTitle(NSString *title) {
   [_centerSplit addSubview:_groupsHost];
   [_centerSplit adjustSubviews];
   [self setGroupsPaneHeight:kRDLGroupsPaneHeight];
+}
+
+#pragma mark - Hosted
+
+// A page of a side pane as a part of the host's: its view, which the tab view
+// item gives up for an empty one -- the tab view selecting the item again
+// (the designer's own selection does) would otherwise take it back from
+// wherever the host has put it.
+static NSViewController *RDLTakePage(NSTabViewItem *item, NSString *title) {
+  NSViewController *part = [[NSViewController alloc] init];
+  part.view = [item view];
+  part.title = title;
+  [item setView:[[NSView alloc] initWithFrame:[[item view] frame]]];
+  return part;
+}
+
+- (BOOL)isHosted {
+  return _hosted;
+}
+
+- (void)setHosted:(BOOL)hosted {
+  if (!hosted || _hosted)
+    return;
+  _hosted = YES;
+  self.embedsSidePanes = NO;
+  self.embedsGroupsPane = NO;
+
+  // The navigator: Outline and Datasets; the palette the host's library, the
+  // problems the host's to list.
+  NSTabViewItem *insert = [_leftTabView tabViewItemAtIndex:2];
+  _insertController = RDLTakePage(insert, @"Insert");
+  [_leftTabView selectTabViewItemAtIndex:0];
+  while ([_leftTabView numberOfTabViewItems] > 2)
+    [_leftTabView removeTabViewItem:[_leftTabView tabViewItemAtIndex:2]];
+  RDLFillTabBar(_leftTabBar, self, @selector(leftTabChanged:), 0,
+                [RDLLeftPages() subarrayWithRange:NSMakeRange(0, 2)]);
+
+  // The inspectors, each built now: a host's tab shows it without the
+  // designer hearing the tab chosen.
+  [self reportInspector];
+  [self styleInspector];
+  NSArray *titles = @[ @"Report", @"Attributes", @"Style" ];
+  NSMutableArray *inspectors = [NSMutableArray array];
+  for (NSInteger i = 0; i < [_rightTabView numberOfTabViewItems] && i < (NSInteger)[titles count]; i++)
+    [inspectors addObject:RDLTakePage([_rightTabView tabViewItemAtIndex:i], titles[(NSUInteger)i])];
+  _inspectorControllers = [inspectors copy];
+
+  _groupsController = [[NSViewController alloc] init];
+  _groupsController.view = _groupsHost;
+  _groupsController.title = @"Groups";
+
+  // The report shown, never its source: the host's text is that.
+  [_centerMode setHidden:YES];
+  [self showCentreTab:0];
+}
+
+- (NSArray<NSViewController *> *)inspectorControllers {
+  return _inspectorControllers ?: @[];
+}
+
+- (NSViewController *)insertController {
+  return _insertController;
+}
+
+- (NSViewController *)groupsController {
+  return _groupsController;
 }
 
 #pragma mark - Commands
