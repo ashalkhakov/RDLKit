@@ -2,14 +2,17 @@
 # RDLKit on GNUstep: the libraries, rdlgen and RDLDesigner, and their tests.
 #
 #   make            RDLKit (the generator), RDLKitUI (the viewer and the
-#                   designer, to embed), rdlgen and RDLDesigner
+#                   designer, to embed), rdlgen and RDLDesigner; and, where
+#                   UDCode's SDK is installed, UDCode's RDL extension
+#                   (UDCodeExtension, docs/UDCODE.md)
 #   make check      no macOS-only imports; the two suites, built and run
 #                   under AddressSanitizer (and Xvfb when there is no
 #                   display); the designer's UI tests, run in RDLDesigner
 #                   itself; rdlgen on a sample report; the example host
 #                   (Examples/ReportHost), --self-test; and the libraries
 #                   installed into a staging directory and used from there
-#                   (Scripts/installcheck.sh)
+#                   (Scripts/installcheck.sh); and the RDL extension's
+#                   tests where it is built (UDCodeExtension/Tests)
 #   make install    the libraries with their headers (and RDLKitUI's XIBs),
 #                   rdlgen and RDLDesigner; not the test bundles. What an app
 #                   pins: the release's rdlkit-<v>-ubuntu22.04-<arch>.tar.xz,
@@ -26,6 +29,11 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 PACKAGE_NAME = RDLKit
 SUBPROJECTS = RDLKit RDLKitUI RDLGen RDLDesigner
+# UDCode's RDL extension, where UDCode's SDK is installed (.github/pins.env's
+# UDCODEKIT_VERSION; UDCodeExtension/GNUmakefile).
+ifneq ($(wildcard $(GNUSTEP_LOCAL_HEADERS)/UDCodeKit/UDExtension.h $(GNUSTEP_SYSTEM_HEADERS)/UDCodeKit/UDExtension.h),)
+SUBPROJECTS += UDCodeExtension
+endif
 
 include $(GNUSTEP_MAKEFILES)/aggregate.make
 
@@ -43,6 +51,7 @@ check::
 	$(XVFB) $(MAKE) -C RDLKitTests run-tests $(RDL_SANITIZE)
 	$(XVFB) $(MAKE) -C RDLDesignerTests run-tests $(RDL_SANITIZE)
 	$(XVFB) $(MAKE) -C RDLDesignerUITests run-tests
+	$(if $(filter UDCodeExtension,$(SUBPROJECTS)),$(XVFB) $(MAKE) -C UDCodeExtension/Tests run-tests)
 	$(RDL_RUN) XVFB="$(XVFB)" Scripts/rdlgen-smoke.sh RDLGen/$(GNUSTEP_OBJ_DIR_NAME)/rdlgen
 	$(MAKE) -C Examples/ReportHost self-test
 	@stage=$$(mktemp -d) && \
@@ -56,3 +65,4 @@ after-clean::
 	$(MAKE) -C RDLKitTests clean
 	$(MAKE) -C RDLDesignerTests clean
 	$(MAKE) -C RDLDesignerUITests clean
+	-$(MAKE) -C UDCodeExtension/Tests clean

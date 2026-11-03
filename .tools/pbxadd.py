@@ -40,6 +40,11 @@ TARGETS = {
                           None, '0C7A1FD3B4E5A6C7D8E9F001'),
     # Hosted in RDLDesigner.app (TEST_HOST), so it has no resources of its own.
     'RDLDesignerUITests': ('4E06CF1EB7168622901D7CCD', 'CF4048A249C714AA33CF3320', None, None),
+    # UDCode's RDL extension (UDCodeExtension/), and its tests, which compile
+    # its sources in: register a file of the extension's with --shared-ref for
+    # RDLTests.
+    'RDL': ('268C8025E640F253EFE95057', '60C830235004F72B4513B4DA', None, '5F4F95A9AC25D60692A4B9D5'),
+    'RDLTests': ('3A037570843C573DF39574A6', '5A98BBB7B39CDDE993A08575', None, '111FE4B953C633FC1FD291CA'),
 }
 
 FILETYPE = {

@@ -5,6 +5,7 @@ Report Definition Language Kit for GNUstep and Cocoa.
 1. **Generator** (`RDLKit` + `RDLGen`) — takes an RDL file, data sources, and input parameters, and generates a **PDF** or **HTML** file.
 2. **Viewer and designer, to embed** (`RDLKitUI`) — a report viewer and the report designer as components an application puts in its own windows, with its own rows (see **Embedding the viewer and the designer**).
 3. **Designer** (`RDLDesigner`) — creates and edits RDL definitions: a thin application over `RDLKitUI`.
+4. **RDL for UDCode** (`UDCodeExtension`) — the same designer in a UDCode tab, a report part of a project, installed from each release's `.udcx` ([docs/UDCODE.md](docs/UDCODE.md)).
 
 The object model follows **MS-RDL 2010/01** — older documents (2003, 2005,
 2008) are upgraded into that grammar on read by `RDLUpgrader`, and 2016 is
@@ -39,6 +40,7 @@ Report generation is a pipeline:
 | `RDLKitUI` | Viewer and designer library | `RDLReportViewController` and `RDLReportDesigner` (and a window controller for each), the designer's editing core, canvas, panes and panels, and their XIBs |
 | `RDLGen` | Generator CLI | command-line tool to generate reports |
 | `RDLDesigner` | Designer app | The application around `RDLKitUI`'s designer: the library and generator windows, the new-report wizard, the menu bar, updates, the samples |
+| `UDCodeExtension` | UDCode extension | RDL: the designer, hosted, in a UDCode tab, the report its document's text ([docs/UDCODE.md](docs/UDCODE.md)); its tests in `UDCodeExtension/Tests` |
 | `Examples/ReportHost` | Example host | The smallest application embedding the viewer and the designer; `--self-test` is part of `make check` |
 | `RDLDesignerTests` | XCTest (Mac and GNUstep) | The designer's editing core, canvas geometry, panes and selection, and the wiring its XIBs carry |
 | `RDLDesignerUITests` | XCTest, run inside `RDLDesigner` (Mac and GNUstep) | The designer driven as a person drives it -- clicks, drags, typing, menu commands -- checked in the model, the saved file, the preview and the window |
@@ -223,6 +225,8 @@ Open `RDLKit.xcodeproj` (this folder). Its targets, all Objective-C ARC, macOS 1
 | **RDLKitUI** | `RDLKitUI.framework` | The viewer and the designer, to embed |
 | **RDLKitTests** | `RDLKitTests.xctest` | XCTest for the library (parser, expressions, layout, backends, checker, `.docx` import) |
 | **RDLDesignerTests** | `RDLDesignerTests.xctest` | XCTest for the app (editing core, canvas, panels) |
+| **RDL** | `RDL.bundle` | UDCode's RDL extension (needs UDCode's SDK in `.deps`) |
+| **RDLTests** | `RDLTests.xctest` | XCTest for the extension, against UDCode's document and text model |
 
 RDLDesigner links and embeds `RDLKitUI.framework` and `RDLKit.framework`, RDLGen `RDLKit.framework`; `make -f Makefile.apple` also makes the two frameworks into XCFrameworks (`build/`). Ad-hoc signing (`CODE_SIGN_IDENTITY = "-"`) so it builds without a team.
 

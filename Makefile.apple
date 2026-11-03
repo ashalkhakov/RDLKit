@@ -39,11 +39,14 @@ CORPUS_OK = 79
 # The libraries an application builds on, as XCFrameworks: macOS, arm64 and
 # x86_64, made from the Release frameworks.
 FRAMEWORKS = RDLKit RDLKitUI
+# UDCode's RDL extension, where UDCode's SDK is in .deps (.github/pins.env's
+# UDCODEKIT_VERSION): its bundle, which Scripts/udcx.sh packages, and its tests.
+RDL = $(if $(wildcard .deps/UDCodeKit.xcframework),RDL)
 
 all:
 	@test -d .deps/Sparkle.xcframework \
 	  || { echo "no Sparkle in .deps: gnustep-release-actions' scripts/deps.sh apple fetches what .github/pins.env names"; exit 1; }
-	@for scheme in RDLKit RDLKitUI RDLGen RDLDesigner; do \
+	@for scheme in RDLKit RDLKitUI RDLGen RDLDesigner $(RDL); do \
 	  $(XCODEBUILD) -scheme $$scheme -configuration Release -destination 'generic/platform=macOS' build || exit 1; \
 	done
 	@for fw in $(FRAMEWORKS); do \
@@ -57,7 +60,7 @@ check:
 	@for scheme in RDLKit RDLKitUI RDLDesigner RDLGen; do \
 	  $(XCODEBUILD) -scheme $$scheme -configuration Debug -destination 'platform=macOS' build || exit 1; \
 	done
-	@for suite in RDLKitTests RDLDesignerTests RDLDesignerUITests; do \
+	@for suite in RDLKitTests RDLDesignerTests RDLDesignerUITests $(RDL:%=%Tests); do \
 	  rm -rf $(RESULTS)/$$suite.xcresult; \
 	  $(XCODEBUILD) -scheme $$suite -destination 'platform=macOS' -resultBundlePath $(RESULTS)/$$suite.xcresult test || exit 1; \
 	done
