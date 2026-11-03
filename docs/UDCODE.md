@@ -64,10 +64,11 @@ files work here too:
   that differ. One exception is the first change to a file another tool
   wrote: RDLKit writes the whole report the way it writes RDL, which may lay
   out what it did not change differently.
-- **Show as Text** shows the RDL in a normal editor tab, using the XML mode's
-  highlighting. Edits made there appear in the designer the next time it is
-  shown. The designer's own Source view is not shown in UDCode: the text tab
-  is the source.
+- **View > Open as Text** (UDCode 0.18.1 and later) shows the RDL in a normal
+  editor tab, with the XML mode's highlighting, beside the designer's. The two
+  tabs are the same document: edits made in the text appear in the designer
+  the next time it is shown, and the designer's in the text. The designer's
+  own Source view is not shown in UDCode: the text tab is the source.
 
 A file that is not a report (broken XML, say) opens with a message
 explaining why, and offers to show it as text.
