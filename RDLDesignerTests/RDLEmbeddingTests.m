@@ -14,15 +14,24 @@
 @property (nonatomic, strong) NSMutableArray<NSString *> *asked;
 @property (nonatomic, assign) NSUInteger changes, dirtyFlips, exports;
 @property (nonatomic, assign) BOOL lastDirty;
+// What a hosted designer asked to be brought forward.
+@property (nonatomic, strong) NSMutableArray<NSViewController *> *shown;
 @end
 
 @implementation RDLEmbeddingHost
 
 - (instancetype)init {
   self = [super init];
-  if (self)
+  if (self) {
     _asked = [NSMutableArray array];
+    _shown = [NSMutableArray array];
+  }
   return self;
+}
+
+- (void)reportDesigner:(RDLReportDesigner *)designer showPart:(NSViewController *)part {
+  RDL_UNUSED(designer);
+  [_shown addObject:part];
 }
 
 - (id)rowsForDataSet:(NSString *)dataSetName
@@ -225,6 +234,59 @@ static NSString *RDLHTMLText(NSData *html) {
   boxes = [[[designer RDLString] componentsSeparatedByString:@"<Textbox "] count] - 1;
   if (boxes != 3)
     XCTFail(@"%@", @"the host's Undo did not take the duplicate back");
+  [window orderOut:nil];
+}
+
+// Hosted, as an IDE's editor: the parts handed to the host's panes, the
+// navigator Outline and Datasets alone, no Source switch, and the host asked
+// to bring the Attributes inspector and the groups forward.
+- (void)testTheDesignerHostedHandsItsPartsToTheHost {
+  RDLEmbeddingHost *host = [[RDLEmbeddingHost alloc] init];
+  RDLReportDesigner *designer = [[RDLReportDesigner alloc] init];
+  designer.delegate = host;
+  if (![designer loadURL:[NSURL fileURLWithPath:RDLStockReportPath()] error:NULL]) {
+    XCTFail(@"%@", @"the report did not load");
+    return;
+  }
+  designer.hosted = YES;
+  if (!designer.isHosted || designer.embedsSidePanes || designer.embedsGroupsPane)
+    XCTFail(@"%@", @"hosted, the side panes and the groups are still the designer's");
+
+  NSArray *titles = [designer.inspectorControllers valueForKey:@"title"];
+  if (![titles isEqual:(@[ @"Report", @"Attributes", @"Style" ])])
+    XCTFail(@"%@", [NSString stringWithFormat:@"the inspectors are %@", titles]);
+  if ([designer valueForKey:@"reportInspector"] == nil || ![[designer valueForKey:@"reportInspector"] isDescendantOf:[designer.inspectorControllers[0] view]] ||
+      [designer valueForKey:@"styleInspector"] == nil || ![[designer valueForKey:@"styleInspector"] isDescendantOf:[designer.inspectorControllers[2] view]])
+    XCTFail(@"%@", @"the Report and Style inspectors are not in their parts");
+  if ([designer valueForKey:@"palette"] == nil || ![[designer valueForKey:@"palette"] isDescendantOf:[designer.insertController view]])
+    XCTFail(@"%@", @"the insert palette is not the Insert part");
+  if ([designer.groupsController view] != designer.groupsPane)
+    XCTFail(@"%@", @"the groups part is not the groups pane");
+  if ([[designer valueForKey:@"leftTabView"] numberOfTabViewItems] != 2 || [[designer valueForKey:@"problemsView"] isDescendantOf:designer.navigatorPane])
+    XCTFail(@"%@", @"the navigator is more than Outline and Datasets");
+  if (![[designer valueForKey:@"centerMode"] isHidden])
+    XCTFail(@"%@", @"the Preview/Source switch is still shown");
+
+  // The host's layout: its inspector shows Report; the designer choosing its
+  // own tabs again takes none of the parts back.
+  NSWindow *window = RDLHostWindow(NSMakeRect(0, 0, 1200, 760));
+  NSView *inspector = [[NSView alloc] initWithFrame:NSMakeRect(900, 0, 300, 760)];
+  [[designer view] setFrame:NSMakeRect(0, 0, 900, 760)];
+  [[window contentView] addSubview:[designer view]];
+  [[window contentView] addSubview:inspector];
+  NSView *report = [designer.inspectorControllers[0] view];
+  [report setFrame:[inspector bounds]];
+  [inspector addSubview:report];
+  [window orderFront:nil];
+  if (![designer selectItemNamed:@"Total"])
+    XCTFail(@"%@", @"the Total text box could not be selected by name");
+  if ([host.shown lastObject] != designer.inspectorControllers[1])
+    XCTFail(@"%@", @"selecting did not ask for the Attributes inspector");
+  if ([report superview] != inspector)
+    XCTFail(@"%@", @"the Report inspector was taken back from the host");
+  [designer toggleGroupsPane:nil];
+  if ([host.shown lastObject] != designer.groupsController)
+    XCTFail(@"%@", @"Row and Column Groups did not ask for the groups");
   [window orderOut:nil];
 }
 

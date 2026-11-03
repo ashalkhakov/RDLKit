@@ -18,6 +18,10 @@
 // tab, another window -- and returns YES; NO (or no delegate method) opens it
 // in a designer window of its own.
 - (BOOL)reportDesigner:(RDLReportDesigner *)designer openSubreportAtURL:(NSURL *)url;
+// A hosted designer's part (-inspectorControllers, -groupsController) is
+// wanted in view: the Attributes inspector when something is selected, the
+// groups when they are asked for. The host brings it forward in its pane.
+- (void)reportDesigner:(RDLReportDesigner *)designer showPart:(NSViewController *)part;
 @end
 
 // One command the designer answers, for a host that builds its own menus or
@@ -111,6 +115,20 @@
 @property (nonatomic, readonly, strong) NSView *inspectorPane;
 // How the tablix being worked in groups.
 @property (nonatomic, readonly, strong) NSView *groupsPane;
+
+// Spread over a host's window, as an IDE's editor is (UDCode's RDL extension):
+// set YES once, before the view is shown. The side panes and the groups pane
+// are then the host's (embedsSidePanes and embedsGroupsPane become NO); the
+// navigator pane is Outline and Datasets alone; the inspectors, the insert
+// palette and the groups are view controllers for the host's inspector,
+// library and bottom area; the problems are the host's to list (RDLChecker);
+// and the editor has no Preview/Source switch, the host having the text.
+@property (nonatomic, assign, getter=isHosted) BOOL hosted;
+// While hosted: Report, Attributes and Style, each titled; the insert palette;
+// the groups (the view groupsPane is).
+- (NSArray<NSViewController *> *)inspectorControllers;
+@property (nonatomic, readonly, strong) NSViewController *insertController;
+@property (nonatomic, readonly, strong) NSViewController *groupsController;
 
 // The field editor the expression fields complete with, for a client inside
 // this designer's view; nil for anything else.
