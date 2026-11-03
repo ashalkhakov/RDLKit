@@ -1,0 +1,11 @@
+{
+  "name": "rdl",
+  "publisher": "ashalkhakov",
+  "displayName": "RDL",
+  "description": "Report Definition Language: .rdl and .rdlc reports edited with RDLDesigner's designer (canvas, datasets, parameters, groups, preview, PDF and HTML export)",
+  "version": "0.0.0",
+  "license": "LGPL-2.1-only",
+  "repository": "https://github.com/ashalkhakov/RDLKit",
+  "engines": { "udcode": "^0.18.0" },
+  "main": "./RDL.bundle"
+}

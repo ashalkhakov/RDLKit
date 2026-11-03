@@ -3,6 +3,8 @@
 Report Definition Language Kit for GNUstep and Cocoa: a generator
 (`RDLKit` + `RDLGen`) that turns an RDL file, data sources and parameters
 into PDF or HTML, and a designer (`RDLDesigner`) that edits the definitions.
+The designer also runs in UDCode as its RDL extension (`UDCodeExtension/`,
+[docs/UDCODE.md](docs/UDCODE.md)), hosted, the report its document's text.
 
 ## GNUstep patches live elsewhere
 

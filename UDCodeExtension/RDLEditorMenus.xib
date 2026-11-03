@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="24127" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="24127"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="NSObject"/>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <!-- The designer's menus in UDCode's Editor menu (RDLExtension's
+             -editorMenuItemsForWorkbench:): RDLDesigner's Report, Arrange and
+             View commands (+[RDLReportDesigner commands]) less Cut, Copy,
+             Paste, Select All and Delete, which UDCode's Edit menu has. Their
+             items go to the first responder: in an RDL tab, the designer or
+             its canvas. Only the keys UDCode leaves free are kept (Duplicate,
+             Add Element). -->
+        <menu title="Report Menus" id="reportMenus">
+            <items>
+                <menuItem title="Report" id="reportMenuItem">
+                    <menu key="submenu" title="Report" id="reportMenu">
+                        <items>
+                            <menuItem title="Duplicate" keyEquivalent="d" id="reportDuplicate">
+                                <connections>
+                                    <action selector="duplicate:" target="-1" id="reportDuplicateAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Add Element…" keyEquivalent="A" id="reportAddElement">
+                                <modifierMask key="keyEquivalentModifierMask" shift="YES" command="YES"/>
+                                <connections>
+                                    <action selector="addElement:" target="-1" id="reportAddElementAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Edit Subreport" id="reportEditSubreport">
+                                <connections>
+                                    <action selector="editSubreport:" target="-1" id="reportEditSubreportAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="reportMenuSeparator4"/>
+                            <menuItem title="Preview" id="reportPreview">
+                                <connections>
+                                    <action selector="preview:" target="-1" id="reportPreviewAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Export PDF…" id="reportExportPdf">
+                                <connections>
+                                    <action selector="exportPDF:" target="-1" id="reportExportPdfAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Export HTML…" id="reportExportHtml">
+                                <connections>
+                                    <action selector="exportHTML:" target="-1" id="reportExportHtmlAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Print Report…" id="reportPrintReport">
+                                <connections>
+                                    <action selector="printReport:" target="-1" id="reportPrintReportAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="Arrange" id="arrangeMenuItem">
+                    <menu key="submenu" title="Arrange" id="arrangeMenu">
+                        <items>
+                            <menuItem title="Bring to Front" id="arrangeBringToFront">
+                                <connections>
+                                    <action selector="bringToFront:" target="-1" id="arrangeBringToFrontAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Bring Forward" id="arrangeBringForward">
+                                <connections>
+                                    <action selector="bringForward:" target="-1" id="arrangeBringForwardAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send Backward" id="arrangeSendBackward">
+                                <connections>
+                                    <action selector="sendBackward:" target="-1" id="arrangeSendBackwardAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Send to Back" id="arrangeSendToBack">
+                                <connections>
+                                    <action selector="sendToBack:" target="-1" id="arrangeSendToBackAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="arrangeMenuSeparator13"/>
+                            <menuItem title="Align Left Edges" id="arrangeAlignLeftEdges">
+                                <connections>
+                                    <action selector="alignLeftEdges:" target="-1" id="arrangeAlignLeftEdgesAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align Horizontal Centers" id="arrangeAlignHorizontalCenters">
+                                <connections>
+                                    <action selector="alignHorizontalCenters:" target="-1" id="arrangeAlignHorizontalCentersAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align Right Edges" id="arrangeAlignRightEdges">
+                                <connections>
+                                    <action selector="alignRightEdges:" target="-1" id="arrangeAlignRightEdgesAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align Top Edges" id="arrangeAlignTopEdges">
+                                <connections>
+                                    <action selector="alignTopEdges:" target="-1" id="arrangeAlignTopEdgesAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align Vertical Centers" id="arrangeAlignVerticalCenters">
+                                <connections>
+                                    <action selector="alignVerticalCenters:" target="-1" id="arrangeAlignVerticalCentersAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Align Bottom Edges" id="arrangeAlignBottomEdges">
+                                <connections>
+                                    <action selector="alignBottomEdges:" target="-1" id="arrangeAlignBottomEdgesAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="arrangeMenuSeparator20"/>
+                            <menuItem title="Make Same Width" id="arrangeMakeSameWidth">
+                                <connections>
+                                    <action selector="makeSameWidth:" target="-1" id="arrangeMakeSameWidthAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Make Same Height" id="arrangeMakeSameHeight">
+                                <connections>
+                                    <action selector="makeSameHeight:" target="-1" id="arrangeMakeSameHeightAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Make Same Size" id="arrangeMakeSameSize">
+                                <connections>
+                                    <action selector="makeSameSize:" target="-1" id="arrangeMakeSameSizeAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="arrangeMenuSeparator24"/>
+                            <menuItem title="Distribute Horizontally" id="arrangeDistributeHorizontally">
+                                <connections>
+                                    <action selector="distributeHorizontally:" target="-1" id="arrangeDistributeHorizontallyAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Distribute Vertically" id="arrangeDistributeVertically">
+                                <connections>
+                                    <action selector="distributeVertically:" target="-1" id="arrangeDistributeVerticallyAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+                <menuItem title="Canvas" id="canvasMenuItem">
+                    <menu key="submenu" title="Canvas" id="canvasMenu">
+                        <items>
+                            <menuItem title="Toggle Grid" id="canvasToggleGrid">
+                                <connections>
+                                    <action selector="toggleGrid:" target="-1" id="canvasToggleGridAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Zoom In" id="canvasZoomIn">
+                                <connections>
+                                    <action selector="zoomIn:" target="-1" id="canvasZoomInAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem title="Zoom Out" id="canvasZoomOut">
+                                <connections>
+                                    <action selector="zoomOut:" target="-1" id="canvasZoomOutAction"/>
+                                </connections>
+                            </menuItem>
+                            <menuItem isSeparatorItem="YES" id="canvasMenuSeparator30"/>
+                            <menuItem title="Row and Column Groups" id="canvasRowAndColumnGroups">
+                                <connections>
+                                    <action selector="toggleGroupsPane:" target="-1" id="canvasRowAndColumnGroupsAction"/>
+                                </connections>
+                            </menuItem>
+                        </items>
+                    </menu>
+                </menuItem>
+            </items>
+        </menu>
+    </objects>
+</document>

@@ -41,6 +41,8 @@ jobs:
     with:
       tag: ${{ inputs.tag }}
       library: true
+      # patchelf and zip: the RDL extension's package (Scripts/udcx.sh)
+      extra-packages: patchelf zip
 
   windows:
     uses: ashalkhakov/gnustep-release-actions/.github/workflows/windows.yml@v1

@@ -369,6 +369,32 @@
 		4A2964A23B35E30C072FF92B /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
 		A542108E3AEF5FE82FECFA68 /* RDLKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */; };
 		A1EC9411201F62817084426E /* RDLKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		56B140007D2B5DD04724A749 /* RDLExtension.m in Sources */ = {isa = PBXBuildFile; fileRef = 12B5A360780F6A616471624C /* RDLExtension.m */; };
+		3339BD4C69DF298628F57990 /* RDLEditorViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B0913A6EE44DC90F2EAC7B8B /* RDLEditorViewController.m */; };
+		B9E3E53BAED675CBEDFADDE1 /* RDLTextDiff.m in Sources */ = {isa = PBXBuildFile; fileRef = 0DBBBB6357F94233D5187621 /* RDLTextDiff.m */; };
+		9CD0DD7EDE2563B2D71D3F57 /* LanguageInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 182245CDBBF7E5C922C1E136 /* LanguageInfo.plist */; };
+		8F32C7A00FF4A1A4BC1D2735 /* RDLEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 43785F2C3838751A023650DE /* RDLEditor.xib */; };
+		02FE428AB668F7E801E8772E /* RDLEditorMenus.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2B65B977FAB3EF25EC087DBE /* RDLEditorMenus.xib */; };
+		003FE5C618A2DA6B9046D3C2 /* RDLKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */; };
+		04B57307B60CEAB4E8311283 /* RDLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; };
+		20D6946EEB7C552730071CBF /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		FC6C5E31C3A3E957606B7C3B /* UDCodeKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D049770B4B139B55EF6F43AA /* UDCodeKit.xcframework */; };
+		0F66BD9AEB48BBBCDDFA1D68 /* UDPieceTable.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4875371671313212DE754D44 /* UDPieceTable.xcframework */; };
+		412308EFAB1C5634A4A70DF7 /* LSPKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = ECC732A9C509EDA5CC87712E /* LSPKit.xcframework */; };
+		22840403C5F44D92D241F48D /* RDLKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3A7F9F13BAC365BFA24B8895 /* RDLKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		743A956AC99537E6D3B1CFC2 /* RDLTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0FDF03B015934A654EA5CD2C /* RDLTests.m */; };
+		1132CECBC95E8CCE5DEA1AD5 /* RDLExtension.m in Sources */ = {isa = PBXBuildFile; fileRef = 12B5A360780F6A616471624C /* RDLExtension.m */; };
+		DC54B8ED013AA5FDC2E6CDAA /* RDLEditorViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = B0913A6EE44DC90F2EAC7B8B /* RDLEditorViewController.m */; };
+		F16534118F93A02DF72D45EA /* RDLTextDiff.m in Sources */ = {isa = PBXBuildFile; fileRef = 0DBBBB6357F94233D5187621 /* RDLTextDiff.m */; };
+		5535AB25ED52E2907BC02208 /* RDLEditor.xib in Resources */ = {isa = PBXBuildFile; fileRef = 43785F2C3838751A023650DE /* RDLEditor.xib */; };
+		E6B6D60E8B740C17282AAB4F /* RDLEditorMenus.xib in Resources */ = {isa = PBXBuildFile; fileRef = 2B65B977FAB3EF25EC087DBE /* RDLEditorMenus.xib */; };
+		9ECD85459F73AA52CE40C7DD /* RDLKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */; };
+		6607FACFF6A63A5E5AB3ED4A /* RDLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 36F476BBE541DC85EE2D7647 /* RDLKit.framework */; };
+		E03BEE654D9E75F862329240 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5B7068E3A597C2544433CB15 /* AppKit.framework */; };
+		97E59DA0733E3461E70AA0A7 /* UDCodeKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = D049770B4B139B55EF6F43AA /* UDCodeKit.xcframework */; };
+		5E5DA2924C9C2938C14EB174 /* UDPieceTable.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4875371671313212DE754D44 /* UDPieceTable.xcframework */; };
+		886C7755A8F973F55A90A208 /* LSPKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = ECC732A9C509EDA5CC87712E /* LSPKit.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -421,6 +447,34 @@
 			remoteGlobalIDString = D15ADE4898DFDF95942E6F69;
 			remoteInfo = RDLKitUI;
 		};
+		32C30DF5CB2122D6AD5DB45B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F14379BD3391DC97D94E4AC2;
+			remoteInfo = RDLKit;
+		};
+		46CEC3DD4D6BF2FF7BAB07DF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D15ADE4898DFDF95942E6F69;
+			remoteInfo = RDLKitUI;
+		};
+		60025A2C90C53C5FADC7D2C2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F14379BD3391DC97D94E4AC2;
+			remoteInfo = RDLKit;
+		};
+		639A3E1C9C9FFB9B25C00407 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D15ADE4898DFDF95942E6F69;
+			remoteInfo = RDLKitUI;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -446,6 +500,18 @@
 				34CF8670DFFB8A8963C41008 /* RDLKit.framework in Copy Frameworks */,
 			);
 			name = "Copy Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		280E51ABA3C6AC419E118027 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				22840403C5F44D92D241F48D /* RDLKit.framework in Embed Frameworks */,
+				3A7F9F13BAC365BFA24B8895 /* RDLKitUI.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -788,6 +854,23 @@
 		A0391F74D204D5EAB69004C7 /* RDLReportViewerWindowController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLReportViewerWindowController.m; sourceTree = "<group>"; };
 		246416066E560C749C185C34 /* RDLEmbeddingTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLEmbeddingTests.m; sourceTree = "<group>"; };
 		4F2826938EB89590FC8B771C /* RDLKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = RDLKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B96C6DDD8BA046FB36AFED9 /* RDLExtension.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLExtension.h; sourceTree = "<group>"; };
+		12B5A360780F6A616471624C /* RDLExtension.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLExtension.m; sourceTree = "<group>"; };
+		3CDD869BCACF33B48B920D1E /* RDLEditorViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLEditorViewController.h; sourceTree = "<group>"; };
+		B0913A6EE44DC90F2EAC7B8B /* RDLEditorViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLEditorViewController.m; sourceTree = "<group>"; };
+		664DA0BB3FE8B8E281AA6088 /* RDLTextDiff.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RDLTextDiff.h; sourceTree = "<group>"; };
+		0DBBBB6357F94233D5187621 /* RDLTextDiff.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTextDiff.m; sourceTree = "<group>"; };
+		43785F2C3838751A023650DE /* RDLEditor.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLEditor.xib; sourceTree = "<group>"; };
+		2B65B977FAB3EF25EC087DBE /* RDLEditorMenus.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; path = RDLEditorMenus.xib; sourceTree = "<group>"; };
+		2FAFA503107569DC155DB339 /* package.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = package.json; sourceTree = "<group>"; };
+		C0700A9AB17A8A5D496B09B8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		182245CDBBF7E5C922C1E136 /* LanguageInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = LanguageInfo.plist; sourceTree = "<group>"; };
+		0FDF03B015934A654EA5CD2C /* RDLTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RDLTests.m; sourceTree = "<group>"; };
+		D049770B4B139B55EF6F43AA /* UDCodeKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = UDCodeKit.xcframework; path = .deps/UDCodeKit.xcframework; sourceTree = SOURCE_ROOT; };
+		4875371671313212DE754D44 /* UDPieceTable.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = UDPieceTable.xcframework; path = .deps/UDPieceTable.xcframework; sourceTree = SOURCE_ROOT; };
+		ECC732A9C509EDA5CC87712E /* LSPKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LSPKit.xcframework; path = .deps/LSPKit.xcframework; sourceTree = SOURCE_ROOT; };
+		5843E8163504B6990E51FA9D /* RDL.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RDL.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		244FE9BAFCEA5D9E2740B446 /* RDLTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RDLTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -853,6 +936,32 @@
 			files = (
 				3C5BD678418F541CA988096B /* RDLKit.framework in Frameworks */,
 				4A2964A23B35E30C072FF92B /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB6F9CDEA4D9C9A90BA3FFF5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				003FE5C618A2DA6B9046D3C2 /* RDLKitUI.framework in Frameworks */,
+				04B57307B60CEAB4E8311283 /* RDLKit.framework in Frameworks */,
+				20D6946EEB7C552730071CBF /* AppKit.framework in Frameworks */,
+				FC6C5E31C3A3E957606B7C3B /* UDCodeKit.xcframework in Frameworks */,
+				0F66BD9AEB48BBBCDDFA1D68 /* UDPieceTable.xcframework in Frameworks */,
+				412308EFAB1C5634A4A70DF7 /* LSPKit.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3449D5B2DE63149749D0C086 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9ECD85459F73AA52CE40C7DD /* RDLKitUI.framework in Frameworks */,
+				6607FACFF6A63A5E5AB3ED4A /* RDLKit.framework in Frameworks */,
+				E03BEE654D9E75F862329240 /* AppKit.framework in Frameworks */,
+				97E59DA0733E3461E70AA0A7 /* UDCodeKit.xcframework in Frameworks */,
+				5E5DA2924C9C2938C14EB174 /* UDPieceTable.xcframework in Frameworks */,
+				886C7755A8F973F55A90A208 /* LSPKit.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1013,6 +1122,8 @@
 				3ACD4FCE2926083C83034463 /* RDLKitTests.xctest */,
 				6790076B2E553AE0FAFF4A94 /* RDLDesignerTests.xctest */,
 				B5657A8507A3AC852FA79CDE /* RDLDesignerUITests.xctest */,
+				5843E8163504B6990E51FA9D /* RDL.bundle */,
+				244FE9BAFCEA5D9E2740B446 /* RDLTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1063,6 +1174,10 @@
 				5B525B480D23A981A0DB1611 /* README.md */,
 				79B75F223E5D7AEAEC1468B4 /* Frameworks */,
 				4FDE57E4B72FFCEE306CEB0F /* Products */,
+				268C8025E640F253EFE95057 /* UDCodeExtension */,
+				D049770B4B139B55EF6F43AA /* UDCodeKit.xcframework */,
+				4875371671313212DE754D44 /* UDPieceTable.xcframework */,
+				ECC732A9C509EDA5CC87712E /* LSPKit.xcframework */,
 			);
 			sourceTree = "<group>";
 		};
@@ -1282,6 +1397,41 @@
 			path = RDLKitUI;
 			sourceTree = "<group>";
 		};
+		268C8025E640F253EFE95057 /* UDCodeExtension */ = {
+			isa = PBXGroup;
+			children = (
+				9B96C6DDD8BA046FB36AFED9 /* RDLExtension.h */,
+				12B5A360780F6A616471624C /* RDLExtension.m */,
+				3CDD869BCACF33B48B920D1E /* RDLEditorViewController.h */,
+				B0913A6EE44DC90F2EAC7B8B /* RDLEditorViewController.m */,
+				664DA0BB3FE8B8E281AA6088 /* RDLTextDiff.h */,
+				0DBBBB6357F94233D5187621 /* RDLTextDiff.m */,
+				43785F2C3838751A023650DE /* RDLEditor.xib */,
+				2B65B977FAB3EF25EC087DBE /* RDLEditorMenus.xib */,
+				2FAFA503107569DC155DB339 /* package.json */,
+				BB13199301DA3B621536369B /* Resources */,
+				3A037570843C573DF39574A6 /* Tests */,
+			);
+			path = UDCodeExtension;
+			sourceTree = "<group>";
+		};
+		BB13199301DA3B621536369B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C0700A9AB17A8A5D496B09B8 /* Info.plist */,
+				182245CDBBF7E5C922C1E136 /* LanguageInfo.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		3A037570843C573DF39574A6 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				0FDF03B015934A654EA5CD2C /* RDLTests.m */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1464,6 +1614,45 @@
 			productReference = 4F2826938EB89590FC8B771C /* RDLKitUI.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		E2C67AADCCB493C4080C5F3D /* RDL */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1F9C2C036C5339A85C78A26 /* Build configuration list for PBXNativeTarget "RDL" */;
+			buildPhases = (
+				60C830235004F72B4513B4DA /* Sources */,
+				5F4F95A9AC25D60692A4B9D5 /* Resources */,
+				AB6F9CDEA4D9C9A90BA3FFF5 /* Frameworks */,
+				280E51ABA3C6AC419E118027 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E42FB185D029B6A5DF4E3831 /* PBXTargetDependency */,
+				C68A3FB0ADDFB4FA28D13528 /* PBXTargetDependency */,
+			);
+			name = RDL;
+			productName = RDL;
+			productReference = 5843E8163504B6990E51FA9D /* RDL.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
+		68B5FED0F5A004D04009589D /* RDLTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 050D10CBAB267771B5D3679E /* Build configuration list for PBXNativeTarget "RDLTests" */;
+			buildPhases = (
+				5A98BBB7B39CDDE993A08575 /* Sources */,
+				111FE4B953C633FC1FD291CA /* Resources */,
+				3449D5B2DE63149749D0C086 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				385DCE2081D39DA57BE1E0D6 /* PBXTargetDependency */,
+				900B6A1378B04C7D58437D50 /* PBXTargetDependency */,
+			);
+			name = RDLTests;
+			productName = RDLTests;
+			productReference = 244FE9BAFCEA5D9E2740B446 /* RDLTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1508,6 +1697,8 @@
 				2FE3FBD7A51C361D063370C7 /* RDLDesigner */,
 				D125E61DED1C7934C31DB9B9 /* RDLGen */,
 				45C98D5FCE3016A4889B25F4 /* RDLKitTests */,
+				E2C67AADCCB493C4080C5F3D /* RDL */,
+				68B5FED0F5A004D04009589D /* RDLTests */,
 			);
 		};
 /* End PBXProject section */
@@ -1609,6 +1800,25 @@
 				442C844011796BF4936FC9D8 /* RDLReportDesignerWindow.xib in Resources */,
 				5B2ECA7F655179F225476C4A /* RDLReportViewController.xib in Resources */,
 				49C7AD86D528B664C2C4A23A /* RDLReportViewerWindow.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F4F95A9AC25D60692A4B9D5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9CD0DD7EDE2563B2D71D3F57 /* LanguageInfo.plist in Resources */,
+				8F32C7A00FF4A1A4BC1D2735 /* RDLEditor.xib in Resources */,
+				02FE428AB668F7E801E8772E /* RDLEditorMenus.xib in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		111FE4B953C633FC1FD291CA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5535AB25ED52E2907BC02208 /* RDLEditor.xib in Resources */,
+				E6B6D60E8B740C17282AAB4F /* RDLEditorMenus.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1892,6 +2102,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		60C830235004F72B4513B4DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				56B140007D2B5DD04724A749 /* RDLExtension.m in Sources */,
+				3339BD4C69DF298628F57990 /* RDLEditorViewController.m in Sources */,
+				B9E3E53BAED675CBEDFADDE1 /* RDLTextDiff.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A98BBB7B39CDDE993A08575 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				743A956AC99537E6D3B1CFC2 /* RDLTests.m in Sources */,
+				1132CECBC95E8CCE5DEA1AD5 /* RDLExtension.m in Sources */,
+				DC54B8ED013AA5FDC2E6CDAA /* RDLEditorViewController.m in Sources */,
+				F16534118F93A02DF72D45EA /* RDLTextDiff.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1929,6 +2160,26 @@
 			isa = PBXTargetDependency;
 			target = D15ADE4898DFDF95942E6F69 /* RDLKitUI */;
 			targetProxy = 94987504DD9013B5E90659F6 /* PBXContainerItemProxy */;
+		};
+		E42FB185D029B6A5DF4E3831 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F14379BD3391DC97D94E4AC2 /* RDLKit */;
+			targetProxy = 32C30DF5CB2122D6AD5DB45B /* PBXContainerItemProxy */;
+		};
+		C68A3FB0ADDFB4FA28D13528 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D15ADE4898DFDF95942E6F69 /* RDLKitUI */;
+			targetProxy = 46CEC3DD4D6BF2FF7BAB07DF /* PBXContainerItemProxy */;
+		};
+		385DCE2081D39DA57BE1E0D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F14379BD3391DC97D94E4AC2 /* RDLKit */;
+			targetProxy = 60025A2C90C53C5FADC7D2C2 /* PBXContainerItemProxy */;
+		};
+		900B6A1378B04C7D58437D50 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D15ADE4898DFDF95942E6F69 /* RDLKitUI */;
+			targetProxy = 639A3E1C9C9FFB9B25C00407 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2474,6 +2725,64 @@
 			};
 			name = Release;
 		};
+		EE2953B6284799ADF38C50E6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 0.0.0;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = ("$(SRCROOT)/UDCodeExtension", "$(SRCROOT)/RDLKitUI", "$(SRCROOT)/RDLKitUI/ThirdParty/DMTabBar", "$(SRCROOT)/RDLKit", "$(SRCROOT)/RDLKit/MiniVB");
+				INFOPLIST_FILE = UDCodeExtension/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@loader_path/../Frameworks");
+				MARKETING_VERSION = 0.0.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.udcode.rdl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Debug;
+		};
+		9948BCBC66FFB40B2BDAF15D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CURRENT_PROJECT_VERSION = 0.0.0;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = ("$(SRCROOT)/UDCodeExtension", "$(SRCROOT)/RDLKitUI", "$(SRCROOT)/RDLKitUI/ThirdParty/DMTabBar", "$(SRCROOT)/RDLKit", "$(SRCROOT)/RDLKit/MiniVB");
+				INFOPLIST_FILE = UDCodeExtension/Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@loader_path/../Frameworks");
+				MARKETING_VERSION = 0.0.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.udcode.rdl;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = bundle;
+			};
+			name = Release;
+		};
+		98BFE2422F375E475276CA86 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = ("$(SRCROOT)/UDCodeExtension", "$(SRCROOT)/RDLKitUI", "$(SRCROOT)/RDLKitUI/ThirdParty/DMTabBar", "$(SRCROOT)/RDLKit", "$(SRCROOT)/RDLKit/MiniVB");
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.udcode.rdl.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		50E8FC3FEFD38088B37890C3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = ("$(SRCROOT)/UDCodeExtension", "$(SRCROOT)/RDLKitUI", "$(SRCROOT)/RDLKitUI/ThirdParty/DMTabBar", "$(SRCROOT)/RDLKit", "$(SRCROOT)/RDLKit/MiniVB");
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@loader_path/../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.rdl.udcode.rdl.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -2545,6 +2854,24 @@
 			buildConfigurations = (
 				71B402CDB88BA8B801554260 /* Debug */,
 				44461A01D41854D278116A2A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1F9C2C036C5339A85C78A26 /* Build configuration list for PBXNativeTarget "RDL" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EE2953B6284799ADF38C50E6 /* Debug */,
+				9948BCBC66FFB40B2BDAF15D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		050D10CBAB267771B5D3679E /* Build configuration list for PBXNativeTarget "RDLTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				98BFE2422F375E475276CA86 /* Debug */,
+				50E8FC3FEFD38088B37890C3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
