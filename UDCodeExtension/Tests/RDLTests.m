@@ -265,11 +265,15 @@ static NSString *RDLApplied(NSString *old, NSArray<RDLTextChange *> *changes) {
   NSString *text = [[self stockReport] stringByReplacingOccurrencesOfString:@"Fields!Qty.Value, \"Items\""
                                                                  withString:@"Fields!NoSuchField.Value, \"Items\""];
   [self openText:text];
-  [self spin:0.8];
+  // Found a moment after the report is read (half a second): waited for, up
+  // to five, as a loaded machine takes longer.
   UDDiagnosticItem *wrong = nil;
-  for (UDDiagnosticItem *item in _document.diagnosticStore.allDiagnostics)
-    if ([item.message rangeOfString:@"NoSuchField"].location != NSNotFound)
-      wrong = item;
+  for (NSDate *until = [NSDate dateWithTimeIntervalSinceNow:5]; wrong == nil && [until timeIntervalSinceNow] > 0;) {
+    [self spin:0.1];
+    for (UDDiagnosticItem *item in _document.diagnosticStore.allDiagnostics)
+      if ([item.message rangeOfString:@"NoSuchField"].location != NSNotFound)
+        wrong = item;
+  }
   XCTAssertNotNil(wrong, @"%@", [_document.diagnosticStore.allDiagnostics valueForKey:@"message"]);
   NSString *line = [_document.textModel getLineContent:wrong.line];
   XCTAssertTrue([line rangeOfString:@"Name=\"Total\""].location != NSNotFound,
