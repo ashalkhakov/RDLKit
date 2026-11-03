@@ -457,8 +457,17 @@ static const NSUInteger kRDLOpeningNotesShown = 8;
 // The view has been put in a window: what reading the report noted is said
 // then, once the window is on screen, not while it is being put there.
 - (void)designerViewDidMoveToWindow {
-  if ([[self view] window] != nil && !_presentedOpeningNotes)
+  if ([[self view] window] != nil && !_presentedOpeningNotes) {
     [self performSelector:@selector(presentOpeningNotes) withObject:nil afterDelay:0];
+    // The page from its top: a host that moved the editor from view to view
+    // (hosted, or embedsSidePanes off) leaves the clip view wherever each
+    // resize put it.
+    [self performSelector:@selector(scrollCanvasToTop) withObject:nil afterDelay:0];
+  }
+}
+
+- (void)scrollCanvasToTop {
+  [[_canvasScroll documentView] scrollPoint:NSZeroPoint];
 }
 
 + (NSString *)openingNotesForReport:(RDLReport *)report {
