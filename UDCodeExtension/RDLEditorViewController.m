@@ -106,6 +106,31 @@ static NSImage *RDLInspectorImage(NSString *title) {
 @property (nonatomic, readwrite, copy) NSString *problem;
 @end
 
+// The designer's undo: none, the text's being the undo. Emptying an undo
+// manager turns its registration back on (-removeAllActions, AppKit's and
+// GNUstep's both), and the designer empties it on every read, the extension
+// after every write: this one stays off.
+@interface RDLNoUndoManager : NSUndoManager
+@end
+
+@implementation RDLNoUndoManager
+
+- (instancetype)init {
+  if ((self = [super init])) {
+    [self setGroupsByEvent:NO];
+    [self disableUndoRegistration];
+  }
+  return self;
+}
+
+- (void)removeAllActions {
+  [super removeAllActions];
+  if ([self isUndoRegistrationEnabled])
+    [self disableUndoRegistration];
+}
+
+@end
+
 @implementation RDLEditorViewController {
   __weak id<UDWorkbench> _workbench;
   // The designer's undo, which records nothing: the text's is the undo.
@@ -155,9 +180,7 @@ static NSImage *RDLInspectorImage(NSString *title) {
 // The designer, hosted, for the first text that is a report, recording no
 // undo of its own.
 - (RDLReportDesigner *)makeDesigner {
-  _designerUndo = [[NSUndoManager alloc] init];
-  [_designerUndo setGroupsByEvent:NO];
-  [_designerUndo disableUndoRegistration];
+  _designerUndo = [[RDLNoUndoManager alloc] init];
   RDLReportDesigner *designer = [[RDLReportDesigner alloc] initWithReport:nil
                                                               undoManager:_designerUndo];
   designer.delegate = self;
