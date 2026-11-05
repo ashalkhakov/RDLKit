@@ -158,10 +158,13 @@
   XCTAssertEqual([self textboxesIn:[_tab.designer RDLString]], (NSUInteger)4);
 }
 
-// After a change is written, the designer still records no undo: the next
-// action is the text's next edit, and the designer has nothing to undo.
-- (void)testTheDesignerRecordsNoUndoAfterAWrite {
+// After the report is read and after a change is written (each empties the
+// designer's undo), the designer still records no undo: each action is the
+// text's next edit, and the designer has nothing to undo.
+- (void)testTheDesignerRecordsNoUndoAfterAReadOrAWrite {
   [self openText:[self stockReport]];
+  XCTAssertFalse([_tab.designer.undoManager isUndoRegistrationEnabled],
+                 @"the designer's read, which empties its undo, must not turn its recording on");
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
   [self spin:0.05];
