@@ -243,8 +243,12 @@ static NSImage *RDLInspectorImage(NSString *title) {
   [model applyEdits:edits];
   _writing = NO;
   // The designer opens a group for each action even with nothing recorded:
-  // kept empty, it never says it has something to undo.
+  // kept empty, it never says it has something to undo. Emptying it turns
+  // registration back on (AppKit's and GNUstep's -removeAllActions both do),
+  // so it is turned off again: the designer goes on recording nothing.
   [_designerUndo removeAllActions];
+  if ([_designerUndo isUndoRegistrationEnabled])
+    [_designerUndo disableUndoRegistration];
   [self scheduleIssues];
 }
 

@@ -158,6 +158,24 @@
   XCTAssertEqual([self textboxesIn:[_tab.designer RDLString]], (NSUInteger)4);
 }
 
+// After a change is written, the designer still records no undo: the next
+// action is the text's next edit, and the designer has nothing to undo.
+- (void)testTheDesignerRecordsNoUndoAfterAWrite {
+  [self openText:[self stockReport]];
+  XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
+  XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
+  [self spin:0.05];
+  XCTAssertEqual(_edits, (NSUInteger)1);
+  XCTAssertFalse([_tab.designer.undoManager isUndoRegistrationEnabled],
+                 @"emptying the designer's undo must not turn its recording on");
+  XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
+  XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
+  [self spin:0.05];
+  XCTAssertEqual(_edits, (NSUInteger)2, @"the second action, the second edit");
+  XCTAssertEqual([self textboxesIn:[_document.textModel getValue]], (NSUInteger)5);
+  XCTAssertFalse([_tab.designer.undoManager canUndo], @"the designer records no undo of its own");
+}
+
 // The edit is the lines that differ, not the whole text.
 - (void)testTheEditIsTheLinesThatChanged {
   [self openText:[self stockReport]];
