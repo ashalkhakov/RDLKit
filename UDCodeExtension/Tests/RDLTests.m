@@ -89,6 +89,16 @@
   [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:seconds]];
 }
 
+// The run loop turned until `condition` holds, for five seconds at most: the
+// text is written on the turn after a change, and the report read again after
+// an undo, which a loaded machine takes its time over. Whatever the condition
+// says when the time is up, the test asserts.
+- (void)waitFor:(BOOL (^)(void))condition {
+  NSDate *until = [NSDate dateWithTimeIntervalSinceNow:5];
+  while (!condition() && [until timeIntervalSinceNow] > 0)
+    [self spin:0.02];
+}
+
 - (NSUInteger)textboxesIn:(NSString *)text {
   return [[text componentsSeparatedByString:@"<Textbox "] count] - 1;
 }
@@ -134,7 +144,7 @@
   [self openText:text];
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
-  [self spin:0.05];
+  [self waitFor:^BOOL { return self->_edits >= 1; }];
   XCTAssertEqual(_edits, (NSUInteger)1, @"one action, one edit");
   NSString *changed = [_document.textModel getValue];
   XCTAssertEqual([self textboxesIn:changed], (NSUInteger)4);
@@ -148,12 +158,12 @@
   [_tab undo:nil];
   XCTAssertEqualObjects([_document.textModel getValue], text);
   // Read again at once (the tab is in a window): three text boxes.
-  [self spin:0.1];
+  [self waitFor:^BOOL { return [self textboxesIn:[self->_tab.designer RDLString]] == 3; }];
   XCTAssertEqual([self textboxesIn:[_tab.designer RDLString]], (NSUInteger)3);
   XCTAssertEqualObjects([_tab.designer selectedItemName], @"Total", @"still selected");
 
   [_tab redo:nil];
-  [self spin:0.1];
+  [self waitFor:^BOOL { return [self textboxesIn:[self->_tab.designer RDLString]] == 4; }];
   XCTAssertEqualObjects([_document.textModel getValue], changed);
   XCTAssertEqual([self textboxesIn:[_tab.designer RDLString]], (NSUInteger)4);
 }
@@ -167,13 +177,13 @@
                  @"the designer's read, which empties its undo, must not turn its recording on");
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
-  [self spin:0.05];
+  [self waitFor:^BOOL { return self->_edits >= 1; }];
   XCTAssertEqual(_edits, (NSUInteger)1);
   XCTAssertFalse([_tab.designer.undoManager isUndoRegistrationEnabled],
                  @"emptying the designer's undo must not turn its recording on");
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
-  [self spin:0.05];
+  [self waitFor:^BOOL { return self->_edits >= 2; }];
   XCTAssertEqual(_edits, (NSUInteger)2, @"the second action, the second edit");
   XCTAssertEqual([self textboxesIn:[_document.textModel getValue]], (NSUInteger)5);
   XCTAssertFalse([_tab.designer.undoManager canUndo], @"the designer records no undo of its own");
@@ -185,7 +195,7 @@
   // The first change writes the report as RDLKit does; the second is measured.
   XCTAssertTrue([_tab.designer selectItemNamed:@"Title"]);
   XCTAssertTrue([_tab.designer performCommand:NSSelectorFromString(@"duplicate:")]);
-  [self spin:0.05];
+  [self waitFor:^BOOL { return self->_edits >= 1; }];
   NSString *text = [_document.textModel getValue];
   __block UDTextModelContentChange *change = nil;
   id observer = [[NSNotificationCenter defaultCenter]
@@ -197,7 +207,7 @@
               }];
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab.designer performCommand:@selector(delete:)]);
-  [self spin:0.05];
+  [self waitFor:^BOOL { return change != nil; }];
   [[NSNotificationCenter defaultCenter] removeObserver:observer];
   XCTAssertNotNil(change);
   // Whole lines, starting at a line's start: a few of them, not the file.
@@ -244,7 +254,7 @@ static NSString *RDLApplied(NSString *old, NSArray<RDLTextChange *> *changes) {
   UDTextModel *model = _document.textModel;
   UDRange all = [model validateRange:(UDRange){1, 1, NSIntegerMax, NSIntegerMax}];
   [model applyEdits:@[ [[UDTextModelEdit alloc] initWithRange:all text:[self stockReport]] ]];
-  [self spin:0.1];
+  [self waitFor:^BOOL { return self->_tab.problem == nil; }];
   XCTAssertNil(_tab.problem);
   XCTAssertTrue([[_tab valueForKey:@"problemView"] isHidden]);
   XCTAssertNotNil([_tab.designer.report itemNamed:@"Title" inBand:NULL]);
@@ -333,7 +343,9 @@ static NSString *RDLApplied(NSString *old, NSArray<RDLTextChange *> *changes) {
   XCTAssertTrue([_tab.designer selectItemNamed:@"Total"]);
   XCTAssertTrue([_tab respondsToSelector:@selector(delete:)]);
   [_tab performSelector:@selector(delete:) withObject:nil];
-  [self spin:0.05];
+  [self waitFor:^BOOL {
+    return [[self->_document.textModel getValue] rangeOfString:@"Name=\"Total\""].location == NSNotFound;
+  }];
   XCTAssertTrue([[_document.textModel getValue] rangeOfString:@"Name=\"Total\""].location ==
                 NSNotFound);
 }
