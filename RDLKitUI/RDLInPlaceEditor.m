@@ -4,6 +4,7 @@
 #import "RDLEditingContext.h"
 #import "RDLExpressionHelper.h"
 #import "RDLCompatibility.h"
+#import <objc/runtime.h>
 
 @interface RDLInPlaceEditor () <NSTextFieldDelegate>
 @end
@@ -208,7 +209,15 @@
            textView:(NSTextView *)textView
     doCommandBySelector:(SEL)commandSelector {
   RDL_UNUSED(textView);
-  if (control == _editorField && commandSelector == @selector(cancelOperation:)) {
+  // Escape gives the edit up: cancelOperation: on macOS, complete: from
+  // GNUstep's key bindings (on macOS complete: is Option-Esc, the
+  // completions). By name: the key bindings' selectors are not always ==
+  // @selector() on GNUstep.
+  BOOL escape = sel_isEqual(commandSelector, @selector(cancelOperation:));
+#ifdef GNUSTEP
+  escape = escape || sel_isEqual(commandSelector, @selector(complete:));
+#endif
+  if (control == _editorField && escape) {
     _editorCancelled = YES;
     [self tearDownEditor];
     [[_hostView window] makeFirstResponder:_hostView];

@@ -30,6 +30,7 @@
 #import "RDLPageGeometry.h"
 #import "ThirdParty/DMTabBar/DMTabBar.h"
 #import "ThirdParty/DMTabBar/DMTabBarItem.h"
+#import <objc/runtime.h>
 
 // How narrow a side pane may be dragged. Named because two delegate methods
 // have to agree on it.
@@ -1605,23 +1606,23 @@ static NSViewController *RDLTakePage(NSTabViewItem *item, NSString *title) {
 - (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item {
   SEL action = [item action];
   NSMenuItem *menuItem = [(id)item isKindOfClass:[NSMenuItem class]] ? (NSMenuItem *)item : nil;
-  if (action == @selector(toggleGroupsPane:)) {
+  if (sel_isEqual(action, @selector(toggleGroupsPane:))) {
     [menuItem setState:[self groupsPaneIsShowing] ? NSOnState : NSOffState];
     return _embedsGroupsPane;
   }
-  if (action == @selector(toggleGrid:)) {
+  if (sel_isEqual(action, @selector(toggleGrid:))) {
     [menuItem setState:_context.showsGrid ? NSOnState : NSOffState];
     return YES;
   }
-  if (action == @selector(delete:) || action == @selector(removeElement:))
+  if (sel_isEqual(action, @selector(delete:)) || sel_isEqual(action, @selector(removeElement:)))
     return [_context selectedItem] != nil;
-  if (action == @selector(editSubreport:))
+  if (sel_isEqual(action, @selector(editSubreport:)))
     return [[_context selectedItem] isKindOfClass:[RDLSubreport class]];
-  if (action == @selector(addElement:))
+  if (sel_isEqual(action, @selector(addElement:)))
     return [[_context allowedElementKinds] count] > 0;
-  if (action == @selector(zoomIn:))
+  if (sel_isEqual(action, @selector(zoomIn:)))
     return _context.zoom < RDLMaximumZoom - 0.001;
-  if (action == @selector(zoomOut:))
+  if (sel_isEqual(action, @selector(zoomOut:)))
     return _context.zoom > RDLMinimumZoom + 0.001;
   return YES;
 }

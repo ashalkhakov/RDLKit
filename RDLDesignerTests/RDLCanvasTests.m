@@ -28,6 +28,30 @@
 // The samples' rules are rules, not slopes. Every one of them was written
 // 0.02in high -- 1.4 points of drop across 7.5 inches -- which the painter
 // draws as the slope it is, faithfully and wrongly.
+// Edit's items are validated by their actions' names: a XIB's action, made
+// from a name, is not always == the compiler's @selector() on GNUstep.
+- (void)testTheEditItemsAreValidatedByTheirActionsNames {
+  RDLReport *report = [RDLSamples atelierInvoice];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLCanvasView *canvas = [[RDLCanvasView alloc] initWithFrame:NSMakeRect(0, 0, 900, 900)
+                                                       context:ctx];
+  NSMenuItem *(^named)(NSString *) = ^NSMenuItem *(NSString *action) {
+    return [[NSMenuItem alloc] initWithTitle:@"x" action:NSSelectorFromString(action) keyEquivalent:@""];
+  };
+  NSArray<NSString *> *needSelection = @[ @"copy:", @"cut:", @"duplicate:", @"delete:" ];
+  [ctx.selection selectReport];
+  for (NSString *action in needSelection)
+    if ([canvas validateMenuItem:named(action)])
+      XCTFail(@"%@ should be disabled with nothing selected", action);
+  RDLItem *first = report.body.items.firstObject;
+  [ctx.selection selectItems:@[ first ] inBandWithKey:@"body"];
+  for (NSString *action in needSelection)
+    if (![canvas validateMenuItem:named(action)])
+      XCTFail(@"%@ should be enabled with %@ selected", action, first.name);
+  if ([canvas validateMenuItem:named(@"paste:")] != [ctx canPaste])
+    XCTFail(@"%@", @"Paste should be enabled when there is something to paste");
+}
+
 - (void)testNoSampleRulesAreSloped {
   for (NSDictionary *entry in [RDLSamples catalog]) {
     RDLReport *report = [RDLSamples reportWithId:entry[@"id"]];

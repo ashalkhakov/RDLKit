@@ -11,6 +11,7 @@
 #import "RDLVariablesEditor.h"
 #import "RDLCodeEditor.h"
 #import "RDLStylePanel.h"
+#import <objc/runtime.h>
 
 
 
@@ -956,7 +957,7 @@
                                                                 context:ctx];
   inspector.shows = RDLInspectorShowsStyle;
   NSButton *button = [inspector valueForKey:@"cellBordersButton"];
-  if (button == nil || [button action] != @selector(editBorders:)) {
+  if (button == nil || !sel_isEqual([button action], @selector(editBorders:))) {
     XCTFail(@"%@", @"the cell section's Borders… button should be connected to editBorders:");
     return;
   }

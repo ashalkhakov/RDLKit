@@ -6,6 +6,7 @@
 #import "RDLDesignerTestSupport.h"
 #import "RDLInspectorView.h"
 #import "RDLPlainTextEdit.h"
+#import <objc/runtime.h>
 
 // Finds a button by title anywhere under a view. Used instead of running a
 // modal session: what these panels owe us is that they are built and wired,
@@ -163,7 +164,7 @@ static NSString *RDLRunsOf(NSArray<RDLParagraph *> *paragraphs) {
   NSButton *fx = [inspector valueForKey:@"valueExprButton"];
   if (![fx isEnabled])
     XCTFail(@"%@", @"f(x) should be the way in, whatever the text holds");
-  if ([fx action] != @selector(editRichText:))
+  if (!sel_isEqual([fx action], @selector(editRichText:)))
     XCTFail(@"f(x) should open the rich-text editor, it sends %@",
             NSStringFromSelector([fx action]));
 
