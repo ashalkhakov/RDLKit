@@ -7,6 +7,7 @@
 #import "RDLNewReportPanel.h"
 #import "RDLSamples.h"
 #import "RDLUpdater.h"
+#import <objc/runtime.h>
 
 // MainMenu.xib's RDLDesigner > Check for Updates…, removed where there is no
 // updater (RDLUpdater.h).
@@ -260,8 +261,8 @@ static const NSInteger RDLCheckForUpdatesTag = 1001;
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
-  if ([item action] == @selector(checkForUpdates:)) return _updater.canCheckForUpdates;
-  if ([item action] == @selector(toggleGroupsPane:)) {
+  if (sel_isEqual([item action], @selector(checkForUpdates:))) return _updater.canCheckForUpdates;
+  if (sel_isEqual([item action], @selector(toggleGroupsPane:))) {
     for (NSWindowController *wc in [[self currentDocument] windowControllers])
       if ([wc isKindOfClass:[RDLDesignerWindow class]]) {
         [item setState:[(RDLDesignerWindow *)wc groupsPaneIsShowing] ? NSOnState : NSOffState];
@@ -273,7 +274,7 @@ static const NSInteger RDLCheckForUpdatesTag = 1001;
   // The grid is a thing that is either on or off, so its item says which, the
   // way a Mac menu does. Without the tick the only way to know was to look at
   // the canvas and guess.
-  if ([item action] == @selector(toggleGrid:)) {
+  if (sel_isEqual([item action], @selector(toggleGrid:))) {
     RDLEditingContext *ctx = [self currentContext];
     [item setState:ctx.showsGrid ? NSOnState : NSOffState];
     return ctx != nil;

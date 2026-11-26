@@ -4925,6 +4925,43 @@ static NSPoint RDLCanvasPointOfCell(RDLTablix *tablix, NSRect itemRect, NSUInteg
   }
 }
 
+// Escape gives an in-place edit up, as the key bindings send it: a command
+// made from its name, not always == @selector() on GNUstep, and there
+// complete:.
+- (void)testEscapeGivesAnInPlaceEditUp {
+  RDLReport *report = [RDLSamples regionalSales];
+  RDLEditingContext *ctx = [[RDLEditingContext alloc] initWithReport:report];
+  RDLDesignerWindow *wc = [[RDLDesignerWindow alloc] initWithContext:ctx];
+  RDLCanvasView *canvas = [wc valueForKey:@"canvas"];
+  RDLItem *corner = [RDLTablixGeometry itemOf:RDLFirstTablixOf(report) inRow:0 column:0];
+  if (![corner isKindOfClass:[RDLTextbox class]]) {
+    XCTFail(@"%@", @"the matrix should have a text box in its corner");
+    return;
+  }
+  NSString *was = [(RDLTextbox *)corner value];
+#ifdef GNUSTEP
+  NSArray<NSString *> *escapes = @[ @"cancelOperation:", @"complete:" ];
+#else
+  NSArray<NSString *> *escapes = @[ @"cancelOperation:" ];
+#endif
+  RDLInPlaceEditor *editor = [canvas valueForKey:@"inPlaceEditor"];
+  for (NSString *escape in escapes) {
+    [editor beginEditingItem:corner];
+    if (!editor.isEditing) {
+      XCTFail(@"%@", @"the corner's text box should be edited");
+      return;
+    }
+    NSTextField *field = [editor valueForKey:@"editorField"];
+    [field setStringValue:@"Typed, then given up"];
+    BOOL taken = [(id<NSTextFieldDelegate>)editor control:field textView:nil
+                                       doCommandBySelector:NSSelectorFromString(escape)];
+    if (!taken || editor.isEditing)
+      XCTFail(@"%@ should end the edit", escape);
+    if (![[(RDLTextbox *)corner value] isEqualToString:was])
+      XCTFail(@"%@ should leave the text box as it was, not %@", escape, [(RDLTextbox *)corner value]);
+  }
+}
+
 // The corner's text box is typed into like a body cell's, and Tab goes on
 // from it to the body's first, and back.
 - (void)testTheCornerIsTypedIntoInPlace {

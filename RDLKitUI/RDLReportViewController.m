@@ -6,6 +6,7 @@
 #import "RDLParameterPrompts.h"
 #import "RDLPane.h"
 #import "RDLKit.h"
+#import <objc/runtime.h>
 
 // The bar's height, the parameter bar's most before it scrolls, and the
 // status line's.
@@ -572,21 +573,21 @@ static NSString *RDLViewerText(id value) {
 - (BOOL)validateUserInterfaceItem:(id<NSValidatedUserInterfaceItem>)item {
   SEL action = [item action];
   NSUInteger count = [self pageCount];
-  if (action == @selector(goToFirstPage:) || action == @selector(goToPreviousPage:))
+  if (sel_isEqual(action, @selector(goToFirstPage:)) || sel_isEqual(action, @selector(goToPreviousPage:)))
     return count > 0 && [self pageIndex] > 0;
-  if (action == @selector(goToNextPage:) || action == @selector(goToLastPage:))
+  if (sel_isEqual(action, @selector(goToNextPage:)) || sel_isEqual(action, @selector(goToLastPage:)))
     return count > 0 && [self pageIndex] + 1 < count;
-  if (action == @selector(zoomIn:))
+  if (sel_isEqual(action, @selector(zoomIn:)))
     return _zoom < [[RDLViewerZoomStops() lastObject] doubleValue] - 0.001;
-  if (action == @selector(zoomOut:))
+  if (sel_isEqual(action, @selector(zoomOut:)))
     return _zoom > [[RDLViewerZoomStops() firstObject] doubleValue] + 0.001;
-  if (action == @selector(toggleParameters:)) {
+  if (sel_isEqual(action, @selector(toggleParameters:))) {
     if ([(id)item isKindOfClass:[NSMenuItem class]])
       [(NSMenuItem *)item setState:_showsParameters ? NSOnState : NSOffState];
     return [_prompts askedCount] > 0;
   }
-  if (action == @selector(exportPDF:) || action == @selector(exportHTML:) ||
-      action == @selector(printReport:))
+  if (sel_isEqual(action, @selector(exportPDF:)) || sel_isEqual(action, @selector(exportHTML:)) ||
+      sel_isEqual(action, @selector(printReport:)))
     return count > 0;
   return YES;
 }

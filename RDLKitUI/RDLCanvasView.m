@@ -591,10 +591,10 @@ static RDLDistributeAxis RDLDistributeAxisForAction(SEL action) {
 
 - (BOOL)validateMenuItem:(NSMenuItem *)item {
   SEL a = [item action];
-  if (a == @selector(copy:) || a == @selector(cut:) || a == @selector(duplicate:) ||
-      a == @selector(delete:))
+  if (sel_isEqual(a, @selector(copy:)) || sel_isEqual(a, @selector(cut:)) || sel_isEqual(a, @selector(duplicate:)) ||
+      sel_isEqual(a, @selector(delete:)))
     return [_context selectedItem] != nil;
-  if (a == @selector(paste:))
+  if (sel_isEqual(a, @selector(paste:)))
     return [_context canPaste];
   RDLStackingMove move = RDLStackingMoveForAction(a);
   if (move != RDLStackingMoveUnspecified)
